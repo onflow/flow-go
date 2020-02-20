@@ -288,8 +288,12 @@ type ArgumentCountError struct {
 }
 
 func (e *ArgumentCountError) Error() string {
+	return "incorrect number of arguments"
+}
+
+func (e *ArgumentCountError) SecondaryError() string {
 	return fmt.Sprintf(
-		"incorrect number of arguments: expected %d, got %d",
+		"expected %d, got %d",
 		e.ParameterCount,
 		e.ArgumentCount,
 	)
@@ -324,12 +328,16 @@ type IncorrectArgumentLabelError struct {
 }
 
 func (e *IncorrectArgumentLabelError) Error() string {
+	return "incorrect argument label"
+}
+
+func (e *IncorrectArgumentLabelError) SecondaryError() string {
 	expected := "none"
 	if e.ExpectedArgumentLabel != "" {
 		expected = e.ExpectedArgumentLabel
 	}
 	return fmt.Sprintf(
-		"incorrect argument label: expected `%s`, got `%s`",
+		"expected `%s`, got `%s`",
 		expected,
 		e.ActualArgumentLabel,
 	)
@@ -348,8 +356,14 @@ type InvalidUnaryOperandError struct {
 
 func (e *InvalidUnaryOperandError) Error() string {
 	return fmt.Sprintf(
-		"cannot apply unary operation %s to type: expected `%s`, got `%s`",
+		"cannot apply unary operation %s to type",
 		e.Operation.Symbol(),
+	)
+}
+
+func (e *InvalidUnaryOperandError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected `%s`, got `%s`",
 		e.ExpectedType,
 		e.ActualType,
 	)
@@ -369,9 +383,15 @@ type InvalidBinaryOperandError struct {
 
 func (e *InvalidBinaryOperandError) Error() string {
 	return fmt.Sprintf(
-		"cannot apply binary operation %s to %s-hand type: expected `%s`, got `%s`",
+		"cannot apply binary operation %s to %s-hand type",
 		e.Operation.Symbol(),
 		e.Side.Name(),
+	)
+}
+
+func (e *InvalidBinaryOperandError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected `%s`, got `%s`",
 		e.ExpectedType,
 		e.ActualType,
 	)
@@ -956,8 +976,12 @@ type InvalidIntegerLiteralRangeError struct {
 }
 
 func (e *InvalidIntegerLiteralRangeError) Error() string {
+	return "integer literal out of range"
+}
+
+func (e *InvalidIntegerLiteralRangeError) SecondaryError() string {
 	return fmt.Sprintf(
-		"integer literal out of range: expected `%s`, in range [%s, %s]",
+		"expected `%s`, in range [%s, %s]",
 		e.ExpectedType,
 		e.ExpectedMinInt,
 		e.ExpectedMaxInt,
@@ -990,8 +1014,12 @@ type InvalidFixedPointLiteralRangeError struct {
 }
 
 func (e *InvalidFixedPointLiteralRangeError) Error() string {
+	return "fixed-point literal out of range"
+}
+
+func (e *InvalidFixedPointLiteralRangeError) SecondaryError() string {
 	return fmt.Sprintf(
-		"fixed-point literal out of range: expected `%s`, in range [%s.%s, %s.%s]",
+		"expected `%s`, in range [%s.%s, %s.%s]",
 		e.ExpectedType,
 		e.ExpectedMinInt,
 		e.ExpectedMinFractional,
@@ -1011,8 +1039,12 @@ type InvalidFixedPointLiteralScaleError struct {
 }
 
 func (e *InvalidFixedPointLiteralScaleError) Error() string {
+	return "fixed-point literal scale out of range"
+}
+
+func (e *InvalidFixedPointLiteralScaleError) SecondaryError() string {
 	return fmt.Sprintf(
-		"fixed-point literal scale out of range: expected `%s`, with maximum scale %d",
+		"expected `%s`, with maximum scale %d",
 		e.ExpectedType,
 		e.ExpectedScale,
 	)
@@ -1105,6 +1137,26 @@ func (e *InvalidResourceAnnotationError) EndPosition() ast.Position {
 	return e.Pos.Shifted(len(common.CompositeKindResource.Annotation()) - 1)
 }
 
+// InvalidResourceAnnotationError
+
+type InvalidResourceInterfaceTypeError struct {
+	ResourceInterfaceType *InterfaceType
+	ast.Range
+}
+
+func (e *InvalidResourceInterfaceTypeError) Error() string {
+	return "invalid resource interface type"
+}
+
+func (e *InvalidResourceInterfaceTypeError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected `AnyResource{%[1]s}`, got `%[1]s`",
+		e.ResourceInterfaceType.String(),
+	)
+}
+
+func (*InvalidResourceInterfaceTypeError) isSemanticError() {}
+
 // IncorrectTransferOperationError
 
 type IncorrectTransferOperationError struct {
@@ -1114,8 +1166,12 @@ type IncorrectTransferOperationError struct {
 }
 
 func (e *IncorrectTransferOperationError) Error() string {
+	return "incorrect transfer operation"
+}
+
+func (e *IncorrectTransferOperationError) SecondaryError() string {
 	return fmt.Sprintf(
-		"incorrect transfer operation: expected `%s`",
+		"expected `%s`",
 		e.ExpectedOperation.Operator(),
 	)
 }
@@ -1306,7 +1362,11 @@ type MissingCreateError struct {
 }
 
 func (e *MissingCreateError) Error() string {
-	return "cannot create resource: expected `create`"
+	return "cannot create resource"
+}
+
+func (e *MissingCreateError) SecondaryError() string {
+	return "expected `create`"
 }
 
 func (*MissingCreateError) isSemanticError() {}
@@ -1338,7 +1398,11 @@ type InvalidMoveOperationError struct {
 }
 
 func (e *InvalidMoveOperationError) Error() string {
-	return "invalid move operation for non-resource: unexpected `<-`"
+	return "invalid move operation for non-resource"
+}
+
+func (e *InvalidMoveOperationError) SecondaryError() string {
+	return "unexpected `<-`"
 }
 
 func (*InvalidMoveOperationError) isSemanticError() {}
@@ -1394,7 +1458,11 @@ type InvalidTypeIndexingError struct {
 }
 
 func (e *InvalidTypeIndexingError) Error() string {
-	return "invalid index: expected type"
+	return "invalid index"
+}
+
+func (e *InvalidTypeIndexingError) SecondaryError() string {
+	return "expected type"
 }
 
 func (*InvalidTypeIndexingError) isSemanticError() {}
@@ -1406,7 +1474,11 @@ type InvalidIndexingError struct {
 }
 
 func (e *InvalidIndexingError) Error() string {
-	return "invalid index: expected expression"
+	return "invalid index"
+}
+
+func (e *InvalidIndexingError) SecondaryError() string {
+	return "expected expression"
 }
 
 func (*InvalidIndexingError) isSemanticError() {}
@@ -1420,9 +1492,13 @@ type InvalidSwapExpressionError struct {
 
 func (e *InvalidSwapExpressionError) Error() string {
 	return fmt.Sprintf(
-		"invalid %s-hand side of swap: expected target expression",
+		"invalid %s-hand side of swap",
 		e.Side.Name(),
 	)
+}
+
+func (e *InvalidSwapExpressionError) SecondaryError() string {
+	return "expected target expression"
 }
 
 func (*InvalidSwapExpressionError) isSemanticError() {}
@@ -1687,8 +1763,12 @@ type NonResourceReferenceTypeError struct {
 }
 
 func (e *NonResourceReferenceTypeError) Error() string {
+	return "invalid reference type"
+}
+
+func (e *NonResourceReferenceTypeError) SecondaryError() string {
 	return fmt.Sprintf(
-		"invalid reference type: expected resource type, got `%s`",
+		"expected resource type, got `%s`",
 		e.ActualType,
 	)
 }
@@ -1703,8 +1783,12 @@ type NonReferenceTypeReferenceError struct {
 }
 
 func (e *NonReferenceTypeReferenceError) Error() string {
+	return "cannot create reference"
+}
+
+func (e *NonReferenceTypeReferenceError) SecondaryError() string {
 	return fmt.Sprintf(
-		"cannot create reference: expected reference type, got `%s`",
+		"expected reference type, got `%s`",
 		e.ActualType,
 	)
 }
@@ -1719,8 +1803,12 @@ type NonResourceTypeReferenceError struct {
 }
 
 func (e *NonResourceTypeReferenceError) Error() string {
+	return "cannot create reference"
+}
+
+func (e *NonResourceTypeReferenceError) SecondaryError() string {
 	return fmt.Sprintf(
-		"cannot create reference: expected resource type, got `%s`",
+		"expected resource type, got `%s`",
 		e.ActualType,
 	)
 }
@@ -1776,6 +1864,10 @@ type NonResourceTypeError struct {
 }
 
 func (e *NonResourceTypeError) Error() string {
+	return "invalid type"
+}
+
+func (e *NonResourceTypeError) SecondaryError() string {
 	return fmt.Sprintf(
 		"expected resource type, got `%s`",
 		e.ActualType,
@@ -1915,8 +2007,11 @@ type InvalidCharacterLiteralError struct {
 }
 
 func (e *InvalidCharacterLiteralError) Error() string {
-	return fmt.Sprintf(
-		"character literal has invalid length: expected 1, got %d",
+	return "character literal has invalid length"
+}
+
+func (e *InvalidCharacterLiteralError) SecondaryError() string {
+	return fmt.Sprintf("expected 1, got %d",
 		e.Length,
 	)
 }
@@ -1955,8 +2050,12 @@ type InvalidTransactionBlockError struct {
 }
 
 func (e *InvalidTransactionBlockError) Error() string {
+	return "invalid transaction block"
+}
+
+func (e *InvalidTransactionBlockError) SecondaryError() string {
 	return fmt.Sprintf(
-		"invalid transaction block: expected `prepare` or `execute`, got `%s`",
+		"expected `prepare` or `execute`, got `%s`",
 		e.Name,
 	)
 }
@@ -2184,8 +2283,12 @@ type ConstantSizedArrayLiteralSizeError struct {
 }
 
 func (e *ConstantSizedArrayLiteralSizeError) Error() string {
+	return "incorrect number of array literal elements"
+}
+
+func (e *ConstantSizedArrayLiteralSizeError) SecondaryError() string {
 	return fmt.Sprintf(
-		"incorrect number of array literal elements: expected %d, got %d",
+		"expected %d, got %d",
 		e.ExpectedSize,
 		e.ActualSize,
 	)

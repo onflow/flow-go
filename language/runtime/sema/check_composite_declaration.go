@@ -1000,7 +1000,7 @@ func (checker *Checker) nonEventMembersAndOrigins(
 
 		fieldTypeAnnotation := checker.ConvertTypeAnnotation(field.TypeAnnotation)
 
-		checker.checkTypeAnnotation(fieldTypeAnnotation, field.TypeAnnotation.StartPos)
+		checker.checkTypeAnnotation(fieldTypeAnnotation, field.TypeAnnotation)
 
 		members[identifier] = &Member{
 			ContainerType:   containerType,
@@ -1197,7 +1197,7 @@ func (checker *Checker) checkSpecialFunction(
 
 	checker.checkFunction(
 		specialFunction.ParameterList,
-		ast.Position{},
+		nil,
 		functionType,
 		specialFunction.FunctionBlock,
 		true,
