@@ -2,11 +2,13 @@ package hotstuff
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/model/hotstuff"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
@@ -56,9 +58,23 @@ func (el *EventLoop) processEvent() error {
 	// to block honest nodes' pacemaker from progressing by sending
 	// other events.
 	timeoutChannel := el.eventHandler.TimeoutChannel()
+
+	idleStart := time.Now()
+
 	var err error
 	select {
-	case <-timeoutChannel:
+	case t := <-timeoutChannel:
+		// measure how long it takes for a timeout event to go through
+		// eventloop and get handled
+		busyDuration := time.Now().Sub(t)
+		el.log.Debug().Dur("busy_duration", busyDuration).
+			Msg("busy duration to handle local timeout")
+
+		// meansure how long the event loop was idle waiting for an
+		// incoming event
+		idleDuration := time.Now().Sub(idleStart)
+		el.log.Debug().Dur("idle_duration", idleDuration)
+
 		err = el.eventHandler.OnLocalTimeout()
 	default:
 	}
@@ -69,11 +85,24 @@ func (el *EventLoop) processEvent() error {
 
 	// select for block headers/votes here
 	select {
-	case <-timeoutChannel:
+	case t := <-timeoutChannel:
+		busyDuration := time.Now().Sub(t)
+		el.log.Debug().Dur("busy_duration", busyDuration).
+			Msg("busy duration to handle local timeout")
+
+		idleDuration := time.Now().Sub(idleStart)
+		el.log.Debug().Dur("idle_duration", idleDuration)
+
 		err = el.eventHandler.OnLocalTimeout()
 	case p := <-el.proposals:
+		idleDuration := time.Now().Sub(idleStart)
+		el.log.Debug().Dur("idle_duration", idleDuration)
+
 		err = el.eventHandler.OnReceiveProposal(p)
 	case v := <-el.votes:
+		idleDuration := time.Now().Sub(idleStart)
+		el.log.Debug().Dur("idle_duration", idleDuration)
+
 		err = el.eventHandler.OnReceiveVote(v)
 	}
 	return err
@@ -81,12 +110,32 @@ func (el *EventLoop) processEvent() error {
 
 // OnReceiveProposal pushes the received block to the blockheader channel
 func (el *EventLoop) OnReceiveProposal(proposal *hotstuff.Proposal) {
+	received := time.Now()
+
 	el.proposals <- proposal
+
+	// the busy duration is measured as how long it takes from a block being
+	// received to a block being handled by the event handler.
+	busyDuration := time.Now().Sub(received)
+	el.log.Debug().Hex("block_ID", logging.ID(proposal.Block.BlockID)).
+		Uint64("view", proposal.Block.View).
+		Dur("busy_duration", busyDuration).
+		Msg("busy duration to handle a proposal")
 }
 
 // OnReceiveVote pushes the received vote to the votes channel
 func (el *EventLoop) OnReceiveVote(vote *hotstuff.Vote) {
+	received := time.Now()
+
 	el.votes <- vote
+
+	// the busy duration is measured as how long it takes from a vote being
+	// received to a vote being handled by the event handler.
+	busyDuration := time.Now().Sub(received)
+	el.log.Debug().Hex("vote_id", logging.ID(vote.BlockID)).
+		Uint64("view", vote.View).
+		Dur("busy_duration", busyDuration).
+		Msg("busy duration to handle a vote")
 }
 
 // Start will start the event handler then enter the loop
