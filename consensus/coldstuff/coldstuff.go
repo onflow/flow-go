@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff/round"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -28,6 +28,7 @@ type coldStuff struct {
 	comms     Communicator
 	builder   module.Builder
 	finalizer module.Finalizer
+	unit      *engine.Unit
 
 	// round config
 	interval time.Duration
@@ -37,9 +38,6 @@ type coldStuff struct {
 	proposals chan *flow.Header
 	votes     chan *model.Vote
 	commits   chan *model.Commit
-
-	// stops the consent loop
-	done chan struct{}
 }
 
 func New(
@@ -56,9 +54,10 @@ func New(
 		log:       log,
 		me:        me,
 		state:     state,
+		comms:     comms,
 		builder:   builder,
 		finalizer: finalizer,
-		comms:     comms,
+		unit:      engine.NewUnit(),
 		interval:  interval,
 		timeout:   timeout,
 		proposals: make(chan *flow.Header, 1),
@@ -66,32 +65,21 @@ func New(
 		commits:   make(chan *model.Commit, 1),
 	}
 
-	// TODO incorporate this later
-	_ = cold.finalizer
-
 	return &cold, nil
 }
 
-func (e *coldStuff) Start() (exit func(), done <-chan struct{}) {
-	e.done = make(chan struct{})
-	done = e.done
-
-	var once sync.Once
-	exit = func() {
-		once.Do(func() {
-			close(e.done)
-		})
-	}
-
-	go func() {
+func (e *coldStuff) Ready() <-chan struct{} {
+	e.unit.Launch(func() {
 		err := e.loop()
 		if err != nil {
 			e.log.Error().Err(err).Msg("coldstuff loop exited with error")
 		}
-		exit()
-	}()
+	})
+	return e.unit.Ready()
+}
 
-	return
+func (e *coldStuff) Done() <-chan struct{} {
+	return e.unit.Done()
 }
 
 func (e *coldStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
@@ -134,7 +122,7 @@ ConsentLoop:
 		limit := e.round.Parent().Timestamp.Add(e.interval)
 
 		select {
-		case <-e.done:
+		case <-e.unit.Quit():
 			return nil
 		case <-time.After(time.Until(limit)):
 			if e.round.Leader().NodeID == localID {

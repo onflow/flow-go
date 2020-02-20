@@ -37,9 +37,6 @@ type Engine struct {
 	cache    map[flow.Identifier][]cacheItem
 
 	coldstuff module.ColdStuff
-	// TODO this is pretty awkward, should change the interface
-	stopColdStuff func()
-	coldStuffDone <-chan struct{}
 }
 
 type cacheItem struct {
@@ -91,7 +88,7 @@ func New(
 // started. For the consensus, we consider it ready right away.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
-		e.stopColdStuff, e.coldStuffDone = e.coldstuff.Start()
+		<-e.coldstuff.Ready()
 	})
 }
 
@@ -99,8 +96,7 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		e.stopColdStuff()
-		<-e.coldStuffDone
+		<-e.coldstuff.Done()
 	})
 }
 
