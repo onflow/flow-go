@@ -153,20 +153,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		payloadHash := payload.Hash()
 
 		// index the guarantees for the payload
-		for _, guarantee := range guarantees {
+		for i, guarantee := range guarantees {
 			err = operation.InsertGuarantee(guarantee)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert guarantee (%x): %w", guarantee.ID(), err)
 			}
-			err = operation.IndexGuarantee(payloadHash, guarantee.ID())(tx)
+			err = operation.IndexGuarantee(payloadHash, uint64(i), guarantee.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.ID(), err)
 			}
 		}
 
 		// index the seals for the payload
-		for _, seal := range seals {
-			err = operation.IndexSeal(payloadHash, seal.ID())(tx)
+		for i, seal := range seals {
+			err = operation.IndexSeal(payloadHash, uint64(i), seal.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index seal (%x): %w", seal.ID(), err)
 			}

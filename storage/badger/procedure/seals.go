@@ -39,7 +39,6 @@ func RetrieveSeals(payloadHash flow.Identifier, seals *[]*flow.Seal) func(*badge
 	// make sure we have a zero value
 	//*seals = make([]*flow.Seal, 0)
 
-
 	return func(tx *badger.Txn) error {
 
 		var retrievedSeals []*flow.Seal

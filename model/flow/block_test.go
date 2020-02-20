@@ -40,7 +40,3 @@ func Test_OrderingChangesHash(t *testing.T) {
 
 	assert.NotEqual(t, payload1.Hash(), payload2.Hash())
 }
-
-
-
-
