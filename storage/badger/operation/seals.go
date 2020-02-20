@@ -18,8 +18,10 @@ func RetrieveSeal(sealID flow.Identifier, seal *flow.Seal) func(*badger.Txn) err
 	return retrieve(makePrefix(codeSeal, sealID), seal)
 }
 
-func IndexSeal(payloadHash flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexSeal, payloadHash, sealID), sealID)
+func IndexSeal(payloadHash flow.Identifier, index uint64, sealID flow.Identifier) func(*badger.Txn) error {
+	//BadgerDB iterates the keys in order - https://github.com/dgraph-io/badger/blob/master/iterator.go#L710
+	//Hence adding index at the end should make us retrieve them in order
+	return insert(makePrefix(codeIndexSeal, payloadHash, index), sealID)
 }
 
 func LookupSeals(payloadHash flow.Identifier, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
