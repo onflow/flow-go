@@ -71,23 +71,6 @@ func TestBootStrapValid(t *testing.T) {
 	})
 }
 
-func TestPayloadHashChange(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-
-		payload := unittest.BlockFixture().Payload
-
-		err := db.Update(procedure.InsertPayload(&payload))
-		require.NoError(t, err)
-
-		var retrievedPayload flow.Payload
-		err = db.View(procedure.RetrievePayload(payload.Hash(), &retrievedPayload))
-		require.NoError(t, err)
-
-		require.Equal(t, payload, retrievedPayload)
-		require.Equal(t, payload.Hash(), retrievedPayload.Hash())
-	})
-}
-
 func TestExtendSealedBoundary(t *testing.T) {
 	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 

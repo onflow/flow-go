@@ -18,8 +18,10 @@ func RetrieveGuarantee(collID flow.Identifier, guarantee *flow.CollectionGuarant
 	return retrieve(makePrefix(codeGuarantee, collID), guarantee)
 }
 
-func IndexGuarantee(payloadHash flow.Identifier, guaranteeID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexGuarantee, payloadHash, guaranteeID), guaranteeID)
+func IndexGuarantee(payloadHash flow.Identifier, index uint64, guaranteeID flow.Identifier) func(*badger.Txn) error {
+	//BadgerDB iterates the keys in order - https://github.com/dgraph-io/badger/blob/master/iterator.go#L710
+	//Hence adding index at the end should make us retrieve them in order
+	return insert(makePrefix(codeIndexGuarantee, payloadHash, index), guaranteeID)
 }
 
 func LookupGuarantees(payloadHash flow.Identifier, collIDs *[]flow.Identifier) func(*badger.Txn) error {
