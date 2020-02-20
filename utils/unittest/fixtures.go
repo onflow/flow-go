@@ -42,6 +42,15 @@ func BlockHeaderFixture() flow.Header {
 	}
 }
 
+func SealFixture() flow.Seal {
+	return flow.Seal{
+		BlockID:       IdentifierFixture(),
+		PreviousState: StateCommitmentFixture(),
+		FinalState:    StateCommitmentFixture(),
+		Signature:     SignatureFixture(),
+	}
+}
+
 // ClusterBlockWithParent creates a new cluster consensus block that is valid
 // with respect to the given parent block.
 func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
