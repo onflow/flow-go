@@ -184,6 +184,8 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 // StopNodes stop all nodes in the input slice
 func (psts *PubSubTestSuite) StopNodes(nodes []*P2PNode) {
 	for _, n := range nodes {
-		assert.NoError(psts.Suite.T(), n.Stop())
+		done, err := n.Stop()
+		assert.NoError(psts.Suite.T(), err)
+		<-done
 	}
 }

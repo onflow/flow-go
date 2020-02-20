@@ -57,6 +57,10 @@ func TestBootStrapValid(t *testing.T) {
 		err = db.View(operation.RetrieveHeader(genesis.ID(), &storedHeader))
 		require.Nil(t, err)
 
+		var storedCommit flow.StateCommitment
+		err = db.View(operation.LookupCommit(blockID, &storedCommit))
+		require.Nil(t, err)
+
 		assert.Zero(t, boundary)
 		assert.Equal(t, genesis.ID(), storedID)
 		assert.Equal(t, genesis.Header, storedHeader)

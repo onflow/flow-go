@@ -32,7 +32,6 @@ type BaseConfig struct {
 	NodeName    string
 	Entries     []string
 	Timeout     time.Duration
-	Connections uint
 	datadir     string
 	level       string
 	metricsPort uint
@@ -82,7 +81,6 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e", []string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
-	fnb.flags.UintVarP(&fnb.BaseConfig.Connections, "connections", "c", 0, "number of connections to establish to peers")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
@@ -95,10 +93,10 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		codec := json.NewCodec()
 
-		mw, err := libp2p.NewMiddleware(fnb.Logger, codec, fnb.Me.Address(), fnb.Me.NodeID())
+		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID())
 		fnb.MustNot(err).Msg("could not initialize flow middleware")
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw, 10e6)
+		net, err := libp2p.NewNetwork(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.State, fnb.Me, mw, 10e6)
 		fnb.MustNot(err).Msg("could not initialize flow network")
 		fnb.Network = net
 		return net
