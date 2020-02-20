@@ -1,15 +1,15 @@
 package finalizer
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // BlockContainer wraps a block to implement forest.Vertex
 // In addition, it holds some additional properties for efficient processing of blocks
 // by the Finalizer
 type BlockContainer struct {
-	Block *types.Block
+	Block *hotstuff.Block
 }
 
 // functions implementing forest.vertex

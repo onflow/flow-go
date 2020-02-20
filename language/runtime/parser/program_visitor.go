@@ -716,43 +716,42 @@ func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interfa
 }
 
 func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
-	return v.VisitChildren(ctx.BaseParserRuleContext)
-}
 
-func (v *ProgramVisitor) VisitReferenceType(ctx *ReferenceTypeContext) interface{} {
+	// First, parse the inner type.
+	// Second, parse as a reference.
+	// Finally, parse as optional.
 
-	// A type line `&R` is parsed as `ReferenceType{NominalType{}}`.
-	// A type like `&R{I}` is parsed as `ReferenceType{RestrictedType{NominalType{}}}`.
-	// A type like `&{I}` is parsed as `ReferenceType{RestrictedType{}}`.
-
-	authorized := ctx.Auth() != nil
-
-	storable := ctx.Storable() != nil
+	// For example:
+	//  - `T` = `NominalType{}`
+	//  - `R{I}` = `RestrictedType{NominalType{}}`
+	//  - `R{I}?` = `OptionalType{RestrictedType{NominalType{}}}`
+	//  - `{I}` = `RestrictedType{NominalType{}}`
+	//  - `&R` = `ReferenceType{NominalType{}}`
+	//  - `&R{I}` = `ReferenceType{RestrictedType{NominalType{}}}`
+	//  - `&{I}` = `ReferenceType{RestrictedType{}}`
+	//  - `T?` = `OptionalType{NominalType{}}`
+	//  - `&T?` = `OptionalType{ReferenceType{NominalType{}}}`
 
 	result := ctx.InnerType().Accept(v).(ast.Type)
 
 	startPos := PositionFromToken(ctx.GetStart())
 
-	result = &ast.ReferenceType{
-		Authorized: authorized,
-		Storable:   storable,
-		Type:       result,
-		StartPos:   startPos,
+	// Reference?
+
+	if ctx.Ampersand() != nil {
+		authorized := ctx.Auth() != nil
+		storable := ctx.Storable() != nil
+
+		result = &ast.ReferenceType{
+			Authorized: authorized,
+			Storable:   storable,
+			Type:       result,
+			StartPos:   startPos,
+		}
 	}
 
-	return result
-}
+	// Optionals
 
-func (v *ProgramVisitor) VisitNonReferenceType(ctx *NonReferenceTypeContext) interface{} {
-
-	// A type line `R` is parsed as `NominalType{}`.
-	// A type like `R{I}` is parsed as `RestrictedType{NominalType{}}`.
-	// A type like `R{I}?` is parsed as `OptionalType{RestrictedType{NominalType{}}}`.
-	// A type like `{I}` is parsed as `RestrictedType{NominalType{}}`.
-
-	result := ctx.InnerType().Accept(v).(ast.Type)
-
-	// optionals
 	for _, optional := range ctx.optionals {
 		endPos := PositionFromToken(optional)
 		result = &ast.OptionalType{
@@ -1590,48 +1589,74 @@ func (v *ProgramVisitor) VisitLiteral(ctx *LiteralContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
+func (v *ProgramVisitor) parseFixedPointPart(part string) (integer *big.Int, scale uint) {
+	withoutUnderscores := strings.Replace(part, "_", "", -1)
+	integer, _ = big.NewInt(0).SetString(withoutUnderscores, 10)
+	return integer, uint(len(withoutUnderscores))
+}
+
+func (v *ProgramVisitor) VisitFixedPointLiteral(ctx *FixedPointLiteralContext) interface{} {
+	token := ctx.PositiveFixedPointLiteral().GetSymbol()
+	startPosition := PositionFromToken(token)
+	endPosition := ast.EndPosition(startPosition, token.GetStop())
+
+	parts := strings.Split(token.GetText(), ".")
+	integer, _ := v.parseFixedPointPart(parts[0])
+	fractional, scale := v.parseFixedPointPart(parts[1])
+
+	expression := &ast.FixedPointExpression{
+		Integer:    integer,
+		Fractional: fractional,
+		Scale:      uint(scale),
+		Range: ast.Range{
+			StartPos: startPosition,
+			EndPos:   endPosition,
+		},
+	}
+	if ctx.Minus() != nil {
+		expression.Integer.Neg(expression.Integer)
+	}
+	return expression
+}
+
 func (v *ProgramVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {
-	intExpression := ctx.PositiveIntegerLiteral().Accept(v).(*ast.IntExpression)
+	intExpression := ctx.PositiveIntegerLiteral().Accept(v).(*ast.IntegerExpression)
 	if ctx.Minus() != nil {
 		intExpression.Value.Neg(intExpression.Value)
 	}
 	return intExpression
 }
 
-func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntExpression {
+func (v *ProgramVisitor) parseIntegerExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntegerExpression {
 	startPosition := PositionFromToken(token)
 	endPosition := ast.EndPosition(startPosition, token.GetStop())
+	tokenRange := ast.Range{
+		StartPos: startPosition,
+		EndPos:   endPosition,
+	}
+	literal := token.GetText()
 
-	// check literal has no leading underscore
-	if strings.HasPrefix(text, "_") {
+	report := func(invalidKind InvalidNumberLiteralKind) {
 		v.report(
 			&InvalidIntegerLiteralError{
 				IntegerLiteralKind:        kind,
-				InvalidIntegerLiteralKind: InvalidIntegerLiteralKindLeadingUnderscore,
+				InvalidIntegerLiteralKind: invalidKind,
 				// NOTE: not using text, because it has the base-prefix stripped
-				Literal: token.GetText(),
-				Range: ast.Range{
-					StartPos: startPosition,
-					EndPos:   endPosition,
-				},
+				Literal: literal,
+				Range:   tokenRange,
 			},
 		)
 	}
 
+	// check literal has no leading underscore
+
+	if strings.HasPrefix(text, "_") {
+		report(InvalidNumberLiteralKindLeadingUnderscore)
+	}
+
 	// check literal has no trailing underscore
 	if strings.HasSuffix(text, "_") {
-		v.report(
-			&InvalidIntegerLiteralError{
-				IntegerLiteralKind:        kind,
-				InvalidIntegerLiteralKind: InvalidIntegerLiteralKindTrailingUnderscore,
-				// NOTE: not using text, because it has the base-prefix stripped
-				Literal: token.GetText(),
-				Range: ast.Range{
-					StartPos: startPosition,
-					EndPos:   endPosition,
-				},
-			},
-		)
+		report(InvalidNumberLiteralKindTrailingUnderscore)
 	}
 
 	withoutUnderscores := strings.Replace(text, "_", "", -1)
@@ -1639,27 +1664,13 @@ func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind
 	base := kind.Base()
 	value, ok := big.NewInt(0).SetString(withoutUnderscores, base)
 	if !ok {
-		v.report(
-			&InvalidIntegerLiteralError{
-				IntegerLiteralKind:        kind,
-				InvalidIntegerLiteralKind: InvalidIntegerLiteralKindUnknown,
-				// NOTE: not using text, because it has the base-prefix stripped
-				Literal: token.GetText(),
-				Range: ast.Range{
-					StartPos: startPosition,
-					EndPos:   endPosition,
-				},
-			},
-		)
+		report(InvalidNumberLiteralKindUnknown)
 	}
 
-	return &ast.IntExpression{
+	return &ast.IntegerExpression{
 		Value: value,
 		Base:  base,
-		Range: ast.Range{
-			StartPos: startPosition,
-			EndPos:   endPosition,
-		},
+		Range: tokenRange,
 	}
 }
 
@@ -1670,7 +1681,7 @@ func (v *ProgramVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralCont
 	v.report(
 		&InvalidIntegerLiteralError{
 			IntegerLiteralKind:        IntegerLiteralKindUnknown,
-			InvalidIntegerLiteralKind: InvalidIntegerLiteralKindUnknownPrefix,
+			InvalidIntegerLiteralKind: InvalidNumberLiteralKindUnknownPrefix,
 			Literal:                   ctx.GetText(),
 			Range: ast.Range{
 				StartPos: startPosition,
@@ -1679,7 +1690,7 @@ func (v *ProgramVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralCont
 		},
 	)
 
-	return &ast.IntExpression{
+	return &ast.IntegerExpression{
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
@@ -1688,7 +1699,7 @@ func (v *ProgramVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralCont
 }
 
 func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interface{} {
-	return v.parseIntExpression(
+	return v.parseIntegerExpression(
 		ctx.GetStart(),
 		ctx.GetText(),
 		IntegerLiteralKindDecimal,
@@ -1696,7 +1707,7 @@ func (v *ProgramVisitor) VisitDecimalLiteral(ctx *DecimalLiteralContext) interfa
 }
 
 func (v *ProgramVisitor) VisitBinaryLiteral(ctx *BinaryLiteralContext) interface{} {
-	return v.parseIntExpression(
+	return v.parseIntegerExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
 		IntegerLiteralKindBinary,
@@ -1704,7 +1715,7 @@ func (v *ProgramVisitor) VisitBinaryLiteral(ctx *BinaryLiteralContext) interface
 }
 
 func (v *ProgramVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interface{} {
-	return v.parseIntExpression(
+	return v.parseIntegerExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
 		IntegerLiteralKindOctal,
@@ -1712,7 +1723,7 @@ func (v *ProgramVisitor) VisitOctalLiteral(ctx *OctalLiteralContext) interface{}
 }
 
 func (v *ProgramVisitor) VisitHexadecimalLiteral(ctx *HexadecimalLiteralContext) interface{} {
-	return v.parseIntExpression(
+	return v.parseIntegerExpression(
 		ctx.GetStart(),
 		ctx.GetText()[2:],
 		IntegerLiteralKindHexadecimal,

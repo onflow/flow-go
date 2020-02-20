@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -26,7 +26,7 @@ func NewValidator(viewState *ViewState, forks ForksReader, sigVerifier SigVerifi
 // ValidateQC validates the QC
 // qc - the qc to be validated
 // block - the block that the qc is pointing to
-func (v *Validator) ValidateQC(qc *types.QuorumCertificate, block *types.Block) error {
+func (v *Validator) ValidateQC(qc *hotstuff.QuorumCertificate, block *hotstuff.Block) error {
 	// check block ID
 	if qc.BlockID != block.BlockID {
 		return newInvalidBlockError(block, fmt.Sprintf("qc.BlockID (%x) doesn't match with block's ID (%x)", qc.BlockID, block.BlockID))
@@ -99,7 +99,7 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate, block *types.Block) 
 // ValidateProposal validates the block proposal
 // A block is considered as valid if it's a valid extension of existing forks.
 // Note it doesn't check if it's conflicting with finalized block
-func (v *Validator) ValidateProposal(proposal *types.Proposal) error {
+func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 	qc := proposal.Block.QC
 	block := proposal.Block
 	blockID := proposal.Block.BlockID
@@ -164,7 +164,7 @@ func (v *Validator) ValidateProposal(proposal *types.Proposal) error {
 // ValidateVote validates the vote and returns the signer identity who signed the vote
 // vote - the vote to be validated
 // block - the voting block. Assuming the block has been validated.
-func (v *Validator) ValidateVote(vote *types.Vote, block *types.Block) (*flow.Identity, error) {
+func (v *Validator) ValidateVote(vote *hotstuff.Vote, block *hotstuff.Block) (*flow.Identity, error) {
 	blockID := block.BlockID
 	voteID := vote.ID()
 
@@ -205,16 +205,16 @@ func (v *Validator) ValidateVote(vote *types.Vote, block *types.Block) (*flow.Id
 	return signer, nil
 }
 
-func newInvalidBlockError(block *types.Block, msg string) error {
-	return &types.ErrorInvalidBlock{
+func newInvalidBlockError(block *hotstuff.Block, msg string) error {
+	return &hotstuff.ErrorInvalidBlock{
 		BlockID: block.BlockID,
 		View:    block.View,
 		Msg:     msg,
 	}
 }
 
-func newInvalidVoteError(vote *types.Vote, msg string) error {
-	return &types.ErrorInvalidVote{
+func newInvalidVoteError(vote *hotstuff.Vote, msg string) error {
+	return &hotstuff.ErrorInvalidVote{
 		VoteID: vote.ID(),
 		View:   vote.View,
 		Msg:    msg,

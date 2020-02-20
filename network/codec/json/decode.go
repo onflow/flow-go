@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -33,6 +34,14 @@ func decode(env Envelope) (interface{}, error) {
 		v = &trickle.Request{}
 	case CodeResponse:
 		v = &trickle.Response{}
+
+	// Consensus
+	case CodeBlockProposal:
+		v = &messages.BlockProposal{}
+	case CodeBlockVote:
+		v = &messages.BlockVote{}
+	case CodeBlockCommit:
+		v = &coldstuff.Commit{}
 
 	case CodeCollectionGuarantee:
 		v = &flow.CollectionGuarantee{}

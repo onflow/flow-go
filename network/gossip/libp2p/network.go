@@ -3,7 +3,6 @@ package libp2p
 import (
 	"fmt"
 	"hash"
-	"math"
 	"strconv"
 	"sync"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -61,7 +61,7 @@ func NewNetwork(
 
 	// todo fanout optimization #2244
 	// fanout is set to half of the system size for connectivity assurance w.h.p
-	fanout := int(math.Round(float64(len(netSize)) / 2.0))
+	fanout := (len(netSize) + 1) / 2
 
 	o := &Network{
 		logger:  log,
@@ -171,15 +171,19 @@ func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
 	for _, b := range hash {
 		seed = append(seed, uint64(b+1))
 	}
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse hash: %w", err)
-	}
 
 	// selects subset of the nodes in idMap as large as the size
 	if len(idList) < n.fanout {
 		return nil, fmt.Errorf("cannot sample topology idList %d smaller than fanout %d", len(idList), n.fanout)
 	}
-	topListInd, err := crypto.RandomPermutationSubset(len(idList), n.fanout, seed)
+
+	// creates a new random generator based on the seed
+	rng, err := random.NewRand(seed)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse hash: %w", err)
+	}
+	topListInd, err := random.PermutateSubset(len(idList), n.fanout, rng)
+
 	if err != nil {
 		return nil, fmt.Errorf("cannot sample topology: %w", err)
 	}

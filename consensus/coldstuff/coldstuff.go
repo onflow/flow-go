@@ -1,192 +1,162 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package coldstuff
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff/round"
-	"github.com/dapperlabs/flow-go/model/coldstuff"
+	"github.com/dapperlabs/flow-go/consensus/coldstuff/round"
+	"github.com/dapperlabs/flow-go/crypto"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine implements a simulated consensus algorithm. It's similar to a
-// one-chain BFT consensus algorithm, finalizing blocks immediately upon
-// collecting the first quorum. In order to keep nodes in sync, the quorum is
-// set at the totality of the stake in the network.
-type Engine struct {
-	unit      *engine.Unit
+// internal implementation of ColdStuff
+type coldStuff struct {
 	log       zerolog.Logger
-	con       network.Conduit
-	exp       network.Engine
-	headers   storage.Headers
 	state     protocol.State
 	me        module.Local
+	round     *round.Round
+	comms     Communicator
 	builder   module.Builder
 	finalizer module.Finalizer
-	round     Round
-	interval  time.Duration
-	timeout   time.Duration
-	proposals chan proposalWrap
-	votes     chan voteWrap
-	commits   chan commitWrap
+
+	// round config
+	interval time.Duration
+	timeout  time.Duration
+
+	// incoming consensus entities
+	proposals chan *flow.Header
+	votes     chan *model.Vote
+	commits   chan *model.Commit
+
+	// stops the consent loop
+	done chan struct{}
 }
 
-// New initializes a new coldstuff consensus engine, using the injected network
-// and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, exp network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, finalizer module.Finalizer) (*Engine, error) {
-
-	// initialize the engine with dependencies
-	e := &Engine{
-		unit:      engine.NewUnit(),
-		log:       log.With().Str("engine", "coldstuff").Logger(),
-		exp:       exp,
-		headers:   headers,
-		state:     state,
+func New(
+	log zerolog.Logger,
+	state protocol.State,
+	me module.Local,
+	comms Communicator,
+	builder module.Builder,
+	finalizer module.Finalizer,
+	interval time.Duration,
+	timeout time.Duration,
+) (module.ColdStuff, error) {
+	cold := coldStuff{
+		log:       log,
 		me:        me,
+		state:     state,
 		builder:   builder,
 		finalizer: finalizer,
-		round:     nil, // initialized for each consensus round
-		interval:  4 * time.Second,
-		timeout:   1 * time.Second,
-		proposals: make(chan proposalWrap, 1),
-		votes:     make(chan voteWrap, 1),
-		commits:   make(chan commitWrap, 1),
+		comms:     comms,
+		interval:  interval,
+		timeout:   timeout,
+		proposals: make(chan *flow.Header, 1),
+		votes:     make(chan *model.Vote, 1),
+		commits:   make(chan *model.Commit, 1),
 	}
 
-	// register the engine with the network layer to get our conduit
-	con, err := net.Register(engine.SimulationColdstuff, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register engine: %w", err)
+	// TODO incorporate this later
+	_ = cold.finalizer
+
+	return &cold, nil
+}
+
+func (e *coldStuff) Start() (exit func(), done <-chan struct{}) {
+	e.done = make(chan struct{})
+	done = e.done
+
+	var once sync.Once
+	exit = func() {
+		once.Do(func() {
+			close(e.done)
+		})
 	}
 
-	e.con = con
-
-	return e, nil
-}
-
-// Ready returns a channel that will close when the coldstuff engine has
-// successfully started.
-func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.consent)
-	return e.unit.Ready()
-}
-
-// Done returns a channel that will close when the coldstuff engine has
-// successfully stopped.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+	go func() {
+		err := e.loop()
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			e.log.Error().Err(err).Msg("coldstuff loop exited with error")
 		}
-	})
+		exit()
+	}()
+
+	return
 }
 
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+func (e *coldStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
+	// Ignore HotStuff-only values
+	_ = parentView
+
+	e.proposals <- proposal
 }
 
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
-}
+func (e *coldStuff) SubmitVote(originID, blockID flow.Identifier, view uint64, sig crypto.Signature) {
+	// Ignore HotStuff-only values
+	_ = view
+	_ = sig
 
-// process processes events for the proposal engine on the collection node.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
-	case *coldstuff.BlockProposal:
-		e.proposals <- proposalWrap{originID: originID, header: ev.Header}
-		return nil
-	case *coldstuff.BlockVote:
-		e.votes <- voteWrap{originID: originID, blockID: ev.BlockID}
-		return nil
-	case *coldstuff.BlockCommit:
-		e.commits <- commitWrap{originID: originID, blockID: ev.BlockID}
-		return nil
-	default:
-		return errors.Errorf("invalid event type (%T)", event)
+	e.votes <- &model.Vote{
+		VoterID: originID,
+		BlockID: blockID,
 	}
 }
 
-// consent will start the consensus algorithm on the engine. As we need to
-// process events sequentially, all submissions are queued in channels and then
-// processed here.
-func (e *Engine) consent() {
+func (e *coldStuff) SubmitCommit(commit *model.Commit) {
+	e.commits <- commit
+}
+
+func (e *coldStuff) loop() error {
 
 	localID := e.me.NodeID()
-	log := e.log.With().Hex("local_id", localID[:]).Logger()
+	log := e.log.With().Hex("local_id", logging.ID(localID)).Logger()
 
-	// each iteration of the loop represents one (successful or failed) round of
-	// the consensus algorithm
 ConsentLoop:
 	for {
 
-		// initialize and cache immutable parameters for the current round
 		var err error
 		e.round, err = round.New(e.state, e.me)
 		if err != nil {
-			log.Error().Err(err).Msg("could not initialize round")
-			break
+			return fmt.Errorf("could not initialize round: %w", err)
 		}
 
 		// calculate the time at which we can generate the next valid block
 		limit := e.round.Parent().Timestamp.Add(e.interval)
 
 		select {
-
-		// break the loop and shut down
-		case <-e.unit.Quit():
-			break ConsentLoop
-
-		// start the next consensus round
+		case <-e.done:
+			return nil
 		case <-time.After(time.Until(limit)):
-
 			if e.round.Leader().NodeID == localID {
 				// if we are the leader, we:
 				// 1) send a block proposal
 				// 2) wait for sufficient block votes
 				// 3) send a block commit
 
+				e.log.Debug().Msg("sending proposal")
 				err = e.sendProposal()
 				if err != nil {
 					log.Error().Err(err).Msg("could not send proposal")
 					continue ConsentLoop
 				}
 
+				e.log.Debug().Msg("waiting for votes")
 				err = e.waitForVotes()
 				if err != nil {
 					log.Error().Err(err).Msg("could not receive votes")
 					continue ConsentLoop
 				}
 
+				e.log.Debug().Msg("sending commit")
 				err = e.sendCommit()
 				if err != nil {
 					log.Error().Err(err).Msg("could not send commit")
@@ -199,18 +169,21 @@ ConsentLoop:
 				// 2) vote on the block proposal
 				// 3) wait for a block commit
 
+				e.log.Debug().Msg("waiting for proposal")
 				err = e.waitForProposal()
 				if err != nil {
 					log.Error().Err(err).Msg("could not receive proposal")
 					continue ConsentLoop
 				}
 
+				e.log.Debug().Msg("voting for proposal")
 				err = e.voteOnProposal()
 				if err != nil {
 					log.Error().Err(err).Msg("could not vote on proposal")
 					continue ConsentLoop
 				}
 
+				e.log.Debug().Msg("waiting for commit")
 				err = e.waitForCommit()
 				if err != nil {
 					log.Error().Err(err).Msg("could not receive commit")
@@ -221,6 +194,7 @@ ConsentLoop:
 			// regardless of path, if we successfully reach here, we finished a
 			// full successful consensus round and can commit the current
 			// block candidate
+			e.log.Debug().Msg("committing candidate")
 			err = e.commitCandidate()
 			if err != nil {
 				log.Error().Err(err).Msg("could not commit candidate")
@@ -230,79 +204,67 @@ ConsentLoop:
 	}
 }
 
-// sendProposal will build a new block, cache it as the current candidate for
-// consensus and propagate it to the other consensus nodes. It assumes that we
-// are the leader for the current round.
-func (e *Engine) sendProposal() error {
-
+func (e *coldStuff) sendProposal() error {
 	log := e.log.With().
 		Str("action", "send_proposal").
 		Logger()
 
 	// get our own ID to tally our stake
-	id, err := e.state.Final().Identity(e.me.NodeID())
+	myIdentity, err := e.state.Final().Identity(e.me.NodeID())
 	if err != nil {
 		return fmt.Errorf("could not get own current ID: %w", err)
 	}
 
 	// define the block header build function
-	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
-		header := flow.Header{
-			View:        e.round.Parent().View + 1,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    e.round.Parent().ID(),
-			PayloadHash: payloadHash,
-			ProposerID:  e.me.NodeID(),
-		}
-		return &header, nil
+	setProposer := func(header *flow.Header) {
+		header.ProposerID = myIdentity.NodeID
 	}
 
-	// get the payload for the next hash
-	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), build)
+	// define payload and build next block
+	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), setProposer)
 	if err != nil {
 		return fmt.Errorf("could not build on parent: %w", err)
 	}
 
 	log = log.With().
-		Uint64("number", candidate.View).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
 
+	// TODO this should be done by builder
 	// store the block proposal
-	err = e.headers.Store(candidate)
-	if err != nil {
-		return fmt.Errorf("could not store candidate: %w", err)
-	}
+	//err = e.headers.Store(candidate)
+	//if err != nil {
+	//	return fmt.Errorf("could not store candidate: %w", err)
+	//}
 
 	// cache the candidate block
 	e.round.Propose(candidate)
 
 	// send the block proposal
-	proposal := &coldstuff.BlockProposal{
-		Header: candidate,
-	}
-	err = e.con.Submit(proposal, e.round.Participants().NodeIDs()...)
+	err = e.comms.BroadcastProposal(candidate)
 	if err != nil {
 		return fmt.Errorf("could not submit proposal: %w", err)
 	}
 
 	// add our own vote to the engine
-	e.round.Tally(id.NodeID, id.Stake)
+	e.round.Tally(myIdentity.NodeID, myIdentity.Stake)
 
 	log.Info().Msg("block proposal sent")
 
 	return nil
+
 }
 
 // waitForVotes will wait for received votes and validate them until we have
 // reached a quorum on the currently cached block candidate. It assumse we are
 // the leader and will timeout after the configured timeout.
-func (e *Engine) waitForVotes() error {
+func (e *coldStuff) waitForVotes() error {
 
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.View).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "wait_votes").
 		Logger()
@@ -311,8 +273,8 @@ func (e *Engine) waitForVotes() error {
 		select {
 
 		// process each vote that we receive
-		case w := <-e.votes:
-			voterID, voteID := w.originID, w.blockID
+		case vote := <-e.votes:
+			voterID, voteID := vote.VoterID, vote.BlockID
 
 			// discard votes by double voters
 			voted := e.round.Voted(voterID)
@@ -329,7 +291,7 @@ func (e *Engine) waitForVotes() error {
 
 			// discard votes that are not by staked consensus nodes
 			id, err := e.state.Final().Identity(voterID)
-			if errors.Cause(err) == badger.ErrKeyNotFound {
+			if errors.Is(err, badger.ErrKeyNotFound) {
 				log.Warn().Hex("voter_id", voterID[:]).Msg("vote by unknown node")
 				continue
 			}
@@ -369,21 +331,21 @@ func (e *Engine) waitForVotes() error {
 // sendCommit is called after we have successfully waited for a vote quorum. It
 // will send a block commit message with the block hash that instructs all nodes
 // to forward their blockchain and start a new consensus round.
-func (e *Engine) sendCommit() error {
+func (e *coldStuff) sendCommit() error {
 
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.View).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "send_commit").
 		Logger()
 
 	// send a commit for the cached block hash
-	commit := &coldstuff.BlockCommit{
+	commit := &model.Commit{
 		BlockID: candidate.ID(),
 	}
-	err := e.con.Submit(commit, e.round.Participants().NodeIDs()...)
+	err := e.comms.BroadcastCommit(commit)
 	if err != nil {
 		return fmt.Errorf("could not submit commit: %w", err)
 	}
@@ -397,8 +359,7 @@ func (e *Engine) sendCommit() error {
 // a number of ways. It should be called at the beginning of a round if we are
 // not the leader. It will timeout if no proposal was received by the leader
 // after the configured timeout.
-func (e *Engine) waitForProposal() error {
-
+func (e *coldStuff) waitForProposal() error {
 	log := e.log.With().
 		Str("action", "wait_proposal").
 		Logger()
@@ -407,15 +368,16 @@ func (e *Engine) waitForProposal() error {
 		select {
 
 		// process each proposal we receive
-		case w := <-e.proposals:
-			proposerID, candidate := w.originID, w.header
+		case candidate := <-e.proposals:
+			proposerID := candidate.ProposerID
 
+			// TODO this should be done automatically by CCL
 			// store every proposal
-			err := e.headers.Store(candidate)
-			if err != nil {
-				log.Error().Err(err).Msg("could not store candidate")
-				continue
-			}
+			//err := e.headers.Store(candidate)
+			//if err != nil {
+			//	log.Error().Err(err).Msg("could not store candidate")
+			//	continue
+			//}
 
 			// discard proposals by non-leaders
 			leaderID := e.round.Leader().NodeID
@@ -425,9 +387,9 @@ func (e *Engine) waitForProposal() error {
 			}
 
 			// discard proposals with the wrong height
-			number := e.round.Parent().View + 1
-			if candidate.View != e.round.Parent().View+1 {
-				log.Warn().Uint64("candidate_height", candidate.View).Uint64("expected_height", number).Msg("invalid height")
+			number := e.round.Parent().Height + 1
+			if candidate.Height != e.round.Parent().Height+1 {
+				log.Warn().Uint64("candidate_height", candidate.Height).Uint64("expected_height", number).Msg("invalid height")
 				continue
 			}
 
@@ -449,7 +411,7 @@ func (e *Engine) waitForProposal() error {
 			e.round.Propose(candidate)
 
 			log.Info().
-				Uint64("number", candidate.View).
+				Uint64("number", candidate.Height).
 				Hex("candidate_id", logging.Entity(candidate)).
 				Msg("block proposal received")
 
@@ -464,21 +426,18 @@ func (e *Engine) waitForProposal() error {
 // voteOnProposal is called after we have received a new block proposal as
 // non-leader. It assumes that all checks were already done and simply sends a
 // vote to the leader of the current round that accepts the candidate block.
-func (e *Engine) voteOnProposal() error {
+func (e *coldStuff) voteOnProposal() error {
 
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.View).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "send_vote").
 		Logger()
 
 	// send vote for proposal to leader
-	vote := &coldstuff.BlockVote{
-		BlockID: candidate.ID(),
-	}
-	err := e.con.Submit(vote, e.round.Leader().NodeID)
+	err := e.comms.SendVote(candidate.ID(), candidate.View, nil, e.round.Leader().NodeID)
 	if err != nil {
 		return fmt.Errorf("could not submit vote: %w", err)
 	}
@@ -491,12 +450,12 @@ func (e *Engine) voteOnProposal() error {
 // waitForCommit is called after we have submitted our vote for the leader and
 // awaits his confirmation that we can commit the block. The confirmation is
 // only sent once a quorum of votes was received by the leader.
-func (e *Engine) waitForCommit() error {
+func (e *coldStuff) waitForCommit() error {
 
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.View).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "wait_commit").
 		Logger()
@@ -504,7 +463,7 @@ func (e *Engine) waitForCommit() error {
 	for {
 		select {
 		case w := <-e.commits:
-			committerID, commitID := w.originID, w.blockID
+			committerID, commitID := w.CommitterID, w.BlockID
 
 			// discard commits not from leader
 			leaderID := e.round.Leader().NodeID
@@ -531,30 +490,38 @@ func (e *Engine) waitForCommit() error {
 
 // commitCandidate commits the current block candidate to the blockchain and
 // starts the next consensus round.
-func (e *Engine) commitCandidate() error {
+func (e *coldStuff) commitCandidate() error {
 
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.View).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "exec_commit").
 		Logger()
 
-	// commit the block to our chain state
-	err := e.state.Mutate().Extend(candidate.ID())
-	if err != nil {
-		return fmt.Errorf("could not extend state: %w", err)
-	}
-
-	// finalize the state
-	err = e.finalizer.MakeFinal(candidate.ID())
-	if err != nil {
-		return fmt.Errorf("could not finalize state: %w", err)
-	}
-
-	// hand the finalized block to expulsion engine to spread to all nodes
-	e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
+	// TODO extend should be done automatically in CCL
+	// TODO finalize+clean+expulse should be done in Finalizer callback
+	//// commit the block to our chain state
+	//err := e.state.Mutate().Extend(candidate.ID())
+	//if err != nil {
+	//	return fmt.Errorf("could not extend state: %w", err)
+	//}
+	//
+	//// finalize the state
+	//err = e.state.Mutate().Finalize(candidate.ID())
+	//if err != nil {
+	//	return fmt.Errorf("could not finalize state: %w", err)
+	//}
+	//
+	//// hand the finalized block to expulsion engine to spread to all nodes
+	//e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
+	//
+	//// make sure all pending ambiguous state is now cleared up
+	//err = e.cleaner.CleanAfter(candidate.ID())
+	//if err != nil {
+	//	return fmt.Errorf("could not drop ambiguous state: %w", err)
+	//}
 
 	log.Info().Msg("block candidate committed")
 

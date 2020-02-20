@@ -6,22 +6,22 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
 type EventLoop struct {
 	log          zerolog.Logger
 	eventHandler *EventHandler
-	proposals    chan *types.Proposal
-	votes        chan *types.Vote
+	proposals    chan *hotstuff.Proposal
+	votes        chan *hotstuff.Vote
 	started      *atomic.Bool
 }
 
 // NewEventLoop creates an instance of EventLoop
 func NewEventLoop(log zerolog.Logger, eventHandler *EventHandler) (*EventLoop, error) {
-	proposals := make(chan *types.Proposal)
-	votes := make(chan *types.Vote)
+	proposals := make(chan *hotstuff.Proposal)
+	votes := make(chan *hotstuff.Vote)
 
 	el := &EventLoop{
 		log:          log,
@@ -80,12 +80,12 @@ func (el *EventLoop) processEvent() error {
 }
 
 // OnReceiveProposal pushes the received block to the blockheader channel
-func (el *EventLoop) OnReceiveProposal(proposal *types.Proposal) {
+func (el *EventLoop) OnReceiveProposal(proposal *hotstuff.Proposal) {
 	el.proposals <- proposal
 }
 
 // OnReceiveVote pushes the received vote to the votes channel
-func (el *EventLoop) OnReceiveVote(vote *types.Vote) {
+func (el *EventLoop) OnReceiveVote(vote *hotstuff.Vote) {
 	el.votes <- vote
 }
 

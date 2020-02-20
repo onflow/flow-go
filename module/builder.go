@@ -16,10 +16,8 @@ type BuildFunc func(payloadHash flow.Identifier) (*flow.Header, error)
 // as QCs.
 type Builder interface {
 	// BuildOn generates a new payload that is valid with respect to the parent
-	// being built upon, builds and stores the header, then returns the stored
-	// header.
-	//
-	// The caller is responsible for defining how to build and sign the header
-	// by specifying the build function.
-	BuildOn(parentID flow.Identifier, build BuildFunc) (*flow.Header, error)
+	// being built upon, with the view being provided by the consensus algorithm.
+	// The builder stores the block and validates it against the protocol state
+	// before returning it.
+	BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error)
 }

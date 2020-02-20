@@ -1,4 +1,4 @@
-package types
+package hotstuff
 
 import (
 	"errors"
@@ -7,27 +7,18 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type ErrorFinalizationFatal struct {
-	Msg string
-}
-
-func (e *ErrorFinalizationFatal) Error() string { return e.Msg }
-
 type MissingSignerError struct {
-	Vote *Vote
-}
-
-type InvalidSignatureError struct {
-	Vote *Vote
-}
-
-type InvalidViewError struct {
 	Vote *Vote
 }
 
 type DoubleVoteError struct {
 	OriginalVote *Vote
 	DoubleVote   *Vote
+}
+
+type InvalidVoteError struct {
+	VoteID flow.Identifier
+	View   uint64
 }
 
 type StaleVoteError struct {
@@ -51,12 +42,8 @@ func (e MissingSignerError) Error() string {
 	return fmt.Sprintf("missing signer of vote %v", e.Vote)
 }
 
-func (e InvalidSignatureError) Error() string {
-	return fmt.Sprintf("invalid signature for vote %v", e.Vote)
-}
-
-func (e InvalidViewError) Error() string {
-	return fmt.Sprintf("invalid view for vote %v", e.Vote)
+func (e InvalidVoteError) Error() string {
+	return fmt.Sprintf("invalid vote found (vote: %x)", e.VoteID)
 }
 
 func (e DoubleVoteError) Error() string {
@@ -127,4 +114,16 @@ func (e ErrorInvalidVote) Error() string {
 func (e ErrorInvalidVote) Is(other error) bool {
 	_, ok := other.(ErrorInvalidVote)
 	return ok
+}
+
+// ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which
+// prove a Byzantine threshold of consensus replicas has been exceeded.
+// Per definition, the byzantine threshold is exceeded is there are byzantine consensus
+// replicas with _at least_ 1/3 stake.
+type ErrorByzantineThresholdExceeded struct {
+	Evidence string
+}
+
+func (e *ErrorByzantineThresholdExceeded) Error() string {
+	return e.Evidence
 }

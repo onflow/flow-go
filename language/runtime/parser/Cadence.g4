@@ -200,23 +200,19 @@ typeAnnotation
 // NOTE: only allow reference or optionals – prevent ambiguous
 // and not particular useful types like `&R?`
 fullType
-    : referenceType
-    | nonReferenceType
+    : (
+        ( Auth Storable
+        | Auth
+        | Storable Auth
+        | Storable
+        | /* no auth or storable */
+        )
+        Ampersand {p.noWhitespace()}?
+      )?
+      innerType
+      ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
-referenceType
-    : ( Auth Storable
-      | Auth
-      | Storable Auth
-      | Storable
-      | /* no auth or storable */
-      )
-      Ampersand {p.noWhitespace()}? innerType
-    ;
-
-nonReferenceType
-    : innerType ({p.noWhitespace()}? optionals+=Optional)*
-    ;
 
 innerType
     : typeRestrictions
@@ -564,7 +560,8 @@ argument
     ;
 
 literal
-    : integerLiteral
+    : fixedPointLiteral
+    | integerLiteral
     | booleanLiteral
     | arrayLiteral
     | dictionaryLiteral
@@ -583,6 +580,10 @@ nilLiteral
 
 stringLiteral
     : StringLiteral
+    ;
+
+fixedPointLiteral
+    : Minus? PositiveFixedPointLiteral
     ;
 
 integerLiteral
@@ -693,6 +694,9 @@ fragment IdentifierCharacter
     | IdentifierHead
     ;
 
+PositiveFixedPointLiteral
+    : [0-9] ([0-9_]* [0-9])? '.' [0-9] ([0-9_]* [0-9])?
+    ;
 
 DecimalLiteral
     // NOTE: allows trailing underscores, but the parser checks underscores

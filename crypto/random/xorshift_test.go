@@ -1,4 +1,4 @@
-package crypto
+package random
 
 import (
 	"testing"
@@ -33,19 +33,23 @@ func TestRandomPermutationSubset(t *testing.T) {
 	listSize := 1000
 	subsetSize := 20
 	seed := []uint64{1, 2, 3, 4, 5, 6}
-	shuffledlist, err := RandomPermutationSubset(listSize, subsetSize, seed)
+	rng, err := NewRand(seed)
 	if err != nil {
-		t.Errorf("RandomPermutationSubset returned an error")
+		t.Errorf("NewRand returned an error")
+	}
 
+	shuffledlist, err := PermutateSubset(listSize, subsetSize, rng)
+	if err != nil {
+		t.Errorf("PermutateSubset returned an error")
 	}
 	if len(shuffledlist) != subsetSize {
-		t.Errorf("RandomPermutationSubset returned a list with a wrong size")
+		t.Errorf("PermutateSubset returned a list with a wrong size")
 	}
 	// check for repetition
 	has := make(map[int]bool)
 	for i := range shuffledlist {
 		if _, ok := has[shuffledlist[i]]; ok {
-			t.Errorf("dupplicated item in the results returned by RandomPermutationSubset")
+			t.Errorf("dupplicated item in the results returned by PermutateSubset")
 		}
 		has[shuffledlist[i]] = true
 	}

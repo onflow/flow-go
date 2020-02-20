@@ -72,12 +72,28 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			},
 			tests: []operationTest{
 				{&sema.IntType{}, "1", "2", nil},
+				{&sema.Fix64Type{}, "1.2", "3.4", nil},
+				{&sema.Fix64Type{}, "1.2", "3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.IntType{}, "1", "2.3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
 				{&sema.IntType{}, "true", "2", []error{
 					&sema.InvalidBinaryOperandError{},
 					&sema.InvalidBinaryOperandsError{},
 					&sema.TypeMismatchError{},
 				}},
+				{&sema.Int64Type{}, "true", "1.2", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
+					&sema.TypeMismatchError{},
+				}},
 				{&sema.IntType{}, "1", "true", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.Fix64Type{}, "1.2", "true", []error{
 					&sema.InvalidBinaryOperandError{},
 					&sema.InvalidBinaryOperandsError{},
 				}},
@@ -93,11 +109,26 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			},
 			tests: []operationTest{
 				{&sema.BoolType{}, "1", "2", nil},
+				{&sema.BoolType{}, "1.2", "3.4", nil},
 				{&sema.BoolType{}, "true", "2", []error{
 					&sema.InvalidBinaryOperandError{},
 					&sema.InvalidBinaryOperandsError{},
 				}},
+				{&sema.BoolType{}, "1.2", "3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "1", "2.3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "true", "1.2", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
+				}},
 				{&sema.BoolType{}, "1", "true", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "1.2", "true", []error{
 					&sema.InvalidBinaryOperandError{},
 					&sema.InvalidBinaryOperandsError{},
 				}},
@@ -130,7 +161,14 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			tests: []operationTest{
 				{&sema.BoolType{}, "true", "false", nil},
 				{&sema.BoolType{}, "1", "2", nil},
+				{&sema.BoolType{}, "1.2", "3.4", nil},
 				{&sema.BoolType{}, "true", "2", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "1.2", "3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "1", "2.3", []error{
 					&sema.InvalidBinaryOperandsError{},
 				}},
 				{&sema.BoolType{}, "1", "true", []error{
@@ -144,7 +182,13 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 	for _, operationTests := range allOperationTests {
 		for _, operation := range operationTests.operations {
 			for _, test := range operationTests.tests {
-				t.Run("", func(t *testing.T) {
+
+				testName := fmt.Sprintf(
+					"%s / %s %s %s",
+					test.ty, test.left, operation.Symbol(), test.right,
+				)
+
+				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheck(t,
 						fmt.Sprintf(
@@ -201,7 +245,13 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run("", func(t *testing.T) {
+
+		testName := fmt.Sprintf(
+			"%s / %s %s %s",
+			test.ty, test.left, ast.OperationConcat.Symbol(), test.right,
+		)
+
+		t.Run(testName, func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(

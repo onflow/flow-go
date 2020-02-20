@@ -117,10 +117,11 @@ func (m *Middleware) Stop() {
 	m.cancel()
 
 	// stop libp2p
-	err := m.libP2PNode.Stop()
+	done, err := m.libP2PNode.Stop()
 	if err != nil {
 		log.Error().Err(err).Msg("stopping failed")
 	} else {
+		<-done
 		log.Debug().Msg("node stopped successfully")
 	}
 

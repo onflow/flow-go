@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	model "github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 const (
@@ -23,16 +23,16 @@ const (
 	additiveDecrease       float64 = 50    // Milliseconds
 )
 
-func expectedTimerInfo(view uint64, mode types.TimeoutMode) interface{} {
+func expectedTimerInfo(view uint64, mode model.TimeoutMode) interface{} {
 	return mock.MatchedBy(
-		func(timerInfo *types.TimerInfo) bool {
+		func(timerInfo *model.TimerInfo) bool {
 			return timerInfo.View == view && timerInfo.Mode == mode
 		})
 }
 
-func expectedTimeoutInfo(view uint64, mode types.TimeoutMode) interface{} {
+func expectedTimeoutInfo(view uint64, mode model.TimeoutMode) interface{} {
 	return mock.MatchedBy(
-		func(timerInfo *types.TimerInfo) bool {
+		func(timerInfo *model.TimerInfo) bool {
 			return timerInfo.View == view && timerInfo.Mode == mode
 		})
 }
@@ -52,17 +52,17 @@ func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mockdist.Con
 	if err != nil {
 		t.Fail()
 	}
-	notifier.On("OnStartingTimeout", expectedTimerInfo(view, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(view, model.ReplicaTimeout)).Return().Once()
 	pm.Start()
 	return pm, notifier
 }
 
-func qc(view uint64) *types.QuorumCertificate {
-	return &types.QuorumCertificate{View: view}
+func qc(view uint64) *model.QuorumCertificate {
+	return &model.QuorumCertificate{View: view}
 }
 
-func makeBlock(qcView, blockView uint64) *types.Block {
-	return &types.Block{View: blockView, QC: qc(qcView)}
+func makeBlock(qcView, blockView uint64) *model.Block {
+	return &model.Block{View: blockView, QC: qc(qcView)}
 }
 
 // Test_SkipIncreaseViewThroughQC tests that PaceMaker increases View when receiving QC,
@@ -70,14 +70,14 @@ func makeBlock(qcView, blockView uint64) *types.Block {
 func Test_SkipIncreaseViewThroughQC(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithQC(qc(3))
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 4)
 
 	notifier.On("OnSkippedAhead", uint64(13)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(13, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(13, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithQC(qc(12))
 	assert.True(t, nveOccurred && nve.View == 13)
 
@@ -99,14 +99,14 @@ func Test_SkipViewThroughBlock(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 
 	notifier.On("OnSkippedAhead", uint64(6)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(6, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(5, 9), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(6), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 6)
 
 	notifier.On("OnSkippedAhead", uint64(23)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(23, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(23, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(22, 25), false)
 	assert.True(t, nveOccurred && nve.View == 23)
 
@@ -120,14 +120,14 @@ func Test_HandlesSkipViewAttack(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 
 	notifier.On("OnSkippedAhead", uint64(6)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(6, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(5, 9), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(6), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 6)
 
 	notifier.On("OnSkippedAhead", uint64(15)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(15, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(15, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(14, 23), false)
 	assert.True(t, nveOccurred && nve.View == 15)
 
@@ -147,14 +147,14 @@ func Test_IgnoreOldBlocks(t *testing.T) {
 // Test_ProcessBlockForCurrentView tests that PaceMaker processes the block for the current view correctly
 func Test_ProcessBlockForCurrentView(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(3, types.VoteCollectionTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(3, model.VoteCollectionTimeout)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(1, 3), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(3), pm.CurView())
 	assert.True(t, !nveOccurred && nve == nil)
 
 	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(1, 3), false)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
@@ -169,8 +169,8 @@ func Test_ProcessBlockForCurrentView(t *testing.T) {
 func Test_FutureBlockWithQcForCurrentView(t *testing.T) {
 	// NOT Primary for the Block's view
 	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(5, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(5, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(3, 4), false)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(5), pm.CurView())
@@ -178,8 +178,8 @@ func Test_FutureBlockWithQcForCurrentView(t *testing.T) {
 
 	// PRIMARY for the Block's view
 	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.VoteCollectionTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.VoteCollectionTimeout)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
@@ -194,8 +194,8 @@ func Test_FutureBlockWithQcForCurrentView(t *testing.T) {
 func Test_FutureBlockWithQcForFutureView(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(15, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(15, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(13, 14), false)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(15), pm.CurView())
@@ -203,8 +203,8 @@ func Test_FutureBlockWithQcForFutureView(t *testing.T) {
 
 	pm, notifier = initPaceMaker(t, 3)
 	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.VoteCollectionTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.VoteCollectionTimeout)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(13, 14), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(14), pm.CurView())
@@ -220,7 +220,7 @@ func Test_FutureBlockWithQcForFutureView(t *testing.T) {
 func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(13, 17), false)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(14), pm.CurView())
@@ -228,7 +228,7 @@ func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
 
 	pm, notifier = initPaceMaker(t, 3)
 	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(13, 17), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(14), pm.CurView())
@@ -239,8 +239,8 @@ func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
 func Test_IgnoreBlockDuplicates(t *testing.T) {
 	// NOT Primary for the Block's view
 	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(5, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(5, model.ReplicaTimeout)).Return().Once()
 	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(3, 4), false)
 	assert.True(t, nveOccurred && nve.View == 5)
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), false)
@@ -252,8 +252,8 @@ func Test_IgnoreBlockDuplicates(t *testing.T) {
 
 	// PRIMARY for the Block's view
 	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.VoteCollectionTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.VoteCollectionTimeout)).Return().Once()
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), true)
 	assert.True(t, nveOccurred && nve.View == 4)
 	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), true)
@@ -283,8 +283,8 @@ func Test_ReplicaTimeout(t *testing.T) {
 	assert.Equal(t, uint64(3), pm.CurView())
 
 	// here the, the Event loop would now call EventHandler.OnTimeout() -> PaceMaker.OnTimeout()
-	notifier.On("OnReachedTimeout", expectedTimeoutInfo(3, types.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnReachedTimeout", expectedTimeoutInfo(3, model.ReplicaTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
 	viewChange := pm.OnTimeout()
 	if viewChange == nil {
 		assert.Fail(t, "Expecting ViewChange event as result of timeout")
@@ -299,7 +299,7 @@ func Test_VoteTimeout(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
 	start := time.Now()
 
-	notifier.On("OnStartingTimeout", expectedTimerInfo(3, types.VoteCollectionTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(3, model.VoteCollectionTimeout)).Return().Once()
 	pm.UpdateCurViewWithBlock(makeBlock(2, 3), true)
 	notifier.AssertExpectations(t)
 
@@ -318,8 +318,8 @@ func Test_VoteTimeout(t *testing.T) {
 	assert.Equal(t, uint64(3), pm.CurView())
 
 	// here the, the Event loop would now call EventHandler.OnTimeout() -> PaceMaker.OnTimeout()
-	notifier.On("OnReachedTimeout", expectedTimeoutInfo(3, types.VoteCollectionTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
+	notifier.On("OnReachedTimeout", expectedTimeoutInfo(3, model.VoteCollectionTimeout)).Return().Once()
+	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
 	viewChange := pm.OnTimeout()
 	if viewChange == nil {
 		assert.Fail(t, "Expecting ViewChange event as result of timeout")

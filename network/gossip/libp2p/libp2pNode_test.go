@@ -8,12 +8,14 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
@@ -33,6 +35,7 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 // SetupTests initiates the test setups prior to each test
 func (l *LibP2PNodeTestSuite) SetupTest() {
 	l.ctx, l.cancel = context.WithCancel(context.Background())
+	golog.SetAllLoggers(gologging.INFO)
 }
 
 // TestMultiAddress evaluates correct translations from
@@ -83,7 +86,9 @@ func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 	nodes := l.CreateNodes(1)
 
 	// stops the created node
-	assert.NoError(l.Suite.T(), nodes[0].Stop())
+	done, err := nodes[0].Stop()
+	assert.NoError(l.Suite.T(), err)
+	<-done
 }
 
 // TestGetPeerInfo evaluates the deterministic translation between the nodes address and
@@ -378,6 +383,8 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 // StopNodes stop all nodes in the input slice
 func (l *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
 	for _, n := range nodes {
-		assert.NoError(l.Suite.T(), n.Stop())
+		done, err := n.Stop()
+		assert.NoError(l.Suite.T(), err)
+		<-done
 	}
 }
