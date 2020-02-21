@@ -55,6 +55,12 @@ func UncheckedState(db *badger.DB, identities flow.IdentityList) (*protocol.Stat
 			return fmt.Errorf("could not initialize boundary: %w", err)
 		}
 
+		// insert sealed block mapping
+		err = operation.InsertSealHeight(0, genesis.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert seal height: %w", err)
+		}
+
 		// insert the finalized boundary
 		err = operation.InsertBoundary(genesis.View)(tx)
 		if err != nil {

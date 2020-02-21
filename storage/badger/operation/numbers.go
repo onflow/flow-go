@@ -15,3 +15,11 @@ func InsertNumber(number uint64, blockID flow.Identifier) func(*badger.Txn) erro
 func RetrieveNumber(number uint64, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeNumber, number), blockID)
 }
+
+func InsertSealHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeSealHeight, height), blockID)
+}
+
+func RetrieveSealHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeSealHeight, height), blockID)
+}

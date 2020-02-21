@@ -71,6 +71,12 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 			return fmt.Errorf("could not initialize boundary: %w", err)
 		}
 
+		// insert sealed block mapping
+		err = operation.InsertSealHeight(0, genesis.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert seal height: %w", err)
+		}
+
 		// insert the finalized boundary
 		err = operation.InsertBoundary(genesis.View)(tx)
 		if err != nil {
@@ -127,6 +133,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		// create a lookup for each seal by parent
 		lookup := make(map[string]*flow.Seal, len(block.Seals))
 		var latestSealedHeight uint64
+		var latestSealedHeader flow.Header
 
 		for _, seal := range block.Seals {
 			lookup[string(seal.PreviousState)] = seal
@@ -139,6 +146,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 			if header.Height > latestSealedHeight {
 				latestSealedHeight = header.Height
+				latestSealedHeader = header
 			}
 		}
 
@@ -174,6 +182,12 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 			if latestSealedHeight <= sealedBoundary {
 				return errors.New("new block seals blocks with lower height than current sealed boundary")
+			}
+
+			// insert sealed block mapping
+			err = operation.InsertSealHeight(latestSealedHeight, latestSealedHeader.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert seal height: %w", err)
 			}
 
 			err = operation.UpdateSealedBoundary(latestSealedHeight)(tx)
