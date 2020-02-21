@@ -172,6 +172,22 @@ func (e *EventHandler) startNewView() error {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 		}
 
+		// broadcast the proposal
+		header := hotstuff.ProposalToFlow(proposal)
+		err = e.network.BroadcastProposal(header)
+		if err != nil {
+			// when the network failed sending the proposal due to network issues, it will NOT
+			// return error.
+			// so if there is an error returned here, it must be some exception. It could be, i.e:
+			// 1) the network layer double checks the proposal, and the check failed.
+			// 2) the network layer had some exception encoding the proposal
+			/// ...
+			e.log.Warn().
+				Hex("proposal_id", logging.ID(proposal.Block.BlockID)).
+				Msg("failed to broadcast a block")
+			return fmt.Errorf("can not broadcast the new proposal (%x) for view (%v): %w", proposal.Block.BlockID, proposal.Block.View, err)
+		}
+
 		// store the proposer's vote in voteAggregator
 		// note: duplicate here to account for an edge case
 		// where we are the leader of current view as well

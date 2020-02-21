@@ -2332,8 +2332,7 @@ func testResourceNesting(
 		_, err := ParseAndCheck(t, program)
 
 		switch outerCompositeKind {
-		case common.CompositeKindStructure,
-			common.CompositeKindContract:
+		case common.CompositeKindStructure:
 
 			switch innerCompositeKind {
 			case common.CompositeKindStructure,
@@ -2350,13 +2349,56 @@ func testResourceNesting(
 				panic(errors.NewUnreachableError())
 			}
 
-		case common.CompositeKindResource:
+		case common.CompositeKindResource,
+			common.CompositeKindContract:
+
 			require.NoError(t, err)
 
 		default:
 			panic(errors.NewUnreachableError())
 		}
 	})
+}
+
+func TestCheckContractResourceField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      contract C {
+          let r: @R
+
+          init(r: @R) {
+              self.r <- r
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidContractResourceFieldMove(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      contract C {
+          let r: @R
+
+          init(r: @R) {
+              self.r <- r
+          }
+      }
+
+      fun test() {
+          let r <- C.r
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 }
 
 // TestCheckResourceInterfaceConformance tests the check

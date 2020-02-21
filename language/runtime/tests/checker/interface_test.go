@@ -1252,12 +1252,18 @@ func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 				// `secondKind` is the container composite kind.
 				// Resource composites can only be nested in resource composite kinds.
 
-				if firstKind == common.CompositeKindResource &&
-					secondKind != common.CompositeKindResource {
+				if firstKind == common.CompositeKindResource {
+					switch secondKind {
+					case common.CompositeKindResource,
+						common.CompositeKindContract:
 
-					errs := ExpectCheckerErrors(t, err, 1)
+						require.NoError(t, err)
 
-					assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
+					default:
+						errs := ExpectCheckerErrors(t, err, 1)
+
+						assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
+					}
 				} else {
 					require.NoError(t, err)
 				}

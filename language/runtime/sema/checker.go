@@ -1357,13 +1357,23 @@ func (checker *Checker) checkResourceFieldNesting(
 	members map[string]*Member,
 	compositeKind common.CompositeKind,
 ) {
-	if compositeKind == common.CompositeKindResource {
+	// Resource fields are only allowed in resources and contracts
+
+	switch compositeKind {
+	case common.CompositeKindResource,
+		common.CompositeKindContract:
+
 		return
 	}
 
+	// The field is not a resource or contract, check if there are
+	// any fields that have a resource type  and report them
+
 	for name, member := range members {
+
 		// NOTE: check type, not resource annotation:
 		// the field could have a wrong annotation
+
 		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
 		}
@@ -1372,8 +1382,9 @@ func (checker *Checker) checkResourceFieldNesting(
 
 		checker.report(
 			&InvalidResourceFieldError{
-				Name: name,
-				Pos:  field.Identifier.Pos,
+				Name:          name,
+				CompositeKind: compositeKind,
+				Pos:           field.Identifier.Pos,
 			},
 		)
 	}

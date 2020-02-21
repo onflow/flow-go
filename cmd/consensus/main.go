@@ -79,7 +79,7 @@ func main() {
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
 			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
-			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
+			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
 
 			cons, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, build, final)
 			node.MustNot(err).Msg("could not initialize consensus engine")

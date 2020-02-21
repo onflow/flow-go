@@ -51,3 +51,19 @@ func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
 	}
 	return &proposal
 }
+
+// ProposalToFlow turns a block proposal into a flow header.
+func ProposalToFlow(proposal *Proposal) *flow.Header {
+	block := proposal.Block
+	header := flow.Header{
+		ParentID:      block.QC.BlockID,
+		PayloadHash:   block.PayloadHash,
+		Timestamp:     block.Timestamp,
+		View:          block.View,
+		ParentSigners: block.QC.AggregatedSignature.SignerIDs,
+		ParentSigs:    block.QC.AggregatedSignature.Raw,
+		ProposerID:    block.ProposerID,
+		ProposerSig:   proposal.Signature,
+	}
+	return &header
+}
