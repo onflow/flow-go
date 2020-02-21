@@ -328,7 +328,7 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 
 		// if its number is below current boundary, the block does not connect
 		// to the finalized protocol state and would break database consistency
-		if header.View < boundary {
+		if currentHeader.View < boundary {
 			return fmt.Errorf("block doesn't connect to finalized state")
 		}
 
