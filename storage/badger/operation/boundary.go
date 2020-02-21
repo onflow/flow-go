@@ -17,3 +17,15 @@ func UpdateBoundary(number uint64) func(*badger.Txn) error {
 func RetrieveBoundary(number *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeBoundary), number)
 }
+
+func InsertSealedBoundary(number uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeSealBoundary), number)
+}
+
+func UpdateSealedBoundary(number uint64) func(*badger.Txn) error {
+	return update(makePrefix(codeSealBoundary), number)
+}
+
+func RetrieveSealedBoundary(number *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeSealBoundary), number)
+}

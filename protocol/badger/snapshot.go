@@ -21,6 +21,7 @@ type Snapshot struct {
 	state   *State
 	number  uint64
 	blockID flow.Identifier
+	sealed  bool
 }
 
 // Identities retrieves all active ids at the given snapshot and
@@ -202,19 +203,37 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// set the number to boundary if it's at max uint64
-		if s.number == math.MaxUint64 {
-			err := operation.RetrieveBoundary(&s.number)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve boundary: %w", err)
+		if s.sealed {
+			// set the number to boundary if it's at max uint64
+			if s.number == math.MaxUint64 {
+				err := operation.RetrieveSealedBoundary(&s.number)(tx)
+				if err != nil {
+					return fmt.Errorf("could not retrieve sealed boundary: %w", err)
+				}
 			}
-		}
 
-		// check if hash is nil and try to get it from height
-		if s.blockID == flow.ZeroID {
-			err := operation.RetrieveNumber(s.number, &s.blockID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve hash (%d): %w", s.number, err)
+			// check if hash is nil and try to get it from height
+			if s.blockID == flow.ZeroID {
+				err := operation.RetrieveSealHeight(s.number, &s.blockID)(tx)
+				if err != nil {
+					return fmt.Errorf("could not retrieve seal height (%d): %w", s.number, err)
+				}
+			}
+		} else {
+			// set the number to boundary if it's at max uint64
+			if s.number == math.MaxUint64 {
+				err := operation.RetrieveBoundary(&s.number)(tx)
+				if err != nil {
+					return fmt.Errorf("could not retrieve boundary: %w", err)
+				}
+			}
+
+			// check if hash is nil and try to get it from height
+			if s.blockID == flow.ZeroID {
+				err := operation.RetrieveNumber(s.number, &s.blockID)(tx)
+				if err != nil {
+					return fmt.Errorf("could not retrieve number (%d): %w", s.number, err)
+				}
 			}
 		}
 

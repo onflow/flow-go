@@ -36,3 +36,28 @@ func TestBoundaryInsertUpdateRetrieve(t *testing.T) {
 		assert.Equal(t, retrieved, boundary)
 	})
 }
+
+func TestSealedBoundaryInsertUpdateRetrieve(t *testing.T) {
+
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		boundary := uint64(1337)
+
+		err := db.Update(InsertSealedBoundary(boundary))
+		require.Nil(t, err)
+
+		var retrieved uint64
+		err = db.View(RetrieveSealedBoundary(&retrieved))
+		require.Nil(t, err)
+
+		assert.Equal(t, retrieved, boundary)
+
+		boundary = 9999
+		err = db.Update(UpdateSealedBoundary(boundary))
+		require.Nil(t, err)
+
+		err = db.View(RetrieveSealedBoundary(&retrieved))
+		require.Nil(t, err)
+
+		assert.Equal(t, retrieved, boundary)
+	})
+}

@@ -89,3 +89,17 @@ func (mr *MockStateMockRecorder) Mutate() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mutate", reflect.TypeOf((*MockState)(nil).Mutate))
 }
+
+// Sealed mocks base method
+func (m *MockState) Sealed() protocol.Snapshot {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Sealed")
+	ret0, _ := ret[0].(protocol.Snapshot)
+	return ret0
+}
+
+// Sealed indicates an expected call of Sealed
+func (mr *MockStateMockRecorder) Sealed() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sealed", reflect.TypeOf((*MockState)(nil).Sealed))
+}

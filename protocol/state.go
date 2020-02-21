@@ -16,6 +16,9 @@ type State interface {
 	// time.
 	Final() Snapshot
 
+	//Sealed returns snapshot of blockchain at highest sealed block.
+	Sealed() Snapshot
+
 	// AtNumber returns the snapshot of the persistent protocol state at the
 	// given block number. It is only available for finalized blocks and the
 	// returned snapshot is therefore immutable over time.

@@ -71,10 +71,22 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 			return fmt.Errorf("could not initialize boundary: %w", err)
 		}
 
+		// insert sealed block mapping
+		err = operation.InsertSealHeight(0, genesis.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert seal height: %w", err)
+		}
+
 		// insert the finalized boundary
 		err = operation.InsertBoundary(genesis.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update boundary: %w", err)
+		}
+
+		// insert sealed boundary
+		err = operation.InsertSealedBoundary(genesis.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert sealed boundary: %w", err)
 		}
 
 		return nil
@@ -119,8 +131,22 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 		// create a lookup for each seal by parent
 		lookup := make(map[string]*flow.Seal, len(block.Seals))
+		var latestSealedHeight uint64
+		var latestSealedHeader flow.Header
+
 		for _, seal := range block.Seals {
 			lookup[string(seal.PreviousState)] = seal
+
+			var header flow.Header
+			err = operation.RetrieveHeader(seal.BlockID, &header)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve sealed block: %w", err)
+			}
+
+			if header.Height > latestSealedHeight {
+				latestSealedHeight = header.Height
+				latestSealedHeader = header
+			}
 		}
 
 		// starting with what was the state commitment at the parent block, we
@@ -143,6 +169,30 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		err = operation.IndexCommit(blockID, nextCommit)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert commit: %w", err)
+		}
+
+		if latestSealedHeight > 0 {
+			//update sealed boundary
+			var sealedBoundary uint64
+			err = operation.RetrieveSealedBoundary(&sealedBoundary)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve sealed boundary: %w", err)
+			}
+
+			if latestSealedHeight <= sealedBoundary {
+				return errors.New("new block seals blocks with lower height than current sealed boundary")
+			}
+
+			// insert sealed block mapping
+			err = operation.InsertSealHeight(latestSealedHeight, latestSealedHeader.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert seal height: %w", err)
+			}
+
+			err = operation.UpdateSealedBoundary(latestSealedHeight)(tx)
+			if err != nil {
+				return fmt.Errorf("could not update sealed boundary: %w", err)
+			}
 		}
 
 		return nil

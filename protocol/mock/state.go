@@ -74,3 +74,19 @@ func (_m *State) Mutate() protocol.Mutator {
 
 	return r0
 }
+
+// Sealed provides a mock function with given fields:
+func (_m *State) Sealed() protocol.Snapshot {
+	ret := _m.Called()
+
+	var r0 protocol.Snapshot
+	if rf, ok := ret.Get(0).(func() protocol.Snapshot); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.Snapshot)
+		}
+	}
+
+	return r0
+}
