@@ -1,9 +1,9 @@
 package coldstuff
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff/round"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -27,6 +28,7 @@ type coldStuff struct {
 	comms     Communicator
 	builder   module.Builder
 	finalizer module.Finalizer
+	unit      *engine.Unit
 
 	// round config
 	interval time.Duration
@@ -36,9 +38,6 @@ type coldStuff struct {
 	proposals chan *flow.Header
 	votes     chan *model.Vote
 	commits   chan *model.Commit
-
-	// stops the consent loop
-	done chan struct{}
 }
 
 func New(
@@ -55,9 +54,10 @@ func New(
 		log:       log,
 		me:        me,
 		state:     state,
+		comms:     comms,
 		builder:   builder,
 		finalizer: finalizer,
-		comms:     comms,
+		unit:      engine.NewUnit(),
 		interval:  interval,
 		timeout:   timeout,
 		proposals: make(chan *flow.Header, 1),
@@ -65,32 +65,21 @@ func New(
 		commits:   make(chan *model.Commit, 1),
 	}
 
-	// TODO incorporate this later
-	_ = cold.finalizer
-
 	return &cold, nil
 }
 
-func (e *coldStuff) Start() (exit func(), done <-chan struct{}) {
-	e.done = make(chan struct{})
-	done = e.done
-
-	var once sync.Once
-	exit = func() {
-		once.Do(func() {
-			close(e.done)
-		})
-	}
-
-	go func() {
+func (e *coldStuff) Ready() <-chan struct{} {
+	e.unit.Launch(func() {
 		err := e.loop()
 		if err != nil {
 			e.log.Error().Err(err).Msg("coldstuff loop exited with error")
 		}
-		exit()
-	}()
+	})
+	return e.unit.Ready()
+}
 
-	return
+func (e *coldStuff) Done() <-chan struct{} {
+	return e.unit.Done()
 }
 
 func (e *coldStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
@@ -133,7 +122,7 @@ ConsentLoop:
 		limit := e.round.Parent().Timestamp.Add(e.interval)
 
 		select {
-		case <-e.done:
+		case <-e.unit.Quit():
 			return nil
 		case <-time.After(time.Until(limit)):
 			if e.round.Leader().NodeID == localID {
@@ -218,6 +207,7 @@ func (e *coldStuff) sendProposal() error {
 	// define the block header build function
 	setProposer := func(header *flow.Header) {
 		header.ProposerID = myIdentity.NodeID
+		header.View = e.round.Parent().View + 1
 	}
 
 	// define payload and build next block
@@ -230,13 +220,6 @@ func (e *coldStuff) sendProposal() error {
 		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
-
-	// TODO this should be done by builder
-	// store the block proposal
-	//err = e.headers.Store(candidate)
-	//if err != nil {
-	//	return fmt.Errorf("could not store candidate: %w", err)
-	//}
 
 	// cache the candidate block
 	e.round.Propose(candidate)
@@ -343,7 +326,8 @@ func (e *coldStuff) sendCommit() error {
 
 	// send a commit for the cached block hash
 	commit := &model.Commit{
-		BlockID: candidate.ID(),
+		BlockID:     candidate.ID(),
+		CommitterID: e.me.NodeID(),
 	}
 	err := e.comms.BroadcastCommit(commit)
 	if err != nil {
@@ -370,14 +354,6 @@ func (e *coldStuff) waitForProposal() error {
 		// process each proposal we receive
 		case candidate := <-e.proposals:
 			proposerID := candidate.ProposerID
-
-			// TODO this should be done automatically by CCL
-			// store every proposal
-			//err := e.headers.Store(candidate)
-			//if err != nil {
-			//	log.Error().Err(err).Msg("could not store candidate")
-			//	continue
-			//}
 
 			// discard proposals by non-leaders
 			leaderID := e.round.Leader().NodeID
@@ -436,8 +412,15 @@ func (e *coldStuff) voteOnProposal() error {
 		Str("action", "send_vote").
 		Logger()
 
+	// create a fake signature to avoid network message de-duplication
+	sig := make([]byte, 32)
+	_, err := rand.Read(sig)
+	if err != nil {
+		return fmt.Errorf("could not create fake signature: %w", err)
+	}
+
 	// send vote for proposal to leader
-	err := e.comms.SendVote(candidate.ID(), candidate.View, nil, e.round.Leader().NodeID)
+	err = e.comms.SendVote(candidate.ID(), candidate.View, sig, e.round.Leader().NodeID)
 	if err != nil {
 		return fmt.Errorf("could not submit vote: %w", err)
 	}
@@ -500,28 +483,10 @@ func (e *coldStuff) commitCandidate() error {
 		Str("action", "exec_commit").
 		Logger()
 
-	// TODO extend should be done automatically in CCL
-	// TODO finalize+clean+expulse should be done in Finalizer callback
-	//// commit the block to our chain state
-	//err := e.state.Mutate().Extend(candidate.ID())
-	//if err != nil {
-	//	return fmt.Errorf("could not extend state: %w", err)
-	//}
-	//
-	//// finalize the state
-	//err = e.state.Mutate().Finalize(candidate.ID())
-	//if err != nil {
-	//	return fmt.Errorf("could not finalize state: %w", err)
-	//}
-	//
-	//// hand the finalized block to expulsion engine to spread to all nodes
-	//e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
-	//
-	//// make sure all pending ambiguous state is now cleared up
-	//err = e.cleaner.CleanAfter(candidate.ID())
-	//if err != nil {
-	//	return fmt.Errorf("could not drop ambiguous state: %w", err)
-	//}
+	err := e.finalizer.MakeFinal(candidate.ID())
+	if err != nil {
+		return fmt.Errorf("could not finalize committed block: %w", err)
+	}
 
 	log.Info().Msg("block candidate committed")
 
