@@ -124,7 +124,6 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 		// check the block integrity
 		if block.Payload.Hash() != block.Header.PayloadHash {
-			fmt.Printf("Block# = %d Block.PayloadHash = %s block.Payload.Hash() = %s\n", block.Height, block.PayloadHash, block.Payload.Hash())
 			return fmt.Errorf("block integrity check failed")
 		}
 

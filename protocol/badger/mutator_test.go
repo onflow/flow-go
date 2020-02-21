@@ -3,7 +3,6 @@
 package badger
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -90,7 +89,6 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block.View = 1
 		block.ParentID = genesis.ID()
 		block.PayloadHash = block.Payload.Hash()
-		fmt.Printf("Block# %d        Block.PayloadHash = %s        block.Payload.Hash() = %s        block.ID() = %s \n", block.Height, block.PayloadHash, block.Payload.Hash(), block.ID())
 
 		sealingBlock := unittest.BlockFixture()
 		sealingBlock.Seals = make([]*flow.Seal, 1)
@@ -109,7 +107,6 @@ func TestExtendSealedBoundary(t *testing.T) {
 		}
 		sealingBlock.Seals[0] = seal
 		sealingBlock.PayloadHash = sealingBlock.Payload.Hash()
-		fmt.Printf("Block# %d sealingBlock.PayloadHash = %s sealingBlock.Payload.Hash() = %s sealingBlock.ID() = %s \n", sealingBlock.Height, sealingBlock.PayloadHash, sealingBlock.Payload.Hash(), sealingBlock.ID())
 
 		err = db.Update(func(txn *badger.Txn) error {
 			err = procedure.InsertPayload(&block.Payload)(txn)

@@ -90,7 +90,6 @@ func RetrievePayload(payloadHash flow.Identifier, payload *flow.Payload) func(tx
 		// get seals
 		var seals []*flow.Seal
 		err = RetrieveSeals(payloadHash, &seals)(tx)
-		fmt.Printf("Retriving seals for payload hash %s found %d seals \n", payloadHash, len(seals))
 
 		if err != nil {
 			return fmt.Errorf("could not retrieve seals: %w", err)
