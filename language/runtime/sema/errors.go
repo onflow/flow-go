@@ -1090,7 +1090,7 @@ func (*UnsupportedOptionalChainingAssignmentError) isSemanticError() {}
 // MissingResourceAnnotationError
 
 type MissingResourceAnnotationError struct {
-	Pos ast.Position
+	ast.Range
 }
 
 func (e *MissingResourceAnnotationError) Error() string {
@@ -1098,14 +1098,6 @@ func (e *MissingResourceAnnotationError) Error() string {
 }
 
 func (*MissingResourceAnnotationError) isSemanticError() {}
-
-func (e *MissingResourceAnnotationError) StartPosition() ast.Position {
-	return e.Pos
-}
-
-func (e *MissingResourceAnnotationError) EndPosition() ast.Position {
-	return e.Pos
-}
 
 // InvalidNestedResourceMoveError
 
@@ -1131,7 +1123,7 @@ func (e *InvalidNestedResourceMoveError) EndPosition() ast.Position {
 // InvalidResourceAnnotationError
 
 type InvalidResourceAnnotationError struct {
-	Pos ast.Position
+	ast.Range
 }
 
 func (e *InvalidResourceAnnotationError) Error() string {
@@ -1139,14 +1131,6 @@ func (e *InvalidResourceAnnotationError) Error() string {
 }
 
 func (*InvalidResourceAnnotationError) isSemanticError() {}
-
-func (e *InvalidResourceAnnotationError) StartPosition() ast.Position {
-	return e.Pos
-}
-
-func (e *InvalidResourceAnnotationError) EndPosition() ast.Position {
-	return e.Pos.Shifted(len(common.CompositeKindResource.Annotation()) - 1)
-}
 
 // InvalidResourceInterfaceTypeError
 

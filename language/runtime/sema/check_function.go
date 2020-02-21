@@ -185,7 +185,7 @@ func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parame
 	}
 }
 
-func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.Position) {
+func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.HasPosition) {
 	checker.checkResourceAnnotation(
 		typeAnnotation.Type,
 		typeAnnotation.IsResource,
@@ -193,7 +193,7 @@ func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos 
 	)
 }
 
-func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, pos ast.Position) {
+func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, pos ast.HasPosition) {
 	if ty.IsInvalidType() {
 		return
 	}
@@ -202,7 +202,7 @@ func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, po
 		if !isResourceMove {
 			checker.report(
 				&MissingResourceAnnotationError{
-					Pos: pos,
+					Range: ast.NewRangeFromPositioned(pos),
 				},
 			)
 		}
@@ -210,7 +210,7 @@ func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, po
 		if isResourceMove {
 			checker.report(
 				&InvalidResourceAnnotationError{
-					Pos: pos,
+					Range: ast.NewRangeFromPositioned(pos),
 				},
 			)
 		}
