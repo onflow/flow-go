@@ -2868,12 +2868,12 @@ func (v Fix64Value) Copy() Value {
 	return v
 }
 
-func (Fix64Value) GetOwner() string {
+func (Fix64Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Fix64Value) SetOwner(_ string) {
+func (Fix64Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -3012,12 +3012,12 @@ func (v UFix64Value) Copy() Value {
 	return v
 }
 
-func (UFix64Value) GetOwner() string {
+func (UFix64Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (UFix64Value) SetOwner(_ string) {
+func (UFix64Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
