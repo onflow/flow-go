@@ -835,7 +835,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
           }
           destroy r
 
-          signer.storage[&RI] = &signer.storage[R] as &RI
+          signer.storage[&AnyResource{RI}] = &signer.storage[R] as &AnyResource{RI}
         }
       }
     `)
@@ -850,7 +850,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 
       transaction {
         prepare(signer: Account) {
-          let ref = signer.storage[&RI] ?? panic("no RI ref")
+          let ref = signer.storage[&AnyResource{RI}] ?? panic("no RI ref")
           ref.x()
         }
       }
@@ -1726,7 +1726,7 @@ pub contract FungibleToken {
             }
         }
 
-        pub fun deposit(from: @Receiver) {
+        pub fun deposit(from: @AnyResource{Receiver}) {
             pre {
                 from.balance > 0:
                     "Deposit balance needs to be positive!"
@@ -1752,7 +1752,7 @@ pub contract FungibleToken {
         }
 
         // transfer combines withdraw and deposit into one function call
-        pub fun transfer(to: &Receiver, amount: Int) {
+        pub fun transfer(to: &AnyResource{Receiver}, amount: Int) {
             pre {
                 amount <= self.balance:
                     "Insufficient funds"
@@ -1764,7 +1764,7 @@ pub contract FungibleToken {
             to.deposit(from: <-self.withdraw(amount: amount))
         }
 
-        pub fun deposit(from: @Receiver) {
+        pub fun deposit(from: @AnyResource{Receiver}) {
             self.balance = self.balance + from.balance
             destroy from
         }
@@ -1779,7 +1779,7 @@ pub contract FungibleToken {
     }
 
     pub resource VaultMinter {
-        pub fun mintTokens(amount: Int, recipient: &Receiver) {
+        pub fun mintTokens(amount: Int, recipient: &AnyResource{Receiver}) {
             recipient.deposit(from: <-create Vault(balance: amount))
         }
     }
@@ -1822,9 +1822,14 @@ func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
       import FungibleToken from 0x01
 
       transaction {
+
           prepare(acct: Account) {
-              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Receiver
-              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
+
+              acct.published[&AnyResource{FungibleToken.Receiver}] =
+                  &acct.storage[FungibleToken.Vault] as &AnyResource{FungibleToken.Receiver}
+
+              acct.storage[&FungibleToken.Vault] =
+                  &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
           }
       }
     `)
@@ -1844,8 +1849,11 @@ func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
               let oldVault <- acct.storage[FungibleToken.Vault] <- vaultA
               destroy oldVault
 
-              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Receiver
-              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
+              acct.published[&AnyResource{FungibleToken.Receiver}] =
+                  &acct.storage[FungibleToken.Vault] as &AnyResource{FungibleToken.Receiver}
+
+              acct.storage[&FungibleToken.Vault] =
+                  &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
           }
       }
     `)
@@ -1925,9 +1933,13 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
       import FungibleToken from 0x2
 
       transaction {
+
           prepare(acct: Account) {
-              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Receiver
-              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
+              acct.published[&AnyResource{FungibleToken.Receiver}] =
+                  &acct.storage[FungibleToken.Vault] as &AnyResource{FungibleToken.Receiver}
+
+              acct.storage[&FungibleToken.Vault] =
+                  &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
           }
       }
     `)
@@ -1947,8 +1959,11 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
               let oldVault <- acct.storage[FungibleToken.Vault] <- vaultA
               destroy oldVault
 
-              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Receiver
-              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
+              acct.published[&AnyResource{FungibleToken.Receiver}] =
+                  &acct.storage[FungibleToken.Vault] as &AnyResource{FungibleToken.Receiver}
+
+              acct.storage[&FungibleToken.Vault] =
+                  &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
           }
       }
     `)
@@ -2058,7 +2073,7 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 
 	  transaction {
 	      prepare(signer: Account) {
-	          let oldR <- signer.storage[TestContractInterface.RInterface] <- TestContract.createR()
+	          let oldR <- signer.storage[AnyResource{TestContractInterface.RInterface}] <- TestContract.createR()
 	          destroy oldR
 	      }
 	  }
@@ -2077,7 +2092,7 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 
 	              transaction {
 	                  prepare(signer: Account) {
-	                      signer.storage[TestContractInterface.RInterface]?.check(a: %d, b: %d)
+	                      signer.storage[AnyResource{TestContractInterface.RInterface}]?.check(a: %d, b: %d)
 	                  }
 	              }
 	            `,

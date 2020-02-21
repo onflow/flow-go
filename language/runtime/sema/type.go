@@ -57,6 +57,7 @@ type Type interface {
 	IsResourceType() bool
 	IsInvalidType() bool
 	TypeAnnotationState() TypeAnnotationState
+	ContainsFirstLevelResourceInterfaceType() bool
 }
 
 // ValueIndexableType is a type which can be indexed into using a value
@@ -198,6 +199,10 @@ func (*AnyType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*AnyType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 // AnyStructType represents the top type of all non-resource types
 type AnyStructType struct{}
 
@@ -230,6 +235,10 @@ func (*AnyStructType) IsInvalidType() bool {
 
 func (*AnyStructType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*AnyStructType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 // AnyResourceType represents the top type of all resource types
@@ -266,6 +275,10 @@ func (*AnyResourceType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*AnyResourceType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 // NeverType represents the bottom type
 type NeverType struct{}
 
@@ -300,6 +313,10 @@ func (*NeverType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*NeverType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 // VoidType represents the void type
 type VoidType struct{}
 
@@ -332,6 +349,10 @@ func (*VoidType) IsInvalidType() bool {
 
 func (*VoidType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*VoidType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 // InvalidType represents a type that is invalid.
@@ -369,6 +390,10 @@ func (*InvalidType) IsInvalidType() bool {
 
 func (*InvalidType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*InvalidType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 // OptionalType represents the optional variant of another type
@@ -420,6 +445,10 @@ func (t *OptionalType) TypeAnnotationState() TypeAnnotationState {
 	return t.Type.TypeAnnotationState()
 }
 
+func (t *OptionalType) ContainsFirstLevelResourceInterfaceType() bool {
+	return t.Type.ContainsFirstLevelResourceInterfaceType()
+}
+
 // BoolType represents the boolean type
 type BoolType struct{}
 
@@ -452,6 +481,10 @@ func (*BoolType) IsInvalidType() bool {
 
 func (*BoolType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*BoolType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 // CharacterType represents the character type
@@ -489,6 +522,10 @@ func (*CharacterType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*CharacterType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 // StringType represents the string type
 type StringType struct{}
 
@@ -521,6 +558,10 @@ func (*StringType) IsInvalidType() bool {
 
 func (*StringType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*StringType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 func (*StringType) CanHaveMembers() bool {
@@ -634,6 +675,10 @@ func (*NumberType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*NumberType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 func (*NumberType) MinInt() *big.Int {
 	return nil
 }
@@ -674,6 +719,10 @@ func (*SignedNumberType) IsInvalidType() bool {
 
 func (*SignedNumberType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*SignedNumberType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 func (*SignedNumberType) MinInt() *big.Int {
@@ -733,6 +782,10 @@ func (*IntegerType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*IntegerType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 func (*IntegerType) MinInt() *big.Int {
 	return nil
 }
@@ -773,6 +826,10 @@ func (*SignedIntegerType) IsInvalidType() bool {
 
 func (*SignedIntegerType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*SignedIntegerType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 func (*SignedIntegerType) MinInt() *big.Int {
@@ -817,6 +874,10 @@ func (*IntType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*IntType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 func (*IntType) MinInt() *big.Int {
 	return nil
 }
@@ -858,6 +919,10 @@ func (*Int8Type) IsInvalidType() bool {
 
 func (*Int8Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*Int8Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var Int8TypeMinInt = big.NewInt(0).SetInt64(math.MinInt8)
@@ -905,6 +970,10 @@ func (*Int16Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*Int16Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var Int16TypeMinInt = big.NewInt(0).SetInt64(math.MinInt16)
 var Int16TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt16)
 
@@ -948,6 +1017,10 @@ func (*Int32Type) IsInvalidType() bool {
 
 func (*Int32Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*Int32Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var Int32TypeMinInt = big.NewInt(0).SetInt64(math.MinInt32)
@@ -995,6 +1068,10 @@ func (*Int64Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*Int64Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var Int64TypeMinInt = big.NewInt(0).SetInt64(math.MinInt64)
 var Int64TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt64)
 
@@ -1038,6 +1115,10 @@ func (*Int128Type) IsInvalidType() bool {
 
 func (*Int128Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*Int128Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var Int128TypeMinInt *big.Int
@@ -1097,6 +1178,10 @@ func (*Int256Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*Int256Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var Int256TypeMinInt *big.Int
 
 func init() {
@@ -1154,6 +1239,10 @@ func (*UIntType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*UIntType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var UIntTypeMin = big.NewInt(0)
 
 func (*UIntType) MinInt() *big.Int {
@@ -1197,6 +1286,10 @@ func (*UInt8Type) IsInvalidType() bool {
 
 func (*UInt8Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*UInt8Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var UInt8TypeMinInt = big.NewInt(0)
@@ -1245,6 +1338,10 @@ func (*UInt16Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*UInt16Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var UInt16TypeMinInt = big.NewInt(0)
 var UInt16TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint16)
 
@@ -1289,6 +1386,10 @@ func (*UInt32Type) IsInvalidType() bool {
 
 func (*UInt32Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*UInt32Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var UInt32TypeMinInt = big.NewInt(0)
@@ -1337,6 +1438,10 @@ func (*UInt64Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*UInt64Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var UInt64TypeMinInt = big.NewInt(0)
 var UInt64TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint64)
 
@@ -1381,6 +1486,10 @@ func (*UInt128Type) IsInvalidType() bool {
 
 func (*UInt128Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*UInt128Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var UInt128TypeMinInt = big.NewInt(0)
@@ -1435,6 +1544,10 @@ func (*UInt256Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*UInt256Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var UInt256TypeMinInt = big.NewInt(0)
 var UInt256TypeMaxInt *big.Int
 
@@ -1487,6 +1600,10 @@ func (*Word8Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*Word8Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var Word8TypeMinInt = big.NewInt(0)
 var Word8TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint8)
 
@@ -1531,6 +1648,10 @@ func (*Word16Type) IsInvalidType() bool {
 
 func (*Word16Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*Word16Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var Word16TypeMinInt = big.NewInt(0)
@@ -1579,6 +1700,10 @@ func (*Word32Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*Word32Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var Word32TypeMinInt = big.NewInt(0)
 var Word32TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint32)
 
@@ -1623,6 +1748,10 @@ func (*Word64Type) IsInvalidType() bool {
 
 func (*Word64Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*Word64Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var Word64TypeMinInt = big.NewInt(0)
@@ -1716,6 +1845,10 @@ func (*SignedFixedPointType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*SignedFixedPointType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 func (*SignedFixedPointType) MinInt() *big.Int {
 	return nil
 }
@@ -1760,6 +1893,10 @@ func (*Fix64Type) IsInvalidType() bool {
 
 func (*Fix64Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*Fix64Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var Fix64TypeMinInt = big.NewInt(0).SetInt64(math.MinInt64 / Fix64Factor)
@@ -1824,6 +1961,10 @@ func (*UFix64Type) IsInvalidType() bool {
 
 func (*UFix64Type) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*UFix64Type) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 var UFix64TypeMinInt = big.NewInt(0)
@@ -2118,6 +2259,10 @@ func (t *VariableSizedType) TypeAnnotationState() TypeAnnotationState {
 	return t.Type.TypeAnnotationState()
 }
 
+func (t *VariableSizedType) ContainsFirstLevelResourceInterfaceType() bool {
+	return t.Type.ContainsFirstLevelResourceInterfaceType()
+}
+
 func (t *VariableSizedType) isValueIndexableType() bool {
 	return true
 }
@@ -2179,6 +2324,10 @@ func (t *ConstantSizedType) IsInvalidType() bool {
 
 func (t *ConstantSizedType) TypeAnnotationState() TypeAnnotationState {
 	return t.Type.TypeAnnotationState()
+}
+
+func (t *ConstantSizedType) ContainsFirstLevelResourceInterfaceType() bool {
+	return t.Type.ContainsFirstLevelResourceInterfaceType()
 }
 
 func (t *ConstantSizedType) isValueIndexableType() bool {
@@ -2408,6 +2557,20 @@ func (t *FunctionType) TypeAnnotationState() TypeAnnotationState {
 	}
 
 	return TypeAnnotationStateValid
+}
+
+func (t *FunctionType) ContainsFirstLevelResourceInterfaceType() bool {
+	if t.ReturnTypeAnnotation.Type.ContainsFirstLevelResourceInterfaceType() {
+		return true
+	}
+
+	for _, parameter := range t.Parameters {
+		if parameter.TypeAnnotation.Type.ContainsFirstLevelResourceInterfaceType() {
+			return true
+		}
+	}
+
+	return false
 }
 
 // SpecialFunctionType is the the type representing a special function,
@@ -2640,11 +2803,23 @@ type CompositeType struct {
 	Identifier   string
 	Kind         common.CompositeKind
 	Conformances []*InterfaceType
-	Members      map[string]*Member
+	// an internal set of field `Conformances`
+	conformanceSet InterfaceSet
+	Members        map[string]*Member
 	// TODO: add support for overloaded initializers
 	ConstructorParameters []*Parameter
 	NestedTypes           map[string]Type
 	ContainerType         Type
+}
+
+func (t *CompositeType) ConformanceSet() InterfaceSet {
+	if t.conformanceSet == nil {
+		t.conformanceSet = make(InterfaceSet, len(t.Conformances))
+		for _, conformance := range t.Conformances {
+			t.conformanceSet[conformance] = struct{}{}
+		}
+	}
+	return t.conformanceSet
 }
 
 func (*CompositeType) IsType() {}
@@ -2705,6 +2880,10 @@ func (*CompositeType) IsInvalidType() bool {
 
 func (*CompositeType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*CompositeType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 func (t *CompositeType) InterfaceType() *InterfaceType {
@@ -2777,6 +2956,10 @@ func (*AccountType) IsInvalidType() bool {
 
 func (*AccountType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*AccountType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 func (*AccountType) CanHaveMembers() bool {
@@ -2907,6 +3090,10 @@ func (*PublicAccountType) IsInvalidType() bool {
 
 func (*PublicAccountType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (*PublicAccountType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 func (*PublicAccountType) CanHaveMembers() bool {
@@ -3099,6 +3286,10 @@ func (*InterfaceType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (t *InterfaceType) ContainsFirstLevelResourceInterfaceType() bool {
+	return t.CompositeKind == common.CompositeKindResource
+}
+
 // DictionaryType
 
 type DictionaryType struct {
@@ -3164,6 +3355,11 @@ func (t *DictionaryType) TypeAnnotationState() TypeAnnotationState {
 	}
 
 	return TypeAnnotationStateValid
+}
+
+func (t *DictionaryType) ContainsFirstLevelResourceInterfaceType() bool {
+	return t.KeyType.ContainsFirstLevelResourceInterfaceType() ||
+		t.ValueType.ContainsFirstLevelResourceInterfaceType()
 }
 
 func (t *DictionaryType) CanHaveMembers() bool {
@@ -3311,6 +3507,10 @@ func (*StorageType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (t *StorageType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 func (t *StorageType) isTypeIndexableType() {}
 
 func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string) {
@@ -3379,6 +3579,10 @@ func (t *ReferencesType) IsInvalidType() bool {
 
 func (*ReferencesType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
+}
+
+func (t *ReferencesType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
 }
 
 func (t *ReferencesType) isTypeIndexableType() {}
@@ -3479,6 +3683,10 @@ func (*ReferenceType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (t *ReferenceType) ContainsFirstLevelResourceInterfaceType() bool {
+	return t.Type.ContainsFirstLevelResourceInterfaceType()
+}
+
 func (t *ReferenceType) CanHaveMembers() bool {
 	referencedType, ok := t.Type.(MemberAccessibleType)
 	if !ok {
@@ -3554,6 +3762,10 @@ func (*AddressType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*AddressType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 var AddressTypeMinInt = big.NewInt(0)
 var AddressTypeMaxInt *big.Int
 
@@ -3577,6 +3789,7 @@ func (*AddressType) MaxInt() *big.Int {
 // Types are subtypes of themselves.
 //
 func IsSubType(subType Type, superType Type) bool {
+
 	if subType.Equal(superType) {
 		return true
 	}
@@ -3787,51 +4000,6 @@ func IsSubType(subType Type, superType Type) bool {
 				return false
 			}
 
-		case *InterfaceType:
-
-			if typedInnerSuperType.CompositeKind != common.CompositeKindResource {
-				return false
-			}
-
-			switch typedInnerSubType := typedSubType.Type.(type) {
-			case *CompositeType:
-				// An unauthorized reference to a resource type `&T`
-				// is a subtype of a reference to a resource interface type `&V`,
-				// if `T` conforms to `V`
-
-				if typedInnerSubType.Kind != common.CompositeKindResource {
-					return false
-				}
-
-				// TODO: optimize, use set
-				for _, conformance := range typedInnerSubType.Conformances {
-					if typedInnerSuperType.Equal(conformance) {
-						return true
-					}
-				}
-
-				return false
-
-			case *RestrictedResourceType:
-				// An unauthorized reference to a restricted resource type `&T{Us}` is a subtype of
-				// a reference to a resource interface type `&V`, if `Us` contains `V`.
-				//
-				// The holder of the reference may not gain more permissions or knowledge.
-
-				// TODO: optimize, use set
-				for _, restriction := range typedInnerSubType.Restrictions {
-					if typedInnerSuperType.Equal(restriction) {
-						return true
-					}
-				}
-
-				return false
-
-			case *InterfaceType:
-				// TODO: Once interfaces can conform to interfaces, check conformances here. Only allow upcasting.
-				return false
-			}
-
 		case *CompositeType:
 			// An unauthorized reference is not a subtype of a reference to a resource type `&V`
 			// (e.g. reference to a restricted resource type `&T{Us}`, or reference to a resource interface type `&T`)
@@ -3894,8 +4062,21 @@ func IsSubType(subType Type, superType Type) bool {
 		case *CompositeType:
 			// A resource type `T` is a subtype of a restricted resource type `U{Vs}`, if `T == U`
 
-			return typedSubType.Kind == common.CompositeKindResource &&
-				typedSubType == typedSuperType.Type
+			if typedSubType.Kind == common.CompositeKindResource {
+				if typedSubType == typedSuperType.Type {
+					return true
+				}
+
+				if _, ok := typedSuperType.Type.(*AnyResourceType); ok {
+					for _, restriction := range typedSuperType.Restrictions {
+						if _, ok := typedSubType.ConformanceSet()[restriction]; !ok {
+							return false
+						}
+					}
+
+					return true
+				}
+			}
 
 		case *InterfaceType:
 			// A resource interface type `T` is not a (static) subtype of a restricted resource type `U{Vs}.
@@ -3929,30 +4110,24 @@ func IsSubType(subType Type, superType Type) bool {
 
 		switch typedSubType := subType.(type) {
 		case *CompositeType:
-			// A composite type `T` is a subtype of a interface type `V`, if `T` conforms to `V`
 
-			// TODO: optimize, use set
-			for _, conformance := range typedSubType.Conformances {
-				if typedSuperType.Equal(conformance) {
-					return true
-				}
-			}
+			// Resources are not subtypes of resource interfaces.
+			// (Use `AnyResource` with restriction instead).
 
-			return false
-
-		case *RestrictedResourceType:
-			// A restricted resource type `T{Us}` is a subtype of a resource interface type `V`,
-			// if `T` conforms to `V`. `Us` does not have to contain `V`.
-
-			if typedSuperType.CompositeKind != common.CompositeKindResource {
+			if typedSuperType.CompositeKind == common.CompositeKindResource {
 				return false
 			}
 
-			// TODO: optimize, use set
-			for _, conformance := range typedSubType.Type.Conformances {
-				if typedSuperType.Equal(conformance) {
-					return true
-				}
+			// A composite type `T` is a subtype of a interface type `V`, if `T` conforms to `V`,
+			// and `V` and `T` are of the same kind
+
+			if typedSubType.Kind != typedSuperType.CompositeKind {
+				return false
+			}
+
+			// TODO: once interfaces can conform to interfaces, include
+			if _, ok := typedSubType.ConformanceSet()[typedSuperType]; ok {
+				return true
 			}
 
 			return false
@@ -4101,6 +4276,10 @@ func (*TransactionType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
+func (*TransactionType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 func (t *TransactionType) CanHaveMembers() bool {
 	return true
 }
@@ -4109,13 +4288,13 @@ func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error
 	return t.Members[identifier]
 }
 
-// RestrictionSet
+// InterfaceSet
 
-type RestrictionSet map[*InterfaceType]struct{}
+type InterfaceSet map[*InterfaceType]struct{}
 
-func (s RestrictionSet) IsSubsetOf(other RestrictionSet) bool {
-	for restriction := range s {
-		if _, ok := other[restriction]; !ok {
+func (s InterfaceSet) IsSubsetOf(other InterfaceSet) bool {
+	for interfaceType := range s {
+		if _, ok := other[interfaceType]; !ok {
 			return false
 		}
 	}
@@ -4129,15 +4308,15 @@ func (s RestrictionSet) IsSubsetOf(other RestrictionSet) bool {
 // i.e. no members of the underlying resource type are available.
 //
 type RestrictedResourceType struct {
-	Type         *CompositeType
+	Type         Type
 	Restrictions []*InterfaceType
-	// an internal set of `Restrictions`
-	restrictionSet RestrictionSet
+	// an internal set of field `Restrictions`
+	restrictionSet InterfaceSet
 }
 
-func (t *RestrictedResourceType) RestrictionSet() RestrictionSet {
+func (t *RestrictedResourceType) RestrictionSet() InterfaceSet {
 	if t.restrictionSet == nil {
-		t.restrictionSet = make(RestrictionSet, len(t.Restrictions))
+		t.restrictionSet = make(InterfaceSet, len(t.Restrictions))
 		for _, restriction := range t.Restrictions {
 			t.restrictionSet[restriction] = struct{}{}
 		}
@@ -4229,6 +4408,13 @@ func (*RestrictedResourceType) IsInvalidType() bool {
 func (*RestrictedResourceType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
+
+func (*RestrictedResourceType) ContainsFirstLevelResourceInterfaceType() bool {
+	// Even though the restrictions should be resource interfaces,
+	// they are not on the "first level", i.e. not the restricted type
+	return false
+}
+
 func (t *RestrictedResourceType) CanHaveMembers() bool {
 	return true
 }
@@ -4246,21 +4432,30 @@ func (t *RestrictedResourceType) GetMember(identifier string, targetRange ast.Ra
 		}
 	}
 
-	// If none of the restrictions had a member, see if the restricted type
-	// has a member with the identifier. Still return it for convenience
-	// to help check the rest of the program and improve the developer experience,
+	// If none of the restrictions had a member, see if
+	// the restricted type has a member with the identifier.
+	//
+	// Still return it for convenience to help check the rest
+	// of the program and improve the developer experience,
 	// *but* also report an error that this access is invalid
+	//
+	// The restricted type may be `AnyResource`,
+	// in which case there are no members.
 
-	member := t.Type.GetMember(identifier, targetRange, reportError)
+	if memberAccessibleType, ok := t.Type.(MemberAccessibleType); ok {
+		member := memberAccessibleType.GetMember(identifier, targetRange, reportError)
 
-	if member != nil {
-		reportError(
-			&InvalidRestrictedTypeMemberAccessError{
-				Name:  identifier,
-				Range: targetRange,
-			},
-		)
+		if member != nil {
+			reportError(
+				&InvalidRestrictedTypeMemberAccessError{
+					Name:  identifier,
+					Range: targetRange,
+				},
+			)
+		}
+
+		return member
 	}
 
-	return member
+	return nil
 }

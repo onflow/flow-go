@@ -248,6 +248,10 @@ func (*BlockType) IsInvalidType() bool {
 	return false
 }
 
+func (*BlockType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 func (*BlockType) CanHaveMembers() bool {
 	return true
 }

@@ -312,33 +312,37 @@ func TestCheckContractNestedDeclarationOrderOutsideInside(t *testing.T) {
             `
 		}
 
+		annotationType := "R"
+		if isInterface {
+			annotationType = "AnyResource{R}"
+		}
+
 		t.Run(interfaceKeyword, func(t *testing.T) {
 
 			code := fmt.Sprintf(
 				`
                   contract C {
 
-                      fun callGoExisting(r: @R) {
+                      fun callGoExisting(r: @%[1]s) {
                           r.go()
                           destroy r
                       }
 
-                      %[1]s
+                      %[2]s
 
-                      resource %[2]s R {
-                          fun go() %[3]s
+                      resource %[3]s R {
+                          fun go() %[4]s
                       }
                   }
                 `,
+				annotationType,
 				extraFunction,
 				interfaceKeyword,
 				body,
 			)
 			_, err := ParseAndCheck(t, code)
 
-			if !assert.NoError(t, err) {
-				cmd.PrettyPrintError(err, "", map[string]string{"": code})
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -466,39 +470,65 @@ func TestCheckContractNestedDeclarationsComplex(t *testing.T) {
 							)
 						}
 
+						firstQualifiedTypeAnnotation := "C.A"
+						firstLocalTypeAnnotation := "A"
+						if firstIsInterface && firstKind == common.CompositeKindResource {
+							firstQualifiedTypeAnnotation = fmt.Sprintf(
+								"AnyResource{%s}",
+								firstQualifiedTypeAnnotation,
+							)
+							firstLocalTypeAnnotation = fmt.Sprintf(
+								"AnyResource{%s}",
+								firstLocalTypeAnnotation,
+							)
+						}
+
+						secondQualifiedTypeAnnotation := "C.B"
+						secondLocalTypeAnnotation := "B"
+						if secondIsInterface && secondKind == common.CompositeKindResource {
+							secondQualifiedTypeAnnotation = fmt.Sprintf(
+								"AnyResource{%s}",
+								secondQualifiedTypeAnnotation,
+							)
+							secondLocalTypeAnnotation = fmt.Sprintf(
+								"AnyResource{%s}",
+								secondLocalTypeAnnotation,
+							)
+						}
+
 						t.Run(testName, func(t *testing.T) {
 
 							code := fmt.Sprintf(
 								`
                                   contract %[1]s C {
 
-                                      fun qualifiedBeforeA(_ a: %[4]sC.A) %[12]s
-                                      fun localBeforeA(_ a: %[4]sA) %[12]s
+                                      fun qualifiedBeforeA(_ a: %[4]s%[14]s) %[12]s
+                                      fun localBeforeA(_ a: %[4]s%[16]s) %[12]s
 
-                                      fun qualifiedBeforeB(_ b: %[7]sC.B) %[13]s
-                                      fun localBeforeB(_ b: %[7]sB) %[13]s
+                                      fun qualifiedBeforeB(_ b: %[7]s%[15]s) %[13]s
+                                      fun localBeforeB(_ b: %[7]s%[17]s) %[13]s
 
                                       %[2]s %[3]s A {
-                                          fun qualifiedB(_ b: %[7]sC.B) %[9]s
-                                          fun localB(_ b: %[7]sB) %[9]s
+                                          fun qualifiedB(_ b: %[7]s%[15]s) %[9]s
+                                          fun localB(_ b: %[7]s%[17]s) %[9]s
 
-                                          fun qualifiedA(_ a: %[4]sC.A) %[8]s
-                                          fun localA(_ a: %[4]sA) %[8]s
+                                          fun qualifiedA(_ a: %[4]s%[14]s) %[8]s
+                                          fun localA(_ a: %[4]s%[16]s) %[8]s
                                       }
 
                                       %[5]s %[6]s B {
-                                          fun qualifiedA(_ a: %[4]sC.A) %[10]s
-                                          fun localA(_ a: %[4]sA) %[10]s
+                                          fun qualifiedA(_ a: %[4]s%[14]s) %[10]s
+                                          fun localA(_ a: %[4]s%[16]s) %[10]s
 
-                                          fun qualifiedB(_ b: %[7]sC.B) %[11]s
-                                          fun localB(_ b: %[7]sB) %[11]s
+                                          fun qualifiedB(_ b: %[7]s%[15]s) %[11]s
+                                          fun localB(_ b: %[7]s%[17]s) %[11]s
                                       }
 
-                                      fun qualifiedAfterA(_ a: %[4]sC.A) %[12]s
-                                      fun localAfterA(_ a: %[4]sA) %[12]s
+                                      fun qualifiedAfterA(_ a: %[4]s%[14]s) %[12]s
+                                      fun localAfterA(_ a: %[4]s%[16]s) %[12]s
 
-                                      fun qualifiedAfterB(_ b: %[7]sC.B) %[13]s
-                                      fun localAfterB(_ b: %[7]sB) %[13]s
+                                      fun qualifiedAfterB(_ b: %[7]s%[15]s) %[13]s
+                                      fun localAfterB(_ b: %[7]s%[17]s) %[13]s
                                   }
                                 `,
 								contractInterfaceKeyword,
@@ -514,6 +544,10 @@ func TestCheckContractNestedDeclarationsComplex(t *testing.T) {
 								bodyUsingSecondInsideSecond,
 								bodyUsingFirstOutside,
 								bodyUsingSecondOutside,
+								firstQualifiedTypeAnnotation,
+								secondQualifiedTypeAnnotation,
+								firstLocalTypeAnnotation,
+								secondLocalTypeAnnotation,
 							)
 							_, err := ParseAndCheck(t, code)
 

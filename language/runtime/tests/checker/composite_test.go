@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
@@ -683,18 +684,24 @@ func TestCheckInvalidResourceFieldWithMissingResourceAnnotation(t *testing.T) {
                 `
 			}
 
+			annotationType := "Test"
+			if isInterface {
+				annotationType = "AnyResource{Test}"
+			}
+
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
                       resource %[1]s Test {
-                          let test: Test
+                          let test: %[2]s
 
-                          init(test: @Test) %[2]s
+                          init(test: @%[2]s) %[3]s
 
-                          destroy() %[3]s
+                          destroy() %[4]s
                       }
                     `,
 					interfaceKeyword,
+					annotationType,
 					initializerBody,
 					destructorBody,
 				),
@@ -1930,13 +1937,21 @@ func TestCheckMutualTypeUseTopLevel(t *testing.T) {
 				for _, secondIsInterface := range interfacePossibilities {
 
 					firstInterfaceKeyword := ""
+					firstTypeAnnotation := "A"
 					if firstIsInterface {
 						firstInterfaceKeyword = "interface"
+						if firstKind == common.CompositeKindResource {
+							firstTypeAnnotation = "AnyResource{A}"
+						}
 					}
 
 					secondInterfaceKeyword := ""
+					secondTypeAnnotation := "B"
 					if secondIsInterface {
 						secondInterfaceKeyword = "interface"
+						if secondKind == common.CompositeKindResource {
+							secondTypeAnnotation = "AnyResource{B}"
+						}
 					}
 
 					testName := fmt.Sprintf(
@@ -1965,29 +1980,33 @@ func TestCheckMutualTypeUseTopLevel(t *testing.T) {
 
 					t.Run(testName, func(t *testing.T) {
 
-						_, err := ParseAndCheck(t,
-							fmt.Sprintf(
-								`
-                                  %[1]s %[2]s A {
-                                      fun use(_ b: %[3]sB) %[4]s
-                                  }
+						code := fmt.Sprintf(
+							`
+                              %[1]s %[2]s A {
+                                  fun use(_ b: %[3]s%[4]s) %[5]s
+                              }
 
-                                  %[5]s %[6]s B {
-                                      fun use(_ a: %[7]sA) %[8]s
-                                  }
-                                `,
-								firstKind.Keyword(),
-								firstInterfaceKeyword,
-								secondKind.Annotation(),
-								firstBody,
-								secondKind.Keyword(),
-								secondInterfaceKeyword,
-								firstKind.Annotation(),
-								secondBody,
-							),
+                              %[6]s %[7]s B {
+                                  fun use(_ a: %[8]s%[9]s) %[10]s
+                              }
+                            `,
+							firstKind.Keyword(),
+							firstInterfaceKeyword,
+							secondKind.Annotation(),
+							secondTypeAnnotation,
+							firstBody,
+							secondKind.Keyword(),
+							secondInterfaceKeyword,
+							firstKind.Annotation(),
+							firstTypeAnnotation,
+							secondBody,
 						)
 
-						require.NoError(t, err)
+						_, err := ParseAndCheck(t, code)
+
+						if !assert.NoError(t, err) {
+							cmd.PrettyPrintError(err, "", map[string]string{"": code})
+						}
 					})
 				}
 			}
