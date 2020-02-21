@@ -53,8 +53,8 @@ func NewThresholdSigner(size int, hashingAlgo Hasher) (*ThresholdSigner, error) 
 	threshold := optimalThreshold(size)
 	// Hahser to be used
 	hasher := hashingAlgo
-	shares := make([]byte, 0, size*SignatureLenBLS_BLS12381)
-	signers := make([]index, 0, size)
+	shares := make([]byte, 0, (threshold+1)*SignatureLenBLS_BLS12381)
+	signers := make([]index, 0, threshold+1)
 
 	return &ThresholdSigner{
 		size:               size,
@@ -192,5 +192,41 @@ func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 			"The constructed threshold signature in incorrect. There might be an issue with the set keys"}
 	}
 
+	return thresholdSignature, nil
+}
+
+// ReconstructThresholdSignature is a stateless function that takes a list of
+// signatures and their signers's indices and returns the threshold signature
+// size is the size of the threshold signature group
+// The function does not check the validity of the shares, and does not check
+// the validity of the resulting signature.
+// The function assumes the threshold value is equal to the output of optimalThreshold()
+// ReconstructThresholdSignature returns:
+// - Signature: the threshold signature if the threshold was reached, nil otherwise
+func ReconstructThresholdSignature(size int, shares []Signature, signers []int) (Signature, error) {
+	if len(shares) != len(signers) {
+		return nil, cryptoError{"The number of signature shares is not matching the number of signers"}
+	}
+	// check if the threshold was not reached
+	threshold := optimalThreshold(size)
+	if len(shares) < threshold+1 {
+		return nil, nil
+	}
+
+	// flatten the shares (required by the C layer)
+	flatShares := make([]byte, 0, signatureLengthBLS_BLS12381*(threshold+1))
+	indexSigners := make([]index, 0, threshold+1)
+	for i, share := range shares {
+		flatShares = append(flatShares, share...)
+		indexSigners = append(indexSigners, index(signers[i]))
+	}
+
+	thresholdSignature := make([]byte, signatureLengthBLS_BLS12381)
+	// Lagrange Interpolate at point 0
+	C.G1_lagrangeInterpolateAtZero(
+		(*C.uchar)(&thresholdSignature[0]),
+		(*C.uchar)(&flatShares[0]),
+		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold+1),
+	)
 	return thresholdSignature, nil
 }
