@@ -48,7 +48,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), state, me, mws[i], csize)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), state, me, mws[i], csize, libp2p.NewRandPermTopology())
 		if err != nil {
 			return nil, fmt.Errorf("could not create error %w", err)
 		}
