@@ -200,6 +200,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// apply the custom fields setter of the consensus algorithm
 		setter(header)
 
+		// index the state commitment for this block
+		// TODO this is also done by Mutator.Extend, perhaps refactor that into a procedure
+		err = operation.IndexCommit(header.ID(), commit)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index commit: %w", err)
+		}
+
 		// insert the block header
 		err = operation.InsertHeader(header)(tx)
 		if err != nil {
