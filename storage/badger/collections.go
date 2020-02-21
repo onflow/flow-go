@@ -22,6 +22,17 @@ func NewCollections(db *badger.DB) *Collections {
 	return &c
 }
 
+func (c *Collections) StoreLight(collection *flow.LightCollection) error {
+	return c.db.Update(func(tx *badger.Txn) error {
+		err := operation.InsertCollection(collection)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert collection: %w", err)
+		}
+
+		return nil
+	})
+}
+
 func (c *Collections) Store(collection *flow.Collection) error {
 	return c.db.Update(func(btx *badger.Txn) error {
 		light := collection.Light()
