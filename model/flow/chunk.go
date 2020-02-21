@@ -30,18 +30,14 @@ func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
-type RegisterTouch struct {
-	RegisterID RegisterID
-	Value      RegisterValue
-	Proof      Proof
-}
-
 // ChunkDataPack holds all register touches (any read, or write)
 // note that we have to capture a read proof for each write before updating the registers
 type ChunkDataPack struct {
-	ChunkID         Identifier
-	StartState      StateCommitment
-	RegisterTouches []RegisterTouch
+	ChunkID     Identifier
+	StartState  StateCommitment
+	RegisterIds [][]byte
+	Values      [][]byte
+	Proofs      [][]byte
 }
 
 type ChunkHeader struct {
