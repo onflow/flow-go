@@ -15,7 +15,7 @@ func IndexGuarantees(payloadHash flow.Identifier, guarantees []*flow.CollectionG
 	return func(tx *badger.Txn) error {
 
 		// check and index the guarantees
-		for _, guarantee := range guarantees {
+		for i, guarantee := range guarantees {
 			var exists bool
 			err := operation.CheckGuarantee(guarantee.CollectionID, &exists)(tx)
 			if err != nil {
@@ -26,7 +26,7 @@ func IndexGuarantees(payloadHash flow.Identifier, guarantees []*flow.CollectionG
 			}
 
 			// TODO: Revisit duplicate handling logic
-			err = operation.AllowDuplicates(operation.IndexGuarantee(payloadHash, guarantee.CollectionID))(tx)
+			err = operation.AllowDuplicates(operation.IndexGuarantee(payloadHash, uint64(i), guarantee.CollectionID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.CollectionID, err)
 			}
@@ -38,10 +38,9 @@ func IndexGuarantees(payloadHash flow.Identifier, guarantees []*flow.CollectionG
 
 func RetrieveGuarantees(payloadHash flow.Identifier, guarantees *[]*flow.CollectionGuarantee) func(*badger.Txn) error {
 
-	// make sure we have a zero value
-	*guarantees = make([]*flow.CollectionGuarantee, 0)
-
 	return func(tx *badger.Txn) error {
+
+		var retrievedGuarantees []*flow.CollectionGuarantee
 
 		// get the collection IDs for the guarantees
 		var collIDs []flow.Identifier
@@ -51,15 +50,16 @@ func RetrieveGuarantees(payloadHash flow.Identifier, guarantees *[]*flow.Collect
 		}
 
 		// get all guarantees
-		*guarantees = make([]*flow.CollectionGuarantee, 0, len(collIDs))
 		for _, collID := range collIDs {
 			var guarantee flow.CollectionGuarantee
 			err = operation.RetrieveGuarantee(collID, &guarantee)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve guarantee (%x): %w", collID, err)
 			}
-			*guarantees = append(*guarantees, &guarantee)
+			retrievedGuarantees = append(retrievedGuarantees, &guarantee)
 		}
+
+		*guarantees = retrievedGuarantees
 
 		return nil
 	}

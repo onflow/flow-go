@@ -15,7 +15,7 @@ func IndexSeals(payloadHash flow.Identifier, seals []*flow.Seal) func(*badger.Tx
 	return func(tx *badger.Txn) error {
 
 		// check and index the seals
-		for _, seal := range seals {
+		for i, seal := range seals {
 			var exists bool
 			err := operation.CheckSeal(seal.ID(), &exists)(tx)
 			if err != nil {
@@ -24,7 +24,7 @@ func IndexSeals(payloadHash flow.Identifier, seals []*flow.Seal) func(*badger.Tx
 			if !exists {
 				return fmt.Errorf("node seal missing in DB (%x)", seal.ID())
 			}
-			err = operation.IndexSeal(payloadHash, seal.ID())(tx)
+			err = operation.IndexSeal(payloadHash, uint64(i), seal.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index seal (%x): %w", seal.ID(), err)
 			}
@@ -37,9 +37,11 @@ func IndexSeals(payloadHash flow.Identifier, seals []*flow.Seal) func(*badger.Tx
 func RetrieveSeals(payloadHash flow.Identifier, seals *[]*flow.Seal) func(*badger.Txn) error {
 
 	// make sure we have a zero value
-	*seals = make([]*flow.Seal, 0)
+	//*seals = make([]*flow.Seal, 0)
 
 	return func(tx *badger.Txn) error {
+
+		var retrievedSeals []*flow.Seal
 
 		// get the sealection IDs for the seals
 		var sealIDs []flow.Identifier
@@ -49,15 +51,17 @@ func RetrieveSeals(payloadHash flow.Identifier, seals *[]*flow.Seal) func(*badge
 		}
 
 		// get all seals
-		*seals = make([]*flow.Seal, 0, len(sealIDs))
+		//*seals = make([]*flow.Seal, 0, len(sealIDs))
 		for _, sealID := range sealIDs {
 			var seal flow.Seal
 			err = operation.RetrieveSeal(sealID, &seal)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve seal (%x): %w", sealID, err)
 			}
-			*seals = append(*seals, &seal)
+			retrievedSeals = append(retrievedSeals, &seal)
 		}
+
+		*seals = retrievedSeals
 
 		return nil
 	}
