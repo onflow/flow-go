@@ -833,14 +833,25 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 
 		for name := range interfaceType.Members {
 			if previousDeclaringInterfaceType, ok := memberSet[name]; ok {
-				checker.report(
-					&RestrictionMemberClashError{
-						Name:                  name,
-						RedeclaringType:       interfaceType,
-						OriginalDeclaringType: previousDeclaringInterfaceType,
-						Range:                 ast.NewRangeFromPositioned(restriction),
-					},
-				)
+
+				// If there is an overlap in members, ensure the members have the same type
+
+				memberType := interfaceType.Members[name].TypeAnnotation.Type
+				previousMemberType := previousDeclaringInterfaceType.Members[name].TypeAnnotation.Type
+
+				if !memberType.IsInvalidType() &&
+					!previousMemberType.IsInvalidType() &&
+					!memberType.Equal(previousMemberType) {
+
+					checker.report(
+						&RestrictionMemberClashError{
+							Name:                  name,
+							RedeclaringType:       interfaceType,
+							OriginalDeclaringType: previousDeclaringInterfaceType,
+							Range:                 ast.NewRangeFromPositioned(restriction),
+						},
+					)
+				}
 			} else {
 				memberSet[name] = interfaceType
 			}
@@ -1346,13 +1357,23 @@ func (checker *Checker) checkResourceFieldNesting(
 	members map[string]*Member,
 	compositeKind common.CompositeKind,
 ) {
-	if compositeKind == common.CompositeKindResource {
+	// Resource fields are only allowed in resources and contracts
+
+	switch compositeKind {
+	case common.CompositeKindResource,
+		common.CompositeKindContract:
+
 		return
 	}
 
+	// The field is not a resource or contract, check if there are
+	// any fields that have a resource type  and report them
+
 	for name, member := range members {
+
 		// NOTE: check type, not resource annotation:
 		// the field could have a wrong annotation
+
 		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
 		}
@@ -1361,8 +1382,9 @@ func (checker *Checker) checkResourceFieldNesting(
 
 		checker.report(
 			&InvalidResourceFieldError{
-				Name: name,
-				Pos:  field.Identifier.Pos,
+				Name:          name,
+				CompositeKind: compositeKind,
+				Pos:           field.Identifier.Pos,
 			},
 		)
 	}
@@ -1590,22 +1612,34 @@ func (checker *Checker) withSelfResourceInvalidationAllowed(f func()) {
 func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 	var predeclaredMembers []*Member
 
-	// Contracts have a predeclared `account: Account` field
+	addPredeclaredMember := func(member *Member) {
+		member.Predeclared = true
+		predeclaredMembers = append(predeclaredMembers, member)
+	}
 
-	if compositeType, ok := containerType.(*CompositeType); ok &&
-		compositeType.Kind == common.CompositeKindContract {
+	if compositeKindedType, ok := containerType.(CompositeKindedType); ok {
 
-		predeclaredMembers = append(predeclaredMembers,
-			&Member{
-				Predeclared:     true,
-				ContainerType:   compositeType,
-				Access:          ast.AccessPrivate,
-				Identifier:      ast.Identifier{Identifier: "account"},
-				TypeAnnotation:  &TypeAnnotation{Type: &AccountType{}},
-				DeclarationKind: common.DeclarationKindField,
-				VariableKind:    ast.VariableKindConstant,
-			},
-		)
+		switch compositeKindedType.GetCompositeKind() {
+		case common.CompositeKindContract:
+			// Contracts have a predeclared private field `priv let account: Account`
+
+			member := NewPublicConstantFieldMember(
+				containerType,
+				"account",
+				&AccountType{},
+			)
+			member.Access = ast.AccessPrivate
+			addPredeclaredMember(member)
+
+		case common.CompositeKindResource:
+			// Resources have a predeclared field `pub let owner: PublicAccount?`
+
+			addPredeclaredMember(NewPublicConstantFieldMember(
+				containerType,
+				"owner",
+				&OptionalType{&PublicAccountType{}},
+			))
+		}
 	}
 
 	return predeclaredMembers

@@ -686,6 +686,13 @@ func (checker *Checker) checkCompositeConformance(
 
 	for name, interfaceMember := range interfaceType.Members {
 
+		// Conforming types do not provide a concrete member
+		// for the member in the interface if it is predeclared
+
+		if interfaceMember.Predeclared {
+			continue
+		}
+
 		compositeMember, ok := compositeType.Members[name]
 		if !ok {
 			if checkMissingMembers {

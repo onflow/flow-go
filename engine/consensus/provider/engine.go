@@ -126,12 +126,12 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	}
 
 	// get all non-consensus nodes in the system
-	identities, err := e.state.Final().Identities(filter.Not(filter.HasNodeID(localID)))
+	identities, err := e.state.Final().Identities(filter.Not(filter.HasRole(flow.RoleConsensus)))
 	if err != nil {
 		return errors.Wrap(err, "could not get identities")
 	}
 
-	// submit the block proposal to the targets
+	// submit the blocks to the targets
 	err = e.con.Submit(block, identities.NodeIDs()...)
 	if err != nil {
 		return errors.Wrap(err, "could not broadcast block")

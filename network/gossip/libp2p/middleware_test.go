@@ -44,6 +44,10 @@ func (m *MiddlewareTestSuit) SetupTest() {
 	m.StartMiddlewares()
 }
 
+func (m *MiddlewareTestSuit) TearDownTest() {
+	m.StopMiddlewares()
+}
+
 // TestPingRawReception tests the middleware for solely the
 // reception of a single ping message by a node that is sent from another node
 // it does not evaluate the type and content of the message
@@ -283,4 +287,16 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 	}
 
 	return message
+}
+
+func (m *MiddlewareTestSuit) StopMiddlewares() {
+	// start all the middlewares
+	for i := 0; i < m.size; i++ {
+		// start the middleware
+		m.mws[i].Stop()
+	}
+	m.mws = nil
+	m.ov = nil
+	m.ids = nil
+	m.size = 0
 }

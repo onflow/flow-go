@@ -6,7 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// BlockVote is a coldstuff consensus event to vote for a block.
-type BlockVote struct {
+// Vote is a coldstuff consensus event to vote for a block.
+type Vote struct {
 	BlockID flow.Identifier
+	VoterID flow.Identifier
 }

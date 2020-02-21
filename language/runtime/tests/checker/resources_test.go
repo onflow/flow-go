@@ -2338,8 +2338,7 @@ func testResourceNesting(
 		_, err := ParseAndCheck(t, program)
 
 		switch outerCompositeKind {
-		case common.CompositeKindStructure,
-			common.CompositeKindContract:
+		case common.CompositeKindStructure:
 
 			switch innerCompositeKind {
 			case common.CompositeKindStructure,
@@ -2356,13 +2355,56 @@ func testResourceNesting(
 				panic(errors.NewUnreachableError())
 			}
 
-		case common.CompositeKindResource:
+		case common.CompositeKindResource,
+			common.CompositeKindContract:
+
 			require.NoError(t, err)
 
 		default:
 			panic(errors.NewUnreachableError())
 		}
 	})
+}
+
+func TestCheckContractResourceField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      contract C {
+          let r: @R
+
+          init(r: @R) {
+              self.r <- r
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidContractResourceFieldMove(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      contract C {
+          let r: @R
+
+          init(r: @R) {
+              self.r <- r
+          }
+      }
+
+      fun test() {
+          let r <- C.r
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 }
 
 // TestCheckResourceInterfaceConformance tests the check
@@ -3600,4 +3642,104 @@ func TestCheckResourceCreationAndInvalidationInLoop(t *testing.T) {
     `)
 
 	require.NoError(t, err)
+}
+
+func TestCheckInvalidResourceOwnerField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Test {
+          let owner: PublicAccount
+
+          init(owner: PublicAccount) {
+              self.owner = owner
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceInterfaceOwnerField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+         let owner: PublicAccount
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceOwnerFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+         fun owner() {}
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceInterfaceOwnerFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+         fun owner()
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckResourceOwnerFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+
+         fun test(): PublicAccount? {
+             return self.owner
+         }
+     }
+   `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckResourceInterfaceOwnerFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+
+         fun test() {
+             pre { self.owner != nil }
+         }
+     }
+   `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidResourceOwnerFieldInitialization(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+
+         init(owner: PublicAccount) {
+             self.owner = owner
+         }
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
 }
