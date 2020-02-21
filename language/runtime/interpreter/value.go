@@ -24,8 +24,8 @@ import (
 type Value interface {
 	IsValue()
 	Copy() Value
-	GetOwner() string
-	SetOwner(owner string)
+	GetOwner() *common.Address
+	SetOwner(*common.Address)
 }
 
 // ValueIndexableValue
@@ -81,12 +81,12 @@ func (v VoidValue) Copy() Value {
 	return v
 }
 
-func (VoidValue) GetOwner() string {
+func (VoidValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (VoidValue) SetOwner(_ string) {
+func (VoidValue) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -108,12 +108,12 @@ func (v BoolValue) Copy() Value {
 	return v
 }
 
-func (BoolValue) GetOwner() string {
+func (BoolValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (BoolValue) SetOwner(_ string) {
+func (BoolValue) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -157,12 +157,12 @@ func (v *StringValue) Copy() Value {
 	return &StringValue{Str: v.Str}
 }
 
-func (*StringValue) GetOwner() string {
+func (*StringValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (*StringValue) SetOwner(_ string) {
+func (*StringValue) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -303,7 +303,7 @@ func (*StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value
 
 type ArrayValue struct {
 	Values []Value
-	Owner  string
+	Owner  *common.Address
 }
 
 func init() {
@@ -312,15 +312,14 @@ func init() {
 
 func NewArrayValueUnownedNonCopying(values ...Value) *ArrayValue {
 	// NOTE: new value has no owner
-	const noOwner = ""
 
 	for _, value := range values {
-		value.SetOwner(noOwner)
+		value.SetOwner(nil)
 	}
 
 	return &ArrayValue{
 		Values: values,
-		Owner:  noOwner,
+		Owner:  nil,
 	}
 }
 
@@ -335,11 +334,11 @@ func (v *ArrayValue) Copy() Value {
 	return NewArrayValueUnownedNonCopying(copies...)
 }
 
-func (v *ArrayValue) GetOwner() string {
+func (v *ArrayValue) GetOwner() *common.Address {
 	return v.Owner
 }
 
-func (v *ArrayValue) SetOwner(owner string) {
+func (v *ArrayValue) SetOwner(owner *common.Address) {
 	if v.Owner == owner {
 		return
 	}
@@ -591,12 +590,12 @@ func (v IntValue) Copy() Value {
 	return IntValue{big.NewInt(0).Set(v.Int)}
 }
 
-func (IntValue) GetOwner() string {
+func (IntValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (IntValue) SetOwner(_ string) {
+func (IntValue) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -703,12 +702,12 @@ func (v Int8Value) Copy() Value {
 	return v
 }
 
-func (Int8Value) GetOwner() string {
+func (Int8Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Int8Value) SetOwner(_ string) {
+func (Int8Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -845,12 +844,12 @@ func (v Int16Value) Copy() Value {
 	return v
 }
 
-func (Int16Value) GetOwner() string {
+func (Int16Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Int16Value) SetOwner(_ string) {
+func (Int16Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -987,12 +986,12 @@ func (v Int32Value) Copy() Value {
 	return v
 }
 
-func (Int32Value) GetOwner() string {
+func (Int32Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Int32Value) SetOwner(_ string) {
+func (Int32Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1129,12 +1128,12 @@ func (v Int64Value) Copy() Value {
 	return v
 }
 
-func (Int64Value) GetOwner() string {
+func (Int64Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Int64Value) SetOwner(_ string) {
+func (Int64Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1277,12 +1276,12 @@ func (v Int128Value) Copy() Value {
 	return Int128Value{big.NewInt(0).Set(v.int)}
 }
 
-func (Int128Value) GetOwner() string {
+func (Int128Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Int128Value) SetOwner(_ string) {
+func (Int128Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1452,12 +1451,12 @@ func (v Int256Value) Copy() Value {
 	return Int256Value{big.NewInt(0).Set(v.int)}
 }
 
-func (Int256Value) GetOwner() string {
+func (Int256Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Int256Value) SetOwner(_ string) {
+func (Int256Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1639,12 +1638,12 @@ func (v UIntValue) Copy() Value {
 	return UIntValue{big.NewInt(0).Set(v.Int)}
 }
 
-func (UIntValue) GetOwner() string {
+func (UIntValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (UIntValue) SetOwner(_ string) {
+func (UIntValue) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1754,12 +1753,12 @@ func (v UInt8Value) Copy() Value {
 	return v
 }
 
-func (UInt8Value) GetOwner() string {
+func (UInt8Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (UInt8Value) SetOwner(_ string) {
+func (UInt8Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1863,12 +1862,12 @@ func (UInt16Value) IsValue() {}
 func (v UInt16Value) Copy() Value {
 	return v
 }
-func (UInt16Value) GetOwner() string {
+func (UInt16Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (UInt16Value) SetOwner(_ string) {
+func (UInt16Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1972,12 +1971,12 @@ func (v UInt32Value) Copy() Value {
 	return v
 }
 
-func (UInt32Value) GetOwner() string {
+func (UInt32Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (UInt32Value) SetOwner(_ string) {
+func (UInt32Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2082,12 +2081,12 @@ func (v UInt64Value) Copy() Value {
 	return v
 }
 
-func (UInt64Value) GetOwner() string {
+func (UInt64Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (UInt64Value) SetOwner(_ string) {
+func (UInt64Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2199,12 +2198,12 @@ func (v UInt128Value) Copy() Value {
 	return UInt128Value{big.NewInt(0).Set(v.int)}
 }
 
-func (UInt128Value) GetOwner() string {
+func (UInt128Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (UInt128Value) SetOwner(_ string) {
+func (UInt128Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2344,12 +2343,12 @@ func (v UInt256Value) Copy() Value {
 	return UInt256Value{big.NewInt(0).Set(v.int)}
 }
 
-func (UInt256Value) GetOwner() string {
+func (UInt256Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (UInt256Value) SetOwner(_ string) {
+func (UInt256Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2487,12 +2486,12 @@ func (v Word8Value) Copy() Value {
 	return v
 }
 
-func (Word8Value) GetOwner() string {
+func (Word8Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Word8Value) SetOwner(_ string) {
+func (Word8Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2582,12 +2581,12 @@ func (Word16Value) IsValue() {}
 func (v Word16Value) Copy() Value {
 	return v
 }
-func (Word16Value) GetOwner() string {
+func (Word16Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Word16Value) SetOwner(_ string) {
+func (Word16Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2677,12 +2676,12 @@ func (v Word32Value) Copy() Value {
 	return v
 }
 
-func (Word32Value) GetOwner() string {
+func (Word32Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Word32Value) SetOwner(_ string) {
+func (Word32Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2773,12 +2772,12 @@ func (v Word64Value) Copy() Value {
 	return v
 }
 
-func (Word64Value) GetOwner() string {
+func (Word64Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Word64Value) SetOwner(_ string) {
+func (Word64Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2869,12 +2868,12 @@ func (v Fix64Value) Copy() Value {
 	return v
 }
 
-func (Fix64Value) GetOwner() string {
+func (Fix64Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (Fix64Value) SetOwner(_ string) {
+func (Fix64Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -3013,12 +3012,12 @@ func (v UFix64Value) Copy() Value {
 	return v
 }
 
-func (UFix64Value) GetOwner() string {
+func (UFix64Value) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (UFix64Value) SetOwner(_ string) {
+func (UFix64Value) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -3157,7 +3156,7 @@ type CompositeValue struct {
 	NestedValues   map[string]Value
 	Functions      map[string]FunctionValue
 	Destructor     FunctionValue
-	Owner          string
+	Owner          *common.Address
 	Destroyed      bool
 }
 
@@ -3225,7 +3224,7 @@ func (v *CompositeValue) Copy() Value {
 		Destructor:     v.Destructor,
 		Destroyed:      v.Destroyed,
 		// NOTE: new value has no owner
-		Owner: "",
+		Owner: nil,
 	}
 }
 
@@ -3238,11 +3237,11 @@ func (v *CompositeValue) checkStatus(locationRange LocationRange) {
 	}
 }
 
-func (v *CompositeValue) GetOwner() string {
+func (v *CompositeValue) GetOwner() *common.Address {
 	return v.Owner
 }
 
-func (v *CompositeValue) SetOwner(owner string) {
+func (v *CompositeValue) SetOwner(owner *common.Address) {
 	if v.Owner == owner {
 		return
 	}
@@ -3256,6 +3255,18 @@ func (v *CompositeValue) SetOwner(owner string) {
 
 func (v *CompositeValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
 	v.checkStatus(locationRange)
+
+	if v.Kind == common.CompositeKindResource &&
+		name == "owner" {
+
+		if v.Owner == nil {
+			return NilValue{}
+		}
+
+		address := AddressValue(*v.Owner)
+
+		return NewSomeValueOwningNonCopying(NewPublicAccountValue(address))
+	}
 
 	value, ok := v.Fields[name]
 	if ok {
@@ -3393,7 +3404,7 @@ func (v *CompositeValue) GetField(name string) Value {
 type DictionaryValue struct {
 	Keys    *ArrayValue
 	Entries map[string]Value
-	Owner   string
+	Owner   *common.Address
 }
 
 func NewDictionaryValueUnownedNonCopying(keysAndValues ...Value) *DictionaryValue {
@@ -3406,7 +3417,7 @@ func NewDictionaryValueUnownedNonCopying(keysAndValues ...Value) *DictionaryValu
 		Keys:    NewArrayValueUnownedNonCopying(),
 		Entries: make(map[string]Value, keysAndValuesCount/2),
 		// NOTE: new value has no owner
-		Owner: "",
+		Owner: nil,
 	}
 
 	for i := 0; i < keysAndValuesCount; i += 2 {
@@ -3434,15 +3445,15 @@ func (v *DictionaryValue) Copy() Value {
 		Keys:    newKeys,
 		Entries: newEntries,
 		// NOTE: new value has no owner
-		Owner: "",
+		Owner: nil,
 	}
 }
 
-func (v *DictionaryValue) GetOwner() string {
+func (v *DictionaryValue) GetOwner() *common.Address {
 	return v.Owner
 }
 
-func (v *DictionaryValue) SetOwner(owner string) {
+func (v *DictionaryValue) SetOwner(owner *common.Address) {
 	if v.Owner == owner {
 		return
 	}
@@ -3729,12 +3740,12 @@ func (v NilValue) Copy() Value {
 	return v
 }
 
-func (NilValue) GetOwner() string {
+func (NilValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (NilValue) SetOwner(_ string) {
+func (NilValue) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -3750,7 +3761,7 @@ func (NilValue) String() string {
 
 type SomeValue struct {
 	Value Value
-	Owner string
+	Owner *common.Address
 }
 
 func init() {
@@ -3772,15 +3783,15 @@ func (v *SomeValue) Copy() Value {
 	return &SomeValue{
 		Value: v.Value.Copy(),
 		// NOTE: new value has no owner
-		Owner: "",
+		Owner: nil,
 	}
 }
 
-func (v *SomeValue) GetOwner() string {
+func (v *SomeValue) GetOwner() *common.Address {
 	return v.Owner
 }
 
-func (v *SomeValue) SetOwner(owner string) {
+func (v *SomeValue) SetOwner(owner *common.Address) {
 	if v.Owner == owner {
 		return
 	}
@@ -3804,7 +3815,7 @@ type AnyValue struct {
 	Value Value
 	// TODO: don't store
 	Type  sema.Type
-	Owner string
+	Owner *common.Address
 }
 
 func NewAnyValueOwningNonCopying(value Value, ty sema.Type) *AnyValue {
@@ -3826,15 +3837,15 @@ func (v *AnyValue) Copy() Value {
 		Value: v.Value.Copy(),
 		Type:  v.Type,
 		// NOTE: new value has no owner
-		Owner: "",
+		Owner: nil,
 	}
 }
 
-func (v *AnyValue) GetOwner() string {
+func (v *AnyValue) GetOwner() *common.Address {
 	return v.Owner
 }
 
-func (v *AnyValue) SetOwner(owner string) {
+func (v *AnyValue) SetOwner(owner *common.Address) {
 	if v.Owner == owner {
 		return
 	}
@@ -3851,53 +3862,53 @@ func (v *AnyValue) String() string {
 // StorageValue
 
 type StorageValue struct {
-	Identifier string
+	Address common.Address
 }
 
 func (StorageValue) IsValue() {}
 
 func (v StorageValue) Copy() Value {
 	return StorageValue{
-		Identifier: v.Identifier,
+		Address: v.Address,
 	}
 }
 
-func (v StorageValue) GetOwner() string {
-	return v.Identifier
+func (v StorageValue) GetOwner() *common.Address {
+	return &v.Address
 }
 
-func (StorageValue) SetOwner(_ string) {
+func (StorageValue) SetOwner(_ *common.Address) {
 	// NO-OP: ownership cannot be changed
 }
 
 // PublishedValue
 
 type PublishedValue struct {
-	Identifier string
+	Address common.Address
 }
 
 func (PublishedValue) IsValue() {}
 
 func (v PublishedValue) Copy() Value {
 	return PublishedValue{
-		Identifier: v.Identifier,
+		Address: v.Address,
 	}
 }
 
-func (v PublishedValue) GetOwner() string {
-	return v.Identifier
+func (v PublishedValue) GetOwner() *common.Address {
+	return &v.Address
 }
 
-func (PublishedValue) SetOwner(_ string) {
+func (PublishedValue) SetOwner(_ *common.Address) {
 	// NO-OP: ownership cannot be changed
 }
 
 // StorageReferenceValue
 
 type StorageReferenceValue struct {
-	TargetStorageIdentifier string
-	TargetKey               string
-	Owner                   string
+	TargetStorageAddress common.Address
+	TargetKey            string
+	Owner                *common.Address
 }
 
 func init() {
@@ -3908,25 +3919,25 @@ func (*StorageReferenceValue) IsValue() {}
 
 func (v *StorageReferenceValue) Copy() Value {
 	return &StorageReferenceValue{
-		TargetStorageIdentifier: v.TargetStorageIdentifier,
-		TargetKey:               v.TargetKey,
+		TargetStorageAddress: v.TargetStorageAddress,
+		TargetKey:            v.TargetKey,
 		// NOTE: new value has no owner
-		Owner: "",
+		Owner: nil,
 	}
 }
 
-func (v *StorageReferenceValue) GetOwner() string {
+func (v *StorageReferenceValue) GetOwner() *common.Address {
 	return v.Owner
 }
 
-func (v *StorageReferenceValue) SetOwner(owner string) {
+func (v *StorageReferenceValue) SetOwner(owner *common.Address) {
 	v.Owner = owner
 }
 
 func (v *StorageReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
 	key := PrefixedStorageKey(v.TargetKey, AccessLevelPrivate)
 
-	switch referenced := interpreter.readStored(v.TargetStorageIdentifier, key).(type) {
+	switch referenced := interpreter.readStored(v.TargetStorageAddress, key).(type) {
 	case *SomeValue:
 		return referenced.Value
 	case NilValue:
@@ -3964,7 +3975,7 @@ func (v *StorageReferenceValue) Equal(other Value) BoolValue {
 		return false
 	}
 
-	return v.TargetStorageIdentifier == otherReference.TargetStorageIdentifier &&
+	return v.TargetStorageAddress == otherReference.TargetStorageAddress &&
 		v.TargetKey == otherReference.TargetKey
 }
 
@@ -3980,12 +3991,12 @@ func (v *EphemeralReferenceValue) Copy() Value {
 	return v
 }
 
-func (v *EphemeralReferenceValue) GetOwner() string {
+func (v *EphemeralReferenceValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (v *EphemeralReferenceValue) SetOwner(owner string) {
+func (v *EphemeralReferenceValue) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -4064,12 +4075,12 @@ func (v AddressValue) String() string {
 	return fmt.Sprintf("%x", [common.AddressLength]byte(v))
 }
 
-func (AddressValue) GetOwner() string {
+func (AddressValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (AddressValue) SetOwner(_ string) {
+func (AddressValue) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -4091,16 +4102,16 @@ func (v AddressValue) ToAddress() common.Address {
 
 // AccountValue
 
-func NewAccountValue(address AddressValue, setCode, addPublicKey, removePublicKey FunctionValue) *CompositeValue {
-	storageIdentifier := address.Hex()
+func NewAccountValue(addressValue AddressValue, setCode, addPublicKey, removePublicKey FunctionValue) *CompositeValue {
+	address := addressValue.ToAddress()
 
 	return &CompositeValue{
 		Kind:   common.CompositeKindStructure,
 		TypeID: (&sema.AccountType{}).ID(),
 		InjectedFields: map[string]Value{
-			"address":         address,
-			"storage":         StorageValue{Identifier: storageIdentifier},
-			"published":       PublishedValue{Identifier: storageIdentifier},
+			"address":         addressValue,
+			"storage":         StorageValue{Address: address},
+			"published":       PublishedValue{Address: address},
 			"setCode":         setCode,
 			"addPublicKey":    addPublicKey,
 			"removePublicKey": removePublicKey,
@@ -4110,15 +4121,17 @@ func NewAccountValue(address AddressValue, setCode, addPublicKey, removePublicKe
 
 // PublicAccountValue
 
-func NewPublicAccountValue(address AddressValue) *CompositeValue {
-	storageIdentifier := address.Hex()
+func NewPublicAccountValue(addressValue AddressValue) *CompositeValue {
+	address := addressValue.ToAddress()
 
 	return &CompositeValue{
 		Kind:   common.CompositeKindStructure,
 		TypeID: (&sema.PublicAccountType{}).ID(),
 		InjectedFields: map[string]Value{
-			"address":   address,
-			"published": PublishedValue{Identifier: storageIdentifier},
+			"address": addressValue,
+			"published": PublishedValue{
+				Address: address,
+			},
 		},
 	}
 }
