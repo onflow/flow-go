@@ -1705,14 +1705,14 @@ func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos 
 	case TypeAnnotationStateMissingResourceAnnotation:
 		checker.report(
 			&MissingResourceAnnotationError{
-				Pos: pos.StartPosition(),
+				Range: ast.NewRangeFromPositioned(pos),
 			},
 		)
 
 	case TypeAnnotationStateInvalidResourceAnnotation:
 		checker.report(
 			&InvalidResourceAnnotationError{
-				Pos: pos.StartPosition(),
+				Range: ast.NewRangeFromPositioned(pos),
 			},
 		)
 	}
