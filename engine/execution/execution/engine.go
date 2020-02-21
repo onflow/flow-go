@@ -116,8 +116,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
-	// TODO: replace with latest sealed block
-	block, err := e.protoState.Final().Head()
+	block, err := e.protoState.Sealed().Head()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
