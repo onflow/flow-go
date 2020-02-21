@@ -50,7 +50,7 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 		},
 	)
 
-	checker.checkResourceFieldsInvalidated(transactionType.String(), transactionType.Members)
+	checker.checkResourceFieldsInvalidated(transactionType, transactionType.Members)
 
 	return nil
 }
