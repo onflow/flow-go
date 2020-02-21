@@ -176,7 +176,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 				return errors.New("new block seals blocks with lower height than current sealed boundary")
 			}
 
-			err = operation.UpdateSealedBoundary(block.Height)(tx)
+			err = operation.UpdateSealedBoundary(latestSealedHeight)(tx)
 			if err != nil {
 				return fmt.Errorf("could not update sealed boundary: %w", err)
 			}

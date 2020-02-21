@@ -147,6 +147,13 @@ func TestExtendSealedBoundary(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(1), sealedBoundary)
 
+		state, err := NewState(db)
+		assert.NoError(t, err)
+
+		sealed, err := state.Sealed().Head()
+		assert.NoError(t, err)
+
+		assert.Equal(t, block.Header, *sealed)
 	})
 }
 
