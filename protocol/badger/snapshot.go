@@ -21,7 +21,7 @@ type Snapshot struct {
 	state   *State
 	number  uint64
 	blockID flow.Identifier
-	sealed bool
+	sealed  bool
 }
 
 // Identities retrieves all active ids at the given snapshot and
@@ -236,7 +236,6 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 				}
 			}
 		}
-
 
 		// get the height for our desired target hash
 		err := operation.RetrieveHeader(s.blockID, head)(tx)

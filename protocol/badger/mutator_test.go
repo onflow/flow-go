@@ -75,7 +75,6 @@ func TestBootStrapValid(t *testing.T) {
 	})
 }
 
-
 func TestExtendSealedBoundary(t *testing.T) {
 	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 

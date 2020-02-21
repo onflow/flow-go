@@ -96,7 +96,6 @@ func RetrievePayload(payloadHash flow.Identifier, payload *flow.Payload) func(tx
 			return fmt.Errorf("could not retrieve seals: %w", err)
 		}
 
-
 		// create the block content
 		*payload = flow.Payload{
 			Identities: identities,
