@@ -14,8 +14,8 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-// Builder is the builder for block payloads. Upon providing a payload hash, it
-// also memorizes which entities were included into the payload.
+// Builder is the builder for consensus block payloads. Upon providing a payload
+// hash, it also memorizes which entities were included into the payload.
 type Builder struct {
 	db         *badger.DB
 	guarantees mempool.Guarantees
@@ -74,7 +74,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 			// look up the ancestor's guarantees
 			var guaranteeIDs []flow.Identifier
-			err := operation.LookupGuarantees(ancestor.PayloadHash, &guaranteeIDs)(tx)
+			err = operation.LookupGuarantees(ancestor.PayloadHash, &guaranteeIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up ancestor guarantees (%x): %w", ancestor.PayloadHash, err)
 			}
