@@ -62,6 +62,8 @@ func ProposalToFlow(proposal *Proposal) *flow.Header {
 		View:          block.View,
 		ParentSigners: block.QC.AggregatedSignature.SignerIDs,
 		ParentSigs:    block.QC.AggregatedSignature.Raw,
+		ProposerID:    block.ProposerID,
+		ProposerSig:   proposal.Signature,
 	}
 	return &header
 }
