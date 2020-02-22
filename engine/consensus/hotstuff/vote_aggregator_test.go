@@ -7,8 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/mock"
+	mocks "github.com/dapperlabs/flow-go/crypto/mock"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/hotstuff"
