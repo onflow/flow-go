@@ -22,5 +22,5 @@ type HotStuff interface {
 	// This method blocks until the vote is accepted to the event queue.
 	//
 	// Votes may be submitted in any order.
-	SubmitVote(originID flow.Identifier, blockID flow.Identifier, view uint64, sig crypto.Signature)
+	SubmitVote(originID flow.Identifier, blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature)
 }
