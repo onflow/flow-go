@@ -54,6 +54,12 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 // blockID - specifies the block to be queried.
 // nodeIDs - optional arguments to only return identities that matches the given nodeIDs.
 func (v *ViewState) GetStakedIdentitiesAtBlock(blockID flow.Identifier, nodeIDs ...flow.Identifier) (flow.IdentityList, error) {
+	if nodeIDs == nil {
+		return v.protocolState.AtBlockID(blockID).Identities(
+			v.consensusMembersFilter, // nodes must be belong to the same consensus group
+			filter.HasStake,          // nodes must be staked
+		)
+	}
 	return v.protocolState.AtBlockID(blockID).Identities(
 		v.consensusMembersFilter,     // nodes must be belong to the same consensus group
 		filter.HasStake,              // nodes must be staked

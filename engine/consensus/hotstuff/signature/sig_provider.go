@@ -15,6 +15,14 @@ type SigProvider struct {
 	myID   flow.Identifier
 }
 
+func NewSigProvider(sk crypto.PrivateKey, hasher crypto.Hasher, myID flow.Identifier) *SigProvider {
+	return &SigProvider{
+		sk:     sk,
+		hasher: hasher,
+		myID:   myID,
+	}
+}
+
 // VerifySig verifies a single signature for a block using the given public key
 // sig - the signature to be verified
 // block - the block that the signature was signed for.
