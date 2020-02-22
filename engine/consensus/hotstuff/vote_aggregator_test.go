@@ -1,17 +1,17 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/mock"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/hotstuff"
 	protocol "github.com/dapperlabs/flow-go/protocol/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -44,9 +44,6 @@ func TestReceiveBlockBeforeInsufficientVotes(t *testing.T) {
 	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
 	_ = va.StoreProposerVote(bp.ProposerVote())
 	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
-	require.False(t, built)
-	require.Nil(t, qc)
-	require.NoError(t, err)
 	for i := 0; i < 3; i++ {
 		vote := newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
 		qc, built, err = va.StoreVoteAndBuildQC(vote, bp.Block)
@@ -65,17 +62,10 @@ func TestReceiveBlockBeforeSufficientVotes(t *testing.T) {
 	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
 	_ = va.StoreProposerVote(bp.ProposerVote())
 	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
-	require.False(t, built)
-	require.Nil(t, qc)
-	require.NoError(t, err)
 	for i := 0; i < 4; i++ {
 		vote := newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
 		qc, built, err = va.StoreVoteAndBuildQC(vote, bp.Block)
-		if i < 3 {
-			require.Nil(t, qc)
-			require.NoError(t, err)
-			require.False(t, built)
-		} else {
+		if i == 3 {
 			require.Nil(t, err)
 			require.True(t, built)
 			require.NotNil(t, qc)
@@ -91,22 +81,10 @@ func TestReceiveVoteAfterQCBuilt(t *testing.T) {
 	testView := uint64(5)
 	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
 	_ = va.StoreProposerVote(bp.ProposerVote())
-	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
-	require.Nil(t, qc)
-	require.NoError(t, err)
-	require.False(t, built)
+	_, built, err := va.BuildQCOnReceivedBlock(bp.Block)
 	for i := 0; i < 4; i++ {
 		vote := newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
-		qc, built, err = va.StoreVoteAndBuildQC(vote, bp.Block)
-		if i < 3 {
-			require.Nil(t, qc)
-			require.NoError(t, err)
-			require.False(t, built)
-		} else {
-			require.Nil(t, err)
-			require.NotNil(t, qc)
-			require.Equal(t, bp.Block.BlockID, qc.BlockID)
-		}
+		_, built, err = va.StoreVoteAndBuildQC(vote, bp.Block)
 	}
 	finalVote := newMockVote(testView, bp.Block.BlockID, ids[4].NodeID)
 	finalQC, built, err := va.StoreVoteAndBuildQC(finalVote, bp.Block)
@@ -115,134 +93,81 @@ func TestReceiveVoteAfterQCBuilt(t *testing.T) {
 	require.True(t, built)
 }
 
-//// PENDING PATH (votes are valid and the block arrives after votes)
-//// receive 3 votes first, a QC should not be built when receiving the block because of insufficient votes
-//func TestReceiveInsufficientVotesBeforeBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, qc)
-//	require.NotNil(t, err)
-//	for i := 0; i < 3; i++ {
-//		vote := newMockVote(testView, block.BlockID(), uint32(i))
-//		err = va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//	}
-//	qc, err = va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, qc)
-//	require.NotNil(t, err)
-//	require.True(t, errors.Is(err, types.ErrInsufficientVotes{}))
-//}
-//
-//// PENDING PATH (votes are valid and the block arrives after votes)
-//// receive 6 votes only, votes should be stored correctly
-//func TestReceivePendingVotesOnly(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	testView := uint64(5)
-//	blockID := unittest.IdentifierFixture()
-//	for i := 0; i < 6; i++ {
-//		vote := newMockVote(testView, blockID, uint32(i))
-//		err := va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//		require.Equal(t, vote, va.pendingVoteMap[blockID].orderedVotes[i])
-//		require.Equal(t, vote, va.pendingVoteMap[blockID].voteMap[vote.ID()])
-//	}
-//}
-//
-//// PENDING PATH (votes are valid and the block arrives after votes)
-//// receive 6 votes first, a QC should be built when receiving the block
-//func TestReceiveSufficientVotesBeforeBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, qc)
-//	require.NotNil(t, err)
-//	for i := 0; i < 6; i++ {
-//		vote := newMockVote(testView, block.BlockID(), uint32(i))
-//		err = va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//	}
-//	qc, err = va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, err)
-//	require.NotNil(t, qc)
-//	require.Equal(t, block.BlockID(), qc.BlockID)
-//}
-//
-//// UNHAPPY PATH
-//// lastPruneView is 10, receive a vote with view 5 without the block
-//func TestErrStaleVoteWithoutBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	va.lastPrunedView = 10
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	vote := newMockVote(testView, block.BlockID(), uint32(1))
-//	err := va.StorePendingVote(vote)
-//	require.NotNil(t, err)
-//	require.True(t, errors.Is(err, types.ErrStaleVote{
-//		Vote:          vote,
-//		FinalizedView: va.lastPrunedView,
-//	}))
-//	require.Equal(t, 0, len(va.pendingVoteMap))
-//	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 0, len(va.viewToIDToVote))
-//}
-//
-//// UNHAPPY PATH
-//// lastPruneView is 10, receive a vote with view 5 with the block
-//func TestErrStaleVoteWithBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	va.lastPrunedView = 10
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, qc)
-//	require.NotNil(t, err)
-//	require.Equal(t, 0, len(va.blockHashToVotingStatus))
-//	require.Equal(t, 0, len(va.viewToIDToVote))
-//	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
-//	vote := newMockVote(testView, block.BlockID(), uint32(1))
-//	qc, err = va.StoreVoteAndBuildQC(vote, block)
-//	require.NotNil(t, err)
-//	require.True(t, errors.Is(err, types.ErrStaleVote{
-//		Vote:          vote,
-//		FinalizedView: va.lastPrunedView,
-//	}))
-//	require.Equal(t, 0, len(va.blockHashToVotingStatus))
-//	require.Equal(t, 0, len(va.viewToIDToVote))
-//	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
-//}
-//
-//// UNHAPPY PATH
-//// lastPruneView is 10, receive a block with view 5
-//func TestErrStaleBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	va.lastPrunedView = 10
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, qc)
-//	require.NotNil(t, err)
-//	require.Equal(t, 0, len(va.blockHashToVotingStatus))
-//	require.Equal(t, 0, len(va.viewToIDToVote))
-//	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
-//	require.True(t, errors.Is(err, types.ErrStaleBlock{
-//		BlockProposal: block,
-//		FinalizedView: va.lastPrunedView,
-//	}))
-//}
-//
-//// UNHAPPY PATH (double voting)
-//// store one vote in the memory
-//// receive another vote with the same voter and the same view
-//// should trigger ErrDoubleVote
+// PENDING PATH (votes are valid and the block arrives after votes)
+// receive 3 votes first, a QC should not be built when receiving the block because of insufficient votes
+func TestReceiveInsufficientVotesBeforeBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	for i := 0; i < 3; i++ {
+		vote := newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
+		ok := va.StorePendingVote(vote)
+		require.True(t, ok)
+	}
+	ok := va.StoreProposerVote(bp.ProposerVote())
+	require.True(t, ok)
+	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	require.False(t, built)
+	require.Nil(t, qc)
+	require.NoError(t, err)
+}
+
+// PENDING PATH (votes are valid and the block arrives after votes)
+// receive 6 votes first, a QC should be built when receiving the block
+func TestReceiveSufficientVotesBeforeBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	_, _, err := va.BuildQCOnReceivedBlock(bp.Block)
+	for i := 0; i < 6; i++ {
+		vote := newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
+		ok := va.StorePendingVote(vote)
+		require.True(t, ok)
+	}
+	_ = va.StoreProposerVote(bp.ProposerVote())
+	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	require.NoError(t, err)
+	require.NotNil(t, qc)
+	require.True(t, built)
+}
+
+// UNHAPPY PATH
+// highestPrunedView is 10, receive a vote with view 5 without the block
+// the vote should not be stored
+func TestStaleVoteWithoutBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	va.highestPrunedView = 10
+	testView := uint64(5)
+	vote := newMockVote(testView, unittest.IdentifierFixture(), ids[0].NodeID)
+	ok := va.StorePendingVote(vote)
+	require.False(t, ok)
+}
+
+// UNHAPPY PATH
+// highestPrunedView is 10, receive a block with view 5
+func TestStaleProposerVote(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	va.highestPrunedView = 10
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	ok := va.StoreProposerVote(bp.ProposerVote())
+	require.False(t, ok)
+	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	require.Error(t, err)
+	require.False(t, built)
+	require.Nil(t, qc)
+}
+
+// UNHAPPY PATH (double voting)
+// store one vote in the memory
+// receive another vote with the same voter and the same view
+// should trigger ErrDoubleVote
 //func TestErrDoubleVote(t *testing.T) {
-//	va := newMockVoteAggregator(t)
+//	va, ids := newMockVoteAggregator(t)
 //	// mock blocks and votes
-//	b1 := newMockBlock(10)
-//	b2 := newMockBlock(10)
-//	vote1 := newMockVote(10, b1.BlockID(), uint32(1))
+//	bp1 := newMockBlock(10, ids[0].NodeID)
+//	bp2 := newMockBlock(10, ids[1].NodeID)
+//	vote1 := newMockVote(10, bp1.Block.BlockID, ids[0].NodeID)
 //	_, err := va.StoreVoteAndBuildQC(vote1, b1)
 //	// vote2 is double voting
 //	vote2 := newMockVote(10, b2.BlockID(), uint32(1))
