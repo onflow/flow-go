@@ -18,13 +18,14 @@ import (
 func TestHeaderInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := flow.Header{
-			View:          1337,
-			Timestamp:     time.Now().UTC(),
-			ParentID:      flow.Identifier{0x11},
-			PayloadHash:   flow.Identifier{0x22},
-			ProposerID:    flow.Identifier{0x33},
-			ParentSigs:    []crypto.Signature{[]byte{0x88}},
-			ParentSigners: []flow.Identifier{flow.Identifier{0x44}},
+			View:                  1337,
+			Timestamp:             time.Now().UTC(),
+			ParentID:              flow.Identifier{0x11},
+			PayloadHash:           flow.Identifier{0x22},
+			ProposerID:            flow.Identifier{0x33},
+			ParentStakingSigs:     []crypto.Signature{[]byte{0x88}},
+			ParentRandomBeaconSig: crypto.Signature{0x77},
+			ParentSigners:         []flow.Identifier{flow.Identifier{0x44}},
 		}
 		blockID := expected.ID()
 

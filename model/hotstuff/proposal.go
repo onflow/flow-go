@@ -8,15 +8,17 @@ import (
 // Proposal represent a new proposed block within HotStuff (and thus a
 // a header in the bigger picture), signed by the proposer.
 type Proposal struct {
-	Block     *Block
-	Signature crypto.Signature
+	Block                 *Block
+	StakingSignature      crypto.Signature
+	RandomBeaconSignature crypto.Signature
 }
 
 // ProposerVote extracts the proposer vote from the proposal
 func (p *Proposal) ProposerVote() *Vote {
 	sig := SingleSignature{
-		SignerID: p.Block.ProposerID,
-		Raw:      p.Signature,
+		SignerID:              p.Block.ProposerID,
+		StakingSignature:      p.StakingSignature,
+		RandomBeaconSignature: p.RandomBeaconSignature,
 	}
 	vote := Vote{
 		BlockID:   p.Block.BlockID,
@@ -29,8 +31,9 @@ func (p *Proposal) ProposerVote() *Vote {
 // ProposalFromFlow turns a flow header into a hotstuff block type.
 func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
 	sig := AggregatedSignature{
-		Raw:       header.ParentSigs,
-		SignerIDs: header.ParentSigners,
+		StakingSignatures:     header.ParentStakingSigs,
+		RandomBeaconSignature: header.ParentRandomBeaconSig,
+		SignerIDs:             header.ParentSigners,
 	}
 	qc := QuorumCertificate{
 		BlockID:             header.ParentID,
@@ -46,8 +49,9 @@ func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
 		Timestamp:   header.Timestamp,
 	}
 	proposal := Proposal{
-		Block:     &block,
-		Signature: header.ProposerSig,
+		Block:                 &block,
+		StakingSignature:      header.ProposerStakingSig,
+		RandomBeaconSignature: header.ProposerRandomBeaconSig,
 	}
 	return &proposal
 }
@@ -56,14 +60,16 @@ func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
 func ProposalToFlow(proposal *Proposal) *flow.Header {
 	block := proposal.Block
 	header := flow.Header{
-		ParentID:      block.QC.BlockID,
-		PayloadHash:   block.PayloadHash,
-		Timestamp:     block.Timestamp,
-		View:          block.View,
-		ParentSigners: block.QC.AggregatedSignature.SignerIDs,
-		ParentSigs:    block.QC.AggregatedSignature.Raw,
-		ProposerID:    block.ProposerID,
-		ProposerSig:   proposal.Signature,
+		ParentID:                block.QC.BlockID,
+		PayloadHash:             block.PayloadHash,
+		Timestamp:               block.Timestamp,
+		View:                    block.View,
+		ParentSigners:           block.QC.AggregatedSignature.SignerIDs,
+		ParentStakingSigs:       block.QC.AggregatedSignature.StakingSignatures,
+		ParentRandomBeaconSig:   block.QC.AggregatedSignature.RandomBeaconSignature,
+		ProposerID:              block.ProposerID,
+		ProposerStakingSig:      proposal.StakingSignature,
+		ProposerRandomBeaconSig: proposal.RandomBeaconSignature,
 	}
 	return &header
 }

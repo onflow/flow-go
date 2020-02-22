@@ -89,10 +89,11 @@ func (e *coldStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
 	e.proposals <- proposal
 }
 
-func (e *coldStuff) SubmitVote(originID, blockID flow.Identifier, view uint64, sig crypto.Signature) {
+func (e *coldStuff) SubmitVote(originID, blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature) {
 	// Ignore HotStuff-only values
 	_ = view
-	_ = sig
+	_ = stakingSig
+	_ = randomBeaconSig
 
 	e.votes <- &model.Vote{
 		VoterID: originID,
@@ -420,7 +421,7 @@ func (e *coldStuff) voteOnProposal() error {
 	}
 
 	// send vote for proposal to leader
-	err = e.comms.SendVote(candidate.ID(), candidate.View, sig, e.round.Leader().NodeID)
+	err = e.comms.SendVote(candidate.ID(), candidate.View, sig, sig, e.round.Leader().NodeID)
 	if err != nil {
 		return fmt.Errorf("could not submit vote: %w", err)
 	}

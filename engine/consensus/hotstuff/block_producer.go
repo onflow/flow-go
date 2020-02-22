@@ -51,7 +51,8 @@ func (bp *BlockProducer) makeBlockForView(qc *hotstuff.QuorumCertificate, view u
 	setHotstuffFields := func(header *flow.Header) {
 		header.View = view
 		header.ProposerID = bp.viewState.myID
-		header.ParentSigs = qc.AggregatedSignature.Raw
+		header.ParentStakingSigs = qc.AggregatedSignature.StakingSignatures
+		header.ParentRandomBeaconSig = qc.AggregatedSignature.RandomBeaconSignature
 		header.ParentSigners = qc.AggregatedSignature.SignerIDs
 	}
 

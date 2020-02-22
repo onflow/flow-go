@@ -53,6 +53,8 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 // GetStakedIdentitiesAtBlock returns all the staked nodes for my role at a certain block.
 // blockID - specifies the block to be queried.
 // nodeIDs - optional arguments to only return identities that matches the given nodeIDs.
+// Note: the order of the identity in the returned identity list is NOT the same as the
+// order of node ID in the input of nodeIDs
 func (v *ViewState) GetStakedIdentitiesAtBlock(blockID flow.Identifier, nodeIDs ...flow.Identifier) (flow.IdentityList, error) {
 	if nodeIDs == nil {
 		return v.protocolState.AtBlockID(blockID).Identities(
