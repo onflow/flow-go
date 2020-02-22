@@ -57,7 +57,7 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 // order of node ID in the input of nodeIDs
 func (v *ViewState) GetStakedIdentitiesAtBlock(blockID flow.Identifier, nodeIDs ...flow.Identifier) (flow.IdentityList, error) {
 	var filters []flow.IdentityFilter
-	filters = append(filters, v.consensusMembersFilter)
+	filters = append(filters, v.consensusMembersFilter, filter.HasStake)
 	if len(nodeIDs) > 0 {
 		filters = append(filters, filter.HasNodeID(nodeIDs...))
 	}
