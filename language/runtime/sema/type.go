@@ -3941,7 +3941,6 @@ func IsSubType(subType Type, superType Type) bool {
 		}
 
 		// A non-storable reference type is not a (static) subtype of a storable reference.
-		// However, a dynamic cast is valid, if the reference is authorized.
 		//
 		// The holder of the reference may not gain more permissions without having authorization.
 
@@ -4050,60 +4049,143 @@ func IsSubType(subType Type, superType Type) bool {
 
 	case *RestrictedResourceType:
 
-		switch typedSubType := subType.(type) {
-		case *RestrictedResourceType:
-			// A restricted resource type `T{Us}` is a subtype of a restricted resource type `V{Ws}`, if `T == V`.
-			// NOTE: `Us` and `Ws` do NOT have to be subsets.
-			//
-			// The owner of the resource may freely restrict and unrestrict the resource.
+		if _, ok := typedSuperType.Type.(*AnyResourceType); ok {
 
-			return typedSubType.Type == typedSuperType.Type
+			switch typedSubType := subType.(type) {
+			case *RestrictedResourceType:
 
-		case *CompositeType:
-			// A resource type `T` is a subtype of a restricted resource type `U{Vs}`, if `T == U`
+				// A restricted resource type `T{Us}`
+				// is a subtype of a restricted resource type `AnyResource{Vs}`:
 
-			if typedSubType.Kind == common.CompositeKindResource {
-				if typedSubType == typedSuperType.Type {
-					return true
-				}
+				switch restrictedSubtype := typedSubType.Type.(type) {
+				case *AnyResourceType:
+					// When `T == AnyResource`: if `Vs` is a subset of `Us`.
 
-				if _, ok := typedSuperType.Type.(*AnyResourceType); ok {
+					return typedSuperType.RestrictionSet().
+						IsSubsetOf(typedSubType.RestrictionSet())
+
+				case *CompositeType:
+					// When `T != AnyResource`: if `T` conforms to `Vs`.
+					// `Us` and `Vs` do *not* have to be subsets.
+
+					if restrictedSubtype.Kind != common.CompositeKindResource {
+						return false
+					}
+
 					for _, restriction := range typedSuperType.Restrictions {
-						if _, ok := typedSubType.ConformanceSet()[restriction]; !ok {
+						// TODO: once interfaces can conform to interfaces, include
+						if _, ok := restrictedSubtype.ConformanceSet()[restriction]; !ok {
 							return false
 						}
 					}
 
 					return true
 				}
+
+			case *AnyResourceType:
+				// `AnyResource` is a subtype of a restricted resource type `AnyResource{Us}`:
+				// not statically.
+
+				return false
+
+			case *CompositeType:
+				// An unrestricted resource type `T`
+				// is a subtype of a restricted resource type `AnyResource{Us}`:
+				// if `T` conforms to `Us`.
+
+				if typedSubType.Kind != common.CompositeKindResource {
+					return false
+				}
+
+				for _, restriction := range typedSuperType.Restrictions {
+					// TODO: once interfaces can conform to interfaces, include
+					if _, ok := typedSubType.ConformanceSet()[restriction]; !ok {
+						return false
+					}
+				}
+
+				return true
 			}
 
-		case *InterfaceType:
-			// A resource interface type `T` is not a (static) subtype of a restricted resource type `U{Vs}.
-			// However, a dynamic cast is valid.
+		} else {
 
-			return false
+			switch typedSubType := subType.(type) {
+			case *RestrictedResourceType:
+
+				// A restricted resource type `T{Us}`
+				// is a subtype of a restricted resource type `V{Ws}`:
+
+				switch restrictedSubType := typedSubType.Type.(type) {
+				case *AnyResourceType:
+					// When `T == AnyResource`: not statically.
+					return false
+
+				case *CompositeType:
+					// When `T != AnyResource`: if `T == V`.
+					//
+					// `Us` and `Ws` do not have to be subsets:
+					// The owner of the resource may freely restrict and unrestrict the resource.
+
+					return restrictedSubType.Kind == common.CompositeKindResource &&
+						restrictedSubType == typedSuperType.Type
+				}
+
+			case *CompositeType:
+				// An unrestricted resource type `T`
+				// is a subtype of a restricted resource type `U{Vs}`: if `T == U`.
+				//
+				// The owner of the resource may freely restrict the resource.
+
+				return typedSubType.Kind == common.CompositeKindResource &&
+					typedSubType == typedSuperType.Type
+
+			case *AnyResourceType:
+				// An unrestricted resource type `T`
+				// is a subtype of a restricted resource type `AnyResource{Vs}`:
+				// not statically.
+
+				return false
+			}
 		}
 
 	case *CompositeType:
 
+		// NOTE: type equality case (composite type `T` is subtype of composite type `U`)
+		// is already handled at beginning of function
+
+		if typedSubType, ok := subType.(*RestrictedResourceType); ok &&
+			typedSuperType.Kind == common.CompositeKindResource {
+
+			// A restricted resource type `T{Us}`
+			// is a subtype of an unrestricted resource type `V`:
+
+			switch restrictedSubType := typedSubType.Type.(type) {
+			case *AnyResourceType:
+				// When `T == AnyResource`: not statically.
+				return false
+
+			case *CompositeType:
+				// When `T != AnyResource`: if `T == V`.
+				//
+				// The owner of the resource may freely unrestrict the resource.
+
+				return restrictedSubType.Kind == common.CompositeKindResource &&
+					restrictedSubType == typedSuperType
+			}
+		}
+
+	case *AnyResourceType:
+
+		// A restricted resource type `T{Us}` or unrestricted resource type `T`
+		// is a subtype of the type `AnyResource`:
+		// always.
+
 		switch typedSubType := subType.(type) {
 		case *RestrictedResourceType:
-			// A restricted resource type `T{Us}` is a subtype of a resource type `V`, if `T == V`
-
-			return typedSuperType.Kind == common.CompositeKindResource &&
-				typedSubType.Type == typedSuperType
-
-		case *InterfaceType:
-			// A resource interface type `T` is not a (static) subtype of a resource type `U`.
-			// However, a dynamic cast is valid.
-
-			return false
+			return true
 
 		case *CompositeType:
-			// A composite type is never a subtype of another composite type
-
-			return false
+			return typedSubType.Kind == common.CompositeKindResource
 		}
 
 	case *InterfaceType:
@@ -4118,8 +4200,8 @@ func IsSubType(subType Type, superType Type) bool {
 				return false
 			}
 
-			// A composite type `T` is a subtype of a interface type `V`, if `T` conforms to `V`,
-			// and `V` and `T` are of the same kind
+			// A composite type `T` is a subtype of a interface type `V`:
+			// if `T` conforms to `V`, and `V` and `T` are of the same kind
 
 			if typedSubType.Kind != typedSuperType.CompositeKind {
 				return false

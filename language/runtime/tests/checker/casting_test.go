@@ -296,8 +296,6 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 	})
 
 	t.Run("restricted resource -> conforming resource interface: in restriction", func(t *testing.T) {
-		// TODO: requires @R{} -> @AnyResource{} subtyping
-		t.Skip()
 
 		checker, err := ParseAndCheckStorage(t, `
 	         resource interface I {}
@@ -311,7 +309,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 
 		require.NoError(t, err)
 
-		iType := checker.GlobalValues["I"].Type
+		iType := checker.GlobalTypes["I"].Type
 
 		require.IsType(t, &sema.InterfaceType{}, iType)
 
@@ -329,8 +327,6 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 	})
 
 	t.Run("restricted resource -> conforming resource interface: not in restriction", func(t *testing.T) {
-		// TODO: requires @R{} -> @AnyResource{} subtyping
-		t.Skip()
 
 		checker, err := ParseAndCheckStorage(t, `
 	         resource interface I1 {}
@@ -346,7 +342,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 
 		require.NoError(t, err)
 
-		i2Type := checker.GlobalValues["I2"].Type
+		i2Type := checker.GlobalTypes["I2"].Type
 
 		require.IsType(t, &sema.InterfaceType{}, i2Type)
 
@@ -380,6 +376,112 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 1)
 
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	        resource interface I1 {}
+
+	        resource interface I2 {}
+
+	        resource R: I1, I2 {}
+
+	        let r: @AnyResource{I1, I2} <- create R()
+	        let r2 <- r as @AnyResource{I2}
+	      `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: more restrictions", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	       resource interface I1 {}
+
+	       resource interface I2 {}
+
+	       resource R: I1, I2 {}
+
+	       let r: @AnyResource{I1} <- create R()
+	       let r2 <- r as @AnyResource{I1, I2}
+	     `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: non-conforming", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	       resource interface I1 {}
+
+	       resource interface I2 {}
+
+	       resource R: I1 {}
+
+	       let r: @AnyResource{I1} <- create R()
+	       let r2 <- r as @AnyResource{I1, I2}
+	     `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	       resource interface I1 {}
+
+	       resource interface I2 {}
+
+	       resource R: I1, I2 {}
+
+	       let r: @R{I1} <- create R()
+	       let r2 <- r as @AnyResource
+	     `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	       resource interface I1 {}
+
+	       resource interface I2 {}
+
+	       resource R: I1, I2 {}
+
+	       let r: @AnyResource{I1} <- create R()
+	       let r2 <- r as @AnyResource
+	     `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	       resource interface I1 {}
+
+	       resource interface I2 {}
+
+	       resource R: I1, I2 {}
+
+	       let r <- create R()
+	       let r2 <- r as @AnyResource
+	     `,
+		)
+
+		require.NoError(t, err)
 	})
 }
 
@@ -647,8 +749,6 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
 	})
 
 	t.Run("restricted resource -> conforming resource interface: in restriction", func(t *testing.T) {
-		// TODO: requires &R{} -> &AnyResource{} subtyping
-		t.Skip()
 
 		_, err := ParseAndCheckStorage(t, `
 	        resource interface I {}
@@ -664,8 +764,6 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
 	})
 
 	t.Run("restricted resource -> conforming resource interface: not in restriction", func(t *testing.T) {
-		// TODO: requires &R{} -> &AnyResource{} subtyping
-		t.Skip()
 
 		_, err := ParseAndCheckStorage(t, `
 	        resource interface I1 {}
@@ -699,6 +797,112 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 1)
 
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	        resource interface I1 {}
+
+	        resource interface I2 {}
+
+	        resource R: I1, I2 {}
+
+            let r = &storage[R] as auth &AnyResource{I1, I2}
+	        let r2 = r as &AnyResource{I2}
+	      `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: more restrictions", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let r = &storage[R] as auth &AnyResource{I1}
+	      let r2 = r as &AnyResource{I1, I2}
+	    `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: non-conforming", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1 {}
+
+          let r = &storage[R] as auth &AnyResource{I1}
+	      let r2 = r as &AnyResource{I1, I2}
+	    `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let r = &storage[R] as auth &R{I1}
+	      let r2 = r as &AnyResource
+	    `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let r = &storage[R] as auth &AnyResource{I1}
+	      let r2 = r as &AnyResource
+	    `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let r = &storage[R] as auth &R
+	      let r2 = r as &AnyResource
+	    `,
+		)
+
+		require.NoError(t, err)
 	})
 }
 
