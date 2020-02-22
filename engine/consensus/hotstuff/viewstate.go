@@ -56,17 +56,12 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 // Note: the order of the identity in the returned identity list is NOT the same as the
 // order of node ID in the input of nodeIDs
 func (v *ViewState) GetStakedIdentitiesAtBlock(blockID flow.Identifier, nodeIDs ...flow.Identifier) (flow.IdentityList, error) {
-	if nodeIDs == nil {
-		return v.protocolState.AtBlockID(blockID).Identities(
-			v.consensusMembersFilter, // nodes must be belong to the same consensus group
-			filter.HasStake,          // nodes must be staked
-		)
+	var filters []flow.IdentityFilter
+	filters = append(filters, v.consensusMembersFilter)
+	if len(nodeIDs) > 0 {
+		filters = append(filters, filter.HasNodeID(nodeIDs...))
 	}
-	return v.protocolState.AtBlockID(blockID).Identities(
-		v.consensusMembersFilter,     // nodes must be belong to the same consensus group
-		filter.HasStake,              // nodes must be staked
-		filter.HasNodeID(nodeIDs...), // filter only the given nodes
-	)
+	return v.protocolState.AtBlockID(blockID).Identities(filters...)
 }
 
 // GetQCStakeThresholdAtBlock returns the stack threshold for building QC at a given block
