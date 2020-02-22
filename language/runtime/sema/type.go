@@ -4174,20 +4174,6 @@ func IsSubType(subType Type, superType Type) bool {
 			}
 		}
 
-	case *AnyResourceType:
-
-		// A restricted resource type `T{Us}` or unrestricted resource type `T`
-		// is a subtype of the type `AnyResource`:
-		// always.
-
-		switch typedSubType := subType.(type) {
-		case *RestrictedResourceType:
-			return true
-
-		case *CompositeType:
-			return typedSubType.Kind == common.CompositeKindResource
-		}
-
 	case *InterfaceType:
 
 		switch typedSubType := subType.(type) {
