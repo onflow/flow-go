@@ -295,7 +295,13 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *hotstu
 
 	// send my vote if I should vote and I'm not the leader
 	if shouldVote {
-		err := e.network.SendVote(ownVote.BlockID, ownVote.View, ownVote.Signature.Raw, nextLeader.NodeID)
+		err := e.network.SendVote(
+			ownVote.BlockID,
+			ownVote.View,
+			ownVote.Signature.StakingSignature,
+			ownVote.Signature.RandomBeaconSignature,
+			nextLeader.NodeID,
+		)
 		if err != nil {
 			// TODO: should we error here? E.g.
 			//    return fmt.Errorf("failed to send vote: %w", err)
