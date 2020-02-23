@@ -23,7 +23,7 @@ type ThresholdSigner struct {
 	// the group public key (a DKG output)
 	groupPublicKey PublicKey
 	// the group public key shares (a DKG output)
-	nodePublicKeys []PublicKey
+	publicKeyShares []PublicKey
 	// the hasher to be used for all signatures
 	hashAlgo Hasher
 	// the message to be signed. Siganture shares and the threshold signature
@@ -74,7 +74,7 @@ func (s *ThresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 
 	s.currentPrivateKey = currentPrivateKey
 	s.groupPublicKey = groupPublicKey
-	s.nodePublicKeys = sharePublicKeys
+	s.publicKeyShares = sharePublicKeys
 }
 
 // SetMessageToSign sets the next message to be signed
@@ -98,11 +98,11 @@ func (s *ThresholdSigner) verifyShare(share Signature, signerIndex index) (bool,
 	if s.size-1 < int(signerIndex) {
 		return false, cryptoError{"The signer index is larger than the group size"}
 	}
-	if len(s.nodePublicKeys)-1 < int(signerIndex) {
+	if len(s.publicKeyShares)-1 < int(signerIndex) {
 		return false, cryptoError{"The node public keys are not set"}
 	}
 
-	return s.nodePublicKeys[signerIndex].Verify(share, s.messageToSign, s.hashAlgo)
+	return s.publicKeyShares[signerIndex].Verify(share, s.messageToSign, s.hashAlgo)
 }
 
 // VerifyThresholdSignature verifies a threshold signature using the group public key
