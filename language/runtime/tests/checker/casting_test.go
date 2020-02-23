@@ -198,7 +198,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
-	t.Run("resource interface -> conforming restricted resource", func(t *testing.T) {
+	t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
 
 		_, err := ParseAndCheckStorage(t, `
 	        resource interface RI {}
@@ -241,7 +241,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		)
 	})
 
-	t.Run("resource interface -> conforming resource", func(t *testing.T) {
+	t.Run("restricted AnyResource -> conforming resource", func(t *testing.T) {
 
 		_, err := ParseAndCheckStorage(t, `
 	         resource interface RI {}
@@ -260,9 +260,9 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
-	// Supertype: Resource interface
+	// Supertype: restricted AnyResource
 
-	t.Run("resource -> non-conformance resource interface", func(t *testing.T) {
+	t.Run("resource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
 
 		_, err := ParseAndCheckStorage(t, `
 	         resource interface RI {}
@@ -280,7 +280,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
-	t.Run("resource -> conforming resource interface", func(t *testing.T) {
+	t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
 
 		_, err := ParseAndCheckStorage(t, `
 	         resource interface RI {}
@@ -295,7 +295,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("restricted resource -> conforming resource interface: in restriction", func(t *testing.T) {
+	t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
 
 		checker, err := ParseAndCheckStorage(t, `
 	         resource interface I {}
@@ -326,7 +326,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		)
 	})
 
-	t.Run("restricted resource -> conforming resource interface: not in restriction", func(t *testing.T) {
+	t.Run("restricted resource -> restricted AnyResource with conformance not in restriction", func(t *testing.T) {
 
 		checker, err := ParseAndCheckStorage(t, `
 	         resource interface I1 {}
@@ -359,7 +359,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		)
 	})
 
-	t.Run("restricted resource -> non-conforming resource interface", func(t *testing.T) {
+	t.Run("restricted resource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
 
 		_, err := ParseAndCheckStorage(t, `
 	         resource interface I1 {}
@@ -414,7 +414,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
-	t.Run("restricted AnyResource -> restricted AnyResource: non-conforming", func(t *testing.T) {
+	t.Run("restricted AnyResource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
 
 		_, err := ParseAndCheckStorage(t, `
 	       resource interface I1 {}
@@ -677,6 +677,23 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
+	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      let r = &storage[R] as auth &AnyResource
+	      let r2 = r as &R{RI}
+	    `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
 	// Supertype: Resource (unrestricted)
 
 	t.Run("restricted resource -> unrestricted resource", func(t *testing.T) {
@@ -707,6 +724,23 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
 		)
 
 		// NOTE: static cast not allowed, only dynamic
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("AnyResource -> unrestricted resource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      let r = &storage[R] as auth &AnyResource
+	      let r2 = r as &R
+	    `,
+		)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -853,6 +887,25 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
 
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
+
+	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I {}
+
+	      resource R: I {}
+
+          let r = &storage[R] as auth &AnyResource
+	      let r2 = r as &AnyResource{I}
+	    `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	// Supertype: AnyResource
 
 	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
 
@@ -1016,6 +1069,23 @@ func TestCheckCastStaticUnauthorizedReferenceType(t *testing.T) {
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 
+	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      let r = &storage[R] as &AnyResource
+	      let r2 = r as &R{RI}
+	    `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
 	// Supertype: Resource (unrestricted)
 
 	t.Run("restricted resource -> unrestricted resource", func(t *testing.T) {
@@ -1045,6 +1115,23 @@ func TestCheckCastStaticUnauthorizedReferenceType(t *testing.T) {
 	        let r = &storage[R] as &AnyResource{RI}
 	        let r2 = r as &R
 	      `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("AnyResource -> unrestricted resource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      let r = &storage[R] as &AnyResource
+	      let r2 = r as &R
+	    `,
 		)
 
 		errs := ExpectCheckerErrors(t, err, 1)
@@ -1138,5 +1225,75 @@ func TestCheckCastStaticUnauthorizedReferenceType(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 1)
 
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I {}
+
+	      resource R: I {}
+
+          let r = &storage[R] as &AnyResource
+	      let r2 = r as &AnyResource{I}
+	    `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	// Supertype: AnyResource
+
+	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let r = &storage[R] as &R{I1}
+	      let r2 = r as &AnyResource
+	    `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let r = &storage[R] as &AnyResource{I1}
+	      let r2 = r as &AnyResource
+	    `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let r = &storage[R] as &R
+	      let r2 = r as &AnyResource
+	    `,
+		)
+
+		require.NoError(t, err)
 	})
 }
