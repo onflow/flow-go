@@ -3968,35 +3968,95 @@ func IsSubType(subType Type, superType Type) bool {
 		switch typedInnerSuperType := typedSuperType.Type.(type) {
 		case *RestrictedResourceType:
 
-			switch typedInnerSubType := typedSubType.Type.(type) {
-			case *RestrictedResourceType:
-				// An unauthorized reference to a restricted resource type `&T{Us}` is a subtype of
-				// a reference to a reference to a restricted resource type `&V{Ws}`,
-				// if `T == V` and `Ws` is a subset of `Us`.
-				//
-				// The holder of the reference may only further restrict the resource.
+			if _, ok := typedInnerSuperType.Type.(*AnyResourceType); ok {
 
-				return typedInnerSubType.Type == typedInnerSuperType.Type &&
-					typedInnerSuperType.RestrictionSet().
+				switch typedInnerSubType := typedSubType.Type.(type) {
+				case *RestrictedResourceType:
+					// An unauthorized reference to a restricted resource type `&T{Us}`
+					// is a subtype of a reference to a restricted resource type `&AnyResource{Vs}`:
+					// if `Vs` is a subset of `Us`.
+					//
+					// The holder of the reference may only further restrict the reference.
+					//
+					// The requirement for `T` to conform to `Vs` is implied by the subset requirement.
+
+					return typedInnerSuperType.RestrictionSet().
 						IsSubsetOf(typedInnerSubType.RestrictionSet())
 
-			case *CompositeType:
-				// An unauthorized reference to a resource type `&T` is a subtype of
-				// a reference to a restricted resource type `&T{Us}`, if `T == U`.
-				//
-				// The holder of the reference may restrict the resource.
+				case *CompositeType:
+					// An unauthorized reference to an unrestricted resource type `&T`
+					// is a subtype of a reference to a restricted resource type &AnyResource{Us}:
+					// When `T != AnyResource`: if `T` conforms to `Us`.
+					//
+					// The holder of the reference may only restrict the reference.
 
-				return typedInnerSubType.Kind == common.CompositeKindResource &&
-					typedInnerSubType == typedInnerSuperType.Type
+					if typedInnerSubType.Kind != common.CompositeKindResource {
+						return false
+					}
 
-			case *InterfaceType:
-				// An unauthorized reference to a resource interface type
-				// is not a subtype of a reference to a restricted resource type.
-				// Not even dynamically.
-				//
-				// The holder of the reference may not gain more permissions or knowledge.
+					for _, restriction := range typedInnerSuperType.Restrictions {
+						// TODO: once interfaces can conform to interfaces, include
+						if _, ok := typedInnerSubType.ConformanceSet()[restriction]; !ok {
+							return false
+						}
+					}
 
-				return false
+					return true
+
+				case *AnyResourceType:
+					// An unauthorized reference to an unrestricted resource type `&T`
+					// is a subtype of a reference to a restricted resource type &AnyResource{Us}:
+					// When `T == AnyResource`: never.
+					//
+					// The holder of the reference may not gain more permissions or knowledge.
+
+					return false
+				}
+
+			} else {
+
+				switch typedInnerSubType := typedSubType.Type.(type) {
+				case *RestrictedResourceType:
+
+					// An unauthorized reference to a restricted resource type `&T{Us}`
+					// is a subtype of a reference to a restricted resource type `&V{Ws}:`
+
+					switch typedInnerSubType.Type.(type) {
+					case *CompositeType:
+						// When `T != AnyResource`: if `T == V` and `Ws` is a subset of `Us`.
+						//
+						// The holder of the reference may not gain more permissions or knowledge
+						// and may only further restrict the reference to the resource.
+
+						return typedInnerSubType.Type == typedInnerSuperType.Type &&
+							typedInnerSuperType.RestrictionSet().
+								IsSubsetOf(typedInnerSubType.RestrictionSet())
+
+					case *AnyResourceType:
+						// When `T == AnyResource`: never.
+
+						return false
+					}
+
+				case *CompositeType:
+					// An unauthorized reference to an unrestricted resource type `&T`
+					// is a subtype of a reference to a restricted resource type `&U{Vs}`:
+					// When `T != AnyResource`: if `T == U`.
+					//
+					// The holder of the reference may only further restrict the reference.
+
+					return typedInnerSubType.Kind == common.CompositeKindResource &&
+						typedInnerSubType == typedInnerSuperType.Type
+
+				case *AnyResourceType:
+					// An unauthorized reference to an unrestricted resource type `&T`
+					// is a subtype of a reference to a restricted resource type `&U{Vs}`:
+					// When `T == AnyResource`: never.
+					//
+					// The holder of the reference may not gain more permissions or knowledge.
+
+					return false
+				}
 			}
 
 		case *CompositeType:
@@ -4006,6 +4066,21 @@ func IsSubType(subType Type, superType Type) bool {
 			// The holder of the reference may not gain more permissions or knowledge.
 
 			return false
+
+		case *AnyResourceType:
+
+			// An unauthorized reference to a restricted resource type `&T{Us}`
+			// or to a unrestricted resource type `&T`
+			// is a subtype of the type `&AnyResource`:
+			// always.
+
+			switch typedInnerSubType := typedSubType.Type.(type) {
+			case *RestrictedResourceType:
+				return true
+
+			case *CompositeType:
+				return typedInnerSubType.Kind == common.CompositeKindResource
+			}
 		}
 
 	case *FunctionType:
