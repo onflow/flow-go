@@ -231,7 +231,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				}
 				n := proc.dkg.Size()
 				kmac := NewBLS_KMAC(ThresholdSignaureTag)
-				proc.ts, err = NewThresholdSigner(n, kmac)
+				proc.ts, err = NewThresholdSigner(n, proc.current, kmac)
 				assert.Nil(t, err)
 				proc.ts.SetKeys(sk, groupPK, nodesPK)
 				proc.ts.SetMessageToSign(messageToSign)
@@ -255,19 +255,19 @@ func tsRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving TS from %d:", proc.current, newMsg.orig)
-			verif, err := proc.ts.ReceiveSignatureShare(
+			verif, thresholdReached, err := proc.ts.AddSignatureShare(
 				newMsg.orig, newMsg.data)
 			assert.Nil(t, err)
 			assert.True(t, verif,
 				"the signature share sent from %d to %d is not correct", newMsg.orig,
 				proc.current)
-			threshReached, thresholdSignature, err := proc.ts.ThresholdSignaure()
-			if threshReached {
+			if thresholdReached {
+				thresholdSignature, err := proc.ts.ThresholdSignaure()
 				verif, err = proc.ts.VerifyThresholdSignature(thresholdSignature)
 				assert.Nil(t, err)
 				assert.True(t, verif, "the threshold signature is not correct")
 				if verif {
-					log.Errorf("%d reconstructed a valid signature: %d\n", proc.current,
+					log.Infof("%d reconstructed a valid signature: %d\n", proc.current,
 						thresholdSignature)
 				}
 			}
@@ -336,7 +336,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 				assert.Nil(t, err)
 				assert.True(t, verif, "the threshold signature is not correct")
 				if verif {
-					log.Errorf("%d reconstructed a valid signature: %d\n", proc.current,
+					log.Infof("%d reconstructed a valid signature: %d\n", proc.current,
 						thresholdSignature)
 				}
 			}

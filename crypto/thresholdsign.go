@@ -18,6 +18,8 @@ type ThresholdSigner struct {
 	// the thresold t of the scheme where (t+1) shares are
 	// required to reconstruct a signature
 	threshold int
+	// the index of the current node
+	currentIndex int
 	// the current node private key (a DKG output)
 	currentPrivateKey PrivateKey
 	// the group public key (a DKG output)
@@ -44,21 +46,26 @@ const ThresholdSignaureTag = "Threshold Signatures"
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
 // size is the number of participants
-func NewThresholdSigner(size int, hashingAlgo Hasher) (*ThresholdSigner, error) {
+func NewThresholdSigner(size int, currentIndex int, hashingAlgo Hasher) (*ThresholdSigner, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)}
+	}
+	if size-1 < currentIndex {
+		return nil, cryptoError{"The current index is larger than the group size"}
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	// Hahser to be used
 	hasher := hashingAlgo
+	// internal list of valid signature shares
 	shares := make([]byte, 0, (threshold+1)*SignatureLenBLS_BLS12381)
 	signers := make([]index, 0, threshold+1)
 
 	return &ThresholdSigner{
 		size:               size,
 		threshold:          threshold,
+		currentIndex:       currentIndex,
 		hashAlgo:           hasher,
 		shares:             shares,
 		signers:            signers,
@@ -89,15 +96,24 @@ func (s *ThresholdSigner) SignShare() (Signature, error) {
 	if s.currentPrivateKey == nil {
 		return nil, cryptoError{"The private key of the current node is not set"}
 	}
-	// TOD0: should ReceiveThresholdSignatureMsg be called ?
-	return s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
+	// sign
+	share, err := s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
+	if err != nil {
+		return nil, err
+	}
+	// add the node own signature
+	valid, _, err := s.AddSignatureShare(s.currentIndex, share)
+	if err != nil {
+		return nil, err
+	}
+	if !valid {
+		return nil, cryptoError{"The current node private and public keys do not match"}
+	}
+	return share, nil
 }
 
 // VerifyShare verifies a signature share using the signer's public key
 func (s *ThresholdSigner) verifyShare(share Signature, signerIndex index) (bool, error) {
-	if s.size-1 < int(signerIndex) {
-		return false, cryptoError{"The signer index is larger than the group size"}
-	}
 	if len(s.publicKeyShares)-1 < int(signerIndex) {
 		return false, cryptoError{"The node public keys are not set"}
 	}
@@ -120,13 +136,16 @@ func (s *ThresholdSigner) ClearShares() {
 	s.shares = s.shares[:0]
 }
 
-// ReceiveSignatureShare processes a new TS share
-// If the share is valid, not perviously added and the threshold not reached yet,
-// it is appended to a local list of valid signatures
-func (s *ThresholdSigner) ReceiveSignatureShare(orig int, share Signature) (bool, error) {
+// AddSignatureShare processes a new TS share
+// If the share is valid, not perviously added and the threshold is not reached yet,
+// it is appended to a local list of valid shares
+// The function returns:
+//  - first bool: true if the share is valid, false otherwise
+//  - second bool: true if thereshold is reached, false otherwise
+func (s *ThresholdSigner) AddSignatureShare(orig int, share Signature) (bool, bool, error) {
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
-		return false, err
+		return false, len(s.signers) == (s.threshold + 1), err
 	}
 	// check if share is valid and threshold is not reached
 	if verif && len(s.signers) < (s.threshold+1) {
@@ -144,27 +163,25 @@ func (s *ThresholdSigner) ReceiveSignatureShare(orig int, share Signature) (bool
 			s.signers = append(s.signers, index(orig))
 		}
 	}
-	return verif, nil
+	return verif, len(s.signers) == (s.threshold + 1), nil
 }
 
-// ThresholdSignaure returns:
-// - bool: true if the threshold was reached, false otherwise
-// - Signature: the threshold signature if the threshold was reached, nil otherwise
-func (s *ThresholdSigner) ThresholdSignaure() (bool, Signature, error) {
+// ThresholdSignaure returns the threshold signature if the threshold was reached, nil otherwise
+func (s *ThresholdSigner) ThresholdSignaure() (Signature, error) {
 	// thresholdSignature is only computed once
 	if s.thresholdSignature != nil {
-		return true, s.thresholdSignature, nil
+		return s.thresholdSignature, nil
 	}
 	// reconstruct the threshold signature
 	if len(s.signers) == (s.threshold + 1) {
 		thresholdSignature, err := s.reconstructThresholdSignature()
 		if err != nil {
-			return false, nil, err
+			return nil, err
 		}
 		s.thresholdSignature = thresholdSignature
-		return true, thresholdSignature, nil
+		return thresholdSignature, nil
 	}
-	return false, nil, nil
+	return nil, nil
 }
 
 // ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
