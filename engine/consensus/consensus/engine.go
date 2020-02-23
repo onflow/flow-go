@@ -131,13 +131,14 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // SendVote will send a vote to the desired node.
-func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, recipientID flow.Identifier) error {
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature, recipientID flow.Identifier) error {
 
 	// build the vote message
 	vote := &messages.BlockVote{
-		BlockID:   blockID,
-		View:      view,
-		Signature: sig,
+		BlockID:               blockID,
+		View:                  view,
+		StakingSignature:      stakingSig,
+		RandomBeaconSignature: randomBeaconSig,
 	}
 
 	// send the vote the desired recipient
@@ -157,6 +158,16 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	if header.ProposerID != e.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
 	}
+
+	// get the parent of the block
+	parent, err := e.headers.ByBlockID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
+	// fill in the fields that can't be populated by HotStuff
+	header.ChainID = parent.ChainID
+	header.Height = parent.Height + 1
 
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
@@ -286,7 +297,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
 	// forward the vote to coldstuff for processing
-	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature)
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.StakingSignature, vote.RandomBeaconSignature)
 
 	return nil
 }

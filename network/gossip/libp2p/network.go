@@ -3,7 +3,6 @@ package libp2p
 import (
 	"fmt"
 	"hash"
-	"strconv"
 	"sync"
 
 	"github.com/dchest/siphash"
@@ -246,39 +245,10 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 
 	// TODO: debup the message here
 
-	err = n.send(channelID, msg, targetIDs...)
+	err = n.mw.Send(channelID, msg, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not gossip event")
 	}
 
-	return nil
-}
-
-// send sends the message to the set of target ids through the middleware
-// send is the last method within the pipeline of message shipping in network layer
-// once it is called, the message slips through the network layer towards the middleware
-// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.send
-// Otherwise, middleware.Publish is used, which uses the PubSub method of communication.
-// TODO: Move this decision making to the Middleware Issue#2246
-func (n *Network) send(channelID uint8, msg *message.Message, nodeIDs ...flow.Identifier) error {
-	var err error
-	switch len(nodeIDs) {
-	case 0:
-		n.logger.Debug().Msg("list of target node IDs empty")
-		return nil
-	case 1:
-		if nodeIDs[0] == n.me.NodeID() {
-			// to avoid self dial by the underlay
-			n.logger.Debug().Msg("self dial attempt")
-			return nil
-		}
-		err = n.mw.Send(nodeIDs[0], msg)
-	default:
-		err = n.mw.Publish(strconv.Itoa(int(channelID)), msg)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to send message to %s:%w", nodeIDs, err)
-	}
 	return nil
 }

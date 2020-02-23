@@ -57,7 +57,7 @@ func (v *Validator) ValidateQC(qc *hotstuff.QuorumCertificate, block *hotstuff.B
 	// if the counts are equal, then the aggregated signature contains all staked signers' signatures.
 	// if the counts are not equal, then some signer is not staked.
 	if int(stakedSigners.Count()) != len(qc.AggregatedSignature.SignerIDs) {
-		return newInvalidBlockError(block, fmt.Sprintf("QC has unstaked signer"))
+		return newInvalidBlockError(block, fmt.Sprintf("QC has signatures from unstaked signers or non-consensus nodes"))
 	}
 
 	// get all staked nodes at qc's Block
@@ -78,19 +78,29 @@ func (v *Validator) ValidateQC(qc *hotstuff.QuorumCertificate, block *hotstuff.B
 	}
 
 	// convert to public keys
-	pubkeys := make([]crypto.PublicKey, len(stakedSigners))
-	for i, signer := range stakedSigners {
-		pubkeys[i] = signer.PubKey
+	stakingPubKeys := make([]crypto.PublicKey, 0, len(stakedSigners))
+	for _, signer := range stakedSigners {
+		stakingPubKeys = append(stakingPubKeys, signer.StakingPubKey)
 	}
 
-	// validate qc's aggregated signature.
-	valid, err := v.sigVerifier.VerifyAggregatedSignature(qc.AggregatedSignature, block, pubkeys)
+	// validate qc's aggregated staking signatures.
+	valid, err := v.sigVerifier.VerifyAggregatedStakingSignature(qc.AggregatedSignature.StakingSignatures, block, stakingPubKeys)
 	if err != nil {
 		return fmt.Errorf("cannot verify qc's aggregated signature, qc.BlockID: %x", qc.BlockID)
 	}
 
 	if !valid {
-		return newInvalidBlockError(block, "aggregated signature in QC is invalid")
+		return newInvalidBlockError(block, "aggregated staking signature in QC is invalid")
+	}
+
+	// validate qc's reconstructed random beacon signatures.
+	valid, err = v.sigVerifier.VerifyAggregatedRandomBeaconSignature(qc.AggregatedSignature.RandomBeaconSignature, block)
+	if err != nil {
+		return fmt.Errorf("cannot verify reconstructed random beacon sig from qc: %w", err)
+	}
+
+	if !valid {
+		return newInvalidBlockError(block, "reconstructed random beacon signature in QC is invalid")
 	}
 
 	return nil
@@ -105,6 +115,8 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 	blockID := proposal.Block.BlockID
 
 	// get claimed signer
+	// ToDo The following is O(N) as the filter will iterate over _all_ consensus nodes.
+	//      Instead, Calling protocol state.AtBlockID(blockID).Identity(proposal.Block.ProposerID) will only require O(1)
 	signers, err := v.viewState.GetStakedIdentitiesAtBlock(proposal.Block.BlockID, proposal.Block.ProposerID)
 	if err != nil {
 		return fmt.Errorf("cannot get signer for block: %x", blockID)
@@ -123,14 +135,24 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%x), expected leader: (%x)", signer.ID(), leader.ID()))
 	}
 
-	// check signature
-	valid, err := v.sigVerifier.VerifySig(proposal.Signature, proposal.Block, signer.PubKey)
+	// check staking signature
+	valid, err := v.sigVerifier.VerifyStakingSig(proposal.StakingSignature, proposal.Block, signer.StakingPubKey)
 	if err != nil {
-		return fmt.Errorf("cannot verify block %x 's signature: %w", blockID, err)
+		return fmt.Errorf("cannot verify block %x 's staking signature: %w", blockID, err)
 	}
 
 	if !valid {
-		return newInvalidBlockError(block, "block proposer's signature is invalid")
+		return newInvalidBlockError(block, "block proposer's staking signature is invalid")
+	}
+
+	// check random beacon signature
+	valid, err = v.sigVerifier.VerifyRandomBeaconSig(proposal.RandomBeaconSignature, proposal.Block, signer.RandomBeaconPubKey)
+	if err != nil {
+		return fmt.Errorf("cannot verify block %x 's random beacon signature: %w", blockID, err)
+	}
+
+	if !valid {
+		return newInvalidBlockError(block, "block proposer's random beacon signature is invalid")
 	}
 
 	// check view
@@ -180,6 +202,8 @@ func (v *Validator) ValidateVote(vote *hotstuff.Vote, block *hotstuff.Block) (*f
 
 	// get claimed signer
 	signerID := vote.Signature.SignerID
+	// ToDo The following is O(N) as the filter will iterate over _all_ consensus nodes.
+	//      Instead, Calling protocol state.AtBlockID(blockID).Identity(proposal.Block.ProposerID) will only require O(1)
 	signers, err := v.viewState.GetStakedIdentitiesAtBlock(blockID, signerID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get signer (%x) to validate vote (%x): %w", signerID, voteID, err)
@@ -192,14 +216,24 @@ func (v *Validator) ValidateVote(vote *hotstuff.Vote, block *hotstuff.Block) (*f
 	// the only signer
 	signer := signers[0]
 
-	// check signature
-	valid, err := v.sigVerifier.VerifySig(vote.Signature.Raw, block, signer.PubKey)
+	// check staking signature
+	valid, err := v.sigVerifier.VerifyStakingSig(vote.Signature.StakingSignature, block, signer.StakingPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", voteID, err)
 	}
 
 	if !valid {
-		return nil, newInvalidVoteError(vote, "signer signature is invalid")
+		return nil, newInvalidVoteError(vote, "vote's staking signature is invalid")
+	}
+
+	// check random beacon signature
+	valid, err = v.sigVerifier.VerifyRandomBeaconSig(vote.Signature.RandomBeaconSignature, block, signer.RandomBeaconPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot verify vote %x 's random beacon signature: %w", blockID, err)
+	}
+
+	if !valid {
+		return nil, newInvalidVoteError(vote, "vote's random beacon signature is invalid")
 	}
 
 	return signer, nil
