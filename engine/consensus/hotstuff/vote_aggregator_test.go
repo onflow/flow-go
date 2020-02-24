@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -143,6 +144,18 @@ func TestStaleVoteWithoutBlock(t *testing.T) {
 }
 
 // UNHAPPY PATH
+// build qc without storing proposer vote
+func TestBuildQCWithoutProposerVote(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	require.Errorf(t, err, fmt.Sprintf("could not get proposer vote for block: %x", bp.Block.BlockID))
+	require.False(t, built)
+	require.Nil(t, qc)
+}
+
+// UNHAPPY PATH
 // highestPrunedView is 10, receive a block with view 5
 func TestStaleProposerVote(t *testing.T) {
 	va, ids := newMockVoteAggregator(t)
@@ -152,12 +165,12 @@ func TestStaleProposerVote(t *testing.T) {
 	ok := va.StoreProposerVote(bp.ProposerVote())
 	require.False(t, ok)
 	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
-	require.Error(t, err)
+	require.Errorf(t, err, fmt.Sprintf("could not get proposer vote for block: %x", bp.Block.BlockID))
 	require.False(t, built)
 	require.Nil(t, qc)
 }
 
-// UNHAPPY PATH (double voting)
+// UNHAPPY PATH
 // store one vote in the memory
 // receive another vote with the same voter and the same view
 // should trigger notifier
