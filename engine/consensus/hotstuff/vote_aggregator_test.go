@@ -515,15 +515,15 @@ func newMockBlock(view uint64, proposerID flow.Identifier) *hotstuff.Proposal {
 	}
 	sig := crypto.Signature{}
 	return &hotstuff.Proposal{
-		Block:     block,
-		Signature: sig,
+		Block:            block,
+		StakingSignature: sig,
 	}
 }
 
 func newMockVote(view uint64, blockID flow.Identifier, signerID flow.Identifier) *hotstuff.Vote {
 	sig := &hotstuff.SingleSignature{
-		SignerID: signerID,
-		Raw:      []byte{},
+		SignerID:         signerID,
+		StakingSignature: []byte{},
 	}
 	vote := &hotstuff.Vote{
 		BlockID:   blockID,
@@ -547,12 +547,20 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	viewState, err := NewViewState(mockProtocolState, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-	sigProvider := signature.NewSigProvider(mocks.NewMockPrivateKey(ctrl), hasher, unittest.IdentifierFixture())
+	sigProvider := signature.NewSigProvider(
+		unittest.IdentifierFixture(),
+		mockProtocolState,
+		mocks.NewMockPrivateKey(ctrl),
+		hasher,
+		&signature.DKGPublicData{},
+		mocks.NewMockPrivateKey(ctrl),
+		hasher,
+	)
 	voteValidator := &Validator{viewState: viewState, sigVerifier: sigProvider}
 	for i := 0; i < VALIDATOR_SIZE; i += 1 {
 		mockPubKey := mocks.NewMockPublicKey(ctrl)
 		mockPubKey.EXPECT().Verify(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
-		ids[i].PubKey = mockPubKey
+		ids[i].StakingPubKey = mockPubKey
 		//snapshot.EXPECT().Identities(viewState.consensusMembersFilter, filter.HasStake, filter.HasNodeID(ids[i].NodeID)).Return(flow.IdentityList{ids[i]}, nil).AnyTimes()
 	}
 
