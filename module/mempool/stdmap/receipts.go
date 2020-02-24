@@ -3,24 +3,21 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool"
 )
 
 // Receipts implements the execution receipts memory pool of the consensus node,
 // used to store execution receipts and to generate block seals.
 type Receipts struct {
 	*Backend
-	byResult map[flow.Identifier]flow.Identifier
+	byBlock map[flow.Identifier](map[flow.Identifier]struct{})
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
 func NewReceipts() (*Receipts, error) {
 	r := &Receipts{
-		Backend:  NewBackend(),
-		byResult: make(map[flow.Identifier]flow.Identifier),
+		Backend: NewBackend(),
+		byBlock: make(map[flow.Identifier](map[flow.Identifier]struct{})),
 	}
 
 	return r, nil
@@ -32,56 +29,66 @@ func (r *Receipts) Add(receipt *flow.ExecutionReceipt) error {
 	if err != nil {
 		return err
 	}
-	r.byResult[receipt.ExecutionResult.ID()] = receipt.ID()
+	blockID := receipt.ExecutionResult.BlockID
+	forBlock, ok := r.byBlock[blockID]
+	if !ok {
+		forBlock = make(map[flow.Identifier]struct{})
+		r.byBlock[blockID] = forBlock
+	}
+	forBlock[receipt.ID()] = struct{}{}
 	return nil
 }
 
-// Rem removes a result approval from the mempool.
+// Rem will remove a receipt by ID.
 func (r *Receipts) Rem(receiptID flow.Identifier) bool {
-	receipt, err := r.ByID(receiptID)
+	entity, err := r.Backend.ByID(receiptID)
 	if err != nil {
 		return false
 	}
-	ok := r.Backend.Rem(receiptID)
-	if !ok {
-		return false
+	_ = r.Backend.Rem(receiptID)
+	receipt := entity.(*flow.ExecutionReceipt)
+	blockID := receipt.ExecutionResult.BlockID
+	forBlock := r.byBlock[blockID]
+	delete(forBlock, receiptID)
+	if len(forBlock) > 0 {
+		return true
 	}
-	delete(r.byResult, receipt.ExecutionResult.ID())
+	delete(r.byBlock, blockID)
 	return true
 }
 
-// ByID returns the execution receipt with the given ID from the mempool.
-func (r *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
-	entity, err := r.Backend.ByID(receiptID)
-	if err != nil {
-		return nil, err
-	}
-	receipt, ok := entity.(*flow.ExecutionReceipt)
+// ByBlockID returns an execution receipt by approval ID.
+func (r *Receipts) ByBlockID(blockID flow.Identifier) []*flow.ExecutionReceipt {
+	byBlock, ok := r.byBlock[blockID]
 	if !ok {
-		panic(fmt.Sprintf("invalid entity in receipt pool (%T)", entity))
+		return nil
 	}
-	return receipt, nil
+	receipts := make([]*flow.ExecutionReceipt, 0, len(byBlock))
+	for receiptID := range byBlock {
+		entity, _ := r.Backend.ByID(receiptID)
+		receipts = append(receipts, entity.(*flow.ExecutionReceipt))
+	}
+	return receipts
 }
 
-// ByResultID returns an execution receipt by approval ID.
-func (r *Receipts) ByResultID(resultID flow.Identifier) (*flow.ExecutionReceipt, error) {
-	receiptID, ok := r.byResult[resultID]
+// DropForBlock drops all execution receipts for the given block.
+func (r *Receipts) DropForBlock(blockID flow.Identifier) {
+	byBlock, ok := r.byBlock[blockID]
 	if !ok {
-		return nil, mempool.ErrEntityNotFound
+		return
 	}
-	return r.ByID(receiptID)
+	for receiptID := range byBlock {
+		_ = r.Backend.Rem(receiptID)
+	}
+	delete(r.byBlock, blockID)
 }
 
-// All returns all execution receipts from the pool.
+// All will return all execution receipts in the memory pool.
 func (r *Receipts) All() []*flow.ExecutionReceipt {
 	entities := r.Backend.All()
 	receipts := make([]*flow.ExecutionReceipt, 0, len(entities))
 	for _, entity := range entities {
-		receipt, ok := entity.(*flow.ExecutionReceipt)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in receipt pool (%T)", entity))
-		}
-		receipts = append(receipts, receipt)
+		receipts = append(receipts, entity.(*flow.ExecutionReceipt))
 	}
 	return receipts
 }

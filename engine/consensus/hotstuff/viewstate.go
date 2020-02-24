@@ -82,8 +82,7 @@ func (v *ViewState) LeaderForView(view uint64) *flow.Identity {
 
 // Selects Leader in Round-Robin fashion. NO support for Epochs.
 func roundRobin(nodes flow.IdentityList, view uint64) *flow.Identity {
-	leaderIndex := int(view) % int(nodes.Count())
-	return nodes.Get(uint(leaderIndex))
+	return nodes[int(view)%int(len(nodes))]
 }
 
 // ComputeStakeThresholdForBuildingQC returns the threshold to determine how much stake are needed for building a QC

@@ -117,7 +117,20 @@ func (il IdentityList) Count() uint {
 	return uint(len(il))
 }
 
-// Get returns the node at the given index.
-func (il IdentityList) Get(i uint) *Identity {
-	return il[int(i)]
+// ByIndex returns the node at the given index.
+func (il IdentityList) ByIndex(index uint) (*Identity, bool) {
+	if index >= uint(len(il)) {
+		return nil, false
+	}
+	return il[int(index)], true
+}
+
+// ByNodeID gets a node from the list by node ID.
+func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
+	for _, identity := range il {
+		if identity.NodeID == nodeID {
+			return identity, true
+		}
+	}
+	return nil, false
 }
