@@ -201,7 +201,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, 
 	// does not report invalid vote as an error, notify consumers instead
 	if err != nil {
 		switch err := err.(type) {
-		case hotstuff.InvalidVoteError:
+		case *hotstuff.ErrorInvalidVote:
 			va.notifier.OnInvalidVoteDetected(vote)
 			va.logger.Warn().Msg(err.Error())
 			return false, nil

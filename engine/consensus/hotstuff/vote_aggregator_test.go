@@ -11,7 +11,7 @@ import (
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/hotstuff"
+	hotmodel "github.com/dapperlabs/flow-go/model/hotstuff"
 	protocol "github.com/dapperlabs/flow-go/protocol/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -160,371 +160,378 @@ func TestStaleProposerVote(t *testing.T) {
 // UNHAPPY PATH (double voting)
 // store one vote in the memory
 // receive another vote with the same voter and the same view
-// should trigger ErrDoubleVote
-//func TestErrDoubleVote(t *testing.T) {
-//	va, ids := newMockVoteAggregator(t)
-//	// mock blocks and votes
-//	bp1 := newMockBlock(10, ids[0].NodeID)
-//	bp2 := newMockBlock(10, ids[1].NodeID)
-//	vote1 := newMockVote(10, bp1.Block.BlockID, ids[0].NodeID)
-//	_, err := va.StoreVoteAndBuildQC(vote1, b1)
-//	// vote2 is double voting
-//	vote2 := newMockVote(10, b2.BlockID(), uint32(1))
-//	_, err = va.StoreVoteAndBuildQC(vote2, b2)
-//	if err != nil {
-//		switch err.(type) {
-//		case types.ErrDoubleVote:
-//			fmt.Printf("double vote detected %v", err)
-//		default:
-//			fmt.Printf("error detected %v", err)
-//		}
-//	} else {
-//		t.Errorf("double vote not detected")
-//	}
-//}
-//
-//// INVALID VOTES
-//// receive 4 invalid votes, and then the block, no QC should be built
-//func TestInvalidVotesOnly(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	// testing invalid pending votes
-//	for i := 0; i < 4; i++ {
-//		// vote view is invalid
-//		vote := newMockVote(testView-1, block.BlockID(), uint32(i))
-//		err := va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//	}
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, qc)
-//	require.NotNil(t, err)
-//	// no votes should be added to blockHashToVotingStatus since the view is invalid
-//	require.Equal(t, 1, len(va.blockHashToVotingStatus))
-//	// the only vote added should be the primary vote
-//	primaryVote, exists := va.blockHashToVotingStatus[block.BlockID()].votes[block.ToVote().ID()]
-//	require.True(t, exists)
-//	require.Equal(t, block.ToVote(), primaryVote)
-//}
-//
-//// INVALID VOTES
-//// receive 1 invalid vote, and 4 valid votes, and then the block, a QC should be built
-//func TestVoteMixtureBeforeBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	// testing invalid pending votes
-//	for i := 0; i < 5; i++ {
-//		var vote *types.Vote
-//		if i == 0 {
-//			// vote view is invalid
-//			vote = newMockVote(testView-1, block.BlockID(), uint32(i))
-//		} else {
-//			vote = newMockVote(testView, block.BlockID(), uint32(i))
-//		}
-//		err := va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//	}
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, err)
-//	require.NotNil(t, qc)
-//}
-//
-//// INVALID VOTES
-//// receive the block, and 3 valid vote, and 1 invalid vote, no QC should be built
-//func TestVoteMixtureAfterBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, qc)
-//	require.NotNil(t, err)
-//	// testing invalid pending votes
-//	for i := 0; i < 4; i++ {
-//		var vote *types.Vote
-//		if i < 3 {
-//			vote = newMockVote(testView, block.BlockID(), uint32(i))
-//		} else {
-//			// vote view is invalid
-//			vote = newMockVote(testView-1, block.BlockID(), uint32(i))
-//		}
-//		qc, err = va.StoreVoteAndBuildQC(vote, block)
-//		require.Nil(t, qc)
-//		require.NotNil(t, err)
-//	}
-//}
-//
-//// DUPLICATION
-//// receive the block, and the same valid votes for 5 times, no QC should be built
-//func TestDuplicateVotesAfterBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, qc)
-//	require.NotNil(t, err)
-//	vote := newMockVote(testView, block.BlockID(), uint32(1))
-//	// testing invalid pending votes
-//	for i := 0; i < 4; i++ {
-//		qc, err = va.StoreVoteAndBuildQC(vote, block)
-//		require.Nil(t, qc)
-//		require.NotNil(t, err)
-//		// only this vote and the primary vote are added
-//		require.Equal(t, 2, len(va.blockHashToVotingStatus[block.BlockID()].votes))
-//	}
-//}
-//
-//// DUPLICATION
-//// receive same valid votes for 5 times, then the block, no QC should be built
-//func TestDuplicateVotesBeforeBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	vote := newMockVote(testView, block.BlockID(), uint32(1))
-//	for i := 0; i < 4; i++ {
-//		err := va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//	}
-//	require.Equal(t, 1, len(va.pendingVoteMap[block.BlockID()].voteMap))
-//	require.Equal(t, 1, len(va.pendingVoteMap[block.BlockID()].orderedVotes))
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, qc)
-//	require.NotNil(t, err)
-//	require.Equal(t, 2, len(va.blockHashToVotingStatus[block.BlockID()].votes))
-//}
-//
-//// ORDER
-//// receive 5 votes, and the block, the QC should contain leader's vote, and the first 4 votes.
-//func TestVoteOrderAfterBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	testView := uint64(5)
-//	block := newMockBlock(testView)
-//	var voteList []*types.Vote
-//	voteList = append(voteList, block.ToVote())
-//	for i := 0; i < 5; i++ {
-//		vote := newMockVote(testView, block.BlockID(), uint32(i))
-//		err := va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//		voteList = append(voteList, vote)
-//	}
-//	qc, err := va.BuildQCOnReceivingBlock(block)
-//	require.Nil(t, err)
-//	require.NotNil(t, qc)
-//
-//	for i := 0; i < 6; i++ {
-//		if i < 5 {
-//			require.True(t, qc.AggregatedSignature.Signers[voteList[i].Signature.SignerIdx])
-//		} else {
-//			require.False(t, qc.AggregatedSignature.Signers[voteList[i].Signature.SignerIdx])
-//		}
-//	}
-//}
-//
-//// PRUNE
-//// receive votes for view 2, 3, 4, 5 without the block
-//// prune by 4, should have only vote for view 5 left
-//func TestPartialPruneBeforeBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	pruneView := uint64(4)
-//	var voteList []*types.Vote
-//	for i := 2; i <= 5; i++ {
-//		view := uint64(i)
-//		vote := newMockVote(view, unittest.IdentifierFixture(), uint32(i))
-//		err := va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//		voteList = append(voteList, vote)
-//	}
-//	require.Equal(t, 4, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 4, len(va.viewToIDToVote))
-//	require.Equal(t, 4, len(va.pendingVoteMap))
-//	va.PruneByView(pruneView)
-//	require.Equal(t, pruneView, va.lastPrunedView)
-//	require.Equal(t, 1, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 1, len(va.viewToIDToVote))
-//	require.Equal(t, 1, len(va.pendingVoteMap))
-//	testVote := voteList[len(voteList)-1]
-//	require.NotNil(t, va.viewToBlockIDStrSet[uint64(5)][testVote.BlockID])
-//	voter, err := va.voteValidator.ValidateVote(testVote, nil)
-//	require.Nil(t, err)
-//	require.NotNil(t, voter)
-//	require.Equal(t, testVote, va.viewToIDToVote[uint64(5)][voter.ID()])
-//	_, exists := va.pendingVoteMap[testVote.BlockID]
-//	require.True(t, exists)
-//}
-//
-//// PRUNE
-//// receive the block and the votes for view 2, 3, 4, 5
-//// prune by 4, should have only vote for view 5 left
-//func TestPartialPruneAfterBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	pruneView := uint64(4)
-//	var voteList []*types.Vote
-//	var blockList []*types.BlockProposal
-//	for i := 2; i <= 5; i++ {
-//		view := uint64(i)
-//		block := newMockBlock(view)
-//		blockList = append(blockList, block)
-//		qc, err := va.BuildQCOnReceivingBlock(block)
-//		require.Nil(t, qc)
-//		require.NotNil(t, err)
-//		vote := newMockVote(view, block.BlockID(), uint32(i))
-//		qc, err = va.StoreVoteAndBuildQC(vote, block)
-//		require.Nil(t, qc)
-//		require.NotNil(t, err)
-//		voteList = append(voteList, vote)
-//	}
-//	require.Equal(t, 4, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 4, len(va.viewToIDToVote))
-//	require.Equal(t, 4, len(va.blockHashToVotingStatus))
-//	va.PruneByView(pruneView)
-//	require.Equal(t, pruneView, va.lastPrunedView)
-//	require.Equal(t, 1, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 1, len(va.viewToIDToVote))
-//	require.Equal(t, 1, len(va.blockHashToVotingStatus))
-//	testVote := voteList[len(voteList)-1]
-//	testBlock := blockList[len(blockList)-1]
-//	require.NotNil(t, va.viewToBlockIDStrSet[uint64(5)][testVote.BlockID])
-//	voter, err := va.voteValidator.ValidateVote(testVote, testBlock)
-//	require.Nil(t, err)
-//	require.NotNil(t, voter)
-//	require.Equal(t, testVote, va.viewToIDToVote[uint64(5)][voter.ID()])
-//	_, exists := va.blockHashToVotingStatus[testVote.BlockID]
-//	require.True(t, exists)
-//}
-//
-//// PRUNE
-//// receive votes for view 2, 3, 4, 5 without the block
-//// prune by 6, should have no vote left
-//func TestFullPruneBeforeBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	pruneView := uint64(6)
-//	for i := 2; i <= 5; i++ {
-//		view := uint64(i)
-//		vote := newMockVote(view, unittest.IdentifierFixture(), uint32(i))
-//		err := va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//	}
-//	require.Equal(t, 4, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 4, len(va.viewToIDToVote))
-//	require.Equal(t, 4, len(va.pendingVoteMap))
-//	va.PruneByView(pruneView)
-//	require.Equal(t, pruneView, va.lastPrunedView)
-//	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 0, len(va.viewToIDToVote))
-//	require.Equal(t, 0, len(va.pendingVoteMap))
-//}
-//
-//// PRUNE
-//// receive the block and the votes for view 2, 3, 4, 5
-//// prune by 6, should have no vote left
-//func TestFullPruneAfterBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	pruneView := uint64(6)
-//	var voteList []*types.Vote
-//	for i := 2; i <= 5; i++ {
-//		view := uint64(i)
-//		block := newMockBlock(view)
-//		qc, err := va.BuildQCOnReceivingBlock(block)
-//		require.Nil(t, qc)
-//		require.NotNil(t, err)
-//		vote := newMockVote(view, block.BlockID(), uint32(i))
-//		qc, err = va.StoreVoteAndBuildQC(vote, block)
-//		require.Nil(t, qc)
-//		require.NotNil(t, err)
-//		voteList = append(voteList, vote)
-//	}
-//	require.Equal(t, 4, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 4, len(va.viewToIDToVote))
-//	require.Equal(t, 4, len(va.blockHashToVotingStatus))
-//	va.PruneByView(pruneView)
-//	require.Equal(t, pruneView, va.lastPrunedView)
-//	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 0, len(va.viewToIDToVote))
-//	require.Equal(t, 0, len(va.blockHashToVotingStatus))
-//}
-//
-//// PRUNE
-//// receive votes for view 3, 4, 5 without block
-//// prune by 2 twice, should have all votes there
-//func TestNonePruneBeforeBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	pruneView := uint64(2)
-//	for i := 3; i <= 5; i++ {
-//		view := uint64(i)
-//		vote := newMockVote(view, unittest.IdentifierFixture(), uint32(i))
-//		err := va.StorePendingVote(vote)
-//		require.Nil(t, err)
-//	}
-//	require.Equal(t, 3, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 3, len(va.viewToIDToVote))
-//	require.Equal(t, 3, len(va.pendingVoteMap))
-//	va.PruneByView(pruneView)
-//	require.Equal(t, pruneView, va.lastPrunedView)
-//	require.Equal(t, 3, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 3, len(va.viewToIDToVote))
-//	require.Equal(t, 3, len(va.pendingVoteMap))
-//	// prune twice
-//	va.PruneByView(pruneView)
-//	require.Equal(t, pruneView, va.lastPrunedView)
-//	require.Equal(t, 3, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 3, len(va.viewToIDToVote))
-//	require.Equal(t, 3, len(va.pendingVoteMap))
-//}
-//
-//// PRUNE
-//// receive the block and the votes for view 3, 4, 5
-//// prune by 2 twice, should have all votes there
-//func TestNonePruneAfterBlock(t *testing.T) {
-//	va := newMockVoteAggregator(t)
-//	pruneView := uint64(2)
-//	for i := 3; i <= 5; i++ {
-//		view := uint64(i)
-//		block := newMockBlock(view)
-//		qc, err := va.BuildQCOnReceivingBlock(block)
-//		require.Nil(t, qc)
-//		require.NotNil(t, err)
-//		vote := newMockVote(view, block.BlockID(), uint32(i))
-//		qc, err = va.StoreVoteAndBuildQC(vote, block)
-//		require.Nil(t, qc)
-//		require.NotNil(t, err)
-//	}
-//	require.Equal(t, 3, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 3, len(va.viewToIDToVote))
-//	require.Equal(t, 3, len(va.blockHashToVotingStatus))
-//	va.PruneByView(pruneView)
-//	require.Equal(t, pruneView, va.lastPrunedView)
-//	require.Equal(t, 3, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 3, len(va.viewToIDToVote))
-//	require.Equal(t, 3, len(va.blockHashToVotingStatus))
-//	// prune twice
-//	va.PruneByView(pruneView)
-//	require.Equal(t, pruneView, va.lastPrunedView)
-//	require.Equal(t, 3, len(va.viewToBlockIDStrSet))
-//	require.Equal(t, 3, len(va.viewToIDToVote))
-//	require.Equal(t, 3, len(va.blockHashToVotingStatus))
-//}
+// should trigger notifier
+func TestDoubleVote(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testview := uint64(5)
+	// mock double proposal
+	bp1 := newMockBlock(testview, ids[0].NodeID)
+	bp2 := newMockBlock(testview, ids[1].NodeID)
+	va.StoreProposerVote(bp1.ProposerVote())
+	va.StoreProposerVote(bp2.ProposerVote())
+	_, _, _ = va.BuildQCOnReceivedBlock(bp1.Block)
+	_, _, _ = va.BuildQCOnReceivedBlock(bp2.Block)
+	// mock double voting
+	vote1 := newMockVote(testview, bp1.Block.BlockID, ids[2].NodeID)
+	qc, built, err := va.StoreVoteAndBuildQC(vote1, bp1.Block)
+	require.Nil(t, qc)
+	require.False(t, built)
+	require.NoError(t, err)
+	vote2 := newMockVote(testview, bp2.Block.BlockID, ids[2].NodeID)
+	notifier := &mockdist.Consumer{}
+	va.notifier = notifier
+	notifier.On("OnDoubleVotingDetected", vote1, vote2).Return().Once()
+	qc, built, err = va.StoreVoteAndBuildQC(vote2, bp2.Block)
+	notifier.AssertExpectations(t)
+	require.Nil(t, qc)
+	require.False(t, built)
+	require.NoError(t, err)
+}
 
-func newMockBlock(view uint64, proposerID flow.Identifier) *hotstuff.Proposal {
+// INVALID VOTES
+// receive 4 invalid votes, and then the block, no QC should be built
+// should trigger the notifier when converting pending votes
+func TestInvalidVotesOnly(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	notifier := &mockdist.Consumer{}
+	va.notifier = notifier
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	// testing invalid pending votes
+	for i := 0; i < 4; i++ {
+		// vote view is invalid
+		vote := newMockVote(testView-1, bp.Block.BlockID, ids[i].NodeID)
+		notifier.On("OnInvalidVoteDetected", vote)
+		va.StorePendingVote(vote)
+	}
+	va.StoreProposerVote(bp.ProposerVote())
+	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	require.Nil(t, qc)
+	require.False(t, built)
+	require.NoError(t, err)
+	notifier.AssertExpectations(t)
+}
+
+// INVALID VOTES
+// receive 1 invalid vote, and 4 valid votes, and then the block, a QC should be built
+func TestVoteMixtureBeforeBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testView := uint64(5)
+	notifier := &mockdist.Consumer{}
+	va.notifier = notifier
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	// testing invalid pending votes
+	for i := 0; i < 5; i++ {
+		var vote *hotmodel.Vote
+		if i == 0 {
+			// vote view is invalid
+			vote = newMockVote(testView-1, bp.Block.BlockID, ids[i].NodeID)
+			notifier.On("OnInvalidVoteDetected", vote)
+		} else {
+			vote = newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
+		}
+		va.StorePendingVote(vote)
+	}
+	va.StoreProposerVote(bp.ProposerVote())
+	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	require.NotNil(t, qc)
+	require.True(t, built)
+	require.NoError(t, err)
+	notifier.AssertExpectations(t)
+}
+
+// INVALID VOTES
+// receive the block, and 3 valid vote, and 1 invalid vote, no QC should be built
+func TestVoteMixtureAfterBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testView := uint64(5)
+	notifier := &mockdist.Consumer{}
+	va.notifier = notifier
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	va.StoreProposerVote(bp.ProposerVote())
+	_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+	// testing invalid pending votes
+	for i := 0; i < 4; i++ {
+		var vote *hotmodel.Vote
+		if i < 3 {
+			vote = newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
+		} else {
+			// vote view is invalid
+			vote = newMockVote(testView-1, bp.Block.BlockID, ids[i].NodeID)
+			notifier.On("OnInvalidVoteDetected", vote)
+		}
+		qc, built, err := va.StoreVoteAndBuildQC(vote, bp.Block)
+		require.Nil(t, qc)
+		require.False(t, built)
+		require.NoError(t, err)
+		notifier.AssertExpectations(t)
+	}
+}
+
+// DUPLICATION
+// receive the block, and the same valid votes for 5 times, no QC should be built
+func TestDuplicateVotesAfterBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	va.StoreProposerVote(bp.ProposerVote())
+	_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+	vote := newMockVote(testView, bp.Block.BlockID, ids[1].NodeID)
+	for i := 0; i < 4; i++ {
+		qc, built, err := va.StoreVoteAndBuildQC(vote, bp.Block)
+		require.Nil(t, qc)
+		require.False(t, built)
+		require.NoError(t, err)
+		// only one vote and the primary vote are added
+		require.Equal(t, 2, len(va.blockIDToVotingStatus[bp.Block.BlockID].votes))
+	}
+}
+
+// DUPLICATION
+// receive same valid votes for 5 times, then the block, no QC should be built
+func TestDuplicateVotesBeforeBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	va.StoreProposerVote(bp.ProposerVote())
+	_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+	vote := newMockVote(testView, bp.Block.BlockID, ids[1].NodeID)
+	for i := 0; i < 4; i++ {
+		_ = va.StorePendingVote(vote)
+	}
+	va.StoreProposerVote(bp.ProposerVote())
+	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	require.Nil(t, qc)
+	require.False(t, built)
+	require.NoError(t, err)
+}
+
+// ORDER
+// receive 5 votes, and the block, the QC should contain leader's vote, and the first 4 votes.
+func TestVoteOrderAfterBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	var voteList []*hotmodel.Vote
+	voteList = append(voteList, bp.ProposerVote())
+	for i := 0; i < 5; i++ {
+		vote := newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
+		va.StorePendingVote(vote)
+		voteList = append(voteList, vote)
+	}
+	va.StoreProposerVote(bp.ProposerVote())
+	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	require.NotNil(t, qc)
+	require.True(t, built)
+	require.NoError(t, err)
+	// first five votes including proposer vote should be stored in voting status
+	// while the 6th vote shouldn't
+	for i := 0; i < 6; i++ {
+		_, exists := va.blockIDToVotingStatus[bp.Block.BlockID].votes[voteList[i].ID()]
+		if i < 5 {
+			require.True(t, exists)
+		} else {
+			require.False(t, exists)
+		}
+	}
+}
+
+// PRUNE
+// receive votes for view 2, 3, 4, 5 without the block
+// prune by 4, should have only vote for view 5 left
+func TestPartialPruneBeforeBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	pruneView := uint64(4)
+	var voteList []*hotmodel.Vote
+	var blockList []*hotmodel.Block
+	for i := 2; i <= 5; i++ {
+		view := uint64(i)
+		bp := newMockBlock(view, unittest.IdentifierFixture())
+		vote := newMockVote(view, bp.Block.BlockID, ids[i].NodeID)
+		va.StorePendingVote(vote)
+		voteList = append(voteList, vote)
+		blockList = append(blockList, bp.Block)
+	}
+	// before pruning
+	require.Equal(t, 4, len(va.viewToBlockIDSet))
+	require.Equal(t, 4, len(va.viewToVoteID))
+	require.Equal(t, 4, len(va.pendingVotes.votes))
+	// after pruning
+	va.PruneByView(pruneView)
+	require.Equal(t, pruneView, va.highestPrunedView)
+	require.Equal(t, 1, len(va.viewToBlockIDSet))
+	require.Equal(t, 1, len(va.viewToVoteID))
+	require.Equal(t, 1, len(va.pendingVotes.votes))
+	// the remaining vote should be the vote that has view at 5
+	lastVote := voteList[len(voteList)-1]
+	require.Equal(t, uint64(5), lastVote.View)
+	_, exists := va.viewToVoteID[uint64(5)]
+	require.True(t, exists)
+	_, exists = va.viewToBlockIDSet[uint64(5)]
+	require.True(t, exists)
+	_, exists = va.pendingVotes.votes[lastVote.BlockID].voteMap[lastVote.ID()]
+	require.True(t, exists)
+}
+
+// PRUNE
+// receive the block and the votes for view 2, 3, 4, 5
+// prune by 4, should have only vote for view 5 left
+func TestPartialPruneAfterBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	pruneView := uint64(4)
+	var voteList []*hotmodel.Vote
+	var blockList []*hotmodel.Block
+	for i := 2; i <= 5; i++ {
+		view := uint64(i)
+		bp := newMockBlock(view, ids[i].NodeID)
+		va.StoreProposerVote(bp.ProposerVote())
+		_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+		vote := newMockVote(view, bp.Block.BlockID, ids[i].NodeID)
+		_, _, _ = va.StoreVoteAndBuildQC(vote, bp.Block)
+		voteList = append(voteList, vote)
+		blockList = append(blockList, bp.Block)
+	}
+	// before pruning
+	require.Equal(t, 4, len(va.viewToBlockIDSet))
+	require.Equal(t, 4, len(va.viewToVoteID))
+	require.Equal(t, 4, len(va.blockIDToVotingStatus))
+	// after pruning
+	va.PruneByView(pruneView)
+	require.Equal(t, pruneView, va.highestPrunedView)
+	require.Equal(t, 1, len(va.viewToBlockIDSet))
+	require.Equal(t, 1, len(va.viewToVoteID))
+	require.Equal(t, 1, len(va.blockIDToVotingStatus))
+	// the remaining vote should be the vote that has view at 5
+	lastVote := voteList[len(voteList)-1]
+	require.Equal(t, uint64(5), lastVote.View)
+	_, exists := va.viewToVoteID[uint64(5)]
+	require.True(t, exists)
+	_, exists = va.viewToBlockIDSet[uint64(5)]
+	require.True(t, exists)
+	_, exists = va.blockIDToVotingStatus[lastVote.BlockID].votes[lastVote.ID()]
+	require.True(t, exists)
+}
+
+// PRUNE
+// receive votes for view 2, 3, 4, 5 without the block
+// prune by 6, should have no vote left
+func TestFullPruneBeforeBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	pruneView := uint64(6)
+	for i := 2; i <= 5; i++ {
+		view := uint64(i)
+		vote := newMockVote(view, unittest.IdentifierFixture(), ids[i].NodeID)
+		va.StorePendingVote(vote)
+	}
+	va.PruneByView(pruneView)
+	require.Equal(t, pruneView, va.highestPrunedView)
+	require.Equal(t, 0, len(va.viewToVoteID))
+	require.Equal(t, 0, len(va.viewToBlockIDSet))
+	require.Equal(t, 0, len(va.pendingVotes.votes))
+}
+
+// PRUNE
+// receive the block and the votes for view 2, 3, 4, 5
+// prune by 6, should have no vote left
+func TestFullPruneAfterBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	pruneView := uint64(6)
+	for i := 2; i <= 5; i++ {
+		view := uint64(i)
+		bp := newMockBlock(view, ids[i].NodeID)
+		va.StoreProposerVote(bp.ProposerVote())
+		_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+		vote := newMockVote(view, bp.Block.BlockID, ids[i].NodeID)
+		_, _, _ = va.StoreVoteAndBuildQC(vote, bp.Block)
+	}
+	require.Equal(t, 4, len(va.viewToBlockIDSet))
+	require.Equal(t, 4, len(va.viewToVoteID))
+	require.Equal(t, 4, len(va.blockIDToVotingStatus))
+	va.PruneByView(pruneView)
+	require.Equal(t, pruneView, va.highestPrunedView)
+	require.Equal(t, 0, len(va.viewToVoteID))
+	require.Equal(t, 0, len(va.viewToBlockIDSet))
+	require.Equal(t, 0, len(va.blockIDToVotingStatus))
+}
+
+// PRUNE
+// receive votes for view 3, 4, 5 without block
+// prune by 2 twice, should have all votes there
+func TestNonePruneBeforeBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	pruneView := uint64(2)
+	for i := 3; i <= 5; i++ {
+		view := uint64(i)
+		vote := newMockVote(view, unittest.IdentifierFixture(), ids[i].NodeID)
+		va.StorePendingVote(vote)
+	}
+	require.Equal(t, 3, len(va.viewToBlockIDSet))
+	require.Equal(t, 3, len(va.viewToVoteID))
+	require.Equal(t, 3, len(va.pendingVotes.votes))
+	va.PruneByView(pruneView)
+	require.Equal(t, pruneView, va.highestPrunedView)
+	require.Equal(t, 3, len(va.viewToVoteID))
+	require.Equal(t, 3, len(va.viewToBlockIDSet))
+	require.Equal(t, 3, len(va.pendingVotes.votes))
+	// prune twice
+	va.PruneByView(pruneView)
+	require.Equal(t, pruneView, va.highestPrunedView)
+	require.Equal(t, 3, len(va.viewToBlockIDSet))
+	require.Equal(t, 3, len(va.viewToVoteID))
+	require.Equal(t, 3, len(va.pendingVotes.votes))
+}
+
+// PRUNE
+// receive the block and the votes for view 3, 4, 5
+// prune by 2 twice, should have all votes there
+func TestNonePruneAfterBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	pruneView := uint64(2)
+	for i := 3; i <= 5; i++ {
+		view := uint64(i)
+		bp := newMockBlock(view, ids[i].NodeID)
+		va.StoreProposerVote(bp.ProposerVote())
+		_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+		vote := newMockVote(view, bp.Block.BlockID, ids[i].NodeID)
+		_, _, _ = va.StoreVoteAndBuildQC(vote, bp.Block)
+	}
+	require.Equal(t, 3, len(va.viewToVoteID))
+	require.Equal(t, 3, len(va.viewToBlockIDSet))
+	require.Equal(t, 3, len(va.blockIDToVotingStatus))
+	va.PruneByView(pruneView)
+	require.Equal(t, pruneView, va.highestPrunedView)
+	require.Equal(t, 3, len(va.viewToBlockIDSet))
+	require.Equal(t, 3, len(va.viewToVoteID))
+	require.Equal(t, 3, len(va.blockIDToVotingStatus))
+	// prune twice
+	va.PruneByView(pruneView)
+	require.Equal(t, pruneView, va.highestPrunedView)
+	require.Equal(t, 3, len(va.viewToVoteID))
+	require.Equal(t, 3, len(va.viewToBlockIDSet))
+	require.Equal(t, 3, len(va.blockIDToVotingStatus))
+}
+
+func newMockBlock(view uint64, proposerID flow.Identifier) *hotmodel.Proposal {
 	blockHeader := unittest.BlockHeaderFixture()
 	blockHeader.View = view
-	block := &hotstuff.Block{
+	block := &hotmodel.Block{
 		View:       view,
 		BlockID:    blockHeader.ID(),
 		ProposerID: proposerID,
 	}
 	sig := crypto.Signature{}
-	return &hotstuff.Proposal{
+	return &hotmodel.Proposal{
 		Block:            block,
 		StakingSignature: sig,
 	}
 }
 
-func newMockVote(view uint64, blockID flow.Identifier, signerID flow.Identifier) *hotstuff.Vote {
-	sig := &hotstuff.SingleSignature{
+func newMockVote(view uint64, blockID flow.Identifier, signerID flow.Identifier) *hotmodel.Vote {
+	sig := &hotmodel.SingleSignature{
 		SignerID:         signerID,
 		StakingSignature: []byte{},
 	}
-	vote := &hotstuff.Vote{
+	vote := &hotmodel.Vote{
 		BlockID:   blockID,
 		View:      view,
 		Signature: sig,
@@ -535,9 +542,11 @@ func newMockVote(view uint64, blockID flow.Identifier, signerID flow.Identifier)
 
 func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	ctrl := gomock.NewController(t)
+	// mock identity list
 	ids := unittest.IdentityListFixture(VALIDATOR_SIZE, unittest.WithRole(flow.RoleConsensus))
-	mockSnapshot := protocol.NewMockSnapshot(ctrl)
+	// mock protocol state
 	mockProtocolState := protocol.NewMockState(ctrl)
+	mockSnapshot := protocol.NewMockSnapshot(ctrl)
 	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(mockSnapshot).AnyTimes()
 	mockProtocolState.EXPECT().Final().Return(mockSnapshot).AnyTimes()
 	signer := unittest.IdentityFixture()
@@ -545,16 +554,17 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	mockSnapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f ...flow.IdentityFilter) (flow.IdentityList, error) {
 		return ids.Filter(f...), nil
 	}).AnyTimes()
-	viewState, err := NewViewState(mockProtocolState, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
-	require.NoError(t, err)
+	// mock sig verifier and aggregator
 	mockSigVerifier := mockverifier.NewMockSigVerifier(ctrl)
 	mockSigVerifier.EXPECT().VerifyAggregatedRandomBeaconSignature(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigVerifier.EXPECT().VerifyAggregatedStakingSignature(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigVerifier.EXPECT().VerifyRandomBeaconSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigVerifier.EXPECT().VerifyStakingSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigAggregator := mockverifier.NewMockSigAggregator(ctrl)
-	mockSigAggregator.EXPECT().Aggregate(gomock.Any(), gomock.Any()).Return(&hotstuff.AggregatedSignature{}, nil).AnyTimes()
+	mockSigAggregator.EXPECT().Aggregate(gomock.Any(), gomock.Any()).Return(&hotmodel.AggregatedSignature{}, nil).AnyTimes()
 	mockSigAggregator.EXPECT().CanReconstruct(gomock.Any()).Return(true).AnyTimes()
+
+	viewState, _ := NewViewState(mockProtocolState, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
 	voteValidator := &Validator{viewState: viewState, sigVerifier: mockSigVerifier}
 	return NewVoteAggregator(&mockdist.Consumer{}, 0, viewState, voteValidator, mockSigAggregator), ids
 }
