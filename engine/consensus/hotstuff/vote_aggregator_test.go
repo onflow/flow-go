@@ -7,9 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	mocks "github.com/dapperlabs/flow-go/crypto/mock"
+	mockverifier "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/engine/consensus/hotstuff/mocks"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/hotstuff"
@@ -66,7 +65,7 @@ func TestReceiveBlockBeforeSufficientVotes(t *testing.T) {
 		vote := newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
 		qc, built, err = va.StoreVoteAndBuildQC(vote, bp.Block)
 		if i == 3 {
-			require.Nil(t, err)
+			require.NoError(t, err)
 			require.True(t, built)
 			require.NotNil(t, qc)
 		}
@@ -537,32 +536,25 @@ func newMockVote(view uint64, blockID flow.Identifier, signerID flow.Identifier)
 func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	ctrl := gomock.NewController(t)
 	ids := unittest.IdentityListFixture(VALIDATOR_SIZE, unittest.WithRole(flow.RoleConsensus))
-	snapshot := protocol.NewMockSnapshot(ctrl)
-	snapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f ...flow.IdentityFilter) (flow.IdentityList, error) {
+	mockSnapshot := protocol.NewMockSnapshot(ctrl)
+	mockProtocolState := protocol.NewMockState(ctrl)
+	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(mockSnapshot).AnyTimes()
+	mockProtocolState.EXPECT().Final().Return(mockSnapshot).AnyTimes()
+	signer := unittest.IdentityFixture()
+	mockSnapshot.EXPECT().Identity(gomock.AssignableToTypeOf(signer.NodeID)).Return(signer, nil).AnyTimes()
+	mockSnapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f ...flow.IdentityFilter) (flow.IdentityList, error) {
 		return ids.Filter(f...), nil
 	}).AnyTimes()
-	mockProtocolState := protocol.NewMockState(ctrl)
-	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(snapshot).AnyTimes()
-	mockProtocolState.EXPECT().Final().Return(snapshot).AnyTimes()
 	viewState, err := NewViewState(mockProtocolState, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
-	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-	sigProvider := signature.NewSigProvider(
-		unittest.IdentifierFixture(),
-		mockProtocolState,
-		mocks.NewMockPrivateKey(ctrl),
-		hasher,
-		&signature.DKGPublicData{},
-		mocks.NewMockPrivateKey(ctrl),
-		hasher,
-	)
-	voteValidator := &Validator{viewState: viewState, sigVerifier: sigProvider}
-	for i := 0; i < VALIDATOR_SIZE; i += 1 {
-		mockPubKey := mocks.NewMockPublicKey(ctrl)
-		mockPubKey.EXPECT().Verify(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
-		ids[i].StakingPubKey = mockPubKey
-		//snapshot.EXPECT().Identities(viewState.consensusMembersFilter, filter.HasStake, filter.HasNodeID(ids[i].NodeID)).Return(flow.IdentityList{ids[i]}, nil).AnyTimes()
-	}
-
-	return NewVoteAggregator(&mockdist.Consumer{}, 0, viewState, voteValidator, sigProvider), ids
+	mockSigVerifier := mockverifier.NewMockSigVerifier(ctrl)
+	mockSigVerifier.EXPECT().VerifyAggregatedRandomBeaconSignature(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	mockSigVerifier.EXPECT().VerifyAggregatedStakingSignature(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	mockSigVerifier.EXPECT().VerifyRandomBeaconSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	mockSigVerifier.EXPECT().VerifyStakingSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	mockSigAggregator := mockverifier.NewMockSigAggregator(ctrl)
+	mockSigAggregator.EXPECT().Aggregate(gomock.Any(), gomock.Any()).Return(&hotstuff.AggregatedSignature{}, nil).AnyTimes()
+	mockSigAggregator.EXPECT().CanReconstruct(gomock.Any()).Return(true).AnyTimes()
+	voteValidator := &Validator{viewState: viewState, sigVerifier: mockSigVerifier}
+	return NewVoteAggregator(&mockdist.Consumer{}, 0, viewState, voteValidator, mockSigAggregator), ids
 }
