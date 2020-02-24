@@ -88,11 +88,13 @@ func roundRobin(nodes flow.IdentityList, view uint64) *flow.Identity {
 // ComputeStakeThresholdForBuildingQC returns the threshold to determine how much stake are needed for building a QC
 // identities is the full identity list at a certain block
 func ComputeStakeThresholdForBuildingQC(totalStake uint64) uint64 {
-	// total * 2 / 3
+	// 1 + total * 2 / 3
 	total := new(big.Int).SetUint64(totalStake)
+	one := new(big.Int).SetUint64(1)
 	two := new(big.Int).SetUint64(2)
 	three := new(big.Int).SetUint64(3)
-	return new(big.Int).Div(
-		new(big.Int).Mul(total, two),
-		three).Uint64()
+	return new(big.Int).Add(one,
+		new(big.Int).Div(
+			new(big.Int).Mul(total, two),
+			three)).Uint64()
 }
