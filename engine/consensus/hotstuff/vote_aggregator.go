@@ -54,7 +54,7 @@ func (va *VoteAggregator) StorePendingVote(vote *hotstuff.Vote) bool {
 	if va.isStale(vote) {
 		return false
 	}
-	// add vote, return false if the vote exists
+	// add vote, return false if the vote is not successfully added (already existed)
 	ok := va.pendingVotes.AddVote(vote)
 	if !ok {
 		return false
