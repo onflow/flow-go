@@ -64,11 +64,7 @@ func (s *Seals) All() []*flow.Seal {
 	entities := s.Backend.All()
 	seals := make([]*flow.Seal, 0, len(entities))
 	for _, entity := range entities {
-		seal, ok := entity.(*flow.Seal)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in seal pool (%T)", entity))
-		}
-		seals = append(seals, seal)
+		seals = append(seals, entity.(*flow.Seal))
 	}
 	return seals
 }
