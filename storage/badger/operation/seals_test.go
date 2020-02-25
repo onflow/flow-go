@@ -13,41 +13,44 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestIdentitiesInsertCheckRetrieve(t *testing.T) {
+func TestSealInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.IdentityFixture()
+		expected := unittest.SealFixture()
 
-		err := db.Update(InsertIdentity(expected))
+		err := db.Update(InsertSeal(&expected))
 		require.Nil(t, err)
 
 		var exists bool
-		err = db.View(CheckIdentity(expected.ID(), &exists))
+		err = db.View(CheckSeal(expected.ID(), &exists))
 		require.Nil(t, err)
 		require.True(t, exists)
 
-		var actual flow.Identity
-		err = db.View(RetrieveIdentity(expected.ID(), &actual))
+		var actual flow.Seal
+		err = db.View(RetrieveSeal(expected.ID(), &actual))
 		require.Nil(t, err)
 
-		assert.Equal(t, expected, &actual)
+		assert.Equal(t, expected, actual)
 	})
 }
 
-func TestIdentitiesIndexAndLookup(t *testing.T) {
+func TestSealIndexAndLookup(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		ids := unittest.IdentityListFixture(4)
+		seal1 := unittest.SealFixture()
+		seal2 := unittest.SealFixture()
+
+		seals := []*flow.Seal{&seal1, &seal2}
 
 		payload := flow.MakeID([]byte{0x42})
 
-		expected := make([]flow.Identifier, len(ids))
+		expected := make([]flow.Identifier, len(seals))
 
 		err := db.Update(func(tx *badger.Txn) error {
-			for i, id := range ids {
-				expected[i] = id.ID()
-				if err := InsertIdentity(id)(tx); err != nil {
+			for i, seal := range seals {
+				expected[i] = seal.ID()
+				if err := InsertSeal(seal)(tx); err != nil {
 					return err
 				}
-				if err := IndexIdentity(payload, uint64(i), id.ID())(tx); err != nil {
+				if err := IndexSeal(payload, uint64(i), seal.ID())(tx); err != nil {
 					return err
 				}
 			}
@@ -56,7 +59,7 @@ func TestIdentitiesIndexAndLookup(t *testing.T) {
 		require.Nil(t, err)
 
 		var actual []flow.Identifier
-		err = db.View(LookupIdentities(payload, &actual))
+		err = db.View(LookupSeals(payload, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
