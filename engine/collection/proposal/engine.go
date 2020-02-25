@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/cluster"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -166,9 +167,12 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 	payload := cluster.Payload{Collection: *collection}
 
-	// retrieve all consensus in our cluster
+	// retrieve all collection nodes in our cluster
 	// TODO filter by cluster
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.HasRole(flow.RoleCollection))
+	recipients, err := e.state.Final().Identities(
+		filter.HasRole(flow.RoleCollection),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
 	if err != nil {
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}
@@ -185,6 +189,28 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	return nil
+}
+
+// BroadcastCommit broadcasts a commit message to all collection nodes in our
+// cluster.
+func (e *Engine) BroadcastCommit(commit *model.Commit) error {
+
+	// retrieve all collection nodes in our cluster
+	// TODO filter by cluster
+	recipients, err := e.state.Final().Identities(
+		filter.HasRole(flow.RoleCollection),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
+	if err != nil {
+		return fmt.Errorf("could not get cluster members: %w", err)
+	}
+
+	err = e.con.Submit(commit, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not send commit message: %w", err)
+	}
+
+	return err
 }
 
 func (e *Engine) propose() {
