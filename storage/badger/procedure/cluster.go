@@ -132,7 +132,7 @@ func IndexClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 		// index the single collection
 		// we allow duplicate indexing because we anticipate blocks will often
 		// contain empty collections (which will be indexed by the same key)
-		err = operation.AllowDuplicates(operation.IndexCollection(payload.Hash(), &payload.Collection))(tx)
+		err = operation.AllowDuplicates(operation.IndexCollection(payload.Hash(), 0, &payload.Collection))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}
@@ -149,16 +149,20 @@ func RetrieveClusterPayload(payloadHash flow.Identifier, payload *cluster.Payloa
 		*payload = cluster.Payload{}
 
 		// lookup collection ID
-		var collectionID flow.Identifier
-		err := operation.LookupCollection(payloadHash, &collectionID)(tx)
+		collectionIDs := make([]flow.Identifier, 0, 1)
+		err := operation.LookupCollections(payloadHash, &collectionIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not look up collection ID: %w", err)
 		}
 
+		if len(collectionIDs) == 0 {
+			return fmt.Errorf("could not find collection for payloadHash: %v", payloadHash)
+		}
+
 		// lookup collection
-		err = operation.RetrieveCollection(collectionID, &payload.Collection)(tx)
+		err = operation.RetrieveCollection(collectionIDs[0], &payload.Collection)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve collection (id=%x): %w", collectionID, err)
+			return fmt.Errorf("could not retrieve collection (id=%x): %w", collectionIDs[0], err)
 		}
 
 		return nil

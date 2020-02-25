@@ -17,11 +17,14 @@ func InsertCommit(blockID flow.Identifier, commit flow.StateCommitment) func(*ba
 }
 
 // RetrieveCommit gets a state commitment.
+//
+// State commitments are keyed by the block ID of the block whose final state
+// is the state being committed to.
 func RetrieveCommit(blockID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCommit, blockID), commit)
 }
 
-// IndexCommit indexes a state commitment.
+// IndexCommit inserts a state commitment.
 //
 // State commitments are indexed by the block ID of the block in which the
 // commitment is sealed/finalized.
@@ -29,7 +32,10 @@ func IndexCommit(finalID flow.Identifier, commit flow.StateCommitment) func(*bad
 	return insert(makePrefix(codeIndexCommit, finalID), commit)
 }
 
-// LookupCommit gets a state commitment by its indexing key.
+// RetrieveCommit gets a state commitment.
+//
+// LookupCommit gets a state commitment by the block ID of the block in which the
+// commitment is sealed/finalized.
 func LookupCommit(finalID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIndexCommit, finalID), commit)
 }
