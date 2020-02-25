@@ -199,25 +199,27 @@ func TestStaleProposerVote(t *testing.T) {
 // receive another vote with the same voter and the same view
 // should trigger notifier
 func TestDoubleVote(t *testing.T) {
+	testview := uint64(5)
 	va, ids := newMockVoteAggregator(t)
 	notifier := &mockdist.Consumer{}
-	va.notifier = notifier
-	testview := uint64(5)
 	// mock two proposals at the same view
 	bp1 := newMockBlock(testview, ids[0].NodeID)
 	bp2 := newMockBlock(testview, ids[1].NodeID)
+	// mock double voting
+	vote1 := newMockVote(testview, bp1.Block.BlockID, ids[2].NodeID)
+	vote2 := newMockVote(testview, bp2.Block.BlockID, ids[2].NodeID)
+	// set notifier
+	notifier.On("OnDoubleVotingDetected", vote1, vote2).Return().Once()
+	va.notifier = notifier
+
 	va.StoreProposerVote(bp1.ProposerVote())
 	va.StoreProposerVote(bp2.ProposerVote())
 	_, _, _ = va.BuildQCOnReceivedBlock(bp1.Block)
 	_, _, _ = va.BuildQCOnReceivedBlock(bp2.Block)
-	// mock double voting
-	vote1 := newMockVote(testview, bp1.Block.BlockID, ids[2].NodeID)
 	qc, built, err := va.StoreVoteAndBuildQC(vote1, bp1.Block)
 	require.Nil(t, qc)
 	require.False(t, built)
 	require.NoError(t, err)
-	vote2 := newMockVote(testview, bp2.Block.BlockID, ids[2].NodeID)
-	notifier.On("OnDoubleVotingDetected", vote1, vote2).Return().Once()
 	qc, built, err = va.StoreVoteAndBuildQC(vote2, bp2.Block)
 	notifier.AssertExpectations(t)
 	require.Nil(t, qc)
