@@ -54,9 +54,9 @@ func (va *VoteAggregator) StorePendingVote(vote *hotstuff.Vote) bool {
 	if va.isStale(vote) {
 		return false
 	}
-	// add vote, return false if the vote exists
-	exists := va.pendingVotes.AddVote(vote)
-	if exists {
+	// add vote, return false if the vote is not successfully added (already existed)
+	ok := va.pendingVotes.AddVote(vote)
+	if !ok {
 		return false
 	}
 	va.updateState(vote)
@@ -201,7 +201,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, 
 	// does not report invalid vote as an error, notify consumers instead
 	if err != nil {
 		switch err := err.(type) {
-		case hotstuff.InvalidVoteError:
+		case *hotstuff.ErrorInvalidVote:
 			va.notifier.OnInvalidVoteDetected(vote)
 			va.logger.Warn().Msg(err.Error())
 			return false, nil

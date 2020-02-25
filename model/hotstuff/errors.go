@@ -43,14 +43,6 @@ func (e MissingSignerError) Error() string {
 	return fmt.Sprintf("missing signer of vote %v", e.Vote)
 }
 
-func (e InvalidVoteError) Error() string {
-	return fmt.Sprintf("invalid vote found (vote: %x)", e.VoteID)
-}
-
-func (e DoubleVoteError) Error() string {
-	return fmt.Sprintf("double voting detected (original vote: %v, double vote: %v)", e.OriginalVote, e.DoubleVote)
-}
-
 func (e StaleVoteError) Error() string {
 	return fmt.Sprintf("stale vote (highest pruned view %d): %v", e.HighestPrunedView, e.Vote)
 }
