@@ -2,7 +2,6 @@ package hotstuff
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -88,11 +87,14 @@ func roundRobin(nodes flow.IdentityList, view uint64) *flow.Identity {
 // ComputeStakeThresholdForBuildingQC returns the threshold to determine how much stake are needed for building a QC
 // identities is the full identity list at a certain block
 func ComputeStakeThresholdForBuildingQC(totalStake uint64) uint64 {
-	// total * 2 / 3
-	total := new(big.Int).SetUint64(totalStake)
-	two := new(big.Int).SetUint64(2)
-	three := new(big.Int).SetUint64(3)
-	return new(big.Int).Div(
-		new(big.Int).Mul(total, two),
-		three).Uint64()
+	// Formally, the minimally required stake is: 2 * Floor(totalStake/3) + max(1, totalStake mod 3)
+	floorOneThird := totalStake / 3 // integer division, includes floor
+	res := 2 * floorOneThird
+	divRemainder := totalStake % 3
+	if  divRemainder <= 1 {
+		res += 1
+	} else {
+		res += divRemainder
+	}
+	return  res
 }
