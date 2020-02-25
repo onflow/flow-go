@@ -52,14 +52,14 @@ func (c *Collections) Store(collection *flow.Collection) error {
 	})
 }
 
-func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
+func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 	var (
 		light      flow.LightCollection
 		collection flow.Collection
 	)
 
 	err := c.db.View(func(btx *badger.Txn) error {
-		err := operation.RetrieveCollection(collID, &light)(btx)
+		err := operation.RetrieveCollection(colID, &light)(btx)
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
 				return storage.ErrNotFound
@@ -89,9 +89,30 @@ func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	return &collection, nil
 }
 
-func (c *Collections) Remove(collID flow.Identifier) error {
+func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, error) {
+	var collection flow.LightCollection
+
+	err := c.db.View(func(tx *badger.Txn) error {
+		err := operation.RetrieveCollection(colID, &collection)(tx)
+		if err != nil {
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return storage.ErrNotFound
+			}
+			return fmt.Errorf("could nto retrieve transaction: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &collection, nil
+}
+
+func (c *Collections) Remove(colID flow.Identifier) error {
 	return c.db.Update(func(btx *badger.Txn) error {
-		err := operation.RemoveCollection(collID)(btx)
+		err := operation.RemoveCollection(colID)(btx)
 		if err != nil {
 			return fmt.Errorf("could not remove collection: %w", err)
 		}
