@@ -166,8 +166,9 @@ type iterationFunc func() (checkFunc, createFunc, handleFunc)
 
 // lookup is the default iteration function allowing us to collect a list of
 // entity IDs from an index.
-func lookup(entityIDs *[]flow.Identifier) iterationFunc {
-	*entityIDs = make([]flow.Identifier, 0)
+// TODO passing pointers to slices is uncommon
+func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleFunc) {
+	*entityIDs = make([]flow.Identifier, 0, len(*entityIDs))
 	return func() (checkFunc, createFunc, handleFunc) {
 		check := func(key []byte) bool {
 			return true
@@ -192,8 +193,13 @@ func lookup(entityIDs *[]flow.Identifier) iterationFunc {
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
+//
+// TODO: this function is unbounded – should at least check whether end is a valid end, or
+// define a limit of iterations to prevent unbounded loops that can cause hangs
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
+
+		// TODO: add check whether end >= start?
 
 		it := tx.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -250,6 +256,9 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
+//
+// TODO: this function is unbounded – should at least check whether end is a valid end, or
+// define a limit of iterations to prevent unbounded loops that can cause hangs
 func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
