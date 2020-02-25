@@ -134,3 +134,12 @@ func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 	}
 	return nil, false
 }
+
+// Identities lists up and returns all the Identity objects inside the IdentityList
+func (il IdentityList) Identities() []*Identity {
+	l := make([]*Identity, 0)
+	for _, id := range il {
+		l = append(l, id)
+	}
+	return l
+}
