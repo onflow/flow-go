@@ -14,7 +14,7 @@ type Network interface {
 
 	// Register will make the network aware of a new process in the business logic
 	// of the node that wants to communicate across the network. It will return a
-	// conduit which connects the process to a bus with the same engine on all
-	// other nodes of the network.
-	Register(engineID uint8, engine network.Engine) (network.Conduit, error)
+	// conduit which connects the process to a bus allowing it to communicate with
+	// all other engines on the network that are on the same channel.
+	Register(channelID uint8, engine network.Engine) (network.Conduit, error)
 }

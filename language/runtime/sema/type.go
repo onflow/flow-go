@@ -11,38 +11,54 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
+func qualifiedIdentifier(identifier string, containerType Type) string {
+
+	// Gather all identifiers: this, parent, grand-parent, etc.
+
+	identifiers := []string{identifier}
+
+	for containerType != nil {
+		switch typedContainerType := containerType.(type) {
+		case *InterfaceType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		case *CompositeType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		default:
+			panic(errors.NewUnreachableError())
+		}
+	}
+
+	// Append all identifiers, in reverse order
+
+	var sb strings.Builder
+
+	for i := len(identifiers) - 1; i >= 0; i-- {
+		sb.WriteString(identifiers[i])
+		if i != 0 {
+			sb.WriteRune('.')
+		}
+	}
+
+	return sb.String()
+}
+
+type TypeID string
+
 type Type interface {
-	isType()
+	IsType()
 	String() string
 	Equal(other Type) bool
 	IsResourceType() bool
 	IsInvalidType() bool
-	ID() string
+	ID() TypeID
 }
 
-type ExportableType interface {
-	//TODO once https://github.com/dapperlabs/flow-go/issues/1589 is done
-	// we can stop requiring AST tree to fetch extra names
-	// and Variable to be able to locate this type
-	Export(program *ast.Program, variable *Variable) types.Type
-}
-
-//Helper function to wrap a types in a variable if a variable is set
-func wrapVariable(t types.Type, variable *Variable) types.Type {
-	if variable != nil {
-		return types.Variable{
-			Type: t,
-		}
-	} else {
-		return t
-	}
-}
-
-// ValueIndexableType
-
+// ValueIndexableType is a type which can be indexed into using a value
+//
 type ValueIndexableType interface {
 	Type
 	isValueIndexableType() bool
@@ -50,8 +66,8 @@ type ValueIndexableType interface {
 	IndexingType() Type
 }
 
-// TypeIndexableType
-
+// TypeIndexableType is a type which can be indexed into using a type
+//
 type TypeIndexableType interface {
 	Type
 	isTypeIndexableType()
@@ -60,15 +76,43 @@ type TypeIndexableType interface {
 	ElementType(indexingType Type, isAssignment bool) Type
 }
 
+// MemberAccessibleType is a type which might have members
+//
+type MemberAccessibleType interface {
+	Type
+	CanHaveMembers() bool
+	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
+}
+
+// ContainedType is a type which might have a container type
+//
+type ContainedType interface {
+	Type
+	GetContainerType() Type
+}
+
+// CompositeKindedType is a type which has a composite kind
+//
+type CompositeKindedType interface {
+	Type
+	GetCompositeKind() common.CompositeKind
+}
+
+// LocatedType is a type which has a location
+type LocatedType interface {
+	Type
+	GetLocation() ast.Location
+}
+
 // TypeAnnotation
 
 type TypeAnnotation struct {
-	Move bool
-	Type Type
+	IsResource bool
+	Type       Type
 }
 
 func (a *TypeAnnotation) String() string {
-	if a.Move {
+	if a.IsResource {
 		return fmt.Sprintf("<-%s", a.Type)
 	} else {
 		return fmt.Sprint(a.Type)
@@ -76,45 +120,34 @@ func (a *TypeAnnotation) String() string {
 }
 
 func (a *TypeAnnotation) Equal(other *TypeAnnotation) bool {
-	return a.Move == other.Move &&
+	return a.IsResource == other.IsResource &&
 		a.Type.Equal(other.Type)
 }
 
 func NewTypeAnnotation(ty Type) *TypeAnnotation {
 	return &TypeAnnotation{
-		Move: ty.IsResourceType(),
-		Type: ty,
+		IsResource: ty.IsResourceType(),
+		Type:       ty,
 	}
 }
 
-func NewTypeAnnotations(types ...Type) []*TypeAnnotation {
-	typeAnnotations := make([]*TypeAnnotation, len(types))
-	for i, ty := range types {
-		typeAnnotations[i] = NewTypeAnnotation(ty)
-	}
-	return typeAnnotations
-}
-
-// AnyType represents the top type
+// AnyType represents the top type of all types.
+// NOTE: This type is only used internally and not available in programs.
 type AnyType struct{}
 
-func (*AnyType) isType() {}
+func (*AnyType) IsType() {}
 
 func (*AnyType) String() string {
 	return "Any"
 }
 
-func (*AnyType) ID() string {
+func (*AnyType) ID() TypeID {
 	return "Any"
 }
 
 func (*AnyType) Equal(other Type) bool {
 	_, ok := other.(*AnyType)
 	return ok
-}
-
-func (*AnyType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Any{}, variable)
 }
 
 func (*AnyType) IsResourceType() bool {
@@ -125,16 +158,68 @@ func (*AnyType) IsInvalidType() bool {
 	return false
 }
 
+// AnyStructType represents the top type of all non-resource types
+type AnyStructType struct{}
+
+func (*AnyStructType) IsType() {}
+
+func (*AnyStructType) String() string {
+	return "AnyStruct"
+}
+
+func (*AnyStructType) ID() TypeID {
+	return "AnyStruct"
+}
+
+func (*AnyStructType) Equal(other Type) bool {
+	_, ok := other.(*AnyStructType)
+	return ok
+}
+
+func (*AnyStructType) IsResourceType() bool {
+	return false
+}
+
+func (*AnyStructType) IsInvalidType() bool {
+	return false
+}
+
+// AnyResourceType represents the top type of all resource types
+type AnyResourceType struct{}
+
+func (*AnyResourceType) IsType() {}
+
+func (*AnyResourceType) String() string {
+	return "AnyResource"
+}
+
+func (*AnyResourceType) ID() TypeID {
+	return "AnyResource"
+}
+
+func (*AnyResourceType) Equal(other Type) bool {
+	_, ok := other.(*AnyResourceType)
+	return ok
+}
+
+func (*AnyResourceType) IsResourceType() bool {
+	return true
+}
+
+func (*AnyResourceType) IsInvalidType() bool {
+	return false
+}
+
 // NeverType represents the bottom type
 type NeverType struct{}
 
-func (*NeverType) isType() {}
+func (*NeverType) IsType() {}
 
 func (*NeverType) String() string {
 	return "Never"
 }
 
-func (*NeverType) ID() string {
+func (*NeverType) ID() TypeID {
 	return "Never"
 }
 
@@ -154,17 +239,13 @@ func (*NeverType) IsInvalidType() bool {
 // VoidType represents the void type
 type VoidType struct{}
 
-func (*VoidType) isType() {}
-
-func (*VoidType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Void{}, variable)
-}
+func (*VoidType) IsType() {}
 
 func (*VoidType) String() string {
 	return "Void"
 }
 
-func (*VoidType) ID() string {
+func (*VoidType) ID() TypeID {
 	return "Void"
 }
 
@@ -187,13 +268,13 @@ func (*VoidType) IsInvalidType() bool {
 //
 type InvalidType struct{}
 
-func (*InvalidType) isType() {}
+func (*InvalidType) IsType() {}
 
 func (t *InvalidType) String() string {
 	return "<<invalid>>"
 }
 
-func (*InvalidType) ID() string {
+func (*InvalidType) ID() TypeID {
 	return "<<invalid>>"
 }
 
@@ -215,7 +296,7 @@ type OptionalType struct {
 	Type Type
 }
 
-func (*OptionalType) isType() {}
+func (*OptionalType) IsType() {}
 
 func (t *OptionalType) String() string {
 	if t.Type == nil {
@@ -224,11 +305,12 @@ func (t *OptionalType) String() string {
 	return fmt.Sprintf("%s?", t.Type)
 }
 
-func (t *OptionalType) ID() string {
-	if t.Type == nil {
-		return "optional"
+func (t *OptionalType) ID() TypeID {
+	var id string
+	if t.Type != nil {
+		id = string(t.Type.ID())
 	}
-	return fmt.Sprintf("%s?", t.Type.ID())
+	return TypeID(fmt.Sprintf("%s?", id))
 }
 
 func (t *OptionalType) Equal(other Type) bool {
@@ -247,27 +329,16 @@ func (t *OptionalType) IsInvalidType() bool {
 	return t.Type.IsInvalidType()
 }
 
-func (t *OptionalType) Export(program *ast.Program, variable *Variable) types.Type {
-
-	return wrapVariable(types.Optional{
-		Of: t.Type.(ExportableType).Export(program, nil),
-	}, variable)
-}
-
 // BoolType represents the boolean type
 type BoolType struct{}
 
-func (*BoolType) isType() {}
-
-func (*BoolType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Bool{}, variable)
-}
+func (*BoolType) IsType() {}
 
 func (*BoolType) String() string {
 	return "Bool"
 }
 
-func (*BoolType) ID() string {
+func (*BoolType) ID() TypeID {
 	return "Bool"
 }
 
@@ -288,13 +359,13 @@ func (*BoolType) IsInvalidType() bool {
 
 type CharacterType struct{}
 
-func (*CharacterType) isType() {}
+func (*CharacterType) IsType() {}
 
 func (*CharacterType) String() string {
 	return "Character"
 }
 
-func (*CharacterType) ID() string {
+func (*CharacterType) ID() TypeID {
 	return "Character"
 }
 
@@ -314,17 +385,13 @@ func (*CharacterType) IsInvalidType() bool {
 // StringType represents the string type
 type StringType struct{}
 
-func (*StringType) isType() {}
-
-func (*StringType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.String{}, variable)
-}
+func (*StringType) IsType() {}
 
 func (*StringType) String() string {
 	return "String"
 }
 
-func (*StringType) ID() string {
+func (*StringType) ID() TypeID {
 	return "String"
 }
 
@@ -341,57 +408,65 @@ func (*StringType) IsInvalidType() bool {
 	return false
 }
 
-func (*StringType) HasMembers() bool {
+func (*StringType) CanHaveMembers() bool {
 	return true
 }
 
 func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	newFunction := func(functionType *FunctionType) *Member {
+		return NewPublicFunctionMember(t, identifier, functionType)
+	}
+
 	switch identifier {
 	case "concat":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&StringType{},
-				),
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "other",
+						TypeAnnotation: NewTypeAnnotation(&StringType{}),
+					},
+				},
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					&StringType{},
 				),
 			},
-		})
+		)
 
 	case "slice":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&IntType{},
-					&IntType{},
-				),
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "from",
+						TypeAnnotation: NewTypeAnnotation(&IntType{}),
+					},
+					{
+						Identifier:     "upTo",
+						TypeAnnotation: NewTypeAnnotation(&IntType{}),
+					},
+				},
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					&StringType{},
 				),
 			},
-			ArgumentLabels: []string{"from", "upTo"},
-		})
+		)
+
+	case "decodeHex":
+		return newFunction(
+			&FunctionType{
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VariableSizedType{
+						// TODO: change to UInt8
+						Type: &IntType{},
+					},
+				),
+			},
+		)
 
 	case "length":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			Type:            &IntType{},
-		})
+		return NewPublicConstantFieldMember(t, identifier, &IntType{})
 
 	default:
 		return nil
@@ -402,7 +477,7 @@ func (t *StringType) isValueIndexableType() bool {
 	return true
 }
 
-func (t *StringType) ElementType(isAssignment bool) Type {
+func (t *StringType) ElementType(_ bool) Type {
 	return &CharacterType{}
 }
 
@@ -410,24 +485,100 @@ func (t *StringType) IndexingType() Type {
 	return &IntegerType{}
 }
 
-// Ranged
+// NumberType represents the super-type of all signed number types
+type NumberType struct{}
 
-type Ranged interface {
-	Min() *big.Int
-	Max() *big.Int
+func (*NumberType) IsType() {}
+
+func (*NumberType) String() string {
+	return "Number"
+}
+
+func (*NumberType) ID() TypeID {
+	return "Number"
+}
+
+func (*NumberType) Equal(other Type) bool {
+	_, ok := other.(*NumberType)
+	return ok
+}
+
+func (*NumberType) IsResourceType() bool {
+	return false
+}
+
+func (*NumberType) IsInvalidType() bool {
+	return false
+}
+
+func (*NumberType) MinInt() *big.Int {
+	return nil
+}
+
+func (*NumberType) MaxInt() *big.Int {
+	return nil
+}
+
+// SignedNumberType represents the super-type of all signed number types
+type SignedNumberType struct{}
+
+func (*SignedNumberType) IsType() {}
+
+func (*SignedNumberType) String() string {
+	return "SignedNumber"
+}
+
+func (*SignedNumberType) ID() TypeID {
+	return "SignedNumber"
+}
+
+func (*SignedNumberType) Equal(other Type) bool {
+	_, ok := other.(*SignedNumberType)
+	return ok
+}
+
+func (*SignedNumberType) IsResourceType() bool {
+	return false
+}
+
+func (*SignedNumberType) IsInvalidType() bool {
+	return false
+}
+
+func (*SignedNumberType) MinInt() *big.Int {
+	return nil
+}
+
+func (*SignedNumberType) MaxInt() *big.Int {
+	return nil
+}
+
+// IntegerRangedType
+
+type IntegerRangedType interface {
+	Type
+	MinInt() *big.Int
+	MaxInt() *big.Int
+}
+
+type FractionalRangedType interface {
+	IntegerRangedType
+	Scale() uint
+	MinFractional() *big.Int
+	MaxFractional() *big.Int
 }
 
 // IntegerType represents the super-type of all integer types
 type IntegerType struct{}
 
-func (*IntegerType) isType() {}
+func (*IntegerType) IsType() {}
 
 func (*IntegerType) String() string {
-	return "integer"
+	return "Integer"
 }
 
-func (*IntegerType) ID() string {
-	return "integer"
+func (*IntegerType) ID() TypeID {
+	return "Integer"
 }
 
 func (*IntegerType) Equal(other Type) bool {
@@ -443,28 +594,58 @@ func (*IntegerType) IsInvalidType() bool {
 	return false
 }
 
-func (*IntegerType) Min() *big.Int {
+func (*IntegerType) MinInt() *big.Int {
 	return nil
 }
 
-func (*IntegerType) Max() *big.Int {
+func (*IntegerType) MaxInt() *big.Int {
+	return nil
+}
+
+// SignedIntegerType represents the super-type of all signed integer types
+type SignedIntegerType struct{}
+
+func (*SignedIntegerType) IsType() {}
+
+func (*SignedIntegerType) String() string {
+	return "SignedInteger"
+}
+
+func (*SignedIntegerType) ID() TypeID {
+	return "SignedInteger"
+}
+
+func (*SignedIntegerType) Equal(other Type) bool {
+	_, ok := other.(*SignedIntegerType)
+	return ok
+}
+
+func (*SignedIntegerType) IsResourceType() bool {
+	return false
+}
+
+func (*SignedIntegerType) IsInvalidType() bool {
+	return false
+}
+
+func (*SignedIntegerType) MinInt() *big.Int {
+	return nil
+}
+
+func (*SignedIntegerType) MaxInt() *big.Int {
 	return nil
 }
 
 // IntType represents the arbitrary-precision integer type `Int`
 type IntType struct{}
 
-func (*IntType) isType() {}
-
-func (*IntType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int{}, variable)
-}
+func (*IntType) IsType() {}
 
 func (*IntType) String() string {
 	return "Int"
 }
 
-func (*IntType) ID() string {
+func (*IntType) ID() TypeID {
 	return "Int"
 }
 
@@ -481,11 +662,11 @@ func (*IntType) IsInvalidType() bool {
 	return false
 }
 
-func (*IntType) Min() *big.Int {
+func (*IntType) MinInt() *big.Int {
 	return nil
 }
 
-func (*IntType) Max() *big.Int {
+func (*IntType) MaxInt() *big.Int {
 	return nil
 }
 
@@ -493,17 +674,13 @@ func (*IntType) Max() *big.Int {
 
 type Int8Type struct{}
 
-func (*Int8Type) isType() {}
-
-func (*Int8Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int8{}, variable)
-}
+func (*Int8Type) IsType() {}
 
 func (*Int8Type) String() string {
 	return "Int8"
 }
 
-func (*Int8Type) ID() string {
+func (*Int8Type) ID() TypeID {
 	return "Int8"
 }
 
@@ -520,31 +697,27 @@ func (*Int8Type) IsInvalidType() bool {
 	return false
 }
 
-var Int8TypeMin = big.NewInt(0).SetInt64(math.MinInt8)
-var Int8TypeMax = big.NewInt(0).SetInt64(math.MaxInt8)
+var Int8TypeMinInt = big.NewInt(0).SetInt64(math.MinInt8)
+var Int8TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt8)
 
-func (*Int8Type) Min() *big.Int {
-	return Int8TypeMin
+func (*Int8Type) MinInt() *big.Int {
+	return Int8TypeMinInt
 }
 
-func (*Int8Type) Max() *big.Int {
-	return Int8TypeMax
+func (*Int8Type) MaxInt() *big.Int {
+	return Int8TypeMaxInt
 }
 
 // Int16Type represents the 16-bit signed integer type `Int16`
 type Int16Type struct{}
 
-func (*Int16Type) isType() {}
-
-func (*Int16Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int16{}, variable)
-}
+func (*Int16Type) IsType() {}
 
 func (*Int16Type) String() string {
 	return "Int16"
 }
 
-func (*Int16Type) ID() string {
+func (*Int16Type) ID() TypeID {
 	return "Int16"
 }
 
@@ -561,31 +734,27 @@ func (*Int16Type) IsInvalidType() bool {
 	return false
 }
 
-var Int16TypeMin = big.NewInt(0).SetInt64(math.MinInt16)
-var Int16TypeMax = big.NewInt(0).SetInt64(math.MaxInt16)
+var Int16TypeMinInt = big.NewInt(0).SetInt64(math.MinInt16)
+var Int16TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt16)
 
-func (*Int16Type) Min() *big.Int {
-	return Int16TypeMin
+func (*Int16Type) MinInt() *big.Int {
+	return Int16TypeMinInt
 }
 
-func (*Int16Type) Max() *big.Int {
-	return Int16TypeMax
+func (*Int16Type) MaxInt() *big.Int {
+	return Int16TypeMaxInt
 }
 
 // Int32Type represents the 32-bit signed integer type `Int32`
 type Int32Type struct{}
 
-func (*Int32Type) isType() {}
-
-func (*Int32Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int32{}, variable)
-}
+func (*Int32Type) IsType() {}
 
 func (*Int32Type) String() string {
 	return "Int32"
 }
 
-func (*Int32Type) ID() string {
+func (*Int32Type) ID() TypeID {
 	return "Int32"
 }
 
@@ -602,31 +771,27 @@ func (*Int32Type) IsInvalidType() bool {
 	return false
 }
 
-var Int32TypeMin = big.NewInt(0).SetInt64(math.MinInt32)
-var Int32TypeMax = big.NewInt(0).SetInt64(math.MaxInt32)
+var Int32TypeMinInt = big.NewInt(0).SetInt64(math.MinInt32)
+var Int32TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt32)
 
-func (*Int32Type) Min() *big.Int {
-	return Int32TypeMin
+func (*Int32Type) MinInt() *big.Int {
+	return Int32TypeMinInt
 }
 
-func (*Int32Type) Max() *big.Int {
-	return Int32TypeMax
+func (*Int32Type) MaxInt() *big.Int {
+	return Int32TypeMaxInt
 }
 
 // Int64Type represents the 64-bit signed integer type `Int64`
 type Int64Type struct{}
 
-func (*Int64Type) isType() {}
-
-func (*Int64Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int64{}, variable)
-}
+func (*Int64Type) IsType() {}
 
 func (*Int64Type) String() string {
 	return "Int64"
 }
 
-func (*Int64Type) ID() string {
+func (*Int64Type) ID() TypeID {
 	return "Int64"
 }
 
@@ -643,31 +808,162 @@ func (*Int64Type) IsInvalidType() bool {
 	return false
 }
 
-var Int64TypeMin = big.NewInt(0).SetInt64(math.MinInt64)
-var Int64TypeMax = big.NewInt(0).SetInt64(math.MaxInt64)
+var Int64TypeMinInt = big.NewInt(0).SetInt64(math.MinInt64)
+var Int64TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt64)
 
-func (*Int64Type) Min() *big.Int {
-	return Int64TypeMin
+func (*Int64Type) MinInt() *big.Int {
+	return Int64TypeMinInt
 }
 
-func (*Int64Type) Max() *big.Int {
-	return Int64TypeMax
+func (*Int64Type) MaxInt() *big.Int {
+	return Int64TypeMaxInt
+}
+
+// Int128Type represents the 128-bit signed integer type `Int128`
+type Int128Type struct{}
+
+func (*Int128Type) IsType() {}
+
+func (*Int128Type) String() string {
+	return "Int128"
+}
+
+func (*Int128Type) ID() TypeID {
+	return "Int128"
+}
+
+func (*Int128Type) Equal(other Type) bool {
+	_, ok := other.(*Int128Type)
+	return ok
+}
+
+func (*Int128Type) IsResourceType() bool {
+	return false
+}
+
+func (*Int128Type) IsInvalidType() bool {
+	return false
+}
+
+var Int128TypeMinInt *big.Int
+
+func init() {
+	Int128TypeMinInt = big.NewInt(-1)
+	Int128TypeMinInt.Lsh(Int128TypeMinInt, 127)
+}
+
+var Int128TypeMaxInt *big.Int
+
+func init() {
+	Int128TypeMaxInt = big.NewInt(1)
+	Int128TypeMaxInt.Lsh(Int128TypeMaxInt, 127)
+	Int128TypeMaxInt.Sub(Int128TypeMaxInt, big.NewInt(1))
+}
+
+func (*Int128Type) MinInt() *big.Int {
+	return Int128TypeMinInt
+}
+
+func (*Int128Type) MaxInt() *big.Int {
+	return Int128TypeMaxInt
+}
+
+// Int256Type represents the 256-bit signed integer type `Int256`
+type Int256Type struct{}
+
+func (*Int256Type) IsType() {}
+
+func (*Int256Type) String() string {
+	return "Int256"
+}
+
+func (*Int256Type) ID() TypeID {
+	return "Int256"
+}
+
+func (*Int256Type) Equal(other Type) bool {
+	_, ok := other.(*Int256Type)
+	return ok
+}
+
+func (*Int256Type) IsResourceType() bool {
+	return false
+}
+
+func (*Int256Type) IsInvalidType() bool {
+	return false
+}
+
+var Int256TypeMinInt *big.Int
+
+func init() {
+	Int256TypeMinInt = big.NewInt(-1)
+	Int256TypeMinInt.Lsh(Int256TypeMinInt, 255)
+}
+
+var Int256TypeMaxInt *big.Int
+
+func init() {
+	Int256TypeMaxInt = big.NewInt(1)
+	Int256TypeMaxInt.Lsh(Int256TypeMaxInt, 255)
+	Int256TypeMaxInt.Sub(Int256TypeMaxInt, big.NewInt(1))
+}
+
+func (*Int256Type) MinInt() *big.Int {
+	return Int256TypeMinInt
+}
+
+func (*Int256Type) MaxInt() *big.Int {
+	return Int256TypeMaxInt
+}
+
+// UIntType represents the arbitrary-precision unsigned integer type `UInt`
+type UIntType struct{}
+
+func (*UIntType) IsType() {}
+
+func (*UIntType) String() string {
+	return "UInt"
+}
+
+func (*UIntType) ID() TypeID {
+	return "UInt"
+}
+
+func (*UIntType) Equal(other Type) bool {
+	_, ok := other.(*UIntType)
+	return ok
+}
+
+func (*UIntType) IsResourceType() bool {
+	return false
+}
+
+func (*UIntType) IsInvalidType() bool {
+	return false
+}
+
+var UIntTypeMin = big.NewInt(0)
+
+func (*UIntType) MinInt() *big.Int {
+	return UIntTypeMin
+}
+
+func (*UIntType) MaxInt() *big.Int {
+	return nil
 }
 
 // UInt8Type represents the 8-bit unsigned integer type `UInt8`
+// which checks for overflow and underflow
 type UInt8Type struct{}
 
-func (*UInt8Type) isType() {}
-
-func (*UInt8Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt8{}, variable)
-}
+func (*UInt8Type) IsType() {}
 
 func (*UInt8Type) String() string {
 	return "UInt8"
 }
 
-func (*UInt8Type) ID() string {
+func (*UInt8Type) ID() TypeID {
 	return "UInt8"
 }
 
@@ -684,31 +980,28 @@ func (*UInt8Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt8TypeMin = big.NewInt(0)
-var UInt8TypeMax = big.NewInt(0).SetUint64(math.MaxUint8)
+var UInt8TypeMinInt = big.NewInt(0)
+var UInt8TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint8)
 
-func (*UInt8Type) Min() *big.Int {
-	return UInt8TypeMin
+func (*UInt8Type) MinInt() *big.Int {
+	return UInt8TypeMinInt
 }
 
-func (*UInt8Type) Max() *big.Int {
-	return UInt8TypeMax
+func (*UInt8Type) MaxInt() *big.Int {
+	return UInt8TypeMaxInt
 }
 
 // UInt16Type represents the 16-bit unsigned integer type `UInt16`
+// which checks for overflow and underflow
 type UInt16Type struct{}
 
-func (*UInt16Type) isType() {}
-
-func (*UInt16Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt16{}, variable)
-}
+func (*UInt16Type) IsType() {}
 
 func (*UInt16Type) String() string {
 	return "UInt16"
 }
 
-func (*UInt16Type) ID() string {
+func (*UInt16Type) ID() TypeID {
 	return "UInt16"
 }
 
@@ -725,31 +1018,28 @@ func (*UInt16Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt16TypeMin = big.NewInt(0)
-var UInt16TypeMax = big.NewInt(0).SetUint64(math.MaxUint16)
+var UInt16TypeMinInt = big.NewInt(0)
+var UInt16TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint16)
 
-func (*UInt16Type) Min() *big.Int {
-	return UInt16TypeMin
+func (*UInt16Type) MinInt() *big.Int {
+	return UInt16TypeMinInt
 }
 
-func (*UInt16Type) Max() *big.Int {
-	return UInt16TypeMax
+func (*UInt16Type) MaxInt() *big.Int {
+	return UInt16TypeMaxInt
 }
 
 // UInt32Type represents the 32-bit unsigned integer type `UInt32`
+// which checks for overflow and underflow
 type UInt32Type struct{}
 
-func (*UInt32Type) isType() {}
-
-func (*UInt32Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt32{}, variable)
-}
+func (*UInt32Type) IsType() {}
 
 func (*UInt32Type) String() string {
 	return "UInt32"
 }
 
-func (*UInt32Type) ID() string {
+func (*UInt32Type) ID() TypeID {
 	return "UInt32"
 }
 
@@ -766,31 +1056,28 @@ func (*UInt32Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt32TypeMin = big.NewInt(0)
-var UInt32TypeMax = big.NewInt(0).SetUint64(math.MaxUint32)
+var UInt32TypeMinInt = big.NewInt(0)
+var UInt32TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint32)
 
-func (*UInt32Type) Min() *big.Int {
-	return UInt32TypeMin
+func (*UInt32Type) MinInt() *big.Int {
+	return UInt32TypeMinInt
 }
 
-func (*UInt32Type) Max() *big.Int {
-	return UInt32TypeMax
+func (*UInt32Type) MaxInt() *big.Int {
+	return UInt32TypeMaxInt
 }
 
 // UInt64Type represents the 64-bit unsigned integer type `UInt64`
+// which checks for overflow and underflow
 type UInt64Type struct{}
 
-func (*UInt64Type) isType() {}
-
-func (*UInt64Type) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt64{}, variable)
-}
+func (*UInt64Type) IsType() {}
 
 func (*UInt64Type) String() string {
 	return "UInt64"
 }
 
-func (*UInt64Type) ID() string {
+func (*UInt64Type) ID() TypeID {
 	return "UInt64"
 }
 
@@ -807,15 +1094,434 @@ func (*UInt64Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt64TypeMin = big.NewInt(0)
-var UInt64TypeMax = big.NewInt(0).SetUint64(math.MaxUint64)
+var UInt64TypeMinInt = big.NewInt(0)
+var UInt64TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint64)
 
-func (*UInt64Type) Min() *big.Int {
-	return UInt64TypeMin
+func (*UInt64Type) MinInt() *big.Int {
+	return UInt64TypeMinInt
 }
 
-func (*UInt64Type) Max() *big.Int {
-	return UInt64TypeMax
+func (*UInt64Type) MaxInt() *big.Int {
+	return UInt64TypeMaxInt
+}
+
+// UInt128Type represents the 128-bit unsigned integer type `UInt128`
+// which checks for overflow and underflow
+type UInt128Type struct{}
+
+func (*UInt128Type) IsType() {}
+
+func (*UInt128Type) String() string {
+	return "UInt128"
+}
+
+func (*UInt128Type) ID() TypeID {
+	return "UInt128"
+}
+
+func (*UInt128Type) Equal(other Type) bool {
+	_, ok := other.(*UInt128Type)
+	return ok
+}
+
+func (*UInt128Type) IsResourceType() bool {
+	return false
+}
+
+func (*UInt128Type) IsInvalidType() bool {
+	return false
+}
+
+var UInt128TypeMinInt = big.NewInt(0)
+var UInt128TypeMaxInt *big.Int
+
+func init() {
+	UInt128TypeMaxInt = big.NewInt(1)
+	UInt128TypeMaxInt.Lsh(UInt128TypeMaxInt, 128)
+	UInt128TypeMaxInt.Sub(UInt128TypeMaxInt, big.NewInt(1))
+}
+
+func (*UInt128Type) MinInt() *big.Int {
+	return UInt128TypeMinInt
+}
+
+func (*UInt128Type) MaxInt() *big.Int {
+	return UInt128TypeMaxInt
+}
+
+// UInt256Type represents the 256-bit unsigned integer type `UInt256`
+// which checks for overflow and underflow
+type UInt256Type struct{}
+
+func (*UInt256Type) IsType() {}
+
+func (*UInt256Type) String() string {
+	return "UInt256"
+}
+
+func (*UInt256Type) ID() TypeID {
+	return "UInt256"
+}
+
+func (*UInt256Type) Equal(other Type) bool {
+	_, ok := other.(*UInt256Type)
+	return ok
+}
+
+func (*UInt256Type) IsResourceType() bool {
+	return false
+}
+
+func (*UInt256Type) IsInvalidType() bool {
+	return false
+}
+
+var UInt256TypeMinInt = big.NewInt(0)
+var UInt256TypeMaxInt *big.Int
+
+func init() {
+	UInt256TypeMaxInt = big.NewInt(1)
+	UInt256TypeMaxInt.Lsh(UInt256TypeMaxInt, 256)
+	UInt256TypeMaxInt.Sub(UInt256TypeMaxInt, big.NewInt(1))
+}
+
+func (*UInt256Type) MinInt() *big.Int {
+	return UInt256TypeMinInt
+}
+
+func (*UInt256Type) MaxInt() *big.Int {
+	return UInt256TypeMaxInt
+}
+
+// Word8Type represents the 8-bit unsigned integer type `Word8`
+// which does NOT check for overflow and underflow
+type Word8Type struct{}
+
+func (*Word8Type) IsType() {}
+
+func (*Word8Type) String() string {
+	return "Word8"
+}
+
+func (*Word8Type) ID() TypeID {
+	return "Word8"
+}
+
+func (*Word8Type) Equal(other Type) bool {
+	_, ok := other.(*Word8Type)
+	return ok
+}
+
+func (*Word8Type) IsResourceType() bool {
+	return false
+}
+
+func (*Word8Type) IsInvalidType() bool {
+	return false
+}
+
+var Word8TypeMinInt = big.NewInt(0)
+var Word8TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint8)
+
+func (*Word8Type) MinInt() *big.Int {
+	return Word8TypeMinInt
+}
+
+func (*Word8Type) MaxInt() *big.Int {
+	return Word8TypeMaxInt
+}
+
+// Word16Type represents the 16-bit unsigned integer type `Word16`
+// which does NOT check for overflow and underflow
+type Word16Type struct{}
+
+func (*Word16Type) IsType() {}
+
+func (*Word16Type) String() string {
+	return "Word16"
+}
+
+func (*Word16Type) ID() TypeID {
+	return "Word16"
+}
+
+func (*Word16Type) Equal(other Type) bool {
+	_, ok := other.(*Word16Type)
+	return ok
+}
+
+func (*Word16Type) IsResourceType() bool {
+	return false
+}
+
+func (*Word16Type) IsInvalidType() bool {
+	return false
+}
+
+var Word16TypeMinInt = big.NewInt(0)
+var Word16TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint16)
+
+func (*Word16Type) MinInt() *big.Int {
+	return Word16TypeMinInt
+}
+
+func (*Word16Type) MaxInt() *big.Int {
+	return Word16TypeMaxInt
+}
+
+// Word32Type represents the 32-bit unsigned integer type `Word32`
+// which does NOT check for overflow and underflow
+type Word32Type struct{}
+
+func (*Word32Type) IsType() {}
+
+func (*Word32Type) String() string {
+	return "Word32"
+}
+
+func (*Word32Type) ID() TypeID {
+	return "Word32"
+}
+
+func (*Word32Type) Equal(other Type) bool {
+	_, ok := other.(*Word32Type)
+	return ok
+}
+
+func (*Word32Type) IsResourceType() bool {
+	return false
+}
+
+func (*Word32Type) IsInvalidType() bool {
+	return false
+}
+
+var Word32TypeMinInt = big.NewInt(0)
+var Word32TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint32)
+
+func (*Word32Type) MinInt() *big.Int {
+	return Word32TypeMinInt
+}
+
+func (*Word32Type) MaxInt() *big.Int {
+	return Word32TypeMaxInt
+}
+
+// Word64Type represents the 64-bit unsigned integer type `Word64`
+// which does NOT check for overflow and underflow
+type Word64Type struct{}
+
+func (*Word64Type) IsType() {}
+
+func (*Word64Type) String() string {
+	return "Word64"
+}
+
+func (*Word64Type) ID() TypeID {
+	return "Word64"
+}
+
+func (*Word64Type) Equal(other Type) bool {
+	_, ok := other.(*Word64Type)
+	return ok
+}
+
+func (*Word64Type) IsResourceType() bool {
+	return false
+}
+
+func (*Word64Type) IsInvalidType() bool {
+	return false
+}
+
+var Word64TypeMinInt = big.NewInt(0)
+var Word64TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint64)
+
+func (*Word64Type) MinInt() *big.Int {
+	return Word64TypeMinInt
+}
+
+func (*Word64Type) MaxInt() *big.Int {
+	return Word64TypeMaxInt
+}
+
+// FixedPointType represents the super-type of all fixed-point types
+type FixedPointType struct{}
+
+func (*FixedPointType) IsType() {}
+
+func (*FixedPointType) String() string {
+	return "FixedPoint"
+}
+
+func (*FixedPointType) ID() TypeID {
+	return "FixedPoint"
+}
+
+func (*FixedPointType) Equal(other Type) bool {
+	_, ok := other.(*FixedPointType)
+	return ok
+}
+
+func (*FixedPointType) IsResourceType() bool {
+	return false
+}
+
+func (*FixedPointType) IsInvalidType() bool {
+	return false
+}
+
+func (*FixedPointType) MinInt() *big.Int {
+	return nil
+}
+
+func (*FixedPointType) MaxInt() *big.Int {
+	return nil
+}
+
+// SignedFixedPointType represents the super-type of all signed fixed-point types
+type SignedFixedPointType struct{}
+
+func (*SignedFixedPointType) IsType() {}
+
+func (*SignedFixedPointType) String() string {
+	return "SignedFixedPoint"
+}
+
+func (*SignedFixedPointType) ID() TypeID {
+	return "SignedFixedPoint"
+}
+
+func (*SignedFixedPointType) Equal(other Type) bool {
+	_, ok := other.(*SignedFixedPointType)
+	return ok
+}
+
+func (*SignedFixedPointType) IsResourceType() bool {
+	return false
+}
+
+func (*SignedFixedPointType) IsInvalidType() bool {
+	return false
+}
+
+func (*SignedFixedPointType) MinInt() *big.Int {
+	return nil
+}
+
+func (*SignedFixedPointType) MaxInt() *big.Int {
+	return nil
+}
+
+const Fix64Scale uint = 8
+const Fix64Factor = 100_000_000
+
+// Fix64Type represents the 64-bit signed decimal fixed-point type `Fix64`
+// which has a scale of Fix64Scale, and checks for overflow and underflow
+type Fix64Type struct{}
+
+func (*Fix64Type) IsType() {}
+
+func (*Fix64Type) String() string {
+	return "Fix64"
+}
+
+func (*Fix64Type) ID() TypeID {
+	return "Fix64"
+}
+
+func (*Fix64Type) Equal(other Type) bool {
+	_, ok := other.(*Fix64Type)
+	return ok
+}
+
+func (*Fix64Type) IsResourceType() bool {
+	return false
+}
+
+func (*Fix64Type) IsInvalidType() bool {
+	return false
+}
+
+var Fix64TypeMinInt = big.NewInt(0).SetInt64(math.MinInt64 / Fix64Factor)
+var Fix64TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt64 / Fix64Factor)
+var Fix64TypeMinFractional = big.NewInt(0).SetInt64(math.MinInt64 % Fix64Factor)
+var Fix64TypeMaxFractional = big.NewInt(0).SetInt64(math.MaxInt64 % Fix64Factor)
+
+func init() {
+	Fix64TypeMinFractional.Abs(Fix64TypeMinFractional)
+}
+
+func (*Fix64Type) MinInt() *big.Int {
+	return Fix64TypeMinInt
+}
+
+func (*Fix64Type) MaxInt() *big.Int {
+	return Fix64TypeMaxInt
+}
+
+func (*Fix64Type) Scale() uint {
+	return Fix64Scale
+}
+
+func (*Fix64Type) MinFractional() *big.Int {
+	return Fix64TypeMinFractional
+}
+
+func (*Fix64Type) MaxFractional() *big.Int {
+	return Fix64TypeMaxFractional
+}
+
+// UFix64Type represents the 64-bit unsigned decimal fixed-point type `UFix64`
+// which has a scale of 1E9, and checks for overflow and underflow
+type UFix64Type struct{}
+
+func (*UFix64Type) IsType() {}
+
+func (*UFix64Type) String() string {
+	return "UFix64"
+}
+
+func (*UFix64Type) ID() TypeID {
+	return "UFix64"
+}
+
+func (*UFix64Type) Equal(other Type) bool {
+	_, ok := other.(*UFix64Type)
+	return ok
+}
+
+func (*UFix64Type) IsResourceType() bool {
+	return false
+}
+
+func (*UFix64Type) IsInvalidType() bool {
+	return false
+}
+
+var UFix64TypeMinInt = big.NewInt(0)
+var UFix64TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint64 / uint64(Fix64Factor))
+var UFix64TypeMinFractional = big.NewInt(0)
+var UFix64TypeMaxFractional = big.NewInt(0).SetUint64(math.MaxUint64 % uint64(Fix64Factor))
+
+func (*UFix64Type) MinInt() *big.Int {
+	return UFix64TypeMinInt
+}
+
+func (*UFix64Type) MaxInt() *big.Int {
+	return UFix64TypeMaxInt
+}
+
+func (*UFix64Type) Scale() uint {
+	return Fix64Scale
+}
+
+func (*UFix64Type) MinFractional() *big.Int {
+	return UFix64TypeMinFractional
+}
+
+func (*UFix64Type) MaxFractional() *big.Int {
+	return UFix64TypeMaxFractional
 }
 
 // ArrayType
@@ -826,6 +1532,9 @@ type ArrayType interface {
 }
 
 func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, report func(error)) *Member {
+	newFunction := func(functionType *FunctionType) *Member {
+		return NewPublicFunctionMember(arrayType, field, functionType)
+	}
 
 	switch field {
 	case "append":
@@ -837,21 +1546,20 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 		}
 
 		elementType := arrayType.ElementType(false)
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					elementType,
-				),
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "element",
+						TypeAnnotation: NewTypeAnnotation(elementType),
+					},
+				},
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					&VoidType{},
 				),
 			},
-		})
+		)
 
 	case "concat":
 		// TODO: maybe allow constant sized:
@@ -878,19 +1586,18 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		typeAnnotation := NewTypeAnnotation(arrayType)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: []*TypeAnnotation{
-					typeAnnotation,
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "other",
+						TypeAnnotation: typeAnnotation,
+					},
 				},
 				ReturnTypeAnnotation: typeAnnotation,
 			},
-		})
+		)
 
 	case "insert":
 		// Inserting elements into to a constant sized array is not allowed
@@ -902,23 +1609,24 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&IntegerType{},
-					elementType,
-				),
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "at",
+						TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+					},
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "element",
+						TypeAnnotation: NewTypeAnnotation(elementType),
+					},
+				},
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					&VoidType{},
 				),
 			},
-			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
-		})
+		)
 
 	case "remove":
 		// Removing elements from a constant sized array is not allowed
@@ -930,22 +1638,19 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&IntegerType{},
-				),
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "at",
+						TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+					},
+				},
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					elementType,
 				),
 			},
-			ArgumentLabels: []string{"at"},
-		})
+		)
 
 	case "removeFirst":
 		// Removing elements from a constant sized array is not allowed
@@ -957,18 +1662,13 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
+		return newFunction(
+			&FunctionType{
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					elementType,
 				),
 			},
-		})
+		)
 
 	case "removeLast":
 		// Removing elements from a constant sized array is not allowed
@@ -980,18 +1680,13 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
+		return newFunction(
+			&FunctionType{
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					elementType,
 				),
 			},
-		})
+		)
 
 	case "contains":
 		elementType := arrayType.ElementType(false)
@@ -1020,31 +1715,27 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			)
 		}
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					elementType,
-				),
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "element",
+						TypeAnnotation: NewTypeAnnotation(elementType),
+					},
+				},
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					&BoolType{},
 				),
 			},
-		})
+		)
 
 	case "length":
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			Type:            &IntType{},
-		})
+		return NewPublicConstantFieldMember(
+			arrayType,
+			field,
+			&IntType{},
+		)
 
 	default:
 		return nil
@@ -1056,21 +1747,15 @@ type VariableSizedType struct {
 	Type
 }
 
-func (*VariableSizedType) isType()      {}
+func (*VariableSizedType) IsType()      {}
 func (*VariableSizedType) isArrayType() {}
-
-func (t *VariableSizedType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.VariableSizedArray{
-		ElementType: t.Type.(ExportableType).Export(program, nil),
-	}, variable)
-}
 
 func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type)
 }
 
-func (t *VariableSizedType) ID() string {
-	return fmt.Sprintf("[%s]", t.Type.ID())
+func (t *VariableSizedType) ID() TypeID {
+	return TypeID(fmt.Sprintf("[%s]", t.Type.ID()))
 }
 
 func (t *VariableSizedType) Equal(other Type) bool {
@@ -1082,7 +1767,7 @@ func (t *VariableSizedType) Equal(other Type) bool {
 	return t.Type.Equal(otherArray.Type)
 }
 
-func (t *VariableSizedType) HasMembers() bool {
+func (t *VariableSizedType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1102,7 +1787,7 @@ func (t *VariableSizedType) isValueIndexableType() bool {
 	return true
 }
 
-func (t *VariableSizedType) ElementType(isAssignment bool) Type {
+func (t *VariableSizedType) ElementType(_ bool) Type {
 	return t.Type
 }
 
@@ -1116,22 +1801,15 @@ type ConstantSizedType struct {
 	Size int
 }
 
-func (*ConstantSizedType) isType()      {}
+func (*ConstantSizedType) IsType()      {}
 func (*ConstantSizedType) isArrayType() {}
-
-func (t *ConstantSizedType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.ConstantSizedArray{
-		Size:        uint(t.Size),
-		ElementType: t.Type.(ExportableType).Export(program, nil),
-	}, variable)
-}
 
 func (t *ConstantSizedType) String() string {
 	return fmt.Sprintf("[%s; %d]", t.Type, t.Size)
 }
 
-func (t *ConstantSizedType) ID() string {
-	return fmt.Sprintf("[%s;%d]", t.Type.ID(), t.Size)
+func (t *ConstantSizedType) ID() TypeID {
+	return TypeID(fmt.Sprintf("[%s;%d]", t.Type.ID(), t.Size))
 }
 
 func (t *ConstantSizedType) Equal(other Type) bool {
@@ -1144,7 +1822,7 @@ func (t *ConstantSizedType) Equal(other Type) bool {
 		t.Size == otherArray.Size
 }
 
-func (t *ConstantSizedType) HasMembers() bool {
+func (t *ConstantSizedType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1164,7 +1842,7 @@ func (t *ConstantSizedType) isValueIndexableType() bool {
 	return true
 }
 
-func (t *ConstantSizedType) ElementType(isAssignment bool) Type {
+func (t *ConstantSizedType) ElementType(_ bool) Type {
 	return t.Type
 }
 
@@ -1180,80 +1858,83 @@ type InvokableType interface {
 	CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression)
 }
 
+// Parameter
+
+type Parameter struct {
+	Label          string
+	Identifier     string
+	TypeAnnotation *TypeAnnotation
+}
+
+func (p *Parameter) String() string {
+	if p.Label != "" {
+		return fmt.Sprintf(
+			"%s %s: %s",
+			p.Label,
+			p.Identifier,
+			p.TypeAnnotation.String(),
+		)
+	}
+
+	if p.Identifier != "" {
+		return fmt.Sprintf(
+			"%s: %s",
+			p.Identifier,
+			p.TypeAnnotation.String(),
+		)
+	}
+
+	return p.TypeAnnotation.String()
+}
+
+// EffectiveArgumentLabel returns the effective argument label that
+// an argument in a call must use:
+// If no argument label is declared for parameter,
+// the parameter name is used as the argument label
+//
+func (p *Parameter) EffectiveArgumentLabel() string {
+	if p.Label != "" {
+		return p.Label
+	}
+	return p.Identifier
+}
+
 // FunctionType
 
 type FunctionType struct {
-	ParameterTypeAnnotations []*TypeAnnotation
-	ReturnTypeAnnotation     *TypeAnnotation
-	GetReturnType            func(argumentTypes []Type) Type
-	RequiredArgumentCount    *int
+	Parameters            []*Parameter
+	ReturnTypeAnnotation  *TypeAnnotation
+	ReturnTypeGetter      func(argumentTypes []Type) Type
+	RequiredArgumentCount *int
 }
 
-func (*FunctionType) isType() {}
+func (t *FunctionType) ReturnType(argumentTypes []Type) Type {
+	if len(argumentTypes) == len(t.Parameters) &&
+		t.ReturnTypeGetter != nil {
 
-func (t *FunctionType) Export(program *ast.Program, variable *Variable) types.Type {
-
-	// we have function type rather than named functions with params
-	if variable == nil {
-		parameterTypes := make([]types.Type, len(t.ParameterTypeAnnotations))
-
-		for i, annotation := range t.ParameterTypeAnnotations {
-			parameterTypes[i] = annotation.Type.(ExportableType).Export(program, nil)
-		}
-
-		return types.FunctionType{
-			ParameterTypes: parameterTypes,
-			ReturnType:     t.ReturnTypeAnnotation.Type.(ExportableType).Export(program, nil),
-		}
-
-	} else {
-		functionDeclaration := func() *ast.FunctionDeclaration {
-			for _, fn := range program.FunctionDeclarations() {
-				if fn.Identifier.Identifier == variable.Identifier && fn.Identifier.Pos == *variable.Pos {
-					return fn
-				}
-			}
-
-			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
-		}()
-
-		parameterTypeAnnotations := make([]*types.Parameter, len(t.ParameterTypeAnnotations))
-
-		for i, annotation := range t.ParameterTypeAnnotations {
-
-			astParam := functionDeclaration.ParameterList.Parameters[i]
-
-			parameterTypeAnnotations[i] = &types.Parameter{
-				Field: types.Field{
-					Identifier: astParam.Identifier.Identifier,
-					Type:       annotation.Type.(ExportableType).Export(program, nil),
-				},
-				Label: astParam.Label,
-			}
-		}
-
-		return types.Function{
-			Parameters: parameterTypeAnnotations,
-			ReturnType: t.ReturnTypeAnnotation.Type.(ExportableType).Export(program, nil),
-		}
+		return t.ReturnTypeGetter(argumentTypes)
 	}
+
+	return t.ReturnTypeAnnotation.Type
 }
+
+func (*FunctionType) IsType() {}
 
 func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
 }
 
-func (*FunctionType) CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression) {
+func (*FunctionType) CheckArgumentExpressions(_ *Checker, _ []ast.Expression) {
 	// NO-OP: no checks for normal functions
 }
 
 func (t *FunctionType) String() string {
 	var parameters strings.Builder
-	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+	for i, parameter := range t.Parameters {
 		if i > 0 {
 			parameters.WriteString(", ")
 		}
-		parameters.WriteString(parameterTypeAnnotation.String())
+		parameters.WriteString(parameter.String())
 	}
 
 	return fmt.Sprintf(
@@ -1263,40 +1944,56 @@ func (t *FunctionType) String() string {
 	)
 }
 
-func (t *FunctionType) ID() string {
+// NOTE: parameter names and argument labels are *not* part of the ID!
+func (t *FunctionType) ID() TypeID {
 	var parameters strings.Builder
-	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+	for i, parameter := range t.Parameters {
 		if i > 0 {
 			parameters.WriteString(",")
 		}
-		parameters.WriteString(parameterTypeAnnotation.Type.ID())
+		parameters.WriteString(string(parameter.TypeAnnotation.Type.ID()))
 	}
 
-	return fmt.Sprintf(
-		"((%s):%s)",
-		parameters.String(),
-		t.ReturnTypeAnnotation,
-	)
+	return TypeID(fmt.Sprintf("((%s):%s)", parameters.String(), t.ReturnTypeAnnotation))
 }
 
+// NOTE: parameter names and argument labels are intentionally *not* considered!
 func (t *FunctionType) Equal(other Type) bool {
 	otherFunction, ok := other.(*FunctionType)
 	if !ok {
 		return false
 	}
 
-	if len(t.ParameterTypeAnnotations) != len(otherFunction.ParameterTypeAnnotations) {
+	if len(t.Parameters) != len(otherFunction.Parameters) {
 		return false
 	}
 
-	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
-		otherParameterType := otherFunction.ParameterTypeAnnotations[i]
-		if !parameterTypeAnnotation.Equal(otherParameterType) {
+	for i, parameter := range t.Parameters {
+		otherParameter := otherFunction.Parameters[i]
+		if !parameter.TypeAnnotation.Equal(otherParameter.TypeAnnotation) {
 			return false
 		}
 	}
 
 	return t.ReturnTypeAnnotation.Equal(otherFunction.ReturnTypeAnnotation)
+}
+
+// NOTE: argument labels *are* considered! parameter names are intentionally *not* considered!
+func (t *FunctionType) EqualIncludingArgumentLabels(other Type) bool {
+	if !t.Equal(other) {
+		return false
+	}
+
+	otherFunction := other.(*FunctionType)
+
+	for i, parameter := range t.Parameters {
+		otherParameter := otherFunction.Parameters[i]
+		if parameter.EffectiveArgumentLabel() != otherParameter.EffectiveArgumentLabel() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (*FunctionType) IsResourceType() bool {
@@ -1308,8 +2005,8 @@ func (t *FunctionType) IsInvalidType() bool {
 		return true
 	}
 
-	for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
-		if parameterTypeAnnotation.Type.IsInvalidType() {
+	for _, parameter := range t.Parameters {
+		if parameter.TypeAnnotation.Type.IsInvalidType() {
 			return true
 		}
 	}
@@ -1325,7 +2022,7 @@ type SpecialFunctionType struct {
 	Members map[string]*Member
 }
 
-func (t *SpecialFunctionType) HasMembers() bool {
+func (t *SpecialFunctionType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1355,25 +2052,26 @@ func init() {
 		"": &VoidType{},
 	}
 
-	types := []Type{
+	otherTypes := []Type{
 		&VoidType{},
-		&AnyType{},
+		&AnyStructType{},
+		&AnyResourceType{},
 		&NeverType{},
 		&BoolType{},
 		&CharacterType{},
-		&IntType{},
 		&StringType{},
-		&Int8Type{},
-		&Int16Type{},
-		&Int32Type{},
-		&Int64Type{},
-		&UInt8Type{},
-		&UInt16Type{},
-		&UInt32Type{},
-		&UInt64Type{},
 		&AddressType{},
 		&AccountType{},
+		&PublicAccountType{},
 	}
+
+	types := append(
+		append(
+			AllIntegerTypes,
+			AllFixedPointTypes...,
+		),
+		otherTypes...,
+	)
 
 	for _, ty := range types {
 		typeName := ty.String()
@@ -1423,20 +2121,53 @@ func init() {
 	initAddressFunction()
 }
 
-func initIntegerFunctions() {
-	integerTypes := []Type{
-		&IntType{},
-		&Int8Type{},
-		&Int16Type{},
-		&Int32Type{},
-		&Int64Type{},
-		&UInt8Type{},
-		&UInt16Type{},
-		&UInt32Type{},
-		&UInt64Type{},
-	}
+var AllSignedFixedPointTypes = []Type{
+	&Fix64Type{},
+}
 
-	for _, integerType := range integerTypes {
+var AllUnsignedFixedPointTypes = []Type{
+	&UFix64Type{},
+}
+
+var AllFixedPointTypes = append(
+	AllUnsignedFixedPointTypes,
+	AllSignedFixedPointTypes...,
+)
+
+var AllSignedIntegerTypes = []Type{
+	&IntType{},
+	&Int8Type{},
+	&Int16Type{},
+	&Int32Type{},
+	&Int64Type{},
+	&Int128Type{},
+	&Int256Type{},
+}
+
+var AllUnsignedIntegerTypes = []Type{
+	// UInt*
+	&UIntType{},
+	&UInt8Type{},
+	&UInt16Type{},
+	&UInt32Type{},
+	&UInt64Type{},
+	&UInt128Type{},
+	&UInt256Type{},
+	// Word*
+	&Word8Type{},
+	&Word16Type{},
+	&Word32Type{},
+	&Word64Type{},
+}
+
+var AllIntegerTypes = append(
+	AllUnsignedIntegerTypes,
+	AllSignedIntegerTypes...,
+)
+
+func initIntegerFunctions() {
+
+	for _, integerType := range AllIntegerTypes {
 		typeName := integerType.String()
 
 		// check type is not accidentally redeclared
@@ -1448,8 +2179,14 @@ func initIntegerFunctions() {
 			name: typeName,
 			invokableType: &CheckedFunctionType{
 				FunctionType: &FunctionType{
-					ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
-					ReturnTypeAnnotation:     &TypeAnnotation{Type: integerType},
+					Parameters: []*Parameter{
+						{
+							Label:          ArgumentLabelNotRequired,
+							Identifier:     "value",
+							TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+						},
+					},
+					ReturnTypeAnnotation: &TypeAnnotation{Type: integerType},
 				},
 				ArgumentExpressionsCheck: integerFunctionArgumentExpressionsChecker(integerType),
 			},
@@ -1470,11 +2207,17 @@ func initAddressFunction() {
 		name: typeName,
 		invokableType: &CheckedFunctionType{
 			FunctionType: &FunctionType{
-				ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
-				ReturnTypeAnnotation:     &TypeAnnotation{Type: addressType},
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "value",
+						TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+					},
+				},
+				ReturnTypeAnnotation: &TypeAnnotation{Type: addressType},
 			},
 			ArgumentExpressionsCheck: func(checker *Checker, argumentExpressions []ast.Expression) {
-				intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+				intExpression, ok := argumentExpressions[0].(*ast.IntegerExpression)
 				if !ok {
 					return
 				}
@@ -1486,7 +2229,7 @@ func initAddressFunction() {
 
 func integerFunctionArgumentExpressionsChecker(integerType Type) func(*Checker, []ast.Expression) {
 	return func(checker *Checker, argumentExpressions []ast.Expression) {
-		intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+		intExpression, ok := argumentExpressions[0].(*ast.IntegerExpression)
 		if !ok {
 			return
 		}
@@ -1503,32 +2246,35 @@ type CompositeType struct {
 	Conformances []*InterfaceType
 	Members      map[string]*Member
 	// TODO: add support for overloaded initializers
-	ConstructorParameterTypeAnnotations []*TypeAnnotation
-	NestedTypes                         map[string]Type
-	ContainerType                       Type
+	ConstructorParameters []*Parameter
+	NestedTypes           map[string]Type
+	ContainerType         Type
 }
 
-func (*CompositeType) isType() {}
+func (*CompositeType) IsType() {}
 
 func (t *CompositeType) String() string {
 	return t.Identifier
 }
 
-func (t *CompositeType) ID() string {
-	return fmt.Sprintf("%c.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
+func (t *CompositeType) GetContainerType() Type {
+	return t.ContainerType
 }
 
-func (t *CompositeType) idPrefix() rune {
-	switch t.Kind {
-	case common.CompositeKindStructure:
-		return 'S'
-	case common.CompositeKindResource:
-		return 'R'
-	case common.CompositeKindContract:
-		return 'C'
-	default:
-		panic(errors.NewUnreachableError())
-	}
+func (t *CompositeType) GetCompositeKind() common.CompositeKind {
+	return t.Kind
+}
+
+func (t *CompositeType) GetLocation() ast.Location {
+	return t.Location
+}
+
+func (t *CompositeType) QualifiedIdentifier() string {
+	return qualifiedIdentifier(t.Identifier, t.ContainerType)
+}
+
+func (t *CompositeType) ID() TypeID {
+	return TypeID(fmt.Sprintf("%s.%s", t.Location.ID(), t.QualifiedIdentifier()))
 }
 
 func (t *CompositeType) Equal(other Type) bool {
@@ -1541,85 +2287,7 @@ func (t *CompositeType) Equal(other Type) bool {
 		otherStructure.Identifier == t.Identifier
 }
 
-func (t *CompositeType) exportAsPointer() types.Type {
-	switch t.Kind {
-	case common.CompositeKindStructure:
-		return types.StructPointer{
-			TypeName: t.Identifier,
-		}
-	case common.CompositeKindResource:
-		return types.ResourcePointer{
-			TypeName: t.Identifier,
-		}
-	}
-	panic(fmt.Sprintf("cannot convert type %v of unknown kind %v", t, t.Kind))
-}
-
-func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.Type {
-
-	//this type is exported as a field or parameter type, not main definition
-	if variable == nil {
-		return t.exportAsPointer()
-	}
-
-	convert := func() types.Composite {
-
-		compositeDeclaration := func() *ast.CompositeDeclaration {
-			for _, cd := range program.CompositeDeclarations() {
-				if cd.Identifier.Identifier == variable.Identifier &&
-					cd.Identifier.Pos == *variable.Pos {
-					return cd
-				}
-			}
-			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
-		}()
-
-		fieldTypes := map[string]*types.Field{}
-
-		for name, field := range t.Members {
-			fieldTypes[name] = &types.Field{
-				Identifier: name,
-				Type:       field.Type.(ExportableType).Export(program, nil),
-			}
-		}
-
-		parameters := make([]*types.Parameter, len(t.ConstructorParameterTypeAnnotations))
-
-		//TODO For now we have only one initializer, so we just assume this here
-		// as this is post SEMA we really hope AST list of params matches SEMA type one
-		for i, parameter := range compositeDeclaration.Members.Initializers()[0].ParameterList.Parameters {
-			semaType := t.ConstructorParameterTypeAnnotations[i].Type
-
-			parameters[i] = &types.Parameter{
-				Field: types.Field{
-					Identifier: parameter.Identifier.Identifier,
-					Type:       semaType.(ExportableType).Export(program, nil),
-				},
-				Label: parameter.Label,
-			}
-		}
-
-		return types.Composite{
-			Fields:       fieldTypes,
-			Initializers: [][]*types.Parameter{parameters},
-			Identifier:   t.Identifier,
-		}
-	}
-
-	switch t.Kind {
-	case common.CompositeKindStructure:
-		return types.Struct{
-			Composite: convert(),
-		}
-	case common.CompositeKindResource:
-		return types.Resource{
-			Composite: convert(),
-		}
-	}
-	panic(fmt.Sprintf("cannot convert type %v of unknown kind %v", t, t.Kind))
-}
-
-func (t *CompositeType) HasMembers() bool {
+func (t *CompositeType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1636,17 +2304,54 @@ func (t *CompositeType) IsInvalidType() bool {
 	return false
 }
 
+func (t *CompositeType) InterfaceType() *InterfaceType {
+	return &InterfaceType{
+		Location:              t.Location,
+		Identifier:            t.Identifier,
+		CompositeKind:         t.Kind,
+		Members:               t.Members,
+		InitializerParameters: t.ConstructorParameters,
+		ContainerType:         t.ContainerType,
+		NestedTypes:           t.NestedTypes,
+	}
+}
+
+func (t *CompositeType) TypeRequirements() []*CompositeType {
+
+	var typeRequirements []*CompositeType
+
+	if containerComposite, ok := t.ContainerType.(*CompositeType); ok {
+		for _, conformance := range containerComposite.Conformances {
+			ty := conformance.NestedTypes[t.Identifier]
+			typeRequirement, ok := ty.(*CompositeType)
+			if !ok {
+				continue
+			}
+
+			typeRequirements = append(typeRequirements, typeRequirement)
+		}
+	}
+
+	return typeRequirements
+}
+
+func (t *CompositeType) AllConformances() []*InterfaceType {
+	// TODO: also return conformances' conformances recursively
+	//   once interface can have conformances
+	return t.Conformances
+}
+
 // AccountType
 
 type AccountType struct{}
 
-func (*AccountType) isType() {}
+func (*AccountType) IsType() {}
 
 func (*AccountType) String() string {
 	return "Account"
 }
 
-func (*AccountType) ID() string {
+func (*AccountType) ID() TypeID {
 	return "Account"
 }
 
@@ -1663,41 +2368,95 @@ func (*AccountType) IsInvalidType() bool {
 	return false
 }
 
-func (*AccountType) HasMembers() bool {
+func (*AccountType) CanHaveMembers() bool {
 	return true
 }
 
 func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	newField := func(fieldType Type) *Member {
+		return NewPublicConstantFieldMember(t, identifier, fieldType)
+	}
+
+	newFunction := func(functionType *FunctionType) *Member {
+		return NewPublicFunctionMember(t, identifier, functionType)
+	}
+
 	switch identifier {
 	case "address":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &AddressType{},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return newField(&AddressType{})
 
 	case "storage":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &StorageType{},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return newField(&StorageType{})
 
 	case "published":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &ReferencesType{Assignable: true},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return newField(&ReferencesType{Assignable: true})
+
+	case "setCode":
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:      ArgumentLabelNotRequired,
+						Identifier: "code",
+						TypeAnnotation: NewTypeAnnotation(
+							&VariableSizedType{
+								// TODO: UInt8. Requires array literals of integer literals
+								//   to be type compatible with with [UInt8]
+								Type: &IntType{},
+							},
+						),
+					},
+				},
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
+				// additional arguments are passed to the contract initializer
+				RequiredArgumentCount: (func() *int {
+					var count = 2
+					return &count
+				})(),
+			},
+		)
+
+	case "addPublicKey":
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:      ArgumentLabelNotRequired,
+						Identifier: "key",
+						TypeAnnotation: NewTypeAnnotation(
+							&VariableSizedType{
+								// TODO: UInt8. Requires array literals of integer literals
+								//   to be type compatible with with [UInt8]
+								Type: &IntType{},
+							},
+						),
+					},
+				},
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
+			},
+		)
+
+	case "removePublicKey":
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:      ArgumentLabelNotRequired,
+						Identifier: "index",
+						TypeAnnotation: NewTypeAnnotation(
+							&IntType{},
+						),
+					},
+				},
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
+			},
+		)
 
 	default:
 		return nil
@@ -1708,13 +2467,13 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 
 type PublicAccountType struct{}
 
-func (*PublicAccountType) isType() {}
+func (*PublicAccountType) IsType() {}
 
 func (*PublicAccountType) String() string {
 	return "PublicAccount"
 }
 
-func (*PublicAccountType) ID() string {
+func (*PublicAccountType) ID() TypeID {
 	return "PublicAccount"
 }
 
@@ -1731,31 +2490,21 @@ func (*PublicAccountType) IsInvalidType() bool {
 	return false
 }
 
-func (*PublicAccountType) HasMembers() bool {
+func (*PublicAccountType) CanHaveMembers() bool {
 	return true
 }
 
 func (t *PublicAccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	newField := func(fieldType Type) *Member {
+		return NewPublicConstantFieldMember(t, identifier, fieldType)
+	}
+
 	switch identifier {
 	case "address":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &AddressType{},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return newField(&AddressType{})
 
 	case "published":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &ReferencesType{Assignable: false},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return newField(&ReferencesType{Assignable: false})
 
 	default:
 		return nil
@@ -1768,10 +2517,12 @@ type Member struct {
 	ContainerType   Type
 	Access          ast.Access
 	Identifier      ast.Identifier
-	Type            Type
+	TypeAnnotation  *TypeAnnotation
 	DeclarationKind common.DeclarationKind
 	VariableKind    ast.VariableKind
 	ArgumentLabels  []string
+	// Predeclared fields can be considered initialized
+	Predeclared bool
 }
 
 // NewCheckedMember panics if the member declaration is invalid.
@@ -1793,11 +2544,11 @@ func NewCheckedMember(member *Member) *Member {
 		))
 	}
 
-	if invokableType, ok := member.Type.(InvokableType); ok {
+	if invokableType, ok := member.TypeAnnotation.Type.(InvokableType); ok {
 		functionType := invokableType.InvocationFunctionType()
 
 		if member.ArgumentLabels != nil &&
-			len(member.ArgumentLabels) != len(functionType.ParameterTypeAnnotations) {
+			len(member.ArgumentLabels) != len(functionType.Parameters) {
 
 			panic(fmt.Sprintf(
 				"member `%s.%s` has incorrect argument label count",
@@ -1818,10 +2569,42 @@ func NewCheckedMember(member *Member) *Member {
 	return member
 }
 
-type MemberAccessibleType interface {
-	Type
-	HasMembers() bool
-	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
+func NewPublicFunctionMember(containerType Type, identifier string, functionType *FunctionType) *Member {
+
+	var argumentLabels []string
+
+	for _, parameter := range functionType.Parameters {
+
+		argumentLabel := ArgumentLabelNotRequired
+		if parameter.Label != "" {
+			argumentLabel = parameter.Label
+		} else if parameter.Identifier != "" {
+			argumentLabel = parameter.Identifier
+		}
+
+		argumentLabels = append(argumentLabels, argumentLabel)
+	}
+
+	return &Member{
+		ContainerType:   containerType,
+		Access:          ast.AccessPublic,
+		Identifier:      ast.Identifier{Identifier: identifier},
+		DeclarationKind: common.DeclarationKindFunction,
+		VariableKind:    ast.VariableKindConstant,
+		TypeAnnotation:  &TypeAnnotation{Type: functionType},
+		ArgumentLabels:  argumentLabels,
+	}
+}
+
+func NewPublicConstantFieldMember(containerType Type, identifier string, fieldType Type) *Member {
+	return &Member{
+		ContainerType:   containerType,
+		Access:          ast.AccessPublic,
+		Identifier:      ast.Identifier{Identifier: identifier},
+		DeclarationKind: common.DeclarationKindField,
+		VariableKind:    ast.VariableKindConstant,
+		TypeAnnotation:  NewTypeAnnotation(fieldType),
+	}
 }
 
 // InterfaceType
@@ -1832,32 +2615,35 @@ type InterfaceType struct {
 	CompositeKind common.CompositeKind
 	Members       map[string]*Member
 	// TODO: add support for overloaded initializers
-	InitializerParameterTypeAnnotations []*TypeAnnotation
-	ContainerType                       Type
-	NestedTypes                         map[string]Type
+	InitializerParameters []*Parameter
+	ContainerType         Type
+	NestedTypes           map[string]Type
 }
 
-func (*InterfaceType) isType() {}
+func (*InterfaceType) IsType() {}
 
 func (t *InterfaceType) String() string {
 	return t.Identifier
 }
 
-func (t *InterfaceType) ID() string {
-	return fmt.Sprintf("%s.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
+func (t *InterfaceType) GetContainerType() Type {
+	return t.ContainerType
 }
 
-func (t *InterfaceType) idPrefix() string {
-	switch t.CompositeKind {
-	case common.CompositeKindStructure:
-		return "SI"
-	case common.CompositeKindResource:
-		return "RI"
-	case common.CompositeKindContract:
-		return "CI"
-	default:
-		panic(errors.NewUnreachableError())
-	}
+func (t *InterfaceType) GetCompositeKind() common.CompositeKind {
+	return t.CompositeKind
+}
+
+func (t *InterfaceType) GetLocation() ast.Location {
+	return t.Location
+}
+
+func (t *InterfaceType) QualifiedIdentifier() string {
+	return qualifiedIdentifier(t.Identifier, t.ContainerType)
+}
+
+func (t *InterfaceType) ID() TypeID {
+	return TypeID(fmt.Sprintf("%s.%s", t.Location.ID(), t.QualifiedIdentifier()))
 }
 
 func (t *InterfaceType) Equal(other Type) bool {
@@ -1870,7 +2656,7 @@ func (t *InterfaceType) Equal(other Type) bool {
 		otherInterface.Identifier == t.Identifier
 }
 
-func (t *InterfaceType) HasMembers() bool {
+func (t *InterfaceType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1894,7 +2680,7 @@ type DictionaryType struct {
 	ValueType Type
 }
 
-func (*DictionaryType) isType() {}
+func (*DictionaryType) IsType() {}
 
 func (t *DictionaryType) String() string {
 	return fmt.Sprintf(
@@ -1904,19 +2690,12 @@ func (t *DictionaryType) String() string {
 	)
 }
 
-func (t *DictionaryType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Dictionary{
-		KeyType:     t.KeyType.(ExportableType).Export(program, nil),
-		ElementType: t.ValueType.(ExportableType).Export(program, nil),
-	}, variable)
-}
-
-func (t *DictionaryType) ID() string {
-	return fmt.Sprintf(
+func (t *DictionaryType) ID() TypeID {
+	return TypeID(fmt.Sprintf(
 		"{%s:%s}",
 		t.KeyType.ID(),
 		t.ValueType.ID(),
-	)
+	))
 }
 
 func (t *DictionaryType) Equal(other Type) bool {
@@ -1939,21 +2718,22 @@ func (t *DictionaryType) IsInvalidType() bool {
 		t.ValueType.IsInvalidType()
 }
 
-func (t *DictionaryType) HasMembers() bool {
+func (t *DictionaryType) CanHaveMembers() bool {
 	return true
 }
 
 func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
+	newField := func(fieldType Type) *Member {
+		return NewPublicConstantFieldMember(t, identifier, fieldType)
+	}
+
+	newFunction := func(functionType *FunctionType) *Member {
+		return NewPublicFunctionMember(t, identifier, functionType)
+	}
+
 	switch identifier {
 	case "length":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			Type:            &IntType{},
-		})
+		return newField(&IntType{})
 
 	case "keys":
 		// TODO: maybe allow for resource key type
@@ -1968,14 +2748,7 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			)
 		}
 
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			Type:            &VariableSizedType{Type: t.KeyType},
-		})
+		return newField(&VariableSizedType{Type: t.KeyType})
 
 	case "values":
 		// TODO: maybe allow for resource value type
@@ -1990,55 +2763,46 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			)
 		}
 
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			Type:            &VariableSizedType{Type: t.ValueType},
-		})
+		return newField(&VariableSizedType{Type: t.ValueType})
 
 	case "insert":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					t.KeyType,
-					t.ValueType,
-				),
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "key",
+						TypeAnnotation: NewTypeAnnotation(t.KeyType),
+					},
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "value",
+						TypeAnnotation: NewTypeAnnotation(t.ValueType),
+					},
+				},
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					&OptionalType{
 						Type: t.ValueType,
 					},
 				),
 			},
-			ArgumentLabels: []string{"key", ArgumentLabelNotRequired},
-		})
+		)
 
 	case "remove":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					t.KeyType,
-				),
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "key",
+						TypeAnnotation: NewTypeAnnotation(t.KeyType),
+					},
+				},
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					&OptionalType{
 						Type: t.ValueType,
 					},
 				),
 			},
-			ArgumentLabels: []string{"key"},
-		})
+		)
 
 	default:
 		return nil
@@ -2049,7 +2813,7 @@ func (t *DictionaryType) isValueIndexableType() bool {
 	return true
 }
 
-func (t *DictionaryType) ElementType(isAssignment bool) Type {
+func (t *DictionaryType) ElementType(_ bool) Type {
 	return &OptionalType{Type: t.ValueType}
 }
 
@@ -2066,13 +2830,13 @@ type DictionaryEntryType struct {
 
 type StorageType struct{}
 
-func (t *StorageType) isType() {}
+func (t *StorageType) IsType() {}
 
 func (t *StorageType) String() string {
 	return "Storage"
 }
 
-func (t *StorageType) ID() string {
+func (t *StorageType) ID() TypeID {
 	return "Storage"
 }
 
@@ -2094,6 +2858,12 @@ func (t *StorageType) IsInvalidType() bool {
 func (t *StorageType) isTypeIndexableType() {}
 
 func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string) {
+	const expected = "non-optional resource or reference"
+
+	if _, ok := indexingType.(*OptionalType); ok {
+		return false, expected
+	}
+
 	if _, ok := indexingType.(*ReferenceType); ok {
 		return true, ""
 	}
@@ -2102,14 +2872,14 @@ func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expe
 		return true, ""
 	}
 
-	return false, "resource or reference"
+	return false, expected
 }
 
 func (t *StorageType) IsAssignable() bool {
 	return true
 }
 
-func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
+func (t *StorageType) ElementType(indexingType Type, _ bool) Type {
 	// NOTE: like dictionary
 	return &OptionalType{Type: indexingType}
 }
@@ -2121,13 +2891,13 @@ type ReferencesType struct {
 	Assignable bool
 }
 
-func (t *ReferencesType) isType() {}
+func (t *ReferencesType) IsType() {}
 
 func (t *ReferencesType) String() string {
 	return "References"
 }
 
-func (t *ReferencesType) ID() string {
+func (t *ReferencesType) ID() TypeID {
 	return "References"
 }
 
@@ -2149,7 +2919,7 @@ func (t *ReferencesType) IsInvalidType() bool {
 
 func (t *ReferencesType) isTypeIndexableType() {}
 
-func (t *ReferencesType) ElementType(indexingType Type, isAssignment bool) Type {
+func (t *ReferencesType) ElementType(indexingType Type, _ bool) Type {
 	// NOTE: like dictionary
 	return &OptionalType{Type: indexingType}
 }
@@ -2166,143 +2936,44 @@ func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, e
 	return true, ""
 }
 
-// EventType
-
-type EventType struct {
-	Location                            ast.Location
-	Identifier                          string
-	Fields                              []EventFieldType
-	ConstructorParameterTypeAnnotations []*TypeAnnotation
-}
-
-const EventTypeIDPrefix = 'E'
-
-func (*EventType) isType() {}
-
-func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type {
-
-	eventDeclaration := func() *ast.EventDeclaration {
-		for _, fn := range program.EventDeclarations() {
-			if fn.Identifier.Identifier == variable.Identifier && fn.Identifier.Pos == *variable.Pos {
-				return fn
-			}
-		}
-
-		panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
-	}()
-
-	fieldTypes := make([]*types.Parameter, len(t.Fields))
-
-	for i, field := range t.Fields {
-		fieldTypes[i] = &types.Parameter{
-			Field: types.Field{
-				Identifier: field.Identifier,
-				Type:       field.Type.(ExportableType).Export(program, nil),
-			},
-			Label: eventDeclaration.ParameterList.Parameters[i].Label,
-		}
-	}
-	return types.Event{
-		Fields:     fieldTypes,
-		Identifier: t.Identifier,
-	}
-}
-
-func (t *EventType) String() string {
-	var fields strings.Builder
-	for i, field := range t.Fields {
-		if i > 0 {
-			fields.WriteString(", ")
-		}
-		fields.WriteString(field.String())
-	}
-
-	return fmt.Sprintf("%s(%s)", t.Identifier, fields.String())
-}
-
-func (t *EventType) ID() string {
-	return fmt.Sprintf(
-		"%c.%s.%s",
-		EventTypeIDPrefix,
-		t.Location,
-		t.Identifier,
-	)
-}
-
-func (t *EventType) Equal(other Type) bool {
-	otherEvent, ok := other.(*EventType)
-	if !ok {
-		return false
-	}
-
-	if t.Identifier != otherEvent.Identifier {
-		return false
-	}
-
-	if len(t.Fields) != len(otherEvent.Fields) {
-		return false
-	}
-
-	for i, field := range t.Fields {
-		otherField := otherEvent.Fields[i]
-		if !field.Equal(otherField) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (t *EventType) ConstructorFunctionType() *SpecialFunctionType {
-	return &SpecialFunctionType{
-		FunctionType: &FunctionType{
-			ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
-			ReturnTypeAnnotation:     NewTypeAnnotation(t),
-		},
-	}
-}
-
-func (*EventType) IsResourceType() bool {
-	return false
-}
-
-func (*EventType) IsInvalidType() bool {
-	return false
-}
-
-type EventFieldType struct {
-	Identifier string
+// ReferenceType represents the reference to a value
+type ReferenceType struct {
+	Authorized bool
+	Storable   bool
 	Type       Type
 }
 
-func (t EventFieldType) String() string {
-	return fmt.Sprintf("%s: %s", t.Identifier, t.Type)
-}
-
-func (t EventFieldType) Equal(other EventFieldType) bool {
-	return t.Identifier == other.Identifier &&
-		t.Type.Equal(other.Type)
-}
-
-// ReferenceType represents the reference to a value
-type ReferenceType struct {
-	Type Type
-}
-
-func (*ReferenceType) isType() {}
+func (*ReferenceType) IsType() {}
 
 func (t *ReferenceType) String() string {
 	if t.Type == nil {
 		return "reference"
 	}
-	return fmt.Sprintf("&%s", t.Type)
+	var builder strings.Builder
+	if t.Authorized {
+		builder.WriteString("auth ")
+	}
+	if t.Storable {
+		builder.WriteString("storable ")
+	}
+	builder.WriteRune('&')
+	builder.WriteString(t.Type.String())
+	return builder.String()
 }
 
-func (t *ReferenceType) ID() string {
-	if t.Type == nil {
-		return "reference"
+func (t *ReferenceType) ID() TypeID {
+	var builder strings.Builder
+	if t.Authorized {
+		builder.WriteString("auth ")
 	}
-	return fmt.Sprintf("&%s", t.Type.ID())
+	if t.Storable {
+		builder.WriteString("storable ")
+	}
+	builder.WriteRune('&')
+	if t.Type != nil {
+		builder.WriteString(string(t.Type.ID()))
+	}
+	return TypeID(builder.String())
 }
 
 func (t *ReferenceType) Equal(other Type) bool {
@@ -2310,7 +2981,10 @@ func (t *ReferenceType) Equal(other Type) bool {
 	if !ok {
 		return false
 	}
-	return t.Type.Equal(otherReference.Type)
+
+	return t.Authorized == otherReference.Authorized &&
+		t.Storable == otherReference.Storable &&
+		t.Type.Equal(otherReference.Type)
 }
 
 func (t *ReferenceType) IsResourceType() bool {
@@ -2321,12 +2995,12 @@ func (t *ReferenceType) IsInvalidType() bool {
 	return t.Type.IsInvalidType()
 }
 
-func (t *ReferenceType) HasMembers() bool {
+func (t *ReferenceType) CanHaveMembers() bool {
 	referencedType, ok := t.Type.(MemberAccessibleType)
 	if !ok {
 		return false
 	}
-	return referencedType.HasMembers()
+	return referencedType.CanHaveMembers()
 }
 
 func (t *ReferenceType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
@@ -2365,13 +3039,13 @@ func (t *ReferenceType) IndexingType() Type {
 // AddressType represents the address type
 type AddressType struct{}
 
-func (*AddressType) isType() {}
+func (*AddressType) IsType() {}
 
 func (*AddressType) String() string {
 	return "Address"
 }
 
-func (*AddressType) ID() string {
+func (*AddressType) ID() TypeID {
 	return "Address"
 }
 
@@ -2388,21 +3062,21 @@ func (*AddressType) IsInvalidType() bool {
 	return false
 }
 
-var AddressTypeMin = big.NewInt(0)
-var AddressTypeMax *big.Int
+var AddressTypeMinInt = big.NewInt(0)
+var AddressTypeMaxInt *big.Int
 
 func init() {
-	AddressTypeMax = big.NewInt(2)
-	AddressTypeMax.Exp(AddressTypeMax, big.NewInt(160), nil)
-	AddressTypeMax.Sub(AddressTypeMax, big.NewInt(1))
+	AddressTypeMaxInt = big.NewInt(2)
+	AddressTypeMaxInt.Exp(AddressTypeMaxInt, big.NewInt(160), nil)
+	AddressTypeMaxInt.Sub(AddressTypeMaxInt, big.NewInt(1))
 }
 
-func (*AddressType) Min() *big.Int {
-	return AddressTypeMin
+func (*AddressType) MinInt() *big.Int {
+	return AddressTypeMinInt
 }
 
-func (*AddressType) Max() *big.Int {
-	return AddressTypeMax
+func (*AddressType) MaxInt() *big.Int {
+	return AddressTypeMaxInt
 }
 
 // IsSubType determines if the given subtype is a subtype
@@ -2415,8 +3089,15 @@ func IsSubType(subType Type, superType Type) bool {
 		return true
 	}
 
-	if _, ok := superType.(*AnyType); ok {
+	switch superType.(type) {
+	case *AnyType:
 		return true
+
+	case *AnyStructType:
+		return !subType.IsResourceType()
+
+	case *AnyResourceType:
+		return subType.IsResourceType()
 	}
 
 	if _, ok := subType.(*NeverType); ok {
@@ -2424,11 +3105,63 @@ func IsSubType(subType Type, superType Type) bool {
 	}
 
 	switch typedSuperType := superType.(type) {
+
+	case *NumberType:
+		if _, ok := subType.(*NumberType); ok {
+			return true
+		}
+
+		return IsSubType(subType, &IntegerType{}) ||
+			IsSubType(subType, &FixedPointType{})
+
+	case *SignedNumberType:
+		if _, ok := subType.(*SignedNumberType); ok {
+			return true
+		}
+
+		return IsSubType(subType, &SignedIntegerType{}) ||
+			IsSubType(subType, &SignedFixedPointType{})
+
 	case *IntegerType:
 		switch subType.(type) {
-		case *IntType,
-			*Int8Type, *Int16Type, *Int32Type, *Int64Type,
-			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type:
+		case *IntegerType, *SignedIntegerType,
+			*IntType, *UIntType,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type, *Int256Type,
+			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type, *UInt128Type, *UInt256Type,
+			*Word8Type, *Word16Type, *Word32Type, *Word64Type:
+
+			return true
+
+		default:
+			return false
+		}
+
+	case *SignedIntegerType:
+		switch subType.(type) {
+		case *SignedIntegerType,
+			*IntType,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type, *Int256Type:
+
+			return true
+
+		default:
+			return false
+		}
+
+	case *FixedPointType:
+		switch subType.(type) {
+		case *FixedPointType, *SignedFixedPointType,
+			*Fix64Type, *UFix64Type:
+
+			return true
+
+		default:
+			return false
+		}
+
+	case *SignedFixedPointType:
+		switch subType.(type) {
+		case *SignedNumberType, *Fix64Type:
 
 			return true
 
@@ -2442,21 +3175,8 @@ func IsSubType(subType Type, superType Type) bool {
 			// T <: U? if T <: U
 			return IsSubType(subType, typedSuperType.Type)
 		}
-		// optionals are covariant: T? <: U? if T <: U
+		// Optionals are covariant: T? <: U? if T <: U
 		return IsSubType(optionalSubType.Type, typedSuperType.Type)
-
-	case *InterfaceType:
-		compositeSubType, ok := subType.(*CompositeType)
-		if !ok {
-			return false
-		}
-		// TODO: optimize, use set
-		for _, conformance := range compositeSubType.Conformances {
-			if typedSuperType.Equal(conformance) {
-				return true
-			}
-		}
-		return false
 
 	case *DictionaryType:
 		typedSubType, ok := subType.(*DictionaryType)
@@ -2494,16 +3214,262 @@ func IsSubType(subType Type, superType Type) bool {
 		)
 
 	case *ReferenceType:
+		// References types are only subtypes of reference types
+
 		typedSubType, ok := subType.(*ReferenceType)
 		if !ok {
 			return false
 		}
 
-		// references are covariant: &T <: &U if T <: U
-		return IsSubType(typedSubType.Type, typedSuperType.Type)
-	}
+		// A storable reference type `T` is a subtype of a reference type `U`,
+		// if the non-storable variant of `T` is a subtype of `U`
 
-	// TODO: functions
+		if typedSubType.Storable {
+			return IsSubType(
+				&ReferenceType{
+					Type:       typedSubType.Type,
+					Authorized: typedSubType.Authorized,
+					Storable:   false,
+				},
+				typedSuperType,
+			)
+		}
+
+		// A non-storable reference type is not a (static) subtype of a storable reference.
+		// However, a dynamic cast is valid, if the reference is authorized.
+		//
+		// The holder of the reference may not gain more permissions without having authorization.
+
+		if typedSuperType.Storable {
+			return false
+		}
+
+		// An authorized reference type `auth &T` (storable or non-storable)
+		// is a subtype of a reference type `&U` (authorized or non-authorized, storable or non-storable),
+		// if `T` is a subtype of `U`
+
+		if typedSubType.Authorized {
+			return IsSubType(typedSubType.Type, typedSuperType.Type)
+		}
+
+		// An unauthorized reference type is not a subtype of an authorized reference type.
+		// Not even dynamically.
+		//
+		// The holder of the reference may not gain more permissions.
+
+		if typedSuperType.Authorized {
+			return false
+		}
+
+		switch typedInnerSuperType := typedSuperType.Type.(type) {
+		case *RestrictedResourceType:
+
+			switch typedInnerSubType := typedSubType.Type.(type) {
+			case *RestrictedResourceType:
+				// An unauthorized reference to a restricted resource type `&T{Us}` is a subtype of
+				// a reference to a reference to a restricted resource type `&V{Ws}`,
+				// if `T == V` and `Ws` is a subset of `Us`.
+				//
+				// The holder of the reference may only further restrict the resource.
+
+				return typedInnerSubType.Type == typedInnerSuperType.Type &&
+					typedInnerSuperType.RestrictionSet().
+						IsSubsetOf(typedInnerSubType.RestrictionSet())
+
+			case *CompositeType:
+				// An unauthorized reference to a resource type `&T` is a subtype of
+				// a reference to a restricted resource type `&T{Us}`, if `T == U`.
+				//
+				// The holder of the reference may restrict the resource.
+
+				return typedInnerSubType.Kind == common.CompositeKindResource &&
+					typedInnerSubType == typedInnerSuperType.Type
+
+			case *InterfaceType:
+				// An unauthorized reference to a resource interface type
+				// is not a subtype of a reference to a restricted resource type.
+				// Not even dynamically.
+				//
+				// The holder of the reference may not gain more permissions or knowledge.
+
+				return false
+			}
+
+		case *InterfaceType:
+
+			if typedInnerSuperType.CompositeKind != common.CompositeKindResource {
+				return false
+			}
+
+			switch typedInnerSubType := typedSubType.Type.(type) {
+			case *CompositeType:
+				// An unauthorized reference to a resource type `&T`
+				// is a subtype of a reference to a resource interface type `&V`,
+				// if `T` conforms to `V`
+
+				if typedInnerSubType.Kind != common.CompositeKindResource {
+					return false
+				}
+
+				// TODO: optimize, use set
+				for _, conformance := range typedInnerSubType.Conformances {
+					if typedInnerSuperType.Equal(conformance) {
+						return true
+					}
+				}
+
+				return false
+
+			case *RestrictedResourceType:
+				// An unauthorized reference to a restricted resource type `&T{Us}` is a subtype of
+				// a reference to a resource interface type `&V`, if `Us` contains `V`.
+				//
+				// The holder of the reference may not gain more permissions or knowledge.
+
+				// TODO: optimize, use set
+				for _, restriction := range typedInnerSubType.Restrictions {
+					if typedInnerSuperType.Equal(restriction) {
+						return true
+					}
+				}
+
+				return false
+
+			case *InterfaceType:
+				// TODO: Once interfaces can conform to interfaces, check conformances here. Only allow upcasting.
+				return false
+			}
+
+		case *CompositeType:
+			// An unauthorized reference is not a subtype of a reference to a resource type `&V`
+			// (e.g. reference to a restricted resource type `&T{Us}`, or reference to a resource interface type `&T`)
+			//
+			// The holder of the reference may not gain more permissions or knowledge.
+
+			return false
+		}
+
+	case *FunctionType:
+		typedSubType, ok := subType.(*FunctionType)
+		if !ok {
+			return false
+		}
+
+		if len(typedSubType.Parameters) != len(typedSuperType.Parameters) {
+			return false
+		}
+
+		// Functions are contravariant in their parameter types
+
+		for i, subParameter := range typedSubType.Parameters {
+			superParameter := typedSuperType.Parameters[i]
+			if !IsSubType(
+				superParameter.TypeAnnotation.Type,
+				subParameter.TypeAnnotation.Type,
+			) {
+				return false
+			}
+		}
+
+		// Functions are covariant in their return type
+
+		if typedSubType.ReturnTypeAnnotation != nil &&
+			typedSuperType.ReturnTypeAnnotation != nil {
+
+			return IsSubType(
+				typedSubType.ReturnTypeAnnotation.Type,
+				typedSuperType.ReturnTypeAnnotation.Type,
+			)
+		}
+
+		if typedSubType.ReturnTypeAnnotation == nil &&
+			typedSuperType.ReturnTypeAnnotation == nil {
+
+			return true
+		}
+
+	case *RestrictedResourceType:
+
+		switch typedSubType := subType.(type) {
+		case *RestrictedResourceType:
+			// A restricted resource type `T{Us}` is a subtype of a restricted resource type `V{Ws}`, if `T == V`.
+			// NOTE: `Us` and `Ws` do NOT have to be subsets.
+			//
+			// The owner of the resource may freely restrict and unrestrict the resource.
+
+			return typedSubType.Type == typedSuperType.Type
+
+		case *CompositeType:
+			// A resource type `T` is a subtype of a restricted resource type `U{Vs}`, if `T == U`
+
+			return typedSubType.Kind == common.CompositeKindResource &&
+				typedSubType == typedSuperType.Type
+
+		case *InterfaceType:
+			// A resource interface type `T` is not a (static) subtype of a restricted resource type `U{Vs}.
+			// However, a dynamic cast is valid.
+
+			return false
+		}
+
+	case *CompositeType:
+
+		switch typedSubType := subType.(type) {
+		case *RestrictedResourceType:
+			// A restricted resource type `T{Us}` is a subtype of a resource type `V`, if `T == V`
+
+			return typedSuperType.Kind == common.CompositeKindResource &&
+				typedSubType.Type == typedSuperType
+
+		case *InterfaceType:
+			// A resource interface type `T` is not a (static) subtype of a resource type `U`.
+			// However, a dynamic cast is valid.
+
+			return false
+
+		case *CompositeType:
+			// A composite type is never a subtype of another composite type
+
+			return false
+		}
+
+	case *InterfaceType:
+
+		switch typedSubType := subType.(type) {
+		case *CompositeType:
+			// A composite type `T` is a subtype of a interface type `V`, if `T` conforms to `V`
+
+			// TODO: optimize, use set
+			for _, conformance := range typedSubType.Conformances {
+				if typedSuperType.Equal(conformance) {
+					return true
+				}
+			}
+
+			return false
+
+		case *RestrictedResourceType:
+			// A restricted resource type `T{Us}` is a subtype of a resource interface type `V`,
+			// if `T` conforms to `V`. `Us` does not have to contain `V`.
+
+			if typedSuperType.CompositeKind != common.CompositeKindResource {
+				return false
+			}
+
+			// TODO: optimize, use set
+			for _, conformance := range typedSubType.Type.Conformances {
+				if typedSuperType.Equal(conformance) {
+					return true
+				}
+			}
+
+			return false
+
+		case *InterfaceType:
+			// TODO: Once interfaces can conform to interfaces, check conformances here
+			return false
+		}
+	}
 
 	return false
 }
@@ -2520,7 +3486,7 @@ func IsEquatableType(ty Type) bool {
 
 	if IsSubType(ty, &StringType{}) ||
 		IsSubType(ty, &BoolType{}) ||
-		IsSubType(ty, &IntegerType{}) ||
+		IsSubType(ty, &NumberType{}) ||
 		IsSubType(ty, &ReferenceType{}) ||
 		IsSubType(ty, &AddressType{}) {
 
@@ -2586,8 +3552,8 @@ func IsNilType(ty Type) bool {
 }
 
 type TransactionType struct {
-	Members                         map[string]*Member
-	prepareParameterTypeAnnotations []*TypeAnnotation
+	Members           map[string]*Member
+	prepareParameters []*Parameter
 }
 
 func (t *TransactionType) EntryPointFunctionType() *FunctionType {
@@ -2597,8 +3563,8 @@ func (t *TransactionType) EntryPointFunctionType() *FunctionType {
 func (t *TransactionType) PrepareFunctionType() *SpecialFunctionType {
 	return &SpecialFunctionType{
 		FunctionType: &FunctionType{
-			ParameterTypeAnnotations: t.prepareParameterTypeAnnotations,
-			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
+			Parameters:           t.prepareParameters,
+			ReturnTypeAnnotation: NewTypeAnnotation(&VoidType{}),
 		},
 	}
 }
@@ -2606,25 +3572,25 @@ func (t *TransactionType) PrepareFunctionType() *SpecialFunctionType {
 func (*TransactionType) ExecuteFunctionType() *SpecialFunctionType {
 	return &SpecialFunctionType{
 		FunctionType: &FunctionType{
-			ParameterTypeAnnotations: []*TypeAnnotation{},
-			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
+			Parameters:           []*Parameter{},
+			ReturnTypeAnnotation: NewTypeAnnotation(&VoidType{}),
 		},
 	}
 }
 
-func (*TransactionType) isType() {}
+func (*TransactionType) IsType() {}
 
 func (*TransactionType) String() string {
 	return "Transaction"
 }
 
-func (*TransactionType) ID() string {
+func (*TransactionType) ID() TypeID {
 	return "Transaction"
 }
 
 func (*TransactionType) Equal(other Type) bool {
-	// transaction types are not equatable
-	return false
+	_, ok := other.(*TransactionType)
+	return ok
 }
 
 func (*TransactionType) IsResourceType() bool {
@@ -2635,10 +3601,147 @@ func (*TransactionType) IsInvalidType() bool {
 	return false
 }
 
-func (t *TransactionType) HasMembers() bool {
+func (t *TransactionType) CanHaveMembers() bool {
 	return true
 }
 
 func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	return t.Members[identifier]
+}
+
+// RestrictionSet
+
+type RestrictionSet map[*InterfaceType]struct{}
+
+func (s RestrictionSet) IsSubsetOf(other RestrictionSet) bool {
+	for restriction := range s {
+		if _, ok := other[restriction]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+// RestrictedResourceType
+//
+// No restrictions implies the type is fully restricted,
+// i.e. no members of the underlying resource type are available.
+//
+type RestrictedResourceType struct {
+	Type         *CompositeType
+	Restrictions []*InterfaceType
+	// an internal set of `Restrictions`
+	restrictionSet RestrictionSet
+}
+
+func (t *RestrictedResourceType) RestrictionSet() RestrictionSet {
+	if t.restrictionSet == nil {
+		t.restrictionSet = make(RestrictionSet, len(t.Restrictions))
+		for _, restriction := range t.Restrictions {
+			t.restrictionSet[restriction] = struct{}{}
+		}
+	}
+	return t.restrictionSet
+}
+
+func (*RestrictedResourceType) IsType() {}
+
+func (t *RestrictedResourceType) String() string {
+	var result strings.Builder
+	if t.Type != nil {
+		result.WriteString(t.Type.String())
+	}
+	result.WriteRune('{')
+	for i, restriction := range t.Restrictions {
+		if i > 0 {
+			result.WriteString(", ")
+		}
+		result.WriteString(restriction.String())
+	}
+	result.WriteRune('}')
+	return result.String()
+}
+
+func (t *RestrictedResourceType) ID() TypeID {
+	var result strings.Builder
+	if t.Type != nil {
+		result.WriteString(string(t.Type.ID()))
+	}
+	result.WriteRune('{')
+	for i, restriction := range t.Restrictions {
+		if i > 0 {
+			result.WriteString(",")
+		}
+		result.WriteString(string(restriction.ID()))
+	}
+	result.WriteRune('}')
+	return TypeID(result.String())
+}
+
+func (t *RestrictedResourceType) Equal(other Type) bool {
+	otherRestrictedResourceType, ok := other.(*RestrictedResourceType)
+	if !ok {
+		return false
+	}
+
+	if !otherRestrictedResourceType.Type.Equal(t.Type) {
+		return false
+	}
+
+	// Check that the set of restrictions are equal; order does not matter
+
+	restrictionSet := t.RestrictionSet()
+	otherRestrictionSet := otherRestrictedResourceType.RestrictionSet()
+
+	count := len(restrictionSet)
+	if count != len(otherRestrictionSet) {
+		return false
+	}
+
+	return restrictionSet.IsSubsetOf(otherRestrictionSet)
+}
+
+func (*RestrictedResourceType) IsResourceType() bool {
+	return true
+}
+
+func (*RestrictedResourceType) IsInvalidType() bool {
+	return false
+}
+
+func (t *RestrictedResourceType) CanHaveMembers() bool {
+	return true
+}
+
+func (t *RestrictedResourceType) GetMember(identifier string, targetRange ast.Range, reportError func(error)) *Member {
+
+	// Return the first member of any restriction.
+	// The invariant that restrictions may not have overlapping members is not checked here,
+	// but implicitly when the resource declaration's conformances are checked.
+
+	for _, restriction := range t.Restrictions {
+		member := restriction.GetMember(identifier, targetRange, reportError)
+		if member != nil {
+			return member
+		}
+	}
+
+	// If none of the restrictions had a member, see if the restricted type
+	// has a member with the identifier. Still return it for convenience
+	// to help check the rest of the program and improve the developer experience,
+	// *but* also report an error that this access is invalid
+
+	member := t.Type.GetMember(identifier, targetRange, reportError)
+
+	if member != nil {
+		reportError(
+			&InvalidRestrictedTypeMemberAccessError{
+				Name:  identifier,
+				Range: targetRange,
+			},
+		)
+	}
+
+	return member
 }

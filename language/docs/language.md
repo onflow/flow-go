@@ -8,13 +8,21 @@ The Cadence Programming Language is a new high-level programming language intend
 
 The language's goals are, in order of importance:
 
-- **Safety and security**: Provide a strong static type system, design by contract (preconditions and postconditions), and resources (inspired by linear types).
-- **Auditability**: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
-- **Simplicity**: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
+- **Safety and security**:
+  Provide a strong static type system, design by contract (preconditions and postconditions),
+  and resources (inspired by linear types).
+
+- **Auditability**:
+  Focus on readability: Make it easy to verify what the code is doing,
+  and make intentions explicit, at a small cost of verbosity.
+
+- **Simplicity**: Focus on developer productivity and usability:
+  Make it easy to write code, provide good tooling.
 
 ## Terminology
 
-In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:
+In this document, the following terminology is used to describe syntax
+or behavior that is not allowed in the language:
 
 - `Invalid` means that the invalid program will not even be allowed to run.
   The program error is detected and reported statically by the type checker.
@@ -33,6 +41,10 @@ and provides safe handling of integers and strings.
 Resources are based on liner types which were popularized by Rust.
 
 Events are inspired by Solidity.
+
+**Disclaimer:** In real Cadence code, all type definitions and code
+must be defined and contained in [contracts](#contracts) or [transactions](#transactions),
+but we omit these containers in examples for simplicity.
 
 ## Comments
 
@@ -71,20 +83,20 @@ Mutli-line comments are balanced.
 
 ## Constants and Variable Declarations
 
-Constants and variables are declarations that bind 
+Constants and variables are declarations that bind
 a value and [type](#type-safety) to an identifier.
 Constants are initialized with a value and cannot be reassigned afterwards.
 Variables are initialized with a value and can be reassigned later.
 Declarations can be created in any scope, including the global scope.
 
-Constant means that the *identifier's* association is constant, 
+Constant means that the *identifier's* association is constant,
 not the *value* itself –
-the value may still be changed if is mutable. 
+the value may still be changed if is mutable.
 
-Constants are declared using the `let` keyword. Variables are declared 
+Constants are declared using the `let` keyword. Variables are declared
 using the `var` keyword.
-The keywords are followed by the identifier, 
-an optional [type annotation](#type-annotations), an equals sign `=`, 
+The keywords are followed by the identifier,
+an optional [type annotation](#type-annotations), an equals sign `=`,
 and the initial value.
 
 ```cadence,file=constants-and-variables.cdc
@@ -113,9 +125,9 @@ Variables and constants **must** be initialized.
 let a
 ```
 
-The names of the variable or constant 
-declarations in each scope must be unique. 
-Declaring another variable or constant with a name that is already 
+The names of the variable or constant
+declarations in each scope must be unique.
+Declaring another variable or constant with a name that is already
 declared in the current scope is invalid, regardless of kind or type.
 
 ```cadence
@@ -171,11 +183,11 @@ let a = a
 
 ## Type Annotations
 
-When declaring a constant or variable, 
+When declaring a constant or variable,
 an optional *type annotation* can be provided,
 to make it explicit what type the declaration has.
 
-If no type annotation is provided, the type of the declaration is 
+If no type annotation is provided, the type of the declaration is
 [inferred from the initial value](#type-inference).
 
 ```cadence,file=type-annotations.cdc
@@ -222,9 +234,9 @@ booleanVariable = 1
 
 ## Naming
 
-Names may start with any upper or lowercase letter (A-Z, a-z) 
+Names may start with any upper or lowercase letter (A-Z, a-z)
 or an underscore (`_`).
-This may be followed by zero or more upper and lower case letters, 
+This may be followed by zero or more upper and lower case letters,
 underscores, and numbers (0-9).
 Names may not begin with a number.
 
@@ -357,23 +369,39 @@ let binaryNumber = 0b10_11_01
 ### Integers
 
 Integers are numbers without a fractional part.
-They are either *signed* (positive, zero, or negative) 
+They are either *signed* (positive, zero, or negative)
 or *unsigned* (positive or zero)
 and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
 
-The names for the integer types follow this naming convention:
-Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix,
-i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
-The types are independent types, i.e. not subtypes of each other.
+Signed integer types which check for overflow and underflow have an `Int` prefix.
+They are `Int8`, `Int16`, `Int32`, and `Int64`.
+They can represent values in the following ranges:
 
 - **`Int8`**: -128 through 127
 - **`Int16`**: -32768 through 32767
 - **`Int32`**: -2147483648 through 2147483647
 - **`Int64`**: -9223372036854775808 through 9223372036854775807
+
+Unsigned integer types which check for overflow and underflow have a `UInt` prefix.
+They are `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
+
 - **`UInt8`**: 0 through 255
 - **`UInt16`**: 0 through 65535
 - **`UInt32`**: 0 through 4294967295
 - **`UInt64`**: 0 through 18446744073709551615
+
+Unsigned integer types which do **not** check for overflow and underflow,
+i.e. wrap around, have the `Word` prefix:
+
+- **`Word8`**: 0 through 255
+- **`Word16`**: 0 through 65535
+- **`Word32`**: 0 through 4294967295
+- **`Word64`**: 0 through 18446744073709551615
+
+The types are independent types, i.e. not subtypes of each other.
+
+See the section about [artihmetic operators](#arithmetic) for further
+information aout the behavior of the different integer types.
 
 ```cadence
 // Declare a constant that has type `UInt8` and the value 10.
@@ -465,60 +493,100 @@ let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 // `aNumber` has type `Int`
 ```
 
-### Any
+### AnyStruct and AnyResource
 
-`Any` is the top type, i.e., all types are a subtype of it.
+`AnyStruct` is the top type of all non-resource types,
+i.e., all non-resource types are a subtype of it.
+
+`@AnyResource` is the top type of all resource types.
 
 ```cadence
-// Declare a variable that has the type `Any`.
-// Any value can be assigned to it, for example an integer.
+// Declare a variable that has the type `AnyStruct`.
+// Any non-resource typed value can be assigned to it, for example an integer,
+// but not resoure-typed values.
 //
-var someValue: Any = 1
+var someStruct: AnyStruct = 1
 
-// Assign a value with a different type, `Bool`.
-someValue = true
+// Assign a value with a different non-resource type, `Bool`.
+someStruct = true
+
+// Declare a structure named `TestStruct`, create an instance of it,
+// and assign it to the `AnyStruct`-typed variable
+//
+struct TestStruct {}
+
+let testStruct = TestStruct()
+
+someStruct = testStruct
+
+// Declare a resource named `TestResource`
+
+resource Test {}
+
+// Declare a variable that has the type `@AnyResource`.
+// Any resource-typed value can be assigned to it,
+// but not non-resource typed values.
+//
+var someResource: @AnyResource <- create Test()
+
+// Invalid: Resource-typed values can not be assigned
+// to `AnyStruct`-typed variables
+//
+someStruct <- create Test()
+
+// Invalid: Non-resource typed values can not be assigned
+// to `AnyResource`-typed variables
+//
+someResource = 1
 ```
 
-However, using `Any` does not opt-out of type checking.
-It is invalid to access fields and call functions on `Any` typed values,
-as it has no fields and functions.
+However, using `AnyStruct` and `AnyResource` does not opt-out of type checking.
+It is invalid to access fields and call functions on these types,
+as they have no fields and functions.
 
 ```cadence
-// Declare a variable that has the type `Any`. The initial value is an integer,
-// but the variable  still has the explicit type `Any`.
+// Declare a variable that has the type `AnyStruct`.
+// The initial value is an integer,
+// but the variable still has the explicit type `AnyStruct`.
 //
-let a: Any = 1
+let a: AnyStruct = 1
 
-// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)
+// Invalid: Operator cannot be used for an `AnyStruct` value (`a`, left-hand side)
 // and an `Int` value (`2`, right-hand side).
 //
 a + 2
 ```
 
-`Any` may be used like any other type, for example, 
-it may be the element type of [arrays](#arrays)
+`AnyStruct` and `AnyResource` may be used like other types,
+for example, they may be the element type of [arrays](#arrays)
 or be the element type of an [optional type](#optionals).
 
 ```cadence
-// Declare a variable that has the type `[Any]`, i.e. an array of elements of any type.
+// Declare a variable that has the type `[AnyStruct]`,
+// i.e. an array of elements of any non-resource type.
 //
-let anyValues: [Any] = [1, "2", true]
+let anyValues: [AnyStruct] = [1, "2", true]
 
-// Declare a variable that has the type `Any?`, i.e. an optional type of any type.
+// Declare a variable that has the type `AnyStruct?`,
+// i.e. an optional type of any non-resource type.
 //
-var maybeSomething: Any? = 42
+var maybeSomething: AnyStruct? = 42
 
 maybeSomething = "twenty-four"
 
 maybeSomething = nil
 ```
 
-`Any` is also the super-type of optional types.
+`AnyStruct` is also the super-type of all non-resource optional types,
+and `AnyResource` is the super-type of all resource optional types.
 
 ```cadence
 let maybeInt: Int? = 1
-let anything: Any = y
+let anything: AnyStruct = maybeInt
 ```
+
+[Conditional downcasting](#conditional-downcasting-operator) allows coercing
+a value which has the type `AnyStruct` or `AnyResource` back to its orignal type.
 
 ### Optionals
 
@@ -568,7 +636,7 @@ let y: Int? = x
 // may be `nil`, or any other value.
 // An optional with the value of `x` is created.
 //
-var z: Any? = x
+var z: AnyStruct? = x
 ```
 
 A non-optional type is a subtype of its optional type.
@@ -594,9 +662,9 @@ let doubleOptional: Int?? = nil
 
 #### Nil-Coalescing Operator
 
-The nil-coalescing operator `??` returns 
+The nil-coalescing operator `??` returns
 the value inside an optional if it contains a value,
-or returns an alternative value if the optional has no value, 
+or returns an alternative value if the optional has no value,
 i.e., the optional value is `nil`.
 
 If the left-hand side is non-nil, the right-hand side is not evaluated.
@@ -613,7 +681,7 @@ let b: Int = a ?? 42
 // `b` is 42, as `a` is nil
 ```
 
-The nil-coalescing operator can only be applied 
+The nil-coalescing operator can only be applied
 to values which have an optional type.
 
 ```cadence
@@ -655,12 +723,12 @@ let d = a ?? false
 #### Conditional Downcasting Operator
 
 > 🚧 Status: The conditional downcasting operator `as?` is implemented,
-> but it only supports values that have the type `Any`.
+> but it only supports values that have the type `AnyStruct` and `AnyResource`.
 
-The conditional downcasting operator `as?` 
+The conditional downcasting operator `as?`
 can be used to type cast a value to a type.
 The operator returns an optional.
-If the value has a type that is a subtype 
+If the value has a type that is a subtype
 of the given type that should be casted to,
 the operator returns the value as the given type,
 otherwise the result is `nil`.
@@ -669,10 +737,10 @@ The cast and check is performed at run-time, i.e. when the program is executed,
 not statically, i.e. when the program is checked.
 
 ```cadence,file=conditional-downcasting-any.cdc
-// Declare a constant named `something` which has type `Any`,
+// Declare a constant named `something` which has type `AnyStruct`,
 // with an initial value which has type `Int`.
 //
-let something: Any = 1
+let something: AnyStruct = 1
 
 // Conditionally downcast the value of `something` to `Int`.
 // The cast succeeds, because the value has type `Int`.
@@ -693,10 +761,10 @@ interfaces (if a [resource](#resources) interface not to a concrete resource),
 and optionals.
 
 ```cadence,file=conditional-downcasting-any-array.cdc
-// Declare a constant named `values` which has type `[Any]`,
+// Declare a constant named `values` which has type `[AnyStruct]`,
 // i.e. an array of arbitrarily typed values.
 //
-let values: [Any] = [1, true]
+let values: [AnyStruct] = [1, true]
 
 let first = values[0] as? Int
 // `first` is `1` and has type `Int?`
@@ -734,8 +802,6 @@ fun returnNever(): Never {
 
 ### Strings and Characters
 
-> 🚧 Status: Characters are not implemented yet.
-
 Strings are collections of characters.
 Strings have the type `String`, and characters have the type `Character`.
 Strings can be used to work with text in a Unicode-compliant way.
@@ -757,7 +823,7 @@ String literals may contain escape sequences. An escape sequence starts with a b
 - `\"`: Double quotation mark
 - `\'`: Single quotation mark
 - `\u`: A Unicode scalar value, written as `\u{x}`,
-  where `x` is a 1–8 digit hexadecimal number 
+  where `x` is a 1–8 digit hexadecimal number
   which needs to be a valid Unicode scalar value,
   i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
 
@@ -772,11 +838,11 @@ let thumbsUpText =
 
 The type `Character` represents a single, human-readable character. Characters are extended grapheme clusters, which consist of one or more Unicode scalars.
 
-For example, the single character `ü` can be represented 
+For example, the single character `ü` can be represented
 in several ways in Unicode.
 First, it can be represented by a single Unicode scalar value `ü`
 ("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC).
-Second, the same single character can be represented 
+Second, the same single character can be represented
 by two Unicode scalar values:
 `u` ("LATIN SMALL LETTER U", code point U+0075),
 and "COMBINING DIAERESIS" (code point U+0308).
@@ -836,12 +902,12 @@ Strings have multiple built-in functions you can use.
     ```
 
 - `slice(from: Int, upTo: Int): String`:
-  Returns a string slice of the characters 
+  Returns a string slice of the characters
   in the given string from start index `from` up to,
   but not including, the end index `upTo`.
   This function creates a new string whose length is `upto - from`.
   It does not modify the original string.
-  If either of the parameters are out of 
+  If either of the parameters are out of
   the bounds of the string, the function will fail.
 
     ```cadence,file=string-slice.cdc
@@ -928,7 +994,7 @@ var variableLengthArray: [Int] = []
 ```
 
 Array types are covariant in their element types.
-For example, `[Int]` is a subtype of `[Any]`.
+For example, `[Int]` is a subtype of `[AnyStruct]`.
 This is safe because arrays are value types and not reference types.
 
 #### Array Indexing
@@ -1005,13 +1071,13 @@ are available for both variable-sized and fixed-sized or variable-sized arrays.
     ```
 
 - `concat(_ array: T): T`:
-  Concatenates the parameter `array` to the end 
+  Concatenates the parameter `array` to the end
   of the array the function is called on,
   but does not modify that array.
 
   Both arrays must be the same type `T`.
 
-  This function creates a new array whose length is 
+  This function creates a new array whose length is
   the sum of the length of the array
   the function is called on and the length of the array given as the parameter.
 
@@ -1074,7 +1140,7 @@ It is invalid to use one of these functions on a fixed-sized array.
     ```
 
 - `insert(at index: Int, _ element: T): Void`:
-  Inserts the new element `element` of type `T` 
+  Inserts the new element `element` of type `T`
   at the given `index` of the array.
 
   The new element must be of the same type as the other elements in the array.
@@ -1084,7 +1150,7 @@ It is invalid to use one of these functions on a fixed-sized array.
 
   The existing element at the supplied index is not overwritten.
 
-  All the elements after the new inserted element 
+  All the elements after the new inserted element
   are shifted to the right by one.
 
     ```cadence,file=array-insert.cdc
@@ -1178,14 +1244,14 @@ TODO
 ### Dictionaries
 
 Dictionaries are mutable, unordered collections of key-value associations.
-In a dictionary, all keys must have the same type, 
+In a dictionary, all keys must have the same type,
 and all values must have the same type.
-Dictionaries may contain a key only once and 
+Dictionaries may contain a key only once and
 may contain a value multiple times.
 
-Dictionary literals start with an opening brace `{` 
+Dictionary literals start with an opening brace `{`
 and end with a closing brace `}`.
-Keys are separated from values by a colon, 
+Keys are separated from values by a colon,
 and key-value associations are separated by commas.
 
 ```cadence,file=dictionaries.cdc
@@ -1213,7 +1279,7 @@ and key-value associations are separated by commas.
 Dictionaries have the form `{K: V}`,
 where `K` is the type of the key,
 and `V` is the type of the value.
-For example, a dictionary with `Int` keys and `Bool` 
+For example, a dictionary with `Int` keys and `Bool`
 values has type `{Int: Bool}`.
 
 ```cadence,file=dictionary-types.cdc
@@ -1235,15 +1301,15 @@ let integers = {
 ```
 
 Dictionary types are covariant in their key and value types.
-For example, `[Int: String]` is a subtype of `[Any: String]` 
-and also a subtype of `[Int: Any]`.
+For example, `[Int: String]` is a subtype of `[AnyStruct: String]`
+and also a subtype of `[Int: AnyStruct]`.
 This is safe because dictionaries are value types and not reference types.
 
 #### Dictionary Access
 
-To get the value for a specific key from a dictionary, 
-the access syntax can be used: 
-The dictionary is followed by an opening square bracket `[`, the key, 
+To get the value for a specific key from a dictionary,
+the access syntax can be used:
+The dictionary is followed by an opening square bracket `[`, the key,
 and ends with a closing square bracket `]`.
 
 Accessing a key returns an [optional](#optionals):
@@ -1285,7 +1351,7 @@ integers[true] // is `1`
 integers[false] // is `0`
 ```
 
-To set the value for a key of a dictionary, 
+To set the value for a key of a dictionary,
 the access syntax can be used as well.
 
 ```cadence,file=dictionary-assignment.cdc
@@ -1322,7 +1388,7 @@ booleans[0] = true
 - `remove(key: K): V?`:
   Removes the value for the given `key` of type `K` from the dictionary.
 
-  Returns the value of type `V` as an optional 
+  Returns the value of type `V` as an optional
   if the dictionary contained the key,
   otherwise `nil`.
 
@@ -1382,16 +1448,16 @@ booleans[0] = true
 
 #### Dictionary Keys
 
-Dictionary keys must be hashable and equatable, 
-i.e., must implement the [`Hashable`](#hashable-interface) 
+Dictionary keys must be hashable and equatable,
+i.e., must implement the [`Hashable`](#hashable-interface)
 and [`Equatable`](#equatable-interface) [interfaces](#interfaces).
 
-Most of the built-in types, like booleans and integers, 
+Most of the built-in types, like booleans and integers,
 are hashable and equatable, so can be used as keys in dictionaries.
 
 ## Operators
 
-Operators are special symbols that perform a computation 
+Operators are special symbols that perform a computation
 for one or more values.
 They are either unary, binary, or ternary.
 
@@ -1402,7 +1468,7 @@ They are either unary, binary, or ternary.
     The binary operator symbol appears between the two values (infix).
 
 - Ternary operators operate on three values.
-  The first operator symbol appears between the first and second value, 
+  The first operator symbol appears between the first and second value,
   the second operator symbol appears between the second and third value (infix).
 
 ### Negation
@@ -1423,7 +1489,7 @@ let a = true
 
 ### Assignment
 
-The binary assignment operator `=` can be used 
+The binary assignment operator `=` can be used
 to assign a new value to a variable.
 It is only allowed in a statement and is not allowed in expressions.
 
@@ -1453,7 +1519,7 @@ a = 2
 ```
 
 The left-hand side of the assignment operand must be an identifier.
-For arrays and dictionaries, this identifier can be followed 
+For arrays and dictionaries, this identifier can be followed
 by one or more index or access expressions.
 
 ```cadence,file=assignment-numbers.cdc
@@ -1494,7 +1560,7 @@ dictionaries[false][3] = 0
 
 ### Swapping
 
-The binary swap operator `<->` can be used 
+The binary swap operator `<->` can be used
 to exchange the values of two variables.
 It is only allowed in a statement and is not allowed in expressions.
 
@@ -1515,7 +1581,7 @@ b <-> c
 a <-> b
 ```
 
-Both sides of the swap operation must be variable, 
+Both sides of the swap operation must be variable,
 assignment to constants is invalid.
 
 ```cadence,file=swap-with-constant.cdc
@@ -1547,69 +1613,75 @@ let a = 1 + 2
 The arguments for the operators need to be of the same type.
 The result is always the same type as the arguments.
 
-Arithmetic operators do not cause values to overflow.
+The division and remainder operators abort the program when the divisor is zero.
 
-```cadence,file=operator-times.cdc
-let a: Int8 = 100
-let b: Int8 = 100
-let c = a * b
-// `c` is `10000`, and has type `Int`
+Arithmetic operations on the signed integer types `Int8`, `Int16`, `Int32`, `Int64`,
+and on the unsigned integer types `UInt8`, `UInt16`, `UInt32`, `UInt64`
+do not cause values to overflow or underflow.
+
+```cadence,file=operator-add-overflow.cdc
+let a: UInt8 = 255
+
+// Error: The result `256` does not fit in the range of `UInt8`,
+// thus a fatal overflow error is raised and the program aborts
+//
+let b = a + 1
 ```
 
-If overflow behavior is intended, overflowing operators are available, 
-which are prefixed with an `&`:
+```cadence,file=operator-times-overflow.cdc
+let a: Int8 = 100
+let b: Int8 = 100
 
-- Overflow addition: `&+`
-- Overflow subtraction: `&-`
-- Overflow multiplication: `&*`
+// Error: The result `10000` does not fit in the range of `Int8`,
+// thus a fatal overflow error is raised and the program aborts
+//
+let c = a * b
+```
 
-For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). 
+```cadence,file=operator-unary-negate-overflow.cdc
+let a: Int8 = -128
+
+// Error: The result `128` does not fit in the range of `Int8`,
+// thus a fatal overflow error is raised and the program aborts
+//
+let b = -a
+```
+
+Arithmetic operations on the unsigned integer types `Word8`, `Word6`, `Word32`, `Word64`
+may cause values to overflow or underflow.
+
+For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111).
 Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
 
 ```cadence
-//     11111111 = 255
-// &+         1
-//  = 100000000 = 0
+//    11111111 = 255
+// +         1
+// = 100000000 = 0
 ```
 
 ```cadence,file=operator-overflow-plus.cdc
-let a: UInt8 = 255
-a &+ 1 // is `0`
+let a: Word8 = 255
+a + 1 // is `0`
 ```
 
 Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.
 
 ```cadence,file=operator-minus.cdc
-//     00000000
-// &-         1
-//  =  11111111 = 255
+//    00000000
+// -         1
+// =  11111111 = 255
 ```
 
 ```cadence
-let b: UInt8 = 0
-b &- 1  // is `255`
+let b: Word8 = 0
+b - 1  // is `255`
 ```
-
-Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.
-
-```cadence
-//    10000000 = -128
-// &-        1
-//  = 01111111 = 127
-```
-
-```cadence
-let c: Int8 = -128
-c &- 1  // is `127`
-```
-
-Division by zero is a fatal error at run-time and aborts the program.
 
 ### Logical Operators
 
 Logical operators work with the boolean values `true` and `false`.
 
-  - Logical AND: `a && b`
+- Logical AND: `a && b`
 
     ```cadence,file=operator-and.cdc
     true && true  // is `true`
@@ -1623,7 +1695,7 @@ Logical operators work with the boolean values `true` and `false`.
 
     If the left-hand side is false, the right-hand side is not evaluated.
 
-  - Logical OR: `a || b`
+- Logical OR: `a || b`
 
     ```cadence,file=operator-or.cdc
     true || true  // is `true`
@@ -1641,7 +1713,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 Comparison operators work with boolean and integer values.
 
-  - Equality: `==`, for booleans and integers
+- Equality: `==`, for booleans and integers
 
     Both sides of the equality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
@@ -1682,7 +1754,7 @@ Comparison operators work with boolean and integer values.
     x == y  // is `true`
     ```
 
-  - Inequality: `!=`, for booleans and integers (possibly optional)
+- Inequality: `!=`, for booleans and integers (possibly optional)
 
     Both sides of the inequality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
@@ -1723,7 +1795,7 @@ Comparison operators work with boolean and integer values.
     x != y  // is `false`
     ```
 
-  - Less than: `<`, for integers
+- Less than: `<`, for integers
 
     ```cadence,file=operator-less.cdc
     1 < 1  // is `false`
@@ -1733,7 +1805,7 @@ Comparison operators work with boolean and integer values.
     2 < 1  // is `false`
     ```
 
-  - Less or equal than: `<=`, for integers
+- Less or equal than: `<=`, for integers
 
     ```cadence,file=operator-less-equals.cdc
     1 <= 1  // is `true`
@@ -1743,7 +1815,7 @@ Comparison operators work with boolean and integer values.
     2 <= 1  // is `false`
     ```
 
-  - Greater than: `>`, for integers
+- Greater than: `>`, for integers
 
     ```cadence,file=operator-greater.cdc
     1 > 1  // is `false`
@@ -1753,7 +1825,7 @@ Comparison operators work with boolean and integer values.
     2 > 1  // is `true`
     ```
 
-  - Greater or equal than: `>=`, for integers
+- Greater or equal than: `>=`, for integers
 
     ```cadence,file=operator-greater-equals.cdc
     1 >= 1  // is `true`
@@ -1797,47 +1869,60 @@ Operators have the following precedences, highest to lowest:
 
 All operators are left-associative, except for the ternary operator, which is right-associative.
 
-Expressions can be wrapped in parentheses to override precedence conventions, i.e. an alternate order should be indicated, or when the default order should be emphasized, e.g. to avoid confusion. For example, `(2 + 3) * 4` forces addition to precede multiplication, and `5 + (6 * 7)` reinforces the default order.
+Expressions can be wrapped in parentheses to override precedence conventions,
+i.e. an alternate order should be indicated, or when the default order should be emphasized
+e.g. to avoid confusion.
+For example, `(2 + 3) * 4` forces addition to precede multiplication,
+and `5 + (6 * 7)` reinforces the default order.
 
 ## Functions
 
-Functions are sequences of statements that perform a specific task. Functions have parameters (inputs) and an optional return value (output). Functions are typed: the function type consists of the parameter types and the return type.
+Functions are sequences of statements that perform a specific task.
+Functions have parameters (inputs) and an optional return value (output).
+Functions are typed: the function type consists of the parameter types and the return type.
 
-Functions are values, i.e., they can be assigned to constants and variables, and can be passed as arguments to other functions. This behavior is often called "first-class functions".
+Functions are values, i.e., they can be assigned to constants and variables,
+and can be passed as arguments to other functions.
+This behavior is often called "first-class functions".
 
 ### Function Declarations
 
-Functions can be declared by using the `fun` keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.
+Functions can be declared by using the `fun` keyword, followed by the name of the declaration,
+ the parameters, the optional return type,
+ and the code that should be executed when the function is called.
 
 The parameters need to be enclosed in parentheses.
 The return type, if any, is separated from the parameters by a colon (`:`).
 The function code needs to be enclosed in opening and closing braces.
 
-Each parameter must have a name, which is the name that the argument value will be available as within the function.
+Each parameter must have a name, which is the name that the argument value
+will be available as within the function.
 
-An additional argument label can be provided to require function calls to use the label to provide an argument value for the parameter.
+An additional argument label can be provided to require function calls to use the label
+to provide an argument value for the parameter.
 
 Argument labels make code more explicit and readable.
-For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
+For example, they avoid confusion about the order of arguments
+when there are multiple arguments that have the same type.
 
 Argument labels should be named so they make sense from the perspective of the function call.
 
 Argument labels precede the parameter name.
-The special argument label `_` indicates 
+The special argument label `_` indicates
 that a function call can omit the argument label.
 If no argument label is declared in the function declaration,
 the parameter name is the argument label of the function declaration,
 and function calls must use the parameter name as the argument label.
 
-Each parameter needs to have a type annotation, 
+Each parameter needs to have a type annotation,
 which follows the parameter name after a colon.
 
-Function calls may provide arguments for parameters 
+Function calls may provide arguments for parameters
 which are subtypes of the parameter types.
 
-There is **no** support for optional parameters, 
+There is **no** support for optional parameters,
 i.e. default values for parameters,
-and variadic functions, 
+and variadic functions,
 i.e. functions that take an arbitrary amount of arguments.
 
 ```cadence,file=function-double.cdc
@@ -1956,7 +2041,7 @@ let receiver: Account = // ...
 send(from: sender, to: receiver, amount: 100)
 ```
 
-The order of the arguments in a function call must 
+The order of the arguments in a function call must
 match the order of the parameters in the function declaration.
 
 ```cadence,file=function-test.cdc
@@ -1972,7 +2057,7 @@ fun test(first: Int, second: Int) {
 test(second: 1, first: 2)
 ```
 
-Functions can be nested, 
+Functions can be nested,
 i.e., the code of a function may declare further functions.
 
 ```cadence,file=function-doubleAndAddOne.cdc
@@ -1996,7 +2081,7 @@ doubleAndAddOne(2)  // is `5`
 
 > 🚧 Status: Function overloading is not implemented.
 
-It is possible to declare functions with the same name, 
+It is possible to declare functions with the same name,
 as long as they have different sets of argument labels.
 This is known as function overloading.
 
@@ -2019,7 +2104,7 @@ fun assert(_ test: Bool) {
 ### Function Expressions
 
 Functions can be also used as expressions.
-The syntax is the same as for function declarations, 
+The syntax is the same as for function declarations,
 except that function expressions have no name, i.e., they are anonymous.
 
 ```cadence,file=function-expression.cdc
@@ -2037,7 +2122,7 @@ let double =
 
 ### Function Calls
 
-Functions can be called (invoked). Function calls 
+Functions can be called (invoked). Function calls
 need to provide exactly as many argument values as the function has parameters.
 
 ```cadence,file=function-call.cdc
@@ -2060,10 +2145,10 @@ double()
 
 ### Function Types
 
-Function types consist of the function's parameter types 
+Function types consist of the function's parameter types
 and the function's return type.
 
-The parameter types need to be enclosed in parentheses, 
+The parameter types need to be enclosed in parentheses,
 followed by a colon (`:`), and end with the return type.
 The whole function type needs to be enclosed in parentheses.
 
@@ -2095,17 +2180,17 @@ let doNothing: ((): Void) =
 ```
 
 Parentheses also control precedence.
-For example, a function type `((Int): ((): Int))` is the type 
+For example, a function type `((Int): ((): Int))` is the type
 for a function which accepts one argument with type `Int`,
-and which returns another function, 
+and which returns another function,
 that takes no arguments and returns an `Int`.
 
-The type `[((Int): Int); 2]` specifies an array type of two functions, 
+The type `[((Int): Int); 2]` specifies an array type of two functions,
 which accept one integer and return one integer.
 
 Argument labels are not part of the function type.
-This has the advantage that functions with different argument labels, 
-potentially written by different authors are compatible 
+This has the advantage that functions with different argument labels,
+potentially written by different authors are compatible
 as long as the parameter types and the return type match.
 It has the disadvantage that function calls to plain function values,
 cannot accept argument labels.
@@ -2151,11 +2236,11 @@ someFoo(4)
 
 ### Closures
 
-A function may refer to variables and constants of its outer scopes 
+A function may refer to variables and constants of its outer scopes
 in which it is defined.
-It is called a closure, because 
+It is called a closure, because
 it is closing over those variables and constants.
-A closure can can read from the variables and constants 
+A closure can can read from the variables and constants
 and assign to the variables it refers to.
 
 ```cadence,file=closures-counter.cdc
@@ -2181,7 +2266,7 @@ test()  // is `2`
 ### Argument Passing Behavior
 
 When arguments are passed to a function, they are copied.
-Therefore, values that are passed into a function 
+Therefore, values that are passed into a function
 are unchanged in the caller's scope when the function returns.
 This behavior is known as [call-by-value](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&oldid=896280571#Call_by_value).
 
@@ -2294,8 +2379,8 @@ Control flow statements control the flow of execution in a function.
 
 If-statements allow a certain piece of code to be executed only when a given condition is true.
 
-The if-statement starts with the `if` keyword, followed by the condition, 
-and the code that should be executed if the condition is true 
+The if-statement starts with the `if` keyword, followed by the condition,
+and the code that should be executed if the condition is true
 inside opening and closing braces.
 The condition expression must be Bool
 The braces are required and not optional.
@@ -2397,7 +2482,7 @@ if let number = noNumber {
 While-statements allow a certain piece of code to be executed repeatedly, as long as a condition remains true.
 
 The while-statement starts with the `while` keyword, followed by the condition,
-and the code that should be repeatedly 
+and the code that should be repeatedly
 executed if the condition is true inside opening and closing braces.
 The condition must be boolean and the braces are required.
 
@@ -2568,7 +2653,7 @@ nand(0, 0)
 Types are **not** automatically converted.
 For example, an integer is not automatically converted to a boolean,
 nor is an `Int32` automatically converted to an `Int8`,
-nor is an optional integer `Int?` 
+nor is an optional integer `Int?`
 automatically converted to a non-optional integer `Int`,
 or vice-versa.
 
@@ -2682,7 +2767,12 @@ let maybeSomething: Int? = nil
 
 ## Composite Data Types
 
-Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.
+Composite data types allow composing simpler types into more complex types,
+i.e., they allow the composition of multiple values into one.
+Composite data types have a name and consist of zero or more named fields,
+and zero or more functions that operate on the data.
+Each field may have a different type.  Composite data types can
+only be declared within a [contract](#contracts) and nowhere else.
 
 There are two kinds of composite data types.
 The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable,
@@ -2690,11 +2780,11 @@ when the value is assigned to a variable,
 when the value is passed as an argument to a function,
 and when the value is returned from a function:
 
-  - [**Structures**](#structures) are **copied**, i.e. they are value types.
+- [**Structures**](#structures) are **copied**, they are value types.
 
     Structures are useful when copies with independent state are desired.
 
-  - [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
+- [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
 
     Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
 
@@ -2740,10 +2830,11 @@ Resource must be created (instantiated) by using the `create` keyword and callin
 create SomeResource()
 ```
 
-The constructor function may require parameters
-if the [initializer](#composite-data-type-fields) of the composite data type requires them.
+The constructor function may require parameters if the [initializer](#composite-data-type-fields)
+of the composite data type requires them.
 
-Composite data types can only be declared globally and not locally in functions.
+Composite data types can only be declared within [contract](#contracts)
+and not locally in functions.
 They can also not be nested.
 
 ### Composite Data Type Fields
@@ -2771,18 +2862,19 @@ The initializer always follows any fields.
 
 There are three kinds of fields:
 
-  - **Constant fields** are also stored in the composite value,
-    but after they have been initialized with a value 
+- **Constant fields** are also stored in the composite value,
+    but after they have been initialized with a value
     they **cannot** have new values assigned to them afterwards.
     A constant field must be initialized exactly once.
 
     Constant fields are declared using the `let` keyword.
 
-  - **Variable fields** are stored in the composite value and can have new values assigned to them.
+- **Variable fields** are stored in the composite value
+    and can have new values assigned to them.
 
     Variable fields are declared using the `var` keyword.
 
-  - **Synthetic fields** are **not stored** in the composite value,
+- **Synthetic fields** are **not stored** in the composite value,
     i.e. they are derived/computed from other values.
     They can have new values assigned to them.
 
@@ -2798,9 +2890,12 @@ There are three kinds of fields:
 | **Constant field**   | Yes              | **No**             | `let`       |
 | **Synthetic field**  | **No**           | Yes                | `synthetic` |
 
-In initializers, the special constant `self` refers to the composite value that is to be initialized.
+In initializers, the special constant `self` refers to the composite value
+that is to be initialized.
 
-Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (`.`) and the name of the field.
+Fields can be read (if they are constant or variable) and set (if they are variable),
+using the access syntax: the composite value is followed by a dot (`.`)
+and the name of the field.
 
 ```cadence,file=composite-data-type-fields-and-init.cdc
 // Declare a structure named `Token`, which has a constant field
@@ -2905,14 +3000,14 @@ struct Token {
 
 ### Composite Data Type Field Getters and Setters
 
-Fields may have an optional getter and an optional setter. 
-Getters are functions that are called when a field is read, 
-and setters are functions that are called when a field is written.  
+Fields may have an optional getter and an optional setter.
+Getters are functions that are called when a field is read,
+and setters are functions that are called when a field is written.
 Only certain assignments are allowed in getters and setters.
 
 Getters and setters are enclosed in opening and closing braces, after the field's type.
 
-Getters are declared using the `get` keyword. 
+Getters are declared using the `get` keyword.
 Getters have no parameters and their return type is implicitly the type of the field.
 
 ```cadence,file=composite-data-type-field-getter.cdc
@@ -2945,9 +3040,9 @@ example.balance = -50
 // though `example.balance` is `0` because the getter for `balance` returns `0` instead.
 ```
 
-Setters are declared using the `set` keyword, 
+Setters are declared using the `set` keyword,
 followed by the name for the new value enclosed in parentheses.
-The parameter has implicitly the type of the field. 
+The parameter has implicitly the type of the field.
 Another type cannot be specified. Setters have no return type.
 
 The types of values assigned to setters must always match the field's type.
@@ -2981,7 +3076,7 @@ example.balance = -50
 
 ### Synthetic Composite Data Type Fields
 
-Fields which are not stored in the composite value are *synthetic*, 
+Fields which are not stored in the composite value are *synthetic*,
 i.e., the field value is computed.
 Synthetic can be either read-only, or readable and writable.
 
@@ -3181,7 +3276,7 @@ something = A()
 
 #### Structures
 
-Structures are **copied** when 
+Structures are **copied** when
 used as an initial value for constant or variable,
 when assigned to a different variable,
 when passed as an argument to a function,
@@ -3222,22 +3317,22 @@ b.increment()
 #### Accessing Fields and Functions of Composite Data Types Using Optional Chaining
 
 If a composite data type with fields and functions is wrapped in an optional,
-optional chaining can be used to get those values or call the function without 
-having to get the value of the optional first.  
+optional chaining can be used to get those values or call the function without
+having to get the value of the optional first.
 
-Optional chaining is used by adding a `?` 
+Optional chaining is used by adding a `?`
 before the `.` access operator for fields or
 functions of an optional composite type.
 
-When getting a field value or 
-calling a function with a return value, the access returns 
-the value as an optional. 
+When getting a field value or
+calling a function with a return value, the access returns
+the value as an optional.
 If the object doesn't exist, the value will always be `nil`
 
 When calling a function on an optional like this, if the object doesn't exist,
 nothing will happen and the execution will continue.
 
-It is still invalid 
+It is still invalid
 to access a field of an optional composite type that is not declared.
 
 ```cadence,file=optional-chaining.cdc
@@ -3306,12 +3401,12 @@ Resources are **destroyed** using the `destroy` keyword.
 
 Accessing a field or calling a function of a resource does not move or destroy it.
 
-When the resource was moved, the constant or variable 
+When the resource was moved, the constant or variable
 that referred to the resource before the move becomes **invalid**.
 An **invalid** resource cannot be used again.
 
-To make the behaviour of resource types explicit, 
-the move prefix `<-` must be used in type annotations 
+To make the behaviour of resource types explicit,
+the prefix `@` must be used in type annotations
 of variable or constant declarations, parameters, and return types.
 
 To make moves of resources explicit, the move operator `<-` must be used
@@ -3333,7 +3428,7 @@ resource SomeResource {
 
 // Declare a constant with value of resource type `SomeResource`.
 //
-let a: <-SomeResource <- create SomeResource(value: 0)
+let a: @SomeResource <- create SomeResource(value: 0)
 
 // *Move* the resource value to a new constant.
 //
@@ -3350,9 +3445,9 @@ b.value = 1
 
 // Declare a function which accepts a resource.
 //
-// The parameter has a resource type, so the type name must be prefixed with `<-`.
+// The parameter has a resource type, so the type name must be prefixed with `@`.
 //
-fun use(resource: <-SomeResource) {
+fun use(resource: @SomeResource) {
     // ...
 }
 
@@ -3389,31 +3484,31 @@ destroy d
 d.value
 ```
 
-To make it explicit that the type is moved, 
-it must be prefixed with `<-` in all type annotations,
+To make it explicit that the type is moved,
+it must be prefixed with `@` in all type annotations,
 e.g. for variable declarations, parameters, or return types.
 
 ```cadence,file=resource-type-annotation.cdc
 // Declare a constant with an explicit type annotation.
 //
-// The constant has a resource type, so the type name must be prefixed with `<-`.
+// The constant has a resource type, so the type name must be prefixed with `@`.
 //
-let someResource: <-SomeResource <- create SomeResource(value: 5)
+let someResource: @SomeResource <- create SomeResource(value: 5)
 
 // Declare a function which consumes a resource and destroys it.
 //
-// The parameter has a resource type, so the type name must be prefixed with `<-`.
+// The parameter has a resource type, so the type name must be prefixed with `@`.
 //
-fun use(resource: <-SomeResource) {
+fun use(resource: @SomeResource) {
     destroy resource
 }
 
 // Declare a function which returns a resource.
 //
-// The return type is a resource type, so the type name must be prefixed with `<-`.
+// The return type is a resource type, so the type name must be prefixed with `@`.
 // The return statement must also use the `<-` operator to make it explicit the resource is moved.
 //
-fun get(): <-SomeResource {
+fun get(): @SomeResource {
     let newResource <- create SomeResource()
     return <-newResource
 }
@@ -3425,7 +3520,7 @@ Resources **must** be used exactly once.
 // Declare a function which consumes a resource but does not use it.
 // This function is invalid, because it would cause a loss of the resource.
 //
-fun forgetToUse(resource: <-SomeResource) {
+fun forgetToUse(resource: @SomeResource) {
     // Invalid: The resource parameter `resource` is not used, but must be.
 }
 ```
@@ -3452,7 +3547,7 @@ res.value
 // Declare a function which has a resource parameter but does not use it.
 // This function is invalid, because it would cause a loss of the resource.
 //
-fun forgetToUse(resource: <-SomeResource) {
+fun forgetToUse(resource: @SomeResource) {
     // Invalid: The resource parameter `resource` is not used, but must be.
 }
 ```
@@ -3462,7 +3557,7 @@ fun forgetToUse(resource: <-SomeResource) {
 // This function is invalid, because it does not always use the resource parameter,
 // which would cause a loss of the resource.
 //
-fun sometimesDestroy(resource: <-SomeResource, destroy: Bool) {
+fun sometimesDestroy(resource: @SomeResource, destroy: Bool) {
     if destroyResource {
         destroy resource
     }
@@ -3477,7 +3572,7 @@ fun sometimesDestroy(resource: <-SomeResource, destroy: Bool) {
 // This function is valid, as it always uses the resource parameter,
 // and does not cause a loss of the resource.
 //
-fun alwaysUse(resource: <-SomeResource, destroyResource: Bool) {
+fun alwaysUse(resource: @SomeResource, destroyResource: Bool) {
     if destroyResource {
         destroy resource
     } else {
@@ -3582,9 +3677,9 @@ resource Child {
 //
 resource Parent {
     let name: String
-    var child: <-Child
+    var child: @Child
 
-    init(name: String, child: <-Child) {
+    init(name: String, child: @Child) {
         self.name = name
         self.child <- child
     }
@@ -3631,8 +3726,8 @@ resource R {}
 // the resource parameter `resource`. Each call to the returned function
 // would return the resource, which should not be possible.
 //
-fun makeCloner(resource: <-R): ((): <-R) {
-    return fun (): <-R {
+fun makeCloner(resource: @R): ((): @R) {
+    return fun (): @R {
         return <-resource
     }
 }
@@ -3755,7 +3850,7 @@ let resources <- {
 destroy resources
 ```
 
-The variable array functions like `append`, `insert`, and `remove` 
+The variable array functions like `append`, `insert`, and `remove`
 behave like for non-resource arrays.
 Note however, that the result of the `remove` functions must be used.
 
@@ -3781,13 +3876,13 @@ destroy resources
 ```
 
 The variable array function `contains` is not available, as it is impossible:
-If the resource can be passed to the `contains` function, 
+If the resource can be passed to the `contains` function,
 it is by definition not in the array.
 
-The variable array function `concat` is not available, 
+The variable array function `concat` is not available,
 as it would result in the duplication of resources.
 
-The dictionary functions like `insert` and `remove` 
+The dictionary functions like `insert` and `remove`
 behave like for non-resource dictionaries.
 Note however, that the result of these functions must be used.
 
@@ -3818,62 +3913,66 @@ There is **no** support for `null`.
 
 ### Inheritance and Abstract Types
 
-There is **no** support for inheritance. 
-Inheritance is a feature common in other programming languages, 
+There is **no** support for inheritance.
+Inheritance is a feature common in other programming languages,
 that allows including the fields and functions of one type in another type.
 
-Instead, follow the "composition over inheritance" principle, 
-the idea of composing functionality from multiple individual parts, 
+Instead, follow the "composition over inheritance" principle,
+the idea of composing functionality from multiple individual parts,
 rather than building an inheritance tree.
 
-Furthermore, there is also **no** support for abstract types. 
-An abstract type is a feature common in other programming languages, 
-that prevents creating values of the type and only 
-allows the creation of values of a subtype. 
-In addition, abstract types may declare functions, 
-but omit the implementation of them 
+Furthermore, there is also **no** support for abstract types.
+An abstract type is a feature common in other programming languages,
+that prevents creating values of the type and only
+allows the creation of values of a subtype.
+In addition, abstract types may declare functions,
+but omit the implementation of them
 and instead require subtypes to implement them.
 
 Instead, consider using [interfaces](#interfaces).
 
 ## Access control
 
-> 🚧 Status: Access control is not implemented yet.
-
-Access control allows making certain parts of the program accessible/visible 
+Access control allows making certain parts of the program accessible/visible
 and making other parts inaccessible/invisible.
 
-In Flow and Cadence, there are two types of access control
-- 1. Access control between accounts using capability security.  
-Within Flow, a caller is not able to access an object 
-unless it owns the object or has a specific reference to that object.  
-This means that nothing is truly public by default.  
-Other accounts can not read or write the objects in an account 
-unless the owner of the account has granted them access 
-by providing references to the objects.
-- 2. Access control within programs using `private` and `public` keywords.  
-Assuming the caller has a valid reference that 
-satisfies the first type of access control, 
-these keywords further govern how access is controlled.  
+In Flow and Cadence, there are two types of access control:
 
-The high-level reference-based security (point 1 above) 
-will be covered in a later section. 
-For now, it is assumed that all callers have complete 
+1. Access control between accounts using capability security.
+
+    Within Flow, a caller is not able to access an object
+    unless it owns the object or has a specific reference to that object.
+    This means that nothing is truly public by default.
+    Other accounts can not read or write the objects in an account
+    unless the owner of the account has granted them access
+    by providing references to the objects.
+
+2. Access control within programs using `private` and `public` keywords.
+
+   Assuming the caller has a valid reference that satisfies the first type of access control,
+   these keywords further govern how access is controlled.
+
+The high-level reference-based security (point 1 above)
+will be covered in a later section.
+For now, it is assumed that all callers have complete
 access to the objects in the descriptions and examples.
 
-Top-level declarations 
-(variables, constants, functions, structures, resources, interfaces) 
+Top-level declarations
+(variables, constants, functions, structures, resources, interfaces)
 and fields (in structures, and resources) are either private or public.
 
-- **Private** means the declaration is only accessible/visible 
+- **Private** means the declaration is only accessible/visible
   in the current and inner scopes.
-  For example, a private field can only be 
+
+  For example, a private field can only be
   accessed by functions of the type is part of,
   not by code that uses an instance of the type in an outer scope.
 
 - **Public** means the declaration is accessible/visible in all scopes.
-  This includes the current and inner scopes like for private, 
+
+  This includes the current and inner scopes like for private,
   and the outer scopes.
+
   For example, a public field in a type can be accessed using the access syntax
   on an instance of the type in an outer scope.
   This does not allow the declaration to be publicly writable though.
@@ -3899,6 +3998,11 @@ To summarize the behavior for functions, structures, resources, and interfaces:
 |:------------------------------------------------------------------------|:----------------------|:------------------|
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   |                       | Current and inner |
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   | `pub`                 | **All**           |
+
+Currently, all types must be declared public and are visible to all code.
+However, that does not imply that any code may instantiate the type:
+only code within the [contract](#contracts) in which the type is declared
+is allowed to create instances of the type. See the linked contracts section for more information.
 
 ```cadence,file=access-control-globals.cdc
 // Declare a private constant, inaccessible/invisible in outer scope.
@@ -4004,25 +4108,26 @@ some.e = 5
 
 ## Interfaces
 
-An interface is an abstract type that specifies the behavior of types 
+An interface is an abstract type that specifies the behavior of types
 that *implement* the interface.
-Interfaces declare the required functions and fields, 
-the access control for those declarations, 
+Interfaces declare the required functions and fields,
+the access control for those declarations,
 and preconditions and postconditions that implementing types need to provide.
 
-There are two kinds of interfaces:
+There are three kinds of interfaces:
 
 - **Structure interfaces**: implemented by [structures](#structures)
 - **Resource interfaces**: implemented by [resources](#resources)
+- **Contract interfaces**: implemented by [contracts](#contracts)
 
-Structure and resource types may implement multiple interfaces.
+Structure, resource, and contract types may implement multiple interfaces.
 
-Interfaces consist of the function and field requirements 
+Interfaces consist of the function and field requirements
 that a type implementing the interface must provide implementations for.
-Interface requirements, and therefore also their implementations, 
+Interface requirements, and therefore also their implementations,
 must always be at least public.
 
-Variable field requirements may be annotated 
+Variable field requirements may be annotated
 to require them to be publicly settable.
 
 Function requirements consist of the name of the function, parameter types, an optional return type,
@@ -4036,16 +4141,16 @@ as it ensures that even if implementations change, some aspects of them will alw
 
 ### Interface Declaration
 
-Interfaces are declared using the `struct` or `resource` keyword,
+Interfaces are declared using the `struct`, `resource`, or `contract` keyword,
 followed by the `interface` keyword,
 the name of the interface,
 and the requirements, which must be enclosed in opening and closing braces.
 
-Field requirements can be annotated to 
+Field requirements can be annotated to
 require the implementation to be a variable field, by using the `var` keyword;
 require the implementation to be a constant field, by using the `let` keyword;
 or the field requirement may specify nothing,
-in which case the implementation may either be 
+in which case the implementation may either be
 a variable field, a constant field, or a synthetic field.
 
 Field requirements and function requirements must specify the required level of access.
@@ -4107,9 +4212,9 @@ resource interface FungibleToken {
     //
     // The function must return a new fungible token.
     //
-    // NOTE: `<-Self` is the resource type implementing this interface.
+    // NOTE: `@Self` is the resource type implementing this interface.
     //
-    pub fun withdraw(amount: Int): <-Self {
+    pub fun withdraw(amount: Int): @Self {
         pre {
             amount > 0:
                 "the amount must be positive"
@@ -4135,10 +4240,10 @@ resource interface FungibleToken {
     // is positive, as this condition is already ensured by
     // the field requirement.
     //
-    // NOTE: the first parameter has the type `<-Self`,
+    // NOTE: the first parameter has the type `@Self`,
     // i.e. the resource type implementing this interface.
     //
-    pub fun deposit(_ token: <-Self) {
+    pub fun deposit(_ token: @Self) {
         post {
             self.balance == before(self.balance) + token.balance:
                 "the amount must be added to the balance"
@@ -4151,7 +4256,9 @@ resource interface FungibleToken {
 
 Note that the required initializer and functions do not have any executable code.
 
-Interfaces can only be declared globally, i.e. not inside of functions.
+Struct and resource Interfaces can only be declared directly inside contracts,
+i.e. not inside of functions.
+Contract interfaces can only be declared globally and not inside contracts.
 
 ### Interface Implementation
 
@@ -4213,7 +4320,7 @@ resource ExampleToken: FungibleToken {
     // NOTE: neither the precondition nor the postcondition declared
     // in the interface have to be repeated here in the implementation.
     //
-    pub fun withdraw(amount: Int): <-ExampleToken {
+    pub fun withdraw(amount: Int): @ExampleToken {
         self.balance = self.balance - amount
         return create ExampleToken(balance: amount)
     }
@@ -4224,7 +4331,7 @@ resource ExampleToken: FungibleToken {
     //
     // The function must be public.
     //
-    // NOTE: the type of the parameter is `<-ExampleToken`,
+    // NOTE: the type of the parameter is `@ExampleToken`,
     // i.e., only a token of the same type can be deposited.
     //
     // This implementation satisfies the required postconditions.
@@ -4232,7 +4339,7 @@ resource ExampleToken: FungibleToken {
     // NOTE: neither the precondition nor the postcondition declared
     // in the interface have to be repeated here in the implementation.
     //
-    pub fun deposit(_ token: <-ExampleToken) {
+    pub fun deposit(_ token: @ExampleToken) {
         self.balance = self.balance + token.balance
         destroy token
     }
@@ -4260,7 +4367,7 @@ let withdrawn <- token.withdraw(amount: 10)
 // `withdrawn.balance` is `10`
 
 // Deposit the withdrawn token into another one.
-let receiver: ExampleToken <- // ...
+let receiver: @ExampleToken <- // ...
 receiver.deposit(<-withdrawn)
 
 // Run-time error: The precondition of function `withdraw` in interface
@@ -4276,10 +4383,10 @@ token.withdraw(amount: 90)
 ```
 
 The access level for variable fields in an implementation may be less restrictive than the interface requires.
-For example, an interface may require a field to be 
+For example, an interface may require a field to be
 at least public (i.e. the `pub` keyword is specified),
 and an implementation may provide a variable field which is public,
- but also publicly settable (the `pub(set)` keyword is specified).
+but also publicly settable (the `pub(set)` keyword is specified).
 
 ```cadence
 struct interface AnInterface {
@@ -4421,9 +4528,9 @@ shape.area  // is `54`
 
 ### Interface Implementation Requirements
 
-Interfaces can require implementing types 
+Interfaces can require implementing types
 to also implement other interfaces of the same kind.
-Interface implementation requirements can be declared 
+Interface implementation requirements can be declared
 by following the interface name with a colon (`:`)
 and one or more names of interfaces of the same kind, separated by commas.
 
@@ -4565,12 +4672,12 @@ Types are hashable when they implement the `Hashable` interface.
 
 Hashable types can be used as keys in dictionaries.
 
-Hashable types must also be equatable, 
+Hashable types must also be equatable,
 i.e., they must also implement the `Equatable` interface.
 This is because the hash value is only evidence for inequality:
 two values that have different hash values are guaranteed to be unequal.
 However, if the hash values of two values are the same,
-then the two values could still be unequal 
+then the two values could still be unequal
 and just happen to hash to the same hash value.
 In that case equality still needs to be determined through an equality check.
 Without `Equatable`, values could be added to a dictionary,
@@ -4668,44 +4775,6 @@ import Counter from "examples/counter.cdc"
 import Counter from 0x299F20A29311B9248F12
 ```
 
-## Attestations
-
-> 🚧 Status: Attestations are not implemented yet.
-
-Attestations are values that prove ownership without giving any control over it. They can be created for resources to show that they exists.
-
-Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.
-
-As an analogy, a bank statement is a proof of ownership of money.
-However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
-but it reflects the current state of the underlying resource.
-
-Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource,
-and can be safely handed to untrusted parties.
-
-An attestation reflects the current state of a resource. The state is read-only, so the resource that is referred to cannot be modified.
-It is not possible to change the ownership of a resource through an attestation, or store an attestation.
-
-Attestations of resources are created using the `@` operator.
-Attestation types have the name of the resource type, prefixed with the `@` symbol.
-
-```cadence,file=attestations.cdc
-// Declare a resource named `Token`.
-//
-resource Token {}
-
-// Create a new instance of the resource type `Token`.
-//
-let token <- create Token()
-
-// Declare a constant named `attestation` that has the attestation type `@Token`,
-// and has an attestation for the token value as its initial value.
-//
-let attestation: @Token = @token
-```
-
-Like resources, attestations are associated with an [account](#accounts).
-
 ## Accounts
 
 ```cadence
@@ -4719,7 +4788,7 @@ struct interface Account {
 
 All accounts have a `storage` object which contains the stored values of the account.
 
-All accounts also have a `published` object 
+All accounts also have a `published` object
 which contains the published references
 in an account. This will be covered later.
 
@@ -4762,34 +4831,34 @@ account.storage[Counter] <-> counter
 ## Storage References
 
 It is possible to create references to **storage locations**.
-References allow access to stored values.  A reference can be used to read or 
-call fields and methods of stored values 
+References allow access to stored values.  A reference can be used to read or
+call fields and methods of stored values
 without having to move or call the fields
 and methods on the storage location directly.
 
-References are **copied**, i.e. they are value types.  
-Any number of references to a storage location can be created, 
+References are **copied**, i.e. they are value types.
+Any number of references to a storage location can be created,
 but only by the account that owns the location being referenced.
 
-Note that references are **not** referencing stored values – 
+Note that references are **not** referencing stored values –
 A reference cannot be used to directly modify a value it references, and
 if the value stored in the references location is moved or removed,
 the reference is not updated and it becomes invalid.
 
-References are created by using the `&` operator, 
-followed by the storage location,the `as` keyword, 
+References are created by using the `&` operator,
+followed by the storage location,the `as` keyword,
 and the type through which the stored location should be accessed.
+
 ```cadence,file=reference-ex.cdc
-let nameRef: &Name = &account.storage[Name] as Name
+let nameRef: &Name = &account.storage[Name] as &Name
 ```
 
 The storage location must be a subtype of the type given after the `as` keyword.
 
 References are covariant in their base types.
-For example, `&R` is a subtype of `&RI`, 
+For example, `&R` is a subtype of `&RI`,
 if `R` is a resource, `RI` is a resource interface,
 and resource `R` conforms to (implements) resource interface `RI`.
-
 
 ```cadence,file=storage-reference.cdc
 
@@ -4827,7 +4896,7 @@ account.storage[Counter] <-> counter
 // Create a reference to the storage location `account.storage[Counter]`
 // and allow access to it as the type `Counter`.
 //
-let counterReference: &Counter = &account.storage[Counter] as Counter
+let counterReference: &Counter = &account.storage[Counter] as &Counter
 
 counterReference.count  // is `42`
 
@@ -4841,14 +4910,14 @@ counterReference.count  // is `43`
 As was mentioned before, access to stored objects is governed by the
 tenets of [Capability Security](https://en.wikipedia.org/wiki/Capability-based_security).
 This means that if an account wants to be able to access another account's
-stored objects, it must have a valid reference to that object.  
+stored objects, it must have a valid reference to that object.
 
 Access to stored objects can be restricted by using interfaces.  When storing a reference,
 it can be stored as an interface so that only the fields and methods that the interface
-specifies are able to be called by those who have a reference.  
+specifies are able to be called by those who have a reference.
 
-Based on the above example, 
-a user could use an interface to restrict access to only the `count` field.  
+Based on the above example,
+a user could use an interface to restrict access to only the `count` field.
 Often, other accounts will have functions that take specific references
 as parameters, so this method can be used to create those valid references.
 
@@ -4867,7 +4936,7 @@ resource interface HasCount {
 // Create another reference to the storage location `account.storage[Counter]`
 // and only allow access to it as the type `HasCount`.
 //
-let limitedReference: &HasCount = &account.storage[Counter] as HasCount
+let limitedReference: &HasCount = &account.storage[Counter] as &HasCount
 
 // Read the counter's current count through the limited reference.
 //
@@ -4891,7 +4960,7 @@ and methods of an object.  This can be done by publishing a reference to that ob
 
 Publishing a reference is done by storing the reference in the account's `published`
 object.  `published` is a key-value store where the keys are restricted
-to be only reference types.  
+to be only reference types.
 
 To continue the example above:
 
@@ -4906,7 +4975,7 @@ resource interface HasCount {
 // Create another reference to the storage location `account.storage[Counter]`
 // and only allow access to it as the type `HasCount`.
 //
-let limitedReference: &HasCount = &account.storage[Counter] as HasCount
+let limitedReference: &HasCount = &account.storage[Counter] as &HasCount
 
 // Store the reference in the `published` object.
 //
@@ -4920,7 +4989,7 @@ account.published[Counter] <- account.storage[Counter]
 
 To get the published portion of an account, the `getAccount` function can be used.
 
-The public account object only has the `published` object, which is read-only, 
+The public account object only has the `published` object, which is read-only,
 and can be used to access all published references of the account.
 
 Imagine that the next example is from a different account as before.
@@ -4951,22 +5020,354 @@ let countObj = acct.storage[Counter]
 
 ```
 
+## Contracts
+
+A contract in Cadence is a collection of type definitions
+of interfaces, structs, resources,  data (its state), and code (its functions)
+that lives in the contract storage area of an account in Flow.
+Contracts are where all composite types like structs, resources,
+events, and interfaces for these types in Cadence have to be defined.
+Therefore, an object of one of these types cannot exist
+without having been defined in a deployed Cadence contract.
+
+Contracts can be created, updated, and deleted using the `setCode`
+function of [accounts](#accounts).
+Contract creation is also possible when creating accounts,
+i.e. when using the `Account` constructor.
+This functionality is covered in the [next section](#deploying-and-updating-contracts)
+
+Contracts are types.
+They are similar to composite types, but are stored differently than
+structs or resources and cannot be used as values, copied, or moved
+like resources or structs.
+
+Contract stay in an account's contract storage
+area and can only be updated or deleted by the account owner
+with special commands.
+
+Contracts are declared using the `contract` keyword. The keyword is followed
+by the name of the contract.
+
+```cadence,file=contract.cdc
+pub contract SomeContract {
+    // ...
+}
+```
+
+Contracts cannot be nested in each other.
+
+```cadence,file=contract_invalidnesting.cdc
+pub contract Invalid {
+
+    // Invalid: Contracts cannot be nested in any other type.
+    //
+    pub contract Nested {
+        // ...
+    }
+}
+
+One of the simplest forms of a contract would just be one with a state field,
+a function, and an `init` function that initializes the field:
+
+```cadence,file=contract_hello.cdc
+// HelloWorldResource.cdc
+
+pub contract HelloWorld {
+
+    // Declare a stored state field in HelloWorld
+    //
+    pub let greeting: String
+
+    // Declare a function that can be called by anyone
+    // who imports the contract
+    //
+    pub fun hello(): String {
+        return self.greeting
+    }
+
+    init() {
+        self.greeting = "Hello World!"
+    }
+}
+```
+
+This contract could be deployed to an account and live permanently
+in the contract storage.  Transactions and other contracts
+can interact with contracts by importing them at the beginning
+of a transaction or contract definition.
+
+Anyone could call the above contract's `hello` function by importing
+the contract from the account it was deployed to and using the imported
+object to call the hello function.
+
+```cadence,file=contract_call.cdc
+import HelloWorld from 0x42
+
+// Invalid: The contract does not know where hello comes from
+//
+log(hello())        // Error
+
+// Valid: Using the imported contract object to call the hello
+// function
+//
+log(HelloWorld.hello())    // prints "Hello World!"
+
+// Valid: Using the imported contract object to read the greeting
+// field.
+log(HelloWorld.greeting)   // prints "Hello World!"
+
+// Invalid: Cannot call the init function after the contract has been created.
+//
+HelloWorld.init()    // Error
+```
+
+There can be any number of contracts per account
+and they can include an arbitrary amount of data. This means that
+a contract can have any number of fields, functions, and type definitions,
+but they have to be in the contract and not another top-level definition.
+
+```cadence,file=bad_decl.cdc
+// Invalid: Top-level declarations are restricted to only be contracts
+//          or contract interfaces. Therefore, all of these would be invalid
+//          if they were deployed to the account contract storage and
+//          the deployment would be rejected.
+//
+pub resource Vault {}
+pub struct Hat {}
+pub fun helloWorld(): String {}
+let num: Int
+```
+
+Another important feature of contracts is that instances of resources and events
+that are defined in contracts can only be created within functions or types
+that are defined in that contract.
+Code outside the contract cannot arbitrarily create instances of resources and events.
+
+The contract below defines a resource interface `Receiver` and a resource `Vault`
+that implements that interface.  The way this example is written,
+there is no way to create this resource, so it would not be usable.
+
+```cadence,file=ft_contract.cdc
+// Valid
+pub contract FungibleToken {
+
+    pub resource interface Receiver {
+
+        pub balance: Int
+
+        pub fun deposit(from: @Receiver) {
+            pre {
+                from.balance > 0:
+                    "Deposit balance needs to be positive!"
+            }
+            post {
+                self.balance == before(self.balance) + before(from.balance):
+                    "Incorrect amount removed"
+            }
+        }
+    }
+
+    pub resource Vault: Receiver {
+
+        // keeps track of the total balance of the accounts tokens
+        pub var balance: Int
+
+        init(balance: Int) {
+            self.balance = balance
+        }
+
+        // withdraw subtracts amount from the vaults balance and
+        // returns a vault object with the subtracted balance
+        pub fun withdraw(amount: Int): @Vault {
+            self.balance = self.balance - amount
+            return <-create Vault(balance: amount)
+        }
+
+        // deposit takes a vault object as a parameter and adds
+        // its balance to the balance of the Account's vault, then
+        // destroys the sent vault because its balance has been consumed
+        pub fun deposit(from: @Receiver) {
+            self.balance = self.balance + from.balance
+            destroy from
+        }
+    }
+}
+```
+
+If a user tried to run a transaction that created an instance of the `Vault` type,
+the type checker would not allow it because only code in the `FungibleToken`
+contract can create new `Vault`s.
+
+```cadence,file=contract_invalid_create.cdc
+import FungibleToken from 0x42
+
+// Invalid: Cannot create an instance of the `Vault` type outside
+// of the contract that defines `Vault`
+//
+let newVault <- create FungibleToken.Vault(balance: 10)
+```
+
+The contract would have to either define a function that creates new
+`Vault` instances or use its `init` function to create an instance and
+store it in the owner's account storage.
+
+This brings up another key feature of contracts in Cadence.  Contracts
+can interact with its account's `storage` and `published` objects to store
+resources, structs, and references.  They do so by using the special
+`self.account` object that is only accessible within the contract.
+
+Imagine that these were defined in the above `FungibleToken` contract.
+
+```cadence,file=ft_contract_additions.cdc
+
+    pub fun createVault(initialBalance: Int): @Vault {
+        return <-create Vault(balance: initialBalance)
+    }
+
+    init(balance: Int) {
+        let oldVault <- self.account.storage[Vault] <- create Vault(balance: 1000)
+        destroy oldVault
+    }
+```
+
+Now, any account could call the `createVault` function defined in the contract
+to create a `Vault` object.  Or the owner could call the `withdraw` function
+on their own `Vault` to send new vaults to others.
+
+```cadence,file=ft_contract_tx.cdc
+import FungibleToken from 0x42
+
+// Valid: Create an instance of the `Vault` type by calling the contract's
+// `createVault` function.
+//
+let newVault <- create FungibleToken.createVault(initialBalance: 10)
+```
+
+### Deploying and Updating Contracts
+
+In order for a contract to be used in Cadence, it needs
+to be deployed to an account.
+
+Contract can be deployed to an account using the `setCode` function of the `Account` type:
+`setCode(_ code: [UInt8], ...)`.
+The function's `code` parameter is the byte representation of the source code.
+Additional arguments are passed to the initializer of the contract.
+
+For example, assuming the following contract code should be deployed:
+
+```cadence,file=test_contract.cdc
+contract Test {
+    let message: String
+
+    init(message: String) {
+        self.message = message
+    }
+}
+```
+
+The contract can be deployed as follows:
+
+```cadence,file=deploy_setCode.cdc
+let signer: Account = ...
+signer.setCode(
+    [0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61/*, ... */],
+    message: "I'm a new contract in an existing account"
+)
+```
+
+The contract can also be deployed when creating an account by using the `Account` constructor.
+
+```cadence,file=deploy_setCode.cdc
+let newAccount = Account(
+    publicKeys: [],
+    code: [0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61/*, ... */],
+    message: "I'm a new contract in a new account"
+)
+```
+
+### Contract Interfaces
+
+Like composite types, contracts can have interfaces that specify rules
+about their behavior, their types, and the behavior of their types.
+
+Contract interfaces have to be declared globally.  Declarations
+cannot be nested in other types.
+
+If a contract interface declares a concrete type, implementations of it
+must also declare the same concrete type conforming to the type requirement.
+
+If a contract interface declares an interface type, the implementing contract
+does not have to also define that interface.  They can refer to that nested
+interface by saying `{ContractInterfaceName}.{NestedInterfaceName}`
+
+```cadence,file=contract_interface.cdc
+// Declare a contract interface that declares an interface and a resource
+// that needs to implement that interface in the contract implementation.
+//
+pub contract interface InterfaceExample {
+
+    // Implementations do not need to declare this
+    // They refer to it as InterfaceExample.NestedInterface
+    //
+    pub resource interface NestedInterface {}
+
+    // Implementations must declare this type
+    //
+    pub resource Composite: NestedInterface {}
+}
+
+pub contract ExampleContract: InterfaceExample {
+
+    // The contract doesn't need to redeclare the `NestedInterface` interface
+    // because it is already declared in the contract interface
+
+    // The resource has to refer to the resrouce interface using the name
+    // of the contract interface to access it
+    //
+    pub resource Composite: InterfaceExample.NestedInterface {
+    }
+}
+```
 
 ## Events
 
 Events are special values that can be emitted during the execution of a program.
 
-An event type can be declared with the `event` keyword:
+An event type can be declared with the `event` keyword.
 
 ```cadence
 event FooEvent(x: Int, y: Int)
 ```
 
-The syntax of an event declaration is similar to that of a [function declaration](#function-declarations); events contain named parameters, each of which has an optional argument label.
+The syntax of an event declaration is similar to that of
+a [function declaration](#function-declarations);
+events contain named parameters, each of which has an optional argument label.
+Types that can be in event definitions are restricted
+to booleans, strings, integer, and arrays or dictionaries of these types.
+
+Events can only be declared within a [contract](#contracts) body.
+Events cannot be declared globally or within resource or struct types.
+
+Resource argument types are not allowed because when a resource is used as
+an argument, it is moved.  A piece of code would not want to move a resource
+to emit an event, so it is not allowed as a parameter.
 
 ```cadence
-// Event with explicit argument labels
-event BarEvent(labelA fieldA: Int, labelB fieldB: Int)
+// Invalid: An event cannot be declared globally
+//
+event GlobalEvent(field: Int)
+
+pub contract Events {
+    // Event with explicit argument labels
+    //
+    event BarEvent(labelA fieldA: Int, labelB fieldB: Int)
+
+    // Invalid: A resource type is not allowed to be used
+    // because it would be moved and lost
+    //
+    event ResourceEvent(resourceField: @Vault)
+}
+
 ```
 
 ### Emitting events
@@ -4974,55 +5375,66 @@ event BarEvent(labelA fieldA: Int, labelB fieldB: Int)
 To emit an event from a program, use the `emit` statement:
 
 ```cadence,file=events.cdc
-event FooEvent(x: Int, y: Int)
+pub contract Events {
+    event FooEvent(x: Int, y: Int)
 
-// Event with argument labels
-event BarEvent(labelA fieldA: Int, labelB fieldB: Int)
+    // Event with argument labels
+    event BarEvent(labelA fieldA: Int, labelB fieldB: Int)
 
-fun events() {
-    emit FooEvent(x: 1, y: 2)
+    fun events() {
+        emit FooEvent(x: 1, y: 2)
 
-    // Emit event with explicit argument labels
-    // Note that the emitted event will only contain the field names, 
-    // not the argument labels used at the invocation site.
-    emit FooEvent(labelA: 1, labelB: 2)
+        // Emit event with explicit argument labels
+        // Note that the emitted event will only contain the field names,
+        // not the argument labels used at the invocation site.
+        emit FooEvent(labelA: 1, labelB: 2)
+    }
 }
 ```
 
-Restrictions:
-- Events can only be invoked in an `emit` statement. This means events cannot be assigned to variables or used as function parameters.
+Emitting events has the following restrictions:
+
+- Events can only be invoked in an `emit` statement.
+
+  This means events cannot be assigned to variables or used as function parameters.
+
 - Events can only be emitted from the location in which they are defined.
 
 ## Transactions
-
-> 🚧 Status: The `transaction` syntax is not implemented yet. For now, declare a function named `main`.
 
 Transactions are objects that are signed by one or more [accounts](#accounts)
 and are sent to the chain to interact with it.
 
 Transactions are structured as such:
 
-First, the transaction can import any number of types from external accounts using the import syntax.
+First, the transaction can import any number of types from external accounts
+using the import syntax.
 
 Next is the body of the transaction, which is broken into three main phases:
 Preparation, execution, and postconditions, only in that order.
 Each phase is a block of code that executes sequentially.
 
-  - The **prepare phase** acts like the initializer in a composite data type,
-    i.e., it initializes fields that can then be used in the execution phase.
-    The prepare phase has the permissions to read from and write to the storage 
-    of all the accounts that signed the transaction.
+- The **prepare phase** acts like the initializer in a composite data type,
+  i.e., it initializes fields that can then be used in the execution phase.
 
-  - The **execute phase** is where interaction with external contracts happens.
-    This usually involves interacting with contracts with public types and functions that are deployed in other accounts.
+  The prepare phase has the permissions to read from and write to the storage
+  of all the accounts that signed the transaction.
 
-  - The **postcondition phase** is where the transaction can check that its functionality was executed correctly.
+- The **execute phase** is where interaction with external contracts happens.
+
+  This usually involves interacting with contracts with public types
+  and functions that are deployed in other accounts.
+
+- The **postcondition phase** is where the transaction can check
+  that its functionality was executed correctly.
 
 Transactions are declared using the `transaction` keyword.
 
-Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared. These are valid within the entire scope of the transaction.
+Within the transaction, but before the prepare phase,
+any number of constants and/or variables can be declared.
+These are valid within the entire scope of the transaction.
 
-The prepare phase is declared using the `prepare` keyword 
+The prepare phase is declared using the `prepare` keyword
 and the execution phase can be declared using the `execute` keyword.
 The `post` section can be used to declare postconditions.
 
@@ -5064,7 +5476,7 @@ Imagine it is in a file named `FungibleToken.cdc`.
 //
 pub resource interface Provider {
 
-    pub fun withdraw(amount: Int): <-FungibleToken {
+    pub fun withdraw(amount: Int): @FungibleToken {
         pre {
             amount > 0:
                 "withdrawal amount must be positive"
@@ -5079,7 +5491,7 @@ pub resource interface Provider {
 }
 
 pub resource interface Receiver {
-    pub fun deposit(token: <-FungibleToken)
+    pub fun deposit(token: @FungibleToken)
 }
 
 // Declare a resource interface for a fungible token.
@@ -5105,7 +5517,7 @@ pub resource interface FungibleToken: Provider, Receiver {
         }
     }
 
-    pub fun withdraw(amount: Int): <-Self {
+    pub fun withdraw(amount: Int): @Self {
         pre {
             amount <= self.balance:
                 "insufficient funds: the amount must be smaller or equal to the balance"
@@ -5116,7 +5528,7 @@ pub resource interface FungibleToken: Provider, Receiver {
         }
     }
 
-    pub fun deposit(token: <-Self) {
+    pub fun deposit(token: @Self) {
         post {
             self.balance == before(self.balance) + token.balance:
                 "the amount must be added to the balance"
@@ -5145,7 +5557,6 @@ and the string literal for the path of the file which contains the code of the t
      move explanation for import statement into separate section?
      also see below for version referring to deployed code with an address
 -->
-
 
 ```cadence,file=deploy-resource-interface.cdc
 // Import the resource interface type `FungibleToken`
@@ -5190,20 +5601,20 @@ resource ExampleToken: FungibleToken {
         self.balance = balance
     }
 
-    pub fun withdraw(amount: Int): <-ExampleToken {
+    pub fun withdraw(amount: Int): @ExampleToken {
         self.balance = self.balance - amount
         return <-create ExampleToken(balance: amount)
     }
 
-    pub fun deposit(token: <-ExampleToken) {
+    pub fun deposit(token: @ExampleToken) {
         self.balance = self.balance + token.balance
         destroy token
     }
 
-    // The function `transfer` combines the functions `withdraw` and `deposit` 
+    // The function `transfer` combines the functions `withdraw` and `deposit`
     // into a single function call
     pub fun transfer(to: &Receiver, amount: Int) {
-        // Deposit the tokens that withdraw creates into the 
+        // Deposit the tokens that withdraw creates into the
         // recipient's account using their deposit reference
         to.deposit(from: <-self.withdraw(amount: amount))
     }
@@ -5212,7 +5623,7 @@ resource ExampleToken: FungibleToken {
 // Declare a function that lets any user create an example token
 // with an initial empty balance.
 //
-pub fun newEmptyExampleToken(): <-ExampleToken {
+pub fun newEmptyExampleToken(): @ExampleToken {
     return <-create ExampleToken(balance: 0)
 }
 ```
@@ -5222,10 +5633,11 @@ Again, the type must be stored in the owners account.
 Once code is deployed, it can be used in other code and in transactions.
 
 In most situations it is important to expose only a subset of the functionality
-of the stored values, because some of the functionality should only be available to the owner.
+of the stored values,
+because some of the functionality should only be available to the owner.
 
 The following transaction creates an empty token and stores it in the signer's account.
-This allows the owner to withdraw and deposit. 
+This allows the owner to withdraw and deposit.
 
 However, the deposit function should be available to anyone. To achieve this,
 an additional reference to the token is created, stored, and published,
@@ -5241,8 +5653,8 @@ transaction {
 
     prepare(signer: Account) {
         // Create a new token as an optional.
-        var tokenA: <-ExampleToken? <- newEmptyExampleToken()
-		
+        var tokenA: @ExampleToken? <- newEmptyExampleToken()
+
         // Store the new token in storage by replacing whatever
         // is in the existing location.
         let oldToken <- signer.storage[ExampleToken] <- tokenA
@@ -5255,19 +5667,19 @@ transaction {
         // The `Receiver` references is stored in the `published` object
         // because an account will usually want anyone to be able to read
         // their balance and call their deposit function
-        // 
-        signer.published[&Receiver] = &signer.storage[ExampleToken] as Receiver
+        //
+        signer.published[&Receiver] = &signer.storage[ExampleToken] as &Receiver
 
         // The `Provider` reference is stored in account storage
         // because an account will not want to expose its withdraw method
         // to the public
-        signer.storage[&Provider] = &signer.storage[ExampleToken] as Provider
+        signer.storage[&Provider] = &signer.storage[ExampleToken] as &Provider
     }
 }
 ```
 
 Now, the resource type `ExampleToken` is stored in the account
-and its `Receiver` interface is available via the `published` object 
+and its `Receiver` interface is available via the `published` object
 so that anyone can interact with it by importing it from the account.
 
 Once an account is prepared in such a way, transactions can be run that deposit
@@ -5321,8 +5733,8 @@ transaction {
         //
         let receiverRef = recipient.published[&Receiver] ?? panic("Recipient has no receiver")
 
-        // Call the provider's transfer function which withdraws 5 tokens 
-        // from their account and deposits it to the receiver's account 
+        // Call the provider's transfer function which withdraws 5 tokens
+        // from their account and deposits it to the receiver's account
         // using the reference to their deposit function.
         //
         self.providerRef.transfer(to: receiverRef, amount: 5)

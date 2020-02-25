@@ -26,7 +26,6 @@ func ParseAndCheckPublicAccount(t *testing.T, code string) (*sema.Checker, error
 				sema.WithPredeclaredValues(map[string]sema.ValueDeclaration{
 					"publicAccount": publicAccountValueDeclaration,
 				}),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)
@@ -56,7 +55,7 @@ func TestCheckPublicAccount(t *testing.T) {
               resource R {}
 
               fun test() {
-                  publicAccount.published[&R] = &publicAccount.storage[R] as R
+                  publicAccount.published[&R] = &publicAccount.storage[R] as &R
               }
             `,
 		)

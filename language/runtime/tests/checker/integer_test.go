@@ -12,186 +12,263 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
+var allIntegerTypesAndAddressType = append(
+	sema.AllIntegerTypes,
+	&sema.AddressType{},
+)
+
 func TestCheckIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
 
-	checker, err := ParseAndCheck(t, `
-        let x: Int8 = 1
-    `)
+	for _, ty := range allIntegerTypesAndAddressType {
+		// Test non-optional and optional type
 
-	require.NoError(t, err)
+		for _, ty := range []sema.Type{
+			ty,
+			&sema.OptionalType{Type: ty},
+		} {
 
-	assert.Equal(t,
-		&sema.Int8Type{},
-		checker.GlobalValues["x"].Type,
-	)
-}
+			t.Run(ty.String(), func(t *testing.T) {
 
-func TestCheckIntegerLiteralTypeConversionInVariableDeclarationOptional(t *testing.T) {
+				checker, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          let x: %s = 0x1
+                        `,
+						ty,
+					),
+				)
 
-	checker, err := ParseAndCheck(t, `
-        let x: Int8? = 1
-    `)
+				require.NoError(t, err)
 
-	require.NoError(t, err)
-
-	assert.Equal(t,
-		&sema.OptionalType{Type: &sema.Int8Type{}},
-		checker.GlobalValues["x"].Type,
-	)
+				assert.Equal(t,
+					ty,
+					checker.GlobalValues["x"].Type,
+				)
+			})
+		}
+	}
 }
 
 func TestCheckIntegerLiteralTypeConversionInAssignment(t *testing.T) {
 
-	checker, err := ParseAndCheck(t, `
-        var x: Int8 = 1
-        fun test() {
-            x = 2
-        }
-    `)
+	for _, ty := range allIntegerTypesAndAddressType {
+		// Test non-optional and optional type
 
-	require.NoError(t, err)
+		for _, ty := range []sema.Type{
+			ty,
+			&sema.OptionalType{Type: ty},
+		} {
 
-	assert.Equal(t,
-		&sema.Int8Type{},
-		checker.GlobalValues["x"].Type,
-	)
-}
+			t.Run(ty.String(), func(t *testing.T) {
 
-func TestCheckIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {
+				checker, err := ParseAndCheck(t,
+					fmt.Sprintf(`
+                          var x: %s = 0x1
+                          fun test() {
+                              x = 0x2
+                          }
+                        `,
+						ty,
+					),
+				)
 
-	_, err := ParseAndCheck(t, `
-        var x: Int8? = 1
-        fun test() {
-            x = 2
-        }
-    `)
+				require.NoError(t, err)
 
-	require.NoError(t, err)
+				assert.Equal(t,
+					ty,
+					checker.GlobalValues["x"].Type,
+				)
+			})
+		}
+	}
 }
 
 func TestCheckIntegerLiteralRanges(t *testing.T) {
 
-	for _, ty := range []sema.Type{
-		&sema.Int8Type{},
-		&sema.Int16Type{},
-		&sema.Int32Type{},
-		&sema.Int64Type{},
-		&sema.UInt8Type{},
-		&sema.UInt16Type{},
-		&sema.UInt32Type{},
-		&sema.UInt64Type{},
-		&sema.AddressType{},
-	} {
+	for _, ty := range allIntegerTypesAndAddressType {
 		t.Run(ty.String(), func(t *testing.T) {
 
-			min := ty.(sema.Ranged).Min()
-			max := ty.(sema.Ranged).Max()
+			min := ty.(sema.IntegerRangedType).MinInt()
+			var minPlusOne *big.Int
+			if min != nil {
+				minPlusOne = big.NewInt(0).Add(min, big.NewInt(1))
+			}
+
+			max := ty.(sema.IntegerRangedType).MaxInt()
+			var maxMinusOne *big.Int
+			if max != nil {
+				maxMinusOne = big.NewInt(0).Sub(max, big.NewInt(1))
+			}
 
 			var minString string
+			var minPlusOneString string
 			var maxString string
+			var maxMinusOneString string
 
 			// addresses are only valid as hexadecimal literals
 			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
-				minString = fmt.Sprintf("0x%s", min.Text(16))
-				maxString = fmt.Sprintf("0x%s", max.Text(16))
+				formatAddress := func(i *big.Int) string {
+					return fmt.Sprintf("0x%s", i.Text(16))
+				}
+
+				minString = formatAddress(min)
+				minPlusOneString = formatAddress(minPlusOne)
+				maxString = formatAddress(max)
+				maxMinusOneString = formatAddress(maxMinusOne)
 			} else {
-				minString = min.String()
-				maxString = max.String()
+				if min != nil {
+					minString = min.String()
+					minPlusOneString = minPlusOne.String()
+				}
+				if max != nil {
+					maxString = max.String()
+					maxMinusOneString = maxMinusOne.String()
+				}
 			}
 
-			code := fmt.Sprintf(`
-                let min: %[1]s = %[2]s
-                let max: %[1]s = %[3]s
-                let a = %[1]s(%[2]s)
-                let b = %[1]s(%[3]s)
-            `,
-				ty.String(),
-				minString,
-				maxString,
-			)
+			// check min, if any
 
-			_, err := ParseAndCheck(t, code)
+			if minString != "" {
+				t.Run("min", func(t *testing.T) {
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              let min: %[1]s = %[2]s
+                              let a = %[1]s(%[2]s)
+                            `,
+							ty.String(),
+							minString,
+						),
+					)
+					assert.NoError(t, err)
+				})
 
-			require.NoError(t, err)
+				t.Run("min + 1", func(t *testing.T) {
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              let minPlusOne: %[1]s = %[2]s
+                              let a = %[1]s(%[2]s)
+                            `,
+							ty.String(),
+							minPlusOneString,
+						),
+					)
+					assert.NoError(t, err)
+				})
+			}
+
+			// check max, if any
+
+			if maxString != "" {
+				t.Run("max", func(t *testing.T) {
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              let max: %[1]s = %[2]s
+			                  let b = %[1]s(%[2]s)
+                            `,
+							ty.String(),
+							maxString,
+						),
+					)
+					assert.NoError(t, err)
+				})
+
+				t.Run("max - 1", func(t *testing.T) {
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              let maxMinusOne: %[1]s = %[2]s
+			                  let b = %[1]s(%[2]s)
+                            `,
+							ty.String(),
+							maxMinusOneString,
+						),
+					)
+					assert.NoError(t, err)
+				})
+			}
 		})
 	}
 }
 
 func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 
-	for _, ty := range []sema.Type{
-		&sema.Int8Type{},
-		&sema.Int16Type{},
-		&sema.Int32Type{},
-		&sema.Int64Type{},
-		&sema.UInt8Type{},
-		&sema.UInt16Type{},
-		&sema.UInt32Type{},
-		&sema.UInt64Type{},
-		&sema.AddressType{},
-	} {
+	for _, ty := range allIntegerTypesAndAddressType {
 
-		t.Run(fmt.Sprintf("%s_minMinusOne", ty.String()), func(t *testing.T) {
+		min := ty.(sema.IntegerRangedType).MinInt()
+		if min != nil {
+			t.Run(fmt.Sprintf("%s - 1", ty.String()), func(t *testing.T) {
+				var minMinusOneString string
 
-			var minMinusOneString string
+				// addresses are only valid as hexadecimal literals
+				if _, isAddressType := ty.(*sema.AddressType); isAddressType {
+					minMinusOneString = "-0x1"
+				} else {
+					minMinusOne := big.NewInt(0).Sub(min, big.NewInt(1))
+					minMinusOneString = minMinusOne.String()
+				}
 
-			// addresses are only valid as hexadecimal literals
-			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
-				minMinusOneString = "-0x1"
-			} else {
-				minMinusOne := big.NewInt(0).Sub(ty.(sema.Ranged).Min(), big.NewInt(1))
-				minMinusOneString = minMinusOne.String()
-			}
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          let minMinusOne: %[1]s = %[2]s
+                          let minMinusOne2 = %[1]s(%[2]s)
+                        `,
+						ty.String(),
+						minMinusOneString,
+					),
+				)
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let minMinusOne: %[1]s = %[2]s
-                let minMinusOne2 = %[1]s(%[2]s)
-            `,
-				ty.String(),
-				minMinusOneString,
-			))
+				errs := ExpectCheckerErrors(t, err, 2)
 
-			errs := ExpectCheckerErrors(t, err, 2)
+				if _, isAddressType := ty.(*sema.AddressType); isAddressType {
+					assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
+					assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
+				} else {
+					assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
+					assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[1])
+				}
+			})
+		}
 
-			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
-				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
-				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
-			} else {
-				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
-				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[1])
-			}
-		})
+		max := ty.(sema.IntegerRangedType).MaxInt()
+		if max != nil {
+			t.Run(fmt.Sprintf("%s + 1", ty.String()), func(t *testing.T) {
 
-		t.Run(fmt.Sprintf("%s_maxPlusOne", ty.String()), func(t *testing.T) {
+				maxPlusOne := big.NewInt(0).Add(max, big.NewInt(1))
+				var maxPlusOneString string
 
-			maxPlusOne := big.NewInt(0).Add(ty.(sema.Ranged).Max(), big.NewInt(1))
-			var maxPlusOneString string
+				// addresses are only valid as hexadecimal literals
+				if _, isAddressType := ty.(*sema.AddressType); isAddressType {
+					maxPlusOneString = fmt.Sprintf("0x%s", maxPlusOne.Text(16))
+				} else {
+					maxPlusOneString = maxPlusOne.String()
+				}
 
-			// addresses are only valid as hexadecimal literals
-			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
-				maxPlusOneString = fmt.Sprintf("0x%s", maxPlusOne.Text(16))
-			} else {
-				maxPlusOneString = maxPlusOne.String()
-			}
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          let maxPlusOne: %[1]s = %[2]s
+                          let maxPlusOne2 = %[1]s(%[2]s)
+                        `,
+						ty.String(),
+						maxPlusOneString,
+					),
+				)
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let maxPlusOne: %[1]s = %[2]s
-                let maxPlusOne2 = %[1]s(%[2]s)
-            `,
-				ty.String(),
-				maxPlusOneString,
-			))
+				errs := ExpectCheckerErrors(t, err, 2)
 
-			errs := ExpectCheckerErrors(t, err, 2)
-
-			if _, isAddressType := ty.(*sema.AddressType); isAddressType {
-				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
-				assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
-			} else {
-				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
-				assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[1])
-			}
-		})
+				if _, isAddressType := ty.(*sema.AddressType); isAddressType {
+					assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
+					assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
+				} else {
+					assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[0])
+					assert.IsType(t, &sema.InvalidIntegerLiteralRangeError{}, errs[1])
+				}
+			})
+		}
 	}
 }
 
@@ -213,44 +290,56 @@ func TestCheckInvalidIntegerLiteralWithNeverReturnType(t *testing.T) {
 
 func TestCheckIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.T) {
 
-	_, err := ParseAndCheck(t, `
-        fun test(_ x: Int8) {}
-        let x = test(1)
-    `)
+	for _, ty := range allIntegerTypesAndAddressType {
+		// Test non-optional and optional type
 
-	require.NoError(t, err)
-}
+		for _, ty := range []sema.Type{
+			ty,
+			&sema.OptionalType{Type: ty},
+		} {
 
-func TestCheckIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *testing.T) {
+			t.Run(ty.String(), func(t *testing.T) {
 
-	_, err := ParseAndCheck(t, `
-        fun test(_ x: Int8?) {}
-        let x = test(1)
-    `)
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(`
+                          fun test(_ x: %s) {}
+                          let x = test(0x1)
+                        `,
+						ty,
+					),
+				)
 
-	require.NoError(t, err)
+				require.NoError(t, err)
+			})
+		}
+	}
 }
 
 func TestCheckIntegerLiteralTypeConversionInReturn(t *testing.T) {
 
-	_, err := ParseAndCheck(t, `
-        fun test(): Int8 {
-            return 1
-        }
-    `)
+	for _, ty := range allIntegerTypesAndAddressType {
+		// Test non-optional and optional type
 
-	require.NoError(t, err)
-}
+		for _, ty := range []sema.Type{
+			ty,
+			&sema.OptionalType{Type: ty},
+		} {
+			t.Run(ty.String(), func(t *testing.T) {
 
-func TestCheckIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(`
+                          fun test(): %s {
+                              return 0x1
+                          }
+                        `,
+						ty,
+					),
+				)
 
-	_, err := ParseAndCheck(t, `
-        fun test(): Int8? {
-            return 1
-        }
-    `)
-
-	require.NoError(t, err)
+				require.NoError(t, err)
+			})
+		}
+	}
 }
 
 func TestCheckInvalidAddressDecimal(t *testing.T) {
@@ -264,4 +353,46 @@ func TestCheckInvalidAddressDecimal(t *testing.T) {
 
 	assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
 	assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
+}
+
+func TestCheckSignedIntegerNegate(t *testing.T) {
+
+	for _, ty := range sema.AllSignedIntegerTypes {
+		name := ty.String()
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+                      let x: %s = 1
+                      let y = -x
+                    `,
+					name,
+				),
+			)
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCheckInvalidUnsignedIntegerNegate(t *testing.T) {
+
+	for _, ty := range sema.AllUnsignedIntegerTypes {
+		name := ty.String()
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+                      let x: %s = 1
+                      let y = -x
+                    `,
+					name,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidUnaryOperandError{}, errs[0])
+		})
+	}
 }

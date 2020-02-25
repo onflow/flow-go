@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
-	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -93,7 +93,7 @@ func TestCheckDictionaryIndexingString(t *testing.T) {
       let y = x["abc"]
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{Type: &sema.IntType{}},
@@ -207,7 +207,7 @@ func TestCheckDictionaryKeys(t *testing.T) {
         let keys = {"abc": 1, "def": 2}.keys
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.VariableSizedType{Type: &sema.StringType{}},
@@ -221,7 +221,7 @@ func TestCheckDictionaryValues(t *testing.T) {
         let values = {"abc": 1, "def": 2}.values
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.VariableSizedType{Type: &sema.IntType{}},
@@ -595,35 +595,36 @@ func TestCheckEmptyDictionaryCall(t *testing.T) {
 
 func TestCheckArraySubtyping(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s interface I {}
-              %[1]s S: I {}
-
-              let xs: %[2]s[S] %[3]s []
-              let ys: %[2]s[I] %[3]s xs
-	        `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-			))
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			case common.CompositeKindContract:
-				// TODO: add support for contract interface declarations
-
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-			default:
-				panic(errors.NewUnreachableError())
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
 			}
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface I %[2]s
+                      %[1]s S: I %[2]s
+
+                      let xs: %[3]s[S] %[4]s []
+                      let ys: %[3]s[I] %[4]s xs
+	                `,
+					kind.Keyword(),
+					body,
+					kind.Annotation(),
+					kind.TransferOperator(),
+				),
+			)
+
+			require.NoError(t, err)
 		})
 	}
 }
@@ -642,36 +643,36 @@ func TestCheckInvalidArraySubtyping(t *testing.T) {
 
 func TestCheckDictionarySubtyping(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t,
-				fmt.Sprintf(`
-                      %[1]s interface I {}
-                      %[1]s S: I {}
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
+			}
 
-                      let xs: %[2]s{String: S} %[3]s {}
-                      let ys: %[2]s{String: I} %[3]s xs
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface I %[2]s
+                      %[1]s S: I %[2]s
+
+                      let xs: %[3]s{String: S} %[4]s {}
+                      let ys: %[3]s{String: I} %[4]s xs
 	                `,
 					kind.Keyword(),
+					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
 			)
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			case common.CompositeKindContract:
-				// TODO: add support contract interface declarations
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-			default:
-				panic(errors.NewUnreachableError())
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -768,7 +769,7 @@ func TestCheckConstantSizedArrayDeclaration(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
+func TestCheckInvalidConstantSizedArrayDeclarationCountMismatchTooMany(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test() {
@@ -776,9 +777,10 @@ func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	assert.IsType(t, &sema.ConstantSizedArrayLiteralSizeError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 }
 
 func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
@@ -798,12 +800,15 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 	} {
 		t.Run("valid", func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s
-              let xs = {k: "x"}
-            `,
-				code,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s
+                      let xs = {k: "x"}
+                    `,
+					code,
+				),
+			)
 
 			require.NoError(t, err)
 		})
@@ -819,16 +824,54 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 	} {
 		t.Run("invalid", func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s
-              let xs = {k: "x"}
-            `,
-				code,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s
+                      let xs = {k: "x"}
+                    `,
+					code,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
 		})
 	}
+}
+
+func TestCheckArrayGeneration(t *testing.T) {
+
+	code := `
+      struct Person {
+          let id: Int
+
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      let persons = Array(
+          size: 3,
+          generate: fun(index: Int): Person {
+              return Person(id: index + 1)
+          }
+      )
+    `
+
+	_, err := ParseAndCheckWithOptions(t,
+		code,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.ArrayFunction,
+					}.ToValueDeclarations(),
+				),
+			},
+		},
+	)
+
+	assert.NoError(t, err)
 }

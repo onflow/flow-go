@@ -8,7 +8,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/coldstuff"
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/libp2p/message"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
@@ -33,15 +35,38 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeResponse:
 		v = &trickle.Response{}
 
-	case CodeGuaranteedCollection:
-		v = &collection.GuaranteedCollection{}
-
+	// Consensus
 	case CodeBlockProposal:
-		v = &coldstuff.BlockProposal{}
+		v = &messages.BlockProposal{}
 	case CodeBlockVote:
-		v = &coldstuff.BlockVote{}
+		v = &messages.BlockVote{}
 	case CodeBlockCommit:
-		v = &coldstuff.BlockCommit{}
+		v = &coldstuff.Commit{}
+
+	case CodeCollectionGuarantee:
+		v = &flow.CollectionGuarantee{}
+	case CodeTransaction:
+		v = &flow.Transaction{}
+
+	case CodeBlock:
+		v = &flow.Block{}
+
+	case CodeCollectionRequest:
+		v = &messages.CollectionRequest{}
+	case CodeCollectionResponse:
+		v = &messages.CollectionResponse{}
+
+	case CodeEcho:
+		v = &message.Echo{}
+
+	case CodeExecutionRecipt:
+		v = &flow.ExecutionReceipt{}
+
+	case CodeExecutionStateRequest:
+		v = &messages.ExecutionStateRequest{}
+
+	case CodeExecutionStateResponse:
+		v = &messages.ExecutionStateResponse{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)

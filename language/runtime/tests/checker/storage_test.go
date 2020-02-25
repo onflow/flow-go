@@ -19,15 +19,22 @@ var storageValueDeclaration = stdlib.StandardLibraryValue{
 	IsConstant: true,
 }
 
+var storageValueDeclarations map[string]sema.ValueDeclaration
+
+func init() {
+	storageValueDeclarations = stdlib.StandardLibraryFunctions{
+		stdlib.PanicFunction,
+	}.ToValueDeclarations()
+
+	storageValueDeclarations["storage"] = storageValueDeclaration
+}
+
 func ParseAndCheckStorage(t *testing.T, code string) (*sema.Checker, error) {
 	return ParseAndCheckWithOptions(t,
 		code,
 		ParseAndCheckOptions{
 			Options: []sema.Option{
-				sema.WithPredeclaredValues(map[string]sema.ValueDeclaration{
-					"storage": storageValueDeclaration,
-				}),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+				sema.WithPredeclaredValues(storageValueDeclarations),
 			},
 		},
 	)
@@ -150,7 +157,7 @@ func TestCheckStorageIndexingAssignment(t *testing.T) {
               resource R {}
 
               fun test() {
-                  storage[&R] = &storage[R] as R
+                  storage[&R] = &storage[R] as &R
               }
             `,
 		)
@@ -281,7 +288,7 @@ func TestCheckStorageIndexingWithResourceTypeInSwap(t *testing.T) {
           resource R {}
 
           fun test() {
-              var r: <-R? <- create R()
+              var r: @R? <- create R()
               storage[R] <-> r
               destroy r
           }
@@ -302,11 +309,44 @@ func TestCheckInvalidResourceMoveOutOfStorage(t *testing.T) {
           consume(<-storage[R])
       }
 
-      fun consume(_ r: <-R?) {
+      fun consume(_ r: @R?) {
           destroy r
       }
     `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+}
+
+func TestCheckInvalidDestroyStorageValue(t *testing.T) {
+
+	_, err := ParseAndCheckStorage(t, `
+      resource R {}
+
+      fun test() {
+          destroy storage[R]
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+}
+
+func TestCheckInvalidOptionalStorageKeyType(t *testing.T) {
+
+	_, err := ParseAndCheckStorage(t, `
+      resource R {}
+
+      fun test() {
+          let r <- storage[R?] <- nil
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[1])
 }

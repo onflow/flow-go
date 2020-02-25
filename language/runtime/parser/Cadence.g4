@@ -81,9 +81,19 @@ declaration
     | transactionDeclaration
     ;
 
-// Transactions can be in the form "prepare pre execute post" or "prepare pre post execute"
 transactionDeclaration
-    : Transaction '{' fields prepare? ((preConditions? execute? postConditions?) | (preConditions? postConditions? execute?))'}'
+    : Transaction
+      '{'
+      fields
+      prepare?
+      preConditions?
+      ( execute
+      | execute postConditions
+      | postConditions
+      | postConditions execute
+      | /* no execute or postConditions */
+      )
+      '}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
@@ -107,9 +117,8 @@ importDeclaration
 access
     : /* Not specified */
     | Priv
-    | Auth
-    | Pub
-    | PubSet
+    | Pub ('(' Set ')')?
+    | Access '(' (Self | Contract | Account | All) ')'
     ;
 
 compositeDeclaration
@@ -118,7 +127,7 @@ compositeDeclaration
     ;
 
 conformances
-    : (':' identifier (',' identifier)*)?
+    : (':' nominalType (',' nominalType)*)?
     ;
 
 variableKind
@@ -148,6 +157,7 @@ memberOrNestedDeclaration
     | functionDeclaration
     | interfaceDeclaration
     | compositeDeclaration
+    | eventDeclaration
     ;
 
 compositeKind
@@ -172,7 +182,7 @@ functionDeclaration
     ;
 
 eventDeclaration
-    : Event identifier parameterList
+    : access Event identifier parameterList
     ;
 
 parameterList
@@ -184,14 +194,29 @@ parameter
     ;
 
 typeAnnotation
-    : Move? fullType
+    : ResourceAnnotation? fullType
     ;
 
 // NOTE: only allow reference or optionals – prevent ambiguous
 // and not particular useful types like `&R?`
 fullType
-    : reference=Ampersand {p.noWhitespace()}? baseType
-    | baseType ({p.noWhitespace()}? optionals+=Optional)*
+    : (
+        ( Auth Storable
+        | Auth
+        | Storable Auth
+        | Storable
+        | /* no auth or storable */
+        )
+        Ampersand {p.noWhitespace()}?
+      )?
+      innerType
+      ({p.noWhitespace()}? optionals+=Optional)*
+    ;
+
+
+innerType
+    : typeRestrictions
+    | baseType ({p.noWhitespace()}? typeRestrictions)?
     ;
 
 baseType
@@ -200,6 +225,10 @@ baseType
     | variableSizedType
     | constantSizedType
     | dictionaryType
+    ;
+
+typeRestrictions
+    : '{' (nominalType (',' nominalType)*)? '}'
     ;
 
 nominalType
@@ -446,6 +475,8 @@ Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
 
+Auth : 'auth' ;
+Storable : 'storable' ;
 Ampersand : '&';
 
 unaryOp
@@ -464,6 +495,8 @@ NilCoalescing : WS '??';
 Casting : 'as' ;
 FailableCasting : 'as?' ;
 
+ResourceAnnotation : '@' ;
+
 castingOp
     : Casting
     | FailableCasting
@@ -477,7 +510,7 @@ primaryExpressionStart
     ;
 
 createExpression
-    : Create identifier invocation
+    : Create nominalType invocation
     ;
 
 destroyExpression
@@ -527,7 +560,8 @@ argument
     ;
 
 literal
-    : integerLiteral
+    : fixedPointLiteral
+    | integerLiteral
     | booleanLiteral
     | arrayLiteral
     | dictionaryLiteral
@@ -546,6 +580,10 @@ nilLiteral
 
 stringLiteral
     : StringLiteral
+    ;
+
+fixedPointLiteral
+    : Minus? PositiveFixedPointLiteral
     ;
 
 integerLiteral
@@ -592,9 +630,13 @@ Pre : 'pre' ;
 Post : 'post' ;
 
 Priv : 'priv' ;
-Auth : 'auth' ;
 Pub : 'pub' ;
-PubSet : 'pub(set)' ;
+Set : 'set' ;
+
+Access : 'access' ;
+All : 'all' ;
+Self : 'self' ;
+Account : 'account' ;
 
 Return : 'return' ;
 
@@ -625,6 +667,17 @@ identifier
     | From
     | Create
     | Destroy
+    | Emit
+    | Contract
+    | Resource
+    | Struct
+    | Event
+    | All
+    | Access
+    | Account
+    | Self
+    | Auth
+    | Storable
     ;
 
 Identifier
@@ -641,6 +694,9 @@ fragment IdentifierCharacter
     | IdentifierHead
     ;
 
+PositiveFixedPointLiteral
+    : [0-9] ([0-9_]* [0-9])? '.' [0-9] ([0-9_]* [0-9])?
+    ;
 
 DecimalLiteral
     // NOTE: allows trailing underscores, but the parser checks underscores
@@ -696,7 +752,7 @@ WS
     ;
 
 Terminator
-    : [\r\n]+ -> channel(HIDDEN)
+    : [\r\n\u2028\u2029]+ -> channel(HIDDEN)
     ;
 
 BlockComment

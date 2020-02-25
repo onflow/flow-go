@@ -3,39 +3,27 @@
 package operation
 
 import (
-	"fmt"
-	"math/rand"
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestIdentitiesInsertRetrieve(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		expected := unittest.IdentityFixture()
 
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
+		err := db.Update(InsertIdentity(expected))
+		require.Nil(t, err)
 
-	hash := crypto.Hash{0x13, 0x37}
-	expected := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.Role(1), Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.Role(2), Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.Role(3), Stake: 3},
-	}
+		var actual flow.Identity
+		err = db.View(RetrieveIdentity(expected.ID(), &actual))
+		require.Nil(t, err)
 
-	err = db.Update(InsertIdentities(hash, expected))
-	require.Nil(t, err)
-
-	var actual flow.IdentityList
-	err = db.View(RetrieveIdentities(hash, &actual))
-	require.Nil(t, err)
-
-	assert.Equal(t, expected, actual)
+		assert.Equal(t, expected, &actual)
+	})
 }

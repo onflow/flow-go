@@ -10,6 +10,52 @@ type Snapshot struct {
 	mock.Mock
 }
 
+// Clusters provides a mock function with given fields:
+func (_m *Snapshot) Clusters() (*flow.ClusterList, error) {
+	ret := _m.Called()
+
+	var r0 *flow.ClusterList
+	if rf, ok := ret.Get(0).(func() *flow.ClusterList); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ClusterList)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Commit provides a mock function with given fields:
+func (_m *Snapshot) Commit() ([]byte, error) {
+	ret := _m.Called()
+
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func() []byte); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Head provides a mock function with given fields:
 func (_m *Snapshot) Head() (*flow.Header, error) {
 	ret := _m.Called()
@@ -63,14 +109,16 @@ func (_m *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityLis
 }
 
 // Identity provides a mock function with given fields: nodeID
-func (_m *Snapshot) Identity(nodeID flow.Identifier) (flow.Identity, error) {
+func (_m *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	ret := _m.Called(nodeID)
 
-	var r0 flow.Identity
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identity); ok {
+	var r0 *flow.Identity
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Identity); ok {
 		r0 = rf(nodeID)
 	} else {
-		r0 = ret.Get(0).(flow.Identity)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Identity)
+		}
 	}
 
 	var r1 error

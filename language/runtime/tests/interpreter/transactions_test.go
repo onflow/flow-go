@@ -7,7 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 )
 
 func TestInterpretTransactions(t *testing.T) {
@@ -27,13 +29,13 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("SetTransactionField", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
               self.x = 5
             }
-            
+
             execute {
               let y = self.x + 1
             }
@@ -47,7 +49,7 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("PreConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
@@ -57,8 +59,6 @@ func TestInterpretTransactions(t *testing.T) {
             pre {
               self.x > 1
             }
-            
-            execute {}
           }
         `)
 
@@ -69,7 +69,7 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("FailingPreConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
@@ -79,8 +79,6 @@ func TestInterpretTransactions(t *testing.T) {
             pre {
               self.x > 10
             }
-            
-            execute {}
           }
         `)
 
@@ -95,13 +93,13 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("PostConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
               self.x = 5
             }
-            
+
             execute {
               self.x = 10
             }
@@ -119,13 +117,13 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("FailingPostConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
               self.x = 5
             }
-            
+
             execute {
               self.x = 10
             }
@@ -176,8 +174,6 @@ func TestInterpretTransactions(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
             prepare(signer: Account) {}
-
-            execute {}
           }
         `)
 
@@ -198,11 +194,21 @@ func TestInterpretTransactions(t *testing.T) {
           }
         `)
 
+		panicFunction := interpreter.NewHostFunctionValue(func(invocation interpreter.Invocation) trampoline.Trampoline {
+			panic(errors.NewUnreachableError())
+		})
+
 		signer1 := interpreter.NewAccountValue(
 			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			panicFunction,
+			panicFunction,
+			panicFunction,
 		)
 		signer2 := interpreter.NewAccountValue(
 			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
+			panicFunction,
+			panicFunction,
+			panicFunction,
 		)
 
 		// first transaction

@@ -2,10 +2,11 @@ package ast
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
-	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 // CompositeDeclaration
+
+// NOTE: For events, only an empty initializer is declared
 
 type CompositeDeclaration struct {
 	Access                Access
@@ -29,21 +30,12 @@ func (*CompositeDeclaration) isDeclaration() {}
 //
 func (*CompositeDeclaration) isStatement() {}
 
-func (d *CompositeDeclaration) DeclarationIdentifier() Identifier {
-	return d.Identifier
+func (d *CompositeDeclaration) DeclarationIdentifier() *Identifier {
+	return &d.Identifier
 }
 
 func (d *CompositeDeclaration) DeclarationKind() common.DeclarationKind {
-	switch d.CompositeKind {
-	case common.CompositeKindStructure:
-		return common.DeclarationKindStructure
-	case common.CompositeKindResource:
-		return common.DeclarationKindResource
-	case common.CompositeKindContract:
-		return common.DeclarationKindContract
-	}
-
-	panic(errors.NewUnreachableError())
+	return d.CompositeKind.DeclarationKind(false)
 }
 
 func (d *CompositeDeclaration) DeclarationAccess() Access {
@@ -66,8 +58,8 @@ func (f *FieldDeclaration) Accept(visitor Visitor) Repr {
 
 func (*FieldDeclaration) isDeclaration() {}
 
-func (f *FieldDeclaration) DeclarationIdentifier() Identifier {
-	return f.Identifier
+func (f *FieldDeclaration) DeclarationIdentifier() *Identifier {
+	return &f.Identifier
 }
 
 func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {

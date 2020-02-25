@@ -85,7 +85,7 @@ func TestCheckInvalidFunctionDeclarations(t *testing.T) {
 	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
-func TestCheckFunctionRedeclaration(t *testing.T) {
+func TestCheckInvalidFunctionRedeclaration(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun foo() {
@@ -93,7 +93,9 @@ func TestCheckFunctionRedeclaration(t *testing.T) {
       }
 	`)
 
-	require.NoError(t, err)
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
 func TestCheckFunctionAccess(t *testing.T) {
@@ -130,7 +132,7 @@ func TestCheckReturnWithoutExpression(t *testing.T) {
 func TestCheckAnyReturnType(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      fun foo(): Any {
+      fun foo(): AnyStruct {
           return foo
       }
 	`)
@@ -225,9 +227,9 @@ func TestCheckInvalidResourceCapturingThroughVariable(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource Kitty {}
 
-      fun makeKittyCloner(): ((): <-Kitty) {
+      fun makeKittyCloner(): ((): @Kitty) {
           let kitty <- create Kitty()
-          return fun (): <-Kitty {
+          return fun (): @Kitty {
               return <-kitty
           }
       }
@@ -245,8 +247,8 @@ func TestCheckInvalidResourceCapturingThroughParameter(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource Kitty {}
 
-      fun makeKittyCloner(kitty: <-Kitty): ((): <-Kitty) {
-          return fun (): <-Kitty {
+      fun makeKittyCloner(kitty: @Kitty): ((): @Kitty) {
+          return fun (): @Kitty {
               return <-kitty
           }
       }
@@ -263,8 +265,8 @@ func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       resource Kitty {
-          fun makeCloner(): ((): <-Kitty) {
-              return fun (): <-Kitty {
+          fun makeCloner(): ((): @Kitty) {
+              return fun (): @Kitty {
                   return <-self
               }
           }
@@ -274,9 +276,10 @@ func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
       let test = kitty.makeCloner()
 	`)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[1])
 }
 
 func TestCheckInvalidResourceCapturingJustMemberAccess(t *testing.T) {

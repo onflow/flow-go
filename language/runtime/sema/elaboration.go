@@ -19,6 +19,7 @@ type Elaboration struct {
 	FunctionExpressionFunctionType      map[*ast.FunctionExpression]*FunctionType
 	InvocationExpressionArgumentTypes   map[*ast.InvocationExpression][]Type
 	InvocationExpressionParameterTypes  map[*ast.InvocationExpression][]Type
+	InvocationExpressionReturnTypes     map[*ast.InvocationExpression]Type
 	InterfaceDeclarationTypes           map[*ast.InterfaceDeclaration]*InterfaceType
 	CastingStaticValueTypes             map[*ast.CastingExpression]Type
 	CastingTargetTypes                  map[*ast.CastingExpression]Type
@@ -31,7 +32,6 @@ type Elaboration struct {
 	ArrayExpressionElementType          map[*ast.ArrayExpression]Type
 	DictionaryExpressionType            map[*ast.DictionaryExpression]*DictionaryType
 	DictionaryExpressionEntryTypes      map[*ast.DictionaryExpression][]DictionaryEntryType
-	EventDeclarationTypes               map[*ast.EventDeclaration]*EventType
 	TransactionDeclarationTypes         map[*ast.TransactionDeclaration]*TransactionType
 	// NOTE: not indexed by `ast.Type`, as IndexExpression might index
 	//   with "type" which is an expression, i.e., an IdentifierExpression.
@@ -43,6 +43,9 @@ type Elaboration struct {
 	IsResourceMovingStorageIndexExpression map[*ast.IndexExpression]bool
 	CompositeNestedDeclarations            map[*ast.CompositeDeclaration]map[string]ast.Declaration
 	InterfaceNestedDeclarations            map[*ast.InterfaceDeclaration]map[string]ast.Declaration
+	PostConditionsRewrite                  map[*ast.Conditions]PostConditionsRewrite
+	EmitStatementEventTypes                map[*ast.EmitStatement]*CompositeType
+	IsReferenceIntoStorage                 map[*ast.ReferenceExpression]bool
 }
 
 func NewElaboration() *Elaboration {
@@ -58,6 +61,7 @@ func NewElaboration() *Elaboration {
 		FunctionExpressionFunctionType:         map[*ast.FunctionExpression]*FunctionType{},
 		InvocationExpressionArgumentTypes:      map[*ast.InvocationExpression][]Type{},
 		InvocationExpressionParameterTypes:     map[*ast.InvocationExpression][]Type{},
+		InvocationExpressionReturnTypes:        map[*ast.InvocationExpression]Type{},
 		InterfaceDeclarationTypes:              map[*ast.InterfaceDeclaration]*InterfaceType{},
 		CastingStaticValueTypes:                map[*ast.CastingExpression]Type{},
 		CastingTargetTypes:                     map[*ast.CastingExpression]Type{},
@@ -70,7 +74,6 @@ func NewElaboration() *Elaboration {
 		ArrayExpressionElementType:             map[*ast.ArrayExpression]Type{},
 		DictionaryExpressionType:               map[*ast.DictionaryExpression]*DictionaryType{},
 		DictionaryExpressionEntryTypes:         map[*ast.DictionaryExpression][]DictionaryEntryType{},
-		EventDeclarationTypes:                  map[*ast.EventDeclaration]*EventType{},
 		TransactionDeclarationTypes:            map[*ast.TransactionDeclaration]*TransactionType{},
 		IndexExpressionIndexingTypes:           map[*ast.IndexExpression]Type{},
 		SwapStatementLeftTypes:                 map[*ast.SwapStatement]Type{},
@@ -79,5 +82,8 @@ func NewElaboration() *Elaboration {
 		IsResourceMovingStorageIndexExpression: map[*ast.IndexExpression]bool{},
 		CompositeNestedDeclarations:            map[*ast.CompositeDeclaration]map[string]ast.Declaration{},
 		InterfaceNestedDeclarations:            map[*ast.InterfaceDeclaration]map[string]ast.Declaration{},
+		PostConditionsRewrite:                  map[*ast.Conditions]PostConditionsRewrite{},
+		EmitStatementEventTypes:                map[*ast.EmitStatement]*CompositeType{},
+		IsReferenceIntoStorage:                 map[*ast.ReferenceExpression]bool{},
 	}
 }

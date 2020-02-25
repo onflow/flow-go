@@ -27,8 +27,8 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	}
 
 	switch operationKind {
-	case BinaryOperationKindIntegerArithmetic,
-		BinaryOperationKindIntegerComparison,
+	case BinaryOperationKindArithmetic,
+		BinaryOperationKindNonEqualityComparison,
 		BinaryOperationKindEquality,
 		BinaryOperationKindConcatenation:
 
@@ -40,10 +40,10 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 		anyInvalid := leftIsInvalid || rightIsInvalid
 
 		switch operationKind {
-		case BinaryOperationKindIntegerArithmetic,
-			BinaryOperationKindIntegerComparison:
+		case BinaryOperationKindArithmetic,
+			BinaryOperationKindNonEqualityComparison:
 
-			return checker.checkBinaryExpressionIntegerArithmeticOrComparison(
+			return checker.checkBinaryExpressionArithmeticOrNonEqualityComparison(
 				expression, operation, operationKind,
 				leftType, rightType,
 				leftIsInvalid, rightIsInvalid, anyInvalid,
@@ -109,19 +109,19 @@ func (checker *Checker) VisitBinaryExpression(expression *ast.BinaryExpression) 
 	}
 }
 
-func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
+func (checker *Checker) checkBinaryExpressionArithmeticOrNonEqualityComparison(
 	expression *ast.BinaryExpression,
 	operation ast.Operation,
 	operationKind BinaryOperationKind,
 	leftType, rightType Type,
 	leftIsInvalid, rightIsInvalid, anyInvalid bool,
 ) Type {
-	// check both types are integer subtypes
+	// check both types are number subtypes
 
-	leftIsInteger := IsSubType(leftType, &IntegerType{})
-	rightIsInteger := IsSubType(rightType, &IntegerType{})
+	leftIsNumber := IsSubType(leftType, &NumberType{})
+	rightIsNumber := IsSubType(rightType, &NumberType{})
 
-	if !leftIsInteger && !rightIsInteger {
+	if !leftIsNumber && !rightIsNumber {
 		if !anyInvalid {
 			checker.report(
 				&InvalidBinaryOperandsError{
@@ -132,25 +132,25 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 				},
 			)
 		}
-	} else if !leftIsInteger {
+	} else if !leftIsNumber {
 		if !leftIsInvalid {
 			checker.report(
 				&InvalidBinaryOperandError{
 					Operation:    operation,
 					Side:         common.OperandSideLeft,
-					ExpectedType: &IntegerType{},
+					ExpectedType: &NumberType{},
 					ActualType:   leftType,
 					Range:        ast.NewRangeFromPositioned(expression.Left),
 				},
 			)
 		}
-	} else if !rightIsInteger {
+	} else if !rightIsNumber {
 		if !rightIsInvalid {
 			checker.report(
 				&InvalidBinaryOperandError{
 					Operation:    operation,
 					Side:         common.OperandSideRight,
-					ExpectedType: &IntegerType{},
+					ExpectedType: &NumberType{},
 					ActualType:   rightType,
 					Range:        ast.NewRangeFromPositioned(expression.Right),
 				},
@@ -171,9 +171,10 @@ func (checker *Checker) checkBinaryExpressionIntegerArithmeticOrComparison(
 	}
 
 	switch operationKind {
-	case BinaryOperationKindIntegerArithmetic:
+	case BinaryOperationKindArithmetic:
 		return leftType
-	case BinaryOperationKindIntegerComparison:
+
+	case BinaryOperationKindNonEqualityComparison:
 		return &BoolType{}
 	}
 
@@ -215,7 +216,7 @@ func (checker *Checker) checkBinaryExpressionBooleanLogic(
 	leftType, rightType Type,
 	leftIsInvalid, rightIsInvalid, anyInvalid bool,
 ) Type {
-	// check both types are integer subtypes
+	// check both types are boolean subtypes
 
 	leftIsBool := IsSubType(leftType, &BoolType{})
 	rightIsBool := IsSubType(rightType, &BoolType{})

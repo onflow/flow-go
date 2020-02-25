@@ -13,30 +13,38 @@ import (
 
 // AssertFunction
 
-var assertRequiredArgumentCount = 1
-
 var AssertFunction = NewStandardLibraryFunction(
 	"assert",
 	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.BoolType{},
-			&sema.StringType{},
-		),
+		Parameters: []*sema.Parameter{
+			{
+				Label:          sema.ArgumentLabelNotRequired,
+				Identifier:     "condition",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.BoolType{}),
+			},
+			{
+				Identifier:     "message",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.StringType{}),
+			},
+		},
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VoidType{},
 		),
-		RequiredArgumentCount: &assertRequiredArgumentCount,
+		RequiredArgumentCount: (func() *int {
+			var count = 1
+			return &count
+		})(),
 	},
-	func(arguments []interpreter.Value, location interpreter.LocationPosition) trampoline.Trampoline {
-		result := arguments[0].(interpreter.BoolValue)
+	func(invocation interpreter.Invocation) trampoline.Trampoline {
+		result := invocation.Arguments[0].(interpreter.BoolValue)
 		if !result {
 			var message string
-			if len(arguments) > 1 {
-				message = arguments[1].(*interpreter.StringValue).Str
+			if len(invocation.Arguments) > 1 {
+				message = invocation.Arguments[1].(*interpreter.StringValue).Str
 			}
 			panic(AssertionError{
 				Message:  message,
-				Location: location,
+				Location: invocation.Location,
 			})
 		}
 		return trampoline.Done{}
@@ -75,20 +83,84 @@ func (e PanicError) ImportLocation() ast.Location {
 var PanicFunction = NewStandardLibraryFunction(
 	"panic",
 	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.StringType{},
-		),
+		Parameters: []*sema.Parameter{
+			{
+				Label:          sema.ArgumentLabelNotRequired,
+				Identifier:     "message",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.StringType{}),
+			},
+		},
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.NeverType{},
 		),
 	},
-	func(arguments []interpreter.Value, location interpreter.LocationPosition) trampoline.Trampoline {
-		message := arguments[0].(*interpreter.StringValue)
+	func(invocation interpreter.Invocation) trampoline.Trampoline {
+		message := invocation.Arguments[0].(*interpreter.StringValue)
 		panic(PanicError{
 			Message:  message.Str,
-			Location: location,
+			Location: invocation.Location,
 		})
-		return trampoline.Done{}
+	},
+	nil,
+)
+
+var ArrayFunction = NewStandardLibraryFunction(
+	"Array",
+	&sema.FunctionType{
+		Parameters: []*sema.Parameter{
+			{
+				Identifier:     "size",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+			},
+			{
+				Identifier: "generate",
+				TypeAnnotation: sema.NewTypeAnnotation(
+					&sema.FunctionType{
+						Parameters: []*sema.Parameter{
+							{
+								Identifier:     "index",
+								TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+							},
+						},
+						ReturnTypeAnnotation: sema.NewTypeAnnotation(&sema.AnyType{}),
+					},
+				),
+			},
+		},
+		ReturnTypeGetter: func(argumentTypes []sema.Type) sema.Type {
+			generateFunctionType := argumentTypes[1].(*sema.FunctionType)
+			elementType := generateFunctionType.ReturnTypeAnnotation.Type
+			return &sema.VariableSizedType{
+				Type: elementType,
+			}
+		},
+	},
+	func(invocation interpreter.Invocation) trampoline.Trampoline {
+		count := invocation.Arguments[0].(interpreter.NumberValue).IntValue()
+		generate := invocation.Arguments[1].(interpreter.FunctionValue)
+
+		var elements []interpreter.Value
+
+		var step func(i int) trampoline.Trampoline
+		step = func(i int) trampoline.Trampoline {
+			if i >= count {
+				array := interpreter.NewArrayValueUnownedNonCopying(elements...)
+				return trampoline.Done{Result: array}
+			}
+
+			generateInvocation := invocation
+			generateInvocation.Arguments = []interpreter.Value{interpreter.NewIntValue(int64(i))}
+			generateInvocation.ArgumentTypes = []sema.Type{&sema.IntType{}}
+
+			return generate.Invoke(generateInvocation).
+				FlatMap(func(value interface{}) trampoline.Trampoline {
+					elements = append(elements, value.(interpreter.Value))
+
+					return step(i + 1)
+				})
+		}
+
+		return step(0)
 	},
 	nil,
 )
@@ -98,6 +170,7 @@ var PanicFunction = NewStandardLibraryFunction(
 var BuiltinFunctions = StandardLibraryFunctions{
 	AssertFunction,
 	PanicFunction,
+	ArrayFunction,
 }
 
 // LogFunction
@@ -105,16 +178,21 @@ var BuiltinFunctions = StandardLibraryFunctions{
 var LogFunction = NewStandardLibraryFunction(
 	"log",
 	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.AnyType{},
-		),
+		Parameters: []*sema.Parameter{
+			{
+				Label:          sema.ArgumentLabelNotRequired,
+				Identifier:     "value",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.AnyStructType{}),
+			},
+		},
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VoidType{},
 		),
 	},
-	func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		fmt.Printf("%v\n", arguments[0])
-		return trampoline.Done{Result: &interpreter.VoidValue{}}
+	func(invocation interpreter.Invocation) trampoline.Trampoline {
+		fmt.Printf("%v\n", invocation.Arguments[0])
+		result := interpreter.VoidValue{}
+		return trampoline.Done{Result: result}
 	},
 	nil,
 )

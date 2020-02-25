@@ -59,7 +59,7 @@
                 <p><a href="#addresses">Addresses</a></p>
               </li>
               <li>
-                <p><a href="#any">Any</a></p>
+                <p><a href="#anystruct-and-anyresource">AnyStruct and AnyResource</a></p>
               </li>
               <li>
                 <p><a href="#optionals">Optionals</a></p>
@@ -211,9 +211,6 @@
             <p><a href="#imports">Imports</a></p>
           </li>
           <li>
-            <p><a href="#attestations">Attestations</a></p>
-          </li>
-          <li>
             <p><a href="#accounts">Accounts</a></p>
           </li>
           <li>
@@ -227,6 +224,13 @@
           </li>
           <li>
             <p><a href="#publishing-references">Publishing References</a></p>
+          </li>
+          <li>
+            <p><a href="#contracts">Contracts</a></p>
+            <ul>
+              <li><a href="#deploying-and-updating-contracts">Deploying and Updating Contracts</a></li>
+              <li><a href="#contract-interfaces">Contract Interfaces</a></li>
+            </ul>
           </li>
           <li>
             <p><a href="#events">Events</a></p>
@@ -264,14 +268,34 @@
         <p>The Cadence Programming Language is a new high-level programming language intended for smart contract development.</p>
         <p>The language's goals are, in order of importance:</p>
         <ul>
-          <li><strong>Safety and security</strong>: Provide a strong static type system, design by contract (preconditions and postconditions), and resources (inspired by linear types).</li>
-          <li><strong>Auditability</strong>: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.</li>
-          <li><strong>Simplicity</strong>: Focus on developer productivity and usability: make it easy to write code, provide good tooling.</li>
+          <li>
+            <p>
+              <strong>Safety and security</strong>:
+              Provide a strong static type system, design by contract (preconditions and postconditions),
+              and resources (inspired by linear types).
+            </p>
+          </li>
+          <li>
+            <p>
+              <strong>Auditability</strong>:
+              Focus on readability: Make it easy to verify what the code is doing,
+              and make intentions explicit, at a small cost of verbosity.
+            </p>
+          </li>
+          <li>
+            <p>
+              <strong>Simplicity</strong>: Focus on developer productivity and usability:
+              Make it easy to write code, provide good tooling.
+            </p>
+          </li>
         </ul>
       </section>
       <section>
         <h2 id="terminology"><a href="#terminology" aria-hidden="true"><span class="icon icon-link"></span></a>Terminology</h2>
-        <p>In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:</p>
+        <p>
+          In this document, the following terminology is used to describe syntax
+          or behavior that is not allowed in the language:
+        </p>
         <ul>
           <li>
             <p>
@@ -297,6 +321,11 @@
         </p>
         <p>Resources are based on liner types which were popularized by Rust.</p>
         <p>Events are inspired by Solidity.</p>
+        <p>
+          <strong>Disclaimer:</strong> In real Cadence code, all type definitions and code
+          must be defined and contained in <a href="#contracts">contracts</a> or <a href="#transactions">transactions</a>,
+          but we omit these containers in examples for simplicity.
+        </p>
       </section>
       <section>
         <h2 id="comments"><a href="#comments" aria-hidden="true"><span class="icon icon-link"></span></a>Comments</h2>
@@ -634,21 +663,41 @@
             and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
           </p>
           <p>
-            The names for the integer types follow this naming convention:
-            Signed integer types have an <code>Int</code> prefix, unsigned integer types have a <code>UInt</code> prefix,
-            i.e., the integer types are named <code>Int8</code>, <code>Int16</code>, <code>Int32</code>, <code>Int64</code>, <code>UInt8</code>, <code>UInt16</code>, <code>UInt32</code>, and <code>UInt64</code>.
-            The types are independent types, i.e. not subtypes of each other.
+            Signed integer types which check for overflow and underflow have an <code>Int</code> prefix.
+            They are <code>Int8</code>, <code>Int16</code>, <code>Int32</code>, and <code>Int64</code>.
+            They can represent values in the following ranges:
           </p>
           <ul>
             <li><strong><code>Int8</code></strong>: -128 through 127</li>
             <li><strong><code>Int16</code></strong>: -32768 through 32767</li>
             <li><strong><code>Int32</code></strong>: -2147483648 through 2147483647</li>
             <li><strong><code>Int64</code></strong>: -9223372036854775808 through 9223372036854775807</li>
+          </ul>
+          <p>
+            Unsigned integer types which check for overflow and underflow have a <code>UInt</code> prefix.
+            They are <code>UInt8</code>, <code>UInt16</code>, <code>UInt32</code>, and <code>UInt64</code>.
+          </p>
+          <ul>
             <li><strong><code>UInt8</code></strong>: 0 through 255</li>
             <li><strong><code>UInt16</code></strong>: 0 through 65535</li>
             <li><strong><code>UInt32</code></strong>: 0 through 4294967295</li>
             <li><strong><code>UInt64</code></strong>: 0 through 18446744073709551615</li>
           </ul>
+          <p>
+            Unsigned integer types which do <strong>not</strong> check for overflow and underflow,
+            i.e. wrap around, have the <code>Word</code> prefix:
+          </p>
+          <ul>
+            <li><strong><code>Word8</code></strong>: 0 through 255</li>
+            <li><strong><code>Word16</code></strong>: 0 through 65535</li>
+            <li><strong><code>Word32</code></strong>: 0 through 4294967295</li>
+            <li><strong><code>Word64</code></strong>: 0 through 18446744073709551615</li>
+          </ul>
+          <p>The types are independent types, i.e. not subtypes of each other.</p>
+          <p>
+            See the section about <a href="#arithmetic">artihmetic operators</a> for further
+            information aout the behavior of the different integer types.
+          </p>
           <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant that has type `UInt8` and the value 10.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> smallNumber: UInt8 = </span><span style="color: #09885A">10</span><span>
 </span></code></pre>
@@ -729,52 +778,96 @@
 </span></code></pre>
         </section>
         <section>
-          <h3 id="any"><a href="#any" aria-hidden="true"><span class="icon icon-link"></span></a>Any</h3>
-          <p><code>Any</code> is the top type, i.e., all types are a subtype of it.</p>
-          <pre><code class="language-cadence"><span style="color: #008000">// Declare a variable that has the type `Any`.</span><span>
-</span><span style="color: #008000">// Any value can be assigned to it, for example an integer.</span><span>
+          <h3 id="anystruct-and-anyresource"><a href="#anystruct-and-anyresource" aria-hidden="true"><span class="icon icon-link"></span></a>AnyStruct and AnyResource</h3>
+          <p>
+            <code>AnyStruct</code> is the top type of all non-resource types,
+            i.e., all non-resource types are a subtype of it.
+          </p>
+          <p><code>@AnyResource</code> is the top type of all resource types.</p>
+          <pre><code class="language-cadence"><span style="color: #008000">// Declare a variable that has the type `AnyStruct`.</span><span>
+</span><span style="color: #008000">// Any non-resource typed value can be assigned to it, for example an integer,</span><span>
+</span><span style="color: #008000">// but not resoure-typed values.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">var</span><span style="color: #000000"> someValue: Any = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> someStruct: </span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span><span>
-</span><span style="color: #008000">// Assign a value with a different type, `Bool`.</span><span>
-</span><span style="color: #000000">someValue = </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// Assign a value with a different non-resource type, `Bool`.</span><span>
+</span><span style="color: #000000">someStruct = </span><span style="color: #0000FF">true</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `TestStruct`, create an instance of it,</span><span>
+</span><span style="color: #008000">// and assign it to the `AnyStruct`-typed variable</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> TestStruct {}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> testStruct = TestStruct()</span><span>
+</span><span>
+</span><span style="color: #000000">someStruct = testStruct</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource named `TestResource`</span><span>
+</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Test {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable that has the type `@AnyResource`.</span><span>
+</span><span style="color: #008000">// Any resource-typed value can be assigned to it,</span><span>
+</span><span style="color: #008000">// but not non-resource typed values.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> someResource: @</span><span style="color: #0000FF">AnyResource</span><span style="color: #000000"> &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Test()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Resource-typed values can not be assigned</span><span>
+</span><span style="color: #008000">// to `AnyStruct`-typed variables</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">someStruct &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Test()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Non-resource typed values can not be assigned</span><span>
+</span><span style="color: #008000">// to `AnyResource`-typed variables</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">someResource = </span><span style="color: #09885A">1</span><span>
 </span></code></pre>
           <p>
-            However, using <code>Any</code> does not opt-out of type checking.
-            It is invalid to access fields and call functions on <code>Any</code> typed values,
-            as it has no fields and functions.
+            However, using <code>AnyStruct</code> and <code>AnyResource</code> does not opt-out of type checking.
+            It is invalid to access fields and call functions on these types,
+            as they have no fields and functions.
           </p>
-          <pre><code class="language-cadence"><span style="color: #008000">// Declare a variable that has the type `Any`. The initial value is an integer,</span><span>
-</span><span style="color: #008000">// but the variable  still has the explicit type `Any`.</span><span>
+          <pre><code class="language-cadence"><span style="color: #008000">// Declare a variable that has the type `AnyStruct`.</span><span>
+</span><span style="color: #008000">// The initial value is an integer,</span><span>
+</span><span style="color: #008000">// but the variable still has the explicit type `AnyStruct`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Any = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span><span>
-</span><span style="color: #008000">// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)</span><span>
+</span><span style="color: #008000">// Invalid: Operator cannot be used for an `AnyStruct` value (`a`, left-hand side)</span><span>
 </span><span style="color: #008000">// and an `Int` value (`2`, right-hand side).</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">a + </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
           <p>
-            <code>Any</code> may be used like any other type, for example,
-            it may be the element type of <a href="#arrays">arrays</a>
+            <code>AnyStruct</code> and <code>AnyResource</code> may be used like other types,
+            for example, they may be the element type of <a href="#arrays">arrays</a>
             or be the element type of an <a href="#optionals">optional type</a>.
           </p>
-          <pre><code class="language-cadence"><span style="color: #008000">// Declare a variable that has the type `[Any]`, i.e. an array of elements of any type.</span><span>
+          <pre><code class="language-cadence"><span style="color: #008000">// Declare a variable that has the type `[AnyStruct]`,</span><span>
+</span><span style="color: #008000">// i.e. an array of elements of any non-resource type.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> anyValues: [Any] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #A31515">"2"</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> anyValues: [</span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000">] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #A31515">"2"</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
 </span><span>
-</span><span style="color: #008000">// Declare a variable that has the type `Any?`, i.e. an optional type of any type.</span><span>
+</span><span style="color: #008000">// Declare a variable that has the type `AnyStruct?`,</span><span>
+</span><span style="color: #008000">// i.e. an optional type of any non-resource type.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">var</span><span style="color: #000000"> maybeSomething: Any? = </span><span style="color: #09885A">42</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> maybeSomething: </span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000">? = </span><span style="color: #09885A">42</span><span>
 </span><span>
 </span><span style="color: #000000">maybeSomething = </span><span style="color: #A31515">"twenty-four"</span><span>
 </span><span>
 </span><span style="color: #000000">maybeSomething = </span><span style="color: #0000FF">nil</span><span>
 </span></code></pre>
-          <p><code>Any</code> is also the super-type of optional types.</p>
+          <p>
+            <code>AnyStruct</code> is also the super-type of all non-resource optional types,
+            and <code>AnyResource</code> is the super-type of all resource optional types.
+          </p>
           <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeInt: Int? = </span><span style="color: #09885A">1</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> anything: Any = y</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> anything: </span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000"> = maybeInt</span><span>
 </span></code></pre>
+          <p>
+            <a href="#conditional-downcasting-operator">Conditional downcasting</a> allows coercing
+            a value which has the type <code>AnyStruct</code> or <code>AnyResource</code> back to its orignal type.
+          </p>
         </section>
         <section>
           <h3 id="optionals"><a href="#optionals" aria-hidden="true"><span class="icon icon-link"></span></a>Optionals</h3>
@@ -821,7 +914,7 @@
 </span><span style="color: #008000">// may be `nil`, or any other value.</span><span>
 </span><span style="color: #008000">// An optional with the value of `x` is created.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">var</span><span style="color: #000000"> z: Any? = x</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> z: </span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000">? = x</span><span>
 </span></code></pre>
           <p>A non-optional type is a subtype of its optional type.</p>
           <pre><code class="language-cadence"><span style="color: #0000FF">var</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
@@ -898,7 +991,7 @@
             <blockquote>
               <p>
                 🚧 Status: The conditional downcasting operator <code>as?</code> is implemented,
-                but it only supports values that have the type <code>Any</code>.
+                but it only supports values that have the type <code>AnyStruct</code> and <code>AnyResource</code>.
               </p>
             </blockquote>
             <p>
@@ -914,10 +1007,10 @@
               The cast and check is performed at run-time, i.e. when the program is executed,
               not statically, i.e. when the program is checked.
             </p>
-            <pre><code class="language-cadence,file=conditional-downcasting-any.cdc"><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
+            <pre><code class="language-cadence,file=conditional-downcasting-any.cdc"><span style="color: #008000">// Declare a constant named `something` which has type `AnyStruct`,</span><span>
 </span><span style="color: #008000">// with an initial value which has type `Int`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> something: Any = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> something: </span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Conditionally downcast the value of `something` to `Int`.</span><span>
 </span><span style="color: #008000">// The cast succeeds, because the value has type `Int`.</span><span>
@@ -937,10 +1030,10 @@
               interfaces (if a <a href="#resources">resource</a> interface not to a concrete resource),
               and optionals.
             </p>
-            <pre><code class="language-cadence,file=conditional-downcasting-any-array.cdc"><span style="color: #008000">// Declare a constant named `values` which has type `[Any]`,</span><span>
+            <pre><code class="language-cadence,file=conditional-downcasting-any-array.cdc"><span style="color: #008000">// Declare a constant named `values` which has type `[AnyStruct]`,</span><span>
 </span><span style="color: #008000">// i.e. an array of arbitrarily typed values.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> values: [Any] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> values: [</span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000">] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> first = values[</span><span style="color: #09885A">0</span><span style="color: #000000">] as? Int</span><span>
 </span><span style="color: #008000">// `first` is `1` and has type `Int?`</span><span>
@@ -979,9 +1072,6 @@
         </section>
         <section>
           <h3 id="strings-and-characters"><a href="#strings-and-characters" aria-hidden="true"><span class="icon icon-link"></span></a>Strings and Characters</h3>
-          <blockquote>
-            <p>🚧 Status: Characters are not implemented yet.</p>
-          </blockquote>
           <p>
             Strings are collections of characters.
             Strings have the type <code>String</code>, and characters have the type <code>Character</code>.
@@ -1162,7 +1252,7 @@
 </span></code></pre>
             <p>
               Array types are covariant in their element types.
-              For example, <code>[Int]</code> is a subtype of <code>[Any]</code>.
+              For example, <code>[Int]</code> is a subtype of <code>[AnyStruct]</code>.
               This is safe because arrays are value types and not reference types.
             </p>
           </section>
@@ -1474,8 +1564,8 @@
 </span></code></pre>
             <p>
               Dictionary types are covariant in their key and value types.
-              For example, <code>[Int: String]</code> is a subtype of <code>[Any: String]</code>
-              and also a subtype of <code>[Int: Any]</code>.
+              For example, <code>[Int: String]</code> is a subtype of <code>[AnyStruct: String]</code>
+              and also a subtype of <code>[Int: AnyStruct]</code>.
               This is safe because dictionaries are value types and not reference types.
             </p>
           </section>
@@ -1795,49 +1885,57 @@
             The arguments for the operators need to be of the same type.
             The result is always the same type as the arguments.
           </p>
-          <p>Arithmetic operators do not cause values to overflow.</p>
-          <pre><code class="language-cadence,file=operator-times.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
+          <p>The division and remainder operators abort the program when the divisor is zero.</p>
+          <p>
+            Arithmetic operations on the signed integer types <code>Int8</code>, <code>Int16</code>, <code>Int32</code>, <code>Int64</code>,
+            and on the unsigned integer types <code>UInt8</code>, <code>UInt16</code>, <code>UInt32</code>, <code>UInt64</code>
+            do not cause values to overflow or underflow.
+          </p>
+          <pre><code class="language-cadence,file=operator-add-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: UInt8 = </span><span style="color: #09885A">255</span><span>
+</span><span>
+</span><span style="color: #008000">// Error: The result `256` does not fit in the range of `UInt8`,</span><span>
+</span><span style="color: #008000">// thus a fatal overflow error is raised and the program aborts</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a + </span><span style="color: #09885A">1</span><span>
+</span></code></pre>
+          <pre><code class="language-cadence,file=operator-times-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int8 = </span><span style="color: #09885A">100</span><span>
+</span><span>
+</span><span style="color: #008000">// Error: The result `10000` does not fit in the range of `Int8`,</span><span>
+</span><span style="color: #008000">// thus a fatal overflow error is raised and the program aborts</span><span>
+</span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a * b</span><span>
-</span><span style="color: #008000">// `c` is `10000`, and has type `Int`</span><span>
+</span></code></pre>
+          <pre><code class="language-cadence,file=operator-unary-negate-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">-128</span><span>
+</span><span>
+</span><span style="color: #008000">// Error: The result `128` does not fit in the range of `Int8`,</span><span>
+</span><span style="color: #008000">// thus a fatal overflow error is raised and the program aborts</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = -a</span><span>
 </span></code></pre>
           <p>
-            If overflow behavior is intended, overflowing operators are available,
-            which are prefixed with an <code>&#x26;</code>:
+            Arithmetic operations on the unsigned integer types <code>Word8</code>, <code>Word6</code>, <code>Word32</code>, <code>Word64</code>
+            may cause values to overflow or underflow.
           </p>
-          <ul>
-            <li>Overflow addition: <code>&#x26;+</code></li>
-            <li>Overflow subtraction: <code>&#x26;-</code></li>
-            <li>Overflow multiplication: <code>&#x26;*</code></li>
-          </ul>
           <p>
             For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111).
             Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
           </p>
-          <pre><code class="language-cadence"><span style="color: #008000">//     11111111 = 255</span><span>
-</span><span style="color: #008000">// &#x26;+         1</span><span>
-</span><span style="color: #008000">//  = 100000000 = 0</span><span>
+          <pre><code class="language-cadence"><span style="color: #008000">//    11111111 = 255</span><span>
+</span><span style="color: #008000">// +         1</span><span>
+</span><span style="color: #008000">// = 100000000 = 0</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=operator-overflow-plus.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: UInt8 = </span><span style="color: #09885A">255</span><span>
-</span><span style="color: #000000">a &#x26;+ </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is `0`</span><span>
+          <pre><code class="language-cadence,file=operator-overflow-plus.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Word8</span><span style="color: #000000"> = </span><span style="color: #09885A">255</span><span>
+</span><span style="color: #000000">a + </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is `0`</span><span>
 </span></code></pre>
           <p>Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.</p>
-          <pre><code class="language-cadence,file=operator-minus.cdc"><span style="color: #008000">//     00000000</span><span>
-</span><span style="color: #008000">// &#x26;-         1</span><span>
-</span><span style="color: #008000">//  =  11111111 = 255</span><span>
+          <pre><code class="language-cadence,file=operator-minus.cdc"><span style="color: #008000">//    00000000</span><span>
+</span><span style="color: #008000">// -         1</span><span>
+</span><span style="color: #008000">// =  11111111 = 255</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> b: UInt8 = </span><span style="color: #09885A">0</span><span>
-</span><span style="color: #000000">b &#x26;- </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `255`</span><span>
+          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> b: </span><span style="color: #0000FF">Word8</span><span style="color: #000000"> = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">b - </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `255`</span><span>
 </span></code></pre>
-          <p>Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.</p>
-          <pre><code class="language-cadence"><span style="color: #008000">//    10000000 = -128</span><span>
-</span><span style="color: #008000">// &#x26;-        1</span><span>
-</span><span style="color: #008000">//  = 01111111 = 127</span><span>
-</span></code></pre>
-          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> c: Int8 = </span><span style="color: #09885A">-128</span><span>
-</span><span style="color: #000000">c &#x26;- </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `127`</span><span>
-</span></code></pre>
-          <p>Division by zero is a fatal error at run-time and aborts the program.</p>
         </section>
         <section>
           <h3 id="logical-operators"><a href="#logical-operators" aria-hidden="true"><span class="icon icon-link"></span></a>Logical Operators</h3>
@@ -2006,26 +2104,51 @@
             <li>Ternary precedence: <code>? :</code></li>
           </ul>
           <p>All operators are left-associative, except for the ternary operator, which is right-associative.</p>
-          <p>Expressions can be wrapped in parentheses to override precedence conventions, i.e. an alternate order should be indicated, or when the default order should be emphasized, e.g. to avoid confusion. For example, <code>(2 + 3) * 4</code> forces addition to precede multiplication, and <code>5 + (6 * 7)</code> reinforces the default order.</p>
+          <p>
+            Expressions can be wrapped in parentheses to override precedence conventions,
+            i.e. an alternate order should be indicated, or when the default order should be emphasized
+            e.g. to avoid confusion.
+            For example, <code>(2 + 3) * 4</code> forces addition to precede multiplication,
+            and <code>5 + (6 * 7)</code> reinforces the default order.
+          </p>
         </section>
       </section>
       <section>
         <h2 id="functions"><a href="#functions" aria-hidden="true"><span class="icon icon-link"></span></a>Functions</h2>
-        <p>Functions are sequences of statements that perform a specific task. Functions have parameters (inputs) and an optional return value (output). Functions are typed: the function type consists of the parameter types and the return type.</p>
-        <p>Functions are values, i.e., they can be assigned to constants and variables, and can be passed as arguments to other functions. This behavior is often called "first-class functions".</p>
+        <p>
+          Functions are sequences of statements that perform a specific task.
+          Functions have parameters (inputs) and an optional return value (output).
+          Functions are typed: the function type consists of the parameter types and the return type.
+        </p>
+        <p>
+          Functions are values, i.e., they can be assigned to constants and variables,
+          and can be passed as arguments to other functions.
+          This behavior is often called "first-class functions".
+        </p>
         <section>
           <h3 id="function-declarations"><a href="#function-declarations" aria-hidden="true"><span class="icon icon-link"></span></a>Function Declarations</h3>
-          <p>Functions can be declared by using the <code>fun</code> keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.</p>
+          <p>
+            Functions can be declared by using the <code>fun</code> keyword, followed by the name of the declaration,
+            the parameters, the optional return type,
+            and the code that should be executed when the function is called.
+          </p>
           <p>
             The parameters need to be enclosed in parentheses.
             The return type, if any, is separated from the parameters by a colon (<code>:</code>).
             The function code needs to be enclosed in opening and closing braces.
           </p>
-          <p>Each parameter must have a name, which is the name that the argument value will be available as within the function.</p>
-          <p>An additional argument label can be provided to require function calls to use the label to provide an argument value for the parameter.</p>
+          <p>
+            Each parameter must have a name, which is the name that the argument value
+            will be available as within the function.
+          </p>
+          <p>
+            An additional argument label can be provided to require function calls to use the label
+            to provide an argument value for the parameter.
+          </p>
           <p>
             Argument labels make code more explicit and readable.
-            For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
+            For example, they avoid confusion about the order of arguments
+            when there are multiple arguments that have the same type.
           </p>
           <p>Argument labels should be named so they make sense from the perspective of the function call.</p>
           <p>
@@ -2810,7 +2933,14 @@
       </section>
       <section>
         <h2 id="composite-data-types"><a href="#composite-data-types" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Types</h2>
-        <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.</p>
+        <p>
+          Composite data types allow composing simpler types into more complex types,
+          i.e., they allow the composition of multiple values into one.
+          Composite data types have a name and consist of zero or more named fields,
+          and zero or more functions that operate on the data.
+          Each field may have a different type. Composite data types can
+          only be declared within a <a href="#contracts">contract</a> and nowhere else.
+        </p>
         <p>
           There are two kinds of composite data types.
           The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable,
@@ -2820,7 +2950,7 @@
         </p>
         <ul>
           <li>
-            <p><a href="#structures"><strong>Structures</strong></a> are <strong>copied</strong>, i.e. they are value types.</p>
+            <p><a href="#structures"><strong>Structures</strong></a> are <strong>copied</strong>, they are value types.</p>
             <p>Structures are useful when copies with independent state are desired.</p>
           </li>
           <li>
@@ -2862,11 +2992,12 @@
           <pre><code class="language-cadence,file=resource-instantiation.cdc"><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
 </span></code></pre>
           <p>
-            The constructor function may require parameters
-            if the <a href="#composite-data-type-fields">initializer</a> of the composite data type requires them.
+            The constructor function may require parameters if the <a href="#composite-data-type-fields">initializer</a>
+            of the composite data type requires them.
           </p>
           <p>
-            Composite data types can only be declared globally and not locally in functions.
+            Composite data types can only be declared within <a href="#contracts">contract</a>
+            and not locally in functions.
             They can also not be nested.
           </p>
         </section>
@@ -2907,7 +3038,10 @@
               <p>Constant fields are declared using the <code>let</code> keyword.</p>
             </li>
             <li>
-              <p><strong>Variable fields</strong> are stored in the composite value and can have new values assigned to them.</p>
+              <p>
+                <strong>Variable fields</strong> are stored in the composite value
+                and can have new values assigned to them.
+              </p>
               <p>Variable fields are declared using the <code>var</code> keyword.</p>
             </li>
             <li>
@@ -2954,8 +3088,15 @@
               </tr>
             </tbody>
           </table>
-          <p>In initializers, the special constant <code>self</code> refers to the composite value that is to be initialized.</p>
-          <p>Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (<code>.</code>) and the name of the field.</p>
+          <p>
+            In initializers, the special constant <code>self</code> refers to the composite value
+            that is to be initialized.
+          </p>
+          <p>
+            Fields can be read (if they are constant or variable) and set (if they are variable),
+            using the access syntax: the composite value is followed by a dot (<code>.</code>)
+            and the name of the field.
+          </p>
           <pre><code class="language-cadence,file=composite-data-type-fields-and-init.cdc"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
 </span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3046,7 +3187,8 @@
           <p>
             Fields may have an optional getter and an optional setter.
             Getters are functions that are called when a field is read,
-            and setters are functions that are called when a field is written.<br>Only certain assignments are allowed in getters and setters.
+            and setters are functions that are called when a field is written.
+            Only certain assignments are allowed in getters and setters.
           </p>
           <p>Getters and setters are enclosed in opening and closing braces, after the field's type.</p>
           <p>
@@ -3441,7 +3583,7 @@
             </p>
             <p>
               To make the behaviour of resource types explicit,
-              the move prefix <code>&#x3C;-</code> must be used in type annotations
+              the prefix <code>@</code> must be used in type annotations
               of variable or constant declarations, parameters, and return types.
             </p>
             <p>
@@ -3463,7 +3605,7 @@
 </span><span>
 </span><span style="color: #008000">// Declare a constant with value of resource type `SomeResource`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: &#x3C;-SomeResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// *Move* the resource value to a new constant.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3480,9 +3622,9 @@
 </span><span>
 </span><span style="color: #008000">// Declare a function which accepts a resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `@`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -3516,29 +3658,29 @@
 </span></code></pre>
             <p>
               To make it explicit that the type is moved,
-              it must be prefixed with <code>&#x3C;-</code> in all type annotations,
+              it must be prefixed with <code>@</code> in all type annotations,
               e.g. for variable declarations, parameters, or return types.
             </p>
             <pre><code class="language-cadence,file=resource-type-annotation.cdc"><span style="color: #008000">// Declare a constant with an explicit type annotation.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `@`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> someResource: &#x3C;-SomeResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> someResource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a function which consumes a resource and destroys it.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `@`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a function which returns a resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The return type is a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">// The return type is a resource type, so the type name must be prefixed with `@`.</span><span>
 </span><span style="color: #008000">// The return statement must also use the `&#x3C;-` operator to make it explicit the resource is moved.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> get(): &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> get(): @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> newResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-newResource</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -3547,7 +3689,7 @@
             <pre><code class="language-cadence,file=resource-must-use.cdc"><span style="color: #008000">// Declare a function which consumes a resource but does not use it.</span><span>
 </span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -3570,7 +3712,7 @@
             <pre><code class="language-cadence,file=resource-not-used.cdc"><span style="color: #008000">// Declare a function which has a resource parameter but does not use it.</span><span>
 </span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -3578,7 +3720,7 @@
 </span><span style="color: #008000">// This function is invalid, because it does not always use the resource parameter,</span><span>
 </span><span style="color: #008000">// which would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> sometimesDestroy(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroy: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> sometimesDestroy(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroy: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> destroyResource {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3591,7 +3733,7 @@
 </span><span style="color: #008000">// This function is valid, as it always uses the resource parameter,</span><span>
 </span><span style="color: #008000">// and does not cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> alwaysUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroyResource: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> alwaysUse(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroyResource: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> destroyResource {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
 </span><span style="color: #000000">    } </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
@@ -3690,9 +3832,9 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Parent {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> name: </span><span style="color: #0000FF">String</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> child: &#x3C;-Child</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> child: @</span><span style="color: #0000FF">Child</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(name: </span><span style="color: #0000FF">String</span><span style="color: #000000">, child: &#x3C;-</span><span style="color: #0000FF">Child</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(name: </span><span style="color: #0000FF">String</span><span style="color: #000000">, child: @</span><span style="color: #0000FF">Child</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.name = name</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.child &#x3C;- child</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3736,8 +3878,8 @@
 </span><span style="color: #008000">// the resource parameter `resource`. Each call to the returned function</span><span>
 </span><span style="color: #008000">// would return the resource, which should not be possible.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCloner(resource: &#x3C;-</span><span style="color: #0000FF">R</span><span style="color: #000000">): ((): &#x3C;-</span><span style="color: #0000FF">R</span><span style="color: #000000">) {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> fun (): &#x3C;-R {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCloner(resource: @</span><span style="color: #0000FF">R</span><span style="color: #000000">): ((): @</span><span style="color: #0000FF">R</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> fun (): @R {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-resource</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -3936,35 +4078,31 @@
       </section>
       <section>
         <h2 id="access-control"><a href="#access-control" aria-hidden="true"><span class="icon icon-link"></span></a>Access control</h2>
-        <blockquote>
-          <p>🚧 Status: Access control is not implemented yet.</p>
-        </blockquote>
         <p>
           Access control allows making certain parts of the program accessible/visible
           and making other parts inaccessible/invisible.
         </p>
-        <p>In Flow and Cadence, there are two types of access control</p>
-        <ul>
+        <p>In Flow and Cadence, there are two types of access control:</p>
+        <ol>
           <li>
-            <ol>
-              <li>
-                Access control between accounts using capability security.<br>Within Flow, a caller is not able to access an object
-                unless it owns the object or has a specific reference to that object.<br>This means that nothing is truly public by default.<br>Other accounts can not read or write the objects in an account
-                unless the owner of the account has granted them access
-                by providing references to the objects.
-              </li>
-            </ol>
+            <p>Access control between accounts using capability security.</p>
+            <p>
+              Within Flow, a caller is not able to access an object
+              unless it owns the object or has a specific reference to that object.
+              This means that nothing is truly public by default.
+              Other accounts can not read or write the objects in an account
+              unless the owner of the account has granted them access
+              by providing references to the objects.
+            </p>
           </li>
           <li>
-            <ol start="2">
-              <li>
-                Access control within programs using <code>private</code> and <code>public</code> keywords.<br>Assuming the caller has a valid reference that
-                satisfies the first type of access control,
-                these keywords further govern how access is controlled.
-              </li>
-            </ol>
+            <p>Access control within programs using <code>private</code> and <code>public</code> keywords.</p>
+            <p>
+              Assuming the caller has a valid reference that satisfies the first type of access control,
+              these keywords further govern how access is controlled.
+            </p>
           </li>
-        </ul>
+        </ol>
         <p>
           The high-level reference-based security (point 1 above)
           will be covered in a later section.
@@ -3981,16 +4119,20 @@
             <p>
               <strong>Private</strong> means the declaration is only accessible/visible
               in the current and inner scopes.
+            </p>
+            <p>
               For example, a private field can only be
               accessed by functions of the type is part of,
               not by code that uses an instance of the type in an outer scope.
             </p>
           </li>
           <li>
+            <p><strong>Public</strong> means the declaration is accessible/visible in all scopes.</p>
             <p>
-              <strong>Public</strong> means the declaration is accessible/visible in all scopes.
               This includes the current and inner scopes like for private,
               and the outer scopes.
+            </p>
+            <p>
               For example, a public field in a type can be accessed using the access syntax
               on an instance of the type in an outer scope.
               This does not allow the declaration to be publicly writable though.
@@ -4067,6 +4209,12 @@
             </tr>
           </tbody>
         </table>
+        <p>
+          Currently, all types must be declared public and are visible to all code.
+          However, that does not imply that any code may instantiate the type:
+          only code within the <a href="#contracts">contract</a> in which the type is declared
+          is allowed to create instances of the type. See the linked contracts section for more information.
+        </p>
         <pre><code class="language-cadence,file=access-control-globals.cdc"><span style="color: #008000">// Declare a private constant, inaccessible/invisible in outer scope.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
@@ -4175,12 +4323,13 @@
           the access control for those declarations,
           and preconditions and postconditions that implementing types need to provide.
         </p>
-        <p>There are two kinds of interfaces:</p>
+        <p>There are three kinds of interfaces:</p>
         <ul>
           <li><strong>Structure interfaces</strong>: implemented by <a href="#structures">structures</a></li>
           <li><strong>Resource interfaces</strong>: implemented by <a href="#resources">resources</a></li>
+          <li><strong>Contract interfaces</strong>: implemented by <a href="#contracts">contracts</a></li>
         </ul>
-        <p>Structure and resource types may implement multiple interfaces.</p>
+        <p>Structure, resource, and contract types may implement multiple interfaces.</p>
         <p>
           Interfaces consist of the function and field requirements
           that a type implementing the interface must provide implementations for.
@@ -4206,7 +4355,7 @@
         <section>
           <h3 id="interface-declaration"><a href="#interface-declaration" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Declaration</h3>
           <p>
-            Interfaces are declared using the <code>struct</code> or <code>resource</code> keyword,
+            Interfaces are declared using the <code>struct</code>, <code>resource</code>, or <code>contract</code> keyword,
             followed by the <code>interface</code> keyword,
             the name of the interface,
             and the requirements, which must be enclosed in opening and closing braces.
@@ -4277,9 +4426,9 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The function must return a new fungible token.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: `&#x3C;-Self` is the resource type implementing this interface.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: `@Self` is the resource type implementing this interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @Self {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be positive"</span><span>
@@ -4305,10 +4454,10 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// is positive, as this condition is already ensured by</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// the field requirement.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the first parameter has the type `&#x3C;-Self`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the first parameter has the type `@Self`,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// i.e. the resource type implementing this interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-Self) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: @Self) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
@@ -4319,7 +4468,11 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Note that the required initializer and functions do not have any executable code.</p>
-          <p>Interfaces can only be declared globally, i.e. not inside of functions.</p>
+          <p>
+            Struct and resource Interfaces can only be declared directly inside contracts,
+            i.e. not inside of functions.
+            Contract interfaces can only be declared globally and not inside contracts.
+          </p>
         </section>
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
@@ -4383,7 +4536,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -4394,7 +4547,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The function must be public.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the type of the parameter is `&#x3C;-ExampleToken`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the type of the parameter is `@ExampleToken`,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// i.e., only a token of the same type can be deposited.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the required postconditions.</span><span>
@@ -4402,7 +4555,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + token.balance</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> token</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -4430,7 +4583,7 @@
 </span><span style="color: #008000">// `withdrawn.balance` is `10`</span><span>
 </span><span>
 </span><span style="color: #008000">// Deposit the withdrawn token into another one.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver: </span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> &#x3C;- </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver: @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> &#x3C;- </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">receiver.deposit(&#x3C;-withdrawn)</span><span>
 </span><span>
 </span><span style="color: #008000">// Run-time error: The precondition of function `withdraw` in interface</span><span>
@@ -4828,45 +4981,6 @@
 </span></code></pre>
       </section>
       <section>
-        <h2 id="attestations"><a href="#attestations" aria-hidden="true"><span class="icon icon-link"></span></a>Attestations</h2>
-        <blockquote>
-          <p>🚧 Status: Attestations are not implemented yet.</p>
-        </blockquote>
-        <p>Attestations are values that prove ownership without giving any control over it. They can be created for resources to show that they exists.</p>
-        <p>Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.</p>
-        <p>
-          As an analogy, a bank statement is a proof of ownership of money.
-          However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
-          but it reflects the current state of the underlying resource.
-        </p>
-        <p>
-          Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource,
-          and can be safely handed to untrusted parties.
-        </p>
-        <p>
-          An attestation reflects the current state of a resource. The state is read-only, so the resource that is referred to cannot be modified.
-          It is not possible to change the ownership of a resource through an attestation, or store an attestation.
-        </p>
-        <p>
-          Attestations of resources are created using the <code>@</code> operator.
-          Attestation types have the name of the resource type, prefixed with the <code>@</code> symbol.
-        </p>
-        <pre><code class="language-cadence,file=attestations.cdc"><span style="color: #008000">// Declare a resource named `Token`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Token {}</span><span>
-</span><span>
-</span><span style="color: #008000">// Create a new instance of the resource type `Token`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> token &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Token()</span><span>
-</span><span>
-</span><span style="color: #008000">// Declare a constant named `attestation` that has the attestation type `@Token`,</span><span>
-</span><span style="color: #008000">// and has an attestation for the token value as its initial value.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> attestation: @</span><span style="color: #0000FF">Token</span><span style="color: #000000"> = @token</span><span>
-</span></code></pre>
-        <p>Like resources, attestations are associated with an <a href="#accounts">account</a>.</p>
-      </section>
-      <section>
         <h2 id="accounts"><a href="#accounts" aria-hidden="true"><span class="icon icon-link"></span></a>Accounts</h2>
         <pre><code class="language-cadence"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Account {</span><span>
 </span><span style="color: #000000">    address: Address</span><span>
@@ -4927,7 +5041,8 @@
           and methods on the storage location directly.
         </p>
         <p>
-          References are <strong>copied</strong>, i.e. they are value types.<br>Any number of references to a storage location can be created,
+          References are <strong>copied</strong>, i.e. they are value types.
+          Any number of references to a storage location can be created,
           but only by the account that owns the location being referenced.
         </p>
         <p>
@@ -4941,7 +5056,7 @@
           followed by the storage location,the <code>as</code> keyword,
           and the type through which the stored location should be accessed.
         </p>
-        <pre><code class="language-cadence,file=reference-ex.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> nameRef: &#x26;</span><span style="color: #0000FF">Name</span><span style="color: #000000"> = &#x26;account.storage[Name] as Name</span><span>
+        <pre><code class="language-cadence,file=reference-ex.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> nameRef: &#x26;</span><span style="color: #0000FF">Name</span><span style="color: #000000"> = &#x26;account.storage[Name] as &#x26;Name</span><span>
 </span></code></pre>
         <p>The storage location must be a subtype of the type given after the <code>as</code> keyword.</p>
         <p>
@@ -4985,7 +5100,7 @@
 </span><span style="color: #008000">// Create a reference to the storage location `account.storage[Counter]`</span><span>
 </span><span style="color: #008000">// and allow access to it as the type `Counter`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> counterReference: &#x26;</span><span style="color: #0000FF">Counter</span><span style="color: #000000"> = &#x26;account.storage[Counter] as Counter</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> counterReference: &#x26;</span><span style="color: #0000FF">Counter</span><span style="color: #000000"> = &#x26;account.storage[Counter] as &#x26;Counter</span><span>
 </span><span>
 </span><span style="color: #000000">counterReference.count  </span><span style="color: #008000">// is `42`</span><span>
 </span><span>
@@ -5008,7 +5123,8 @@
           </p>
           <p>
             Based on the above example,
-            a user could use an interface to restrict access to only the <code>count</code> field.<br>Often, other accounts will have functions that take specific references
+            a user could use an interface to restrict access to only the <code>count</code> field.
+            Often, other accounts will have functions that take specific references
             as parameters, so this method can be used to create those valid references.
           </p>
           <pre><code class="language-cadence,file=storage-access-control.cdc"><span>
@@ -5025,7 +5141,7 @@
 </span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
 </span><span style="color: #008000">// and only allow access to it as the type `HasCount`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as HasCount</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as &#x26;HasCount</span><span>
 </span><span>
 </span><span style="color: #008000">// Read the counter's current count through the limited reference.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -5065,7 +5181,7 @@
 </span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
 </span><span style="color: #008000">// and only allow access to it as the type `HasCount`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as HasCount</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as &#x26;HasCount</span><span>
 </span><span>
 </span><span style="color: #008000">// Store the reference in the `published` object.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -5108,50 +5224,388 @@
 </span></code></pre>
       </section>
       <section>
+        <h2 id="contracts"><a href="#contracts" aria-hidden="true"><span class="icon icon-link"></span></a>Contracts</h2>
+        <p>
+          A contract in Cadence is a collection of type definitions
+          of interfaces, structs, resources, data (its state), and code (its functions)
+          that lives in the contract storage area of an account in Flow.
+          Contracts are where all composite types like structs, resources,
+          events, and interfaces for these types in Cadence have to be defined.
+          Therefore, an object of one of these types cannot exist
+          without having been defined in a deployed Cadence contract.
+        </p>
+        <p>
+          Contracts can be created, updated, and deleted using the <code>setCode</code>
+          function of <a href="#accounts">accounts</a>.
+          Contract creation is also possible when creating accounts,
+          i.e. when using the <code>Account</code> constructor.
+          This functionality is covered in the <a href="#deploying-and-updating-contracts">next section</a>
+        </p>
+        <p>
+          Contracts are types.
+          They are similar to composite types, but are stored differently than
+          structs or resources and cannot be used as values, copied, or moved
+          like resources or structs.
+        </p>
+        <p>
+          Contract stay in an account's contract storage
+          area and can only be updated or deleted by the account owner
+          with special commands.
+        </p>
+        <p>
+          Contracts are declared using the <code>contract</code> keyword. The keyword is followed
+          by the name of the contract.
+        </p>
+        <pre><code class="language-cadence,file=contract.cdc"><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> SomeContract {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+        <p>Contracts cannot be nested in each other.</p>
+        <pre><code class="language-cadence,file=contract_invalidnesting.cdc"><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Invalid {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: Contracts cannot be nested in any other type.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Nested {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">One of the simplest forms of a </span><span style="color: #0000FF">contract</span><span style="color: #000000"> would just be one with a state field,</span><span>
+</span><span style="color: #000000">a function, and an `init` function that initializes the field:</span><span>
+</span><span>
+</span><span style="color: #000000">```cadence,file=contract_hello.cdc</span><span>
+</span><span style="color: #008000">// HelloWorldResource.cdc</span><span>
+</span><span>
+</span><span style="color: #000000">pub contract HelloWorld {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a stored state field in HelloWorld</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> greeting: </span><span style="color: #0000FF">String</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a function that can be called by anyone</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// who imports the contract</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> hello(): </span><span style="color: #0000FF">String</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.greeting</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.greeting = </span><span style="color: #A31515">"Hello World!"</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+        <p>
+          This contract could be deployed to an account and live permanently
+          in the contract storage. Transactions and other contracts
+          can interact with contracts by importing them at the beginning
+          of a transaction or contract definition.
+        </p>
+        <p>
+          Anyone could call the above contract's <code>hello</code> function by importing
+          the contract from the account it was deployed to and using the imported
+          object to call the hello function.
+        </p>
+        <pre><code class="language-cadence,file=contract_call.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> HelloWorld </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The contract does not know where hello comes from</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">log(hello())        </span><span style="color: #008000">// Error</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: Using the imported contract object to call the hello</span><span>
+</span><span style="color: #008000">// function</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">log(HelloWorld.hello())    </span><span style="color: #008000">// prints "Hello World!"</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: Using the imported contract object to read the greeting</span><span>
+</span><span style="color: #008000">// field.</span><span>
+</span><span style="color: #000000">log(HelloWorld.greeting)   </span><span style="color: #008000">// prints "Hello World!"</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot call the init function after the contract has been created.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">HelloWorld.</span><span style="color: #0000FF">init</span><span style="color: #000000">()    </span><span style="color: #008000">// Error</span><span>
+</span></code></pre>
+        <p>
+          There can be any number of contracts per account
+          and they can include an arbitrary amount of data. This means that
+          a contract can have any number of fields, functions, and type definitions,
+          but they have to be in the contract and not another top-level definition.
+        </p>
+        <pre><code class="language-cadence,file=bad_decl.cdc"><span style="color: #008000">// Invalid: Top-level declarations are restricted to only be contracts</span><span>
+</span><span style="color: #008000">//          or contract interfaces. Therefore, all of these would be invalid</span><span>
+</span><span style="color: #008000">//          if they were deployed to the account contract storage and</span><span>
+</span><span style="color: #008000">//          the deployment would be rejected.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {}</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Hat {}</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> helloWorld(): </span><span style="color: #0000FF">String</span><span style="color: #000000"> {}</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> num: Int</span><span>
+</span></code></pre>
+        <p>
+          Another important feature of contracts is that instances of resources and events
+          that are defined in contracts can only be created within functions or types
+          that are defined in that contract.
+          Code outside the contract cannot arbitrarily create instances of resources and events.
+        </p>
+        <p>
+          The contract below defines a resource interface <code>Receiver</code> and a resource <code>Vault</code>
+          that implements that interface. The way this example is written,
+          there is no way to create this resource, so it would not be usable.
+        </p>
+        <pre><code class="language-cadence,file=ft_contract.cdc"><span style="color: #008000">// Valid</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> FungibleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Receiver {</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(from: @</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">from</span><span style="color: #000000">.balance > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Deposit balance needs to be positive!"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + before(from.balance):</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Incorrect amount removed"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault: Receiver {</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// keeps track of the total balance of the accounts tokens</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// withdraw subtracts amount from the vaults balance and</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// returns a vault object with the subtracted balance</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> Vault(balance: amount)</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// deposit takes a vault object as a parameter and adds</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// its balance to the balance of the Account's vault, then</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// destroys the sent vault because its balance has been consumed</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(from: @</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + </span><span style="color: #0000FF">from</span><span style="color: #000000">.balance</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> </span><span style="color: #0000FF">from</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+        <p>
+          If a user tried to run a transaction that created an instance of the <code>Vault</code> type,
+          the type checker would not allow it because only code in the <code>FungibleToken</code>
+          contract can create new <code>Vault</code>s.
+        </p>
+        <pre><code class="language-cadence,file=contract_invalid_create.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot create an instance of the `Vault` type outside</span><span>
+</span><span style="color: #008000">// of the contract that defines `Vault`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> newVault &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> FungibleToken.Vault(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span></code></pre>
+        <p>
+          The contract would have to either define a function that creates new
+          <code>Vault</code> instances or use its <code>init</code> function to create an instance and
+          store it in the owner's account storage.
+        </p>
+        <p>
+          This brings up another key feature of contracts in Cadence. Contracts
+          can interact with its account's <code>storage</code> and <code>published</code> objects to store
+          resources, structs, and references. They do so by using the special
+          <code>self.account</code> object that is only accessible within the contract.
+        </p>
+        <p>Imagine that these were defined in the above <code>FungibleToken</code> contract.</p>
+        <pre><code class="language-cadence,file=ft_contract_additions.cdc"><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> createVault(initialBalance: Int): @</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> Vault(balance: initialBalance)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> oldVault &#x3C;- </span><span style="color: #0000FF">self</span><span style="color: #000000">.account.storage[Vault] &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Vault(balance: </span><span style="color: #09885A">1000</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> oldVault</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span></code></pre>
+        <p>
+          Now, any account could call the <code>createVault</code> function defined in the contract
+          to create a <code>Vault</code> object. Or the owner could call the <code>withdraw</code> function
+          on their own <code>Vault</code> to send new vaults to others.
+        </p>
+        <pre><code class="language-cadence,file=ft_contract_tx.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: Create an instance of the `Vault` type by calling the contract's</span><span>
+</span><span style="color: #008000">// `createVault` function.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> newVault &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> FungibleToken.createVault(initialBalance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span></code></pre>
+        <section>
+          <h3 id="deploying-and-updating-contracts"><a href="#deploying-and-updating-contracts" aria-hidden="true"><span class="icon icon-link"></span></a>Deploying and Updating Contracts</h3>
+          <p>
+            In order for a contract to be used in Cadence, it needs
+            to be deployed to an account.
+          </p>
+          <p>
+            Contract can be deployed to an account using the <code>setCode</code> function of the <code>Account</code> type:
+            <code>setCode(_ code: [UInt8], ...)</code>.
+            The function's <code>code</code> parameter is the byte representation of the source code.
+            Additional arguments are passed to the initializer of the contract.
+          </p>
+          <p>For example, assuming the following contract code should be deployed:</p>
+          <pre><code class="language-cadence,file=test_contract.cdc"><span style="color: #0000FF">contract</span><span style="color: #000000"> Test {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> message: </span><span style="color: #0000FF">String</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(message: </span><span style="color: #0000FF">String</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.message = message</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+          <p>The contract can be deployed as follows:</p>
+          <pre><code class="language-cadence,file=deploy_setCode.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> signer: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = ...</span><span>
+</span><span style="color: #000000">signer.setCode(</span><span>
+</span><span style="color: #000000">    [</span><span style="color: #09885A">0x63</span><span style="color: #000000">, </span><span style="color: #09885A">0x6f</span><span style="color: #000000">, </span><span style="color: #09885A">0x6e</span><span style="color: #000000">, </span><span style="color: #09885A">0x74</span><span style="color: #000000">, </span><span style="color: #09885A">0x72</span><span style="color: #000000">, </span><span style="color: #09885A">0x61</span><span style="color: #008000">/*, ... */</span><span style="color: #000000">],</span><span>
+</span><span style="color: #000000">    message: </span><span style="color: #A31515">"I'm a new contract in an existing account"</span><span>
+</span><span style="color: #000000">)</span><span>
+</span></code></pre>
+          <p>The contract can also be deployed when creating an account by using the <code>Account</code> constructor.</p>
+          <pre><code class="language-cadence,file=deploy_setCode.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> newAccount = Account(</span><span>
+</span><span style="color: #000000">    publicKeys: [],</span><span>
+</span><span style="color: #000000">    code: [</span><span style="color: #09885A">0x63</span><span style="color: #000000">, </span><span style="color: #09885A">0x6f</span><span style="color: #000000">, </span><span style="color: #09885A">0x6e</span><span style="color: #000000">, </span><span style="color: #09885A">0x74</span><span style="color: #000000">, </span><span style="color: #09885A">0x72</span><span style="color: #000000">, </span><span style="color: #09885A">0x61</span><span style="color: #008000">/*, ... */</span><span style="color: #000000">],</span><span>
+</span><span style="color: #000000">    message: </span><span style="color: #A31515">"I'm a new contract in a new account"</span><span>
+</span><span style="color: #000000">)</span><span>
+</span></code></pre>
+        </section>
+        <section>
+          <h3 id="contract-interfaces"><a href="#contract-interfaces" aria-hidden="true"><span class="icon icon-link"></span></a>Contract Interfaces</h3>
+          <p>
+            Like composite types, contracts can have interfaces that specify rules
+            about their behavior, their types, and the behavior of their types.
+          </p>
+          <p>
+            Contract interfaces have to be declared globally. Declarations
+            cannot be nested in other types.
+          </p>
+          <p>
+            If a contract interface declares a concrete type, implementations of it
+            must also declare the same concrete type conforming to the type requirement.
+          </p>
+          <p>
+            If a contract interface declares an interface type, the implementing contract
+            does not have to also define that interface. They can refer to that nested
+            interface by saying <code>{ContractInterfaceName}.{NestedInterfaceName}</code>
+          </p>
+          <pre><code class="language-cadence,file=contract_interface.cdc"><span style="color: #008000">// Declare a contract interface that declares an interface and a resource</span><span>
+</span><span style="color: #008000">// that needs to implement that interface in the contract implementation.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> interface InterfaceExample {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implementations do not need to declare this</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// They refer to it as InterfaceExample.NestedInterface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> NestedInterface {}</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implementations must declare this type</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Composite: NestedInterface {}</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> ExampleContract: InterfaceExample {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The contract doesn't need to redeclare the `NestedInterface` interface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// because it is already declared in the contract interface</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The resource has to refer to the resrouce interface using the name</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// of the contract interface to access it</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Composite: InterfaceExample.NestedInterface {</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+        </section>
+      </section>
+      <section>
         <h2 id="events"><a href="#events" aria-hidden="true"><span class="icon icon-link"></span></a>Events</h2>
         <p>Events are special values that can be emitted during the execution of a program.</p>
-        <p>An event type can be declared with the <code>event</code> keyword:</p>
+        <p>An event type can be declared with the <code>event</code> keyword.</p>
         <pre><code class="language-cadence"><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
 </span></code></pre>
-        <p>The syntax of an event declaration is similar to that of a <a href="#function-declarations">function declaration</a>; events contain named parameters, each of which has an optional argument label.</p>
-        <pre><code class="language-cadence"><span style="color: #008000">// Event with explicit argument labels</span><span>
-</span><span style="color: #000000">event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
+        <p>
+          The syntax of an event declaration is similar to that of
+          a <a href="#function-declarations">function declaration</a>;
+          events contain named parameters, each of which has an optional argument label.
+          Types that can be in event definitions are restricted
+          to booleans, strings, integer, and arrays or dictionaries of these types.
+        </p>
+        <p>
+          Events can only be declared within a <a href="#contracts">contract</a> body.
+          Events cannot be declared globally or within resource or struct types.
+        </p>
+        <p>
+          Resource argument types are not allowed because when a resource is used as
+          an argument, it is moved. A piece of code would not want to move a resource
+          to emit an event, so it is not allowed as a parameter.
+        </p>
+        <pre><code class="language-cadence"><span style="color: #008000">// Invalid: An event cannot be declared globally</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">event GlobalEvent(field: Int)</span><span>
+</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Events {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Event with explicit argument labels</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: A resource type is not allowed to be used</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// because it would be moved and lost</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    event ResourceEvent(resourceField: @Vault)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
 </span></code></pre>
         <section>
           <h3 id="emitting-events"><a href="#emitting-events" aria-hidden="true"><span class="icon icon-link"></span></a>Emitting events</h3>
           <p>To emit an event from a program, use the <code>emit</code> statement:</p>
-          <pre><code class="language-cadence,file=events.cdc"><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
+          <pre><code class="language-cadence,file=events.cdc"><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Events {</span><span>
+</span><span style="color: #000000">    event FooEvent(x: Int, y: Int)</span><span>
 </span><span>
-</span><span style="color: #008000">// Event with argument labels</span><span>
-</span><span style="color: #000000">event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Event with argument labels</span><span>
+</span><span style="color: #000000">    event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> events() {</span><span>
-</span><span style="color: #000000">    emit FooEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> events() {</span><span>
+</span><span style="color: #000000">        emit FooEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Emit event with explicit argument labels</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Note that the emitted event will only contain the field names, </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// not the argument labels used at the invocation site.</span><span>
-</span><span style="color: #000000">    emit FooEvent(labelA: </span><span style="color: #09885A">1</span><span style="color: #000000">, labelB: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Emit event with explicit argument labels</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Note that the emitted event will only contain the field names,</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// not the argument labels used at the invocation site.</span><span>
+</span><span style="color: #000000">        emit FooEvent(labelA: </span><span style="color: #09885A">1</span><span style="color: #000000">, labelB: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <p>Restrictions:</p>
+          <p>Emitting events has the following restrictions:</p>
           <ul>
-            <li>Events can only be invoked in an <code>emit</code> statement. This means events cannot be assigned to variables or used as function parameters.</li>
-            <li>Events can only be emitted from the location in which they are defined.</li>
+            <li>
+              <p>Events can only be invoked in an <code>emit</code> statement.</p>
+              <p>This means events cannot be assigned to variables or used as function parameters.</p>
+            </li>
+            <li>
+              <p>Events can only be emitted from the location in which they are defined.</p>
+            </li>
           </ul>
         </section>
       </section>
       <section>
         <h2 id="transactions"><a href="#transactions" aria-hidden="true"><span class="icon icon-link"></span></a>Transactions</h2>
-        <blockquote>
-          <p>🚧 Status: The <code>transaction</code> syntax is not implemented yet. For now, declare a function named <code>main</code>.</p>
-        </blockquote>
         <p>
           Transactions are objects that are signed by one or more <a href="#accounts">accounts</a>
           and are sent to the chain to interact with it.
         </p>
         <p>Transactions are structured as such:</p>
-        <p>First, the transaction can import any number of types from external accounts using the import syntax.</p>
+        <p>
+          First, the transaction can import any number of types from external accounts
+          using the import syntax.
+        </p>
         <p>
           Next is the body of the transaction, which is broken into three main phases:
           Preparation, execution, and postconditions, only in that order.
@@ -5162,22 +5616,32 @@
             <p>
               The <strong>prepare phase</strong> acts like the initializer in a composite data type,
               i.e., it initializes fields that can then be used in the execution phase.
+            </p>
+            <p>
               The prepare phase has the permissions to read from and write to the storage
               of all the accounts that signed the transaction.
             </p>
           </li>
           <li>
+            <p>The <strong>execute phase</strong> is where interaction with external contracts happens.</p>
             <p>
-              The <strong>execute phase</strong> is where interaction with external contracts happens.
-              This usually involves interacting with contracts with public types and functions that are deployed in other accounts.
+              This usually involves interacting with contracts with public types
+              and functions that are deployed in other accounts.
             </p>
           </li>
           <li>
-            <p>The <strong>postcondition phase</strong> is where the transaction can check that its functionality was executed correctly.</p>
+            <p>
+              The <strong>postcondition phase</strong> is where the transaction can check
+              that its functionality was executed correctly.
+            </p>
           </li>
         </ul>
         <p>Transactions are declared using the <code>transaction</code> keyword.</p>
-        <p>Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared. These are valid within the entire scope of the transaction.</p>
+        <p>
+          Within the transaction, but before the prepare phase,
+          any number of constants and/or variables can be declared.
+          These are valid within the entire scope of the transaction.
+        </p>
         <p>
           The prepare phase is declared using the <code>prepare</code> keyword
           and the execution phase can be declared using the <code>execute</code> keyword.
@@ -5218,7 +5682,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Provider {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"withdrawal amount must be positive"</span><span>
@@ -5233,7 +5697,7 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Receiver {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: @</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
@@ -5259,7 +5723,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @Self {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
@@ -5270,7 +5734,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-Self) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: @Self) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
@@ -5337,20 +5801,20 @@
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + token.balance</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> token</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// The function `transfer` combines the functions `withdraw` and `deposit` </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function `transfer` combines the functions `withdraw` and `deposit`</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// into a single function call</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Deposit the tokens that withdraw creates into the </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Deposit the tokens that withdraw creates into the</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// recipient's account using their deposit reference</span><span>
 </span><span style="color: #000000">        to.deposit(from: &#x3C;-</span><span style="color: #0000FF">self</span><span style="color: #000000">.withdraw(amount: amount))</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -5359,7 +5823,7 @@
 </span><span style="color: #008000">// Declare a function that lets any user create an example token</span><span>
 </span><span style="color: #008000">// with an initial empty balance.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> newEmptyExampleToken(): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> newEmptyExampleToken(): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -5367,7 +5831,8 @@
           <p>Once code is deployed, it can be used in other code and in transactions.</p>
           <p>
             In most situations it is important to expose only a subset of the functionality
-            of the stored values, because some of the functionality should only be available to the owner.
+            of the stored values,
+            because some of the functionality should only be available to the owner.
           </p>
           <p>
             The following transaction creates an empty token and stores it in the signer's account.
@@ -5387,8 +5852,8 @@
 </span><span>
 </span><span style="color: #000000">    prepare(signer: Account) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Create a new token as an optional.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">var</span><span style="color: #000000"> tokenA: &#x3C;-ExampleToken? &#x3C;- newEmptyExampleToken()</span><span>
-</span><span style="color: #000000">		</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">var</span><span style="color: #000000"> tokenA: @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">? &#x3C;- newEmptyExampleToken()</span><span>
+</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Store the new token in storage by replacing whatever</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// is in the existing location.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> oldToken &#x3C;- signer.storage[ExampleToken] &#x3C;- tokenA</span><span>
@@ -5401,13 +5866,13 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// The `Receiver` references is stored in the `published` object</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// because an account will usually want anyone to be able to read</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// their balance and call their deposit function</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// </span><span>
-</span><span style="color: #000000">        signer.published[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as Receiver</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        signer.published[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as &#x26;Receiver</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// The `Provider` reference is stored in account storage</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// because an account will not want to expose its withdraw method</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// to the public</span><span>
-</span><span style="color: #000000">        signer.storage[&#x26;Provider] = &#x26;signer.storage[ExampleToken] as Provider</span><span>
+</span><span style="color: #000000">        signer.storage[&#x26;Provider] = &#x26;signer.storage[ExampleToken] as &#x26;Provider</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -5467,8 +5932,8 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> receiverRef = recipient.published[&#x26;Receiver] ?? panic(</span><span style="color: #A31515">"Recipient has no receiver"</span><span style="color: #000000">)</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Call the provider's transfer function which withdraws 5 tokens </span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// from their account and deposits it to the receiver's account </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Call the provider's transfer function which withdraws 5 tokens</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// from their account and deposits it to the receiver's account</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// using the reference to their deposit function.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.providerRef.transfer(to: receiverRef, amount: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>

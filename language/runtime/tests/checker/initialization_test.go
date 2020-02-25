@@ -424,3 +424,60 @@ func TestCheckFieldInitializationWithReturn(t *testing.T) {
 		assert.IsType(t, &sema.FieldUninitializedError{}, errs[0])
 	})
 }
+
+func TestCheckFieldInitializationWithPotentialNeverCallInElse(t *testing.T) {
+
+	_, err := ParseAndCheckWithPanic(
+		t,
+		`
+          struct Test {
+              let foo: Int
+
+              init(foo: Int?) {
+                  if let foo = foo {
+                      self.foo = foo
+                  } else {
+                      panic("no x")
+                  }
+              }
+          }
+        `,
+	)
+
+	require.NoError(t, err)
+}
+
+func TestCheckFieldInitializationWithPotentialNeverCallInNilCoalescing(t *testing.T) {
+
+	_, err := ParseAndCheckWithPanic(t,
+		`
+          struct Test {
+              let foo: Int
+
+              init(foo: Int?) {
+                  self.foo = foo ?? panic("no x")
+              }
+          }
+        `,
+	)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidFieldInitializationWithUseOfUninitializedInPrecondition(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      struct Test {
+          var on: Bool
+
+          init() {
+              pre { self.on }
+              self.on = true
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.UninitializedFieldAccessError{}, errs[0])
+}

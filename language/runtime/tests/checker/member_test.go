@@ -10,11 +10,12 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckOptionalChainingFieldRead(t *testing.T) {
+func TestCheckOptionalChainingNonOptionalFieldRead(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
       struct Test {
           let x: Int
+
           init(x: Int) {
               self.x = x
           }
@@ -24,7 +25,30 @@ func TestCheckOptionalChainingFieldRead(t *testing.T) {
       let x = test?.x
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		&sema.OptionalType{Type: &sema.IntType{}},
+		checker.GlobalValues["x"].Type,
+	)
+}
+
+func TestCheckOptionalChainingOptionalFieldRead(t *testing.T) {
+
+	checker, err := ParseAndCheck(t, `
+      struct Test {
+          let x: Int?
+
+          init(x: Int?) {
+              self.x = x
+          }
+      }
+
+      let test: Test? = Test(x: 1)
+      let x = test?.x
+    `)
+
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{Type: &sema.IntType{}},
@@ -45,7 +69,7 @@ func TestCheckOptionalChainingFunctionRead(t *testing.T) {
       let x = test?.x
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.True(t,
 		checker.GlobalValues["x"].Type.Equal(
@@ -73,7 +97,7 @@ func TestCheckOptionalChainingFunctionCall(t *testing.T) {
       let x = test?.x()
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.True(t,
 		checker.GlobalValues["x"].Type.Equal(
@@ -87,6 +111,7 @@ func TestCheckInvalidOptionalChainingNonOptional(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       struct Test {
           let x: Int
+
           init(x: Int) {
               self.x = x
           }

@@ -5,9 +5,13 @@ package operation
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // insert will encode the given entity using JSON and will insert the resulting
@@ -19,24 +23,43 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		// check if the key already exists in the db
 		_, err := tx.Get(key)
 		if err == nil {
-			return errors.Errorf("key already exists (%x)", key)
+			return storage.ErrAlreadyExists
 		}
-		if err != badger.ErrKeyNotFound {
-			return errors.Wrap(err, "could not check key")
+
+		if !errors.Is(err, badger.ErrKeyNotFound) {
+			return fmt.Errorf("could not check key: %w", err)
 		}
 
 		// serialize the entity data
 		val, err := json.Marshal(entity)
 		if err != nil {
-			return errors.Wrap(err, "could not encode entity")
+			return fmt.Errorf("could not encode entity: %w", err)
 		}
 
-		// insert the entity data into the DB
+		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
-			return errors.Wrap(err, "could not store data")
+			return fmt.Errorf("could not store data: %w", err)
 		}
 
+		return nil
+	}
+}
+
+// check will simply check if the entry with the given key exists in the DB.
+func check(key []byte, exists *bool) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// retrieve the item from the key-value store
+		_, err := tx.Get(key)
+		if err == badger.ErrKeyNotFound {
+			*exists = false
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("could not check existence: %w", err)
+		}
+		*exists = true
 		return nil
 	}
 }
@@ -50,25 +73,43 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
 		if err == badger.ErrKeyNotFound {
-			return errors.Errorf("could not find key %x)", key)
+			return storage.ErrNotFound
 		}
 		if err != nil {
-			return errors.Wrap(err, "could not check key")
+			return fmt.Errorf("could not check key: %w", err)
 		}
 
 		// serialize the entity data
 		val, err := json.Marshal(entity)
 		if err != nil {
-			return errors.Wrap(err, "could not encode entity")
+			return fmt.Errorf("could not encode entity: %w", err)
 		}
 
-		// insert the entity data into the DB
+		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
-			return errors.Wrap(err, "could not replace data")
+			return fmt.Errorf("could not replace data: %w", err)
 		}
 
 		return nil
+	}
+}
+
+// remove removes the entity with the given key, if it exists. If it doesn't
+// exist, this is a no-op.
+func remove(key []byte) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		// retrieve the item from the key-value store
+		_, err := tx.Get(key)
+		if err == badger.ErrKeyNotFound {
+			return fmt.Errorf("could not find key %x): %w", key, err)
+		}
+		if err != nil {
+			return fmt.Errorf("could not check key: %w", err)
+		}
+
+		err = tx.Delete(key)
+		return err
 	}
 }
 
@@ -81,7 +122,10 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 		// retrieve the item from the key-value store
 		item, err := tx.Get(key)
 		if err != nil {
-			return errors.Wrap(err, "could not load data")
+			if err == badger.ErrKeyNotFound {
+				return storage.ErrNotFound
+			}
+			return fmt.Errorf("could not load data: %w", err)
 		}
 
 		// get the value from the item
@@ -90,7 +134,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 			return err
 		})
 		if err != nil {
-			return errors.Wrap(err, "could not decode entity")
+			return fmt.Errorf("could not decode entity: %w", err)
 		}
 
 		return nil
@@ -120,20 +164,46 @@ type handleFunc func() error
 // of values, the initialization of entities and the processing.
 type iterationFunc func() (checkFunc, createFunc, handleFunc)
 
-// iterate will start iteration at the start prefix and keep iterating through
-// the badger DB up to and including the end prefix. On each iteration it will
-// call the iteration function to initialize functions specific to processing
-// the given key-value pair.
+// lookup is the default iteration function allowing us to collect a list of
+// entity IDs from an index.
+func lookup(entityIDs *[]flow.Identifier) iterationFunc {
+	*entityIDs = make([]flow.Identifier, 0)
+	return func() (checkFunc, createFunc, handleFunc) {
+		check := func(key []byte) bool {
+			return true
+		}
+		var entityID flow.Identifier
+		create := func() interface{} {
+			return &entityID
+		}
+		handle := func() error {
+			*entityIDs = append(*entityIDs, entityID)
+			return nil
+		}
+		return check, create, handle
+	}
+}
+
+// iterate iterates over a range of keys defined by a start and end key.
+//
+// The start key is the first key in the iteration and the lexicographically
+// smallest key in the iteration. The end key is last key in the iteration
+// and the lexicographically largest key in the iteration.
+//
+// On each iteration, it will call the iteration function to initialize
+// functions specific to processing the given key-value pair.
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		it := tx.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
+
 		for it.Seek(start); it.Valid(); it.Next() {
 
-			// check if we have reached the end of our iteration
 			item := it.Item()
-			if bytes.Compare(item.Key(), end) > 0 {
+
+			// check if we have reached the end of our iteration
+			if end != nil && bytes.Compare(item.Key(), end) > 0 {
 				break
 			}
 
@@ -154,19 +224,77 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 				entity := create()
 				err := json.Unmarshal(val, entity)
 				if err != nil {
-					return errors.Wrap(err, "could not decode entity")
+					return fmt.Errorf("could not decode entity: %w", err)
 				}
 
 				// process the entity
 				err = handle()
 				if err != nil {
-					return errors.Wrap(err, "could not handle entity")
+					return fmt.Errorf("could not handle entity: %w", err)
 				}
 
 				return nil
 			})
 			if err != nil {
-				return errors.Wrap(err, "could not process value")
+				return fmt.Errorf("could not process value: %w", err)
+			}
+		}
+
+		return nil
+	}
+}
+
+// traverse iterates over a range of keys defined by a prefix.
+//
+// The prefix must be shared by all keys in the iteration.
+//
+// On each iteration, it will call the iteration function to initialize
+// functions specific to processing the given key-value pair.
+func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		opts := badger.DefaultIteratorOptions
+		// NOTE: this is an optimization only, it does not enforce that all
+		// results in the iteration have this prefix.
+		opts.Prefix = prefix
+
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+
+			item := it.Item()
+
+			// initialize processing functions for iteration
+			check, create, handle := iteration()
+
+			// check if we should process the item at all
+			key := item.Key()
+			ok := check(key)
+			if !ok {
+				continue
+			}
+
+			// process the actual item
+			err := item.Value(func(val []byte) error {
+
+				// decode into the entity
+				entity := create()
+				err := json.Unmarshal(val, entity)
+				if err != nil {
+					return fmt.Errorf("could not decode entity: %w", err)
+				}
+
+				// process the entity
+				err = handle()
+				if err != nil {
+					return fmt.Errorf("could not handle entity: %w", err)
+				}
+
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("could not process value: %w", err)
 			}
 		}
 

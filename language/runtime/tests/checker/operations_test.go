@@ -72,12 +72,28 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			},
 			tests: []operationTest{
 				{&sema.IntType{}, "1", "2", nil},
+				{&sema.Fix64Type{}, "1.2", "3.4", nil},
+				{&sema.Fix64Type{}, "1.2", "3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.IntType{}, "1", "2.3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
 				{&sema.IntType{}, "true", "2", []error{
 					&sema.InvalidBinaryOperandError{},
 					&sema.InvalidBinaryOperandsError{},
 					&sema.TypeMismatchError{},
 				}},
+				{&sema.Int64Type{}, "true", "1.2", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
+					&sema.TypeMismatchError{},
+				}},
 				{&sema.IntType{}, "1", "true", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.Fix64Type{}, "1.2", "true", []error{
 					&sema.InvalidBinaryOperandError{},
 					&sema.InvalidBinaryOperandsError{},
 				}},
@@ -93,11 +109,26 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			},
 			tests: []operationTest{
 				{&sema.BoolType{}, "1", "2", nil},
+				{&sema.BoolType{}, "1.2", "3.4", nil},
 				{&sema.BoolType{}, "true", "2", []error{
 					&sema.InvalidBinaryOperandError{},
 					&sema.InvalidBinaryOperandsError{},
 				}},
+				{&sema.BoolType{}, "1.2", "3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "1", "2.3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "true", "1.2", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
+				}},
 				{&sema.BoolType{}, "1", "true", []error{
+					&sema.InvalidBinaryOperandError{},
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "1.2", "true", []error{
 					&sema.InvalidBinaryOperandError{},
 					&sema.InvalidBinaryOperandsError{},
 				}},
@@ -130,7 +161,14 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 			tests: []operationTest{
 				{&sema.BoolType{}, "true", "false", nil},
 				{&sema.BoolType{}, "1", "2", nil},
+				{&sema.BoolType{}, "1.2", "3.4", nil},
 				{&sema.BoolType{}, "true", "2", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "1.2", "3", []error{
+					&sema.InvalidBinaryOperandsError{},
+				}},
+				{&sema.BoolType{}, "1", "2.3", []error{
 					&sema.InvalidBinaryOperandsError{},
 				}},
 				{&sema.BoolType{}, "1", "true", []error{
@@ -144,7 +182,13 @@ func TestCheckIntegerBinaryOperations(t *testing.T) {
 	for _, operationTests := range allOperationTests {
 		for _, operation := range operationTests.operations {
 			for _, test := range operationTests.tests {
-				t.Run("", func(t *testing.T) {
+
+				testName := fmt.Sprintf(
+					"%s / %s %s %s",
+					test.ty, test.left, operation.Symbol(), test.right,
+				)
+
+				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheck(t,
 						fmt.Sprintf(
@@ -201,7 +245,13 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run("", func(t *testing.T) {
+
+		testName := fmt.Sprintf(
+			"%s / %s %s %s",
+			test.ty, test.left, ast.OperationConcat.Symbol(), test.right,
+		)
+
+		t.Run(testName, func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -221,24 +271,51 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 
 func TestCheckInvalidCompositeEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
 
-		_, err := ParseAndCheck(t, fmt.Sprintf(`
-          %[1]s X {}
+		if compositeKind == common.CompositeKindEvent {
+			continue
+		}
 
-          let x1: %[2]sX %[3]s %[4]s X()
-          let x2: %[2]sX %[3]s %[4]s X()
+		t.Run(compositeKind.Name(), func(t *testing.T) {
 
-          let a = x1 == x2
-        `,
-			kind.Keyword(),
-			kind.Annotation(),
-			kind.TransferOperator(),
-			kind.ConstructionKeyword(),
-		))
+			var preparationCode, firstIdentifier, secondIdentifier string
+			if compositeKind == common.CompositeKindContract {
+				firstIdentifier = "X"
+				secondIdentifier = "X"
+			} else {
+				preparationCode = fmt.Sprintf(`
+		              let x1: %[1]sX %[2]s %[3]s X%[4]s
+                      let x2: %[1]sX %[2]s %[3]s X%[4]s
+		            `,
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
+				)
+				firstIdentifier = "x1"
+				secondIdentifier = "x2"
+			}
 
-		errs := ExpectCheckerErrors(t, err, 1)
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s X {}
 
-		assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+                      %[2]s
+
+                      let a = %[3]s == %[4]s
+                    `,
+					compositeKind.Keyword(),
+					preparationCode,
+					firstIdentifier,
+					secondIdentifier,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+		})
 	}
 }

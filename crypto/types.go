@@ -28,11 +28,12 @@ const (
 	SHA2_384
 	SHA3_256
 	SHA3_384
+	KMAC128
 )
 
 // String returns the string representation of this hashing algorithm.
 func (f HashingAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384"}[f]
+	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384", "KMAC128"}[f]
 }
 
 const (
@@ -51,6 +52,9 @@ const (
 	PrKeyLenBLS_BLS12381     = 32
 	// the length is divided by 2 if compression is on
 	PubKeyLenBLS_BLS12381 = 96 * (2 - compression)
+	// Input length of the optimized SwU map to G1: 2*(P_size+security)
+	// security being 128 bits
+	OpSwUInputLenBLS_BLS12381 = 128
 
 	// ECDSA
 
@@ -66,10 +70,14 @@ const (
 	PubKeyLenECDSA_SECp256k1        = 64
 	KeyGenSeedMinLenECDSA_SECp256k1 = 40
 
+	// DKG and Threshold Signatures
 	DKGMinSize       int = 3
 	ThresholdMinSize     = DKGMinSize
 	DKGMaxSize       int = 254
 	ThresholdMaxSize     = DKGMaxSize
+
+	// MAC
+	MACMinKeySize int = 16
 )
 
 // Signature is a generic type, regardless of the signature scheme

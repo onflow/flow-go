@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/raviqqe/hamt"
@@ -10,61 +11,61 @@ import (
 	// revive:enable
 )
 
+// Invocation
+
+type Invocation struct {
+	Self          *CompositeValue
+	Arguments     []Value
+	ArgumentTypes []sema.Type
+	Location      LocationPosition
+	Interpreter   *Interpreter
+}
+
 // FunctionValue
 
 type FunctionValue interface {
 	Value
 	isFunctionValue()
-	invoke(arguments []Value, location LocationPosition) Trampoline
+	Invoke(Invocation) Trampoline
 }
 
 // InterpretedFunctionValue
 
 type InterpretedFunctionValue struct {
-	Interpreter *Interpreter
-	Expression  *ast.FunctionExpression
-	Type        *sema.FunctionType
-	Activation  hamt.Map
+	Interpreter      *Interpreter
+	ParameterList    *ast.ParameterList
+	Type             *sema.FunctionType
+	Activation       hamt.Map
+	BeforeStatements []ast.Statement
+	PreConditions    ast.Conditions
+	Statements       []ast.Statement
+	PostConditions   ast.Conditions
 }
 
-func (InterpretedFunctionValue) isValue() {}
+func (InterpretedFunctionValue) IsValue() {}
 
 func (f InterpretedFunctionValue) Copy() Value {
 	return f
 }
 
-func (InterpretedFunctionValue) GetOwner() string {
+func (InterpretedFunctionValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (InterpretedFunctionValue) SetOwner(owner string) {
+func (InterpretedFunctionValue) SetOwner(owner *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
 func (InterpretedFunctionValue) isFunctionValue() {}
 
-func newInterpretedFunction(
-	interpreter *Interpreter,
-	expression *ast.FunctionExpression,
-	functionType *sema.FunctionType,
-	activation hamt.Map,
-) InterpretedFunctionValue {
-	return InterpretedFunctionValue{
-		Interpreter: interpreter,
-		Expression:  expression,
-		Type:        functionType,
-		Activation:  activation,
-	}
-}
-
-func (f InterpretedFunctionValue) invoke(arguments []Value, _ LocationPosition) Trampoline {
-	return f.Interpreter.invokeInterpretedFunction(f, arguments)
+func (f InterpretedFunctionValue) Invoke(invocation Invocation) Trampoline {
+	return f.Interpreter.invokeInterpretedFunction(f, invocation)
 }
 
 // HostFunctionValue
 
-type HostFunction func(arguments []Value, location LocationPosition) Trampoline
+type HostFunction func(invocation Invocation) Trampoline
 
 type HostFunctionValue struct {
 	Function HostFunction
@@ -79,25 +80,25 @@ func NewHostFunctionValue(
 	}
 }
 
-func (HostFunctionValue) isValue() {}
+func (HostFunctionValue) IsValue() {}
 
 func (f HostFunctionValue) Copy() Value {
 	return f
 }
 
-func (HostFunctionValue) GetOwner() string {
+func (HostFunctionValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (HostFunctionValue) SetOwner(owner string) {
+func (HostFunctionValue) SetOwner(owner *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
 func (HostFunctionValue) isFunctionValue() {}
 
-func (f HostFunctionValue) invoke(arguments []Value, location LocationPosition) Trampoline {
-	return f.Function(arguments, location)
+func (f HostFunctionValue) Invoke(invocation Invocation) Trampoline {
+	return f.Function(invocation)
 }
 
 func (f HostFunctionValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
@@ -106,4 +107,33 @@ func (f HostFunctionValue) GetMember(interpreter *Interpreter, _ LocationRange, 
 
 func (f HostFunctionValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(errors.NewUnreachableError())
+}
+
+// BoundFunctionValue
+
+type BoundFunctionValue struct {
+	Function FunctionValue
+	Self     *CompositeValue
+}
+
+func (BoundFunctionValue) IsValue() {}
+
+func (f BoundFunctionValue) Copy() Value {
+	return f
+}
+
+func (BoundFunctionValue) GetOwner() *common.Address {
+	// value is never owned
+	return nil
+}
+
+func (BoundFunctionValue) SetOwner(owner *common.Address) {
+	// NO-OP: value cannot be owned
+}
+
+func (BoundFunctionValue) isFunctionValue() {}
+
+func (f BoundFunctionValue) Invoke(invocation Invocation) Trampoline {
+	invocation.Self = f.Self
+	return f.Function.Invoke(invocation)
 }

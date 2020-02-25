@@ -40,35 +40,45 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 	return o
 }
 
-// submit is called when an Engine is sending an event to an Engine on another node or nodes.
-func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
-	mn.buffer(mn.GetID(), engineID, event, targetIDs)
-	return nil
-}
-
 // GetID returns the identity of the Node.
 func (mn *Network) GetID() flow.Identifier {
 	return mn.me.NodeID()
 }
 
 // Register implements pkg/module/Network's interface
-func (mn *Network) Register(engineID uint8, engine network.Engine) (network.Conduit, error) {
-	_, ok := mn.engines[engineID]
+func (mn *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
+	_, ok := mn.engines[channelID]
 	if ok {
-		return nil, errors.Errorf("engine code already taken (%d)", engineID)
+		return nil, errors.Errorf("engine code already taken (%d)", channelID)
 	}
 	conduit := &Conduit{
-		engineID: engineID,
-		submit:   mn.submit,
+		channelID: channelID,
+		submit:    mn.submit,
 	}
-	mn.engines[engineID] = engine
+	mn.engines[channelID] = engine
 	return conduit, nil
+}
+
+// submit is called when an Engine is sending an event to an Engine on another node or nodes.
+func (mn *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+	m := &PendingMessage{
+		From:      mn.GetID(),
+		ChannelID: channelID,
+		Event:     event,
+		TargetIDs: targetIDs,
+	}
+
+	if mn.hub.isSync {
+		return mn.sendToAllTargets(m)
+	}
+
+	mn.buffer(m)
+
+	return nil
 }
 
 // return a certain node has seen a certain key
 func (mn *Network) haveSeen(key string) bool {
-	mn.Lock()
-	defer mn.Unlock()
 	seen, ok := mn.seenEventIDs[key]
 	if !ok {
 		return false
@@ -78,38 +88,55 @@ func (mn *Network) haveSeen(key string) bool {
 
 // mark a certain node has seen a certain event for a certain engine
 func (mn *Network) seen(key string) {
-	mn.Lock()
-	defer mn.Unlock()
 	mn.seenEventIDs[key] = true
 }
 
 // buffer saves the request into pending buffer
-func (mn *Network) buffer(from flow.Identifier, engineID uint8, event interface{}, targetIDs []flow.Identifier) {
-	mn.hub.Buffer.Save(from, engineID, event, targetIDs)
+func (mn *Network) buffer(m *PendingMessage) {
+	mn.hub.Buffer.Save(m)
 }
 
-// FlushAll sends all pending messages to the receivers. The receivers might be triggered to forward messages to its peers,
-// so this function block until all receivers have done their forwarding
-func (mn *Network) FlushAll() {
-	mn.hub.Buffer.Flush(mn.sendToAllTargets)
-}
-
-// FlushAllExcept takes a function which determines whether a message should be blocked,
-// and go through all pending messages in the buffer, ignore the blocked ones, and send out
-// unblocked messages.
-// It runs in a loop until all the pending messages have been either blocked or sent out.
-func (mn *Network) FlushAllExcept(shouldBlock func(*PendingMessage) bool) {
-	mn.hub.Buffer.Flush(func(m *PendingMessage) error {
-		if shouldBlock(m) {
-			return nil
-		}
-		return mn.sendToAllTargets(m)
+// DeliverAllRecursive sends all pending messages to the receivers. The receivers
+// might be triggered to forward messages to its peers, so this function will
+// block until all receivers have done their forwarding.
+func (mn *Network) DeliverAllRecursive() {
+	mn.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
+		_ = mn.sendToAllTargets(m)
 	})
 }
 
-// sendToAllTargets send a message to all it's targeted nodes if the targeted node haven't seen it.
+// DeliverAllRecursiveExcept flushes all pending messages in the buffer except
+// those that satisfy the shouldDrop predicate function. All messages that
+// satisfy the shouldDrop predicate are permanently dropped. This function will
+// block until all receivers have done their forwarding.
+func (mn *Network) DeliverAllRecursiveExcept(shouldDrop func(*PendingMessage) bool) {
+	mn.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
+		if shouldDrop(m) {
+			return
+		}
+		_ = mn.sendToAllTargets(m)
+	})
+}
+
+// DeliverSome delivers all messages in the buffer that satisfy the
+// shouldDeliver predicate. Any messages that are not delivered remain in the
+// buffer.
+func (mn *Network) DeliverSome(shouldDeliver func(*PendingMessage) bool) {
+	mn.hub.Buffer.Deliver(func(m *PendingMessage) bool {
+		if shouldDeliver(m) {
+			return mn.sendToAllTargets(m) != nil
+		}
+		return false
+	})
+}
+
+// sendToAllTargets send a message to all its targeted nodes if the targeted
+// node has not yet seen it.
 func (mn *Network) sendToAllTargets(m *PendingMessage) error {
-	key := eventKey(m.EngineID, m.Event)
+	mn.Lock()
+	defer mn.Unlock()
+
+	key := eventKey(m.ChannelID, m.Event)
 	for _, nodeID := range m.TargetIDs {
 		// Find the network of the targeted node
 		receiverNetwork, exist := mn.hub.GetNetwork(nodeID)
@@ -127,9 +154,9 @@ func (mn *Network) sendToAllTargets(m *PendingMessage) error {
 		receiverNetwork.seen(key)
 
 		// Find the engine of the targeted network
-		receiverEngine, ok := receiverNetwork.engines[m.EngineID]
+		receiverEngine, ok := receiverNetwork.engines[m.ChannelID]
 		if !ok {
-			return errors.Errorf("Network can not find engine ID: %v for node: %v", m.EngineID, nodeID)
+			return errors.Errorf("Network can not find engine ID: %v for node: %v", m.ChannelID, nodeID)
 		}
 
 		// Find the engine of the targeted network

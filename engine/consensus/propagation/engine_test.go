@@ -13,22 +13,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/order"
+	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-func TestOnGuaranteedCollection(t *testing.T) {
+func TestOnCollectionGuarantee(t *testing.T) {
 
 	// initialize the mocks and engine
 	con := &network.Conduit{}
 	state := &protocol.State{}
 	ss := &protocol.Snapshot{}
 	me := &module.Local{}
-	pool := &module.Mempool{}
+	pool := &mempool.Guarantees{}
 	e := &Engine{
 		con:   con,
 		state: state,
@@ -37,9 +37,9 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	}
 
 	// create random collection
-	hash := make([]byte, 32)
-	_, _ = rand.Read(hash)
-	coll := &collection.GuaranteedCollection{Hash: hash}
+	var collID flow.Identifier
+	_, _ = rand.Read(collID[:])
+	coll := &flow.CollectionGuarantee{CollectionID: collID}
 
 	// NOTE: as this function relies on two other functions that have their own
 	// unit tests, we only set up and check the behaviour that proxies the
@@ -52,13 +52,13 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	state.On("Final").Return(ss).Once()
 	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
 	con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once()
-	err := e.onGuaranteedCollection(flow.Identifier{}, coll)
+	err := e.onGuarantee(flow.Identifier{}, coll)
 	assert.Nil(t, err)
 	con.AssertExpectations(t)
 
 	// check that we don't propagate if processing fails
 	pool.On("Add", mock.Anything).Return(errors.New("dummy")).Once()
-	err = e.onGuaranteedCollection(flow.Identifier{}, coll)
+	err = e.onGuarantee(flow.Identifier{}, coll)
 	assert.NotNil(t, err)
 	con.AssertExpectations(t)
 
@@ -68,56 +68,56 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	state.On("Final").Return(ss).Once()
 	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
 	con.On("Submit", mock.Anything, mock.Anything).Return(errors.New("dummy")).Once()
-	err = e.onGuaranteedCollection(flow.Identifier{}, coll)
+	err = e.onGuarantee(flow.Identifier{}, coll)
 	assert.NotNil(t, err)
 	con.AssertExpectations(t)
 }
 
-func TestProcessGuaranteedCollection(t *testing.T) {
+func TestProcessCollectionGuarantee(t *testing.T) {
 
 	// initialize mocks and engine
-	pool := &module.Mempool{}
+	pool := &mempool.Guarantees{}
 	e := Engine{
 		pool: pool,
 	}
 
 	// generate n random collections
 	n := 3
-	collections := make([]*collection.GuaranteedCollection, 0, n)
+	collections := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 0; i < n; i++ {
-		hash := make([]byte, 32)
-		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{Hash: hash}
+		var collID flow.Identifier
+		_, _ = rand.Read(collID[:])
+		coll := &flow.CollectionGuarantee{CollectionID: collID}
 		collections = append(collections, coll)
 	}
 
-	// test processing of collections for the first time
+	// test storing of collections for the first time
 	for i, coll := range collections {
 		pool.On("Add", coll).Return(nil).Once()
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuarantee(coll)
 		assert.Nilf(t, err, "collection %d", i)
 	}
 
-	// test processing of collections for the second time
+	// test storing of collections for the second time
 	for i, coll := range collections {
 		pool.On("Add", coll).Return(errors.New("dummy")).Once()
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuarantee(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 
 	// check that we only had the expected calls
 	pool.AssertExpectations(t)
 
-	// test processing of collections when the mempool fails
+	// test storing of collections when the mempool fails
 	for i, coll := range collections {
-		pool.On("Has", coll.Hash).Return(false)
+		pool.On("Has", coll.ID()).Return(false)
 		pool.On("Add", coll).Return(errors.New("dummy"))
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuarantee(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 }
 
-func TestPropagateGuaranteedCollection(t *testing.T) {
+func TestPropagateCollectionGuarantee(t *testing.T) {
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -134,24 +134,24 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 
 	// generate random collections
 	n := 3
-	collections := make([]*collection.GuaranteedCollection, 0, n)
+	collections := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 0; i < n; i++ {
-		hash := make([]byte, 32)
-		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{Hash: hash}
+		var collID flow.Identifier
+		_, _ = rand.Read(collID[:])
+		coll := &flow.CollectionGuarantee{CollectionID: collID}
 		collections = append(collections, coll)
 	}
 
 	// generate our own node identity
-	var ids flow.IdentityList
-	id := flow.Identity{
+	var identities flow.IdentityList
+	identity := &flow.Identity{
 		NodeID:  flow.Identifier{0x09, 0x09, 0x09, 0x09},
 		Address: "home",
 		Role:    flow.RoleConsensus,
 	}
-	ids = append(ids, id)
+	identities = append(identities, identity)
 
-	// generae another 1000 node ids
+	// generate another 1000 node identities
 	var targetIDs flow.IdentityList
 	for i := 0; i < 1000; i++ {
 		var nodeID flow.Identifier
@@ -170,24 +170,24 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 		case 4:
 			role = flow.RoleObservation
 		}
-		id := flow.Identity{
+		identity := &flow.Identity{
 			NodeID:  nodeID,
 			Address: address,
 			Role:    role,
 		}
-		ids = append(ids, id)
+		identities = append(identities, identity)
 		if role == flow.RoleConsensus {
-			targetIDs = append(targetIDs, id)
+			targetIDs = append(targetIDs, identity)
 		}
 	}
 
-	// sort by node id
-	sort.Slice(ids, func(i int, j int) bool {
-		return identity.ByNodeIDAsc(ids[i], ids[j])
+	// sort by node identity
+	sort.Slice(identities, func(i int, j int) bool {
+		return order.ByNodeIDAsc(identities[i], identities[j])
 	})
 
 	// set up the committee mock for good
-	me.On("NodeID").Return(id.NodeID)
+	me.On("NodeID").Return(identity.NodeID)
 	state.On("Final").Return(ss)
 	ss.On("Identities", mock.Anything, mock.Anything).Return(targetIDs, nil)
 
@@ -198,7 +198,7 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 			params = append(params, targetID.NodeID)
 		}
 		con.On("Submit", params...).Return(nil).Once()
-		err := e.propagateGuaranteedCollection(coll)
+		err := e.propagateGuarantee(coll)
 		assert.Nilf(t, err, "collection %d", i)
 	}
 

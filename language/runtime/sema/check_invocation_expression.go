@@ -8,8 +8,10 @@ import (
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
 	typ := checker.checkInvocationExpression(invocationExpression)
 
-	// events cannot be invoked without an emit statement
-	if _, isEventType := typ.(*EventType); isEventType {
+	// Events cannot be invoked without an emit statement
+
+	compositeType, isCompositeType := typ.(*CompositeType)
+	if isCompositeType && compositeType.Kind == common.CompositeKindEvent {
 		checker.report(
 			&InvalidEventUsageError{
 				Range: ast.NewRangeFromPositioned(invocationExpression),
@@ -44,7 +46,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		var member *Member
 		member, isOptionalResult = checker.visitMember(memberExpression)
 		if member != nil {
-			expressionType = member.Type
+			expressionType = member.TypeAnnotation.Type
 		}
 	}
 
@@ -68,6 +70,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 	var returnType Type = &InvalidType{}
 
 	argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType, invokableType)
+	checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
 
 	// If the invocation refers directly to the name of the function as stated in the declaration,
 	// or the invocation refers to a function of a composite (member),
@@ -87,20 +90,13 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		)
 	}
 
-	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
-	if len(argumentTypes) == len(parameterTypeAnnotations) &&
-		functionType.GetReturnType != nil {
+	returnType = functionType.ReturnType(argumentTypes)
+	checker.Elaboration.InvocationExpressionReturnTypes[invocationExpression] = returnType
 
-		returnType = functionType.GetReturnType(argumentTypes)
-	} else {
-		returnType = functionType.ReturnTypeAnnotation.Type
-	}
-
-	checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
-
-	parameterTypes := make([]Type, len(parameterTypeAnnotations))
-	for i, parameterTypeAnnotation := range parameterTypeAnnotations {
-		parameterTypes[i] = parameterTypeAnnotation.Type
+	parameters := functionType.Parameters
+	parameterTypes := make([]Type, len(parameters))
+	for i, parameter := range parameters {
+		parameterTypes[i] = parameter.TypeAnnotation.Type
 	}
 	checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
 
@@ -115,8 +111,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 
 	if returnType.Equal(&NeverType{}) {
 		functionActivation := checker.functionActivations.Current()
-		functionActivation.ReturnInfo.MaybeReturned = true
-		functionActivation.ReturnInfo.DefinitelyReturned = true
+		functionActivation.ReturnInfo.DefinitelyHalted = true
 	}
 
 	if isOptionalResult {
@@ -252,7 +247,7 @@ func (checker *Checker) checkInvocationArguments(
 	argumentCount := len(invocationExpression.Arguments)
 
 	// check the invocation's argument count matches the function's parameter count
-	parameterCount := len(functionType.ParameterTypeAnnotations)
+	parameterCount := len(functionType.Parameters)
 	if argumentCount != parameterCount {
 
 		// TODO: improve
@@ -274,15 +269,23 @@ func (checker *Checker) checkInvocationArguments(
 		minCount = parameterCount
 	}
 
-	argumentTypes = make([]Type, minCount)
+	argumentTypes = make([]Type, argumentCount)
 
 	for i := 0; i < minCount; i++ {
 		// ensure the type of the argument matches the type of the parameter
 
-		parameterType := functionType.ParameterTypeAnnotations[i].Type
+		parameterType := functionType.Parameters[i].TypeAnnotation.Type
 		argument := invocationExpression.Arguments[i]
 
 		argumentTypes[i] = checker.checkInvocationArgument(argument, parameterType)
+	}
+
+	// Add extra argument types
+
+	for i := minCount; i < argumentCount; i++ {
+		argument := invocationExpression.Arguments[i]
+
+		argumentTypes[i] = argument.Expression.Accept(checker).(Type)
 	}
 
 	// The invokable type might have special checks for the arguments
@@ -302,7 +305,7 @@ func (checker *Checker) checkInvocationArgument(argument *ast.Argument, paramete
 
 	if !argumentType.IsInvalidType() &&
 		!parameterType.IsInvalidType() &&
-		!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
+		!checker.checkTypeCompatibility(argument.Expression, argumentType, parameterType) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -313,6 +316,7 @@ func (checker *Checker) checkInvocationArgument(argument *ast.Argument, paramete
 		)
 	}
 
+	checker.checkVariableMove(argument.Expression)
 	checker.checkResourceMoveOperation(argument.Expression, argumentType)
 
 	return argumentType

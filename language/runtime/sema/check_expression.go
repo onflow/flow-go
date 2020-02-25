@@ -63,14 +63,20 @@ func (checker *Checker) checkSelfVariableUseInInitializer(variable *Variable, po
 		// If the member expression refers to a field that must be initialized,
 		// it must be initialized. This check is handled in `VisitMemberExpression`
 
-		// Otherwise, the member access is to a non-field, e.g. a function,
-		// in which case *all* fields must have been initialized
-
 		accessedSelfMember := checker.accessedSelfMember(checker.currentMemberExpression)
-		field := initializationInfo.FieldMembers[accessedSelfMember]
 
-		if field == nil {
-			checkInitializationComplete()
+		// If the member access is to a predeclared field, it can be considered
+		// initialized and its use is valid
+
+		if accessedSelfMember == nil || !accessedSelfMember.Predeclared {
+
+			// If the member access is to a non-field, e.g. a function,
+			// *all* fields must have been initialized
+
+			field := initializationInfo.FieldMembers[accessedSelfMember]
+			if field == nil {
+				checkInitializationComplete()
+			}
 		}
 
 	} else {
@@ -121,22 +127,27 @@ func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatem
 	return nil
 }
 
-func (checker *Checker) VisitBoolExpression(expression *ast.BoolExpression) ast.Repr {
+func (checker *Checker) VisitBoolExpression(_ *ast.BoolExpression) ast.Repr {
 	return &BoolType{}
 }
 
-func (checker *Checker) VisitNilExpression(expression *ast.NilExpression) ast.Repr {
+func (checker *Checker) VisitNilExpression(_ *ast.NilExpression) ast.Repr {
 	// TODO: verify
 	return &OptionalType{
 		Type: &NeverType{},
 	}
 }
 
-func (checker *Checker) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
+func (checker *Checker) VisitIntegerExpression(_ *ast.IntegerExpression) ast.Repr {
 	return &IntType{}
 }
 
-func (checker *Checker) VisitStringExpression(expression *ast.StringExpression) ast.Repr {
+func (checker *Checker) VisitFixedPointExpression(_ *ast.FixedPointExpression) ast.Repr {
+	// TODO: adjust once/if we support more fixed point types
+	return &Fix64Type{}
+}
+
+func (checker *Checker) VisitStringExpression(_ *ast.StringExpression) ast.Repr {
 	return &StringType{}
 }
 
@@ -244,7 +255,6 @@ func (checker *Checker) visitIndexExpression(
 		}
 
 		elementType = checker.visitValueIndexingExpression(
-			targetExpression,
 			indexedType,
 			indexExpression.IndexingExpression,
 			isAssignment,
@@ -258,7 +268,6 @@ func (checker *Checker) visitIndexExpression(
 }
 
 func (checker *Checker) visitValueIndexingExpression(
-	indexedExpression ast.Expression,
 	indexedType ValueIndexableType,
 	indexingExpression ast.Expression,
 	isAssignment bool,

@@ -26,7 +26,6 @@ func ParseAndCheckAccount(t *testing.T, code string) (*sema.Checker, error) {
 				sema.WithPredeclaredValues(map[string]sema.ValueDeclaration{
 					"account": accountValueDeclaration,
 				}),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)
@@ -39,7 +38,7 @@ func TestCheckAccount(t *testing.T) {
 			`
               resource R {}
 
-              fun test(): <-R? {
+              fun test(): @R? {
                   let r <- account.storage[R] <- create R()
                   return <-r
               }
@@ -55,7 +54,7 @@ func TestCheckAccount(t *testing.T) {
               resource R {}
 
               fun test() {
-                  account.published[&R] = &account.storage[R] as R
+                  account.published[&R] = &account.storage[R] as &R
               }
             `,
 		)

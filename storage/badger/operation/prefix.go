@@ -6,19 +6,36 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 const (
-	codeRole        = 10
-	codeAddress     = 11
-	codeDelta       = 12
-	codeHeader      = 20
-	codeIdentities  = 21
-	codeCollections = 22
-	codeHash        = 100
-	codeBoundary    = 101
+
+	// special database markers
+	codeBoundary = 1 // latest finalized block number
+	codeNumber   = 2 // lookup for block by number
+	codeDelta    = 3 // history of stake changes
+
+	// block header and entities included in block contents
+	codeHeader    = 10
+	codeIdentity  = 11
+	codeGuarantee = 12
+	codeSeal      = 13
+
+	// entities that are related to block formation & validation
+	codeTransaction = 21
+	codeCollection  = 22
+	codeCommit      = 23
+	codeResult      = 24
+	// codeReceipt     = 25
+	// codeApproval    = 26
+	codeChunkHeader = 27
+
+	codeIndexIdentity   = 100
+	codeIndexGuarantee  = 101
+	codeIndexSeal       = 102
+	codeIndexCommit     = 103
+	codeIndexCollection = 104
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {
@@ -36,7 +53,7 @@ func b(v interface{}) []byte {
 		b := make([]byte, 8)
 		binary.BigEndian.PutUint64(b, i)
 		return b
-	case crypto.Hash:
+	case string:
 		return []byte(i)
 	case flow.Role:
 		return []byte{byte(i)}

@@ -10,14 +10,15 @@ func _() {
 	var x [1]struct{}
 	_ = x[AccessNotSpecified-0]
 	_ = x[AccessPrivate-1]
-	_ = x[AccessAuthorized-2]
-	_ = x[AccessPublic-3]
-	_ = x[AccessPublicSettable-4]
+	_ = x[AccessContract-2]
+	_ = x[AccessAccount-3]
+	_ = x[AccessPublic-4]
+	_ = x[AccessPublicSettable-5]
 }
 
-const _Access_name = "AccessNotSpecifiedAccessPrivateAccessAuthorizedAccessPublicAccessPublicSettable"
+const _Access_name = "AccessNotSpecifiedAccessPrivateAccessContractAccessAccountAccessPublicAccessPublicSettable"
 
-var _Access_index = [...]uint8{0, 18, 31, 47, 59, 79}
+var _Access_index = [...]uint8{0, 18, 31, 45, 58, 70, 90}
 
 func (i Access) String() string {
 	if i < 0 || i >= Access(len(_Access_index)-1) {

@@ -27,5 +27,5 @@ struct Header {
 struct Block {
   header @0 :Header;
   newIdentities @1 :List(Identity);
-  guaranteedCollections @2 :List(Collection.GuaranteedCollection);
+  collectionGuarantees @2 :List(Collection.CollectionGuarantee);
 }

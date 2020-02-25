@@ -7,10 +7,10 @@ import (
 )
 
 type Local struct {
-	me flow.Identity
+	me *flow.Identity
 }
 
-func New(id flow.Identity) (*Local, error) {
+func New(id *flow.Identity) (*Local, error) {
 	l := &Local{
 		me: id,
 	}

@@ -14,24 +14,33 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFailableCastingWithResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test %[2]s %[3]s T() as? <-T
+                      let test %[3]s %[4]s T%[5]s as? @T
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 2)
 
@@ -42,15 +51,20 @@ func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
-
 				errs := ExpectCheckerErrors(t, err, 2)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+
 			default:
 				panic(errors.NewUnreachableError())
 			}
@@ -58,20 +72,28 @@ func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+func TestCheckFunctionDeclarationParameterWithResourceAnnotation(t *testing.T) {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      fun test(r: <-T) {
-                          %[2]s r
+                      fun test(r: @T) {
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -80,10 +102,13 @@ func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -92,20 +117,28 @@ func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+func TestCheckFunctionDeclarationParameterWithoutResourceAnnotation(t *testing.T) {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       fun test(r: T) {
-                          %[2]s r
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -114,9 +147,12 @@ func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				require.NoError(t, err)
 
 			default:
@@ -126,33 +162,55 @@ func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      fun test(): <-T {
-                          return %[2]s %[3]s T()
+                      fun test(): @T {
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.MoveOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
+
+			case common.CompositeKindEvent:
+
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -161,33 +219,51 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       fun test(): T {
-                          return %[2]s %[3]s T()
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.MoveOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
-				require.NoError(t, err)
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -196,31 +272,52 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test: <-T %[2]s %[3]s T()
+                      let test: @T %[3]s %[4]s T%[5]s
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -229,31 +326,51 @@ func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test: T %[2]s %[3]s T()
+                      let test: T %[3]s %[4]s T%[5]s
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				require.NoError(t, err)
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -262,9 +379,10 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
+func TestCheckFieldDeclarationWithResourceAnnotation(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			destructor := ""
@@ -282,8 +400,8 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
                       %[1]s T {}
 
                       %[1]s U {
-                          let t: <-T
-                          init(t: <-T) {
+                          let t: @T
+                          init(t: @T) {
                               self.t %[2]s t
                           }
 
@@ -300,13 +418,22 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindContract, common.CompositeKindStructure:
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 2)
 
-				// NOTE: one invalid move annotation error for field, one for parameter
+				// NOTE: one invalid resource annotation error for field, one for parameter
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[1])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 3)
+
+				// NOTE: one invalid resource annotation error for field, one for parameter
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[2])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -315,8 +442,8 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+func TestCheckFieldDeclarationWithoutResourceAnnotation(t *testing.T) {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			destructor := ""
@@ -350,14 +477,19 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				// NOTE: one missing move annotation error for field, one for parameter
+				// NOTE: one missing resource annotation error for field, one for parameter
 
 				errs := ExpectCheckerErrors(t, err, 2)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[1])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[1])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+
+			case common.CompositeKindStructure:
 				require.NoError(t, err)
 
 			default:
@@ -367,20 +499,28 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+func TestCheckFunctionExpressionParameterWithResourceAnnotation(t *testing.T) {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test = fun (r: <-T) {
-                          %[2]s r
+                      let test = fun (r: @T) {
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -389,10 +529,13 @@ func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -401,20 +544,28 @@ func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+func TestCheckFunctionExpressionParameterWithoutResourceAnnotation(t *testing.T) {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test = fun (r: T) {
-                          %[2]s r
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -424,9 +575,12 @@ func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
 
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				require.NoError(t, err)
 
 			default:
@@ -436,34 +590,54 @@ func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test = fun (): <-T {
-                          return %[2]s %[3]s T()
+                      let test = fun (): @T {
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.MoveOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
-
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -472,33 +646,53 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test = fun (): T {
-                          return %[2]s %[3]s T()
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.MoveOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				require.NoError(t, err)
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -507,20 +701,28 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test: ((<-T): Void) = fun (r: <-T) {
-                          %[2]s r
+                      let test: ((@T): Void) = fun (r: @T) {
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -529,10 +731,13 @@ func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -541,20 +746,28 @@ func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionTypeParameterWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test: ((T): Void) = fun (r: T) {
-                          %[2]s r
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -563,9 +776,12 @@ func TestCheckFunctionTypeParameterWithoutMoveAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				require.NoError(t, err)
 
 			default:
@@ -575,33 +791,54 @@ func TestCheckFunctionTypeParameterWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test: ((): <-T) = fun (): <-T {
-                          return %[2]s %[3]s T()
+                      let test: ((): @T) = fun (): @T {
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.MoveOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -610,32 +847,53 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
-				fmt.Sprintf(`
-                      %[1]s T {}
+				fmt.Sprintf(
+					`
+                      %[1]s T %[2]s
 
                       let test: ((): T) = fun (): T {
-                          return %[2]s %[3]s T()
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.MoveOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				require.NoError(t, err)
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -644,40 +902,56 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFailableCastingWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFailableCastingWithoutResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test %[2]s %[3]s T() as? T
+                      let test %[3]s %[4]s T%[5]s as? T
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					body,
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 3)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
 				assert.IsType(t, &sema.InvalidFailableResourceDowncastOutsideOptionalBindingError{}, errs[1])
 
 				// TODO: add support for non-Any types in failable downcasting
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[2])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				// TODO: add support for non-Any types in failable casting
 
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -691,7 +965,7 @@ func TestCheckUnaryMove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun foo(x: <-X): <-X {
+      fun foo(x: @X): @X {
           return <-x
       }
 
@@ -837,7 +1111,7 @@ func TestCheckInvalidCreateImportedResource(t *testing.T) {
       pub resource R {}
 	`)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
@@ -856,7 +1130,49 @@ func TestCheckInvalidCreateImportedResource(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
+	assert.IsType(t, &sema.InvalidResourceCreationError{}, errs[0])
+}
+
+func TestCheckResourceCreationInContracts(t *testing.T) {
+
+	t.Run("in sibling contract", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t,
+			`
+              contract A {
+                  resource R {}
+              }
+
+              contract B {
+
+                  pub fun test() {
+                      destroy create A.R()
+                  }
+              }
+            `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidResourceCreationError{}, errs[0])
+	})
+
+	t.Run("in same contract", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t,
+			`
+              contract A {
+                  resource R {}
+
+                  pub fun test() {
+                      destroy create R()
+                  }
+              }
+            `,
+		)
+
+		require.NoError(t, err)
+	})
 }
 
 func TestCheckInvalidResourceLoss(t *testing.T) {
@@ -903,7 +1219,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
                 }
             }
 
-            fun createResource(): <-Foo {
+            fun createResource(): @Foo {
                 return <-create Foo()
             }
 
@@ -931,7 +1247,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 2)
 
 		assert.IsType(t, &sema.ResourceLossError{}, errs[0])
-		assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+		assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 	})
 
 	t.Run("ImmediateIndexingFunctionInvocation", func(t *testing.T) {
@@ -944,7 +1260,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
                 destroy x
             }
 
-            fun makeFoos(): <-[Foo] {
+            fun makeFoos(): @[Foo] {
                 return <-[
                     <-create Foo(),
                     <-create Foo()
@@ -955,7 +1271,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 2)
 
 		assert.IsType(t, &sema.ResourceLossError{}, errs[0])
-		assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+		assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 	})
 }
 
@@ -964,7 +1280,7 @@ func TestCheckResourceReturn(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun test(): <-X {
+      fun test(): @X {
           return <-create X()
       }
     `)
@@ -977,7 +1293,7 @@ func TestCheckInvalidResourceReturnMissingMove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun test(): <-X {
+      fun test(): @X {
           return create X()
       }
     `)
@@ -1023,7 +1339,7 @@ func TestCheckResourceArgument(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun foo(_ x: <-X) {
+      fun foo(_ x: @X) {
           destroy x
       }
 
@@ -1040,7 +1356,7 @@ func TestCheckInvalidResourceArgumentMissingMove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun foo(_ x: <-X) {
+      fun foo(_ x: @X) {
           destroy x
       }
 
@@ -1238,7 +1554,7 @@ func TestCheckResourceMoveThroughReturn(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun test(): <-X {
+      fun test(): @X {
           let x <- create X()
           return <-x
       }
@@ -1257,7 +1573,7 @@ func TestCheckResourceMoveThroughArgumentPassing(t *testing.T) {
           absorb(<-x)
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1276,7 +1592,7 @@ func TestCheckInvalidResourceUseAfterMoveToFunction(t *testing.T) {
           absorb(<-x)
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1325,7 +1641,7 @@ func TestCheckInvalidResourceFieldUseAfterMoveToVariable(t *testing.T) {
           return x.id
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1348,7 +1664,7 @@ func TestCheckResourceUseAfterMoveInIfStatementThenBranch(t *testing.T) {
           absorb(<-x)
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1372,7 +1688,7 @@ func TestCheckResourceUseInIfStatement(t *testing.T) {
           }
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1396,7 +1712,7 @@ func TestCheckResourceUseInNestedIfStatement(t *testing.T) {
           }
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1411,7 +1727,7 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun test(): <-X {
+      fun test(): @X {
           let x <- create X()
           if 1 > 2 {
               absorb(<-x)
@@ -1421,7 +1737,7 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
           return <-x
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1435,13 +1751,13 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
 		[]sema.ResourceInvalidation{
 			{
 				Kind:     sema.ResourceInvalidationKindMove,
-				StartPos: ast.Position{Offset: 165, Line: 9, Column: 23},
-				EndPos:   ast.Position{Offset: 165, Line: 9, Column: 23},
+				StartPos: ast.Position{Offset: 164, Line: 9, Column: 23},
+				EndPos:   ast.Position{Offset: 164, Line: 9, Column: 23},
 			},
 			{
 				Kind:     sema.ResourceInvalidationKindMove,
-				StartPos: ast.Position{Offset: 120, Line: 7, Column: 23},
-				EndPos:   ast.Position{Offset: 120, Line: 7, Column: 23},
+				StartPos: ast.Position{Offset: 119, Line: 7, Column: 23},
+				EndPos:   ast.Position{Offset: 119, Line: 7, Column: 23},
 			},
 		},
 	)
@@ -1837,7 +2153,7 @@ func TestCheckInvalidResourceLossThroughReturnInIfStatementBranches(t *testing.T
           destroy x
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1863,7 +2179,7 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenAndDestroyInElse(t *test
           }
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1885,7 +2201,7 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
           destroy x
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1894,37 +2210,35 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
 }
 
 func TestCheckResourceNesting(t *testing.T) {
-
-	// TODO: add support for contracts
-
-	compositeKindPossibilities := []common.CompositeKind{
-		common.CompositeKindResource,
-		common.CompositeKindStructure,
-	}
 	interfacePossibilities := []bool{true, false}
 
-	for _, innerCompositeKind := range compositeKindPossibilities {
+	for _, innerCompositeKind := range common.AllCompositeKinds {
+
+		// Don't test contract fields/parameters: contracts can't be passed by value
+		if innerCompositeKind == common.CompositeKindContract {
+			continue
+		}
+
 		for _, innerIsInterface := range interfacePossibilities {
-			for _, outerCompositeKind := range compositeKindPossibilities {
+
+			if !innerCompositeKind.SupportsInterfaces() && innerIsInterface {
+				continue
+			}
+
+			for _, outerCompositeKind := range common.CompositeKindsWithBody {
 				for _, outerIsInterface := range interfacePossibilities {
 
-					testName := fmt.Sprintf(
-						"%s %v/%s %v",
-						innerCompositeKind.Keyword(),
+					if !outerCompositeKind.SupportsInterfaces() && outerIsInterface {
+						continue
+					}
+
+					testResourceNesting(
+						t,
+						innerCompositeKind,
 						innerIsInterface,
-						outerCompositeKind.Keyword(),
+						outerCompositeKind,
 						outerIsInterface,
 					)
-
-					t.Run(testName, func(t *testing.T) {
-						testResourceNesting(
-							t,
-							innerCompositeKind,
-							innerIsInterface,
-							outerCompositeKind,
-							outerIsInterface,
-						)
-					})
 				}
 			}
 		}
@@ -1948,74 +2262,143 @@ func testResourceNesting(
 		outerInterfaceKeyword = "interface"
 	}
 
-	// Prepare the initializer, if needed.
-	// `outerCompositeKind` is the container composite kind.
-	// If it is concrete, i.e. not an interface, it needs an initializer.
-
-	initializer := ""
-	if !outerIsInterface {
-		initializer = fmt.Sprintf(
-			`
-              init(t: %[1]sT) {
-                  self.t %[2]s t
-              }
-            `,
-			innerCompositeKind.Annotation(),
-			innerCompositeKind.TransferOperator(),
-		)
-	}
-
-	destructor := ""
-	if !outerIsInterface &&
-		outerCompositeKind == common.CompositeKindResource &&
-		innerCompositeKind == common.CompositeKindResource {
-
-		destructor = `
-          destroy() {
-              destroy self.t
-          }
-        `
-	}
-
-	// Prepare the full program defining an empty composite,
-	// and a second composite which contains the first
-
-	program := fmt.Sprintf(
-		`
-          %[1]s %[2]s T {}
-
-          %[3]s %[4]s U {
-              let t: %[5]sT
-              %[6]s
-              %[7]s
-          }
-        `,
+	testName := fmt.Sprintf(
+		"%s %s/%s %s",
 		innerCompositeKind.Keyword(),
 		innerInterfaceKeyword,
 		outerCompositeKind.Keyword(),
 		outerInterfaceKeyword,
-		innerCompositeKind.Annotation(),
-		initializer,
-		destructor,
 	)
 
-	_, err := ParseAndCheck(t, program)
+	t.Run(testName, func(t *testing.T) {
 
-	// TODO: add support for non-structure / non-resource declarations
+		// Prepare the initializer, if needed.
+		// `outerCompositeKind` is the container composite kind.
+		// If it is concrete, i.e. not an interface, it needs an initializer.
 
-	switch outerCompositeKind {
-	case common.CompositeKindStructure:
-		switch innerCompositeKind {
-		case common.CompositeKindStructure:
-			require.NoError(t, err)
-		case common.CompositeKindResource:
-			errs := ExpectCheckerErrors(t, err, 1)
-			assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
+		initializer := ""
+		if !outerIsInterface {
+			initializer = fmt.Sprintf(
+				`
+                  init(t: %[1]sT) {
+                      self.t %[2]s t
+                  }
+                `,
+				innerCompositeKind.Annotation(),
+				innerCompositeKind.TransferOperator(),
+			)
 		}
 
-	case common.CompositeKindResource:
-		require.NoError(t, err)
-	}
+		destructor := ""
+		if !outerIsInterface &&
+			outerCompositeKind == common.CompositeKindResource &&
+			innerCompositeKind == common.CompositeKindResource {
+
+			destructor = `
+              destroy() {
+                  destroy self.t
+              }
+            `
+		}
+
+		innerBody := "{}"
+		if innerCompositeKind == common.CompositeKindEvent {
+			innerBody = "()"
+		}
+
+		// Prepare the full program defining an empty composite,
+		// and a second composite which contains the first
+
+		program := fmt.Sprintf(
+			`
+              %[1]s %[2]s T %[3]s
+
+              %[4]s %[5]s U {
+                  let t: %[6]sT
+                  %[7]s
+                  %[8]s
+              }
+            `,
+			innerCompositeKind.Keyword(),
+			innerInterfaceKeyword,
+			innerBody,
+			outerCompositeKind.Keyword(),
+			outerInterfaceKeyword,
+			innerCompositeKind.Annotation(),
+			initializer,
+			destructor,
+		)
+
+		_, err := ParseAndCheck(t, program)
+
+		switch outerCompositeKind {
+		case common.CompositeKindStructure:
+
+			switch innerCompositeKind {
+			case common.CompositeKindStructure,
+				common.CompositeKindEvent:
+
+				require.NoError(t, err)
+
+			case common.CompositeKindResource:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
+
+			default:
+				panic(errors.NewUnreachableError())
+			}
+
+		case common.CompositeKindResource,
+			common.CompositeKindContract:
+
+			require.NoError(t, err)
+
+		default:
+			panic(errors.NewUnreachableError())
+		}
+	})
+}
+
+func TestCheckContractResourceField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      contract C {
+          let r: @R
+
+          init(r: @R) {
+              self.r <- r
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidContractResourceFieldMove(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      contract C {
+          let r: @R
+
+          init(r: @R) {
+              self.r <- r
+          }
+      }
+
+      fun test() {
+          let r <- C.r
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 }
 
 // TestCheckResourceInterfaceConformance tests the check
@@ -2065,7 +2448,7 @@ func TestCheckResourceInterfaceUseAsType(t *testing.T) {
 
       resource Y: X {}
 
-      let x: <-X <- create Y()
+      let x: @X <- create Y()
     `)
 
 	require.NoError(t, err)
@@ -2108,7 +2491,7 @@ func TestCheckInvalidResourceLossReturnResourceAndMemberAccess(t *testing.T) {
           return createX().id
       }
 
-      fun createX(): <-X {
+      fun createX(): @X {
           return <-create X(id: 1)
       }
     `)
@@ -2128,13 +2511,13 @@ func TestCheckInvalidResourceLossAfterMoveThroughArrayIndexing(t *testing.T) {
           foo(x: <-xs[0])
       }
 
-      fun foo(x: <-X) {
+      fun foo(x: @X) {
           destroy x
       }
     `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
@@ -2148,7 +2531,7 @@ func TestCheckInvalidResourceLossThroughFunctionResultAccess(t *testing.T) {
           }
       }
 
-      fun createFoo(): <-Foo {
+      fun createFoo(): @Foo {
           return <- create Foo(bar: 1)
       }
 
@@ -2173,7 +2556,7 @@ func TestCheckResourceInterfaceDestruction(t *testing.T) {
 
       resource Y: X {}
 
-      fun foo(x: <-X) {
+      fun foo(x: @X) {
           destroy x
       }
 
@@ -2195,9 +2578,9 @@ func TestCheckInvalidResourceFieldMoveThroughVariableDeclaration(t *testing.T) {
       resource Foo {}
 
       resource Bar {
-          let foo: <-Foo
+          let foo: @Foo
 
-          init(foo: <-Foo) {
+          init(foo: @Foo) {
               self.foo <- foo
           }
 
@@ -2206,7 +2589,7 @@ func TestCheckInvalidResourceFieldMoveThroughVariableDeclaration(t *testing.T) {
           }
       }
 
-      fun test(): <-[Foo] {
+      fun test(): @[Foo] {
           let foo <- create Foo()
           let bar <- create Bar(foo: <-foo)
           let foo2 <- bar.foo
@@ -2218,8 +2601,8 @@ func TestCheckInvalidResourceFieldMoveThroughVariableDeclaration(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 }
 
 // TestCheckInvalidResourceFieldMoveThroughParameter tests if resources nested
@@ -2233,9 +2616,9 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
       resource Foo {}
 
       resource Bar {
-          let foo: <-Foo
+          let foo: @Foo
 
-          init(foo: <-Foo) {
+          init(foo: @Foo) {
               self.foo <- foo
           }
 
@@ -2244,11 +2627,11 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
           }
       }
 
-      fun identity(_ foo: <-Foo): <-Foo {
+      fun identity(_ foo: @Foo): @Foo {
           return <-foo
       }
 
-      fun test(): <-[Foo] {
+      fun test(): @[Foo] {
           let foo <- create Foo()
           let bar <- create Bar(foo: <-foo)
           let foo2 <- identity(<-bar.foo)
@@ -2260,8 +2643,65 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
+}
+
+func TestCheckInvalidResourceFieldMoveSelf(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Y {}
+
+      resource X {
+
+          var y: @Y
+
+          init() {
+              self.y <- create Y()
+          }
+
+          fun test() {
+             absorb(<-self.y)
+          }
+
+          destroy() {
+              destroy self.y
+          }
+      }
+
+      fun absorb(_ y: @Y) {
+          destroy y
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+}
+
+func TestCheckInvalidResourceFieldUseAfterDestroy(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Y {}
+
+      resource X {
+
+          var y: @Y
+
+          init() {
+              self.y <- create Y()
+          }
+
+          destroy() {
+              destroy self.y
+              destroy self.y
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
 }
 
 func TestCheckResourceArrayAppend(t *testing.T) {
@@ -2270,7 +2710,7 @@ func TestCheckResourceArrayAppend(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- []
+          let xs: @[X] <- []
           xs.append(<-create X())
           destroy xs
       }
@@ -2285,7 +2725,7 @@ func TestCheckResourceArrayInsert(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- []
+          let xs: @[X] <- []
           xs.insert(at: 0, <-create X())
           destroy xs
       }
@@ -2300,7 +2740,7 @@ func TestCheckResourceArrayRemove(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let x <- xs.remove(at: 0)
           destroy x
           destroy xs
@@ -2316,7 +2756,7 @@ func TestCheckInvalidResourceArrayRemoveResourceLoss(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           xs.remove(at: 0)
           destroy xs
       }
@@ -2333,7 +2773,7 @@ func TestCheckResourceArrayRemoveFirst(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let x <- xs.removeFirst()
           destroy x
           destroy xs
@@ -2349,7 +2789,7 @@ func TestCheckResourceArrayRemoveLast(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let x <- xs.removeLast()
           destroy x
           destroy xs
@@ -2365,7 +2805,7 @@ func TestCheckInvalidResourceArrayContains(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           xs.contains(<-create X())
           destroy xs
       }
@@ -2383,7 +2823,7 @@ func TestCheckResourceArrayLength(t *testing.T) {
       resource X {}
 
       fun test(): Int {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let count = xs.length
           destroy xs
           return count
@@ -2399,7 +2839,7 @@ func TestCheckInvalidResourceArrayConcat(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let xs2 <- [<-create X()]
           let xs3 <- xs.concat(<-xs2)
           destroy xs
@@ -2418,7 +2858,7 @@ func TestCheckResourceDictionaryRemove(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {"x1": <-create X()}
+          let xs: @{String: X} <- {"x1": <-create X()}
           let x <- xs.remove(key: "x1")
           destroy x
           destroy xs
@@ -2434,7 +2874,7 @@ func TestCheckInvalidResourceDictionaryRemoveResourceLoss(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {"x1": <-create X()}
+          let xs: @{String: X} <- {"x1": <-create X()}
           xs.remove(key: "x1")
           destroy xs
       }
@@ -2451,7 +2891,7 @@ func TestCheckResourceDictionaryInsert(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {}
+          let xs: @{String: X} <- {}
           let old <- xs.insert(key: "x1", <-create X())
           destroy old
           destroy xs
@@ -2467,7 +2907,7 @@ func TestCheckInvalidResourceDictionaryInsertResourceLoss(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {}
+          let xs: @{String: X} <- {}
           xs.insert(key: "x1", <-create X())
           destroy xs
       }
@@ -2484,7 +2924,7 @@ func TestCheckResourceDictionaryLength(t *testing.T) {
       resource X {}
 
       fun test(): Int {
-          let xs: <-{String: X} <- {"x1": <-create X()}
+          let xs: @{String: X} <- {"x1": <-create X()}
           let count = xs.length
           destroy xs
           return count
@@ -2511,7 +2951,7 @@ func TestCheckInvalidResourceDictionaryKeys(t *testing.T) {
 
 	assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
 	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[1])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[2])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[2])
 }
 
 func TestCheckInvalidResourceDictionaryValues(t *testing.T) {
@@ -2530,7 +2970,7 @@ func TestCheckInvalidResourceDictionaryValues(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 }
 
 func TestCheckInvalidResourceLossAfterMoveThroughDictionaryIndexing(t *testing.T) {
@@ -2543,13 +2983,13 @@ func TestCheckInvalidResourceLossAfterMoveThroughDictionaryIndexing(t *testing.T
           foo(x: <-xs["x"])
       }
 
-      fun foo(x: <-X?) {
+      fun foo(x: @X?) {
           destroy x
       }
     `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
@@ -2576,9 +3016,9 @@ func TestCheckInvalidResourceConstantResourceFieldSwap(t *testing.T) {
       resource Foo {}
 
       resource Bar {
-          let foo: <-Foo
+          let foo: @Foo
 
-          init(foo: <-Foo) {
+          init(foo: @Foo) {
               self.foo <- foo
           }
 
@@ -2608,9 +3048,9 @@ func TestCheckResourceVariableResourceFieldSwap(t *testing.T) {
       resource Foo {}
 
       resource Bar {
-          var foo: <-Foo
+          var foo: @Foo
 
-          init(foo: <-Foo) {
+          init(foo: @Foo) {
               self.foo <- foo
           }
 
@@ -2638,9 +3078,9 @@ func TestCheckInvalidResourceFieldDestroy(t *testing.T) {
      resource Foo {}
 
      resource Bar {
-         var foo: <-Foo
+         var foo: @Foo
 
-         init(foo: <-Foo) {
+         init(foo: @Foo) {
              self.foo <- foo
          }
 
@@ -2660,7 +3100,7 @@ func TestCheckInvalidResourceFieldDestroy(t *testing.T) {
 
 	// TODO: maybe have dedicated error
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
@@ -2671,14 +3111,7 @@ func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
 		common.DeclarationKindFunction,
 	}
 
-	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contract interface declarations
-
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
+	for _, compositeKind := range common.CompositeKindsWithBody {
 		for _, declarationKind := range declarationKinds {
 			for _, hasCondition := range []bool{true, false} {
 
@@ -2693,6 +3126,7 @@ func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
 				switch declarationKind {
 				case common.DeclarationKindInitializer:
 					innerDeclaration = declarationKind.Keywords()
+
 				case common.DeclarationKindFunction:
 					innerDeclaration = fmt.Sprintf("%s test", declarationKind.Keywords())
 				}
@@ -2711,7 +3145,7 @@ func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
                           %[1]s interface Y {
 
                               // Should not result in a resource loss error
-                              %[2]s(from: <-X) %[3]s
+                              %[2]s(from: @X) %[3]s
                           }
                         `,
 						compositeKind.Keyword(),
@@ -2732,9 +3166,9 @@ func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
      resource interface RI {}
 
      resource R {
-         var ris: <-{String: RI}
+         var ris: @{String: RI}
 
-         init(_ ri: <-RI) {
+         init(_ ri: @RI) {
              self.ris <- {"first": <-ri}
          }
 
@@ -2748,7 +3182,7 @@ func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
          }
      }
 
-     fun absorb(_ ri: <-RI?) {
+     fun absorb(_ ri: @RI?) {
          destroy ri
      }
    `)
@@ -2761,7 +3195,7 @@ func TestCheckInvalidResourceMethodBinding(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource R {}
 
-      fun test(): ((<-R): Void) {
+      fun test(): ((@R): Void) {
           let rs <- [<-create R()]
           let append = rs.append
           destroy rs
@@ -2795,7 +3229,7 @@ func TestCheckResourceOptionalBinding(t *testing.T) {
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               destroy r
           } else {
@@ -2813,7 +3247,7 @@ func TestCheckInvalidResourceOptionalBindingResourceLossInThen(t *testing.T) {
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               // resource loss of r
           } else {
@@ -2833,7 +3267,7 @@ func TestCheckInvalidResourceOptionalBindingResourceLossInElse(t *testing.T) {
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               destroy r
           } else {
@@ -2853,7 +3287,7 @@ func TestCheckInvalidResourceOptionalBindingResourceUseAfterInvalidationInThen(t
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               destroy r
               destroy maybeR
@@ -2874,7 +3308,7 @@ func TestCheckInvalidResourceOptionalBindingResourceUseAfterInvalidationAfterBra
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               destroy r
           } else {
@@ -2883,7 +3317,7 @@ func TestCheckInvalidResourceOptionalBindingResourceUseAfterInvalidationAfterBra
           f(<-maybeR)
       }
 
-      fun f(_ r: <-R?) {
+      fun f(_ r: @R?) {
           destroy r
       }
     `)
@@ -2902,8 +3336,8 @@ func TestCheckResourceOptionalBindingFailableCast(t *testing.T) {
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
              } else {
                  destroy ri
@@ -2927,8 +3361,8 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
                  destroy ri
              } else {
@@ -2954,8 +3388,8 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
              }
              destroy ri
@@ -2979,8 +3413,8 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceLossMissingElse(
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
              }
          }
@@ -3003,8 +3437,8 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
              }
              destroy ri
@@ -3028,8 +3462,8 @@ func TestCheckInvalidResourceFailableCastOutsideOptionalBinding(t *testing.T) {
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             let r <- ri as? <-R
+             let ri: @RI <- create R()
+             let r <- ri as? @R
              destroy r
          }
     `)
@@ -3040,4 +3474,266 @@ func TestCheckInvalidResourceFailableCastOutsideOptionalBinding(t *testing.T) {
 
 	// TODO: remove once supported
 	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
+}
+
+func TestCheckInvalidUnaryMoveAndCopyTransfer(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test() {
+          let r = <- create R()
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveToFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test() {
+              absorb(<-self)
+          }
+      }
+
+      fun absorb(_ x: @X) {
+          destroy x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveInVariableDeclaration(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test() {
+              let x <- self
+              destroy x
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfDestruction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test() {
+              destroy self
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveReturnFromFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test(): @X {
+              return <-self
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveIntoArrayLiteral(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test(): @[X] {
+              return <-[<-self]
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveIntoDictionaryLiteral(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test(): @{String: X} {
+              return <-{"self": <-self}
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveSwap(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test() {
+              var x: @X? <- nil
+              let oldX <- x <- self
+              destroy x
+              destroy oldX
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckResourceCreationAndInvalidationInLoop(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {}
+
+      fun loop() {
+          var i = 0
+          while i < 10 {
+              let x <- create X()
+              destroy x
+              i = i + 1
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidResourceOwnerField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Test {
+          let owner: PublicAccount
+
+          init(owner: PublicAccount) {
+              self.owner = owner
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceInterfaceOwnerField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+         let owner: PublicAccount
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceOwnerFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+         fun owner() {}
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceInterfaceOwnerFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+         fun owner()
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckResourceOwnerFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+
+         fun test(): PublicAccount? {
+             return self.owner
+         }
+     }
+   `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckResourceInterfaceOwnerFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+
+         fun test() {
+             pre { self.owner != nil }
+         }
+     }
+   `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidResourceOwnerFieldInitialization(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+
+         init(owner: PublicAccount) {
+             self.owner = owner
+         }
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 const (
@@ -65,11 +66,22 @@ func (a Address) String() string {
 	return a.Hex()
 }
 
+// Short returns the string representation of the address with leading zeros
+// removed.
+func (a Address) Short() string {
+	hex := a.String()
+	trimmed := strings.TrimLeft(hex, "0")
+	if len(trimmed)%2 != 0 {
+		trimmed = "0" + trimmed
+	}
+	return trimmed
+}
+
 func (a Address) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("\"%s\"", a.Hex())), nil
 }
 
 func (a *Address) UnmarshalJSON(data []byte) error {
-	*a = HexToAddress(string(data))
+	*a = HexToAddress(strings.Trim(string(data), "\""))
 	return nil
 }

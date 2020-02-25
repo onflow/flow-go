@@ -8,14 +8,14 @@ import (
 // TypeAnnotation
 
 type TypeAnnotation struct {
-	Move     bool
-	Type     Type
-	StartPos Position
+	IsResource bool
+	Type       Type
+	StartPos   Position
 }
 
 func (e *TypeAnnotation) String() string {
-	if e.Move {
-		return fmt.Sprintf("<-%s", e.Type)
+	if e.IsResource {
+		return fmt.Sprintf("@%s", e.Type)
 	}
 	return fmt.Sprint(e.Type)
 }
@@ -157,14 +157,25 @@ func (t *FunctionType) String() string {
 // ReferenceType
 
 type ReferenceType struct {
-	Type     Type
-	StartPos Position
+	Authorized bool
+	Storable   bool
+	Type       Type
+	StartPos   Position
 }
 
 func (*ReferenceType) isType() {}
 
 func (t *ReferenceType) String() string {
-	return fmt.Sprintf("&%s", t.Type)
+	var builder strings.Builder
+	if t.Authorized {
+		builder.WriteString("auth ")
+	}
+	if t.Storable {
+		builder.WriteString("storable ")
+	}
+	builder.WriteRune('&')
+	builder.WriteString(t.Type.String())
+	return builder.String()
 }
 
 func (t *ReferenceType) StartPosition() Position {
@@ -173,4 +184,36 @@ func (t *ReferenceType) StartPosition() Position {
 
 func (t *ReferenceType) EndPosition() Position {
 	return t.Type.EndPosition()
+}
+
+// RestrictedType
+
+type RestrictedType struct {
+	Type         Type
+	Restrictions []*NominalType
+	EndPos       Position
+}
+
+func (*RestrictedType) isType() {}
+
+func (t *RestrictedType) String() string {
+	var builder strings.Builder
+	builder.WriteString(t.Type.String())
+	builder.WriteRune('{')
+	for i, restriction := range t.Restrictions {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(restriction.String())
+	}
+	builder.WriteRune('}')
+	return builder.String()
+}
+
+func (t *RestrictedType) StartPosition() Position {
+	return t.Type.StartPosition()
+}
+
+func (t *RestrictedType) EndPosition() Position {
+	return t.EndPos
 }

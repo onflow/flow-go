@@ -2,7 +2,6 @@
 
 package mock
 
-import crypto "github.com/dapperlabs/flow-go/crypto"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -11,13 +10,13 @@ type Headers struct {
 	mock.Mock
 }
 
-// ByHash provides a mock function with given fields: hash
-func (_m *Headers) ByHash(hash crypto.Hash) (*flow.Header, error) {
-	ret := _m.Called(hash)
+// ByBlockID provides a mock function with given fields: blockID
+func (_m *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
+	ret := _m.Called(blockID)
 
 	var r0 *flow.Header
-	if rf, ok := ret.Get(0).(func(crypto.Hash) *flow.Header); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Header); ok {
+		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Header)
@@ -25,8 +24,8 @@ func (_m *Headers) ByHash(hash crypto.Hash) (*flow.Header, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(crypto.Hash) error); ok {
-		r1 = rf(hash)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -55,4 +54,18 @@ func (_m *Headers) ByNumber(number uint64) (*flow.Header, error) {
 	}
 
 	return r0, r1
+}
+
+// Store provides a mock function with given fields: header
+func (_m *Headers) Store(header *flow.Header) error {
+	ret := _m.Called(header)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.Header) error); ok {
+		r0 = rf(header)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }

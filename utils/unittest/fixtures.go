@@ -1,35 +1,18 @@
 package unittest
 
 import (
-	"crypto/rand"
-	"encoding/hex"
+	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
-const PublicKeyFixtureCount = 2
-
-func PublicKeyFixtures() [PublicKeyFixtureCount]crypto.PublicKey {
-	encodedKeys := [PublicKeyFixtureCount]string{
-		"3059301306072a8648ce3d020106082a8648ce3d0301070342000472b074a452d0a764a1da34318f44cb16740df1cfab1e6b50e5e4145dc06e5d151c9c25244f123e53c9b6fe237504a37e7779900aad53ca26e3b57c5c3d7030c4",
-		"3059301306072a8648ce3d020106082a8648ce3d03010703420004d4423e4ca70ed9fb9bb9ce771e9393e0c3a1b66f3019ed89ab410cdf8f73d5a8ca06cc093766c1a46069cf83fce2a294d3322d55bb86ac9cb5aa805c7dd8d715",
-	}
-
-	keys := [PublicKeyFixtureCount]crypto.PublicKey{}
-
-	for i, hexKey := range encodedKeys {
-		bytesKey, _ := hex.DecodeString(hexKey)
-		publicKey, _ := crypto.DecodePublicKey(crypto.ECDSA_P256, bytesKey)
-		keys[i] = publicKey
-	}
-
-	return keys
-}
-
 func AddressFixture() flow.Address {
-	return flow.ZeroAddress
+	return flow.RootAddress
 }
 
 func AccountSignatureFixture() flow.AccountSignature {
@@ -39,63 +22,141 @@ func AccountSignatureFixture() flow.AccountSignature {
 	}
 }
 
+func BlockFixture() flow.Block {
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: CollectionGuaranteesFixture(16),
+	}
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
+	return flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+}
+
 func BlockHeaderFixture() flow.Header {
 	return flow.Header{
-		Parent: crypto.Hash("parent"),
-		Number: 100,
+		ParentID: IdentifierFixture(),
+		View:     rand.Uint64(),
 	}
 }
 
-func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{
-		Script:             []byte("pub fun main() {}"),
-		ReferenceBlockHash: nil,
-		Nonce:              0,
-		ComputeLimit:       10,
-		PayerAccount:       AddressFixture(),
-		ScriptAccounts:     []flow.Address{AddressFixture()},
-		Signatures:         []flow.AccountSignature{AccountSignatureFixture()},
-	}
-	if len(n) > 0 {
-		n[0](&tx)
-	}
-	return tx
-}
-
-func AccountFixture() flow.Account {
-	return flow.Account{
-		Address: AddressFixture(),
-		Balance: 10,
-		Code:    []byte("pub fun main() {}"),
-		Keys:    []flow.AccountPublicKey{AccountPublicKeyFixture()},
+func SealFixture() flow.Seal {
+	return flow.Seal{
+		BlockID:       IdentifierFixture(),
+		PreviousState: StateCommitmentFixture(),
+		FinalState:    StateCommitmentFixture(),
+		Signature:     SignatureFixture(),
 	}
 }
 
-func AccountPublicKeyFixture() flow.AccountPublicKey {
-	return flow.AccountPublicKey{
-		PublicKey: PublicKeyFixtures()[0],
-		SignAlgo:  crypto.ECDSA_P256,
-		HashAlgo:  crypto.SHA3_256,
-		Weight:    keys.PublicKeyWeightThreshold,
+// ClusterBlockWithParent creates a new cluster consensus block that is valid
+// with respect to the given parent block.
+func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
+	payload := cluster.Payload{
+		Collection: flow.LightCollection{
+			Transactions: []flow.Identifier{IdentifierFixture()},
+		},
+	}
+
+	header := flow.Header{
+		View:        parent.View + 1,
+		ChainID:     parent.ChainID,
+		Timestamp:   time.Now(),
+		ParentID:    parent.ID(),
+		PayloadHash: payload.Hash(),
+	}
+
+	block := cluster.Block{
+		Header:  header,
+		Payload: payload,
+	}
+
+	return block
+}
+
+func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
+	return &flow.CollectionGuarantee{
+		CollectionID: IdentifierFixture(),
+		Signatures:   SignaturesFixture(16),
 	}
 }
 
-func EventFixture(n ...func(e *flow.Event)) flow.Event {
+func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
+	ret := make([]*flow.CollectionGuarantee, 0, n)
+	for i := 1; i <= n; i++ {
+		cg := flow.CollectionGuarantee{
+			CollectionID: flow.Identifier{byte(i)},
+			Signatures:   []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
+		}
+		ret = append(ret, &cg)
+	}
+	return ret
+}
 
-	event := flow.Event{
-		Type: "Transfer",
-		// TODO: create proper fixture
-		// Values: map[string]interface{}{
-		// 	"to":   flow.ZeroAddress,
-		// 	"from": flow.ZeroAddress,
-		// 	"id":   1,
-		// },
-		Payload: []byte{},
+func CollectionFixture(n int) flow.Collection {
+	transactions := make([]*flow.TransactionBody, 0, n)
+
+	for i := 0; i < n; i++ {
+		tx := TransactionFixture()
+		transactions = append(transactions, &tx.TransactionBody)
 	}
-	if len(n) >= 1 {
-		n[0](&event)
+
+	return flow.Collection{Transactions: transactions}
+}
+
+func ExecutionReceiptFixture() *flow.ExecutionReceipt {
+	return &flow.ExecutionReceipt{
+		ExecutorID:        IdentifierFixture(),
+		ExecutionResult:   *ExecutionResultFixture(),
+		Spocks:            nil,
+		ExecutorSignature: SignatureFixture(),
 	}
-	return event
+}
+
+func ExecutionResultFixture() *flow.ExecutionResult {
+	return &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: IdentifierFixture(),
+			BlockID:          IdentifierFixture(),
+			FinalStateCommit: StateCommitmentFixture(),
+			Chunks: flow.ChunkList{
+				ChunkFixture(),
+				ChunkFixture(),
+			},
+		},
+		Signatures: SignaturesFixture(6),
+	}
+}
+
+func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.ResultApprovalBody.ExecutionResultID = id
+	}
+}
+
+func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultApproval {
+	approval := flow.ResultApproval{
+		ResultApprovalBody: flow.ResultApprovalBody{
+			ExecutionResultID:    IdentifierFixture(),
+			AttestationSignature: SignatureFixture(),
+			Spock:                nil,
+		},
+		VerifierSignature: SignatureFixture(),
+	}
+
+	for _, apply := range opts {
+		apply(&approval)
+	}
+
+	return &approval
+}
+
+func StateCommitmentFixture() flow.StateCommitment {
+	var state = make([]byte, 20)
+	_, _ = rand.Read(state[0:20])
+	return state
 }
 
 func HashFixture(size int) crypto.Hash {
@@ -106,14 +167,153 @@ func HashFixture(size int) crypto.Hash {
 	return hash
 }
 
-func LedgerFixture() flow.Ledger {
-	return flow.Ledger{
-		"key": []byte("value"),
-	}
-}
-
 func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
 	_, _ = rand.Read(id[:])
 	return id
+}
+
+// WithRole adds a role to an identity fixture.
+func WithRole(role flow.Role) func(*flow.Identity) {
+	return func(id *flow.Identity) {
+		id.Role = role
+	}
+}
+
+// IdentityFixture returns a node identity.
+func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
+	id := flow.Identity{
+		NodeID:  IdentifierFixture(),
+		Address: "address",
+		Role:    flow.RoleConsensus,
+		Stake:   1000,
+	}
+	for _, apply := range opts {
+		apply(&id)
+	}
+	return &id
+}
+
+// IdentityListFixture returns a list of node identity objects. The identities
+// can be customized (ie. set their role) by passing in a function that modifies
+// the input identities as required.
+func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList {
+	identities := make(flow.IdentityList, n)
+
+	for i := 0; i < n; i++ {
+		identity := IdentityFixture()
+		identity.Address = fmt.Sprintf("address-%d", i+1)
+		for _, opt := range opts {
+			opt(identity)
+		}
+		identities[i] = identity
+	}
+
+	return identities
+}
+
+func ChunkFixture() *flow.Chunk {
+	return &flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex:      42,
+			StartState:           StateCommitmentFixture(),
+			EventCollection:      IdentifierFixture(),
+			TotalComputationUsed: 4200,
+			NumberOfTransactions: 42,
+		},
+		Index:    0,
+		EndState: StateCommitmentFixture(),
+	}
+}
+
+func SignatureFixture() crypto.Signature {
+	sig := make([]byte, 32)
+	_, _ = rand.Read(sig)
+	return sig
+}
+
+func SignaturesFixture(n int) []crypto.Signature {
+	var sigs []crypto.Signature
+	for i := 0; i < n; i++ {
+		sigs = append(sigs, SignatureFixture())
+	}
+	return sigs
+}
+
+func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
+	tx := flow.Transaction{TransactionBody: TransactionBodyFixture()}
+	if len(n) > 0 {
+		n[0](&tx)
+	}
+	return tx
+}
+
+func TransactionBodyFixture() flow.TransactionBody {
+	return flow.TransactionBody{
+		Script:           []byte("pub fun main() {}"),
+		ReferenceBlockID: IdentifierFixture(),
+		Nonce:            rand.Uint64(),
+		ComputeLimit:     10,
+		PayerAccount:     AddressFixture(),
+		ScriptAccounts:   []flow.Address{AddressFixture()},
+		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
+	}
+}
+
+// CompleteExecutionResultFixture returns complete execution result with an
+// execution receipt referencing the block/collections.
+func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
+	coll := CollectionFixture(3)
+	guarantee := coll.Guarantee()
+
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: []*flow.CollectionGuarantee{&guarantee},
+	}
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
+
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+
+	chunk := flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: 0,
+			StartState:      StateCommitmentFixture(),
+		},
+		Index: 0,
+	}
+
+	chunkState := flow.ChunkState{
+		ChunkID:   chunk.ID(),
+		Registers: flow.Ledger{},
+	}
+
+	result := flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID: block.ID(),
+			Chunks:  flow.ChunkList{&chunk},
+		},
+	}
+
+	receipt := flow.ExecutionReceipt{
+		ExecutionResult: result,
+	}
+
+	return verification.CompleteExecutionResult{
+		Receipt:     &receipt,
+		Block:       &block,
+		Collections: []*flow.Collection{&coll},
+		ChunkStates: []*flow.ChunkState{&chunkState},
+	}
+}
+
+func ChunkHeaderFixture() flow.ChunkHeader {
+	return flow.ChunkHeader{
+		ChunkID:     IdentifierFixture(),
+		StartState:  StateCommitmentFixture(),
+		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
+	}
 }

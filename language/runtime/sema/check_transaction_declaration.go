@@ -3,10 +3,14 @@ package sema
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
+	if transactionType == nil {
+		panic(errors.NewUnreachableError())
+	}
 
 	checker.containerTypes[transactionType] = true
 	defer func() {
@@ -31,9 +35,20 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 	checker.declareSelfValue(transactionType)
 
 	checker.visitTransactionPrepareFunction(declaration.Prepare, transactionType, fieldMembers)
-	checker.visitTransactionPreConditions(declaration.PreConditions)
-	checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
-	checker.visitTransactionPostConditions(declaration.PostConditions)
+
+	if declaration.PreConditions != nil {
+		checker.visitConditions(*declaration.PreConditions)
+	}
+
+	checker.visitWithPostConditions(
+		declaration.PostConditions,
+		&VoidType{},
+		func() {
+			checker.withSelfResourceInvalidationAllowed(func() {
+				checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
+			})
+		},
+	)
 
 	checker.checkResourceFieldsInvalidated(transactionType.String(), transactionType.Members)
 
@@ -41,13 +56,14 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 }
 
 // checkTransactionFields validates the field declarations for a transaction.
+//
 func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDeclaration) {
 	for _, field := range declaration.Fields {
 		if field.Access != ast.AccessNotSpecified {
 			checker.report(
 				&InvalidTransactionFieldAccessModifierError{
 					Name:   field.Identifier.Identifier,
-					Access: field.Access.Keyword(),
+					Access: field.Access,
 					Pos:    field.StartPosition(),
 				},
 			)
@@ -58,6 +74,7 @@ func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDecla
 // checkTransactionBlocks checks that a transaction contains the required prepare and execute blocks.
 //
 // An execute block is always required, but a prepare block is only required if fields are present.
+//
 func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDeclaration) {
 	if declaration.Prepare != nil {
 		// parser allows any identifier so it must be checked here
@@ -92,15 +109,11 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 				Pos:  executeIdentifier.Pos,
 			})
 		}
-	} else {
-		// report an error if no execute block is defined
-		checker.report(&TransactionMissingExecuteError{
-			Range: declaration.Range,
-		})
 	}
 }
 
 // visitTransactionPrepareFunction visits and checks the prepare function of a transaction.
+//
 func (checker *Checker) visitTransactionPrepareFunction(
 	prepareFunction *ast.SpecialFunctionDeclaration,
 	transactionType *TransactionType,
@@ -126,33 +139,29 @@ func (checker *Checker) visitTransactionPrepareFunction(
 
 	checker.checkTransactionPrepareFunctionParameters(
 		prepareFunction.ParameterList,
-		prepareFunctionType.ParameterTypeAnnotations,
+		prepareFunctionType.Parameters,
 	)
 }
 
 // checkTransactionPrepareFunctionParameters checks that the parameters are each of type Account.
+//
 func (checker *Checker) checkTransactionPrepareFunctionParameters(
 	parameterList *ast.ParameterList,
-	parameterTypeAnnotations []*TypeAnnotation,
+	parameters []*Parameter,
 ) {
 	for i, parameter := range parameterList.Parameters {
-		parameterTypeAnnotation := parameterTypeAnnotations[i]
+		parameterType := parameters[i].TypeAnnotation.Type
 
-		t := parameterTypeAnnotation.Type
-
-		if !IsSubType(t, &AccountType{}) {
-			checker.report(&InvalidTransactionPrepareParameterType{
-				Type:  t,
-				Range: ast.NewRangeFromPositioned(parameter.TypeAnnotation),
-			})
+		if !IsSubType(parameterType, &AccountType{}) {
+			checker.report(
+				&InvalidTransactionPrepareParameterTypeError{
+					Type:  parameterType,
+					Range: ast.NewRangeFromPositioned(parameter.TypeAnnotation),
+				},
+			)
 		}
 	}
 
-}
-
-// visitTransactionPreConditions visits and checks the pre-conditions of a transaction.
-func (checker *Checker) visitTransactionPreConditions(conditions []*ast.Condition) {
-	checker.visitConditions(conditions)
 }
 
 // visitTransactionExecuteFunction visits and checks the execute function of a transaction.
@@ -177,19 +186,10 @@ func (checker *Checker) visitTransactionExecuteFunction(
 	)
 }
 
-// visitTransactionPreConditions visits and checks the post-conditions of a transaction.
-func (checker *Checker) visitTransactionPostConditions(conditions []*ast.Condition) {
-	if len(conditions) > 0 {
-		checker.declareBefore()
-	}
-
-	checker.visitConditions(conditions)
-}
-
 func (checker *Checker) declareTransactionDeclaration(declaration *ast.TransactionDeclaration) {
 	transactionType := &TransactionType{}
 
-	members, origins := checker.membersAndOrigins(
+	members, origins := checker.nonEventMembersAndOrigins(
 		transactionType,
 		declaration.Fields,
 		nil,
@@ -198,13 +198,13 @@ func (checker *Checker) declareTransactionDeclaration(declaration *ast.Transacti
 
 	checker.memberOrigins[transactionType] = origins
 
-	var prepareParameterTypeAnnotations []*TypeAnnotation
+	var prepareParameters []*Parameter
 	if declaration.Prepare != nil {
-		prepareParameterTypeAnnotations = checker.parameterTypeAnnotations(declaration.Prepare.ParameterList)
+		prepareParameters = checker.parameters(declaration.Prepare.ParameterList)
 	}
 
 	transactionType.Members = members
-	transactionType.prepareParameterTypeAnnotations = prepareParameterTypeAnnotations
+	transactionType.prepareParameters = prepareParameters
 
 	checker.Elaboration.TransactionDeclarationTypes[declaration] = transactionType
 	checker.TransactionTypes = append(checker.TransactionTypes, transactionType)

@@ -16,83 +16,109 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 	// Check that the referenced expression is an index expression and type-check it
 
 	var referencedType Type
+	var targetIsStorage bool
+
+	// If the referenced expression is an index expression, it might be into storage
 
 	indexExpression, isIndexExpression := referencedExpression.(*ast.IndexExpression)
 	if isIndexExpression {
 		var targetType Type
 		referencedType, targetType = checker.visitIndexExpression(indexExpression, false)
 
-		// The referenced expression will evaluate to an optional type, unwrap it
+		// The referenced expression will evaluate to an optional type if it is indexing into storage:
+		// the result of the storage access is an optional.
+		//
+		// Unwrap the optional one level, but not infinitely
 
-		referencedType = UnwrapOptionalType(referencedType)
+		if optionalReferencedType, ok := referencedType.(*OptionalType); ok {
+			referencedType = optionalReferencedType.Type
+		}
 
-		// Check that the index expression's target expression is a storage type
+		// Check if the index expression's target expression is a storage type
 
 		if !targetType.IsInvalidType() {
-			if _, isStorageType := targetType.(*StorageType); !isStorageType {
-				checker.report(
-					&NonStorageReferenceError{
-						Range: ast.NewRangeFromPositioned(indexExpression.TargetExpression),
-					},
-				)
-			}
+			_, targetIsStorage = targetType.(*StorageType)
 		}
 	} else {
-		checker.report(
-			&NonStorageReferenceError{
-				Range: ast.NewRangeFromPositioned(referencedExpression),
-			},
-		)
+		// If the referenced expression is not an index expression, check it normally
 
-		// If the referenced expression is not an index expression, still type check it
-
-		referencedType = UnwrapOptionalType(referencedExpression.Accept(checker).(Type))
+		referencedType = referencedExpression.Accept(checker).(Type)
 	}
 
-	// Check the result type
+	checker.Elaboration.IsReferenceIntoStorage[referenceExpression] = targetIsStorage
 
-	resultType := checker.ConvertType(referenceExpression.Type)
-
-	// Check that the referenced expression's type is a resource or resource interface
+	// Check that the referenced expression's type is a resource type
 
 	if !referencedType.IsInvalidType() &&
 		!referencedType.IsResourceType() {
 
 		checker.report(
-			&NonResourceReferenceError{
+			&NonResourceTypeReferenceError{
 				ActualType: referencedType,
 				Range:      ast.NewRangeFromPositioned(referencedExpression),
 			},
 		)
 	}
 
-	// Check that the result type is a resource or resource interface
+	// Check that the references expression's type is not optional
 
-	if !resultType.IsInvalidType() &&
-		!resultType.IsResourceType() {
+	if _, ok := referencedType.(*OptionalType); ok {
 
 		checker.report(
-			&NonResourceReferenceError{
-				ActualType: resultType,
+			&OptionalTypeReferenceError{
+				ActualType: referencedType,
 				Range:      ast.NewRangeFromPositioned(referencedExpression),
 			},
 		)
 	}
 
+	// Check the result type and ensure it is a reference type
+
+	resultType := checker.ConvertType(referenceExpression.Type)
+
+	var referenceType *ReferenceType
+
+	if !resultType.IsInvalidType() {
+		var ok bool
+		referenceType, ok = resultType.(*ReferenceType)
+		if !ok {
+			checker.report(
+				&NonReferenceTypeReferenceError{
+					ActualType: resultType,
+					Range:      ast.NewRangeFromPositioned(referenceExpression.Type),
+				},
+			)
+		} else if !targetIsStorage && referenceType.Storable {
+
+			// References which are not into storage cannot be storable
+
+			checker.report(
+				&InvalidNonStorageStorableReferenceError{
+					Range: ast.NewRangeFromPositioned(referenceExpression.Type),
+				},
+			)
+		}
+	}
+
 	// Check that the referenced expression's type is a subtype of the result type
 
 	if !referencedType.IsInvalidType() &&
-		!resultType.IsInvalidType() &&
-		!IsSubType(referencedType, resultType) {
+		referenceType != nil &&
+		!referenceType.Type.IsInvalidType() &&
+		!IsSubType(referencedType, referenceType.Type) {
 
 		checker.report(
 			&TypeMismatchError{
-				ExpectedType: resultType,
+				ExpectedType: referenceType.Type,
 				ActualType:   referencedType,
 				Range:        ast.NewRangeFromPositioned(referencedExpression),
 			},
 		)
 	}
 
-	return &ReferenceType{Type: resultType}
+	if referenceType == nil {
+		return &InvalidType{}
+	}
+
+	return referenceType
 }

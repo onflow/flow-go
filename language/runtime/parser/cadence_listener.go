@@ -88,8 +88,14 @@ type CadenceListener interface {
 	// EnterFullType is called when entering the fullType production.
 	EnterFullType(c *FullTypeContext)
 
+	// EnterInnerType is called when entering the innerType production.
+	EnterInnerType(c *InnerTypeContext)
+
 	// EnterBaseType is called when entering the baseType production.
 	EnterBaseType(c *BaseTypeContext)
+
+	// EnterTypeRestrictions is called when entering the typeRestrictions production.
+	EnterTypeRestrictions(c *TypeRestrictionsContext)
 
 	// EnterNominalType is called when entering the nominalType production.
 	EnterNominalType(c *NominalTypeContext)
@@ -274,6 +280,9 @@ type CadenceListener interface {
 	// EnterStringLiteral is called when entering the stringLiteral production.
 	EnterStringLiteral(c *StringLiteralContext)
 
+	// EnterFixedPointLiteral is called when entering the fixedPointLiteral production.
+	EnterFixedPointLiteral(c *FixedPointLiteralContext)
+
 	// EnterIntegerLiteral is called when entering the integerLiteral production.
 	EnterIntegerLiteral(c *IntegerLiteralContext)
 
@@ -388,8 +397,14 @@ type CadenceListener interface {
 	// ExitFullType is called when exiting the fullType production.
 	ExitFullType(c *FullTypeContext)
 
+	// ExitInnerType is called when exiting the innerType production.
+	ExitInnerType(c *InnerTypeContext)
+
 	// ExitBaseType is called when exiting the baseType production.
 	ExitBaseType(c *BaseTypeContext)
+
+	// ExitTypeRestrictions is called when exiting the typeRestrictions production.
+	ExitTypeRestrictions(c *TypeRestrictionsContext)
 
 	// ExitNominalType is called when exiting the nominalType production.
 	ExitNominalType(c *NominalTypeContext)
@@ -573,6 +588,9 @@ type CadenceListener interface {
 
 	// ExitStringLiteral is called when exiting the stringLiteral production.
 	ExitStringLiteral(c *StringLiteralContext)
+
+	// ExitFixedPointLiteral is called when exiting the fixedPointLiteral production.
+	ExitFixedPointLiteral(c *FixedPointLiteralContext)
 
 	// ExitIntegerLiteral is called when exiting the integerLiteral production.
 	ExitIntegerLiteral(c *IntegerLiteralContext)

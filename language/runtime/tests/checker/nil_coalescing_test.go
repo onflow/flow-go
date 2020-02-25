@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -134,7 +133,7 @@ func TestCheckInvalidNilCoalescingNonMatchingTypes(t *testing.T) {
 func TestCheckNilCoalescingAny(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-     let x: Any? = 1
+     let x: AnyStruct? = 1
      let y = x ?? false
   `)
 
@@ -169,20 +168,11 @@ func TestCheckNilCoalescingBothOptional(t *testing.T) {
 
 func TestCheckNilCoalescingWithNever(t *testing.T) {
 
-	_, err := ParseAndCheckWithOptions(t,
+	_, err := ParseAndCheckWithPanic(t,
 		`
           pub let x: Int? = nil
           pub let y = x ?? panic("nope")
         `,
-		ParseAndCheckOptions{
-			Options: []sema.Option{
-				sema.WithPredeclaredValues(
-					stdlib.StandardLibraryFunctions{
-						stdlib.PanicFunction,
-					}.ToValueDeclarations(),
-				),
-			},
-		},
 	)
 
 	require.NoError(t, err)

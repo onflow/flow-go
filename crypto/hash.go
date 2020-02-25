@@ -4,93 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"hash"
-
-	"crypto/sha256"
-	"crypto/sha512"
-
-	"golang.org/x/crypto/sha3"
+	"io"
 )
-
-// NewHasher initializes and chooses a hashing algorithm
-func NewHasher(algo HashingAlgorithm) (Hasher, error) {
-	switch algo {
-	case SHA3_256:
-		hasher := &sha3_256Algo{
-			commonHasher: &commonHasher{
-				algo:       algo,
-				outputSize: HashLenSha3_256,
-				Hash:       sha3.New256()}}
-
-		// Output length sanity check, size() is provided by Hash.hash
-		if hasher.outputSize != hasher.Size() {
-			return nil, cryptoError{
-				fmt.Sprintf("%s requires an output length %d", SHA3_256, hasher.Size()),
-			}
-		}
-		return hasher, nil
-
-	case SHA3_384:
-		hasher := &sha3_384Algo{
-			commonHasher: &commonHasher{
-				algo:       algo,
-				outputSize: HashLenSha3_384,
-				Hash:       sha3.New384()}}
-		// Output length sanity check, size() is provided by Hash.hash
-		if hasher.outputSize != hasher.Size() {
-			return nil, cryptoError{
-				fmt.Sprintf("%s requires an output length %d", SHA3_384, hasher.Size()),
-			}
-		}
-		return hasher, nil
-
-	case SHA2_256:
-		hasher := &sha2_256Algo{
-			commonHasher: &commonHasher{
-				algo:       algo,
-				outputSize: HashLenSha2_256,
-				Hash:       sha256.New()}}
-
-		// Output length sanity check, size() is provided by Hash.hash
-		if hasher.outputSize != hasher.Size() {
-			return nil, cryptoError{
-				fmt.Sprintf("%s requires an output length %d", SHA2_256, hasher.Size()),
-			}
-		}
-		return hasher, nil
-
-	case SHA2_384:
-		hasher := &sha2_384Algo{
-			commonHasher: &commonHasher{
-				algo:       algo,
-				outputSize: HashLenSha2_384,
-				Hash:       sha512.New384()}}
-
-		// Output length sanity check, size() is provided by Hash.hash
-		if hasher.outputSize != hasher.Size() {
-			return nil, cryptoError{
-				fmt.Sprintf("%s requires an output length %d", SHA2_384, hasher.Size()),
-			}
-		}
-		return hasher, nil
-
-	default:
-		return nil, cryptoError{
-			fmt.Sprintf("the hashing algorithm %s is not supported.", algo),
-		}
-	}
-}
 
 // Hash is the hash algorithms output types
 type Hash []byte
-
-// ZeroHash represents the empty hash, used as the parent of the genesis block.
-var ZeroHash = Hash{
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-}
 
 // Equal checks if a hash is equal to a given hash
 func (h Hash) Equal(input Hash) bool {
@@ -109,11 +27,12 @@ type Hasher interface {
 	Algorithm() HashingAlgorithm
 	// Size returns the hash output length
 	Size() int
-	// ComputeHash returns the hash output
+	// ComputeHash returns the hash output regardless of the hash state
 	ComputeHash([]byte) Hash
-	// Adds more bytes to the current hash state (a Hash.hash method)
-	Add([]byte)
-	// SumHash returns the hash output and resets the hash state a
+	// Write([]bytes) (using the io.Writer interface) adds more bytes to the
+	// current hash state
+	io.Writer
+	// SumHash returns the hash output and resets the hash state
 	SumHash() Hash
 	// Reset resets the hash state
 	Reset()
@@ -123,19 +42,10 @@ type Hasher interface {
 type commonHasher struct {
 	algo       HashingAlgorithm
 	outputSize int
-	hash.Hash
 }
 
 func (a *commonHasher) Algorithm() HashingAlgorithm {
 	return a.algo
-}
-
-func (a *commonHasher) Size() int {
-	return a.outputSize
-}
-
-func (a *commonHasher) Add(data []byte) {
-	a.Write(data)
 }
 
 func BytesToHash(b []byte) Hash {
@@ -147,10 +57,27 @@ func BytesToHash(b []byte) Hash {
 // HashesToBytes converts a slice of hashes to a slice of byte slices.
 func HashesToBytes(hashes []Hash) [][]byte {
 	b := make([][]byte, len(hashes))
-
 	for i, h := range hashes {
 		b[i] = h
 	}
-
 	return b
+}
+
+// NewHasher chooses and initializes a hashing algorithm
+// Deprecated and will removed later: use dedicated hash generation functions instead.
+func NewHasher(algo HashingAlgorithm) (Hasher, error) {
+	switch algo {
+	case SHA3_256:
+		return NewSHA3_256(), nil
+	case SHA3_384:
+		return NewSHA3_384(), nil
+	case SHA2_256:
+		return NewSHA2_256(), nil
+	case SHA2_384:
+		return NewSHA2_384(), nil
+	default:
+		return nil, cryptoError{
+			fmt.Sprintf("the hashing algorithm %s is not supported.", algo),
+		}
+	}
 }

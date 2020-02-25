@@ -3,39 +3,44 @@
 package operation
 
 import (
-	"fmt"
-	"math/rand"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestCollectionsInsertRetrieve(t *testing.T) {
+func TestCollections(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		expected := unittest.CollectionFixture(2).Light()
 
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
+		t.Run("Retrieve nonexistant", func(t *testing.T) {
+			var actual flow.LightCollection
+			err := db.View(RetrieveCollection(expected.ID(), &actual))
+			assert.Error(t, err)
+		})
 
-	hash := crypto.Hash{0x13, 0x37}
-	expected := []*collection.GuaranteedCollection{
-		{Hash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
-		{Hash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
-		{Hash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
-	}
+		t.Run("Save", func(t *testing.T) {
+			err := db.Update(InsertCollection(&expected))
+			require.NoError(t, err)
 
-	err = db.Update(InsertCollections(hash, expected))
-	require.Nil(t, err)
+			var actual flow.LightCollection
+			err = db.View(RetrieveCollection(expected.ID(), &actual))
+			assert.NoError(t, err)
 
-	var actual []*collection.GuaranteedCollection
-	err = db.View(RetrieveCollections(hash, &actual))
-	require.Nil(t, err)
+			assert.Equal(t, expected, actual)
+		})
 
-	assert.Equal(t, expected, actual)
+		t.Run("Remove", func(t *testing.T) {
+			err := db.Update(RemoveCollection(expected.ID()))
+			require.NoError(t, err)
+
+			var actual flow.LightCollection
+			err = db.View(RetrieveCollection(expected.ID(), &actual))
+			assert.Error(t, err)
+		})
+	})
 }

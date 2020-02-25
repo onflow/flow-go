@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"fmt"
+	"math/big"
 	goRuntime "runtime"
 
 	"github.com/raviqqe/hamt"
@@ -11,9 +12,9 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	//revive:disable
+	// revive:disable
 	. "github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	//revive:enable
+	// revive:enable
 )
 
 type controlReturn interface {
@@ -53,63 +54,37 @@ type getterSetter struct {
 	set func(Value)
 }
 
-// StatementTrampoline
-
-type StatementTrampoline struct {
-	F    func() Trampoline
-	Line int
-}
-
-func (m StatementTrampoline) Resume() interface{} {
-	return m.F
-}
-
-func (m StatementTrampoline) FlatMap(f func(interface{}) Trampoline) Trampoline {
-	return FlatMap{Subroutine: m, Continuation: f}
-}
-
-func (m StatementTrampoline) Map(f func(interface{}) interface{}) Trampoline {
-	return MapTrampoline(m, f)
-}
-
-func (m StatementTrampoline) Then(f func(interface{})) Trampoline {
-	return ThenTrampoline(m, f)
-}
-
-func (m StatementTrampoline) Continue() Trampoline {
-	return m.F()
-}
-
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
 // OnEventEmittedFunc is a function that is triggered when an event is emitted by the program.
 //
 type OnEventEmittedFunc func(
-	interpreter *Interpreter,
-	event EventValue,
+	inter *Interpreter,
+	event *CompositeValue,
+	eventType *sema.CompositeType,
 )
 
 // OnStatementFunc is a function that is triggered when a statement is about to be executed.
 //
 type OnStatementFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	statement *Statement,
 )
 
 // StorageReadHandlerFunc is a function that handles storage reads.
 //
 type StorageReadHandlerFunc func(
-	interpreter *Interpreter,
-	storageIdentifier string,
+	inter *Interpreter,
+	storageAddress common.Address,
 	key string,
 ) OptionalValue
 
 // StorageWriteHandlerFunc is a function that handles storage writes.
 //
 type StorageWriteHandlerFunc func(
-	interpreter *Interpreter,
-	storageIdentifier string,
+	inter *Interpreter,
+	storageAddress common.Address,
 	key string,
 	value OptionalValue,
 )
@@ -117,26 +92,87 @@ type StorageWriteHandlerFunc func(
 // StorageKeyHandlerFunc is a function that handles storage indexing types.
 //
 type StorageKeyHandlerFunc func(
-	interpreter *Interpreter,
-	storageIdentifier string,
+	inter *Interpreter,
+	storageAddress common.Address,
 	indexingType sema.Type,
 ) string
 
+// InjectedCompositeFieldsHandlerFunc is a function that handles storage reads.
+//
+type InjectedCompositeFieldsHandlerFunc func(
+	inter *Interpreter,
+	location ast.Location,
+	typeID sema.TypeID,
+	compositeKind common.CompositeKind,
+) map[string]Value
+
+// ContractValueHandlerFunc is a function that handles contract values.
+//
+type ContractValueHandlerFunc func(
+	inter *Interpreter,
+	compositeType *sema.CompositeType,
+	constructor FunctionValue,
+) *CompositeValue
+
+// ImportProgramHandlerFunc is a function that handles imports of programs.
+//
+type ImportProgramHandlerFunc func(
+	inter *Interpreter,
+	location ast.Location,
+) *ast.Program
+
+// compositeTypeCode contains the the "prepared" / "callable" "code"
+// for the functions and the destructor of a composite
+// (contract, struct, resource, event).
+//
+// As there is no support for inheritance of concrete types,
+// these are the "leaf" nodes in the call chain, and are functions.
+//
+type compositeTypeCode struct {
+	compositeFunctions map[string]FunctionValue
+	destructorFunction FunctionValue
+}
+
+type FunctionWrapper = func(inner FunctionValue) FunctionValue
+
+// wrapperCode contains the "prepared" / "callable" "code"
+// for inherited types (interfaces and type requirements).
+//
+// These are "branch" nodes in the call chain, and are function wrappers,
+// i.e. they wrap the functions / function wrappers that inherit them.
+//
+type wrapperCode struct {
+	initializerFunctionWrapper FunctionWrapper
+	destructorFunctionWrapper  FunctionWrapper
+	functionWrappers           map[string]FunctionWrapper
+}
+
+// typeCodes is the value which stores the "prepared" / "callable" "code"
+// of all composite types, interface types, and type requirements.
+//
+type typeCodes struct {
+	compositeCodes       map[sema.TypeID]compositeTypeCode
+	interfaceCodes       map[sema.TypeID]wrapperCode
+	typeRequirementCodes map[sema.TypeID]wrapperCode
+}
+
 type Interpreter struct {
-	Checker             *sema.Checker
-	PredefinedValues    map[string]Value
-	activations         *activations.Activations
-	Globals             map[string]*Variable
-	Interfaces          map[string]*ast.InterfaceDeclaration
-	CompositeFunctions  map[string]map[string]FunctionValue
-	DestructorFunctions map[string]*InterpretedFunctionValue
-	SubInterpreters     map[ast.LocationID]*Interpreter
-	Transactions        []*HostFunctionValue
-	onEventEmitted      OnEventEmittedFunc
-	onStatement         OnStatementFunc
-	storageReadHandler  StorageReadHandlerFunc
-	storageWriteHandler StorageWriteHandlerFunc
-	storageKeyHandler   StorageKeyHandlerFunc
+	Checker                        *sema.Checker
+	PredefinedValues               map[string]Value
+	activations                    *activations.Activations
+	Globals                        map[string]*Variable
+	allInterpreters                map[ast.LocationID]*Interpreter
+	allCheckers                    map[ast.LocationID]*sema.Checker
+	typeCodes                      typeCodes
+	Transactions                   []*HostFunctionValue
+	onEventEmitted                 OnEventEmittedFunc
+	onStatement                    OnStatementFunc
+	storageReadHandler             StorageReadHandlerFunc
+	storageWriteHandler            StorageWriteHandlerFunc
+	storageKeyHandler              StorageKeyHandlerFunc
+	injectedCompositeFieldsHandler InjectedCompositeFieldsHandlerFunc
+	contractValueHandler           ContractValueHandlerFunc
+	importProgramHandler           ImportProgramHandlerFunc
 }
 
 type Option func(*Interpreter) error
@@ -199,30 +235,95 @@ func WithStorageWriteHandler(handler StorageWriteHandlerFunc) Option {
 	}
 }
 
-// WithStorageKeyHandlerFunc returns an interpreter option which sets the given function
+// WithStorageKeyHandler returns an interpreter option which sets the given function
 // as the function that is used when a stored value is written.
 //
-func WithStorageKeyHandlerFunc(handler StorageKeyHandlerFunc) Option {
+func WithStorageKeyHandler(handler StorageKeyHandlerFunc) Option {
 	return func(interpreter *Interpreter) error {
 		interpreter.SetStorageKeyHandler(handler)
 		return nil
 	}
 }
 
+// WithInjectedCompositeFieldsHandler returns an interpreter option which sets the given function
+// as the function that is used to initialize new composite values' fields
+//
+func WithInjectedCompositeFieldsHandler(handler InjectedCompositeFieldsHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetInjectedCompositeFieldsHandler(handler)
+		return nil
+	}
+}
+
+// WithContractValueHandler returns an interpreter option which sets the given function
+// as the function that is used to handle imports of values.
+//
+func WithContractValueHandler(handler ContractValueHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetContractValueHandler(handler)
+		return nil
+	}
+}
+
+// WithImportProgramHandler returns an interpreter option which sets the given function
+// as the function that is used to handle the imports of programs.
+//
+func WithImportProgramHandler(handler ImportProgramHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetImportProgramHandler(handler)
+		return nil
+	}
+}
+
+// WithAllInterpreters returns an interpreter option which sets
+// the given map of interpreters as the map of all interpreters.
+//
+func WithAllInterpreters(allInterpreters map[ast.LocationID]*Interpreter) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetAllInterpreters(allInterpreters)
+		return nil
+	}
+}
+
+// WithAllCheckers returns an interpreter option which sets
+// the given map of checkers as the map of all checkers.
+//
+func WithAllCheckers(allCheckers map[ast.LocationID]*sema.Checker) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetAllCheckers(allCheckers)
+		return nil
+	}
+}
+
+// withTypeCodes returns an interpreter option which sets the type codes.
+//
+func withTypeCodes(typeCodes typeCodes) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.setTypeCodes(typeCodes)
+		return nil
+	}
+}
+
 func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
-		Checker:             checker,
-		activations:         &activations.Activations{},
-		Globals:             map[string]*Variable{},
-		Interfaces:          map[string]*ast.InterfaceDeclaration{},
-		CompositeFunctions:  map[string]map[string]FunctionValue{},
-		DestructorFunctions: map[string]*InterpretedFunctionValue{},
-		SubInterpreters:     map[ast.LocationID]*Interpreter{},
+		Checker:     checker,
+		activations: &activations.Activations{},
+		Globals:     map[string]*Variable{},
+	}
+
+	defaultOptions := []Option{
+		WithAllInterpreters(map[ast.LocationID]*Interpreter{}),
+		WithAllCheckers(map[ast.LocationID]*sema.Checker{}),
+		withTypeCodes(typeCodes{
+			compositeCodes:       map[sema.TypeID]compositeTypeCode{},
+			interfaceCodes:       map[sema.TypeID]wrapperCode{},
+			typeRequirementCodes: map[sema.TypeID]wrapperCode{},
+		}),
 	}
 
 	interpreter.defineBaseFunctions()
 
-	for _, option := range options {
+	for _, option := range append(defaultOptions, options...) {
 		err := option(interpreter)
 		if err != nil {
 			return nil, err
@@ -262,6 +363,50 @@ func (interpreter *Interpreter) SetStorageKeyHandler(function StorageKeyHandlerF
 	interpreter.storageKeyHandler = function
 }
 
+// SetInjectedCompositeFieldsHandler sets the function that is used to initialize
+// new composite values' fields
+//
+func (interpreter *Interpreter) SetInjectedCompositeFieldsHandler(function InjectedCompositeFieldsHandlerFunc) {
+	interpreter.injectedCompositeFieldsHandler = function
+}
+
+// SetContractValueHandler sets the function that is used to handle imports of values
+//
+func (interpreter *Interpreter) SetContractValueHandler(function ContractValueHandlerFunc) {
+	interpreter.contractValueHandler = function
+}
+
+// SetImportProgramHandler sets the function that is used to handle imports of programs.
+//
+func (interpreter *Interpreter) SetImportProgramHandler(function ImportProgramHandlerFunc) {
+	interpreter.importProgramHandler = function
+}
+
+// SetAllInterpreters sets the given map of interpreters as the map of all interpreters.
+//
+func (interpreter *Interpreter) SetAllInterpreters(allInterpreters map[ast.LocationID]*Interpreter) {
+	interpreter.allInterpreters = allInterpreters
+
+	// Register self
+	interpreter.allInterpreters[interpreter.Checker.Location.ID()] = interpreter
+}
+
+// SetAllCheckers sets the given map of checkers as the map of all checkers.
+//
+func (interpreter *Interpreter) SetAllCheckers(allCheckers map[ast.LocationID]*sema.Checker) {
+	interpreter.allCheckers = allCheckers
+
+	// Register self
+	checker := interpreter.Checker
+	interpreter.allCheckers[checker.Location.ID()] = checker
+}
+
+// setTypeCodes sets the type codes.
+//
+func (interpreter *Interpreter) setTypeCodes(typeCodes typeCodes) {
+	interpreter.typeCodes = typeCodes
+}
+
 // locationRange returns a new location range for the given positioned element.
 //
 func (interpreter *Interpreter) locationRange(hasPosition ast.HasPosition) LocationRange {
@@ -294,20 +439,9 @@ func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
 
 func (interpreter *Interpreter) Interpret() (err error) {
 	// recover internal panics and return them as an error
-	defer func() {
-		if r := recover(); r != nil {
-			var ok bool
-			// don't recover Go errors
-			err, ok = r.(goRuntime.Error)
-			if ok {
-				panic(err)
-			}
-			err, ok = r.(error)
-			if !ok {
-				err = fmt.Errorf("%v", r)
-			}
-		}
-	}()
+	defer recoverErrors(func(internalErr error) {
+		err = internalErr
+	})
 
 	interpreter.runAllStatements(interpreter.interpret())
 
@@ -383,7 +517,7 @@ func (interpreter *Interpreter) interpret() Trampoline {
 func (interpreter *Interpreter) prepareInterpretation() {
 	program := interpreter.Checker.Program
 
-	// pre-declare empty variables for all structures, interfaces, and function declarations
+	// Pre-declare empty variables for all interfaces, composites, and function declarations
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
@@ -393,9 +527,10 @@ func (interpreter *Interpreter) prepareInterpretation() {
 	for _, declaration := range program.FunctionDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
-	for _, declaration := range program.InterfaceDeclarations() {
-		interpreter.declareInterface(declaration)
-	}
+
+	// TODO:
+	// Register top-level interface declarations, as their functions' conditions
+	// need to be included in conforming composites' functions
 }
 
 func (interpreter *Interpreter) visitGlobalDeclarations(declarations []ast.Declaration) Trampoline {
@@ -424,7 +559,11 @@ func (interpreter *Interpreter) visitGlobalDeclaration(declaration ast.Declarati
 }
 
 func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
-	name := declaration.DeclarationIdentifier().Identifier
+	identifier := declaration.DeclarationIdentifier()
+	if identifier == nil {
+		return
+	}
+	name := identifier.Identifier
 	// NOTE: semantic analysis already checked possible invalid redeclaration
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
@@ -492,8 +631,8 @@ func (interpreter *Interpreter) prepareInvoke(
 
 	// ensures the invocation's argument count matches the function's parameter count
 
-	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
-	parameterCount := len(parameterTypeAnnotations)
+	parameters := functionType.Parameters
+	parameterCount := len(parameters)
 	argumentCount := len(argumentValues)
 
 	if argumentCount != parameterCount {
@@ -510,9 +649,10 @@ func (interpreter *Interpreter) prepareInvoke(
 
 	preparedArguments := make([]Value, len(arguments))
 	for i, argument := range argumentValues {
-		parameterType := parameterTypeAnnotations[i].Type
-		// TODO: value type is not known – only used for Any boxing right now, so reject for now
-		if parameterType.Equal(&sema.AnyType{}) {
+		parameterType := parameters[i].TypeAnnotation.Type
+		// TODO: value type is not known, reject for now
+		switch parameterType.(type) {
+		case *sema.AnyStructType, *sema.AnyResourceType:
 			return nil, &NotInvokableError{
 				Value: functionValue,
 			}
@@ -521,7 +661,12 @@ func (interpreter *Interpreter) prepareInvoke(
 		preparedArguments[i] = interpreter.convertAndBox(argument, nil, parameterType)
 	}
 
-	trampoline = functionValue.invoke(preparedArguments, LocationPosition{})
+	// NOTE: can't fill argument types, as they are unknown
+	trampoline = functionValue.Invoke(Invocation{
+		Arguments:   preparedArguments,
+		Interpreter: interpreter,
+	})
+
 	return trampoline, nil
 }
 
@@ -596,16 +741,44 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	// make the function itself available inside the function
 	lexicalScope = lexicalScope.Insert(common.StringEntry(identifier), variable)
 
-	functionExpression := declaration.ToExpression()
-	variable.Value = newInterpretedFunction(
-		interpreter,
-		functionExpression,
-		functionType,
-		lexicalScope,
-	)
+	variable.Value = interpreter.functionDeclarationValue(declaration, functionType, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
+}
+
+func (interpreter *Interpreter) functionDeclarationValue(
+	declaration *ast.FunctionDeclaration,
+	functionType *sema.FunctionType,
+	lexicalScope hamt.Map,
+) InterpretedFunctionValue {
+
+	var preConditions ast.Conditions
+	if declaration.FunctionBlock.PreConditions != nil {
+		preConditions = *declaration.FunctionBlock.PreConditions
+	}
+
+	var beforeStatements []ast.Statement
+	var rewrittenPostConditions ast.Conditions
+
+	if declaration.FunctionBlock.PostConditions != nil {
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[declaration.FunctionBlock.PostConditions]
+
+		rewrittenPostConditions = postConditionsRewrite.RewrittenPostConditions
+		beforeStatements = postConditionsRewrite.BeforeStatements
+	}
+
+	return InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		ParameterList:    declaration.ParameterList,
+		Type:             functionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       declaration.FunctionBlock.Statements,
+		PostConditions:   rewrittenPostConditions,
+	}
 }
 
 // NOTE: consider using NewInterpreter if the value should be predefined in all programs
@@ -657,101 +830,52 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 	})
 }
 
-func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
-	// NOTE: see visitFunctionBlock
+func (interpreter *Interpreter) VisitFunctionBlock(_ *ast.FunctionBlock) ast.Repr {
+	// NOTE: see visitBlock
 	panic(errors.NewUnreachableError())
 }
 
-func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType sema.Type) Trampoline {
+func (interpreter *Interpreter) visitFunctionBody(
+	beforeStatements []ast.Statement,
+	preConditions ast.Conditions,
+	body Trampoline,
+	postConditions ast.Conditions,
+	returnType sema.Type,
+) Trampoline {
 
 	// block scope: each function block gets an activation record
 	interpreter.activations.PushCurrent()
 
-	beforeStatements, rewrittenPostConditions :=
-		interpreter.rewritePostConditions(functionBlock.PostConditions)
-
 	return interpreter.visitStatements(beforeStatements).
 		FlatMap(func(_ interface{}) Trampoline {
-			return interpreter.visitConditions(functionBlock.PreConditions)
+			return interpreter.visitConditions(preConditions)
 		}).
 		FlatMap(func(_ interface{}) Trampoline {
-			// NOTE: not interpreting block as it enters a new scope
-			// and post-conditions need to be able to refer to block's declarations
-			return interpreter.visitStatements(functionBlock.Block.Statements).
-				FlatMap(func(blockResult interface{}) Trampoline {
+			return body
+		}).
+		FlatMap(func(blockResult interface{}) Trampoline {
+			var resultValue Value
+			if _, ok := blockResult.(functionReturn); ok {
+				resultValue = blockResult.(functionReturn).Value
+			} else {
+				resultValue = VoidValue{}
+			}
 
-					var resultValue Value
-					if _, ok := blockResult.(functionReturn); ok {
-						resultValue = blockResult.(functionReturn).Value
-					} else {
-						resultValue = VoidValue{}
-					}
+			// If there is a return type, declare the constant `result`
+			// which has the return value
 
-					// if there is a return type, declare the constant `result`
-					// which has the return value
+			if _, isVoid := returnType.(*sema.VoidType); !isVoid {
+				interpreter.declareVariable(sema.ResultIdentifier, resultValue)
+			}
 
-					if _, isVoid := returnType.(*sema.VoidType); !isVoid {
-						interpreter.declareVariable(sema.ResultIdentifier, resultValue)
-					}
-
-					return interpreter.visitConditions(rewrittenPostConditions).
-						Map(func(_ interface{}) interface{} {
-							return resultValue
-						})
+			return interpreter.visitConditions(postConditions).
+				Map(func(_ interface{}) interface{} {
+					return resultValue
 				})
 		}).
 		Then(func(_ interface{}) {
 			interpreter.activations.Pop()
 		})
-}
-
-func (interpreter *Interpreter) rewritePostConditions(postConditions []*ast.Condition) (
-	beforeStatements []ast.Statement,
-	rewrittenPostConditions []*ast.Condition,
-) {
-	beforeExtractor := NewBeforeExtractor()
-
-	rewrittenPostConditions = make([]*ast.Condition, len(postConditions))
-
-	for i, postCondition := range postConditions {
-
-		// copy condition and set expression to rewritten one
-		newPostCondition := *postCondition
-
-		testExtraction := beforeExtractor.ExtractBefore(postCondition.Test)
-
-		extractedExpressions := testExtraction.ExtractedExpressions
-
-		newPostCondition.Test = testExtraction.RewrittenExpression
-
-		if postCondition.Message != nil {
-			messageExtraction := beforeExtractor.ExtractBefore(postCondition.Message)
-
-			newPostCondition.Message = messageExtraction.RewrittenExpression
-
-			extractedExpressions = append(
-				extractedExpressions,
-				messageExtraction.ExtractedExpressions...,
-			)
-		}
-
-		for _, extractedExpression := range extractedExpressions {
-
-			// TODO: update interpreter.Checker.Elaboration
-			//    VariableDeclarationValueTypes / VariableDeclarationTargetTypes
-
-			beforeStatements = append(beforeStatements,
-				&ast.VariableDeclaration{
-					Identifier: extractedExpression.Identifier,
-					Value:      extractedExpression.Expression,
-				},
-			)
-		}
-
-		rewrittenPostConditions[i] = &newPostCondition
-	}
-
-	return beforeStatements, rewrittenPostConditions
 }
 
 func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Trampoline {
@@ -821,11 +945,11 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 		})
 }
 
-func (interpreter *Interpreter) VisitBreakStatement(statement *ast.BreakStatement) ast.Repr {
+func (interpreter *Interpreter) VisitBreakStatement(_ *ast.BreakStatement) ast.Repr {
 	return Done{Result: loopBreak{}}
 }
 
-func (interpreter *Interpreter) VisitContinueStatement(statement *ast.ContinueStatement) ast.Repr {
+func (interpreter *Interpreter) VisitContinueStatement(_ *ast.ContinueStatement) ast.Repr {
 	return Done{Result: loopContinue{}}
 }
 
@@ -1108,10 +1232,10 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast
 					})
 
 			case StorageValue:
-				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier, AccessLevelPrivate)
+				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Address, AccessLevelPrivate)
 
 			case PublishedValue:
-				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier, AccessLevelPublic)
+				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Address, AccessLevelPublic)
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -1121,19 +1245,19 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast
 
 func (interpreter *Interpreter) visitStorageIndexExpression(
 	indexExpression *ast.IndexExpression,
-	storageIdentifier string,
+	storageAddress common.Address,
 	accessLevel AccessLevel,
 ) Trampoline {
 	indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
-	rawKey := interpreter.storageKeyHandler(interpreter, storageIdentifier, indexingType)
+	rawKey := interpreter.storageKeyHandler(interpreter, storageAddress, indexingType)
 	key := PrefixedStorageKey(rawKey, accessLevel)
 	return Done{
 		Result: getterSetter{
 			get: func() Value {
-				return interpreter.readStored(storageIdentifier, key)
+				return interpreter.readStored(storageAddress, key)
 			},
 			set: func(value Value) {
-				interpreter.writeStored(storageIdentifier, key, value.(OptionalValue))
+				interpreter.writeStored(storageAddress, key, value.(OptionalValue))
 			},
 		},
 	}
@@ -1141,10 +1265,10 @@ func (interpreter *Interpreter) visitStorageIndexExpression(
 
 func (interpreter *Interpreter) visitReadStorageIndexExpression(
 	expression *ast.IndexExpression,
-	storageIdentifier string,
+	storageAddress common.Address,
 	accessLevel AccessLevel,
 ) Trampoline {
-	return interpreter.visitStorageIndexExpression(expression, storageIdentifier, accessLevel).
+	return interpreter.visitStorageIndexExpression(expression, storageAddress, accessLevel).
 		Map(func(result interface{}) interface{} {
 			getterSetter := result.(getterSetter)
 			return getterSetter.get()
@@ -1174,7 +1298,8 @@ func (interpreter *Interpreter) memberExpressionGetterSetter(memberExpression *a
 }
 
 func (interpreter *Interpreter) VisitIdentifierExpression(expression *ast.IdentifierExpression) ast.Repr {
-	variable := interpreter.findVariable(expression.Identifier.Identifier)
+	name := expression.Identifier.Identifier
+	variable := interpreter.findVariable(name)
 	return Done{Result: variable.Value}
 }
 
@@ -1209,8 +1334,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Plus(right)
 			})
 
@@ -1218,8 +1343,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Minus(right)
 			})
 
@@ -1227,8 +1352,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Mod(right)
 			})
 
@@ -1236,8 +1361,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Mul(right)
 			})
 
@@ -1245,8 +1370,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Div(right)
 			})
 
@@ -1254,8 +1379,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Less(right)
 			})
 
@@ -1263,8 +1388,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.LessEqual(right)
 			})
 
@@ -1272,8 +1397,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Greater(right)
 			})
 
@@ -1281,8 +1406,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.GreaterEqual(right)
 			})
 
@@ -1418,7 +1543,7 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 				return boolValue.Negate()
 
 			case ast.OperationMinus:
-				integerValue := value.(IntegerValue)
+				integerValue := value.(NumberValue)
 				return integerValue.Negate()
 
 			case ast.OperationMove:
@@ -1455,15 +1580,60 @@ func (interpreter *Interpreter) VisitBoolExpression(expression *ast.BoolExpressi
 	return Done{Result: value}
 }
 
-func (interpreter *Interpreter) VisitNilExpression(expression *ast.NilExpression) ast.Repr {
+func (interpreter *Interpreter) VisitNilExpression(_ *ast.NilExpression) ast.Repr {
 	value := NilValue{}
 	return Done{Result: value}
 }
 
-func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
+func (interpreter *Interpreter) VisitIntegerExpression(expression *ast.IntegerExpression) ast.Repr {
 	value := IntValue{expression.Value}
 
 	return Done{Result: value}
+}
+
+func (interpreter *Interpreter) VisitFixedPointExpression(expression *ast.FixedPointExpression) ast.Repr {
+	// TODO: adjust once/if we support more fixed point types
+	value := interpreter.convertToFixedPointBigInt(expression, sema.Fix64Scale)
+	return Done{Result: Fix64Value(value.Int64())}
+}
+
+func (interpreter *Interpreter) convertToFixedPointBigInt(expression *ast.FixedPointExpression, scale uint) *big.Int {
+	ten := big.NewInt(10)
+
+	// integer = expression.Integer * 10 ^ scale
+
+	targetScale := big.NewInt(0).SetUint64(uint64(scale))
+
+	integer := big.NewInt(0).Mul(
+		expression.Integer,
+		big.NewInt(0).Exp(ten, targetScale, nil),
+	)
+
+	// fractional = expression.Fractional * 10 ^ (scale - expression.Scale)
+
+	var fractional *big.Int
+	if expression.Scale == scale {
+		fractional = expression.Fractional
+	} else if expression.Scale < scale {
+		scaleDiff := big.NewInt(0).SetUint64(uint64(scale - expression.Scale))
+		fractional = big.NewInt(0).Mul(
+			expression.Fractional,
+			big.NewInt(0).Exp(ten, scaleDiff, nil),
+		)
+	} else {
+		scaleDiff := big.NewInt(0).SetUint64(uint64(expression.Scale - scale))
+		fractional = big.NewInt(0).Div(expression.Fractional,
+			big.NewInt(0).Exp(ten, scaleDiff, nil),
+		)
+	}
+
+	// value = integer + fractional
+
+	if integer.Sign() < 0 {
+		fractional.Neg(fractional)
+	}
+
+	return integer.Add(integer, fractional)
 }
 
 func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpression) ast.Repr {
@@ -1545,8 +1715,13 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 			locationRange := interpreter.locationRange(expression)
 			resultValue := value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
 
+			// If the member access is optional chaining, only wrap the result value
+			// in an optional, if it is not already an optional value
+
 			if expression.Optional {
-				return NewSomeValueOwningNonCopying(resultValue)
+				if _, ok := resultValue.(OptionalValue); !ok {
+					return NewSomeValueOwningNonCopying(resultValue)
+				}
 			}
 			return resultValue
 		})
@@ -1577,14 +1752,14 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 			case StorageValue:
 				return interpreter.visitReadStorageIndexExpression(
 					expression,
-					typedResult.Identifier,
+					typedResult.Address,
 					AccessLevelPrivate,
 				)
 
 			case PublishedValue:
 				return interpreter.visitReadStorageIndexExpression(
 					expression,
-					typedResult.Identifier,
+					typedResult.Address,
 					AccessLevelPublic,
 				)
 
@@ -1645,27 +1820,20 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 			return interpreter.visitExpressionsNonCopying(argumentExpressions).
 				FlatMap(func(result interface{}) Trampoline {
-					arguments := result.(*ArrayValue)
+					arguments := result.(*ArrayValue).Values
 
 					argumentTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make([]Value, len(arguments.Values))
-					for i, argument := range arguments.Values {
-						argumentType := argumentTypes[i]
-						parameterType := parameterTypes[i]
-						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
-					}
-
-					// TODO: optimize: only potentially used by host-functions
-					location := LocationPosition{
-						Position: invocationExpression.StartPosition(),
-						Location: interpreter.Checker.Location,
-					}
-
-					invocation := function.invoke(argumentCopies, location)
+					invocation := interpreter.functionValueInvocationTrampoline(
+						function,
+						arguments,
+						argumentTypes,
+						parameterTypes,
+						invocationExpression.StartPosition(),
+					)
 
 					// If this is invocation is optional chaining, wrap the result
 					// as an optional, as the result is expected to be an optional
@@ -1681,17 +1849,85 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 		})
 }
 
-func (interpreter *Interpreter) invokeInterpretedFunction(
-	function InterpretedFunctionValue,
+func (interpreter *Interpreter) InvokeFunctionValue(
+	function FunctionValue,
 	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
+) (value Value, err error) {
+	// recover internal panics and return them as an error
+	defer recoverErrors(func(internalErr error) {
+		err = internalErr
+	})
+
+	trampoline := interpreter.functionValueInvocationTrampoline(
+		function,
+		arguments,
+		argumentTypes,
+		parameterTypes,
+		pos,
+	)
+
+	result := interpreter.runAllStatements(trampoline)
+	if result == nil {
+		return nil, nil
+	}
+	return result.(Value), nil
+}
+
+func (interpreter *Interpreter) functionValueInvocationTrampoline(
+	function FunctionValue,
+	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
 ) Trampoline {
 
-	// start a new activation record
-	// lexical scope: use the function declaration's activation record,
+	parameterTypeCount := len(parameterTypes)
+	argumentCopies := make([]Value, len(arguments))
+
+	for i, argument := range arguments {
+		argumentType := argumentTypes[i]
+		if i < parameterTypeCount {
+			parameterType := parameterTypes[i]
+			argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
+		} else {
+			argumentCopies[i] = argument.Copy()
+		}
+	}
+
+	// TODO: optimize: only potentially used by host-functions
+
+	location := LocationPosition{
+		Position: pos,
+		Location: interpreter.Checker.Location,
+	}
+
+	return function.Invoke(Invocation{
+		Arguments:     argumentCopies,
+		ArgumentTypes: argumentTypes,
+		Location:      location,
+		Interpreter:   interpreter,
+	})
+}
+
+func (interpreter *Interpreter) invokeInterpretedFunction(
+	function InterpretedFunctionValue,
+	invocation Invocation,
+) Trampoline {
+
+	// Start a new activation record.
+	// Lexical scope: use the function declaration's activation record,
 	// not the current one (which would be dynamic scope)
 	interpreter.activations.Push(function.Activation)
 
-	return interpreter.invokeInterpretedFunctionActivated(function, arguments)
+	// Make `self` available, if any
+	if invocation.Self != nil {
+		interpreter.declareVariable(sema.SelfIdentifier, invocation.Self)
+	}
+
+	return interpreter.invokeInterpretedFunctionActivated(function, invocation.Arguments)
 }
 
 // NOTE: assumes the function's activation (or an extension of it) is pushed!
@@ -1700,10 +1936,16 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 	function InterpretedFunctionValue,
 	arguments []Value,
 ) Trampoline {
-	interpreter.bindFunctionInvocationParameters(function, arguments)
 
-	functionBlockTrampoline := interpreter.visitFunctionBlock(
-		function.Expression.FunctionBlock,
+	if function.ParameterList != nil {
+		interpreter.bindFunctionInvocationParameters(function.ParameterList, arguments)
+	}
+
+	functionBlockTrampoline := interpreter.visitFunctionBody(
+		function.BeforeStatements,
+		function.PreConditions,
+		interpreter.visitStatements(function.Statements),
+		function.PostConditions,
 		function.Type.ReturnTypeAnnotation.Type,
 	)
 
@@ -1713,16 +1955,12 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 		})
 }
 
-// bindFunctionInvocationParameters binds the argument values to the parameters in the function
+// bindFunctionInvocationParameters binds the argument values to the given parameters
 func (interpreter *Interpreter) bindFunctionInvocationParameters(
-	function InterpretedFunctionValue,
+	parameterList *ast.ParameterList,
 	arguments []Value,
 ) {
-	if function.Expression.ParameterList == nil {
-		return
-	}
-
-	for parameterIndex, parameter := range function.Expression.ParameterList.Parameters {
+	for parameterIndex, parameter := range parameterList.Parameters {
 		argument := arguments[parameterIndex]
 		interpreter.declareVariable(parameter.Identifier.Identifier, argument)
 	}
@@ -1797,7 +2035,32 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 
 	functionType := interpreter.Checker.Elaboration.FunctionExpressionFunctionType[expression]
 
-	function := newInterpretedFunction(interpreter, expression, functionType, lexicalScope)
+	var preConditions ast.Conditions
+	if expression.FunctionBlock.PreConditions != nil {
+		preConditions = *expression.FunctionBlock.PreConditions
+	}
+
+	var beforeStatements []ast.Statement
+	var rewrittenPostConditions ast.Conditions
+
+	if expression.FunctionBlock.PostConditions != nil {
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[expression.FunctionBlock.PostConditions]
+
+		rewrittenPostConditions = postConditionsRewrite.RewrittenPostConditions
+		beforeStatements = postConditionsRewrite.BeforeStatements
+	}
+
+	function := InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		ParameterList:    expression.ParameterList,
+		Type:             functionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       expression.FunctionBlock.Statements,
+		PostConditions:   rewrittenPostConditions,
+	}
 
 	return Done{Result: function}
 }
@@ -1808,14 +2071,16 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	_, _ = interpreter.declareCompositeConstructor(declaration, lexicalScope)
+	_, _ = interpreter.declareCompositeValue(declaration, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-// declareCompositeConstructor creates a constructor function
-// for the given composite, bound in a variable.
+// declareCompositeValue creates and declares the value for
+// the composite declaration.
+//
+// For all composite kinds a constructor function is created.
 //
 // The constructor is a host function which creates a new composite,
 // calls the initializer (interpreted function), if any,
@@ -1824,22 +2089,26 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 // Inside the initializer and all functions, `self` is bound to
 // the new composite value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) declareCompositeConstructor(
+// For contracts, `contractValueHandler` is used to declare
+// a contract value / instance (singleton).
+//
+// For all other composite kinds the constructor function is declared.
+//
+func (interpreter *Interpreter) declareCompositeValue(
 	declaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
 ) (
 	scope hamt.Map,
-	function HostFunctionValue,
+	value Value,
 ) {
-
 	identifier := declaration.Identifier.Identifier
 	variable := interpreter.findOrDeclareVariable(identifier)
 
-	// Make the constructor available in the initializer
+	// Make the value available in the initializer
 	lexicalScope = lexicalScope.
 		Insert(common.StringEntry(identifier), variable)
 
-	// Evaluate nested declarations in a new scope, so constructors
+	// Evaluate nested declarations in a new scope, so values
 	// of nested declarations won't be visible after the containing declaration
 
 	members := map[string]Value{}
@@ -1848,40 +2117,142 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 		interpreter.activations.PushCurrent()
 		defer interpreter.activations.Pop()
 
+		for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+			interpreter.declareInterface(nestedInterfaceDeclaration, lexicalScope)
+		}
+
 		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
 
-			// Pass the lexical scope, which has the containing composite's constructor declared,
+			// Pass the lexical scope, which has the containing composite's value declared,
 			// to the nested declarations so they can refer to it, and update the lexical scope
-			// so the container's functions can refer to the nested constructors
+			// so the container's functions can refer to the nested composite's value
 
-			var nestedConstructor FunctionValue
-			lexicalScope, nestedConstructor =
-				interpreter.declareCompositeConstructor(nestedCompositeDeclaration, lexicalScope)
+			var nestedValue Value
+			lexicalScope, nestedValue =
+				interpreter.declareCompositeValue(nestedCompositeDeclaration, lexicalScope)
 
-			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedConstructor
+			memberIdentifier := nestedCompositeDeclaration.Identifier.Identifier
+			members[memberIdentifier] = nestedValue
 		}
 	})()
 
-	initializerFunction := interpreter.initializerFunction(declaration, lexicalScope)
+	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+	typeID := compositeType.ID()
 
-	destructorFunction := interpreter.destructorFunction(declaration, lexicalScope)
-	interpreter.DestructorFunctions[identifier] = destructorFunction
+	var initializerFunction FunctionValue
+	if declaration.CompositeKind == common.CompositeKindEvent {
+		initializerFunction = NewHostFunctionValue(
+			func(invocation Invocation) Trampoline {
+				for i, argument := range invocation.Arguments {
+					parameter := compositeType.ConstructorParameters[i]
+					invocation.Self.Fields[parameter.Identifier] = argument
+				}
+				return Done{}
+			},
+		)
+	} else {
+		compositeInitializerFunction := interpreter.compositeInitializerFunction(declaration, lexicalScope)
+		if compositeInitializerFunction != nil {
+			initializerFunction = *compositeInitializerFunction
+		}
+	}
+
+	var destructorFunction FunctionValue
+	compositeDestructorFunction := interpreter.compositeDestructorFunction(declaration, lexicalScope)
+	if compositeDestructorFunction != nil {
+		destructorFunction = *compositeDestructorFunction
+	}
 
 	functions := interpreter.compositeFunctions(declaration, lexicalScope)
-	interpreter.CompositeFunctions[identifier] = functions
 
-	function = NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+	wrapFunctions := func(code wrapperCode) {
+
+		// Wrap initializer
+
+		initializerFunctionWrapper :=
+			code.initializerFunctionWrapper
+
+		if initializerFunctionWrapper != nil {
+			initializerFunction = initializerFunctionWrapper(initializerFunction)
+		}
+
+		// Wrap destructor
+
+		destructorFunctionWrapper :=
+			code.destructorFunctionWrapper
+
+		if destructorFunctionWrapper != nil {
+			destructorFunction = destructorFunctionWrapper(destructorFunction)
+		}
+
+		// Wrap functions
+
+		for name, functionWrapper := range code.functionWrappers {
+			functions[name] = functionWrapper(functions[name])
+		}
+	}
+
+	// NOTE: First the conditions of the type requirements are evaluated,
+	//  then the conditions of this composite's conformances
+	//
+	// Because the conditions are wrappers, they have to be applied
+	// in reverse order: first the conformances, then the type requirements;
+	// each conformances and type requirements in reverse order as well.
+
+	for i := len(compositeType.Conformances) - 1; i >= 0; i-- {
+		conformance := compositeType.Conformances[i]
+
+		wrapFunctions(interpreter.typeCodes.interfaceCodes[conformance.ID()])
+	}
+
+	typeRequirements := compositeType.TypeRequirements()
+
+	for i := len(typeRequirements) - 1; i >= 0; i-- {
+		typeRequirement := typeRequirements[i]
+
+		wrapFunctions(interpreter.typeCodes.typeRequirementCodes[typeRequirement.ID()])
+	}
+
+	interpreter.typeCodes.compositeCodes[compositeType.ID()] = compositeTypeCode{
+		destructorFunction: destructorFunction,
+		compositeFunctions: functions,
+	}
+
+	location := interpreter.Checker.Location
+
+	constructor := NewHostFunctionValue(
+		func(invocation Invocation) Trampoline {
+
+			// Load injected fields
+			var injectedFields map[string]Value
+			if interpreter.injectedCompositeFieldsHandler != nil {
+				injectedFields = interpreter.injectedCompositeFieldsHandler(
+					interpreter,
+					location,
+					typeID,
+					declaration.CompositeKind,
+				)
+			}
 
 			value := &CompositeValue{
-				Location:   interpreter.Checker.Location,
-				Identifier: identifier,
-				Kind:       declaration.CompositeKind,
-				Fields:     map[string]Value{},
-				Functions:  functions,
-				Destructor: destructorFunction,
+				Location:       location,
+				TypeID:         typeID,
+				Kind:           declaration.CompositeKind,
+				Fields:         map[string]Value{},
+				InjectedFields: injectedFields,
+				Functions:      functions,
+				Destructor:     destructorFunction,
 				// NOTE: new value has no owner
-				Owner: "",
+				Owner: nil,
+			}
+
+			invocation.Self = value
+
+			if declaration.CompositeKind == common.CompositeKindContract {
+				// NOTE: set the variable value immediately, as the contract value
+				// needs to be available for nested declarations
+
+				variable.Value = value
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -1889,8 +2260,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 			if initializerFunction != nil {
 				// NOTE: arguments are already properly boxed by invocation expression
 
-				initializationTrampoline = interpreter.bindSelf(*initializerFunction, value).
-					invoke(arguments, location)
+				initializationTrampoline = initializerFunction.Invoke(invocation)
 			}
 
 			return initializationTrampoline.
@@ -1899,191 +2269,112 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 				})
 		},
 	)
-	function.Members = members
-	variable.Value = function
 
-	return lexicalScope, function
+	// Contract declarations declare a value / instance (singleton),
+	// for all other composite kinds, the constructor is declared
+
+	if declaration.CompositeKind == common.CompositeKindContract {
+		contract := interpreter.contractValueHandler(interpreter, compositeType, constructor)
+		contract.NestedValues = members
+		value = contract
+		// NOTE: variable value is also set in the constructor function: it needs to be available
+		// for nested declarations, which might be invoked when the constructor is invoked
+		variable.Value = value
+	} else {
+		constructor.Members = members
+		value = constructor
+		variable.Value = value
+	}
+
+	return lexicalScope, value
 }
 
-// bindSelf returns a function which binds `self` to the structure
-//
-func (interpreter *Interpreter) bindSelf(
-	function InterpretedFunctionValue,
-	structure *CompositeValue,
-) FunctionValue {
-	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
-		// start a new activation record
-		// lexical scope: use the function declaration's activation record,
-		// not the current one (which would be dynamic scope)
-		interpreter.activations.Push(function.Activation)
-
-		// make `self` available
-		interpreter.declareVariable(sema.SelfIdentifier, structure)
-
-		return interpreter.invokeInterpretedFunctionActivated(function, arguments)
-	})
-}
-
-func (interpreter *Interpreter) initializerFunction(
+func (interpreter *Interpreter) compositeInitializerFunction(
 	compositeDeclaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
 ) *InterpretedFunctionValue {
 
-	// NOTE: gather all conformances' preconditions and postconditions,
-	// even if the composite declaration does not have an initializer
-
-	var preConditions []*ast.Condition
-	var postConditions []*ast.Condition
-
-	for _, conformance := range compositeDeclaration.Conformances {
-		interfaceDeclaration := interpreter.Interfaces[conformance.Identifier.Identifier]
-
-		// TODO: support multiple overloaded initializers
-
-		initializers := interfaceDeclaration.Members.Initializers()
-		if len(initializers) == 0 {
-			continue
-		}
-
-		firstInitializer := initializers[0]
-		if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
-			continue
-		}
-
-		preConditions = append(
-			preConditions,
-			firstInitializer.FunctionBlock.PreConditions...,
-		)
-
-		postConditions = append(
-			postConditions,
-			firstInitializer.FunctionBlock.PostConditions...,
-		)
-	}
-
-	var function *ast.FunctionExpression
-	var functionType *sema.FunctionType
+	// TODO: support multiple overloaded initializers
 
 	initializers := compositeDeclaration.Members.Initializers()
-	if len(initializers) > 0 {
-		// TODO: support multiple overloaded initializers
-
-		firstInitializer := initializers[0]
-
-		function = firstInitializer.ToExpression()
-
-		// copy function block – this makes rewriting the conditions safe
-		functionBlockCopy := *function.FunctionBlock
-		function.FunctionBlock = &functionBlockCopy
-
-		functionType = interpreter.Checker.Elaboration.SpecialFunctionTypes[firstInitializer].FunctionType
-	} else if len(preConditions) > 0 || len(postConditions) > 0 {
-
-		// no initializer, but preconditions or postconditions from conformances,
-		// prepare a function expression just for those
-
-		// NOTE: the preconditions and postconditions are added below
-
-		function = &ast.FunctionExpression{
-			FunctionBlock: &ast.FunctionBlock{},
-		}
-
-		functionType = emptyFunctionType
-	}
-
-	// no initializer in the composite declaration and also
-	// no preconditions or postconditions in the conformances: no need for initializer
-
-	if function == nil {
+	var initializer *ast.SpecialFunctionDeclaration
+	if len(initializers) == 0 {
 		return nil
 	}
 
-	// prepend the conformances' preconditions and postconditions, if any
+	initializer = initializers[0]
+	functionType := interpreter.Checker.Elaboration.SpecialFunctionTypes[initializer].FunctionType
 
-	function.FunctionBlock.PreConditions = append(preConditions, function.FunctionBlock.PreConditions...)
-	function.FunctionBlock.PostConditions = append(postConditions, function.FunctionBlock.PostConditions...)
+	parameterList := initializer.ParameterList
 
-	result := newInterpretedFunction(
-		interpreter,
-		function,
-		functionType,
-		lexicalScope,
-	)
-	return &result
+	var preConditions ast.Conditions
+	if initializer.FunctionBlock.PreConditions != nil {
+		preConditions = *initializer.FunctionBlock.PreConditions
+	}
+
+	statements := initializer.FunctionBlock.Statements
+
+	var beforeStatements []ast.Statement
+	var rewrittenPostConditions ast.Conditions
+
+	if initializer.FunctionBlock.PostConditions != nil {
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[initializer.FunctionBlock.PostConditions]
+
+		beforeStatements = postConditionsRewrite.BeforeStatements
+		rewrittenPostConditions = postConditionsRewrite.RewrittenPostConditions
+	}
+
+	return &InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		ParameterList:    parameterList,
+		Type:             functionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       statements,
+		PostConditions:   rewrittenPostConditions,
+	}
 }
 
-func (interpreter *Interpreter) destructorFunction(
+func (interpreter *Interpreter) compositeDestructorFunction(
 	compositeDeclaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
 ) *InterpretedFunctionValue {
 
-	// NOTE: gather all conformances' preconditions and postconditions,
-	// even if the composite declaration does not have a destructor
-
-	var preConditions []*ast.Condition
-	var postConditions []*ast.Condition
-
-	for _, conformance := range compositeDeclaration.Conformances {
-		conformanceIdentifier := conformance.Identifier.Identifier
-		interfaceDeclaration := interpreter.Interfaces[conformanceIdentifier]
-		interfaceDestructor := interfaceDeclaration.Members.Destructor()
-		if interfaceDestructor == nil || interfaceDestructor.FunctionBlock == nil {
-			continue
-		}
-
-		preConditions = append(
-			preConditions,
-			interfaceDestructor.FunctionBlock.PreConditions...,
-		)
-
-		postConditions = append(
-			postConditions,
-			interfaceDestructor.FunctionBlock.PostConditions...,
-		)
-	}
-
-	var function *ast.FunctionExpression
-
 	destructor := compositeDeclaration.Members.Destructor()
-	if destructor != nil {
-
-		function = destructor.ToExpression()
-
-		// copy function block – this makes rewriting the conditions safe
-		functionBlockCopy := *function.FunctionBlock
-		function.FunctionBlock = &functionBlockCopy
-
-	} else if len(preConditions) > 0 || len(postConditions) > 0 {
-
-		// no destructor, but preconditions or postconditions from conformances,
-		// prepare a function expression just for those
-
-		// NOTE: the preconditions and postconditions are added below
-
-		function = &ast.FunctionExpression{
-			FunctionBlock: &ast.FunctionBlock{},
-		}
-	}
-
-	// no destructor in the resource declaration and also
-	// no preconditions or postconditions in the conformances: no need for destructor
-
-	if function == nil {
+	if destructor == nil {
 		return nil
 	}
 
-	// prepend the conformances' preconditions and postconditions, if any
+	statements := destructor.FunctionBlock.Statements
 
-	function.FunctionBlock.PreConditions = append(preConditions, function.FunctionBlock.PreConditions...)
-	function.FunctionBlock.PostConditions = append(postConditions, function.FunctionBlock.PostConditions...)
+	var preConditions ast.Conditions
 
-	result := newInterpretedFunction(
-		interpreter,
-		function,
-		emptyFunctionType,
-		lexicalScope,
-	)
-	return &result
+	if destructor.FunctionBlock.PreConditions != nil {
+		preConditions = *destructor.FunctionBlock.PreConditions
+	}
+
+	var beforeStatements []ast.Statement
+	var rewrittenPostConditions ast.Conditions
+
+	if destructor.FunctionBlock.PostConditions != nil {
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[destructor.FunctionBlock.PostConditions]
+
+		beforeStatements = postConditionsRewrite.BeforeStatements
+		rewrittenPostConditions = postConditionsRewrite.RewrittenPostConditions
+	}
+
+	return &InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		Type:             emptyFunctionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       statements,
+		PostConditions:   rewrittenPostConditions,
+	}
 }
 
 func (interpreter *Interpreter) compositeFunctions(
@@ -2094,15 +2385,10 @@ func (interpreter *Interpreter) compositeFunctions(
 	functions := map[string]FunctionValue{}
 
 	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
-		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
-
-		function := interpreter.compositeFunction(functionDeclaration, compositeDeclaration.Conformances)
-
-		functions[functionDeclaration.Identifier.Identifier] =
-			newInterpretedFunction(
-				interpreter,
-				function,
-				functionType,
+		name := functionDeclaration.Identifier.Identifier
+		functions[name] =
+			interpreter.compositeFunction(
+				functionDeclaration,
 				lexicalScope,
 			)
 	}
@@ -2110,42 +2396,73 @@ func (interpreter *Interpreter) compositeFunctions(
 	return functions
 }
 
-func (interpreter *Interpreter) compositeFunction(
-	functionDeclaration *ast.FunctionDeclaration,
-	conformances []*ast.NominalType,
-) *ast.FunctionExpression {
+func (interpreter *Interpreter) functionWrappers(
+	members *ast.Members,
+	lexicalScope hamt.Map,
+) map[string]FunctionWrapper {
 
-	functionIdentifier := functionDeclaration.Identifier.Identifier
+	functionWrappers := map[string]FunctionWrapper{}
 
-	function := functionDeclaration.ToExpression()
+	for _, functionDeclaration := range members.Functions {
 
-	// copy function block, append interfaces' pre-conditions and post-condition
-	functionBlockCopy := *function.FunctionBlock
-	function.FunctionBlock = &functionBlockCopy
+		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
 
-	for _, conformance := range conformances {
-		conformanceIdentifier := conformance.Identifier.Identifier
-		interfaceDeclaration := interpreter.Interfaces[conformanceIdentifier]
-		interfaceFunction, ok := interfaceDeclaration.Members.FunctionsByIdentifier()[functionIdentifier]
-		if !ok || interfaceFunction.FunctionBlock == nil {
+		name := functionDeclaration.Identifier.Identifier
+		functionWrapper := interpreter.functionConditionsWrapper(
+			functionDeclaration,
+			functionType.ReturnTypeAnnotation.Type,
+			lexicalScope,
+		)
+		if functionWrapper == nil {
 			continue
 		}
-
-		functionBlockCopy.PreConditions = append(
-			functionBlockCopy.PreConditions,
-			interfaceFunction.FunctionBlock.PreConditions...,
-		)
-
-		functionBlockCopy.PostConditions = append(
-			functionBlockCopy.PostConditions,
-			interfaceFunction.FunctionBlock.PostConditions...,
-		)
+		functionWrappers[name] = functionWrapper
 	}
 
-	return function
+	return functionWrappers
 }
 
-func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
+func (interpreter *Interpreter) compositeFunction(
+	functionDeclaration *ast.FunctionDeclaration,
+	lexicalScope hamt.Map,
+) InterpretedFunctionValue {
+
+	functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
+
+	var preConditions ast.Conditions
+
+	if functionDeclaration.FunctionBlock.PreConditions != nil {
+		preConditions = *functionDeclaration.FunctionBlock.PreConditions
+	}
+
+	var beforeStatements []ast.Statement
+	var postConditions ast.Conditions
+
+	if functionDeclaration.FunctionBlock.PostConditions != nil {
+
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[functionDeclaration.FunctionBlock.PostConditions]
+
+		beforeStatements = postConditionsRewrite.BeforeStatements
+		postConditions = postConditionsRewrite.RewrittenPostConditions
+	}
+
+	parameterList := functionDeclaration.ParameterList
+	statements := functionDeclaration.FunctionBlock.Statements
+
+	return InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		ParameterList:    parameterList,
+		Type:             functionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       statements,
+		PostConditions:   postConditions,
+	}
+}
+
+func (interpreter *Interpreter) VisitFieldDeclaration(_ *ast.FieldDeclaration) ast.Repr {
 	// fields can't be interpreted
 	panic(errors.NewUnreachableError())
 }
@@ -2179,24 +2496,67 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 	switch unwrappedTargetType.(type) {
 	case *sema.IntType:
 		return ConvertInt(value)
-	case *sema.Int8Type:
-		return ConvertInt8(value)
-	case *sema.Int16Type:
-		return ConvertInt16(value)
-	case *sema.Int32Type:
-		return ConvertInt32(value)
-	case *sema.Int64Type:
-		return ConvertInt64(value)
-	case *sema.UInt8Type:
-		return ConvertUInt8(value)
-	case *sema.UInt16Type:
-		return ConvertUInt16(value)
-	case *sema.UInt32Type:
-		return ConvertUInt32(value)
-	case *sema.UInt64Type:
-		return ConvertUInt64(value)
+
+	case *sema.UIntType:
+		return ConvertUInt(value)
+
 	case *sema.AddressType:
 		return ConvertAddress(value)
+
+	// Int*
+	case *sema.Int8Type:
+		return ConvertInt8(value)
+
+	case *sema.Int16Type:
+		return ConvertInt16(value)
+
+	case *sema.Int32Type:
+		return ConvertInt32(value)
+
+	case *sema.Int64Type:
+		return ConvertInt64(value)
+
+	case *sema.Int128Type:
+		return ConvertInt128(value)
+
+	case *sema.Int256Type:
+		return ConvertInt256(value)
+
+	// UInt*
+	case *sema.UInt8Type:
+		return ConvertUInt8(value)
+
+	case *sema.UInt16Type:
+		return ConvertUInt16(value)
+
+	case *sema.UInt32Type:
+		return ConvertUInt32(value)
+
+	case *sema.UInt64Type:
+		return ConvertUInt64(value)
+
+	case *sema.UInt128Type:
+		return ConvertUInt128(value)
+
+	case *sema.UInt256Type:
+		return ConvertUInt256(value)
+
+	// Word*
+	case *sema.Word8Type:
+		return ConvertWord8(value)
+
+	case *sema.Word16Type:
+		return ConvertWord16(value)
+
+	case *sema.Word32Type:
+		return ConvertWord32(value)
+
+	case *sema.Word64Type:
+		return ConvertWord64(value)
+
+	case *sema.UFix64Type:
+		return ConvertUFix64(value)
+
 	default:
 		return value
 	}
@@ -2233,7 +2593,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 // boxOptional boxes a value in an Any value, if necessary
 func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.Type) Value {
 	switch targetType := targetType.(type) {
-	case *sema.AnyType:
+	case *sema.AnyStructType, *sema.AnyResourceType:
 		// no need to convert already boxed value
 		if _, ok := value.(*AnyValue); ok {
 			return value
@@ -2270,90 +2630,296 @@ func (interpreter *Interpreter) unbox(value Value) Value {
 	}
 }
 
+// NOTE: only called for top-level interface declarations
 func (interpreter *Interpreter) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
+
+	// lexical scope: variables in functions are bound to what is visible at declaration time
+	lexicalScope := interpreter.activations.CurrentOrNew()
+
+	interpreter.declareInterface(declaration, lexicalScope)
+
+	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
-	interpreter.Interfaces[declaration.Identifier.Identifier] = declaration
+func (interpreter *Interpreter) declareInterface(
+	declaration *ast.InterfaceDeclaration,
+	lexicalScope hamt.Map,
+) {
+	// Evaluate nested declarations in a new scope, so values
+	// of nested declarations won't be visible after the containing declaration
+
+	(func() {
+		interpreter.activations.PushCurrent()
+		defer interpreter.activations.Pop()
+
+		for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+			interpreter.declareInterface(nestedInterfaceDeclaration, lexicalScope)
+		}
+
+		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+			interpreter.declareTypeRequirement(nestedCompositeDeclaration, lexicalScope)
+		}
+	})()
+
+	interfaceType := interpreter.Checker.Elaboration.InterfaceDeclarationTypes[declaration]
+	typeID := interfaceType.ID()
+
+	initializerFunctionWrapper := interpreter.initializerFunctionWrapper(declaration.Members, lexicalScope)
+	destructorFunctionWrapper := interpreter.destructorFunctionWrapper(declaration.Members, lexicalScope)
+	functionWrappers := interpreter.functionWrappers(declaration.Members, lexicalScope)
+
+	interpreter.typeCodes.interfaceCodes[typeID] = wrapperCode{
+		initializerFunctionWrapper: initializerFunctionWrapper,
+		destructorFunctionWrapper:  destructorFunctionWrapper,
+		functionWrappers:           functionWrappers,
+	}
 }
 
-func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
-	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location.ID()]
+func (interpreter *Interpreter) declareTypeRequirement(
+	declaration *ast.CompositeDeclaration,
+	lexicalScope hamt.Map,
+) {
+	// Evaluate nested declarations in a new scope, so values
+	// of nested declarations won't be visible after the containing declaration
 
-	subInterpreter, err := NewInterpreter(
+	(func() {
+		interpreter.activations.PushCurrent()
+		defer interpreter.activations.Pop()
+
+		for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+			interpreter.declareInterface(nestedInterfaceDeclaration, lexicalScope)
+		}
+
+		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+			interpreter.declareTypeRequirement(nestedCompositeDeclaration, lexicalScope)
+		}
+	})()
+
+	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+	typeID := compositeType.ID()
+
+	initializerFunctionWrapper := interpreter.initializerFunctionWrapper(declaration.Members, lexicalScope)
+	destructorFunctionWrapper := interpreter.destructorFunctionWrapper(declaration.Members, lexicalScope)
+	functionWrappers := interpreter.functionWrappers(declaration.Members, lexicalScope)
+
+	interpreter.typeCodes.typeRequirementCodes[typeID] = wrapperCode{
+		initializerFunctionWrapper: initializerFunctionWrapper,
+		destructorFunctionWrapper:  destructorFunctionWrapper,
+		functionWrappers:           functionWrappers,
+	}
+}
+
+func (interpreter *Interpreter) initializerFunctionWrapper(
+	members *ast.Members,
+	lexicalScope hamt.Map,
+) FunctionWrapper {
+
+	// TODO: support multiple overloaded initializers
+
+	initializers := members.Initializers()
+	if len(initializers) == 0 {
+		return nil
+	}
+
+	firstInitializer := initializers[0]
+	if firstInitializer.FunctionBlock == nil {
+		return nil
+	}
+
+	return interpreter.functionConditionsWrapper(
+		firstInitializer.FunctionDeclaration,
+		&sema.VoidType{},
+		lexicalScope,
+	)
+}
+
+func (interpreter *Interpreter) destructorFunctionWrapper(
+	members *ast.Members,
+	lexicalScope hamt.Map,
+) FunctionWrapper {
+
+	destructor := members.Destructor()
+	if destructor == nil {
+		return nil
+	}
+
+	return interpreter.functionConditionsWrapper(
+		destructor.FunctionDeclaration,
+		&sema.VoidType{},
+		lexicalScope,
+	)
+}
+
+func (interpreter *Interpreter) functionConditionsWrapper(
+	declaration *ast.FunctionDeclaration,
+	returnType sema.Type,
+	lexicalScope hamt.Map,
+) FunctionWrapper {
+
+	if declaration.FunctionBlock == nil {
+		return nil
+	}
+
+	var preConditions ast.Conditions
+	if declaration.FunctionBlock.PreConditions != nil {
+		preConditions = *declaration.FunctionBlock.PreConditions
+	}
+
+	var beforeStatements []ast.Statement
+	var rewrittenPostConditions ast.Conditions
+
+	if declaration.FunctionBlock.PostConditions != nil {
+
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[declaration.FunctionBlock.PostConditions]
+
+		beforeStatements = postConditionsRewrite.BeforeStatements
+		rewrittenPostConditions = postConditionsRewrite.RewrittenPostConditions
+	}
+
+	return func(inner FunctionValue) FunctionValue {
+		return NewHostFunctionValue(func(invocation Invocation) Trampoline {
+			// Start a new activation record.
+			// Lexical scope: use the function declaration's activation record,
+			// not the current one (which would be dynamic scope)
+			interpreter.activations.Push(lexicalScope)
+
+			if declaration.ParameterList != nil {
+				interpreter.bindFunctionInvocationParameters(
+					declaration.ParameterList,
+					invocation.Arguments,
+				)
+			}
+
+			if invocation.Self != nil {
+				interpreter.declareVariable(sema.SelfIdentifier, invocation.Self)
+			}
+
+			// NOTE: The `inner` function might be nil.
+			//   This is the case if the conforming type did not declare a function.
+
+			var body Trampoline = Done{}
+			if inner != nil {
+				// NOTE: It is important to wrap the invocation in a trampoline,
+				//  so the inner function isn't invoked here
+
+				body = More(func() Trampoline {
+
+					// NOTE: It is important to actually return the value returned
+					//   from the inner function, otherwise it is lost
+
+					return inner.Invoke(invocation).
+						Map(func(returnValue interface{}) interface{} {
+							return functionReturn{returnValue.(Value)}
+						})
+				})
+			}
+
+			functionBlockTrampoline := interpreter.visitFunctionBody(
+				beforeStatements,
+				preConditions,
+				body,
+				rewrittenPostConditions,
+				returnType,
+			)
+
+			return functionBlockTrampoline.
+				Then(func(_ interface{}) {
+					interpreter.activations.Pop()
+				})
+		})
+	}
+}
+
+func (interpreter *Interpreter) ensureLoaded(location ast.Location, loadProgram func() *ast.Program) (subInterpreter *Interpreter) {
+	locationID := location.ID()
+
+	// If sub-interpreter already exists, return it
+	subInterpreter = interpreter.allInterpreters[locationID]
+	if subInterpreter != nil {
+		return subInterpreter
+	}
+
+	// Create a new sub-interpreter and interpret the top-level declarations
+	var checkerErr *sema.CheckerError
+	var importedChecker *sema.Checker
+	importedChecker, checkerErr = interpreter.Checker.EnsureLoaded(location, loadProgram)
+	if importedChecker == nil {
+		panic("missing checker")
+	}
+	if checkerErr != nil {
+		panic(checkerErr)
+	}
+
+	var err error
+	subInterpreter, err = NewInterpreter(
 		importedChecker,
 		WithPredefinedValues(interpreter.PredefinedValues),
 		WithOnEventEmittedHandler(interpreter.onEventEmitted),
 		WithOnStatementHandler(interpreter.onStatement),
 		WithStorageReadHandler(interpreter.storageReadHandler),
 		WithStorageWriteHandler(interpreter.storageWriteHandler),
+		WithStorageKeyHandler(interpreter.storageKeyHandler),
+		WithInjectedCompositeFieldsHandler(interpreter.injectedCompositeFieldsHandler),
+		WithContractValueHandler(interpreter.contractValueHandler),
+		WithImportProgramHandler(interpreter.importProgramHandler),
+		WithAllInterpreters(interpreter.allInterpreters),
+		WithAllCheckers(interpreter.allCheckers),
+		withTypeCodes(interpreter.typeCodes),
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	if subInterpreter.Checker.Location == nil {
-		subInterpreter.Checker.Location = declaration.Location
+	subInterpreter.runAllStatements(subInterpreter.interpret())
+
+	return subInterpreter
+}
+
+func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+
+	location := declaration.Location
+
+	subInterpreter := interpreter.ensureLoaded(
+		location,
+		func() *ast.Program {
+			return interpreter.importProgramHandler(interpreter, location)
+		},
+	)
+
+	// determine which identifiers are imported /
+	// which variables need to be declared
+
+	var variables map[string]*Variable
+	identifierLength := len(declaration.Identifiers)
+	if identifierLength > 0 {
+		variables = make(map[string]*Variable, identifierLength)
+		for _, identifier := range declaration.Identifiers {
+			variables[identifier.Identifier] =
+				subInterpreter.Globals[identifier.Identifier]
+		}
+	} else {
+		variables = subInterpreter.Globals
 	}
 
-	interpreter.SubInterpreters[declaration.Location.ID()] = subInterpreter
+	// set variables for all imported values
+	for name, variable := range variables {
 
-	return subInterpreter.interpret().
-		Then(func(_ interface{}) {
+		// don't import predeclared values
+		if _, ok := subInterpreter.Checker.PredeclaredValues[name]; ok {
+			continue
+		}
 
-			for subSubImportLocation, subSubInterpreter := range subInterpreter.SubInterpreters {
-				interpreter.SubInterpreters[subSubImportLocation] = subSubInterpreter
-			}
+		// don't import base values
+		if _, ok := sema.BaseValues[name]; ok {
+			continue
+		}
 
-			// determine which identifiers are imported /
-			// which variables need to be declared
+		interpreter.setVariable(name, variable)
+	}
 
-			var variables map[string]*Variable
-			identifierLength := len(declaration.Identifiers)
-			if identifierLength > 0 {
-				variables = make(map[string]*Variable, identifierLength)
-				for _, identifier := range declaration.Identifiers {
-					variables[identifier.Identifier] =
-						subInterpreter.Globals[identifier.Identifier]
-				}
-			} else {
-				variables = subInterpreter.Globals
-			}
-
-			// set variables for all imported values
-			for name, variable := range variables {
-
-				// don't import predeclared values
-				if _, ok := subInterpreter.Checker.PredeclaredValues[name]; ok {
-					continue
-				}
-
-				// don't import base values
-				if _, ok := sema.BaseValues[name]; ok {
-					continue
-				}
-
-				interpreter.setVariable(name, variable)
-
-				// If the imported name refers to an interface, also import it from the sub-interpreter
-
-				if interfaceDeclaration, ok := subInterpreter.Interfaces[name]; ok {
-					interpreter.Interfaces[name] = interfaceDeclaration
-				}
-
-				// If the imported name refers to a composite, also import the composite functions
-				// and the destructor function from the sub-interpreter
-
-				if compositeFunctions, ok := subInterpreter.CompositeFunctions[name]; ok {
-					interpreter.CompositeFunctions[name] = compositeFunctions
-				}
-
-				if destructorFunction, ok := subInterpreter.DestructorFunctions[name]; ok {
-					interpreter.DestructorFunctions[name] = destructorFunction
-				}
-			}
-		})
+	return Done{}
 }
 
 func (interpreter *Interpreter) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
@@ -2368,18 +2934,22 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	var prepareFunction *ast.FunctionExpression
+	var prepareFunction *ast.FunctionDeclaration
 	var prepareFunctionType *sema.FunctionType
 	if declaration.Prepare != nil {
-		prepareFunction = declaration.Prepare.FunctionDeclaration.ToExpression()
+		prepareFunction = declaration.Prepare.FunctionDeclaration
 		prepareFunctionType = transactionType.PrepareFunctionType().InvocationFunctionType()
 	}
 
-	executeFunction := declaration.Execute.FunctionDeclaration.ToExpression()
-	executeFunctionType := transactionType.ExecuteFunctionType().InvocationFunctionType()
+	var executeFunction *ast.FunctionDeclaration
+	var executeFunctionType *sema.FunctionType
+	if declaration.Execute != nil {
+		executeFunction = declaration.Execute.FunctionDeclaration
+		executeFunctionType = transactionType.ExecuteFunctionType().InvocationFunctionType()
+	}
 
-	beforeStatements, rewrittenPostConditions :=
-		interpreter.rewritePostConditions(declaration.PostConditions)
+	postConditionsRewrite :=
+		interpreter.Checker.Elaboration.PostConditionsRewrite[declaration.PostConditions]
 
 	self := &CompositeValue{
 		Location: interpreter.Checker.Location,
@@ -2387,99 +2957,73 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 	}
 
 	transactionFunction := NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+		func(invocation Invocation) Trampoline {
 			interpreter.activations.Push(lexicalScope)
 
+			invocation.Self = self
 			interpreter.declareVariable(sema.SelfIdentifier, self)
 
+			// NOTE: get current scope instead of using `lexicalScope`,
+			// because current scope has `self` declared
 			transactionScope := interpreter.activations.CurrentOrNew()
 
-			var entryPoint Trampoline
+			var prepareTrampoline Trampoline = Done{}
+			var executeTrampoline Trampoline = Done{}
 
 			if prepareFunction != nil {
-				prepare := newInterpretedFunction(
-					interpreter,
+				prepare := interpreter.functionDeclarationValue(
 					prepareFunction,
 					prepareFunctionType,
 					transactionScope,
 				)
 
-				entryPoint = prepare.invoke(arguments, location)
-			} else {
-				entryPoint = interpreter.visitStatements(beforeStatements)
+				prepareTrampoline = More(func() Trampoline {
+					return prepare.Invoke(invocation)
+				})
 			}
 
-			execute := newInterpretedFunction(
-				interpreter,
-				executeFunction,
-				executeFunctionType,
-				transactionScope,
-			)
+			if executeFunction != nil {
+				execute := interpreter.functionDeclarationValue(
+					executeFunction,
+					executeFunctionType,
+					transactionScope,
+				)
 
-			return entryPoint.
-				FlatMap(func(_ interface{}) Trampoline {
-					return interpreter.visitConditions(declaration.PreConditions)
-				}).
-				FlatMap(func(_ interface{}) Trampoline {
-					return execute.invoke(nil, location)
-				}).
-				FlatMap(func(_ interface{}) Trampoline {
-					return interpreter.visitConditions(rewrittenPostConditions)
-				}).
-				Then(func(_ interface{}) {
-					interpreter.activations.Pop()
+				executeTrampoline = More(func() Trampoline {
+					invocationWithoutArguments := invocation
+					invocationWithoutArguments.Arguments = nil
+					return execute.Invoke(invocationWithoutArguments)
 				})
-		},
-	)
+			}
+
+			var preConditions ast.Conditions
+			if declaration.PreConditions != nil {
+				preConditions = *declaration.PreConditions
+			}
+
+			return prepareTrampoline.
+				FlatMap(func(_ interface{}) Trampoline {
+					return interpreter.visitFunctionBody(
+						postConditionsRewrite.BeforeStatements,
+						preConditions,
+						executeTrampoline,
+						postConditionsRewrite.RewrittenPostConditions,
+						&sema.VoidType{},
+					)
+				})
+		})
 
 	interpreter.Transactions = append(interpreter.Transactions, &transactionFunction)
-}
-
-func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
-	interpreter.declareEventConstructor(declaration)
-
-	// NOTE: no result, so it does *not* act like a return-statement
-	return Done{}
-}
-
-// declareEventConstructor declares the constructor function for an event type.
-//
-// The constructor is assigned to a variable with the same identifier as the event type itself.
-// For example, this allows an event instance for event type MyEvent(x: Int) to be created
-// by calling MyEvent(x: 2).
-func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDeclaration) {
-	identifier := declaration.Identifier.Identifier
-
-	eventType := interpreter.Checker.Elaboration.EventDeclarationTypes[declaration]
-
-	variable := interpreter.findOrDeclareVariable(identifier)
-	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
-			fields := make([]EventField, len(eventType.Fields))
-			for i, field := range eventType.Fields {
-				fields[i] = EventField{
-					Identifier: field.Identifier,
-					Value:      arguments[i],
-				}
-			}
-
-			value := EventValue{
-				Identifier: eventType.Identifier,
-				Fields:     fields,
-				Location:   interpreter.Checker.Location,
-			}
-
-			return Done{Result: value}
-		},
-	)
 }
 
 func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
 	return statement.InvocationExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			event := result.(EventValue)
+			event := result.(*CompositeValue)
 
-			interpreter.onEventEmitted(interpreter, event)
+			eventType := interpreter.Checker.Elaboration.EmitStatementEventTypes[statement]
+
+			interpreter.onEventEmitted(interpreter, event, eventType)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}
@@ -2533,33 +3077,43 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 }
 
 func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *ast.ReferenceExpression) ast.Repr {
-	indexExpression := referenceExpression.Expression.(*ast.IndexExpression)
-	return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
-		FlatMap(func(result interface{}) Trampoline {
-			storage := result.(StorageValue)
 
-			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
-			key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
+	if interpreter.Checker.Elaboration.IsReferenceIntoStorage[referenceExpression] {
+		indexExpression := referenceExpression.Expression.(*ast.IndexExpression)
+		return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
+			FlatMap(func(result interface{}) Trampoline {
+				storage := result.(StorageValue)
 
-			referenceValue := &ReferenceValue{
-				TargetStorageIdentifier: storage.Identifier,
-				TargetKey:               key,
-				// NOTE: new value has no owner
-				Owner: "",
-			}
+				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
+				key := interpreter.storageKeyHandler(interpreter, storage.Address, indexingType)
 
-			return Done{Result: referenceValue}
-		})
+				referenceValue := &StorageReferenceValue{
+					TargetStorageAddress: storage.Address,
+					TargetKey:            key,
+					// NOTE: new value has no owner
+					Owner: nil,
+				}
+
+				return Done{Result: referenceValue}
+			})
+	} else {
+		return referenceExpression.Expression.Accept(interpreter).(Trampoline).
+			Map(func(result interface{}) interface{} {
+				return &EphemeralReferenceValue{
+					Value: result.(Value),
+				}
+			})
+	}
 }
 
-func (interpreter *Interpreter) readStored(storageIdentifier string, key string) OptionalValue {
-	return interpreter.storageReadHandler(interpreter, storageIdentifier, key)
+func (interpreter *Interpreter) readStored(storageAddress common.Address, key string) OptionalValue {
+	return interpreter.storageReadHandler(interpreter, storageAddress, key)
 }
 
-func (interpreter *Interpreter) writeStored(storageIdentifier string, key string, value OptionalValue) {
-	value.SetOwner(storageIdentifier)
+func (interpreter *Interpreter) writeStored(storageAddress common.Address, key string, value OptionalValue) {
+	value.SetOwner(&storageAddress)
 
-	interpreter.storageWriteHandler(interpreter, storageIdentifier, key, value)
+	interpreter.storageWriteHandler(interpreter, storageAddress, key, value)
 }
 
 var converters = map[string]func(Value) Value{
@@ -2589,8 +3143,8 @@ func (interpreter *Interpreter) defineBaseFunctions() {
 
 func (interpreter *Interpreter) newConverterFunction(converter func(Value) Value) HostFunctionValue {
 	return HostFunctionValue{
-		Function: func(arguments []Value, location LocationPosition) Trampoline {
-			return Done{Result: converter(arguments[0])}
+		Function: func(invocation Invocation) Trampoline {
+			return Done{Result: converter(invocation.Arguments[0])}
 		},
 	}
 }

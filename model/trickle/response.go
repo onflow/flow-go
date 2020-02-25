@@ -8,7 +8,7 @@ import (
 
 // Response represents an opaque system layer event.
 type Response struct {
-	EngineID  uint8
+	ChannelID uint8
 	EventID   []byte
 	OriginID  flow.Identifier
 	TargetIDs []flow.Identifier

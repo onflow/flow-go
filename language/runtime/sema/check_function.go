@@ -10,10 +10,9 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	return checker.visitFunctionDeclaration(
 		declaration,
 		functionDeclarationOptions{
-			mustExit:                true,
-			declareFunction:         true,
-			checkResourceLoss:       true,
-			allowAuthAccessModifier: false,
+			mustExit:          true,
+			declareFunction:   true,
+			checkResourceLoss: true,
 		},
 	)
 }
@@ -30,8 +29,6 @@ type functionDeclarationOptions struct {
 	// checkResourceLoss if the function should be checked for resource loss.
 	// For example, function declarations in interfaces should not be checked.
 	checkResourceLoss bool
-	// allowAuthAccessModifier if the function may have the authorized access modifier
-	allowAuthAccessModifier bool
 }
 
 func (checker *Checker) visitFunctionDeclaration(
@@ -44,7 +41,6 @@ func (checker *Checker) visitFunctionDeclaration(
 		declaration.DeclarationKind(),
 		declaration.StartPos,
 		true,
-		options.allowAuthAccessModifier,
 	)
 
 	// global functions were previously declared, see `declareFunctionDeclaration`
@@ -77,14 +73,18 @@ func (checker *Checker) declareFunctionDeclaration(
 	declaration *ast.FunctionDeclaration,
 	functionType *FunctionType,
 ) {
-	argumentLabels := declaration.ParameterList.ArgumentLabels()
+	argumentLabels := declaration.ParameterList.EffectiveArgumentLabels()
 
-	variable, err := checker.valueActivations.DeclareFunction(
-		declaration.Identifier,
-		declaration.Access,
-		functionType,
-		argumentLabels,
-	)
+	variable, err := checker.valueActivations.Declare(variableDeclaration{
+		identifier:               declaration.Identifier.Identifier,
+		ty:                       functionType,
+		access:                   declaration.Access,
+		kind:                     common.DeclarationKindFunction,
+		pos:                      declaration.Identifier.Pos,
+		isConstant:               true,
+		argumentLabels:           argumentLabels,
+		allowOuterScopeShadowing: false,
+	})
 	checker.report(err)
 
 	checker.recordVariableDeclarationOccurrence(declaration.Identifier.Identifier, variable)
@@ -102,27 +102,33 @@ func (checker *Checker) checkFunction(
 	// check argument labels
 	checker.checkArgumentLabels(parameterList)
 
-	checker.checkParameters(parameterList, functionType.ParameterTypeAnnotations)
+	checker.checkParameters(parameterList, functionType.Parameters)
+
 	if functionType.ReturnTypeAnnotation != nil {
 		checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, returnTypePosition)
 	}
 
-	if functionBlock != nil {
-		checker.functionActivations.WithFunction(
-			functionType,
-			checker.valueActivations.Depth(),
-			func() {
-				// NOTE: important to begin scope in function activation, so that
-				//   variable declarations will have proper function activation
-				//   associated to it, and declare parameters in this new scope
-				checker.enterValueScope()
-				defer checker.leaveValueScope(checkResourceLoss)
+	// NOTE: Always declare the function parameters, even if the function body is empty.
+	// For example, event declarations have an initializer with an empty body,
+	// but their parameters (e.g. duplication) needs to still be checked.
 
-				checker.declareParameters(parameterList, functionType.ParameterTypeAnnotations)
+	checker.functionActivations.WithFunction(
+		functionType,
+		checker.valueActivations.Depth(),
+		func() {
+			// NOTE: important to begin scope in function activation, so that
+			//   variable declarations will have proper function activation
+			//   associated to it, and declare parameters in this new scope
 
-				functionActivation := checker.functionActivations.Current()
-				functionActivation.InitializationInfo = initializationInfo
+			checker.enterValueScope()
+			defer checker.leaveValueScope(checkResourceLoss)
 
+			checker.declareParameters(parameterList, functionType.Parameters)
+
+			functionActivation := checker.functionActivations.Current()
+			functionActivation.InitializationInfo = initializationInfo
+
+			if functionBlock != nil {
 				checker.visitFunctionBlock(
 					functionBlock,
 					functionType.ReturnTypeAnnotation,
@@ -133,13 +139,13 @@ func (checker *Checker) checkFunction(
 					returnType := functionType.ReturnTypeAnnotation.Type
 					checker.checkFunctionExits(functionBlock, returnType)
 				}
+			}
 
-				if initializationInfo != nil {
-					checker.checkFieldMembersInitialized(initializationInfo)
-				}
-			},
-		)
-	}
+			if initializationInfo != nil {
+				checker.checkFieldMembersInitialized(initializationInfo)
+			}
+		},
+	)
 }
 
 // checkFunctionExits checks that the given function block exits
@@ -152,7 +158,12 @@ func (checker *Checker) checkFunctionExits(functionBlock *ast.FunctionBlock, ret
 	}
 
 	functionActivation := checker.functionActivations.Current()
-	if functionActivation.ReturnInfo.DefinitelyReturned {
+
+	definitelyReturnedOrHalted :=
+		functionActivation.ReturnInfo.DefinitelyReturned ||
+			functionActivation.ReturnInfo.DefinitelyHalted
+
+	if definitelyReturnedOrHalted {
 		return
 	}
 
@@ -163,34 +174,42 @@ func (checker *Checker) checkFunctionExits(functionBlock *ast.FunctionBlock, ret
 	)
 }
 
-func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parameterTypeAnnotations []*TypeAnnotation) {
+func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parameters []*Parameter) {
 	for i, parameter := range parameterList.Parameters {
-		parameterTypeAnnotation := parameterTypeAnnotations[i]
-		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.TypeAnnotation.StartPos)
+		parameterTypeAnnotation := parameters[i].TypeAnnotation
+
+		checker.checkTypeAnnotation(
+			parameterTypeAnnotation,
+			parameter.TypeAnnotation.StartPos,
+		)
 	}
 }
 
 func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.Position) {
-	checker.checkMoveAnnotation(
+	checker.checkResourceAnnotation(
 		typeAnnotation.Type,
-		typeAnnotation.Move,
+		typeAnnotation.IsResource,
 		pos,
 	)
 }
 
-func (checker *Checker) checkMoveAnnotation(ty Type, move bool, pos ast.Position) {
+func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, pos ast.Position) {
+	if ty.IsInvalidType() {
+		return
+	}
+
 	if ty.IsResourceType() {
-		if !move {
+		if !isResourceMove {
 			checker.report(
-				&MissingMoveAnnotationError{
+				&MissingResourceAnnotationError{
 					Pos: pos,
 				},
 			)
 		}
 	} else {
-		if move {
+		if isResourceMove {
 			checker.report(
-				&InvalidMoveAnnotationError{
+				&InvalidResourceAnnotationError{
 					Pos: pos,
 				},
 			)
@@ -232,7 +251,7 @@ func (checker *Checker) checkArgumentLabels(parameterList *ast.ParameterList) {
 //
 func (checker *Checker) declareParameters(
 	parameterList *ast.ParameterList,
-	parameterTypeAnnotations []*TypeAnnotation,
+	parameters []*Parameter,
 ) {
 	depth := checker.valueActivations.Depth()
 
@@ -254,8 +273,7 @@ func (checker *Checker) declareParameters(
 			continue
 		}
 
-		parameterTypeAnnotation := parameterTypeAnnotations[i]
-		parameterType := parameterTypeAnnotation.Type
+		parameterType := parameters[i].TypeAnnotation.Type
 
 		variable := &Variable{
 			Identifier:      identifier.Identifier,
@@ -276,38 +294,68 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 	panic(errors.NewUnreachableError())
 }
 
+func (checker *Checker) visitWithPostConditions(postConditions *ast.Conditions, returnType Type, body func()) {
+
+	var rewrittenPostConditions *PostConditionsRewrite
+
+	// If there are post-conditions, rewrite them, extracting `before` expressions.
+	// The result are variable declarations which need to be evaluated before
+	// the function body
+
+	if postConditions != nil {
+		rewriteResult := checker.rewritePostConditions(*postConditions)
+		rewrittenPostConditions = &rewriteResult
+
+		checker.Elaboration.PostConditionsRewrite[postConditions] = rewriteResult
+
+		checker.visitStatements(rewriteResult.BeforeStatements)
+	}
+
+	body()
+
+	// If there is a post-conditions, declare the function `before`
+
+	// TODO: improve: only declare when a condition actually refers to `before`?
+
+	if postConditions != nil &&
+		len(*postConditions) > 0 {
+
+		checker.declareBefore()
+	}
+
+	// If there is a return type, declare the constant `result` which has the return type
+
+	if _, ok := returnType.(*VoidType); !ok {
+		checker.declareResult(returnType)
+	}
+
+	if rewrittenPostConditions != nil {
+		checker.visitConditions(rewrittenPostConditions.RewrittenPostConditions)
+	}
+}
+
 func (checker *Checker) visitFunctionBlock(
 	functionBlock *ast.FunctionBlock,
 	returnTypeAnnotation *TypeAnnotation,
 	checkResourceLoss bool,
 ) {
-
 	checker.enterValueScope()
 	defer checker.leaveValueScope(checkResourceLoss)
 
-	checker.visitConditions(functionBlock.PreConditions)
-
-	// NOTE: not checking block as it enters a new scope
-	// and post-conditions need to be able to refer to block's declarations
-
-	checker.visitStatements(functionBlock.Block.Statements)
-
-	// if there is a post-condition, declare the function `before`
-
-	// TODO: improve: only declare when a condition actually refers to `before`?
-
-	if len(functionBlock.PostConditions) > 0 {
-		checker.declareBefore()
+	if functionBlock.PreConditions != nil {
+		checker.visitConditions(*functionBlock.PreConditions)
 	}
 
-	// if there is a return type, declare the constant `result`
-	// which has the return type
+	checker.visitWithPostConditions(
+		functionBlock.PostConditions,
+		returnTypeAnnotation.Type,
+		func() {
+			// NOTE: not checking block as it enters a new scope
+			// and post-conditions need to be able to refer to block's declarations
 
-	if _, ok := returnTypeAnnotation.Type.(*VoidType); !ok {
-		checker.declareResult(returnTypeAnnotation.Type)
-	}
-
-	checker.visitConditions(functionBlock.PostConditions)
+			checker.visitStatements(functionBlock.Block.Statements)
+		},
+	)
 }
 
 func (checker *Checker) declareResult(ty Type) {

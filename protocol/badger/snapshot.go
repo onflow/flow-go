@@ -3,23 +3,24 @@
 package badger
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Snapshot represents a read-only immutable snapshot of the protocol state.
 type Snapshot struct {
-	state  *State
-	number uint64
-	hash   crypto.Hash
+	state   *State
+	number  uint64
+	blockID flow.Identifier
 }
 
 // Identities retrieves all active ids at the given snapshot and
@@ -27,74 +28,75 @@ type Snapshot struct {
 func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
 
 	// execute the transaction that retrieves everything
-	var ids flow.IdentityList
+	var identities []*flow.Identity
 	err := s.state.db.View(func(tx *badger.Txn) error {
 
-		// check if height is max uint64 to get latest finalized state
+		// get the top header at the requested snapshot
 		var head flow.Header
 		err := s.head(&head)(tx)
 		if err != nil {
-			return errors.Wrap(err, "could not retrieve head")
+			return fmt.Errorf("could not retrieve head: %w", err)
 		}
 
 		// get the latest finalized height
 		var boundary uint64
 		err = operation.RetrieveBoundary(&boundary)(tx)
 		if err != nil {
-			return errors.Wrap(err, "could not retrieve boundary")
+			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		// if the target number is before finalized state, set it as new limit
-		if head.Number < boundary {
-			boundary = head.Number
+		if head.View < boundary {
+			boundary = head.View
 		}
 
 		// get finalized stakes within the boundary
 		deltas, err := computeFinalizedDeltas(tx, boundary, filters)
 		if err != nil {
-			return errors.Wrap(err, "could not compute finalized stakes")
+			return fmt.Errorf("could not compute finalized stakes: %w", err)
 		}
 
 		// if there are unfinalized blocks, retrieve stakes there
-		if head.Number > boundary {
+		if head.View > boundary {
 
 			// get the final block we want to reach
-			var final crypto.Hash
-			err = operation.RetrieveHash(boundary, &final)(tx)
+			var finalID flow.Identifier
+			err = operation.RetrieveNumber(boundary, &finalID)(tx)
 			if err != nil {
-				return errors.Wrap(err, "could not get final hash")
+				return fmt.Errorf("could not get final hash: %w", err)
 			}
 
 			// track back from head block to latest finalized block
-			for !head.Hash().Equal(final) {
+			for head.ID() != finalID {
 
-				// get the identities for pending block
-				var ids flow.IdentityList
-				err = operation.RetrieveIdentities(head.Hash(), &ids)(tx)
+				// get the stake deltas
+				// TODO: separate this from identities
+				var identities []*flow.Identity
+				err = procedure.RetrieveIdentities(head.PayloadHash, &identities)(tx)
 				if err != nil {
-					return errors.Wrap(err, "could not add deltas")
+					return fmt.Errorf("could not add deltas: %w", err)
 				}
 
 				// manually add the deltas for valid ids
-				for _, id := range ids {
+				for _, identity := range identities {
 					for _, filter := range filters {
-						if !filter(id) {
+						if !filter(identity) {
 							continue
 						}
 					}
-					deltas[id.NodeID] += int64(id.Stake)
+					deltas[identity.NodeID] += int64(identity.Stake)
 				}
 
 				// set the head to the parent
-				err = operation.RetrieveHeader(head.Parent, &head)(tx)
+				err = operation.RetrieveHeader(head.ParentID, &head)(tx)
 				if err != nil {
-					return errors.Wrap(err, "could not retrieve parent")
+					return fmt.Errorf("could not retrieve parent: %w", err)
 				}
 			}
 
 		}
 
-		// get role & address for each non-zero stake
+		// get identity for each non-zero stake
 		for nodeID, delta := range deltas {
 
 			// discard nodes where the remaining stake is zero
@@ -102,51 +104,99 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 				continue
 			}
 
-			// create the identity
-			id := flow.Identity{
-				NodeID: nodeID,
-				Stake:  uint64(delta),
-			}
-
-			// retrieve the identity role
-			err = operation.RetrieveRole(id.NodeID, &id.Role)(tx)
+			// retrieve the identity
+			var identity flow.Identity
+			err = operation.RetrieveIdentity(nodeID, &identity)(tx)
 			if err != nil {
-				return errors.Wrapf(err, "could not retrieve role (%x)", nodeID)
+				return fmt.Errorf("could not retrieve role (%x): %w", nodeID, err)
 			}
 
-			// retrieve the identity address
-			err = operation.RetrieveAddress(id.NodeID, &id.Address)(tx)
-			if err != nil {
-				return errors.Wrapf(err, "could not retrieve address (%x)", nodeID)
-			}
+			// set the stake for the node
+			identity.Stake = uint64(delta)
 
-			ids = append(ids, id)
+			identities = append(identities, &identity)
 		}
 
-		sort.Slice(ids, func(i int, j int) bool {
-			return identity.ByNodeIDAsc(ids[i], ids[j])
+		sort.Slice(identities, func(i int, j int) bool {
+			return order.ByNodeIDAsc(identities[i], identities[j])
 		})
 
 		return nil
 	})
 
-	return ids, err
+	return identities, err
 }
 
-func (s *Snapshot) Identity(nodeID flow.Identifier) (flow.Identity, error) {
+func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 
 	// get the ids
-	ids, err := s.Identities(identity.HasNodeID(nodeID))
+	identities, err := s.Identities(filter.HasNodeID(nodeID))
 	if err != nil {
-		return flow.Identity{}, errors.Wrap(err, "could not get ids")
+		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// return error if he doesn't exist
-	if len(ids) == 0 {
-		return flow.Identity{}, errors.Errorf("identity not staked")
+	if len(identities) == 0 {
+		return nil, fmt.Errorf("identity not staked (%x)", nodeID)
 	}
 
-	return ids[0], nil
+	return identities[0], nil
+}
+
+func (s *Snapshot) Commit() (flow.StateCommitment, error) {
+
+	var commit flow.StateCommitment
+	err := s.state.db.View(func(tx *badger.Txn) error {
+
+		// get the head at the requested snapshot
+		var header flow.Header
+		err := s.head(&header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve head: %w", err)
+		}
+
+		// try getting the commit directly from the block
+		var commit flow.StateCommitment
+		err = operation.LookupCommit(header.ID(), &commit)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get commit: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve commit: %w", err)
+	}
+
+	return commit, nil
+}
+
+// Clusters sorts the list of node identities after filtering into the given
+// number of clusters.
+//
+// This is guaranteed to be deterministic for an identical set of identities,
+// regardless of the order.
+func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
+
+	// get the node identities
+	identities, err := s.Identities(filter.HasRole(flow.RoleCollection))
+	if err != nil {
+		return nil, fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// order the identities by node ID
+	sort.Slice(identities, func(i, j int) bool {
+		return order.ByNodeIDAsc(identities[i], identities[j])
+	})
+
+	// create the desired number of clusters and assign nodes
+	clusters := flow.NewClusterList(s.state.clusters)
+	for i, identity := range identities {
+		index := uint(i) % s.state.clusters
+		clusters.Add(index, identity)
+	}
+
+	return clusters, nil
 }
 
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
@@ -156,22 +206,22 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 		if s.number == math.MaxUint64 {
 			err := operation.RetrieveBoundary(&s.number)(tx)
 			if err != nil {
-				return errors.Wrap(err, "could not retrieve boundary")
+				return fmt.Errorf("could not retrieve boundary: %w", err)
 			}
 		}
 
 		// check if hash is nil and try to get it from height
-		if s.hash == nil {
-			err := operation.RetrieveHash(s.number, &s.hash)(tx)
+		if s.blockID == flow.ZeroID {
+			err := operation.RetrieveNumber(s.number, &s.blockID)(tx)
 			if err != nil {
-				return errors.Wrapf(err, "could not retrieve hash (%d)", s.number)
+				return fmt.Errorf("could not retrieve hash (%d): %w", s.number, err)
 			}
 		}
 
 		// get the height for our desired target hash
-		err := operation.RetrieveHeader(s.hash, head)(tx)
+		err := operation.RetrieveHeader(s.blockID, head)(tx)
 		if err != nil {
-			return errors.Wrapf(err, "could not retrieve header (%x)", s.hash)
+			return fmt.Errorf("could not retrieve header (%x): %w", s.blockID, err)
 		}
 
 		return nil

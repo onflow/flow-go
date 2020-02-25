@@ -20,7 +20,7 @@ struct Message {
     request @4 :Trickle.Request;
     response @5 :Trickle.Response;
 
-    guaranteedCollection @6 :Collection.GuaranteedCollection;
+    collectionGuarantee @6 :Collection.CollectionGuarantee;
 
     blockProposal @7 :Coldstuff.BlockProposal;
     blockVote @8 :Coldstuff.BlockVote;

@@ -2,7 +2,6 @@
 
 package mock
 
-import crypto "github.com/dapperlabs/flow-go/crypto"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -25,13 +24,13 @@ func (_m *Mutator) Bootstrap(genesis *flow.Block) error {
 	return r0
 }
 
-// Extend provides a mock function with given fields: block
-func (_m *Mutator) Extend(block *flow.Block) error {
-	ret := _m.Called(block)
+// Extend provides a mock function with given fields: blockID
+func (_m *Mutator) Extend(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
-		r0 = rf(block)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -39,13 +38,13 @@ func (_m *Mutator) Extend(block *flow.Block) error {
 	return r0
 }
 
-// Finalize provides a mock function with given fields: hash
-func (_m *Mutator) Finalize(hash crypto.Hash) error {
-	ret := _m.Called(hash)
+// Finalize provides a mock function with given fields: blockID
+func (_m *Mutator) Finalize(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(crypto.Hash) error); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -185,11 +185,23 @@ func (s *BaseCadenceListener) EnterFullType(ctx *FullTypeContext) {}
 // ExitFullType is called when production fullType is exited.
 func (s *BaseCadenceListener) ExitFullType(ctx *FullTypeContext) {}
 
+// EnterInnerType is called when production innerType is entered.
+func (s *BaseCadenceListener) EnterInnerType(ctx *InnerTypeContext) {}
+
+// ExitInnerType is called when production innerType is exited.
+func (s *BaseCadenceListener) ExitInnerType(ctx *InnerTypeContext) {}
+
 // EnterBaseType is called when production baseType is entered.
 func (s *BaseCadenceListener) EnterBaseType(ctx *BaseTypeContext) {}
 
 // ExitBaseType is called when production baseType is exited.
 func (s *BaseCadenceListener) ExitBaseType(ctx *BaseTypeContext) {}
+
+// EnterTypeRestrictions is called when production typeRestrictions is entered.
+func (s *BaseCadenceListener) EnterTypeRestrictions(ctx *TypeRestrictionsContext) {}
+
+// ExitTypeRestrictions is called when production typeRestrictions is exited.
+func (s *BaseCadenceListener) ExitTypeRestrictions(ctx *TypeRestrictionsContext) {}
 
 // EnterNominalType is called when production nominalType is entered.
 func (s *BaseCadenceListener) EnterNominalType(ctx *NominalTypeContext) {}
@@ -556,6 +568,12 @@ func (s *BaseCadenceListener) EnterStringLiteral(ctx *StringLiteralContext) {}
 
 // ExitStringLiteral is called when production stringLiteral is exited.
 func (s *BaseCadenceListener) ExitStringLiteral(ctx *StringLiteralContext) {}
+
+// EnterFixedPointLiteral is called when production fixedPointLiteral is entered.
+func (s *BaseCadenceListener) EnterFixedPointLiteral(ctx *FixedPointLiteralContext) {}
+
+// ExitFixedPointLiteral is called when production fixedPointLiteral is exited.
+func (s *BaseCadenceListener) ExitFixedPointLiteral(ctx *FixedPointLiteralContext) {}
 
 // EnterIntegerLiteral is called when production integerLiteral is entered.
 func (s *BaseCadenceListener) EnterIntegerLiteral(ctx *IntegerLiteralContext) {}

@@ -20,7 +20,15 @@ type Snapshot interface {
 	// Identity attempts to retrieve the node with the given identifier at the
 	// selected point of the protocol state history. It will error if it doesn't
 	// exist or if its stake is zero.
-	Identity(nodeID flow.Identifier) (flow.Identity, error)
+	Identity(nodeID flow.Identifier) (*flow.Identity, error)
+
+	// Commit returns the execution state commitment at the selected snapshot.
+	Commit() (flow.StateCommitment, error)
+
+	// Cluster selects the given cluster from the node selection. You have to
+	// manually filter the identities to the desired set of nodes before
+	// clustering them.
+	Clusters() (*flow.ClusterList, error)
 
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,

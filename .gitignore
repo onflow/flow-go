@@ -1,6 +1,9 @@
-/cmd/consensus/data/
-/cmd/consensus/consensus
 /cmd/flow/flow
+/cmd/collection/collection
+/cmd/consensus/consensus
+/cmd/execution/execution
+/cmd/verification/verification
+/cmd/testclient/testclient
 
 # Test binary, build with `go test -c`
 *.test
@@ -10,6 +13,8 @@
 
 # Coverage artifacts
 coverage.zip
+cover.json
+cover-summary
 index.html
 
 # Since we have tooling that uses node
@@ -26,3 +31,6 @@ flowdb
 git
 language/tools/vscode-extension/cadence-*.vsix
 language/tools/vscode-extension/out/*
+
+# Go mod ignores
+.history

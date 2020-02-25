@@ -46,10 +46,17 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 		}
 	}
 
+	memberType := member.TypeAnnotation.Type
+
+	// If the member access is optional chaining, only wrap the result value
+	// in an optional, if it is not already an optional value
+
 	if isOptional {
-		return &OptionalType{Type: member.Type}
+		if _, ok := memberType.(*OptionalType); !ok {
+			return &OptionalType{Type: memberType}
+		}
 	}
-	return member.Type
+	return memberType
 }
 
 func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *Member, isOptional bool) {
@@ -79,7 +86,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 
 	accessedSelfMember := checker.accessedSelfMember(expression)
 	if accessedSelfMember != nil &&
-		accessedSelfMember.Type.IsResourceType() {
+		accessedSelfMember.TypeAnnotation.Type.IsResourceType() {
 
 		// NOTE: Preventing the capturing of the resource field is already implicitly handled:
 		// By definition, the resource field can only be nested in a resource,
@@ -101,7 +108,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 	// However, for some types (e.g. reference types) this depends on what type is referenced
 
 	getMemberForType := func(expressionType Type) {
-		if ty, ok := expressionType.(MemberAccessibleType); ok && ty.HasMembers() {
+		if ty, ok := expressionType.(MemberAccessibleType); ok && ty.CanHaveMembers() {
 			targetRange := ast.NewRangeFromPositioned(expression.Expression)
 			member = ty.GetMember(identifier, targetRange, checker.report)
 		}
@@ -208,12 +215,65 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 	return member, isOptional
 }
 
+// isReadableMember returns true if the given member can be read from
+// in the current location of the checker
+//
 func (checker *Checker) isReadableMember(member *Member) bool {
-	return checker.isReadableAccess(member.Access) ||
-		checker.containerTypes[member.ContainerType]
+	if checker.isReadableAccess(member.Access) ||
+		checker.containerTypes[member.ContainerType] {
+
+		return true
+	}
+
+	switch member.Access {
+	case ast.AccessContract:
+		// If the member allows access from the containing contract,
+		// check if the current location is contained in the member's contract
+
+		contractType := containingContractKindedType(member.ContainerType)
+		if checker.containerTypes[contractType] {
+			return true
+		}
+
+	case ast.AccessAccount:
+		// If the member allows access from the containing account,
+		// check if the current location is the same as the member's container location
+
+		location := member.ContainerType.(LocatedType).GetLocation()
+		if ast.LocationsMatch(checker.Location, location) {
+			return true
+		}
+	}
+
+	return false
 }
 
+// isWriteableMember returns true if the given member can be written to
+// in the current location of the checker
+//
 func (checker *Checker) isWriteableMember(member *Member) bool {
 	return checker.isWriteableAccess(member.Access) ||
 		checker.containerTypes[member.ContainerType]
+}
+
+// containingContractKindedType returns the containing contract-kinded type
+// of the given type, if any.
+//
+// The given type itself might be the result.
+//
+func containingContractKindedType(t Type) CompositeKindedType {
+	for {
+		if compositeKindedType, ok := t.(CompositeKindedType); ok &&
+			compositeKindedType.GetCompositeKind() == common.CompositeKindContract {
+
+			return compositeKindedType
+		}
+
+		if containedType, ok := t.(ContainedType); ok {
+			t = containedType.GetContainerType()
+			continue
+		}
+
+		return nil
+	}
 }

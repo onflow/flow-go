@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
 
 // unsupportedOperation
@@ -32,7 +33,7 @@ type NotDeclaredError struct {
 
 func (e *NotDeclaredError) Error() string {
 	return fmt.Sprintf(
-		"cannot find %s `%s` in this scope",
+		"cannot find %s in this scope: `%s`",
 		e.ExpectedKind.Name(),
 		e.Name,
 	)
@@ -61,18 +62,20 @@ type ArgumentCountError struct {
 
 func (e *ArgumentCountError) Error() string {
 	return fmt.Sprintf(
-		"incorrect number of arguments: got %d, need %d",
-		e.ArgumentCount,
+		"incorrect number of arguments: expected %d, got %d",
 		e.ParameterCount,
+		e.ArgumentCount,
 	)
 }
 
-// AnyParameterTypeInInvocationError
+// InvalidParameterTypeInInvocationError
 
-type AnyParameterTypeInInvocationError struct{}
+type InvalidParameterTypeInInvocationError struct {
+	InvalidParameterType sema.Type
+}
 
-func (e *AnyParameterTypeInInvocationError) Error() string {
-	return "cannot invoke functions with `Any` parameter type"
+func (e *InvalidParameterTypeInInvocationError) Error() string {
+	return fmt.Sprintf("cannot invoke functions with parameter type: `%s`", e.InvalidParameterType)
 }
 
 // TransactionNotDeclaredError
@@ -144,5 +147,52 @@ func (e *DereferenceError) StartPosition() ast.Position {
 }
 
 func (e *DereferenceError) EndPosition() ast.Position {
+	return e.LocationRange.EndPos
+}
+
+// OverflowError
+
+type OverflowError struct{}
+
+func (e OverflowError) Error() string {
+	return "overflow"
+}
+
+// UnderflowError
+
+type UnderflowError struct{}
+
+func (e UnderflowError) Error() string {
+	return "underflow"
+}
+
+// UnderflowError
+
+type DivisionByZeroError struct{}
+
+func (e DivisionByZeroError) Error() string {
+	return "division by zero"
+}
+
+// DestroyedCompositeError
+
+type DestroyedCompositeError struct {
+	CompositeKind common.CompositeKind
+	LocationRange LocationRange
+}
+
+func (e *DestroyedCompositeError) ImportLocation() ast.Location {
+	return e.LocationRange.Location
+}
+
+func (e *DestroyedCompositeError) Error() string {
+	return fmt.Sprintf("%s is destroyed", e.CompositeKind)
+}
+
+func (e *DestroyedCompositeError) StartPosition() ast.Position {
+	return e.LocationRange.StartPos
+}
+
+func (e *DestroyedCompositeError) EndPosition() ast.Position {
 	return e.LocationRange.EndPos
 }
