@@ -55,7 +55,7 @@ func TestReceiveBlockBeforeInsufficientVotes(t *testing.T) {
 
 // HAPPY PATH (votes are valid and the block always arrives before votes)
 // assume there are 7 nodes, meaning that the threshold is 5
-// a QC should be built when receiving the 5th vote (the block is counted as one vote)
+// a QC should be built when receiving the block and the 4th vote (the block is counted as one vote)
 func TestReceiveBlockBeforeSufficientVotes(t *testing.T) {
 	va, ids := newMockVoteAggregator(t)
 	testView := uint64(5)
@@ -75,22 +75,46 @@ func TestReceiveBlockBeforeSufficientVotes(t *testing.T) {
 
 // HAPPY PATH (votes are valid and the block always arrives before votes)
 // assume there are 7 nodes, meaning that the threshold is 5
-// the same QC should be returned when receiving the 4th vote
+// the same QC should be returned when receiving the block and the 5th vote
 func TestReceiveVoteAfterQCBuilt(t *testing.T) {
 	va, ids := newMockVoteAggregator(t)
 	testView := uint64(5)
 	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
 	_ = va.StoreProposerVote(bp.ProposerVote())
-	_, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+	var qc *hotmodel.QuorumCertificate
 	for i := 0; i < 4; i++ {
 		vote := newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
-		_, built, err = va.StoreVoteAndBuildQC(vote, bp.Block)
+		qc, _, _ = va.StoreVoteAndBuildQC(vote, bp.Block)
 	}
 	finalVote := newMockVote(testView, bp.Block.BlockID, ids[4].NodeID)
 	finalQC, built, err := va.StoreVoteAndBuildQC(finalVote, bp.Block)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, finalQC)
 	require.True(t, built)
+	require.Equal(t, qc, finalQC)
+}
+
+// HAPPY PATH (votes are valid and the block always arrives before votes)
+// a QC should not be built when received the block and 3 votes (still insufficient) and a vote for a different block
+func TestReceiveVoteForDifferentBlock(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
+	_ = va.StoreProposerVote(bp.ProposerVote())
+	_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+	for i := 0; i < 3; i++ {
+		vote := newMockVote(testView, bp.Block.BlockID, ids[i].NodeID)
+		_, _, _ = va.StoreVoteAndBuildQC(vote, bp.Block)
+	}
+	bp2 := newMockBlock(testView, ids[len(ids)-2].NodeID)
+	_ = va.StoreProposerVote(bp2.ProposerVote())
+	_, _, _ = va.BuildQCOnReceivedBlock(bp2.Block)
+	voteForDifferentBlock := newMockVote(testView, bp2.Block.BlockID, ids[4].NodeID)
+	qc, built, err := va.StoreVoteAndBuildQC(voteForDifferentBlock, bp2.Block)
+	require.Nil(t, qc)
+	require.False(t, built)
+	require.NoError(t, err)
 }
 
 // PENDING PATH (votes are valid and the block arrives after votes)
@@ -136,7 +160,7 @@ func TestReceiveSufficientVotesBeforeBlock(t *testing.T) {
 // the vote should not be stored
 func TestStaleVoteWithoutBlock(t *testing.T) {
 	va, ids := newMockVoteAggregator(t)
-	va.highestPrunedView = 10
+	va.PruneByView(10)
 	testView := uint64(5)
 	vote := newMockVote(testView, unittest.IdentifierFixture(), ids[0].NodeID)
 	ok := va.StorePendingVote(vote)
@@ -156,10 +180,10 @@ func TestBuildQCWithoutProposerVote(t *testing.T) {
 }
 
 // UNHAPPY PATH
-// highestPrunedView is 10, receive a block with view 5
+// highestPrunedView is 10, receive a block with view 5 which should be ignored
 func TestStaleProposerVote(t *testing.T) {
 	va, ids := newMockVoteAggregator(t)
-	va.highestPrunedView = 10
+	va.PruneByView(10)
 	testView := uint64(5)
 	bp := newMockBlock(testView, ids[len(ids)-1].NodeID)
 	ok := va.StoreProposerVote(bp.ProposerVote())
@@ -176,8 +200,10 @@ func TestStaleProposerVote(t *testing.T) {
 // should trigger notifier
 func TestDoubleVote(t *testing.T) {
 	va, ids := newMockVoteAggregator(t)
+	notifier := &mockdist.Consumer{}
+	va.notifier = notifier
 	testview := uint64(5)
-	// mock double proposal
+	// mock two proposals at the same view
 	bp1 := newMockBlock(testview, ids[0].NodeID)
 	bp2 := newMockBlock(testview, ids[1].NodeID)
 	va.StoreProposerVote(bp1.ProposerVote())
@@ -191,8 +217,6 @@ func TestDoubleVote(t *testing.T) {
 	require.False(t, built)
 	require.NoError(t, err)
 	vote2 := newMockVote(testview, bp2.Block.BlockID, ids[2].NodeID)
-	notifier := &mockdist.Consumer{}
-	va.notifier = notifier
 	notifier.On("OnDoubleVotingDetected", vote1, vote2).Return().Once()
 	qc, built, err = va.StoreVoteAndBuildQC(vote2, bp2.Block)
 	notifier.AssertExpectations(t)
@@ -334,9 +358,11 @@ func TestVoteOrderAfterBlock(t *testing.T) {
 	}
 	va.StoreProposerVote(bp.ProposerVote())
 	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	_, exists := va.blockIDToVotingStatus[bp.Block.BlockID].votes[bp.ProposerVote().ID()]
 	require.NotNil(t, qc)
 	require.True(t, built)
 	require.NoError(t, err)
+	require.True(t, exists)
 	// first five votes including proposer vote should be stored in voting status
 	// while the 6th vote shouldn't
 	for i := 0; i < 6; i++ {
@@ -366,15 +392,17 @@ func TestPartialPruneBeforeBlock(t *testing.T) {
 		blockList = append(blockList, bp.Block)
 	}
 	// before pruning
-	require.Equal(t, 4, len(va.viewToBlockIDSet))
-	require.Equal(t, 4, len(va.viewToVoteID))
-	require.Equal(t, 4, len(va.pendingVotes.votes))
+	_, viewToBlockLen, viewToVoteLen, pendingVoteLen, _ := getStateLength(va)
+	require.Equal(t, 4, viewToBlockLen)
+	require.Equal(t, 4, viewToVoteLen)
+	require.Equal(t, 4, pendingVoteLen)
 	// after pruning
 	va.PruneByView(pruneView)
-	require.Equal(t, pruneView, va.highestPrunedView)
-	require.Equal(t, 1, len(va.viewToBlockIDSet))
-	require.Equal(t, 1, len(va.viewToVoteID))
-	require.Equal(t, 1, len(va.pendingVotes.votes))
+	prunedView, viewToBlockLen, viewToVoteLen, pendingVoteLen, _ := getStateLength(va)
+	require.Equal(t, pruneView, prunedView)
+	require.Equal(t, 1, viewToBlockLen)
+	require.Equal(t, 1, viewToVoteLen)
+	require.Equal(t, 1, pendingVoteLen)
 	// the remaining vote should be the vote that has view at 5
 	lastVote := voteList[len(voteList)-1]
 	require.Equal(t, uint64(5), lastVote.View)
@@ -405,15 +433,17 @@ func TestPartialPruneAfterBlock(t *testing.T) {
 		blockList = append(blockList, bp.Block)
 	}
 	// before pruning
-	require.Equal(t, 4, len(va.viewToBlockIDSet))
-	require.Equal(t, 4, len(va.viewToVoteID))
-	require.Equal(t, 4, len(va.blockIDToVotingStatus))
+	_, viewToBlockLen, viewToVoteLen, _, votingStatusLen := getStateLength(va)
+	require.Equal(t, 4, viewToBlockLen)
+	require.Equal(t, 4, viewToVoteLen)
+	require.Equal(t, 4, votingStatusLen)
 	// after pruning
 	va.PruneByView(pruneView)
-	require.Equal(t, pruneView, va.highestPrunedView)
-	require.Equal(t, 1, len(va.viewToBlockIDSet))
-	require.Equal(t, 1, len(va.viewToVoteID))
-	require.Equal(t, 1, len(va.blockIDToVotingStatus))
+	prunedView, viewToBlockLen, viewToVoteLen, _, votingStatusLen := getStateLength(va)
+	require.Equal(t, pruneView, prunedView)
+	require.Equal(t, 1, viewToBlockLen)
+	require.Equal(t, 1, viewToVoteLen)
+	require.Equal(t, 1, votingStatusLen)
 	// the remaining vote should be the vote that has view at 5
 	lastVote := voteList[len(voteList)-1]
 	require.Equal(t, uint64(5), lastVote.View)
@@ -437,10 +467,11 @@ func TestFullPruneBeforeBlock(t *testing.T) {
 		va.StorePendingVote(vote)
 	}
 	va.PruneByView(pruneView)
-	require.Equal(t, pruneView, va.highestPrunedView)
-	require.Equal(t, 0, len(va.viewToVoteID))
-	require.Equal(t, 0, len(va.viewToBlockIDSet))
-	require.Equal(t, 0, len(va.pendingVotes.votes))
+	prunedView, viewToBlockLen, viewToVoteLen, pendingVoteLen, _ := getStateLength(va)
+	require.Equal(t, pruneView, prunedView)
+	require.Equal(t, 0, viewToBlockLen)
+	require.Equal(t, 0, viewToVoteLen)
+	require.Equal(t, 0, pendingVoteLen)
 }
 
 // PRUNE
@@ -457,14 +488,17 @@ func TestFullPruneAfterBlock(t *testing.T) {
 		vote := newMockVote(view, bp.Block.BlockID, ids[i].NodeID)
 		_, _, _ = va.StoreVoteAndBuildQC(vote, bp.Block)
 	}
-	require.Equal(t, 4, len(va.viewToBlockIDSet))
-	require.Equal(t, 4, len(va.viewToVoteID))
-	require.Equal(t, 4, len(va.blockIDToVotingStatus))
+	_, viewToBlockLen, viewToVoteLen, _, votingStatusLen := getStateLength(va)
+	require.Equal(t, 4, viewToBlockLen)
+	require.Equal(t, 4, viewToVoteLen)
+	require.Equal(t, 4, votingStatusLen)
+	// after pruning
 	va.PruneByView(pruneView)
-	require.Equal(t, pruneView, va.highestPrunedView)
-	require.Equal(t, 0, len(va.viewToVoteID))
-	require.Equal(t, 0, len(va.viewToBlockIDSet))
-	require.Equal(t, 0, len(va.blockIDToVotingStatus))
+	prunedView, viewToBlockLen, viewToVoteLen, _, votingStatusLen := getStateLength(va)
+	require.Equal(t, pruneView, prunedView)
+	require.Equal(t, 0, viewToBlockLen)
+	require.Equal(t, 0, viewToVoteLen)
+	require.Equal(t, 0, votingStatusLen)
 }
 
 // PRUNE
@@ -478,20 +512,24 @@ func TestNonePruneBeforeBlock(t *testing.T) {
 		vote := newMockVote(view, unittest.IdentifierFixture(), ids[i].NodeID)
 		va.StorePendingVote(vote)
 	}
-	require.Equal(t, 3, len(va.viewToBlockIDSet))
-	require.Equal(t, 3, len(va.viewToVoteID))
-	require.Equal(t, 3, len(va.pendingVotes.votes))
+	_, viewToBlockLen, viewToVoteLen, pendingVoteLen, _ := getStateLength(va)
+	require.Equal(t, 3, viewToBlockLen)
+	require.Equal(t, 3, viewToVoteLen)
+	require.Equal(t, 3, pendingVoteLen)
+	// after pruning
 	va.PruneByView(pruneView)
-	require.Equal(t, pruneView, va.highestPrunedView)
-	require.Equal(t, 3, len(va.viewToVoteID))
-	require.Equal(t, 3, len(va.viewToBlockIDSet))
-	require.Equal(t, 3, len(va.pendingVotes.votes))
+	prunedView, viewToBlockLen, viewToVoteLen, pendingVoteLen, _ := getStateLength(va)
+	require.Equal(t, pruneView, prunedView)
+	require.Equal(t, 3, viewToBlockLen)
+	require.Equal(t, 3, viewToVoteLen)
+	require.Equal(t, 3, pendingVoteLen)
 	// prune twice
 	va.PruneByView(pruneView)
-	require.Equal(t, pruneView, va.highestPrunedView)
-	require.Equal(t, 3, len(va.viewToBlockIDSet))
-	require.Equal(t, 3, len(va.viewToVoteID))
-	require.Equal(t, 3, len(va.pendingVotes.votes))
+	prunedView, viewToBlockLen, viewToVoteLen, pendingVoteLen, _ = getStateLength(va)
+	require.Equal(t, pruneView, prunedView)
+	require.Equal(t, 3, viewToBlockLen)
+	require.Equal(t, 3, viewToVoteLen)
+	require.Equal(t, 3, pendingVoteLen)
 }
 
 // PRUNE
@@ -508,20 +546,24 @@ func TestNonePruneAfterBlock(t *testing.T) {
 		vote := newMockVote(view, bp.Block.BlockID, ids[i].NodeID)
 		_, _, _ = va.StoreVoteAndBuildQC(vote, bp.Block)
 	}
-	require.Equal(t, 3, len(va.viewToVoteID))
-	require.Equal(t, 3, len(va.viewToBlockIDSet))
-	require.Equal(t, 3, len(va.blockIDToVotingStatus))
+	_, viewToBlockLen, viewToVoteLen, _, votingStatusLen := getStateLength(va)
+	require.Equal(t, 3, viewToBlockLen)
+	require.Equal(t, 3, viewToVoteLen)
+	require.Equal(t, 3, votingStatusLen)
+	// after pruning
 	va.PruneByView(pruneView)
-	require.Equal(t, pruneView, va.highestPrunedView)
-	require.Equal(t, 3, len(va.viewToBlockIDSet))
-	require.Equal(t, 3, len(va.viewToVoteID))
-	require.Equal(t, 3, len(va.blockIDToVotingStatus))
+	prunedView, viewToBlockLen, viewToVoteLen, _, votingStatusLen := getStateLength(va)
+	require.Equal(t, pruneView, prunedView)
+	require.Equal(t, 3, viewToBlockLen)
+	require.Equal(t, 3, viewToVoteLen)
+	require.Equal(t, 3, votingStatusLen)
 	// prune twice
 	va.PruneByView(pruneView)
-	require.Equal(t, pruneView, va.highestPrunedView)
-	require.Equal(t, 3, len(va.viewToVoteID))
-	require.Equal(t, 3, len(va.viewToBlockIDSet))
-	require.Equal(t, 3, len(va.blockIDToVotingStatus))
+	prunedView, viewToBlockLen, viewToVoteLen, _, votingStatusLen = getStateLength(va)
+	require.Equal(t, pruneView, prunedView)
+	require.Equal(t, 3, viewToBlockLen)
+	require.Equal(t, 3, viewToVoteLen)
+	require.Equal(t, 3, votingStatusLen)
 }
 
 func newMockBlock(view uint64, proposerID flow.Identifier) *hotmodel.Proposal {
@@ -580,4 +622,8 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	viewState, _ := NewViewState(mockProtocolState, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
 	voteValidator := &Validator{viewState: viewState, sigVerifier: mockSigVerifier}
 	return NewVoteAggregator(&mockdist.Consumer{}, 0, viewState, voteValidator, mockSigAggregator), ids
+}
+
+func getStateLength(va *VoteAggregator) (uint64, int, int, int, int) {
+	return va.highestPrunedView, len(va.viewToBlockIDSet), len(va.viewToVoteID), len(va.pendingVotes.votes), len(va.blockIDToVotingStatus)
 }
