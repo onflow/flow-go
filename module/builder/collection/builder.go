@@ -48,7 +48,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// for each un-finalized ancestor of our new block, retrieve the list
 		// of pending transactions; we use this to exclude transactions that
 		// already exist in this fork.
-		// TODO we do not check that we aren't duplicating payload items from FINALIZED blocks yet
+		// TODO we need to check that we aren't duplicating payload items from FINALIZED blocks
 		ancestorID := parentID
 		txLookup := make(map[flow.Identifier]struct{})
 		for {
