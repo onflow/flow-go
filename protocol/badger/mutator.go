@@ -65,6 +65,16 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
+		// insert result
+		err = operation.InsertResult(&flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: flow.ZeroID,
+			BlockID:          genesis.ID(),
+			FinalStateCommit: seal.FinalState,
+		}})(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis result: %w", err)
+		}
+
 		// insert the block number mapping
 		err = operation.InsertNumber(0, genesis.ID())(tx)
 		if err != nil {
