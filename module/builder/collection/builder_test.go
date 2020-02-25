@@ -68,6 +68,7 @@ func TestBuilder(t *testing.T) {
 			require.Nil(t, err)
 		}
 
+		// building on a non-existent parent should throw an error
 		t.Run("non-existent parent", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
@@ -80,6 +81,7 @@ func TestBuilder(t *testing.T) {
 			assert.Error(t, err)
 		})
 
+		// should build a block containing all items from mempool
 		t.Run("build", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
@@ -118,6 +120,8 @@ func TestBuilder(t *testing.T) {
 			}
 		})
 
+		// with two conflicting forks (tx1 in fork 1, tx2 in fork 2) and tx3 in mempool,
+		// if we build on fork 1 our block should contain tx2 and tx3 only.
 		t.Run("with forks", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
