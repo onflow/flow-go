@@ -190,15 +190,24 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			// the following fields should be set by the custom function as needed
 			// NOTE: we could abstract all of this away into an interface{} field,
 			// but that would be over the top as we will probably always use hotstuff
-			View:          0,
-			ParentSigners: nil,
-			ParentSigs:    nil,
-			ProposerID:    flow.ZeroID,
-			ProposerSig:   nil,
+			View:                    0,
+			ParentSigners:           nil,
+			ParentStakingSigs:       nil,
+			ParentRandomBeaconSig:   nil,
+			ProposerID:              flow.ZeroID,
+			ProposerStakingSig:      nil,
+			ProposerRandomBeaconSig: nil,
 		}
 
 		// apply the custom fields setter of the consensus algorithm
 		setter(header)
+
+		// index the state commitment for this block
+		// TODO this is also done by Mutator.Extend, perhaps refactor that into a procedure
+		err = operation.IndexCommit(header.ID(), commit)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index commit: %w", err)
+		}
 
 		// insert the block header
 		err = operation.InsertHeader(header)(tx)

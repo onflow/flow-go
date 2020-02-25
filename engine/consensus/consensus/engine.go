@@ -37,9 +37,6 @@ type Engine struct {
 	cache    map[flow.Identifier][]cacheItem
 
 	coldstuff module.ColdStuff
-	// TODO this is pretty awkward, should change the interface
-	stopColdStuff func()
-	coldStuffDone <-chan struct{}
 }
 
 type cacheItem struct {
@@ -91,7 +88,7 @@ func New(
 // started. For the consensus, we consider it ready right away.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
-		e.stopColdStuff, e.coldStuffDone = e.coldstuff.Start()
+		<-e.coldstuff.Ready()
 	})
 }
 
@@ -99,8 +96,7 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		e.stopColdStuff()
-		<-e.coldStuffDone
+		<-e.coldstuff.Done()
 	})
 }
 
@@ -135,13 +131,14 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // SendVote will send a vote to the desired node.
-func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, recipientID flow.Identifier) error {
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature, recipientID flow.Identifier) error {
 
 	// build the vote message
-	vote := messages.BlockVote{
-		BlockID:   blockID,
-		View:      view,
-		Signature: sig,
+	vote := &messages.BlockVote{
+		BlockID:               blockID,
+		View:                  view,
+		StakingSignature:      stakingSig,
+		RandomBeaconSignature: randomBeaconSig,
 	}
 
 	// send the vote the desired recipient
@@ -162,6 +159,16 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
 	}
 
+	// get the parent of the block
+	parent, err := e.headers.ByBlockID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
+	// fill in the fields that can't be populated by HotStuff
+	header.ChainID = parent.ChainID
+	header.Height = parent.Height + 1
+
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
 	if err != nil {
@@ -180,13 +187,13 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
-	msg := messages.BlockProposal{
+	msg := &messages.BlockProposal{
 		Header:  header,
 		Payload: payload,
 	}
 
 	// broadcast the proposal to consensus nodes
-	err = e.con.Submit(&msg, recipients.NodeIDs()...)
+	err = e.con.Submit(msg, recipients.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
@@ -224,6 +231,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onBlockRequest(originID, ev)
 	case *messages.BlockResponse:
 		return e.onBlockResponse(originID, ev)
+	case *model.Commit:
+		return e.onBlockCommit(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -288,7 +297,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
 	// forward the vote to coldstuff for processing
-	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature)
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.StakingSignature, vote.RandomBeaconSignature)
 
 	return nil
 }
@@ -344,6 +353,16 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, response *messages.Bl
 		return fmt.Errorf("could not process block response: %w", err)
 	}
 
+	return nil
+}
+
+// onBlockCommit handles incoming block commits by passing them to the core
+// consensus algorithm.
+//
+// NOTE: This is only necessary for ColdStuff and can be removed when we switch
+// to HotStuff.
+func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
+	e.coldstuff.SubmitCommit(commit)
 	return nil
 }
 

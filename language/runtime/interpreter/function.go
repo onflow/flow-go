@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/raviqqe/hamt"
@@ -47,12 +48,12 @@ func (f InterpretedFunctionValue) Copy() Value {
 	return f
 }
 
-func (InterpretedFunctionValue) GetOwner() string {
+func (InterpretedFunctionValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (InterpretedFunctionValue) SetOwner(owner string) {
+func (InterpretedFunctionValue) SetOwner(owner *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -85,12 +86,12 @@ func (f HostFunctionValue) Copy() Value {
 	return f
 }
 
-func (HostFunctionValue) GetOwner() string {
+func (HostFunctionValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (HostFunctionValue) SetOwner(owner string) {
+func (HostFunctionValue) SetOwner(owner *common.Address) {
 	// NO-OP: value cannot be owned
 }
 
@@ -121,12 +122,12 @@ func (f BoundFunctionValue) Copy() Value {
 	return f
 }
 
-func (BoundFunctionValue) GetOwner() string {
+func (BoundFunctionValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (BoundFunctionValue) SetOwner(owner string) {
+func (BoundFunctionValue) SetOwner(owner *common.Address) {
 	// NO-OP: value cannot be owned
 }
 

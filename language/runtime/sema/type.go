@@ -2062,6 +2062,7 @@ func init() {
 		&StringType{},
 		&AddressType{},
 		&AccountType{},
+		&PublicAccountType{},
 	}
 
 	types := append(
