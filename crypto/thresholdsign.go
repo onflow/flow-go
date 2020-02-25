@@ -168,3 +168,23 @@ func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 
 	return thresholdSignature, nil
 }
+
+// ReconstructThresholdSignature is a stateless function that takes a list of
+// signatures and their signers's indices and returns the threshold signature
+// size is the size of the threshold signature group
+// The function does not check the validity of the shares, and does not check
+// the validity of the resulting signature.
+// The function assumes the threshold value is equal to floor((n-1)/2)
+// ReconstructThresholdSignature returns:
+// - Signature: the threshold signature if the threshold was reached, nil otherwise
+func ReconstructThresholdSignature(size int, shares []Signature, signers []int) (Signature, error) {
+	panic("TODO")
+}
+
+// EnoughShares is a stateless function that takes the size of the threshold
+// signature group and a shares number and returns true if the shares number
+// is enough to reconstruct a threshold signature
+// The function assumes the threshold value is equal to floor((n-1)/2)
+func EnoughShares(size int, sharesNumber int) bool {
+	panic("TODO")
+}

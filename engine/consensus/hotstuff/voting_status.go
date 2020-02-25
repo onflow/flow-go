@@ -10,27 +10,28 @@ import (
 // VotingStatus keeps track of incorporated votes for the same block
 type VotingStatus struct {
 	sigAggregator    SigAggregator
-	blockID          flow.Identifier
-	signerCount      uint32
+	block            *hotstuff.Block
 	view             uint64
-	thresholdStake   uint64
+	stakeThreshold   uint64
 	accumulatedStake uint64
 	// assume votes are all valid to build QC
 	votes map[flow.Identifier]*hotstuff.Vote
 }
 
-func NewVotingStatus(sigAggregator SigAggregator, thresholdStake uint64, view uint64, signerCount uint32, voter *flow.Identity, blockID flow.Identifier) *VotingStatus {
+// NewVotingStatus creates a new Voting Status instance
+func NewVotingStatus(sigAggregator SigAggregator, stakeThreshold uint64, view uint64, signerCount uint32, voter *flow.Identity, block *hotstuff.Block) *VotingStatus {
 	return &VotingStatus{
-		sigAggregator:  sigAggregator,
-		thresholdStake: thresholdStake,
-		view:           view,
-		signerCount:    signerCount,
-		blockID:        blockID,
-		votes:          make(map[flow.Identifier]*hotstuff.Vote),
+		sigAggregator:    sigAggregator,
+		block:            block,
+		view:             view,
+		stakeThreshold:   stakeThreshold,
+		accumulatedStake: 0,
+		votes:            make(map[flow.Identifier]*hotstuff.Vote),
 	}
 }
 
-// assume votes are valid
+// AddVote add votes to the list, and accumulates the stake
+// assume votes are valid.
 // duplicate votes will not be accumulated again
 func (vs *VotingStatus) AddVote(vote *hotstuff.Vote, voter *flow.Identity) {
 	_, exists := vs.votes[vote.ID()]
@@ -38,11 +39,21 @@ func (vs *VotingStatus) AddVote(vote *hotstuff.Vote, voter *flow.Identity) {
 		return
 	}
 	vs.votes[vote.ID()] = vote
+	// - We assume different votes with different vote ID must belong to different signers.
+	//   This requires the signature-scheme to be deterministic.
+	// - Deterministic means that signing on the same data twice with the same private key
+	//   will generate the same signature.
+	// - The assumption currently holds because we are using BLS signatures, and
+	//   BLS signature is deterministic.
+	// - If the signature-scheme is non-deterministic, for instance: ECDSA, then we need to
+	//   check votes are from unique signers here, only accumulate stakes if the vote is
+	//   from a new signer that never seen
 	vs.accumulatedStake += voter.Stake
 }
 
+// CanBuildQC check whether it has collected enough signatures from the votes to build a QC
 func (vs *VotingStatus) CanBuildQC() bool {
-	return vs.accumulatedStake >= vs.thresholdStake
+	return vs.hasEnoughStake() && vs.hasEnoughSigShares()
 }
 
 // TryBuildQC returns a QC if the existing votes are enought to build a QC, otherwise
@@ -62,16 +73,24 @@ func (vs *VotingStatus) TryBuildQC() (*hotstuff.QuorumCertificate, bool, error) 
 	// build the QC
 	qc := &hotstuff.QuorumCertificate{
 		View:                vs.view,
-		BlockID:             vs.blockID,
+		BlockID:             vs.block.BlockID,
 		AggregatedSignature: aggregatedSig,
 	}
 
 	return qc, true, nil
 }
 
+func (vs *VotingStatus) hasEnoughStake() bool {
+	return vs.accumulatedStake >= vs.stakeThreshold
+}
+
+func (vs *VotingStatus) hasEnoughSigShares() bool {
+	return vs.sigAggregator.CanReconstruct(len(vs.votes))
+}
+
 func (vs *VotingStatus) aggregateSig() (*hotstuff.AggregatedSignature, error) {
 	sigs := getSigsSliceFromVotes(vs.votes)
-	return vs.sigAggregator.Aggregate(sigs)
+	return vs.sigAggregator.Aggregate(vs.block, sigs)
 }
 
 func getSigsSliceFromVotes(votes map[flow.Identifier]*hotstuff.Vote) []*hotstuff.SingleSignature {

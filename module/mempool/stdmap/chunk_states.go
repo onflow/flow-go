@@ -45,11 +45,7 @@ func (a *ChunkStates) All() []*flow.ChunkState {
 	entities := a.Backend.All()
 	chunkStates := make([]*flow.ChunkState, 0, len(entities))
 	for _, entity := range entities {
-		chunkState, ok := entity.(*flow.ChunkState)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in chunk state pool (%T)", entity))
-		}
-		chunkStates = append(chunkStates, chunkState)
+		chunkStates = append(chunkStates, entity.(*flow.ChunkState))
 	}
 	return chunkStates
 }
