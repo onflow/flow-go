@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
+// VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 type VoteAggregator struct {
 	logger                zerolog.Logger
 	notifier              notifications.Consumer
@@ -53,9 +54,9 @@ func (va *VoteAggregator) StorePendingVote(vote *hotstuff.Vote) bool {
 	if va.isStale(vote) {
 		return false
 	}
-	// add vote, return false if the vote exists
-	exists := va.pendingVotes.AddVote(vote)
-	if exists {
+	// add vote, return false if the vote is not successfully added (already existed)
+	ok := va.pendingVotes.AddVote(vote)
+	if !ok {
 		return false
 	}
 	va.updateState(vote)
@@ -155,25 +156,6 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *hotstuff.Block) (*hotstu
 	return qc, built, nil
 }
 
-func (va *VoteAggregator) convertPendingVotes(pendingVotes []*hotstuff.Vote, block *hotstuff.Block) error {
-	for _, vote := range pendingVotes {
-		valid, err := va.validateAndStoreIncorporatedVote(vote, block)
-		if err != nil {
-			return fmt.Errorf("processing pending votes failed: %w", err)
-		}
-		if !valid {
-			continue
-		}
-		// if threshold is reached, the rest of the votes can be ignored
-		if va.canBuildQC(block.BlockID) {
-			break
-		}
-	}
-	delete(va.pendingVotes.votes, block.BlockID)
-
-	return nil
-}
-
 // PruneByView will delete all votes equal or below to the given view, as well as related indexes.
 func (va *VoteAggregator) PruneByView(view uint64) {
 	if view <= va.highestPrunedView {
@@ -193,6 +175,25 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 	va.highestPrunedView = view
 }
 
+func (va *VoteAggregator) convertPendingVotes(pendingVotes []*hotstuff.Vote, block *hotstuff.Block) error {
+	for _, vote := range pendingVotes {
+		valid, err := va.validateAndStoreIncorporatedVote(vote, block)
+		if err != nil {
+			return fmt.Errorf("processing pending votes failed: %w", err)
+		}
+		if !valid {
+			continue
+		}
+		// if threshold is reached, the rest of the votes can be ignored
+		if va.canBuildQC(block.BlockID) {
+			break
+		}
+	}
+	delete(va.pendingVotes.votes, block.BlockID)
+
+	return nil
+}
+
 // storeIncorporatedVote stores incorporated votes and accumulate stakes
 // it drops invalid votes and duplicate votes
 func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, block *hotstuff.Block) (bool, error) {
@@ -200,7 +201,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, 
 	// does not report invalid vote as an error, notify consumers instead
 	if err != nil {
 		switch err := err.(type) {
-		case hotstuff.InvalidVoteError:
+		case *hotstuff.ErrorInvalidVote:
 			va.notifier.OnInvalidVoteDetected(vote)
 			va.logger.Warn().Msg(err.Error())
 			return false, nil
@@ -217,15 +218,17 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, 
 	// update existing voting status or create a new one
 	votingStatus, exists := va.blockIDToVotingStatus[vote.BlockID]
 	if !exists {
-		threshold, err := va.viewState.GetQCStakeThresholdAtBlock(vote.BlockID)
-		if err != nil {
-			return false, fmt.Errorf("could not get stake threshold: %w", err)
-		}
+		// get all identities
 		identities, err := va.viewState.GetStakedIdentitiesAtBlock(vote.BlockID)
 		if err != nil {
 			return false, fmt.Errorf("could not get identities: %w", err)
 		}
-		votingStatus = NewVotingStatus(va.sigAggregator, threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
+
+		// calculate stake threshold
+		stakeThreshold := ComputeStakeThresholdForBuildingQC(identities.TotalStake())
+
+		// create VotingStatus for collecting valid votes and building QC
+		votingStatus = NewVotingStatus(va.sigAggregator, stakeThreshold, vote.View, uint32(len(identities)), voter, block)
 		va.blockIDToVotingStatus[vote.BlockID] = votingStatus
 	}
 	votingStatus.AddVote(vote, voter)
@@ -269,7 +272,8 @@ func (va *VoteAggregator) tryBuildQC(blockID flow.Identifier) (*hotstuff.QuorumC
 	if !built { // votes are insufficient
 		return nil, false, nil
 	}
-	va.createdQC[votingStatus.blockID] = qc
+
+	va.createdQC[blockID] = qc
 	return qc, true, nil
 }
 

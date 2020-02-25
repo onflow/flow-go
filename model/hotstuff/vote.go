@@ -16,10 +16,11 @@ func (uv *Vote) ID() flow.Identifier {
 }
 
 // VoteFromFlow turns the vote parameters into a vote struct.
-func VoteFromFlow(signerID flow.Identifier, blockID flow.Identifier, view uint64, raw crypto.Signature) *Vote {
+func VoteFromFlow(signerID flow.Identifier, blockID flow.Identifier, view uint64, stakingSignature crypto.Signature, randomBeaconSignature crypto.Signature) *Vote {
 	sig := SingleSignature{
-		Raw:      raw,
-		SignerID: signerID,
+		StakingSignature:      stakingSignature,
+		RandomBeaconSignature: randomBeaconSignature,
+		SignerID:              signerID,
 	}
 	vote := Vote{
 		BlockID:   blockID,
