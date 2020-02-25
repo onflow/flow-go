@@ -86,7 +86,7 @@ func (suite *TestSuite) TestVerify() {
 	suite.me.On("NodeID").Return(myID).Once()
 	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil).Once()
 	suite.conduit.
-		On("Submit", testifymock.Anything, consensusNodes.Get(0).NodeID).
+		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
 			// check that the approval matches the input execution result
@@ -114,8 +114,8 @@ func TestHappyPath(t *testing.T) {
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	conIdentityList := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	conIdentity := conIdentityList.Get(0)
+	conIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
+	conIdentity := conIdentities[0]
 
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
 

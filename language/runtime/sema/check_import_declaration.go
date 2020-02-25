@@ -196,24 +196,25 @@ func (checker *Checker) handleMissingImports(missing map[ast.Identifier]bool, im
 		// NOTE: declare constant variable with invalid type to silence rest of program
 		const access = ast.AccessPrivate
 
-		_, err := checker.valueActivations.Declare(
-			identifier.Identifier,
-			&InvalidType{},
-			access,
-			common.DeclarationKindValue,
-			identifier.Pos,
-			true,
-			nil,
-		)
+		_, err := checker.valueActivations.Declare(variableDeclaration{
+			identifier:               identifier.Identifier,
+			ty:                       &InvalidType{},
+			access:                   access,
+			kind:                     common.DeclarationKindValue,
+			pos:                      identifier.Pos,
+			isConstant:               true,
+			allowOuterScopeShadowing: false,
+		})
 		checker.report(err)
 
 		// NOTE: declare type with invalid type to silence rest of program
-		_, err = checker.typeActivations.DeclareType(
-			identifier,
-			&InvalidType{},
-			common.DeclarationKindType,
-			access,
-		)
+		_, err = checker.typeActivations.DeclareType(typeDeclaration{
+			identifier:               identifier,
+			ty:                       &InvalidType{},
+			declarationKind:          common.DeclarationKindType,
+			access:                   access,
+			allowOuterScopeShadowing: false,
+		})
 		checker.report(err)
 	}
 }
@@ -276,17 +277,18 @@ func (checker *Checker) importVariables(
 			}
 		}
 
-		_, err := valueActivations.Declare(
-			name,
-			variable.Type,
+		_, err := valueActivations.Declare(variableDeclaration{
+			identifier: name,
+			ty:         variable.Type,
 			// TODO: implies that type is "re-exported"
-			access,
-			variable.DeclarationKind,
+			access: access,
+			kind:   variable.DeclarationKind,
 			// TODO:
-			ast.Position{},
-			true,
-			variable.ArgumentLabels,
-		)
+			pos:                      ast.Position{},
+			isConstant:               true,
+			argumentLabels:           variable.ArgumentLabels,
+			allowOuterScopeShadowing: false,
+		})
 		checker.report(err)
 	}
 

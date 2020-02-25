@@ -218,7 +218,7 @@ func TestCheckImportTypes(t *testing.T) {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceCreationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())

@@ -3,12 +3,14 @@
 package main
 
 import (
+	"github.com/spf13/pflag"
+
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/engine/consensus/consensus"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
-	"github.com/dapperlabs/flow-go/engine/simulation/subzero"
 	"github.com/dapperlabs/flow-go/module"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
@@ -21,6 +23,7 @@ func main() {
 
 	var (
 		err        error
+		chainID    string
 		guarantees mempool.Guarantees
 		receipts   mempool.Receipts
 		approvals  mempool.Approvals
@@ -30,6 +33,9 @@ func main() {
 	)
 
 	cmd.FlowNode("consensus").
+		ExtraFlags(func(flags *pflag.FlagSet) {
+			flags.StringVarP(&chainID, "chain-id", "C", "flow", "the chain ID for the protocol chain")
+		}).
 		Create(func(node *cmd.FlowNodeBuilder) {
 			node.Logger.Info().Msg("initializing guarantee mempool")
 			guarantees, err = stdmap.NewGuarantees()
@@ -43,7 +49,6 @@ func main() {
 		Create(func(node *cmd.FlowNodeBuilder) {
 			node.Logger.Info().Msg("initializing approval mempool")
 			approvals, err = stdmap.NewApprovals()
-			node.MustNot(err).Msg("could not initialize approval mempool")
 		}).
 		Create(func(node *cmd.FlowNodeBuilder) {
 			node.Logger.Info().Msg("initializing seal mempool")
@@ -69,15 +74,16 @@ func main() {
 			node.MustNot(err).Msg("could not initialize propagation engine")
 			return prop
 		}).
-		Component("subzero engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing subzero consensus engine")
+		Component("coldstuff engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing coldstuff engine")
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
-			build := builder.NewBuilder(node.DB, guarantees, seals)
-			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
-			sub, err := subzero.New(node.Logger, prov, headersDB, payloadsDB, node.State, node.Me, build, final)
-			node.MustNot(err).Msg("could not initialize subzero engine")
-			return sub
+			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
+			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
+
+			cons, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, build, final)
+			node.MustNot(err).Msg("could not initialize consensus engine")
+			return cons
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)

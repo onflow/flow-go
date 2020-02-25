@@ -11,8 +11,8 @@ type BinaryOperationKind int
 
 const (
 	BinaryOperationKindUnknown BinaryOperationKind = iota
-	BinaryOperationKindIntegerArithmetic
-	BinaryOperationKindIntegerComparison
+	BinaryOperationKindArithmetic
+	BinaryOperationKindNonEqualityComparison
 	BinaryOperationKindBooleanLogic
 	BinaryOperationKindEquality
 	BinaryOperationKindNilCoalescing
@@ -27,14 +27,14 @@ func binaryOperationKind(operation ast.Operation) BinaryOperationKind {
 		ast.OperationMul,
 		ast.OperationDiv:
 
-		return BinaryOperationKindIntegerArithmetic
+		return BinaryOperationKindArithmetic
 
 	case ast.OperationLess,
 		ast.OperationLessEqual,
 		ast.OperationGreater,
 		ast.OperationGreaterEqual:
 
-		return BinaryOperationKindIntegerComparison
+		return BinaryOperationKindNonEqualityComparison
 
 	case ast.OperationOr,
 		ast.OperationAnd:

@@ -46,8 +46,8 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 		}
 
 		// if the target number is before finalized state, set it as new limit
-		if head.Number < boundary {
-			boundary = head.Number
+		if head.View < boundary {
+			boundary = head.View
 		}
 
 		// get finalized stakes within the boundary
@@ -57,7 +57,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 		}
 
 		// if there are unfinalized blocks, retrieve stakes there
-		if head.Number > boundary {
+		if head.View > boundary {
 
 			// get the final block we want to reach
 			var finalID flow.Identifier

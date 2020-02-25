@@ -45,11 +45,7 @@ func (a *Blocks) All() []*flow.Block {
 	entities := a.Backend.All()
 	blocks := make([]*flow.Block, 0, len(entities))
 	for _, entity := range entities {
-		block, ok := entity.(*flow.Block)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in block pool (%T)", entity))
-		}
-		blocks = append(blocks, block)
+		blocks = append(blocks, entity.(*flow.Block))
 	}
 	return blocks
 }

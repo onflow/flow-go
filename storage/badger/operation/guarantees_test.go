@@ -23,11 +23,11 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		}
 
 		err := db.Update(func(tx *badger.Txn) error {
-			for _, coll := range expected {
+			for i, coll := range expected {
 				if err := InsertGuarantee(coll)(tx); err != nil {
 					return err
 				}
-				if err := IndexGuarantee(blockID, coll.ID())(tx); err != nil {
+				if err := IndexGuarantee(blockID, uint64(i), coll.ID())(tx); err != nil {
 					return err
 				}
 			}
@@ -62,11 +62,11 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 
 		// insert block 1
 		err := db.Update(func(tx *badger.Txn) error {
-			for _, coll := range set1 {
+			for i, coll := range set1 {
 				if err := InsertGuarantee(coll)(tx); err != nil {
 					return err
 				}
-				if err := IndexGuarantee(blockID1, coll.ID())(tx); err != nil {
+				if err := IndexGuarantee(blockID1, uint64(i), coll.ID())(tx); err != nil {
 					return err
 				}
 			}
@@ -76,11 +76,11 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 
 		// insert block 2
 		err = db.Update(func(tx *badger.Txn) error {
-			for _, coll := range set2 {
+			for i, coll := range set2 {
 				if err := InsertGuarantee(coll)(tx); err != nil {
 					return err
 				}
-				if err := IndexGuarantee(blockID2, coll.ID())(tx); err != nil {
+				if err := IndexGuarantee(blockID2, uint64(i), coll.ID())(tx); err != nil {
 					return err
 				}
 			}
