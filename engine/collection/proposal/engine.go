@@ -134,7 +134,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, recipientID flow.Identifier) error {
 
 	// build the vote message
-	vote := &messages.BlockVote{
+	vote := &messages.ClusterBlockVote{
 		BlockID:   blockID,
 		View:      view,
 		Signature: sig,
@@ -148,7 +148,8 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signa
 	return nil
 }
 
-// BroadcastProposal
+// BroadcastProposal submits a cluster block proposal (effectively a proposal
+// for the next collection) to all the collection nodes in our cluster.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
 	// first, check that we are the proposer of the block
