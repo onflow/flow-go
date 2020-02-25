@@ -22,13 +22,12 @@ func TestAllowDuplicates(t *testing.T) {
 		require.NoError(t, err)
 
 		e2 := Entity{ID: 1338}
-		// val2 := []byte(`{"ID":1338}`)
 
 		// persist again
 		err = db.Update(AllowDuplicates(insert(key, e2)))
 		require.NoError(t, err)
 
-		// ensure new value was set
+		// ensure old value is still used
 		var act []byte
 		_ = db.View(func(tx *badger.Txn) error {
 			item, err := tx.Get(key)
@@ -39,6 +38,5 @@ func TestAllowDuplicates(t *testing.T) {
 		})
 
 		assert.Equal(t, val, act)
-		// assert.Equal(t, val2, act) // TODO: this should pass?
 	})
 }
