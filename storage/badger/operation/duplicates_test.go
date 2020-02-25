@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAllowDuplicates(t *testing.T) {
+func TestSkipDuplicates(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
@@ -24,7 +24,7 @@ func TestAllowDuplicates(t *testing.T) {
 		e2 := Entity{ID: 1338}
 
 		// persist again
-		err = db.Update(AllowDuplicates(insert(key, e2)))
+		err = db.Update(SkipDuplicates(insert(key, e2)))
 		require.NoError(t, err)
 
 		// ensure old value is still used

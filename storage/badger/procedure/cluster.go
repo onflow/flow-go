@@ -132,7 +132,7 @@ func IndexClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 		// index the single collection
 		// we allow duplicate indexing because we anticipate blocks will often
 		// contain empty collections (which will be indexed by the same key)
-		err = operation.AllowDuplicates(operation.IndexCollection(payload.Hash(), 0, &payload.Collection))(tx)
+		err = operation.SkipDuplicates(operation.IndexCollection(payload.Hash(), 0, &payload.Collection))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}
