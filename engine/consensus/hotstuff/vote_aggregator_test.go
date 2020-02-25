@@ -524,6 +524,73 @@ func TestNonePruneAfterBlock(t *testing.T) {
 	require.Equal(t, 3, len(va.blockIDToVotingStatus))
 }
 
+// RANDOM BEACON
+// if there are 7 nodes, it requires 4 votes for random beacon,
+// and receives the block from proposer who has 80% stake,
+// then no qc should be built
+func TestOnlyProposerVote(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	// first node has 80% of stake
+	ids[0].Stake = 5600
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[0].NodeID)
+	va.StoreProposerVote(bp.ProposerVote())
+	qc, built, err := va.BuildQCOnReceivedBlock(bp.Block)
+	require.Nil(t, qc)
+	require.False(t, built)
+	require.NoError(t, err)
+}
+
+// RANDOM BEACON
+// if there are 7 nodes, it requires 4 votes for random beacon,
+// and receives the block from proposer who has 40% stake,
+// and a vote whose sender has 40% stake,
+// then no qc should be built
+func TestInSufficientRBSig(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	// first two node has 80% of stake in total
+	ids[0].Stake = 2800
+	ids[1].Stake = 2800
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[0].NodeID)
+	va.StoreProposerVote(bp.ProposerVote())
+	_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+	vote1 := newMockVote(testView, bp.Block.BlockID, ids[1].NodeID)
+	qc, built, err := va.StoreVoteAndBuildQC(vote1, bp.Block)
+	require.Nil(t, qc)
+	require.False(t, built)
+	require.NoError(t, err)
+}
+
+// RANDOM BEACON
+// if there are 7 nodes, it requires 4 votes for random beacon,
+// and receives the block from proposer who has 40% stake,
+// and a vote whose sender has 40% stake,
+// and another two votes with random stake,
+// then a qc should be built
+func TestSufficientRBSig(t *testing.T) {
+	va, ids := newMockVoteAggregator(t)
+	// first two node has 80% of stake in total
+	ids[0].Stake = 2800
+	ids[1].Stake = 2800
+	testView := uint64(5)
+	bp := newMockBlock(testView, ids[0].NodeID)
+	va.StoreProposerVote(bp.ProposerVote())
+	_, _, _ = va.BuildQCOnReceivedBlock(bp.Block)
+	vote1 := newMockVote(testView, bp.Block.BlockID, ids[1].NodeID)
+	_, _, _ = va.StoreVoteAndBuildQC(vote1, bp.Block)
+	vote2 := newMockVote(testView, bp.Block.BlockID, ids[2].NodeID)
+	qc, built, err := va.StoreVoteAndBuildQC(vote2, bp.Block)
+	require.Nil(t, qc)
+	require.False(t, built)
+	require.NoError(t, err)
+	vote3 := newMockVote(testView, bp.Block.BlockID, ids[3].NodeID)
+	qc, built, err = va.StoreVoteAndBuildQC(vote3, bp.Block)
+	require.NotNil(t, qc)
+	require.True(t, built)
+	require.NoError(t, err)
+}
+
 func newMockBlock(view uint64, proposerID flow.Identifier) *hotmodel.Proposal {
 	blockHeader := unittest.BlockHeaderFixture()
 	blockHeader.View = view
