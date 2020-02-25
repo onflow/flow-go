@@ -27,3 +27,13 @@ func IndexSeal(payloadHash flow.Identifier, index uint64, sealID flow.Identifier
 func LookupSeals(payloadHash flow.Identifier, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
 	return traverse(makePrefix(codeIndexSeal, payloadHash), lookup(sealIDs))
 }
+
+// IndexSealByBlock indexes seal by the block it seals
+func IndexSealByBlock(blockID flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexSealByBlock, blockID), sealID)
+}
+
+// LookupSealByBlock retrieves seal by block it seals
+func LookupSealByBlock(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexSealByBlock, blockID), sealID)
+}

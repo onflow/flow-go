@@ -112,7 +112,7 @@ func (s *SnapshotMock) Identity(nodeID flow.Identifier) (*flow.Identity, error) 
 	return nil, fmt.Errorf(" not implemented")
 }
 
-func (s *SnapshotMock) Commit() (flow.StateCommitment, error) {
+func (s *SnapshotMock) StateCommitment() (flow.StateCommitment, error) {
 	return nil, fmt.Errorf(" not implemented")
 }
 
@@ -122,4 +122,8 @@ func (s *SnapshotMock) Clusters() (*flow.ClusterList, error) {
 
 func (s *SnapshotMock) Head() (*flow.Header, error) {
 	return nil, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Seal() (flow.Seal, error) {
+	return flow.Seal{}, fmt.Errorf(" not implemented")
 }
