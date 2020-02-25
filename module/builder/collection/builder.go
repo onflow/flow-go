@@ -133,11 +133,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			Timestamp:   time.Now().UTC(),
 
 			// the following fields should be set by the provided setter function
-			View:          0,
-			ParentSigners: nil,
-			ParentSigs:    nil,
-			ProposerID:    flow.ZeroID,
-			ProposerSig:   nil,
+			View:                    0,
+			ParentSigners:           nil,
+			ParentStakingSigs:       nil,
+			ParentRandomBeaconSig:   nil,
+			ProposerID:              flow.ZeroID,
+			ProposerStakingSig:      nil,
+			ProposerRandomBeaconSig: nil,
 		}
 
 		// set fields specific to the consensus algorithm
