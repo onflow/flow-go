@@ -19,6 +19,7 @@ type Validator struct {
 func NewValidator(viewState *ViewState, forks ForksReader, sigVerifier SigVerifier) *Validator {
 	return &Validator{
 		viewState:   viewState,
+		forks: forks,
 		sigVerifier: sigVerifier,
 	}
 }

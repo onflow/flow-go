@@ -55,6 +55,7 @@ func (f *Forks) AddBlock(block *hotstuff.Block) error {
 
 	// We only process the block's QC if the block's view is larger than the last finalized block.
 	// By ignoring hte qc's of block's at or below the finalized view, we allow the genesis block
+	// By ignoring hte qc's of block's at or below the finalized view, we allow the genesis block
 	// to have a nil QC.
 	if block.View <= f.finalizer.FinalizedBlock().View {
 		return nil

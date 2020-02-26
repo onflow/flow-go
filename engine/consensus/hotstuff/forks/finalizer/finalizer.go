@@ -6,7 +6,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer/forest"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
@@ -14,7 +13,7 @@ import (
 
 // Finalizer implements HotStuff finalization logic
 type Finalizer struct {
-	notifier notifications.Consumer
+	notifier FinalizationConsumer
 	forest   forest.LevelledForest
 
 	finalizationCallback module.Finalizer
@@ -32,7 +31,7 @@ type ancestryChain struct {
 // ErrPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
 var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestry")
 
-func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, notifier notifications.Consumer) (*Finalizer, error) {
+func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, notifier FinalizationConsumer) (*Finalizer, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
 		return nil, &hotstuff.ErrorConfiguration{Msg: "invalid root: root qc is not pointing to root block"}
 	}

@@ -4,11 +4,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
-// Consumer consumes outbound notification events produced by HotStuff and its
-// components. Outbound events are all events that are potentially relevant to
-// the larger node in which HotStuff (or Forks) is running. The notifications
-// are emitted in the order in which the HotStuff algorithm makes the
-// respective steps.
+// Consumer consumes outbound notifications produced by HotStuff and its components.
+// Notifications are consensus-internal state changes which are potentially relevant to
+// the larger node in which HotStuff is running. The notifications are emitted
+// in the order in which the HotStuff algorithm makes the respective steps.
 //
 // Implementations must:
 //   * be concurrency safe
@@ -66,8 +65,8 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnBlockIncorporated(*hotstuff.Block)
 
-	// OnFinalizedBlock notifications are produced by the Finalization Logic whenever a block has been finalized.
-	// They are emitted in the order the blocks are finalized.
+	// OnFinalizedBlock notifications are produced by the Finalization Logic whenever
+	// a block has been finalized. They are emitted in the order the blocks are finalized.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
