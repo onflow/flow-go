@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -49,28 +50,33 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 	return v.IsSelf(v.LeaderForView(view).ID())
 }
 
-// GetStakedIdentitiesAtBlock returns all the staked nodes for my role at a certain block.
+// ConsensusIdentities returns all the staked nodes for my role at a certain block.
 // blockID - specifies the block to be queried.
-// nodeIDs - optional arguments to only return identities that matches the given nodeIDs.
-// Note: the order of the identity in the returned identity list is NOT the same as the
-// order of node ID in the input of nodeIDs
-func (v *ViewState) GetStakedIdentitiesAtBlock(blockID flow.Identifier, nodeIDs ...flow.Identifier) (flow.IdentityList, error) {
-	var filters []flow.IdentityFilter
-	filters = append(filters, v.consensusMembersFilter, filter.HasStake)
+// nodeIDs - only return identities that matches the given nodeIDs.
+func (v *ViewState) ConsensusIdentities(blockID flow.Identifier, nodeIDs ...flow.Identifier) (flow.IdentityList, error) {
+	// create filters
+	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake}
 	if len(nodeIDs) > 0 {
 		filters = append(filters, filter.HasNodeID(nodeIDs...))
 	}
-	return v.protocolState.AtBlockID(blockID).Identities(filters...)
-}
 
-// GetQCStakeThresholdAtBlock returns the stack threshold for building QC at a given block
-func (v *ViewState) GetQCStakeThresholdAtBlock(blockID flow.Identifier) (uint64, error) {
-	// get all the staked nodes
-	identities, err := v.GetStakedIdentitiesAtBlock(blockID)
+	// query all staked identities
+	identities, err := v.protocolState.AtBlockID(blockID).Identities(filters...)
 	if err != nil {
-		return 0, err
+		return nil, fmt.Errorf("cannot find consensus identities: %w", err)
 	}
-	return ComputeStakeThresholdForBuildingQC(identities.TotalStake()), nil
+
+	// build the indice map for sorting
+	indices := make(map[flow.Identifier]int)
+	for i, nodeID := range nodeIDs {
+		indices[nodeID] = i
+	}
+
+	// sort the identities to be the same order as nodeIDs
+	sort.Slice(identities, func(i int, j int) bool {
+		return indices[identities[i].NodeID] < indices[identities[j].NodeID]
+	})
+	return identities, nil
 }
 
 // LeaderForView returns the identity of the leader at given view
@@ -91,10 +97,10 @@ func ComputeStakeThresholdForBuildingQC(totalStake uint64) uint64 {
 	floorOneThird := totalStake / 3 // integer division, includes floor
 	res := 2 * floorOneThird
 	divRemainder := totalStake % 3
-	if  divRemainder <= 1 {
-		res += 1
+	if divRemainder <= 1 {
+		res = res + 1
 	} else {
 		res += divRemainder
 	}
-	return  res
+	return res
 }

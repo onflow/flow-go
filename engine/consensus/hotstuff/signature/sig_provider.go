@@ -79,6 +79,10 @@ func (s *SigProvider) VerifyRandomBeaconSig(sig crypto.Signature, block *model.B
 // aggsig - the aggregated signature to be verified
 // block - the block that the signature was signed for.
 // signerKeys - the public keys of all the signers who signed the block.
+// Note: since the aggregated sig is a slice of all sigs, it assumes each sig
+// pair up with the coresponding signer key at the same index. That means, it's
+// the caller's responsibility to ensure `aggsig` and `signerKeys` can pair up
+// at each index.
 func (s *SigProvider) VerifyAggregatedStakingSignature(aggsig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
 	// for now the aggregated staking signature for BLS signatures is implemented as a slice of all the signatures.
 	// to verify it, we basically verify every single signature
