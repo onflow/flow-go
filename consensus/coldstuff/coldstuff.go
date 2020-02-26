@@ -241,7 +241,7 @@ func (e *coldStuff) sendProposal() error {
 }
 
 // waitForVotes will wait for received votes and validate them until we have
-// reached a quorum on the currently cached block candidate. It assumse we are
+// reached a quorum on the currently cached block candidate. It assumes we are
 // the leader and will timeout after the configured timeout.
 func (e *coldStuff) waitForVotes() error {
 
@@ -252,6 +252,11 @@ func (e *coldStuff) waitForVotes() error {
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "wait_votes").
 		Logger()
+
+	if id, err := e.state.Final().Identity(e.me.NodeID()); err == nil && e.round.Quorum() == id.Stake {
+		log.Info().Msg("sufficient votes received")
+		return nil
+	}
 
 	for {
 		select {
