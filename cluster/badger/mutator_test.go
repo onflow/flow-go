@@ -95,10 +95,10 @@ func TestBootstrap(t *testing.T) {
 				assert.Equal(t, genesis.Collection, collection)
 
 				// should index collection
-				var collectionID flow.Identifier
-				err = operation.LookupCollection(genesis.PayloadHash, &collectionID)(tx)
+				var collectionIDs []flow.Identifier
+				err = operation.LookupCollections(genesis.PayloadHash, &collectionIDs)(tx)
 				assert.Nil(t, err)
-				assert.Equal(t, genesis.Collection.ID(), collectionID)
+				assert.Equal(t, []flow.Identifier{genesis.Collection.ID()}, collectionIDs)
 
 				// should insert header
 				var header flow.Header
