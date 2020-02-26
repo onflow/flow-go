@@ -152,10 +152,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-func (e *Engine) onBlockProposal(originID flow.Identifier, msg *messages.ClusterBlockProposal) error {
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
 	// retrieve the parent block
-	parent, err := e.headers.ByBlockID(msg.Header.ParentID)
+	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 		// TODO handle block buffering https://github.com/dapperlabs/flow-go/issues/2408
 	}
@@ -174,16 +174,57 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, msg *messages.Cluster
 	return nil
 }
 
-func (e *Engine) onBlockVote(originID flow.Identifier, msg *messages.ClusterBlockVote) error {
-	panic("TODO")
+func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
+
+	// forward the vote for processing
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature, nil)
+
+	return nil
 }
 
-func (e *Engine) onBlockRequest(originID flow.Identifier, msg *messages.ClusterBlockRequest) error {
-	panic("TODO")
+func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterBlockRequest) error {
+
+	// retrieve the block header
+	header, err := e.headers.ByBlockID(req.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not find requested block: %w", err)
+	}
+
+	// retrieve the block payload
+	collection, err := e.collections.LightByID(header.PayloadHash)
+	if err != nil {
+		return fmt.Errorf("could not find requested block: %w", err)
+	}
+
+	payload := &cluster.Payload{Collection: *collection}
+
+	proposal := &messages.ClusterBlockProposal{
+		Header:  header,
+		Payload: payload,
+	}
+
+	res := &messages.ClusterBlockResponse{
+		Proposal: proposal,
+		Nonce:    req.Nonce,
+	}
+
+	err = e.con.Submit(res, originID)
+	if err != nil {
+		return fmt.Errorf("could not send block response: %w", err)
+	}
+
+	return nil
 }
 
-func (e *Engine) onBlockResponse(originID flow.Identifier, msg *messages.ClusterBlockResponse) error {
-	panic("TODO")
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) error {
+
+	// process the block response as we would a regular proposal
+	err := e.onBlockProposal(originID, res.Proposal)
+	if err != nil {
+		return fmt.Errorf("could not process block response: %w", err)
+	}
+
+	return nil
 }
 
 // SendVote will send a vote to the desired node.

@@ -50,7 +50,6 @@ type ClusterBlockRequest struct {
 // ClusterBlockResponse  is the response to a collection request. It contains
 // the block proposing the collection.
 type ClusterBlockResponse struct {
-	OriginID flow.Identifier
 	Proposal *ClusterBlockProposal
 	Nonce    uint64
 }
