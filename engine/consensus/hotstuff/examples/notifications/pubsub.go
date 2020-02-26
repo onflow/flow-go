@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // PubSubDistributor is an example implementation of notifications.Consumer
@@ -21,6 +21,8 @@ type PubSubDistributor struct {
 	blockIncorporatedConsumers     []BlockIncorporatedConsumer
 	finalizedBlockConsumers        []FinalizedBlockConsumer
 	doubleProposeDetectedConsumers []DoubleProposeDetectedConsumer
+	doubleVotingDetectedConsumers  []DoubleVotingDetectedConsumer
+	invalidVoteDetectedConsumers   []InvalidVoteDetectedConsumer
 	lock                           sync.RWMutex
 }
 
@@ -44,7 +46,7 @@ func (p *PubSubDistributor) OnEnteringView(view uint64) {
 	}
 }
 
-func (p *PubSubDistributor) OnStartingTimeout(timerInfo *types.TimerInfo) {
+func (p *PubSubDistributor) OnStartingTimeout(timerInfo *hotstuff.TimerInfo) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.startingTimeoutConsumers {
@@ -52,7 +54,7 @@ func (p *PubSubDistributor) OnStartingTimeout(timerInfo *types.TimerInfo) {
 	}
 }
 
-func (p *PubSubDistributor) OnReachedTimeout(timeout *types.TimerInfo) {
+func (p *PubSubDistributor) OnReachedTimeout(timeout *hotstuff.TimerInfo) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.reachedTimeoutConsumers {
@@ -60,7 +62,7 @@ func (p *PubSubDistributor) OnReachedTimeout(timeout *types.TimerInfo) {
 	}
 }
 
-func (p *PubSubDistributor) OnQcIncorporated(qc *types.QuorumCertificate) {
+func (p *PubSubDistributor) OnQcIncorporated(qc *hotstuff.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.qcIncorporatedConsumers {
@@ -68,7 +70,7 @@ func (p *PubSubDistributor) OnQcIncorporated(qc *types.QuorumCertificate) {
 	}
 }
 
-func (p *PubSubDistributor) OnForkChoiceGenerated(curView uint64, selectedQC *types.QuorumCertificate) {
+func (p *PubSubDistributor) OnForkChoiceGenerated(curView uint64, selectedQC *hotstuff.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.forkChoiceGeneratedConsumers {
@@ -76,7 +78,7 @@ func (p *PubSubDistributor) OnForkChoiceGenerated(curView uint64, selectedQC *ty
 	}
 }
 
-func (p *PubSubDistributor) OnBlockIncorporated(block *types.BlockProposal) {
+func (p *PubSubDistributor) OnBlockIncorporated(block *hotstuff.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.blockIncorporatedConsumers {
@@ -84,7 +86,7 @@ func (p *PubSubDistributor) OnBlockIncorporated(block *types.BlockProposal) {
 	}
 }
 
-func (p *PubSubDistributor) OnFinalizedBlock(block *types.BlockProposal) {
+func (p *PubSubDistributor) OnFinalizedBlock(block *hotstuff.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.finalizedBlockConsumers {
@@ -92,11 +94,27 @@ func (p *PubSubDistributor) OnFinalizedBlock(block *types.BlockProposal) {
 	}
 }
 
-func (p *PubSubDistributor) OnDoubleProposeDetected(block1, block2 *types.BlockProposal) {
+func (p *PubSubDistributor) OnDoubleProposeDetected(block1, block2 *hotstuff.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.doubleProposeDetectedConsumers {
 		subscriber.OnDoubleProposeDetected(block1, block2)
+	}
+}
+
+func (p *PubSubDistributor) OnDoubleVotingDetected(vote1, vote2 *hotstuff.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.doubleVotingDetectedConsumers {
+		subscriber.OnDoubleVotingDetected(vote1, vote2)
+	}
+}
+
+func (p *PubSubDistributor) OnInvalidVoteDetected(vote *hotstuff.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.invalidVoteDetectedConsumers {
+		subscriber.OnInvalidVoteDetected(vote)
 	}
 }
 

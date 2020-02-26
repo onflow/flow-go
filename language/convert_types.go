@@ -59,6 +59,10 @@ func ConvertType(typ runtime.Type, prog *ast.Program, variable *sema.Variable) (
 		return wrapVariable(Word32Type{}, variable), nil
 	case *sema.Word64Type:
 		return wrapVariable(Word64Type{}, variable), nil
+	case *sema.Fix64Type:
+		return wrapVariable(Fix64Type{}, variable), nil
+	case *sema.UFix64Type:
+		return wrapVariable(UFix64Type{}, variable), nil
 	case *sema.VariableSizedType:
 		return convertVariableSizedType(t, prog, variable)
 	case *sema.ConstantSizedType:
@@ -206,15 +210,18 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 
 		// TODO: do not sort fields before export, store in order declared
 		fieldNames := make([]string, 0, len(t.Members))
-		for identifer := range t.Members {
-			fieldNames = append(fieldNames, identifer)
+		for identifier, member := range t.Members {
+			if member.Predeclared {
+				continue
+			}
+			fieldNames = append(fieldNames, identifier)
 		}
 
 		// sort field names in lexicographical order
 		sort.Strings(fieldNames)
 
-		for _, identifer := range fieldNames {
-			field := t.Members[identifer]
+		for _, identifier := range fieldNames {
+			field := t.Members[identifier]
 
 			convertedFieldType, err := ConvertType(field.TypeAnnotation.Type, prog, nil)
 			if err != nil {
@@ -222,7 +229,7 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 			}
 
 			fields = append(fields, Field{
-				Identifier: identifer,
+				Identifier: identifier,
 				Type:       convertedFieldType,
 			})
 		}

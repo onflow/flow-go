@@ -46,11 +46,7 @@ func (g *Guarantees) All() []*flow.CollectionGuarantee {
 	entities := g.Backend.All()
 	guarantees := make([]*flow.CollectionGuarantee, 0, len(entities))
 	for _, entity := range entities {
-		guarantee, ok := entity.(*flow.CollectionGuarantee)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in guarantee pool (%T)", entity))
-		}
-		guarantees = append(guarantees, guarantee)
+		guarantees = append(guarantees, entity.(*flow.CollectionGuarantee))
 	}
 	return guarantees
 }

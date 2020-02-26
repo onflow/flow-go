@@ -5,35 +5,38 @@ package consensus
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-// Builder is the builder for block payloads. Upon providing a payload hash, it
-// also memorizes which entities were included into the payload.
+// Builder is the builder for consensus block payloads. Upon providing a payload
+// hash, it also memorizes which entities were included into the payload.
 type Builder struct {
 	db         *badger.DB
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
+	chainID    string
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals) *Builder {
+func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals, chainID string) *Builder {
 	b := &Builder{
 		db:         db,
 		guarantees: guarantees,
 		seals:      seals,
+		chainID:    chainID,
 	}
 	return b
 }
 
-// BuildOn creates a new block payload on top of the provided parent.
-func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*flow.Header, error) {
+// BuildOn creates a new block header build on the provided parent, using the given view and applying the
+// custom setter function to allow the caller to make changes to the header before storing it.
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
 	var header *flow.Header
 	err := b.db.Update(func(tx *badger.Txn) error {
 
@@ -65,13 +68,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 			}
 
 			// if we have reached the finalized boundary, stop indexing
-			if ancestor.Number <= boundary {
+			if ancestor.View <= boundary {
 				break
 			}
 
 			// look up the ancestor's guarantees
 			var guaranteeIDs []flow.Identifier
-			err := operation.LookupGuarantees(ancestor.PayloadHash, &guaranteeIDs)(tx)
+			err = operation.LookupGuarantees(ancestor.PayloadHash, &guaranteeIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up ancestor guarantees (%x): %w", ancestor.PayloadHash, err)
 			}
@@ -150,29 +153,60 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 		payloadHash := payload.Hash()
 
 		// index the guarantees for the payload
-		for _, guarantee := range guarantees {
+		for i, guarantee := range guarantees {
 			err = operation.InsertGuarantee(guarantee)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert guarantee (%x): %w", guarantee.ID(), err)
 			}
-			err = operation.IndexGuarantee(payloadHash, guarantee.ID())(tx)
+			err = operation.IndexGuarantee(payloadHash, uint64(i), guarantee.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.ID(), err)
 			}
 		}
 
 		// index the seals for the payload
-		for _, seal := range seals {
-			err = operation.IndexSeal(payloadHash, seal.ID())(tx)
+		for i, seal := range seals {
+			err = operation.IndexSeal(payloadHash, uint64(i), seal.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index seal (%x): %w", seal.ID(), err)
 			}
 		}
 
-		// generate the block header using the hotstuff-provided function
-		header, err = build(payloadHash)
+		// retrieve the parent to set the height
+		var parent flow.Header
+		err = operation.RetrieveHeader(parentID, &parent)(tx)
 		if err != nil {
-			return fmt.Errorf("could not build block: %w", err)
+			return fmt.Errorf("could not retrieve parent: %w", err)
+		}
+
+		// construct default block on top of the provided parent
+		header = &flow.Header{
+			ChainID:     b.chainID,
+			ParentID:    parentID,
+			Height:      parent.Height + 1,
+			Timestamp:   time.Now().UTC(),
+			PayloadHash: payloadHash,
+
+			// the following fields should be set by the custom function as needed
+			// NOTE: we could abstract all of this away into an interface{} field,
+			// but that would be over the top as we will probably always use hotstuff
+			View:                    0,
+			ParentSigners:           nil,
+			ParentStakingSigs:       nil,
+			ParentRandomBeaconSig:   nil,
+			ProposerID:              flow.ZeroID,
+			ProposerStakingSig:      nil,
+			ProposerRandomBeaconSig: nil,
+		}
+
+		// apply the custom fields setter of the consensus algorithm
+		setter(header)
+
+		// index the state commitment for this block
+		// TODO this is also done by Mutator.Extend, perhaps refactor that into a procedure
+		err = operation.IndexCommit(header.ID(), commit)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index commit: %w", err)
 		}
 
 		// insert the block header

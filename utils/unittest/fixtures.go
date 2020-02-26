@@ -3,9 +3,11 @@ package unittest
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -36,8 +38,42 @@ func BlockFixture() flow.Block {
 func BlockHeaderFixture() flow.Header {
 	return flow.Header{
 		ParentID: IdentifierFixture(),
-		Number:   rand.Uint64(),
+		View:     rand.Uint64(),
 	}
+}
+
+func SealFixture() flow.Seal {
+	return flow.Seal{
+		BlockID:       IdentifierFixture(),
+		PreviousState: StateCommitmentFixture(),
+		FinalState:    StateCommitmentFixture(),
+		Signature:     SignatureFixture(),
+	}
+}
+
+// ClusterBlockWithParent creates a new cluster consensus block that is valid
+// with respect to the given parent block.
+func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
+	payload := cluster.Payload{
+		Collection: flow.LightCollection{
+			Transactions: []flow.Identifier{IdentifierFixture()},
+		},
+	}
+
+	header := flow.Header{
+		View:        parent.View + 1,
+		ChainID:     parent.ChainID,
+		Timestamp:   time.Now(),
+		ParentID:    parent.ID(),
+		PayloadHash: payload.Hash(),
+	}
+
+	block := cluster.Block{
+		Header:  header,
+		Payload: payload,
+	}
+
+	return block
 }
 
 func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
@@ -105,9 +141,7 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 		ResultApprovalBody: flow.ResultApprovalBody{
 			ExecutionResultID:    IdentifierFixture(),
 			AttestationSignature: SignatureFixture(),
-			ChunkIndexList:       nil,
-			Proof:                nil,
-			Spocks:               nil,
+			Spock:                nil,
 		},
 		VerifierSignature: SignatureFixture(),
 	}
@@ -181,11 +215,11 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 func ChunkFixture() *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			CollectionIndex:                 42,
-			StartState:                      StateCommitmentFixture(),
-			EventCollection:                 IdentifierFixture(),
-			TotalComputationUsed:            4200,
-			FirstTransactionComputationUsed: 42,
+			CollectionIndex:      42,
+			StartState:           StateCommitmentFixture(),
+			EventCollection:      IdentifierFixture(),
+			TotalComputationUsed: 4200,
+			NumberOfTransactions: 42,
 		},
 		Index:    0,
 		EndState: StateCommitmentFixture(),

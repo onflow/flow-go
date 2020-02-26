@@ -5143,7 +5143,7 @@ func TestInterpretStorage(t *testing.T) {
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
 	//
 
-	getter := func(_ *interpreter.Interpreter, _ string, key string) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, _ common.Address, key string) interpreter.OptionalValue {
 		value, ok := storedValues[key]
 		if !ok {
 			return interpreter.NilValue{}
@@ -5151,7 +5151,7 @@ func TestInterpretStorage(t *testing.T) {
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, _ string, key string, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, _ common.Address, key string, value interpreter.OptionalValue) {
 		storedValues[key] = value
 	}
 
@@ -5180,7 +5180,7 @@ func TestInterpretStorage(t *testing.T) {
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
-					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
 						return string(indexingType.ID())
 					},
 				),
@@ -5701,7 +5701,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 					"storage": storageValue,
 				}),
 				interpreter.WithStorageKeyHandler(
-					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
 						return string(indexingType.ID())
 					},
 				),
@@ -5721,7 +5721,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 
 	require.Equal(t,
 		&interpreter.StorageReferenceValue{
-			TargetStorageIdentifier: storageValue.Identifier,
+			TargetStorageAddress: storageValue.Address,
 			// TODO: improve
 			TargetKey: string(rType.ID()),
 		},
@@ -5733,11 +5733,13 @@ func TestInterpretReferenceUse(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
-	storageIdentifier := "test-account-storage"
+	storageAddress := common.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+	}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
-		assert.Equal(t, storageIdentifier, id)
+	getter := func(_ *interpreter.Interpreter, address common.Address, key string) interpreter.OptionalValue {
+		assert.Equal(t, storageAddress, address)
 
 		value, ok := storedValues[key]
 		if !ok {
@@ -5746,14 +5748,14 @@ func TestInterpretReferenceUse(t *testing.T) {
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
-		assert.Equal(t, storageIdentifier, id)
+	setter := func(_ *interpreter.Interpreter, address common.Address, key string, value interpreter.OptionalValue) {
+		assert.Equal(t, storageAddress, address)
 
 		storedValues[key] = value
 	}
 
 	storageValue := interpreter.StorageValue{
-		Identifier: storageIdentifier,
+		Address: storageAddress,
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
@@ -5798,7 +5800,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
-					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
 						return string(indexingType.ID())
 					},
 				),
@@ -5823,10 +5825,12 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
-	storageIdentifier := "test-account-storage"
+	storageAddress := common.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+	}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, _ common.Address, key string) interpreter.OptionalValue {
 		value, ok := storedValues[key]
 		if !ok {
 			return interpreter.NilValue{}
@@ -5834,12 +5838,12 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, _ common.Address, key string, value interpreter.OptionalValue) {
 		storedValues[key] = value
 	}
 
 	storageValue := interpreter.StorageValue{
-		Identifier: storageIdentifier,
+		Address: storageAddress,
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
@@ -5881,7 +5885,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
-					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
 						return string(indexingType.ID())
 					},
 				),
@@ -5906,11 +5910,13 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
 
-	storageIdentifier := "test-account-storage"
+	storageAddress := common.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+	}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
-		assert.Equal(t, storageIdentifier, id)
+	getter := func(_ *interpreter.Interpreter, address common.Address, key string) interpreter.OptionalValue {
+		assert.Equal(t, storageAddress, address)
 
 		value, ok := storedValues[key]
 		if !ok {
@@ -5919,14 +5925,14 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
-		assert.Equal(t, storageIdentifier, id)
+	setter := func(_ *interpreter.Interpreter, address common.Address, key string, value interpreter.OptionalValue) {
+		assert.Equal(t, storageAddress, address)
 
 		storedValues[key] = value
 	}
 
 	storageValue := interpreter.StorageValue{
-		Identifier: storageIdentifier,
+		Address: storageAddress,
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
@@ -5950,7 +5956,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
-					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
 						return string(indexingType.ID())
 					},
 				),
@@ -6090,12 +6096,16 @@ func TestInterpretAddressConversion(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.AddressValue{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1},
+		interpreter.AddressValue{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+		},
 		inter.Globals["x"].Value,
 	)
 
 	assert.Equal(t,
-		interpreter.AddressValue{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2},
+		interpreter.AddressValue{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2,
+		},
 		inter.Globals["y"].Value,
 	)
 }
@@ -6265,14 +6275,14 @@ func TestInterpretOptionalChainingFunctionCall(t *testing.T) {
 //
 func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 
-	allStoredValues := map[string]map[string]interpreter.OptionalValue{}
+	allStoredValues := map[common.Address]map[string]interpreter.OptionalValue{}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
-		storedValues := allStoredValues[id]
+	getter := func(_ *interpreter.Interpreter, address common.Address, key string) interpreter.OptionalValue {
+		storedValues := allStoredValues[address]
 		if storedValues == nil {
 			storedValues = map[string]interpreter.OptionalValue{}
-			allStoredValues[id] = storedValues
+			allStoredValues[address] = storedValues
 		}
 
 		value, ok := storedValues[key]
@@ -6282,24 +6292,28 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
-		storedValues := allStoredValues[id]
+	setter := func(_ *interpreter.Interpreter, address common.Address, key string, value interpreter.OptionalValue) {
+		storedValues := allStoredValues[address]
 		if storedValues == nil {
 			storedValues = map[string]interpreter.OptionalValue{}
-			allStoredValues[id] = storedValues
+			allStoredValues[address] = storedValues
 		}
 
 		storedValues[key] = value
 	}
 
-	storageIdentifier1 := "storage1"
+	storageAddress1 := common.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+	}
 	storageValue1 := interpreter.StorageValue{
-		Identifier: storageIdentifier1,
+		Address: storageAddress1,
 	}
 
-	storageIdentifier2 := "storage2"
+	storageAddress2 := common.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2,
+	}
 	storageValue2 := interpreter.StorageValue{
-		Identifier: storageIdentifier2,
+		Address: storageAddress2,
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
@@ -6340,7 +6354,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
-					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
 						return string(indexingType.ID())
 					},
 				),
@@ -6356,10 +6370,10 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 		TypeID: rType.ID(),
 		Kind:   common.CompositeKindResource,
 		Fields: map[string]interpreter.Value{},
-		Owner:  storageIdentifier1,
+		Owner:  &storageAddress1,
 	}
 
-	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
+	allStoredValues[storageAddress1] = map[string]interpreter.OptionalValue{
 		storageKey: interpreter.NewSomeValueOwningNonCopying(
 			originalValue,
 		),
@@ -6371,13 +6385,13 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 	// Assert the ownership of the resource changed to account 2
 
 	assert.Equal(t,
-		storageIdentifier2,
+		&storageAddress2,
 		originalValue.GetOwner(),
 	)
 
 	// Assert the resource was removed from storage of account 1
 
-	storedValue1 := allStoredValues[storageIdentifier1][storageKey]
+	storedValue1 := allStoredValues[storageAddress1][storageKey]
 
 	assert.Equal(t,
 		interpreter.NilValue{},
@@ -6386,7 +6400,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 
 	// Assert the resource was moved into storage of account 2
 
-	storedValue2 := allStoredValues[storageIdentifier2][storageKey]
+	storedValue2 := allStoredValues[storageAddress2][storageKey]
 
 	require.IsType(t,
 		&interpreter.SomeValue{},
@@ -6394,7 +6408,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		storageIdentifier2,
+		&storageAddress2,
 		storedValue2.(*interpreter.SomeValue).Value.GetOwner(),
 	)
 }
@@ -6405,14 +6419,14 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 //
 func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) {
 
-	allStoredValues := map[string]map[string]interpreter.OptionalValue{}
+	allStoredValues := map[common.Address]map[string]interpreter.OptionalValue{}
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
-	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
-		storedValues := allStoredValues[id]
+	getter := func(_ *interpreter.Interpreter, address common.Address, key string) interpreter.OptionalValue {
+		storedValues := allStoredValues[address]
 		if storedValues == nil {
 			storedValues = map[string]interpreter.OptionalValue{}
-			allStoredValues[id] = storedValues
+			allStoredValues[address] = storedValues
 		}
 
 		value, ok := storedValues[key]
@@ -6422,24 +6436,28 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
-		storedValues := allStoredValues[id]
+	setter := func(_ *interpreter.Interpreter, address common.Address, key string, value interpreter.OptionalValue) {
+		storedValues := allStoredValues[address]
 		if storedValues == nil {
 			storedValues = map[string]interpreter.OptionalValue{}
-			allStoredValues[id] = storedValues
+			allStoredValues[address] = storedValues
 		}
 
 		storedValues[key] = value
 	}
 
-	storageIdentifier1 := "storage1"
+	storageAddress1 := common.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+	}
 	storageValue1 := interpreter.StorageValue{
-		Identifier: storageIdentifier1,
+		Address: storageAddress1,
 	}
 
-	storageIdentifier2 := "storage2"
+	storageAddress2 := common.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2,
+	}
 	storageValue2 := interpreter.StorageValue{
-		Identifier: storageIdentifier2,
+		Address: storageAddress2,
 	}
 
 	inter := parseCheckAndInterpretWithOptions(t, `
@@ -6479,7 +6497,7 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
-					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
 						return string(indexingType.ID())
 					},
 				),
@@ -6495,10 +6513,10 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 		TypeID: rType.ID(),
 		Kind:   common.CompositeKindResource,
 		Fields: map[string]interpreter.Value{},
-		Owner:  storageIdentifier1,
+		Owner:  &storageAddress1,
 	}
 
-	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
+	allStoredValues[storageAddress1] = map[string]interpreter.OptionalValue{
 		storageKey: interpreter.NewSomeValueOwningNonCopying(
 			originalValue,
 		),
@@ -6510,13 +6528,13 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 	// Assert the ownership of the resource changed to account 2
 
 	assert.Equal(t,
-		storageIdentifier2,
+		&storageAddress2,
 		originalValue.GetOwner(),
 	)
 
 	// Assert the resource was removed from storage of account 1
 
-	storedValue1 := allStoredValues[storageIdentifier1][storageKey]
+	storedValue1 := allStoredValues[storageAddress1][storageKey]
 
 	assert.Equal(t,
 		interpreter.NilValue{},
@@ -6525,7 +6543,7 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 
 	// Assert the resource was moved into storage of account 2
 
-	storedValue2 := allStoredValues[storageIdentifier2][storageKey]
+	storedValue2 := allStoredValues[storageAddress2][storageKey]
 
 	require.IsType(t,
 		&interpreter.SomeValue{},
@@ -6533,7 +6551,7 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 	)
 
 	assert.Equal(t,
-		storageIdentifier2,
+		&storageAddress2,
 		storedValue2.(*interpreter.SomeValue).Value.GetOwner(),
 	)
 }
@@ -6719,7 +6737,7 @@ const fungibleTokenContract = `
 
       pub fun absorb(vault: @Vault)
 
-      pub fun sprout(): @Vault
+      pub fun sprout(balance: Int): @Vault
   }
 
   pub contract ExampleToken: FungibleToken {
@@ -6747,8 +6765,8 @@ const fungibleTokenContract = `
          destroy vault
      }
 
-     pub fun sprout(): @Vault {
-         return <-create Vault(balance: 0)
+     pub fun sprout(balance: Int): @Vault {
+         return <-create Vault(balance: balance)
      }
   }
 `
@@ -6759,10 +6777,8 @@ func TestInterpretFungibleTokenContract(t *testing.T) {
 
       pub fun test(): [Int; 2] {
 
-          // valid, because code is in the same location
-          let publisher <- create ExampleToken.Vault(balance: 100)
-
-          let receiver <- ExampleToken.sprout()
+          let publisher <- ExampleToken.sprout(balance: 100)
+          let receiver <- ExampleToken.sprout(balance: 0)
 
           let withdrawn <- publisher.withdraw(amount: 60)
           receiver.deposit(vault: <-withdrawn)
@@ -6917,7 +6933,7 @@ func TestInterpretPostConditionWithElaborationAccess(t *testing.T) {
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
 	//
 
-	getter := func(_ *interpreter.Interpreter, _ string, key string) interpreter.OptionalValue {
+	getter := func(_ *interpreter.Interpreter, _ common.Address, key string) interpreter.OptionalValue {
 		value, ok := storedValues[key]
 		if !ok {
 			return interpreter.NilValue{}
@@ -6925,7 +6941,7 @@ func TestInterpretPostConditionWithElaborationAccess(t *testing.T) {
 		return value
 	}
 
-	setter := func(_ *interpreter.Interpreter, _ string, key string, value interpreter.OptionalValue) {
+	setter := func(_ *interpreter.Interpreter, _ common.Address, key string, value interpreter.OptionalValue) {
 		storedValues[key] = value
 	}
 
@@ -6954,7 +6970,7 @@ func TestInterpretPostConditionWithElaborationAccess(t *testing.T) {
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
-					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
 						return string(indexingType.ID())
 					},
 				),
@@ -7193,11 +7209,15 @@ func TestInterpretResourceTypeRequirementInitializerAndDestructorPreConditions(t
                       self.x = x
                   }
               }
+
+              pub fun test(_ x: Int) {
+                  let r <- create C.R(x)
+                  destroy r
+              }
           }
 
-          pub fun test(_ x: Int) {
-              let r <- create C.R(x)
-              destroy r
+          fun test(_ x: Int) {
+              C.test(x)
           }
         `,
 		ParseCheckAndInterpretOptions{
@@ -7353,4 +7373,257 @@ func TestInterpretNonStorageReferenceAfterDestruction(t *testing.T) {
 	require.Error(t, err)
 
 	assert.IsType(t, &interpreter.DestroyedCompositeError{}, err)
+}
+
+func TestInterpretFix64(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          let a = 789.00123010
+          let b = 1234.056
+          let c = -12345.006789
+        `,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(78_900_123_010),
+		inter.Globals["a"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(123_405_600_000),
+		inter.Globals["b"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(-1_234_500_678_900),
+		inter.Globals["c"].Value,
+	)
+}
+
+func TestInterpretFix64Mul(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          let a = 1.1 * -1.1
+        `,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(-121000000),
+		inter.Globals["a"].Value,
+	)
+}
+
+func TestInterpretHexDecode(t *testing.T) {
+
+	expected := interpreter.NewArrayValueUnownedNonCopying(
+		interpreter.NewIntValue(71),
+		interpreter.NewIntValue(111),
+		interpreter.NewIntValue(32),
+		interpreter.NewIntValue(87),
+		interpreter.NewIntValue(105),
+		interpreter.NewIntValue(116),
+		interpreter.NewIntValue(104),
+		interpreter.NewIntValue(32),
+		interpreter.NewIntValue(116),
+		interpreter.NewIntValue(104),
+		interpreter.NewIntValue(101),
+		interpreter.NewIntValue(32),
+		interpreter.NewIntValue(70),
+		interpreter.NewIntValue(108),
+		interpreter.NewIntValue(111),
+		interpreter.NewIntValue(119),
+	)
+
+	t.Run("in Cadence", func(t *testing.T) {
+
+		standardLibraryFunctions :=
+			stdlib.StandardLibraryFunctions{
+				stdlib.PanicFunction,
+			}
+
+		valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+		predefinedValues := standardLibraryFunctions.ToValues()
+
+		inter := parseCheckAndInterpretWithOptions(t,
+			`
+              fun hexDecode(_ s: String): [Int] {
+                  if s.length % 2 != 0 {
+                      panic("Input must have even number of characters")
+                  }
+                  let table = {
+                          "0" : 0,
+                          "1" : 1,
+                          "2" : 2,
+                          "3" : 3,
+                          "4" : 4,
+                          "5" : 5,
+                          "6" : 6,
+                          "7" : 7,
+                          "8" : 8,
+                          "9" : 9,
+                          "a" : 10,
+                          "A" : 10,
+                          "b" : 11,
+                          "B" : 11,
+                          "c" : 12,
+                          "C" : 12,
+                          "d" : 13,
+                          "D" : 13,
+                          "e" : 14,
+                          "E" : 14,
+                          "f" : 15,
+                          "F" : 15
+                      }
+                  let length = s.length / 2
+                  var i = 0
+                  var res: [Int] = []
+                  while i < length {
+                      let c = s.slice(from: i*2, upTo: i*2+1)
+                      let in = table[c] ?? panic("Invalid character ".concat(c))
+                      let c2 = s.slice(from: i*2+1, upTo: i*2+2)
+                      let in2 = table[c2] ?? panic("Invalid character ".concat(c2))
+                      res.append(16 * in + in2)
+                      i = i+1
+                  }
+                  return res
+              }
+
+              fun test(): [Int] {
+                  return hexDecode("476F20576974682074686520466C6F77")
+              }
+            `,
+			ParseCheckAndInterpretOptions{
+				CheckerOptions: []sema.Option{
+					sema.WithPredeclaredValues(valueDeclarations),
+				},
+				Options: []interpreter.Option{
+					interpreter.WithPredefinedValues(predefinedValues),
+				},
+			},
+		)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("native", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t,
+			`
+              fun test(): [Int] {
+                  return "476F20576974682074686520466C6F77".decodeHex()
+              }
+            `,
+		)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		assert.Equal(t, expected, result)
+	})
+
+}
+
+func TestInterpretOptionalChainingOptionalFieldRead(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct Test {
+          let x: Int?
+
+          init(x: Int?) {
+              self.x = x
+          }
+      }
+
+      let test: Test? = Test(x: 1)
+      let x = test?.x
+    `)
+
+	assert.Equal(t,
+		&interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		},
+		inter.Globals["x"].Value,
+	)
+}
+
+func TestInterpretResourceOwnerFieldUse(t *testing.T) {
+
+	storedValues := map[string]interpreter.OptionalValue{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	//
+
+	getter := func(_ *interpreter.Interpreter, _ common.Address, key string) interpreter.OptionalValue {
+		value, ok := storedValues[key]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(_ *interpreter.Interpreter, _ common.Address, key string, value interpreter.OptionalValue) {
+		storedValues[key] = value
+	}
+
+	interpreter.AddressValue{}.Hex()
+
+	storageValue := interpreter.StorageValue{
+		Address: common.Address{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+		},
+	}
+
+	code := `
+      pub resource R {}
+
+      pub fun test(): [Address?] {
+          let addresses: [Address?] = []
+
+          let r <- create R()
+          addresses.append(r.owner?.address)
+
+          let oldR <- storage[R] <- r
+          destroy oldR
+          addresses.append(storage[R]?.owner?.address)
+
+          return addresses
+      }
+    `
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		code,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandler(
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
+						return string(indexingType.ID())
+					},
+				),
+			},
+		},
+	)
+
+	result, err := inter.Invoke("test")
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValueUnownedNonCopying(
+			interpreter.NilValue{},
+			interpreter.NewSomeValueOwningNonCopying(interpreter.AddressValue(storageValue.Address)),
+		),
+		result,
+	)
 }

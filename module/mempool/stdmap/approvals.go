@@ -3,24 +3,23 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool"
 )
 
 // Approvals implements the result approvals memory pool of the consensus nodes,
 // used to store result approvals and to generate block seals.
 type Approvals struct {
 	*Backend
-	byResult map[flow.Identifier]flow.Identifier
+	byResult map[flow.Identifier](map[flow.Identifier]struct{})
+	byBlock  map[flow.Identifier](map[flow.Identifier]struct{})
 }
 
 // NewApprovals creates a new memory pool for result approvals.
 func NewApprovals() (*Approvals, error) {
 	a := &Approvals{
 		Backend:  NewBackend(),
-		byResult: make(map[flow.Identifier]flow.Identifier),
+		byResult: make(map[flow.Identifier](map[flow.Identifier]struct{})),
+		byBlock:  make(map[flow.Identifier](map[flow.Identifier]struct{})),
 	}
 
 	return a, nil
@@ -32,56 +31,78 @@ func (a *Approvals) Add(approval *flow.ResultApproval) error {
 	if err != nil {
 		return err
 	}
-	a.byResult[approval.ResultApprovalBody.ExecutionResultID] = approval.ID()
+	resultID := approval.ResultApprovalBody.ExecutionResultID
+	forResult, hasResult := a.byResult[resultID]
+	if !hasResult {
+		forResult = make(map[flow.Identifier]struct{})
+		a.byResult[resultID] = forResult
+	}
+	blockID := approval.ResultApprovalBody.BlockID
+	forBlock, hasBlock := a.byBlock[blockID]
+	if !hasBlock {
+		forBlock = make(map[flow.Identifier]struct{})
+		a.byBlock[blockID] = forBlock
+	}
+	approvalID := approval.ID()
+	forBlock[resultID] = struct{}{}
+	forResult[approvalID] = struct{}{}
 	return nil
 }
 
-// Rem removes a result approval from the mempool.
+// Rem will remove a receipt by ID.
 func (a *Approvals) Rem(approvalID flow.Identifier) bool {
-	approval, err := a.ByID(approvalID)
+	entity, err := a.Backend.ByID(approvalID)
 	if err != nil {
 		return false
 	}
-	ok := a.Backend.Rem(approvalID)
-	if !ok {
-		return false
+	_ = a.Backend.Rem(approvalID)
+	approval := entity.(*flow.ResultApproval)
+	resultID := approval.ResultApprovalBody.ExecutionResultID
+	forResult := a.byResult[resultID]
+	delete(forResult, approvalID)
+	if len(forResult) > 0 {
+		return true
 	}
-	delete(a.byResult, approval.ResultApprovalBody.ExecutionResultID)
+	delete(a.byResult, resultID)
+	blockID := approval.ResultApprovalBody.BlockID
+	forBlock := a.byBlock[blockID]
+	delete(forBlock, resultID)
+	if len(forBlock) > 0 {
+		return true
+	}
+	delete(a.byBlock, blockID)
 	return true
 }
 
-// ByID returns the result approval with the given ID from the mempool.
-func (a *Approvals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
-	entity, err := a.Backend.ByID(approvalID)
-	if err != nil {
-		return nil, err
-	}
-	approval, ok := entity.(*flow.ResultApproval)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in approval pool (%T)", entity))
-	}
-	return approval, nil
-}
-
 // ByResultID returns an approval by receipt ID.
-func (a *Approvals) ByResultID(resultID flow.Identifier) (*flow.ResultApproval, error) {
-	approvalID, ok := a.byResult[resultID]
-	if !ok {
-		return nil, mempool.ErrEntityNotFound
+func (a *Approvals) ByResultID(resultID flow.Identifier) []*flow.ResultApproval {
+	forResult, hasResult := a.byResult[resultID]
+	if !hasResult {
+		return nil
 	}
-	return a.ByID(approvalID)
-}
-
-// All returns all result approvals from the pool.
-func (a *Approvals) All() []*flow.ResultApproval {
-	entities := a.Backend.All()
-	approvals := make([]*flow.ResultApproval, 0, len(entities))
-	for _, entity := range entities {
-		approval, ok := entity.(*flow.ResultApproval)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in approval pool (%T)", entity))
-		}
-		approvals = append(approvals, approval)
+	approvals := make([]*flow.ResultApproval, 0, len(forResult))
+	for approvalID := range forResult {
+		entity, _ := a.Backend.ByID(approvalID)
+		approvals = append(approvals, entity.(*flow.ResultApproval))
 	}
 	return approvals
+}
+
+// DropForBlock drops all execution receipts for the given block.
+func (a *Approvals) DropForBlock(blockID flow.Identifier) {
+	forBlock, hasBlock := a.byBlock[blockID]
+	if !hasBlock {
+		return
+	}
+	for resultID := range forBlock {
+		forResult, hasResult := a.byResult[resultID]
+		if !hasResult {
+			return
+		}
+		for approvalID := range forResult {
+			_ = a.Backend.Rem(approvalID)
+		}
+		delete(a.byResult, resultID)
+	}
+	delete(a.byBlock, blockID)
 }

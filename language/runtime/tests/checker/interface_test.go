@@ -1252,12 +1252,18 @@ func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 				// `secondKind` is the container composite kind.
 				// Resource composites can only be nested in resource composite kinds.
 
-				if firstKind == common.CompositeKindResource &&
-					secondKind != common.CompositeKindResource {
+				if firstKind == common.CompositeKindResource {
+					switch secondKind {
+					case common.CompositeKindResource,
+						common.CompositeKindContract:
 
-					errs := ExpectCheckerErrors(t, err, 1)
+						require.NoError(t, err)
 
-					assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
+					default:
+						errs := ExpectCheckerErrors(t, err, 1)
+
+						assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
+					}
 				} else {
 					require.NoError(t, err)
 				}
@@ -1654,7 +1660,7 @@ const fungibleTokenContractInterface = `
 
 	  pub fun absorb(vault: @Vault)
 
-	  pub fun sprout(): @Vault
+	  pub fun sprout(balance: Int): @Vault
   }
 `
 
@@ -1691,8 +1697,8 @@ const validExampleFungibleTokenContract = `
          destroy vault
      }
 
-     pub fun sprout(): @Vault {
-         return <-create Vault(balance: 0)
+     pub fun sprout(balance: Int): @Vault {
+         return <-create Vault(balance: balance)
      }
   }
 `
@@ -1712,10 +1718,8 @@ func TestCheckContractInterfaceFungibleTokenUse(t *testing.T) {
 		validExampleFungibleTokenContract + "\n" + `
 
       fun test(): Int {
-          // valid, because code is in the same location
-          let publisher <- create ExampleToken.Vault(balance: 100)
-
-          let receiver <- ExampleToken.sprout()
+          let publisher <- ExampleToken.sprout(balance: 100)
+          let receiver <- ExampleToken.sprout(balance: 0)
 
           let withdrawn <- publisher.withdraw(amount: 60)
           receiver.deposit(vault: <-withdrawn)

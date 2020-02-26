@@ -76,20 +76,6 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 					)
 				}
 
-			} else {
-
-				// NOTE: value and declaration type are already checked for invalidity
-
-				if !checker.checkTypeCompatibility(declaration.Value, valueType, declarationType) {
-
-					checker.report(
-						&TypeMismatchError{
-							ExpectedType: declarationType,
-							ActualType:   valueType,
-							Range:        ast.NewRangeFromPositioned(declaration.Value),
-						},
-					)
-				}
 			}
 		}
 	} else if isOptionalBinding && optionalValueType != nil {
@@ -97,6 +83,22 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 	}
 
 	checker.Elaboration.VariableDeclarationTargetTypes[declaration] = declarationType
+
+	if declarationType != nil &&
+		valueType != nil &&
+		!valueIsInvalid &&
+		!declarationType.IsInvalidType() &&
+		!isOptionalBinding &&
+		!checker.checkTypeCompatibility(declaration.Value, valueType, declarationType) {
+
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: declarationType,
+				ActualType:   valueType,
+				Range:        ast.NewRangeFromPositioned(declaration.Value),
+			},
+		)
+	}
 
 	checker.checkTransfer(declaration.Transfer, declarationType)
 
@@ -188,15 +190,16 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	identifier := declaration.Identifier.Identifier
 
-	variable, err := checker.valueActivations.Declare(
-		identifier,
-		declarationType,
-		declaration.Access,
-		declaration.DeclarationKind(),
-		declaration.Identifier.Pos,
-		declaration.IsConstant,
-		nil,
-	)
+	variable, err := checker.valueActivations.Declare(variableDeclaration{
+		identifier:               identifier,
+		ty:                       declarationType,
+		access:                   declaration.Access,
+		kind:                     declaration.DeclarationKind(),
+		pos:                      declaration.Identifier.Pos,
+		isConstant:               declaration.IsConstant,
+		argumentLabels:           nil,
+		allowOuterScopeShadowing: true,
+	})
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(identifier, variable)
 }

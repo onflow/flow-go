@@ -102,28 +102,53 @@ func (e *StringExpression) String() string {
 	return ""
 }
 
-// IntExpression
+// IntegerExpression
 
-type IntExpression struct {
+type IntegerExpression struct {
 	Value *big.Int
 	Base  int
 	Range
 }
 
-func (*IntExpression) isExpression() {}
+func (*IntegerExpression) isExpression() {}
 
-func (*IntExpression) isIfStatementTest() {}
+func (*IntegerExpression) isIfStatementTest() {}
 
-func (e *IntExpression) Accept(visitor Visitor) Repr {
+func (e *IntegerExpression) Accept(visitor Visitor) Repr {
 	return e.AcceptExp(visitor)
 }
 
-func (e *IntExpression) AcceptExp(visitor ExpressionVisitor) Repr {
-	return visitor.VisitIntExpression(e)
+func (e *IntegerExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitIntegerExpression(e)
 }
 
-func (e *IntExpression) String() string {
+func (e *IntegerExpression) String() string {
 	return e.Value.String()
+}
+
+// FixedPointExpression
+
+type FixedPointExpression struct {
+	Integer    *big.Int
+	Fractional *big.Int
+	Scale      uint
+	Range
+}
+
+func (*FixedPointExpression) isExpression() {}
+
+func (*FixedPointExpression) isIfStatementTest() {}
+
+func (e *FixedPointExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *FixedPointExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitFixedPointExpression(e)
+}
+
+func (e *FixedPointExpression) String() string {
+	return fmt.Sprintf("%s.%s", e.Integer, e.Fractional)
 }
 
 // ArrayExpression

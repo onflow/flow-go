@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // Controller implements a timout with:
@@ -14,7 +14,7 @@ import (
 type Controller struct {
 	config
 	timer          *time.Timer
-	timerInfo      *types.TimerInfo
+	timerInfo      *hotstuff.TimerInfo
 	timeoutChannel <-chan time.Time
 }
 
@@ -44,7 +44,7 @@ func DefaultController() *Controller {
 // TimerInfo returns TimerInfo for the current timer.
 // New struct is created for each timer.
 // Is nil if no timer has been started.
-func (t *Controller) TimerInfo() *types.TimerInfo { return t.timerInfo }
+func (t *Controller) TimerInfo() *hotstuff.TimerInfo { return t.timerInfo }
 
 // Channel returns a channel that will receive the specific timeout.
 // New channel is created for each timer.
@@ -53,7 +53,7 @@ func (t *Controller) TimerInfo() *types.TimerInfo { return t.timerInfo }
 func (t *Controller) Channel() <-chan time.Time { return t.timeoutChannel }
 
 // StartTimeout starts the timeout of the specified type and returns the
-func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) *types.TimerInfo {
+func (t *Controller) StartTimeout(mode hotstuff.TimeoutMode, view uint64) *hotstuff.TimerInfo {
 	if t.timer != nil { // stop old timer
 		t.timer.Stop()
 	}
@@ -61,7 +61,7 @@ func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) *types.Ti
 
 	startTime := time.Now()
 	timer := time.NewTimer(duration)
-	timerInfo := types.TimerInfo{Mode: mode, View: view, StartTime: startTime, Duration: duration}
+	timerInfo := hotstuff.TimerInfo{Mode: mode, View: view, StartTime: startTime, Duration: duration}
 	t.timer = timer
 	t.timeoutChannel = t.timer.C
 	t.timerInfo = &timerInfo
@@ -69,12 +69,12 @@ func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) *types.Ti
 	return &timerInfo
 }
 
-func (t *Controller) computeTimeoutDuration(mode types.TimeoutMode) time.Duration {
+func (t *Controller) computeTimeoutDuration(mode hotstuff.TimeoutMode) time.Duration {
 	var duration time.Duration
 	switch mode {
-	case types.VoteCollectionTimeout:
+	case hotstuff.VoteCollectionTimeout:
 		duration = t.VoteCollectionTimeout()
-	case types.ReplicaTimeout:
+	case hotstuff.ReplicaTimeout:
 		duration = t.ReplicaTimeout()
 	default:
 		// This should never happen; Only protects code from future inconsistent modifications.

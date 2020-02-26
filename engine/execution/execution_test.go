@@ -56,7 +56,7 @@ func TestExecutionFlow(t *testing.T) {
 	block := &flow.Block{
 		Header: flow.Header{
 			ParentID: genesis.ID(),
-			Number:   42,
+			View:     42,
 		},
 		Payload: flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{

@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -19,14 +20,16 @@ type Finalizer struct {
 	db         *badger.DB
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
+	prov       *provider.Engine // to propagate finalized blocks to non-consensus nodes
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals) *Finalizer {
+func NewFinalizer(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals, prov *provider.Engine) *Finalizer {
 	f := &Finalizer{
 		db:         db,
 		guarantees: guarantees,
 		seals:      seals,
+		prov:       prov,
 	}
 	return f
 }
@@ -118,6 +121,27 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			if err != nil {
 				return fmt.Errorf("could not finalize block (%x): %w", blockID, err)
 			}
+		}
+
+		// retrieve the payload, build the full block, and propagate to non-consensus nodes
+		// TODO this is only necessary to replicate existing block propagation behaviour
+		// This should soon be replaced with HotStuff follower https://github.com/dapperlabs/flow/issues/894
+		{
+			// get the payload
+			var payload flow.Payload
+			err = procedure.RetrievePayload(header.PayloadHash, &payload)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve payload: %w", err)
+			}
+
+			// create the block
+			block := &flow.Block{
+				Header:  header,
+				Payload: payload,
+			}
+
+			// finally broadcast to non-consensus nodes
+			f.prov.SubmitLocal(block)
 		}
 
 		return nil

@@ -6,13 +6,12 @@ import (
 
 type ResultApprovalBody struct {
 	// CorrectnessAttestation
+	ApproverID           Identifier       // TODO: actually fill in
+	BlockID              Identifier       // TODO: actually fill in
 	ExecutionResultID    Identifier       // hash of approved execution result
-	AttestationSignature crypto.Signature // signature over ExecutionResultHash
-
-	// Verification Proof
-	ChunkIndexList []uint32 // list of chunk indices assigned to the verifier
-	Proof          []byte   // proof of correctness of the chunk assignment
-	Spocks         []Spock  // proof of re-computation, one per each chunk
+	ChunkIndex           uint64           // index of chunk that is approved
+	AttestationSignature crypto.Signature // signature over ExecutionResultID and ChunkIndex, this has been separated for BLS aggregation
+	Spock                Spock            // proof of re-computation, one per each chunk
 }
 
 type ResultApproval struct {
