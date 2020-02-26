@@ -155,7 +155,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // SendVote will send a vote to the desired node.
-func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig, _ crypto.Signature, recipientID flow.Identifier) error {
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, _ crypto.Signature, recipientID flow.Identifier) error {
 
 	// build the vote message
 	vote := &messages.ClusterBlockVote{
