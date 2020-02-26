@@ -31,6 +31,9 @@ type testcontext struct {
 	pool        *mempool.Transactions
 	collections *storage.Collections
 	guarantees  *storage.Guarantees
+	headers     *storage.Headers
+	builder     *module.Builder
+	finalizer   *module.Finalizer
 }
 
 // WithEngine initializes the dependencies for a test case, then runs the test
@@ -49,16 +52,15 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	hub := stub.NewNetworkHub()
 	ctx.net = stub.NewNetwork(ctx.state, ctx.me, hub)
 
-	conf := Config{
-		ProposalPeriod: time.Millisecond,
-	}
-
 	ctx.provider = new(network.Engine)
 	ctx.pool = new(mempool.Transactions)
 	ctx.collections = new(storage.Collections)
 	ctx.guarantees = new(storage.Guarantees)
+	ctx.headers = new(storage.Headers)
+	ctx.builder = new(module.Builder)
+	ctx.finalizer = new(module.Finalizer)
 
-	e, err := New(log, conf, ctx.net, ctx.me, ctx.state, tracer, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees)
+	e, err := New(log, ctx.net, ctx.me, ctx.state, tracer, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees, ctx.headers, ctx.builder, ctx.finalizer)
 	require.NoError(t, err)
 
 	run(ctx, e)
