@@ -3,7 +3,6 @@
 package proposal
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -241,9 +240,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 	// retrieve the parent block
 	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
-	if errors.Is(err, storage.ErrNotFound) {
-		// TODO handle block buffering https://github.com/dapperlabs/flow-go/issues/2408
-	}
+	// TODO handle block buffering https://github.com/dapperlabs/flow-go/issues/2408
+	//if errors.Is(err, storage.ErrNotFound) {}
 	if err != nil {
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
