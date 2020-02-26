@@ -3,9 +3,10 @@ package forest
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer/forest/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/stretchr/testify/assert"
 )
 
 // ~~~~~~~~~~~~~~~~~~~~~ Mock implementation for Vertex ~~~~~~~~~~~~~~~~~~~~~ //

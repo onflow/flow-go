@@ -50,6 +50,10 @@ func TestBootStrapValid(t *testing.T) {
 		err = db.View(operation.RetrieveHeader(genesis.ID(), &storedHeader))
 		require.Nil(t, err)
 
+		var storedCommit flow.StateCommitment
+		err = db.View(operation.LookupCommit(blockID, &storedCommit))
+		require.Nil(t, err)
+
 		assert.Zero(t, boundary)
 		assert.Equal(t, blockID, storedID)
 		assert.Equal(t, genesis.Header, storedHeader)
@@ -57,7 +61,7 @@ func TestBootStrapValid(t *testing.T) {
 		for _, identity := range identities {
 
 			var delta int64
-			err = db.View(operation.RetrieveDelta(genesis.Header.Number, identity.Role, identity.NodeID, &delta))
+			err = db.View(operation.RetrieveDelta(genesis.Header.View, identity.Role, identity.NodeID, &delta))
 			require.Nil(t, err)
 
 			assert.Equal(t, int64(identity.Stake), delta)

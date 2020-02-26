@@ -23,6 +23,10 @@ func HasNodeID(nodeIDs ...flow.Identifier) flow.IdentityFilter {
 	}
 }
 
+func HasStake(id *flow.Identity) bool {
+	return id.Stake > 0
+}
+
 func HasRole(roles ...flow.Role) flow.IdentityFilter {
 	lookup := make(map[flow.Role]struct{})
 	for _, role := range roles {

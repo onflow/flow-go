@@ -39,7 +39,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		es.On("NewView", mock.Anything).
 			Return(
-				state.NewView(func(key string) (bytes []byte, e error) {
+				state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 					return nil, nil
 				}))
 
@@ -84,7 +84,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		es.On("NewView", mock.Anything).
 			Return(
-				state.NewView(func(key string) (bytes []byte, e error) {
+				state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 					return nil, nil
 				})).
 			Times(collectionCount)
@@ -131,7 +131,7 @@ func generateBlock(collectionCount, transactionCount int) *execution.CompleteBlo
 
 	block := flow.Block{
 		Header: flow.Header{
-			Number: 42,
+			View: 42,
 		},
 		Payload: flow.Payload{
 			Guarantees: guarantees,

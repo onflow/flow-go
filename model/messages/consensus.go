@@ -11,8 +11,19 @@ type BlockProposal struct {
 }
 
 type BlockVote struct {
-	View      uint64
-	BlockID   flow.Identifier
-	Signer    flow.Identifier
-	Signature crypto.Signature
+	BlockID               flow.Identifier
+	View                  uint64
+	StakingSignature      crypto.Signature
+	RandomBeaconSignature crypto.Signature
+}
+
+type BlockRequest struct {
+	BlockID flow.Identifier
+	Nonce   uint64
+}
+
+type BlockResponse struct {
+	OriginID flow.Identifier
+	Proposal *BlockProposal
+	Nonce    uint64
 }

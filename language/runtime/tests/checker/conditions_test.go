@@ -294,8 +294,7 @@ func TestCheckInvalidFunctionWithReturnTypeAndLocalResultAndPostConditionWithRes
 	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
-// TODO: should this be invalid?
-func TestCheckFunctionWithReturnTypeAndResultParameterAndPostConditionWithResult(t *testing.T) {
+func TestCheckInvalidFunctionWithReturnTypeAndResultParameterAndPostConditionWithResult(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test(result: Int): Int {
@@ -306,7 +305,9 @@ func TestCheckFunctionWithReturnTypeAndResultParameterAndPostConditionWithResult
       }
     `)
 
-	require.NoError(t, err)
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
 func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
