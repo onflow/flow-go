@@ -253,7 +253,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	// TODO handle missing transactions
 	// TODO store block contents
 	// TODO ensure block is valid extension of cluster state
-	// TODO submit to hotstuff
+	// TODO submit to coldstuff
 	// TODO check for buffered descendants of the block
 
 	return nil
