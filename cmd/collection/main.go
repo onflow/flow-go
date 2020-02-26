@@ -1,9 +1,12 @@
 package main
 
 import (
+	"time"
+
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
@@ -62,9 +65,14 @@ func main() {
 			build := collection.NewBuilder(node.DB, pool, "TODO")
 			// TODO implement finalizer
 			var final module.Finalizer
-			eng, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees, headers, build, final)
+
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees, headers)
 			node.MustNot(err).Msg("could not initialize proposal engine")
-			return eng
+
+			eng, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, 3*time.Second, 6*time.Second)
+			node.MustNot(err).Msg("could not initialize coldstuff engine")
+
+			return prop.WithConsensus(eng)
 		}).
 		Run()
 }
