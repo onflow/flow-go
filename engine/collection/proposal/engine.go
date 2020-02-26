@@ -3,12 +3,12 @@
 package proposal
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -20,16 +20,10 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type Config struct {
-	// ProposalPeriod the interval at which the engine will propose a collection.
-	ProposalPeriod time.Duration
-}
-
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
 type Engine struct {
 	unit        *engine.Unit
-	conf        Config
 	log         zerolog.Logger
 	tracer      trace.Tracer
 	con         network.Conduit
@@ -39,11 +33,14 @@ type Engine struct {
 	pool        mempool.Transactions
 	collections storage.Collections
 	guarantees  storage.Guarantees
+	build       module.Builder
+	finalizer   module.Finalizer
+
+	coldstuff module.ColdStuff
 }
 
 func New(
 	log zerolog.Logger,
-	conf Config,
 	net module.Network,
 	me module.Local,
 	state protocol.State,
@@ -52,11 +49,12 @@ func New(
 	pool mempool.Transactions,
 	collections storage.Collections,
 	guarantees storage.Guarantees,
+	build module.Builder,
+	finalizer module.Finalizer,
 ) (*Engine, error) {
 
 	e := &Engine{
 		unit:        engine.NewUnit(),
-		conf:        conf,
 		log:         log.With().Str("engine", "proposal").Logger(),
 		me:          me,
 		state:       state,
@@ -65,13 +63,21 @@ func New(
 		pool:        pool,
 		collections: collections,
 		guarantees:  guarantees,
+		build:       build,
+		finalizer:   finalizer,
 	}
+
+	cold, err := coldstuff.New(log, state, me, e, build, finalizer, 3*time.Second, 8*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize coldstuff: %w", err)
+	}
+
+	e.coldstuff = cold
 
 	con, err := net.Register(engine.CollectionProposal, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
-
 	e.con = con
 
 	return e, nil
@@ -80,13 +86,16 @@ func New(
 // Ready returns a ready channel that is closed once the engine has fully
 // started.
 func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.propose)
-	return e.unit.Ready()
+	return e.unit.Ready(func() {
+		<-e.coldstuff.Ready()
+	})
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		<-e.coldstuff.Done()
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -124,25 +133,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
-	}
-}
-
-func (e *Engine) propose() {
-
-	for {
-		select {
-		case <-time.After(e.conf.ProposalPeriod):
-
-			err := e.createProposal()
-			if errors.Is(err, ErrEmptyTxpool) {
-				e.log.Debug().Msg("skipping collection proposal due to empty txpool")
-			} else if err != nil {
-				e.log.Error().Err(err).Msg("failed to create new proposal")
-			}
-
-		case <-e.unit.Quit():
-			return
-		}
 	}
 }
 
