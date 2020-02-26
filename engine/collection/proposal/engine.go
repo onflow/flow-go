@@ -236,6 +236,7 @@ func (e *Engine) BroadcastCommit(commit *model.Commit) error {
 	return err
 }
 
+// onBlockProposal handles proposals for new blocks.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
 	// retrieve the parent block
@@ -258,14 +259,15 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	return nil
 }
 
+// onBlockVote handles votes for blocks by passing them to the core consensus
+// algorithm
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-
-	// forward the vote for processing
 	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature, nil)
-
 	return nil
 }
 
+// onBlockRequest handles requests from other nodes for blocks we have.
+// We always respond to these requests if we have the block in question.
 func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterBlockRequest) error {
 
 	// retrieve the block header
@@ -300,6 +302,7 @@ func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterB
 	return nil
 }
 
+// onBlockResponse handles responses to queries for particular blocks we have made.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) error {
 
 	// process the block response as we would a regular proposal
@@ -311,6 +314,11 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 	return nil
 }
 
+// onBlockCommit handles incoming block commits by passing them to the core
+// consensus algorithm.
+//
+// NOTE: This is only necessary for ColdStuff and can be removed when we switch
+// to HotStuff.
 func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
 	e.coldstuff.SubmitCommit(commit)
 	return nil
