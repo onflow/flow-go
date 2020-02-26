@@ -9,7 +9,7 @@ import (
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
-// SigVerifier provides functions for verifying consensus nodes' signatures
+// SigVerifier provides functions for verifying consensus nodes' staking signatures (i.e. votes)
 type StakingSigVerifier struct {
 	stakingHasher crypto.Hasher // the hasher for staking signature
 }
