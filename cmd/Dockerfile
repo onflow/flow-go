@@ -51,7 +51,7 @@ FROM gcr.io/distroless/base as production
 
 COPY --from=build-production /app/app /bin/app
 
-ENTRYPOINT ["/bin/start"]
+ENTRYPOINT ["/bin/app"]
 
 
 FROM build-env as build-debug
