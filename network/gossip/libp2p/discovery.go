@@ -42,6 +42,7 @@ func (d *Discovery) Advertise(_ context.Context, _ string, _ ...discovery.Option
 // provides all the information about the other nodes.
 func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
 
+	//TODO: respect the limit in option, save state in context and randomize selection
 	// if middleware has been stopped, don't return any peers
 	select {
 	case <-d.done:

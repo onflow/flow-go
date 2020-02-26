@@ -232,6 +232,9 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 	var s network.Stream
 	var retries = 0
 	for ; retries < maxAttempts; retries++ {
+
+		// p.libP2PHost.Network().(*swarm.Swarm).Backoff().Clear(targetID)
+		//TODO: only retry on  failed to negotiate security protocol"
 		select {
 		case <-ctx.Done():
 			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d", retries)
@@ -240,6 +243,7 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 
 		// if this is a retry attempt, wait for some time before retrying
 		if err != nil {
+			// TODO: Add randomness before retry
 			time.Sleep(5 * time.Millisecond)
 		}
 
