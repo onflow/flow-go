@@ -134,10 +134,34 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the proposal engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
+	switch ev := event.(type) {
+	case *messages.ClusterBlockProposal:
+		return e.onBlockProposal(originID, ev)
+	case *messages.ClusterBlockVote:
+		return e.onBlockVote(originID, ev)
+	case *messages.ClusterBlockRequest:
+		return e.onBlockRequest(originID, ev)
+	case *messages.ClusterBlockResponse:
+		return e.onBlockResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+func (e *Engine) onBlockProposal(originID flow.Identifier, msg *messages.ClusterBlockProposal) error {
+	panic("TODO")
+}
+
+func (e *Engine) onBlockVote(originID flow.Identifier, msg *messages.ClusterBlockVote) error {
+	panic("TODO")
+}
+
+func (e *Engine) onBlockRequest(originID flow.Identifier, msg *messages.ClusterBlockRequest) error {
+	panic("TODO")
+}
+
+func (e *Engine) onBlockResponse(originID flow.Identifier, msg *messages.ClusterBlockResponse) error {
+	panic("TODO")
 }
 
 // SendVote will send a vote to the desired node.
