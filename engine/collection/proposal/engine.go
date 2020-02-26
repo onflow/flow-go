@@ -3,6 +3,7 @@
 package proposal
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -37,6 +38,7 @@ type Engine struct {
 	pool        mempool.Transactions
 	collections storage.Collections
 	guarantees  storage.Guarantees
+	headers     storage.Headers
 	build       module.Builder
 	finalizer   module.Finalizer
 
@@ -53,6 +55,7 @@ func New(
 	pool mempool.Transactions,
 	collections storage.Collections,
 	guarantees storage.Guarantees,
+	headers storage.Headers,
 	build module.Builder,
 	finalizer module.Finalizer,
 ) (*Engine, error) {
@@ -67,6 +70,7 @@ func New(
 		pool:        pool,
 		collections: collections,
 		guarantees:  guarantees,
+		headers:     headers,
 		build:       build,
 		finalizer:   finalizer,
 	}
@@ -149,7 +153,25 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) onBlockProposal(originID flow.Identifier, msg *messages.ClusterBlockProposal) error {
-	panic("TODO")
+
+	// retrieve the parent block
+	parent, err := e.headers.ByBlockID(msg.Header.ParentID)
+	if errors.Is(err, storage.ErrNotFound) {
+		// TODO handle block buffering https://github.com/dapperlabs/flow-go/issues/2408
+	}
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
+	_ = parent
+
+	// TODO handle missing transactions
+	// TODO store block contents
+	// TODO ensure block is valid extension of cluster state
+	// TODO submit to hotstuff
+	// TODO check for buffered descendants of the block
+
+	return nil
 }
 
 func (e *Engine) onBlockVote(originID flow.Identifier, msg *messages.ClusterBlockVote) error {
