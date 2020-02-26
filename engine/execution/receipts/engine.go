@@ -100,6 +100,7 @@ func (e *Engine) onExecutionResult(originID flow.Identifier, result *flow.Execut
 	}
 
 	receipt := &flow.ExecutionReceipt{
+		ExecutorID:      originID,
 		ExecutionResult: *result,
 		// TODO: include SPoCKs
 		Spocks: nil,

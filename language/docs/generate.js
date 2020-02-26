@@ -10,12 +10,14 @@ const styleGuide = require('remark-preset-lint-markdown-style-guide')
 const validateLinks = require('remark-validate-links')
 const sectionize = require('remark-sectionize')
 
-const highlight = require('./highlight')
+const { Highlighter } = require('./highlight')
 
 const remark2retext = require('remark-retext')
 const english = require('retext-english')
 const indefiniteArticle = require('retext-indefinite-article')
 const repeatedWords = require('retext-repeated-words')
+
+const stringify = require('remark-stringify')
 
 const remark2rehype = require('remark-rehype')
 const doc = require('rehype-document')
@@ -26,47 +28,125 @@ const addClasses = require('rehype-add-classes')
 const puppeteer = require('puppeteer')
 const path = require('path')
 
-const processor = unified()
-  .use(markdown)
-  .use(toc)
-  .use(slug)
-  .use(autolink)
-  .use(validateLinks)
-  .use({
-    plugins: styleGuide.plugins.filter(elem => {
-      if (!Array.isArray(elem))
-        return elem;
-      return elem[0].displayName !== 'remark-lint:list-item-indent'
+const { makeHighlightOptions } = require('./highlight-cadence')
+
+
+const toHtml = require('hast-util-to-html')
+
+const visit = require('unist-util-visit')
+
+
+function highlight(options) {
+  const highlighterPromise =
+      Highlighter.fromOptions(options)
+
+  return async (ast) => {
+    const highlighter = await highlighterPromise
+
+    async function visitor(node) {
+      const language = node.lang.split(',')[0]
+
+      const grammar = await highlighter.getLanguageGrammar(language)
+      if (!grammar) {
+        throw new Error('Failed to load language grammar')
+      }
+
+      const highlighted =
+          highlighter.highlight(node.value, grammar)
+
+      switch (options.target) {
+          // 'html' adds the highlighted code to the remark node, for use with rehype
+        case 'html':
+          node.data = {hChildren: highlighted}
+          break
+          // 'markdown' replaces the remark code fence node with an HTML node of the highlighted code
+        case 'markdown':
+          node.type = 'html'
+          node.value = toHtml(
+              {
+                type: "element",
+                tagName: "code",
+                children: [
+                  {
+                    type: "element",
+                    tagName: "pre",
+                    children: highlighted,
+                  }
+                ],
+              }
+          )
+          break
+      }
+    }
+
+    return await visit(ast, 'code', visitor)
+  }
+}
+
+
+
+
+// - target:
+//   - 'html': generate HTML
+//   - 'markdown': generate Markdown
+function buildPipeline(target) {
+
+  const base = unified()
+    .use(markdown)
+    .use(toc)
+    .use(slug)
+    .use(autolink)
+    .use(validateLinks)
+    .use({
+      plugins: styleGuide.plugins.filter(elem => {
+        if (!Array.isArray(elem))
+          return elem;
+        return elem[0].displayName !== 'remark-lint:list-item-indent'
+      })
     })
-  })
-  .use(highlight, {
-    languageScopes: {'cadence': 'source.cadence'},
-    grammarPaths: ['../tools/vscode-extension/syntaxes/cadence.tmGrammar.json'],
-    themePath: './light_vs.json'
-  })
-  .use(
-    remark2retext,
-    unified()
-      .use(english)
-      .use(indefiniteArticle)
-      .use(repeatedWords)
-  )
-  .use(sectionize)
-  .use(remark2rehype)
-  .use(doc, {
-    title: 'Cadence Programming Language',
-    css: ['style.css', "https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.css"]
-  })
-  .use(addClasses, {
-    body: 'markdown-body'
-  })
-  .use(format)
-  .use(html)
+    .use(highlight, makeHighlightOptions(target))
+    .use(
+      remark2retext,
+      unified()
+        .use(english)
+        .use(indefiniteArticle)
+        .use(repeatedWords)
+    )
+
+  switch (target) {
+  case 'html':
+    return base
+      .use(sectionize)
+      .use(remark2rehype)
+      .use(doc, {
+        title: 'Cadence Programming Language',
+        css: ['style.css', "https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.css"]
+      })
+      .use(addClasses, {
+        body: 'markdown-body'
+      })
+      .use(format)
+      .use(html)
+
+  case 'markdown':
+    return base
+      .use(stringify, {
+        entities: 'escape'
+      })
+  }
+}
 
 async function writeHTML(file) {
   file.extname = '.html'
   await vfile.write(file)
 }
+
+async function writeMarkdown(file) {
+  file.extname = '.md'
+  file.stem += '.generated'
+  await vfile.write(file)
+}
+
 
 async function writePDF(file) {
   file.extname = '.html'
@@ -92,10 +172,17 @@ async function writePDF(file) {
   await browser.close()
 }
 
-processor.process(vfile.readSync('language.md'), async (err, file) => {
+buildPipeline('html').process(vfile.readSync('language.md'), async (err, file) => {
   if (err)
     throw err;
   console.error(report(file))
   await writeHTML(file)
   await writePDF(file)
+})
+
+buildPipeline('markdown').process(vfile.readSync('language.md'), async (err, file) => {
+  if (err)
+    throw err;
+  console.error(report(file))
+  await writeMarkdown(file)
 })
