@@ -25,6 +25,7 @@ import (
 // testcontext contains the context for a test case.
 type testcontext struct {
 	state       *protocol.State
+	snapshot    *protocol.Snapshot
 	me          *module.Local
 	net         *stub.Network
 	provider    *network.Engine
@@ -46,6 +47,10 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	require.NoError(t, err)
 
 	ctx.state = new(protocol.State)
+	ctx.snapshot = new(protocol.Snapshot)
+	ctx.state.On("Final").Return(ctx.snapshot)
+	ctx.snapshot.On("Head").Return(&flow.Header{}, nil)
+	ctx.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
 	ctx.me = new(module.Local)
 	ctx.me.On("NodeID").Return(flow.Identifier{})
 
