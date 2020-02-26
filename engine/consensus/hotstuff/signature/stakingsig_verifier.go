@@ -11,12 +11,12 @@ import (
 
 // SigVerifier provides functions for verifying consensus nodes' signatures
 type StakingSigVerifier struct {
-	stakingHasher          crypto.Hasher     // the hasher for staking signature
+	stakingHasher crypto.Hasher // the hasher for staking signature
 }
 
 func NewStakingSigVerifier(stakingSigTag string) StakingSigVerifier {
 	return StakingSigVerifier{
-		stakingHasher:          crypto.NewBLS_KMAC(stakingSigTag),
+		stakingHasher: crypto.NewBLS_KMAC(stakingSigTag),
 	}
 }
 

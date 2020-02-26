@@ -21,7 +21,7 @@ type SigProvider struct {
 	stakingPrivateKey      crypto.PrivateKey // private staking key
 	randomBeaconPrivateKey crypto.PrivateKey // private key for random beacon signature
 
-	isRandomBeaconEnabled  bool              // indicates whether random beacon signature is enabled for the cluster
+	isRandomBeaconEnabled bool // indicates whether random beacon signature is enabled for the cluster
 }
 
 // NewSigProvider creates an instance of SigProvider
@@ -36,13 +36,13 @@ func NewSigProvider(
 	isRandomBeaconEnabled bool,
 ) *SigProvider {
 	return &SigProvider{
-		StakingSigVerifier: NewStakingSigVerifier(stakingSigTag),
+		StakingSigVerifier:      NewStakingSigVerifier(stakingSigTag),
 		RandomBeaconSigVerifier: NewRandomBeaconSigVerifier(dkgPubData, randomBeaconSigTag),
-		myID:                   myID,
-		protocolState: protocolState,
-		stakingPrivateKey:      stakingPrivateKey,
-		randomBeaconPrivateKey: randomBeaconPrivateKey,
-		isRandomBeaconEnabled:  isRandomBeaconEnabled,
+		myID:                    myID,
+		protocolState:           protocolState,
+		stakingPrivateKey:       stakingPrivateKey,
+		randomBeaconPrivateKey:  randomBeaconPrivateKey,
+		isRandomBeaconEnabled:   isRandomBeaconEnabled,
 	}
 }
 
