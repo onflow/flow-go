@@ -5,6 +5,7 @@ package operation
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -30,12 +31,15 @@ type Entity struct {
 
 type UnencodeableEntitiy bool
 
+var errCantEncode = fmt.Errorf("MarshalJSON not supported")
+var errCantDecode = fmt.Errorf("UnmarshalJSON not supported")
+
 func (a UnencodeableEntitiy) MarshalJSON() ([]byte, error) {
-	return nil, fmt.Errorf("MarshalJSON not supported")
+	return nil, errCantEncode
 }
 
 func (a *UnencodeableEntitiy) UnmarshalJSON(b []byte) error {
-	return fmt.Errorf("UnmarshalJSON not supported")
+	return errCantDecode
 }
 
 func TestInsertValid(t *testing.T) {
@@ -96,8 +100,8 @@ func TestInsertEncodingError(t *testing.T) {
 		key := []byte{0x01, 0x02, 0x03}
 
 		err := db.Update(insert(key, UnencodeableEntitiy(true)))
-		require.EqualError(t, err, "could not encode entity: json: error calling MarshalJSON for type "+
-			"operation.UnencodeableEntitiy: MarshalJSON not supported")
+
+		require.True(t, errors.Is(err, errCantEncode))
 	})
 }
 
@@ -187,8 +191,7 @@ func TestUpdateEncodingError(t *testing.T) {
 		})
 
 		err := db.Update(update(key, UnencodeableEntitiy(true)))
-		require.EqualError(t, err, "could not encode entity: json: error calling MarshalJSON for type "+
-			"operation.UnencodeableEntitiy: MarshalJSON not supported")
+		require.True(t, errors.Is(err, errCantEncode))
 
 		// ensure value did not change
 		var act []byte
@@ -247,7 +250,7 @@ func TestRetrieveUnencodeable(t *testing.T) {
 
 		var act UnencodeableEntitiy
 		err := db.View(retrieve(key, &act))
-		require.EqualError(t, err, "could not decode entity: UnmarshalJSON not supported")
+		require.True(t, errors.Is(err, errCantDecode))
 	})
 }
 

@@ -43,9 +43,13 @@ func TestStateCommitmentsIndexAndLookup(t *testing.T) {
 		require.Nil(t, err)
 
 		var actual flow.StateCommitment
-		err = db.View(LookupCommit(finalId, &actual))
+		err = db.View(RetrieveCommit(blockId, &actual))
 		require.Nil(t, err)
-
 		assert.Equal(t, comm, actual)
+
+		var actualFinal flow.StateCommitment
+		err = db.View(LookupCommit(finalId, &actualFinal))
+		require.Nil(t, err)
+		assert.Equal(t, comm, actualFinal)
 	})
 }

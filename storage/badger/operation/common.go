@@ -197,8 +197,9 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 // define a limit of iterations to prevent unbounded loops
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-
-		// TODO: add check whether end >= start?
+		if bytes.Compare(start, end) > 0 {
+			return fmt.Errorf("start must be before end")
+		}
 
 		it := tx.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -255,11 +256,11 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
-//
-// TODO: this function is unbounded – should at least check whether end is a valid end, or
-// define a limit of iterations to prevent unbounded loops
 func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
+		if len(prefix) == 0 {
+			return fmt.Errorf("prefix must not be empty")
+		}
 
 		opts := badger.DefaultIteratorOptions
 		// NOTE: this is an optimization only, it does not enforce that all
