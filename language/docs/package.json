@@ -1,6 +1,7 @@
 {
   "private": true,
   "dependencies": {
+    "get-stdin": "^7.0.0",
     "puppeteer": "^1.19.0",
     "rehype-add-classes": "^1.0.0",
     "rehype-document": "^3.0.1",
