@@ -2,7 +2,6 @@ package hotstuff
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -53,12 +52,15 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 // GetStakedIdentitiesAtBlock returns all the staked nodes for my role at a certain block.
 // blockID - specifies the block to be queried.
 // nodeIDs - optional arguments to only return identities that matches the given nodeIDs.
+// Note: the order of the identity in the returned identity list is NOT the same as the
+// order of node ID in the input of nodeIDs
 func (v *ViewState) GetStakedIdentitiesAtBlock(blockID flow.Identifier, nodeIDs ...flow.Identifier) (flow.IdentityList, error) {
-	return v.protocolState.AtBlockID(blockID).Identities(
-		v.consensusMembersFilter,     // nodes must be belong to the same consensus group
-		filter.HasStake,              // nodes must be staked
-		filter.HasNodeID(nodeIDs...), // filter only the given nodes
-	)
+	var filters []flow.IdentityFilter
+	filters = append(filters, v.consensusMembersFilter, filter.HasStake)
+	if len(nodeIDs) > 0 {
+		filters = append(filters, filter.HasNodeID(nodeIDs...))
+	}
+	return v.protocolState.AtBlockID(blockID).Identities(filters...)
 }
 
 // GetQCStakeThresholdAtBlock returns the stack threshold for building QC at a given block
@@ -79,18 +81,20 @@ func (v *ViewState) LeaderForView(view uint64) *flow.Identity {
 
 // Selects Leader in Round-Robin fashion. NO support for Epochs.
 func roundRobin(nodes flow.IdentityList, view uint64) *flow.Identity {
-	leaderIndex := int(view) % int(nodes.Count())
-	return nodes.Get(uint(leaderIndex))
+	return nodes[int(view)%int(len(nodes))]
 }
 
-// ComputeStakeThresholdForBuildingQC returns the threshold to determine how much stake are needed for building a QC
-// identities is the full identity list at a certain block
+// ComputeStakeThresholdForBuildingQC returns the stake that is minimally required for building a QC
 func ComputeStakeThresholdForBuildingQC(totalStake uint64) uint64 {
-	// total * 2 / 3
-	total := new(big.Int).SetUint64(totalStake)
-	two := new(big.Int).SetUint64(2)
-	three := new(big.Int).SetUint64(3)
-	return new(big.Int).Div(
-		new(big.Int).Mul(total, two),
-		three).Uint64()
+	// Given totalStake, we need smallest integer t such that 2 * totalStake / 3 < t
+	// Formally, the minimally required stake is: 2 * Floor(totalStake/3) + max(1, totalStake mod 3)
+	floorOneThird := totalStake / 3 // integer division, includes floor
+	res := 2 * floorOneThird
+	divRemainder := totalStake % 3
+	if  divRemainder <= 1 {
+		res += 1
+	} else {
+		res += divRemainder
+	}
+	return  res
 }

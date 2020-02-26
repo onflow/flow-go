@@ -129,12 +129,13 @@ func (checker *Checker) declareInterfaceNestedTypes(
 			panic(errors.NewUnreachableError())
 		}
 
-		_, err := checker.typeActivations.DeclareType(
-			*identifier,
-			nestedType,
-			nestedDeclaration.DeclarationKind(),
-			nestedDeclaration.DeclarationAccess(),
-		)
+		_, err := checker.typeActivations.DeclareType(typeDeclaration{
+			identifier:               *identifier,
+			ty:                       nestedType,
+			declarationKind:          nestedDeclaration.DeclarationKind(),
+			access:                   nestedDeclaration.DeclarationAccess(),
+			allowOuterScopeShadowing: false,
+		})
 		checker.report(err)
 	}
 }
@@ -195,12 +196,13 @@ func (checker *Checker) declareInterfaceType(declaration *ast.InterfaceDeclarati
 		NestedTypes:   map[string]Type{},
 	}
 
-	variable, err := checker.typeActivations.DeclareType(
-		identifier,
-		interfaceType,
-		declaration.DeclarationKind(),
-		declaration.Access,
-	)
+	variable, err := checker.typeActivations.DeclareType(typeDeclaration{
+		identifier:               identifier,
+		ty:                       interfaceType,
+		declarationKind:          declaration.DeclarationKind(),
+		access:                   declaration.Access,
+		allowOuterScopeShadowing: false,
+	})
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,

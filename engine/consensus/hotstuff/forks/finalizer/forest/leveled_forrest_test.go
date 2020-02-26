@@ -3,9 +3,10 @@ package forest
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer/forest/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/stretchr/testify/assert"
 )
 
 // ~~~~~~~~~~~~~~~~~~~~~ Mock implementation for Vertex ~~~~~~~~~~~~~~~~~~~~~ //
@@ -224,7 +225,7 @@ func TestLevelledForest_GetVerticesAtLevel(t *testing.T) {
 	assert.ElementsMatch(t, []*mock.Vertex{}, children2List(&it))
 }
 
-// TestLevelledForest_GetNumberOfVerticesAtLevel tests that the number of vertices at a specified level is reported correctly. 
+// TestLevelledForest_GetNumberOfVerticesAtLevel tests that the number of vertices at a specified level is reported correctly.
 func TestLevelledForest_GetNumberOfVerticesAtLevel(t *testing.T) {
 	F := populateNewForest(t)
 

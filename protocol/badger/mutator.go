@@ -39,7 +39,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		}
 
 		// apply the stake deltas
-		err = procedure.ApplyDeltas(genesis.Number, genesis.Identities)(tx)
+		err = procedure.ApplyDeltas(genesis.View, genesis.Identities)(tx)
 		if err != nil {
 			return fmt.Errorf("could not apply stake deltas: %w", err)
 		}
@@ -65,6 +65,16 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
+		// insert result
+		err = operation.InsertResult(&flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: flow.ZeroID,
+			BlockID:          genesis.ID(),
+			FinalStateCommit: seal.FinalState,
+		}})(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis result: %w", err)
+		}
+
 		// insert the block number mapping
 		err = operation.InsertNumber(0, genesis.ID())(tx)
 		if err != nil {
@@ -72,7 +82,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		}
 
 		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.Number)(tx)
+		err = operation.InsertBoundary(genesis.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update boundary: %w", err)
 		}
@@ -205,8 +215,8 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 func checkGenesisHeader(header *flow.Header) error {
 
 	// the initial finalized boundary needs to be height zero
-	if header.Number != 0 {
-		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.Number)
+	if header.View != 0 {
+		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.View)
 	}
 
 	// the parent must be zero hash
@@ -234,6 +244,7 @@ func checkGenesisPayload(tx *badger.Txn, payload *flow.Payload) error {
 	for _, identity := range payload.Identities {
 		roles[identity.Role]++
 	}
+
 	if roles[flow.RoleConsensus] < 1 {
 		return fmt.Errorf("need at least one consensus node")
 	}
@@ -304,8 +315,8 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	}
 
 	// if new block number has a lower number, we can't add it
-	if header.Number <= parent.Number {
-		return fmt.Errorf("block needs higher number (%d <= %d)", header.Number, parent.Number)
+	if header.View <= parent.View {
+		return fmt.Errorf("block needs higher number (%d <= %d)", header.View, parent.View)
 	}
 
 	// NOTE: in the default case, the first parent is the boundary, so we don't
@@ -313,19 +324,21 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	// badger has efficient caching, so no reason to complicate the algorithm
 	// here to try avoiding one extra header loading
 
+	var currentHeader = *header
+
 	// trace back from new block until we find a block that has the latest
 	// finalized block as its parent
-	for header.ParentID != headID {
+	for currentHeader.ParentID != headID {
 
 		// get the parent of current block
-		err = operation.RetrieveHeader(header.ParentID, header)(tx)
+		err = operation.RetrieveHeader(currentHeader.ParentID, &currentHeader)(tx)
 		if err != nil {
 			return fmt.Errorf("could not get parent (%x): %w", header.ParentID, err)
 		}
 
 		// if its number is below current boundary, the block does not connect
 		// to the finalized protocol state and would break database consistency
-		if header.Number < boundary {
+		if currentHeader.View < boundary {
 			return fmt.Errorf("block doesn't connect to finalized state")
 		}
 

@@ -9,17 +9,17 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[BinaryOperationKindUnknown-0]
-	_ = x[BinaryOperationKindIntegerArithmetic-1]
-	_ = x[BinaryOperationKindIntegerComparison-2]
+	_ = x[BinaryOperationKindArithmetic-1]
+	_ = x[BinaryOperationKindNonEqualityComparison-2]
 	_ = x[BinaryOperationKindBooleanLogic-3]
 	_ = x[BinaryOperationKindEquality-4]
 	_ = x[BinaryOperationKindNilCoalescing-5]
 	_ = x[BinaryOperationKindConcatenation-6]
 }
 
-const _BinaryOperationKind_name = "BinaryOperationKindUnknownBinaryOperationKindIntegerArithmeticBinaryOperationKindIntegerComparisonBinaryOperationKindBooleanLogicBinaryOperationKindEqualityBinaryOperationKindNilCoalescingBinaryOperationKindConcatenation"
+const _BinaryOperationKind_name = "BinaryOperationKindUnknownBinaryOperationKindArithmeticBinaryOperationKindNonEqualityComparisonBinaryOperationKindBooleanLogicBinaryOperationKindEqualityBinaryOperationKindNilCoalescingBinaryOperationKindConcatenation"
 
-var _BinaryOperationKind_index = [...]uint8{0, 26, 62, 98, 129, 156, 188, 220}
+var _BinaryOperationKind_index = [...]uint8{0, 26, 55, 95, 126, 153, 185, 217}
 
 func (i BinaryOperationKind) String() string {
 	if i < 0 || i >= BinaryOperationKind(len(_BinaryOperationKind_index)-1) {

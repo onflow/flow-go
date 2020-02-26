@@ -146,8 +146,8 @@ func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flo
 			EventCollection: flow.ZeroID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,
-			// TODO: record first tx gas used
-			FirstTransactionComputationUsed: 0,
+			// TODO: record number of transactions
+			NumberOfTransactions: 0,
 		},
 		Index:    0,
 		EndState: endState,

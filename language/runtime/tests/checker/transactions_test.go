@@ -378,10 +378,10 @@ func TestCheckInvalidTransactionSelfMoveInVariableDeclaration(t *testing.T) {
 
      transaction {
 
-          execute {
-              let x = self
-          }
-      }
+         execute {
+             let x = self
+         }
+     }
    `)
 
 	errs := ExpectCheckerErrors(t, err, 1)

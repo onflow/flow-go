@@ -46,11 +46,7 @@ func (t *Transactions) All() []*flow.Transaction {
 	entities := t.Backend.All()
 	txs := make([]*flow.Transaction, 0, len(entities))
 	for _, entity := range entities {
-		tx, ok := entity.(*flow.Transaction)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in transaction pool (%T)", entity))
-		}
-		txs = append(txs, tx)
+		txs = append(txs, entity.(*flow.Transaction))
 	}
 	return txs
 }
