@@ -235,7 +235,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, 
 	votingStatus, exists := va.blockIDToVotingStatus[vote.BlockID]
 	if !exists {
 		// get all identities
-		identities, err := va.viewState.GetStakedIdentitiesAtBlock(vote.BlockID)
+		identities, err := va.viewState.ConsensusIdentities(vote.BlockID)
 		if err != nil {
 			return false, fmt.Errorf("could not get identities: %w", err)
 		}
@@ -244,7 +244,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, 
 		stakeThreshold := ComputeStakeThresholdForBuildingQC(identities.TotalStake())
 
 		// create VotingStatus for collecting valid votes and building QC
-		votingStatus = NewVotingStatus(va.sigAggregator, stakeThreshold, vote.View, uint32(len(identities)), voter, block)
+		votingStatus = NewVotingStatus(va.sigAggregator, stakeThreshold, vote.View, voter, block)
 		va.blockIDToVotingStatus[vote.BlockID] = votingStatus
 	}
 	votingStatus.AddVote(vote, voter)

@@ -300,7 +300,7 @@
             "name": "keyword.control.loop.cadence"
           },
           {
-            "match": "(?<!\\.)\\b(?:pre|post|prepare|execute|import|from|create|destroy)\\b",
+            "match": "(?<!\\.)\\b(?:pre|post|prepare|execute|import|from|create|destroy|emit)\\b",
             "name": "keyword.other.cadence"
           },
           {
@@ -308,7 +308,7 @@
             "name": "keyword.other.declaration-specifier.accessibility.cadence"
           },
           {
-            "match": "\\binit\\b|(?<!\\.)\\b(?:get|set)\\b",
+            "match": "\\binit\\b|\\bdestroy\\b|(?<!\\.)\\b(?:get|set)\\b",
             "name": "storage.type.function.cadence"
           }
         ]
@@ -549,7 +549,7 @@
         "comment": "Types provided in the standard library",
         "patterns": [
           {
-            "match": "\\bAny\\b",
+            "match": "\\bAny(?:Resource|Struct)\\b",
             "name": "support.type.any.cadence"
           },
           {
@@ -561,7 +561,7 @@
             "name": "support.type.self.cadence"
           },
           {
-            "match": "\\bU?Int(?:16|8|32|64)?\\b",
+            "match": "\\bU?(?:Int|Word)(?:8|16|32|64|128|256)?\\b",
             "name": "support.type.integer.cadence"
           }
         ]
@@ -628,7 +628,7 @@
         ]
       },
       "composite": {
-        "begin": "\\b((?:(?:struct|resource)(?:\\s+interface)?)|contract|transaction)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
+        "begin": "\\b((?:(?:struct|resource|contract)(?:\\s+interface)?)|transaction)\\s+([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
         "beginCaptures": {
           "1": {
             "name": "storage.type.$1.cadence"
