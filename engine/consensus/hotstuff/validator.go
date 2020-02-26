@@ -176,7 +176,11 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 		// for sure if the parent block exists. But we know for sure is even if it's invalid we won't vote
 		// for it, because the QC.View is below finalized block. So, we could simply consider this block
 		// as "valid", and we won't vote for it or build a block on top of it.
-		return nil
+
+		// TODO: note other components will expect Validator has validated, and might re-validate it,
+		// if the validation failed there, it will cause crash.
+		// should we return a new error here to ignore?
+		return hotstuff.ErrUnverifiableBlock
 	}
 
 	// validate QC - keep the most expensive the last to check
