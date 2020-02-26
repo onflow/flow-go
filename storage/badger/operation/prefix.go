@@ -34,7 +34,6 @@ const (
 	codeIndexIdentity    = 100
 	codeIndexGuarantee   = 101
 	codeIndexSeal        = 102
-	codeIndexCommit      = 103
 	codeIndexCollection  = 104
 	codeIndexSealByBlock = 105
 )

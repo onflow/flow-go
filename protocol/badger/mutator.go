@@ -47,19 +47,8 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		// get first seal
 		seal := genesis.Seals[0]
 
-		// insert the block seal commit
-		err = operation.InsertCommit(genesis.ID(), seal.FinalState)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert state commit: %w", err)
-		}
-
-		// index the block seal commit
-		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index state commit: %w", err)
-		}
-
-		err = operation.IndexSealByBlock(genesis.ID(), seal.ID())(tx)
+		// index the block seal
+		err = operation.IndexSealIDByBlock(genesis.ID(), seal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index seal by block: %w", err)
 		}
@@ -96,16 +85,9 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// retrieve the seal ID for the parent
-		var parentSealID flow.Identifier
-		err = operation.LookupSealByBlock(block.ParentID, &parentSealID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve parent seal ID: %w", err)
-		}
-
-		// retrieve the seal from parent seal ID
+		// retrieve the seal for the parent
 		var parentSeal flow.Seal
-		err = operation.RetrieveSeal(parentSealID, &parentSeal)(tx)
+		err = procedure.LookupSealByBlock(block.ParentID, &parentSeal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve parent seal: %w", err)
 		}
@@ -151,13 +133,8 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			nextSeal = possibleNextSeal
 		}
 
-		// insert the the commit state into our state commitment timeline
-		err = operation.IndexCommit(blockID, nextSeal.FinalState)(tx)
-		if err != nil {
-			return fmt.Errorf("counld not index commit: %w", err)
-		}
-
-		err = operation.IndexSealByBlock(blockID, nextSeal.ID())(tx)
+		// insert the the seal into our seals timeline
+		err = operation.IndexSealIDByBlock(blockID, nextSeal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index seal by block: %w", err)
 		}

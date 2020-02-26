@@ -22,9 +22,6 @@ type Snapshot interface {
 	// exist or if its stake is zero.
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
-	// StateCommitment returns the highest execution state commitment at the selected snapshot.
-	StateCommitment() (flow.StateCommitment, error)
-
 	// Seal return the highest seal at the selected snapshot.
 	Seal() (flow.Seal, error)
 

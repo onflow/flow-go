@@ -56,9 +56,11 @@ func TestBootStrapValid(t *testing.T) {
 		err = db.View(operation.RetrieveHeader(genesis.ID(), &storedHeader))
 		require.Nil(t, err)
 
-		var storedCommit flow.StateCommitment
-		err = db.View(operation.LookupCommit(storedHeader.ID(), &storedCommit))
-		require.Nil(t, err)
+		var storedSeal flow.Seal
+		err = db.View(procedure.LookupSealByBlock(storedHeader.ID(), &storedSeal))
+		require.NoError(t, err)
+		require.NotNil(t, storedSeal)
+		require.Equal(t, flow.ZeroID, storedSeal.BlockID) //genesis seal is special
 
 		assert.Zero(t, boundary)
 		assert.Equal(t, genesis.ID(), storedID)
@@ -83,10 +85,6 @@ func TestExtendSealedBoundary(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, genesis.Seals[0], &seal)
 		assert.Equal(t, flow.ZeroID, seal.BlockID) //genesis seal seals block with ID 0x00
-
-		commitment, err := state.Final().StateCommitment()
-		assert.NoError(t, err)
-		assert.Equal(t, seal.FinalState, commitment)
 
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
@@ -148,13 +146,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 		sealed, err := state.Final().Seal()
 		assert.NoError(t, err)
 
-		commitment, err = state.Final().StateCommitment()
-		assert.NoError(t, err)
-
 		// Sealed only moves after a block is finalized
 		// so here we still want to check for genesis seal
 		assert.Equal(t, flow.ZeroID, sealed.BlockID)
-		assert.Equal(t, sealed.FinalState, commitment)
 
 		err = mutator.Finalize(sealingBlock.ID())
 		assert.NoError(t, err)
@@ -162,11 +156,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 		sealed, err = state.Final().Seal()
 		assert.NoError(t, err)
 
-		commitment, err = state.Final().StateCommitment()
-		assert.NoError(t, err)
-
 		assert.Equal(t, block.ID(), sealed.BlockID)
-		assert.Equal(t, sealed.FinalState, commitment)
 	})
 }
 

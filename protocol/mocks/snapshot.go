@@ -111,18 +111,3 @@ func (mr *MockSnapshotMockRecorder) Seal() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Seal", reflect.TypeOf((*MockSnapshot)(nil).Seal))
 }
-
-// StateCommitment mocks base method
-func (m *MockSnapshot) StateCommitment() ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StateCommitment")
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// StateCommitment indicates an expected call of StateCommitment
-func (mr *MockSnapshotMockRecorder) StateCommitment() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateCommitment", reflect.TypeOf((*MockSnapshot)(nil).StateCommitment))
-}
