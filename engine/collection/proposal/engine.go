@@ -9,8 +9,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model/cluster"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -134,6 +138,88 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+// SendVote will send a vote to the desired node.
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig, _ crypto.Signature, recipientID flow.Identifier) error {
+
+	// build the vote message
+	vote := &messages.ClusterBlockVote{
+		BlockID:   blockID,
+		View:      view,
+		Signature: sig,
+	}
+
+	err := e.con.Submit(vote, recipientID)
+	if err != nil {
+		return fmt.Errorf("could not send vote: %w", err)
+	}
+
+	return nil
+}
+
+// BroadcastProposal submits a cluster block proposal (effectively a proposal
+// for the next collection) to all the collection nodes in our cluster.
+func (e *Engine) BroadcastProposal(header *flow.Header) error {
+
+	// first, check that we are the proposer of the block
+	if header.ProposerID != e.me.NodeID() {
+		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
+	}
+
+	// retrieve the payload for the block
+	// NOTE: relies on the fact that cluster payload hash is the ID of its collection
+	collectionID := header.PayloadHash
+	collection, err := e.collections.LightByID(collectionID)
+	if err != nil {
+		return fmt.Errorf("could not get payload for block: %w", err)
+	}
+	payload := cluster.Payload{Collection: *collection}
+
+	// retrieve all collection nodes in our cluster
+	// TODO filter by cluster
+	recipients, err := e.state.Final().Identities(
+		filter.HasRole(flow.RoleCollection),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
+	if err != nil {
+		return fmt.Errorf("could not get cluster members: %w", err)
+	}
+
+	// create the proposal message for the collection
+	msg := &messages.ClusterBlockProposal{
+		Header:  header,
+		Payload: &payload,
+	}
+
+	err = e.con.Submit(msg, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not broadcast proposal: %w", err)
+	}
+
+	return nil
+}
+
+// BroadcastCommit broadcasts a commit message to all collection nodes in our
+// cluster.
+func (e *Engine) BroadcastCommit(commit *model.Commit) error {
+
+	// retrieve all collection nodes in our cluster
+	// TODO filter by cluster
+	recipients, err := e.state.Final().Identities(
+		filter.HasRole(flow.RoleCollection),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
+	if err != nil {
+		return fmt.Errorf("could not get cluster members: %w", err)
+	}
+
+	err = e.con.Submit(commit, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not send commit message: %w", err)
+	}
+
+	return err
 }
 
 // createProposal creates a new proposal
