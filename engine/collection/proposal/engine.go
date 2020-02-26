@@ -147,84 +147,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onBlockRequest(originID, ev)
 	case *messages.ClusterBlockResponse:
 		return e.onBlockResponse(originID, ev)
+	case *model.Commit:
+		return e.onBlockCommit(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
-}
-
-func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
-
-	// retrieve the parent block
-	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
-	if errors.Is(err, storage.ErrNotFound) {
-		// TODO handle block buffering https://github.com/dapperlabs/flow-go/issues/2408
-	}
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
-	}
-
-	_ = parent
-
-	// TODO handle missing transactions
-	// TODO store block contents
-	// TODO ensure block is valid extension of cluster state
-	// TODO submit to hotstuff
-	// TODO check for buffered descendants of the block
-
-	return nil
-}
-
-func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-
-	// forward the vote for processing
-	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature, nil)
-
-	return nil
-}
-
-func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterBlockRequest) error {
-
-	// retrieve the block header
-	header, err := e.headers.ByBlockID(req.BlockID)
-	if err != nil {
-		return fmt.Errorf("could not find requested block: %w", err)
-	}
-
-	// retrieve the block payload
-	collection, err := e.collections.LightByID(header.PayloadHash)
-	if err != nil {
-		return fmt.Errorf("could not find requested block: %w", err)
-	}
-
-	payload := &cluster.Payload{Collection: *collection}
-
-	proposal := &messages.ClusterBlockProposal{
-		Header:  header,
-		Payload: payload,
-	}
-
-	res := &messages.ClusterBlockResponse{
-		Proposal: proposal,
-		Nonce:    req.Nonce,
-	}
-
-	err = e.con.Submit(res, originID)
-	if err != nil {
-		return fmt.Errorf("could not send block response: %w", err)
-	}
-
-	return nil
-}
-
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) error {
-
-	// process the block response as we would a regular proposal
-	err := e.onBlockProposal(originID, res.Proposal)
-	if err != nil {
-		return fmt.Errorf("could not process block response: %w", err)
-	}
-
-	return nil
 }
 
 // SendVote will send a vote to the desired node.
@@ -307,6 +234,86 @@ func (e *Engine) BroadcastCommit(commit *model.Commit) error {
 	}
 
 	return err
+}
+
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
+
+	// retrieve the parent block
+	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
+	if errors.Is(err, storage.ErrNotFound) {
+		// TODO handle block buffering https://github.com/dapperlabs/flow-go/issues/2408
+	}
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
+	_ = parent
+
+	// TODO handle missing transactions
+	// TODO store block contents
+	// TODO ensure block is valid extension of cluster state
+	// TODO submit to hotstuff
+	// TODO check for buffered descendants of the block
+
+	return nil
+}
+
+func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
+
+	// forward the vote for processing
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature, nil)
+
+	return nil
+}
+
+func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterBlockRequest) error {
+
+	// retrieve the block header
+	header, err := e.headers.ByBlockID(req.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not find requested block: %w", err)
+	}
+
+	// retrieve the block payload
+	collection, err := e.collections.LightByID(header.PayloadHash)
+	if err != nil {
+		return fmt.Errorf("could not find requested block: %w", err)
+	}
+
+	payload := &cluster.Payload{Collection: *collection}
+
+	proposal := &messages.ClusterBlockProposal{
+		Header:  header,
+		Payload: payload,
+	}
+
+	res := &messages.ClusterBlockResponse{
+		Proposal: proposal,
+		Nonce:    req.Nonce,
+	}
+
+	err = e.con.Submit(res, originID)
+	if err != nil {
+		return fmt.Errorf("could not send block response: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) error {
+
+	// process the block response as we would a regular proposal
+	err := e.onBlockProposal(originID, res.Proposal)
+	if err != nil {
+		return fmt.Errorf("could not process block response: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
+	e.coldstuff.SubmitCommit(commit)
+	return nil
 }
 
 // createProposal creates a new proposal
