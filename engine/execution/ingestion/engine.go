@@ -184,8 +184,6 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		return fmt.Errorf("could not save block: %w", err)
 	}
 
-
-
 	blockID := block.ID()
 
 	// TODO: for MVP assume we're only receiving finalized blocks
