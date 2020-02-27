@@ -22,7 +22,7 @@ func NewResults(db *badger.DB) *Results {
 
 func (r *Results) Store(result *flow.ExecutionResult) error {
 	return r.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertResult(result)(tx)
+		err := operation.InsertExecutionResult(result)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert execution result: %w", err)
 		}
@@ -34,7 +34,7 @@ func (r *Results) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) 
 	var result flow.ExecutionResult
 
 	err := r.db.View(func(tx *badger.Txn) error {
-		return operation.RetrieveResult(resultID, &result)(tx)
+		return operation.RetrieveExecutionResult(resultID, &result)(tx)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve execution result: %w", err)

@@ -60,7 +60,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		}
 
 		// insert result
-		err = operation.InsertResult(&flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
+		err = operation.InsertExecutionResult(&flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: flow.ZeroID,
 			BlockID:          genesis.ID(),
 			FinalStateCommit: seal.FinalState,
