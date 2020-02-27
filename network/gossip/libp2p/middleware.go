@@ -21,6 +21,14 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 )
 
+type communicationMode int
+
+const (
+	NoOp communicationMode = iota
+	OneToOne
+	OneToK
+)
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -129,8 +137,51 @@ func (m *Middleware) Stop() {
 	m.wg.Wait()
 }
 
-// Send will try to send the given message to the given peer.
-func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
+// Send sends the message to the set of target ids
+// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.sendDirect
+// Otherwise, middleware.publish is used, which uses the PubSub method of communication.
+func (m *Middleware) Send(channelID uint8, msg interface{}, targetIDs ...flow.Identifier) error {
+	var err error
+	mode := m.chooseMode(channelID, msg, targetIDs...)
+	// decide what mode of communication to use
+	switch mode {
+	case NoOp:
+		// TODO: Decide if this is actually an error or not
+		// return fmt.Errorf("empty list of target Ids")
+		return nil
+	case OneToOne:
+		if targetIDs[0] == m.me {
+			// to avoid self dial by the underlay
+			m.log.Debug().Msg("self dial attempt")
+			return nil
+		}
+		err = m.sendDirect(targetIDs[0], msg)
+	case OneToK:
+		err = m.publish(strconv.Itoa(int(channelID)), msg)
+	default:
+		err = fmt.Errorf("invalid communcation mode: %d", mode)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to send message to %s:%w", targetIDs, err)
+	}
+	return nil
+}
+
+// chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
+func (m *Middleware) chooseMode(_ uint8, _ interface{}, targetIDs ...flow.Identifier) communicationMode {
+	switch len(targetIDs) {
+	case 0:
+		return NoOp
+	case 1:
+		return OneToOne
+	default:
+		return OneToK
+	}
+}
+
+// sendDirect will try to send the given message to the given peer utilizing a 1-1 direct connection
+func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error {
 	m.Lock()
 	defer m.Unlock()
 	found, stale := false, false
@@ -342,7 +393,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 }
 
 // Publish publishes the given payload on the topic
-func (m *Middleware) Publish(topic string, msg interface{}) error {
+func (m *Middleware) publish(topic string, msg interface{}) error {
 	switch msg := msg.(type) {
 	case *message.Message:
 

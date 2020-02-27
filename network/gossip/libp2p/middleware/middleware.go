@@ -12,8 +12,7 @@ import (
 type Middleware interface {
 	Start(overlay Overlay) error
 	Stop()
-	Send(nodeID flow.Identifier, msg interface{}) error
-	Publish(topic string, msg interface{}) error
+	Send(channelID uint8, msg interface{}, targetIDs ...flow.Identifier) error
 	Subscribe(channelID uint8) error
 }
 

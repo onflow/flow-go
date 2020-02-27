@@ -111,6 +111,7 @@ func TestCheckInvalidOptionalChainingNonOptional(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       struct Test {
           let x: Int
+
           init(x: Int) {
               self.x = x
           }
