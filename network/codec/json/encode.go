@@ -5,7 +5,7 @@ package json
 import (
 	"encoding/json"
 
-	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/messages"
 
 	"github.com/pkg/errors"
@@ -35,6 +35,14 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeResponse
 	case *message.Echo:
 		code = CodeEcho
+
+	// Consensus
+	case *messages.BlockProposal:
+		code = CodeBlockProposal
+	case *messages.BlockVote:
+		code = CodeBlockVote
+	case *coldstuff.Commit:
+		code = CodeBlockCommit
 
 	case *flow.CollectionGuarantee:
 		code = CodeCollectionGuarantee

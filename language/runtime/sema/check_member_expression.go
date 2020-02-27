@@ -48,8 +48,13 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 
 	memberType := member.TypeAnnotation.Type
 
+	// If the member access is optional chaining, only wrap the result value
+	// in an optional, if it is not already an optional value
+
 	if isOptional {
-		return &OptionalType{Type: memberType}
+		if _, ok := memberType.(*OptionalType); !ok {
+			return &OptionalType{Type: memberType}
+		}
 	}
 	return memberType
 }
@@ -256,12 +261,12 @@ func (checker *Checker) isWriteableMember(member *Member) bool {
 //
 // The given type itself might be the result.
 //
-func containingContractKindedType(t Type) Type {
+func containingContractKindedType(t Type) CompositeKindedType {
 	for {
 		if compositeKindedType, ok := t.(CompositeKindedType); ok &&
 			compositeKindedType.GetCompositeKind() == common.CompositeKindContract {
 
-			return t
+			return compositeKindedType
 		}
 
 		if containedType, ok := t.(ContainedType); ok {

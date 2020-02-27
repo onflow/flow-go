@@ -30,11 +30,37 @@ func TestCheckInvalidContractAccountField(t *testing.T) {
 	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
 }
 
+func TestCheckInvalidContractInterfaceAccountField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract interface Test {
+          let account: Account
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
 func TestCheckInvalidContractAccountFunction(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       contract Test {
           fun account() {}
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidContractInterfaceAccountFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract interface Test {
+          fun account()
       }
     `)
 
@@ -50,6 +76,20 @@ func TestCheckContractAccountFieldUse(t *testing.T) {
 
           init() {
               self.account.address
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckContractInterfaceAccountFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract interface Test {
+
+          fun test() {
+              pre { self.account.address == Address(0x42) }
           }
       }
     `)
@@ -485,5 +525,75 @@ func TestCheckContractNestedDeclarationsComplex(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestCheckInvalidContractNestedTypeShadowing(t *testing.T) {
+
+	type test struct {
+		name        string
+		code        string
+		isInterface bool
+	}
+
+	tests := []test{
+		{name: "event", code: `event Test()`, isInterface: false},
+	}
+
+	for _, kind := range common.CompositeKindsWithBody {
+
+		// Contracts can not be nested
+		if kind == common.CompositeKindContract {
+			continue
+		}
+
+		for _, isInterface := range []bool{true, false} {
+			keywords := kind.Keyword()
+
+			if isInterface {
+				keywords += " interface"
+			}
+
+			code := fmt.Sprintf(`%s Test {}`, keywords)
+
+			tests = append(tests, test{
+				name:        keywords,
+				code:        code,
+				isInterface: isInterface,
+			})
+		}
+	}
+
+	for _, test := range tests {
+
+		t.Run(test.name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+                      contract Test {
+                          %s
+                      }
+                    `,
+					test.code,
+				),
+			)
+
+			// If the nested element is an interface, there will only be an error
+			// for the redeclared type.
+			//
+			// If the nested element is a concrete type, there will also be an error
+			// for the redeclared value (constructor).
+
+			expectedErrors := 1
+			if !test.isInterface {
+				expectedErrors += 1
+			}
+
+			errs := ExpectCheckerErrors(t, err, expectedErrors)
+
+			for i := 0; i < expectedErrors; i++ {
+				assert.IsType(t, &sema.RedeclarationError{}, errs[i])
+			}
+		})
 	}
 }

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"time"
-
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -10,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/builder/collection"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
@@ -19,13 +18,12 @@ import (
 func main() {
 
 	var (
-		pool         mempool.Transactions
-		collections  *storage.Collections
-		ingressConf  ingress.Config
-		proposalConf proposal.Config
-		providerEng  *provider.Engine
-		ingestEng    *ingest.Engine
-		err          error
+		pool        mempool.Transactions
+		collections *storage.Collections
+		ingressConf ingress.Config
+		providerEng *provider.Engine
+		ingestEng   *ingest.Engine
+		err         error
 	)
 
 	cmd.FlowNode("collection").
@@ -34,7 +32,6 @@ func main() {
 			node.MustNot(err).Msg("could not initialize transaction pool")
 		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.DurationVarP(&proposalConf.ProposalPeriod, "proposal-period", "p", time.Second*5, "period at which collections are proposed")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
@@ -60,7 +57,12 @@ func main() {
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing proposal engine")
 			guarantees := storage.NewGuarantees(node.DB)
-			eng, err := proposal.New(node.Logger, proposalConf, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees)
+			headers := storage.NewHeaders(node.DB)
+			// TODO determine chain ID for clusters
+			build := collection.NewBuilder(node.DB, pool, "TODO")
+			// TODO implement finalizer
+			var final module.Finalizer
+			eng, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees, headers, build, final)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 			return eng
 		}).

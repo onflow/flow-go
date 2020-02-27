@@ -48,7 +48,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), state, me, mws[i], csize)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), state, me, mws[i], csize, libp2p.NewRandPermTopology())
 		if err != nil {
 			return nil, fmt.Errorf("could not create error %w", err)
 		}
@@ -112,14 +112,14 @@ func (s *SnapshotMock) Identity(nodeID flow.Identifier) (*flow.Identity, error) 
 	return nil, fmt.Errorf(" not implemented")
 }
 
-func (s *SnapshotMock) Commit() (flow.StateCommitment, error) {
-	return nil, fmt.Errorf(" not implemented")
-}
-
 func (s *SnapshotMock) Clusters() (*flow.ClusterList, error) {
 	return nil, fmt.Errorf(" not implemented")
 }
 
 func (s *SnapshotMock) Head() (*flow.Header, error) {
 	return nil, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Seal() (flow.Seal, error) {
+	return flow.Seal{}, fmt.Errorf(" not implemented")
 }

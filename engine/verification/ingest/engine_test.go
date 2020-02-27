@@ -129,11 +129,11 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// mock the receipt coming from an execution node
 	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	collIdentity := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
+	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 
 	suite.state.On("Final").Return(suite.ss, nil)
 	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
-	suite.ss.On("Identities", testifymock.Anything).Return(collIdentity, nil).Once()
+	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Once()
 
 	// we have the corresponding block and chunk state, but not the collection
 	suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil)
@@ -146,7 +146,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 	// expect that the collection is requested
-	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentity.Get(0).NodeID).Return(nil).Once()
+	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
 
 	err := eng.Process(execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)

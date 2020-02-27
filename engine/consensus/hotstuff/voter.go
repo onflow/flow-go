@@ -4,7 +4,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // Voter produces votes for the given block
@@ -34,7 +34,7 @@ func (v *Voter) NewVoter(signer Signer, viewState *ViewState, forks Forks, log z
 // This method will only ever _once_ return a `non-nil, true` vote: the very first time it encounters a safe block of the
 //  current view to vote for. Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
 // (including repeated calls with the initial block we voted for also return `nil, false`).
-func (v *Voter) ProduceVoteIfVotable(block *types.Block, curView uint64) (*types.Vote, bool) {
+func (v *Voter) ProduceVoteIfVotable(block *hotstuff.Block, curView uint64) (*hotstuff.Vote, bool) {
 	if v.forks.IsSafeBlock(block) {
 		log.Info().Msg("received block is not a safe node, don't vote")
 		return nil, false

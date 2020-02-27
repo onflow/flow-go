@@ -214,7 +214,7 @@ func NewIntFromBig(i *big.Int) Int {
 func (Int) isValue() {}
 
 func (Int) Type() Type {
-	return nil
+	return IntType{}
 }
 
 func (v Int) WithType(_ Type) Value {
@@ -339,7 +339,7 @@ func NewInt128FromBig(i *big.Int) Int128 {
 func (Int128) isValue() {}
 
 func (Int128) Type() Type {
-	return nil
+	return Int128Type{}
 }
 
 func (v Int128) WithType(_ Type) Value {
@@ -376,7 +376,7 @@ func NewInt256FromBig(i *big.Int) Int256 {
 func (Int256) isValue() {}
 
 func (Int256) Type() Type {
-	return nil
+	return Int256Type{}
 }
 
 func (v Int256) WithType(_ Type) Value {
@@ -415,7 +415,7 @@ func NewUIntFromBig(i *big.Int) UInt {
 func (UInt) isValue() {}
 
 func (UInt) Type() Type {
-	return nil
+	return UIntType{}
 }
 
 func (v UInt) WithType(_ Type) Value {
@@ -543,7 +543,7 @@ func NewUInt128FromBig(i *big.Int) UInt128 {
 func (UInt128) isValue() {}
 
 func (UInt128) Type() Type {
-	return nil
+	return UInt128Type{}
 }
 
 func (v UInt128) WithType(_ Type) Value {
@@ -583,7 +583,7 @@ func NewUInt256FromBig(i *big.Int) UInt256 {
 func (UInt256) isValue() {}
 
 func (UInt256) Type() Type {
-	return nil
+	return UInt256Type{}
 }
 
 func (v UInt256) WithType(_ Type) Value {
@@ -687,6 +687,50 @@ func (v Word64) WithType(_ Type) Value {
 }
 
 func (v Word64) ToGoValue() interface{} {
+	return uint64(v)
+}
+
+// Fix64
+
+type Fix64 int64
+
+func NewFix64(i int64) Fix64 {
+	return Fix64(i)
+}
+
+func (Fix64) isValue() {}
+
+func (Fix64) Type() Type {
+	return Fix64Type{}
+}
+
+func (v Fix64) WithType(_ Type) Value {
+	return v
+}
+
+func (v Fix64) ToGoValue() interface{} {
+	return int64(v)
+}
+
+// UFix64
+
+type UFix64 uint64
+
+func NewUFix64(i uint64) UFix64 {
+	return UFix64(i)
+}
+
+func (UFix64) isValue() {}
+
+func (UFix64) Type() Type {
+	return UFix64Type{}
+}
+
+func (v UFix64) WithType(_ Type) Value {
+	return v
+}
+
+func (v UFix64) ToGoValue() interface{} {
 	return uint64(v)
 }
 

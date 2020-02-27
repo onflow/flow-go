@@ -85,7 +85,7 @@ func TestCheckInvalidFunctionDeclarations(t *testing.T) {
 	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
-func TestCheckFunctionRedeclaration(t *testing.T) {
+func TestCheckInvalidFunctionRedeclaration(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun foo() {
@@ -93,7 +93,9 @@ func TestCheckFunctionRedeclaration(t *testing.T) {
       }
 	`)
 
-	require.NoError(t, err)
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
 func TestCheckFunctionAccess(t *testing.T) {

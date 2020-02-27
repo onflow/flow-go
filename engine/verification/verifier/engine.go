@@ -118,47 +118,43 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote origin for verify")
 	}
-
-	chunkID := res.Receipt.ExecutionResult.Chunks.ByIndex(0).ID()
-
-	computedEndState, err := e.executeChunk(res)
-	if err != nil {
-		return fmt.Errorf("could not verify chunk (id=%s): %w", chunkID, err)
-	}
-
-	// TODO for now, we discard the computed end state and approve the ER
-	_ = computedEndState
-
 	consensusNodes, err := e.state.Final().
 		Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not load consensus node IDs: %w", err)
 	}
-
-	approval := &flow.ResultApproval{
-		ResultApprovalBody: flow.ResultApprovalBody{
-			ExecutionResultID: res.Receipt.ExecutionResult.ID(),
-		},
+	// TODO add chunk select here
+	for i, chunk := range res.Receipt.ExecutionResult.Chunks {
+		computedEndState, err := e.executeChunk(res, i)
+		if err != nil {
+			return fmt.Errorf("could not verify chunk (id=%s): %w", chunk.ID(), err)
+		}
+		// TODO for now, we discard the computed end state and approve the ER
+		_ = computedEndState
+		approval := &flow.ResultApproval{
+			ResultApprovalBody: flow.ResultApprovalBody{
+				ExecutionResultID: res.Receipt.ExecutionResult.ID(),
+				ChunkIndex:        uint64(i),
+			},
+		}
+		// broadcast result approval to consensus nodes
+		err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
+		if err != nil {
+			// TODO this error needs more advance handling after MVP
+			return fmt.Errorf("could not submit result approval: %w", err)
+		}
+		e.log.Info().
+			Hex("chunk_id", logging.ID(chunk.ID())).
+			Msg("submitted result approval")
 	}
-
-	// broadcast result approval to consensus nodes
-	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
-	if err != nil {
-		// TODO this error needs more advance handling after MVP
-		return fmt.Errorf("could not submit result approval: %w", err)
-	}
-
-	e.log.Info().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("submitted result approval")
 
 	return nil
 }
 
 // executeChunk executes the transactions for a single chunk and returns the
 // resultant end state, or an error if execution failed.
-func (e *Engine) executeChunk(res *verification.CompleteExecutionResult) (flow.StateCommitment, error) {
+func (e *Engine) executeChunk(res *verification.CompleteExecutionResult, chunkIndex int) (flow.StateCommitment, error) {
 	blockCtx := virtualmachine.NewBlockContext(e.runtime, &res.Block.Header)
 
 	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
@@ -168,13 +164,13 @@ func (e *Engine) executeChunk(res *verification.CompleteExecutionResult) (flow.S
 		if !ok {
 			return nil, fmt.Errorf("missing register")
 		}
-
 		return val, nil
 	}
 
 	chunkView := state.NewView(getRegister)
 
-	for _, tx := range res.Collections[0].Transactions {
+	col := res.Collections[chunkIndex]
+	for _, tx := range col.Transactions {
 		txView := chunkView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)

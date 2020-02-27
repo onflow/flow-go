@@ -80,13 +80,13 @@ func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// insert the number to block mapping
-		err = operation.InsertNumber(header.Number, header.ID())(tx)
+		err = operation.InsertNumber(header.View, header.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}
 
 		// update the finalized boundary
-		err = operation.UpdateBoundary(header.Number)(tx)
+		err = operation.UpdateBoundary(header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update finalized boundary: %w", err)
 		}

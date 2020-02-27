@@ -33,6 +33,29 @@ func (_m *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	return r0, r1
 }
 
+// LightByID provides a mock function with given fields: collID
+func (_m *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection, error) {
+	ret := _m.Called(collID)
+
+	var r0 *flow.LightCollection
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.LightCollection); ok {
+		r0 = rf(collID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.LightCollection)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(collID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Remove provides a mock function with given fields: collID
 func (_m *Collections) Remove(collID flow.Identifier) error {
 	ret := _m.Called(collID)
@@ -53,6 +76,20 @@ func (_m *Collections) Store(collection *flow.Collection) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.Collection) error); ok {
+		r0 = rf(collection)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// StoreLight provides a mock function with given fields: collection
+func (_m *Collections) StoreLight(collection *flow.LightCollection) error {
+	ret := _m.Called(collection)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.LightCollection) error); ok {
 		r0 = rf(collection)
 	} else {
 		r0 = ret.Error(0)

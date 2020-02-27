@@ -58,8 +58,6 @@ spec:
             - '$(POD_NAME)'
             - '--entries'
             - '$(NODE_ENTRIES)'
-            - '--connections'
-            - '5'
             - '--datadir'
             - '/flowdb'
 
@@ -88,6 +86,10 @@ spec:
                 configMapKeyRef:
                   name: flow-node-config-map
                   key: entries
+            # Due to the fact that we're using a headless service, we cannot use the cgo version of net,
+            # which causes an error, instead, force using the pure go version now
+            - name: GODEBUG
+              value: "netdns=go"
 
           # Resource requests and constraints
           resources:

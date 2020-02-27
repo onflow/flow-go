@@ -10,7 +10,7 @@ import (
 
 func Genesis() *Block {
 	header := flow.Header{
-		Number:    0,
+		View:      0,
 		ChainID:   "",
 		Timestamp: time.Now(),
 		ParentID:  flow.ZeroID,
@@ -37,10 +37,25 @@ type Block struct {
 	Payload
 }
 
+// SetPayload sets the payload and payload hash.
+func (b *Block) SetPayload(payload Payload) {
+	b.Payload = payload
+	b.PayloadHash = payload.Hash()
+}
+
 // Payload is the payload for blocks in collection node cluster consensus.
 // It contains only a single collection.
 type Payload struct {
 	Collection flow.LightCollection
+}
+
+// PayloadFromTransactions creates a payload given a list of transaction hashes.
+func PayloadFromTransactions(txHashes []flow.Identifier) Payload {
+	return Payload{
+		Collection: flow.LightCollection{
+			Transactions: txHashes,
+		},
+	}
 }
 
 // Hash returns the hash of the payload, simply the ID of the collection.

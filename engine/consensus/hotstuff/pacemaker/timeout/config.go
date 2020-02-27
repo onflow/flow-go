@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // TimoutConfig contains the configuration parameters for ExponentialIncrease-LinearDecrease
@@ -52,19 +52,19 @@ func NewConfig(
 		msg := fmt.Sprintf(
 			"startReplicaTimeout (%dms) cannot be smaller than minReplicaTimeout (%dms)",
 			startReplicaTimeout.Milliseconds(), minReplicaTimeout.Milliseconds())
-		return nil, &types.ErrorConfiguration{Msg: msg}
+		return nil, &hotstuff.ErrorConfiguration{Msg: msg}
 	}
 	if minReplicaTimeout < 0 {
-		return nil, &types.ErrorConfiguration{Msg: "minReplicaTimeout must non-negative"}
+		return nil, &hotstuff.ErrorConfiguration{Msg: "minReplicaTimeout must non-negative"}
 	}
 	if voteAggregationTimeoutFraction <= 0 || 1 < voteAggregationTimeoutFraction {
-		return nil, &types.ErrorConfiguration{Msg: "VoteAggregationTimeoutFraction must be in range (0,1]"}
+		return nil, &hotstuff.ErrorConfiguration{Msg: "VoteAggregationTimeoutFraction must be in range (0,1]"}
 	}
 	if timeoutIncrease <= 1 {
-		return nil, &types.ErrorConfiguration{Msg: "TimeoutIncrease must be strictly bigger than 1"}
+		return nil, &hotstuff.ErrorConfiguration{Msg: "TimeoutIncrease must be strictly bigger than 1"}
 	}
 	if timeoutDecrease <= 0 {
-		return nil, &types.ErrorConfiguration{Msg: "timeoutDecrease must positive"}
+		return nil, &hotstuff.ErrorConfiguration{Msg: "timeoutDecrease must positive"}
 	}
 	tc := config{
 		replicaTimeout:                 float64(startReplicaTimeout.Milliseconds()),

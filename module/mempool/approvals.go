@@ -9,33 +9,18 @@ import (
 // Approvals represents a concurrency-safe memory pool for result approvals.
 type Approvals interface {
 
-	// Has checks whether the result approval with the given hash is currently in
-	// the memory pool.
-	Has(approvalID flow.Identifier) bool
-
-	// Add will add the given result approval to the memory pool; it will error if
-	// the result approval is already in the memory pool.
+	// Add will add the given result approval to the memory pool.
 	Add(approval *flow.ResultApproval) error
 
-	// Rem will remove the given result approval from the memory pool; it will
-	// will return true if the result approval was known and removed.
+	// Has will check if the given approval is in the memory pool.
+	Has(approvalID flow.Identifier) bool
+
+	// Rem will attempt to remove the approval from the memory pool.
 	Rem(approvalID flow.Identifier) bool
 
-	// ByID will retrieve the given result approval from the memory pool; it will
-	// error if the result approval is not in the memory pool.
-	ByID(approvalID flow.Identifier) (*flow.ResultApproval, error)
-
 	// ByResultID will retrieve the approval by receipt ID.
-	ByResultID(resultID flow.Identifier) (*flow.ResultApproval, error)
+	ByResultID(resultID flow.Identifier) []*flow.ResultApproval
 
-	// Size will return the current size of the memory pool.
-	Size() uint
-
-	// All will retrieve all result approvals that are currently in the memory pool
-	// as a slice.
-	All() []*flow.ResultApproval
-
-	// Hash will return a fingerprint has representing the contents of the
-	// entire memory pool.
-	Hash() flow.Identifier
+	// Drop will drop the approvals for the given block.
+	DropForBlock(blockID flow.Identifier)
 }

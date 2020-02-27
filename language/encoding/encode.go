@@ -90,6 +90,10 @@ func (e *Encoder) Encode(v language.Value) error {
 		return e.EncodeWord32(x)
 	case language.Word64:
 		return e.EncodeWord64(x)
+	case language.Fix64:
+		return e.EncodeFix64(x)
+	case language.UFix64:
+		return e.EncodeUFix64(x)
 	case language.VariableSizedArray:
 		return e.EncodeVariableSizedArray(x)
 	case language.ConstantSizedArray:
@@ -397,6 +401,26 @@ func (e *Encoder) EncodeWord32(v language.Word32) error {
 //  RFC Section 4.5 - Unsigned Hyper Integer
 //  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
 func (e *Encoder) EncodeWord64(v language.Word64) error {
+	_, err := e.enc.EncodeUhyper(uint64(v))
+	return err
+}
+
+// EncodeFix64 writes the XDR-encoded representation of an int-64 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.5
+//  RFC Section 4.5 - Hyper Integer
+//  64-bit big-endian signed integer in range [-9223372036854775808, 9223372036854775807]
+func (e *Encoder) EncodeFix64(v language.Fix64) error {
+	_, err := e.enc.EncodeHyper(int64(v))
+	return err
+}
+
+// EncodeUFix64 writes the XDR-encoded representation of a uint-64 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.5
+//  RFC Section 4.5 - Unsigned Hyper Integer
+//  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
+func (e *Encoder) EncodeUFix64(v language.UFix64) error {
 	_, err := e.enc.EncodeUhyper(uint64(v))
 	return err
 }

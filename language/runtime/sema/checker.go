@@ -138,12 +138,13 @@ func NewChecker(program *ast.Program, location ast.Location, options ...Option) 
 
 	typeActivations := NewValueActivations()
 	for name, baseType := range baseTypes {
-		_, err := typeActivations.DeclareType(
-			ast.Identifier{Identifier: name},
-			baseType,
-			common.DeclarationKindType,
-			ast.AccessPublic,
-		)
+		_, err := typeActivations.DeclareType(typeDeclaration{
+			identifier:               ast.Identifier{Identifier: name},
+			ty:                       baseType,
+			declarationKind:          common.DeclarationKindType,
+			access:                   ast.AccessPublic,
+			allowOuterScopeShadowing: false,
+		})
 		if err != nil {
 			panic(err)
 		}
@@ -207,16 +208,17 @@ func (checker *Checker) declareBaseValues() {
 }
 
 func (checker *Checker) declareValue(name string, declaration ValueDeclaration) *Variable {
-	variable, err := checker.valueActivations.Declare(
-		name,
-		declaration.ValueDeclarationType(),
+	variable, err := checker.valueActivations.Declare(variableDeclaration{
+		identifier: name,
+		ty:         declaration.ValueDeclarationType(),
 		// TODO: add access to ValueDeclaration and use declaration's access instead here
-		ast.AccessPublic,
-		declaration.ValueDeclarationKind(),
-		declaration.ValueDeclarationPosition(),
-		declaration.ValueDeclarationIsConstant(),
-		declaration.ValueDeclarationArgumentLabels(),
-	)
+		access:                   ast.AccessPublic,
+		kind:                     declaration.ValueDeclarationKind(),
+		pos:                      declaration.ValueDeclarationPosition(),
+		isConstant:               declaration.ValueDeclarationIsConstant(),
+		argumentLabels:           declaration.ValueDeclarationArgumentLabels(),
+		allowOuterScopeShadowing: false,
+	})
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(name, variable)
 	return variable
@@ -232,12 +234,13 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	// TODO: add access to TypeDeclaration and use declaration's access instead here
 	const access = ast.AccessPublic
 
-	variable, err := checker.typeActivations.DeclareType(
-		identifier,
-		ty,
-		declaration.TypeDeclarationKind(),
-		access,
-	)
+	variable, err := checker.typeActivations.DeclareType(typeDeclaration{
+		identifier:               identifier,
+		ty:                       ty,
+		declarationKind:          declaration.TypeDeclarationKind(),
+		access:                   access,
+		allowOuterScopeShadowing: false,
+	})
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 }
@@ -440,7 +443,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 
 func (checker *Checker) checkTypeCompatibility(expression ast.Expression, valueType Type, targetType Type) bool {
 	switch typedExpression := expression.(type) {
-	case *ast.IntExpression:
+	case *ast.IntegerExpression:
 		unwrappedTargetType := UnwrapOptionalType(targetType)
 
 		// If the target type is `Never`, the checks below will be performed
@@ -457,6 +460,22 @@ func (checker *Checker) checkTypeCompatibility(expression ast.Expression, valueT
 
 		} else if IsSubType(unwrappedTargetType, &AddressType{}) {
 			checker.checkAddressLiteral(typedExpression)
+
+			return true
+		}
+
+	case *ast.FixedPointExpression:
+		unwrappedTargetType := UnwrapOptionalType(targetType)
+
+		// If the target type is `Never`, the checks below will be performed
+		// (as `Never` is the subtype of all types), but the checks are not valid
+
+		if IsSubType(unwrappedTargetType, &NeverType{}) {
+			break
+		}
+
+		if IsSubType(unwrappedTargetType, &FixedPointType{}) {
+			checker.checkFixedPointLiteral(typedExpression, unwrappedTargetType)
 
 			return true
 		}
@@ -509,33 +528,82 @@ func (checker *Checker) checkTypeCompatibility(expression ast.Expression, valueT
 // checkIntegerLiteral checks that the value of the integer literal
 // fits into range of the target integer type
 //
-func (checker *Checker) checkIntegerLiteral(expression *ast.IntExpression, integerType Type) {
-	ranged := integerType.(Ranged)
-	rangeMin := ranged.Min()
-	rangeMax := ranged.Max()
+func (checker *Checker) checkIntegerLiteral(expression *ast.IntegerExpression, integerType Type) {
+	ranged := integerType.(IntegerRangedType)
+	minInt := ranged.MinInt()
+	maxInt := ranged.MaxInt()
 
-	if checker.checkRange(expression.Value, rangeMin, rangeMax) {
+	if checker.checkIntegerRange(expression.Value, minInt, maxInt) {
 		return
 	}
 
 	checker.report(
 		&InvalidIntegerLiteralRangeError{
-			ExpectedType:     integerType,
-			ExpectedRangeMin: rangeMin,
-			ExpectedRangeMax: rangeMax,
-			Range:            ast.NewRangeFromPositioned(expression),
+			ExpectedType:   integerType,
+			ExpectedMinInt: minInt,
+			ExpectedMaxInt: maxInt,
+			Range:          ast.NewRangeFromPositioned(expression),
 		},
 	)
+}
+
+// checkFixedPointLiteral checks that the value of the fixed-point literal
+// fits into range of the target fixed-point type
+//
+func (checker *Checker) checkFixedPointLiteral(expression *ast.FixedPointExpression, fixedPointType Type) {
+
+	// Check the integer range
+
+	ranged := fixedPointType.(FractionalRangedType)
+	minInt := ranged.MinInt()
+	maxInt := ranged.MaxInt()
+	scale := ranged.Scale()
+	minFractional := ranged.MinFractional()
+	maxFractional := ranged.MaxFractional()
+
+	if expression.Scale > scale {
+		checker.report(
+			&InvalidFixedPointLiteralScaleError{
+				ExpectedType:  fixedPointType,
+				ExpectedScale: scale,
+				Range:         ast.NewRangeFromPositioned(expression),
+			},
+		)
+
+		return
+	}
+
+	if !checker.checkFixedPointRange(
+		expression.Integer,
+		expression.Fractional,
+		minInt,
+		minFractional,
+		maxInt,
+		maxFractional,
+	) {
+		checker.report(
+			&InvalidFixedPointLiteralRangeError{
+				ExpectedType:          fixedPointType,
+				ExpectedMinInt:        minInt,
+				ExpectedMinFractional: minFractional,
+				ExpectedMaxInt:        maxInt,
+				ExpectedMaxFractional: maxFractional,
+				Range:                 ast.NewRangeFromPositioned(expression),
+			},
+		)
+
+		return
+	}
 }
 
 // checkAddressLiteral checks that the value of the integer literal
 // fits into the range of an address (160 bits / 20 bytes),
 // and is hexadecimal
 //
-func (checker *Checker) checkAddressLiteral(expression *ast.IntExpression) {
+func (checker *Checker) checkAddressLiteral(expression *ast.IntegerExpression) {
 	ranged := &AddressType{}
-	rangeMin := ranged.Min()
-	rangeMax := ranged.Max()
+	rangeMin := ranged.MinInt()
+	rangeMax := ranged.MaxInt()
 
 	if expression.Base != 16 {
 		checker.report(
@@ -545,7 +613,7 @@ func (checker *Checker) checkAddressLiteral(expression *ast.IntExpression) {
 		)
 	}
 
-	if checker.checkRange(expression.Value, rangeMin, rangeMax) {
+	if checker.checkIntegerRange(expression.Value, rangeMin, rangeMax) {
 		return
 	}
 
@@ -556,9 +624,39 @@ func (checker *Checker) checkAddressLiteral(expression *ast.IntExpression) {
 	)
 }
 
-func (checker *Checker) checkRange(value, min, max *big.Int) bool {
+func (checker *Checker) checkIntegerRange(value, min, max *big.Int) bool {
 	return (min == nil || value.Cmp(min) >= 0) &&
 		(max == nil || value.Cmp(max) <= 0)
+}
+
+func (checker *Checker) checkFixedPointRange(
+	integerValue, fractionalValue,
+	minInt, minFractional,
+	maxInt, maxFractional *big.Int,
+) bool {
+	switch integerValue.Cmp(minInt) {
+	case -1:
+		return false
+	case 0:
+		if fractionalValue.Cmp(minFractional) > 0 {
+			return false
+		}
+	case 1:
+		break
+	}
+
+	switch integerValue.Cmp(maxInt) {
+	case -1:
+		break
+	case 0:
+		if fractionalValue.Cmp(maxFractional) > 0 {
+			return false
+		}
+	case 1:
+		return false
+	}
+
+	return true
 }
 
 func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
@@ -735,14 +833,25 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 
 		for name := range interfaceType.Members {
 			if previousDeclaringInterfaceType, ok := memberSet[name]; ok {
-				checker.report(
-					&RestrictionMemberClashError{
-						Name:                  name,
-						RedeclaringType:       interfaceType,
-						OriginalDeclaringType: previousDeclaringInterfaceType,
-						Range:                 ast.NewRangeFromPositioned(restriction),
-					},
-				)
+
+				// If there is an overlap in members, ensure the members have the same type
+
+				memberType := interfaceType.Members[name].TypeAnnotation.Type
+				previousMemberType := previousDeclaringInterfaceType.Members[name].TypeAnnotation.Type
+
+				if !memberType.IsInvalidType() &&
+					!previousMemberType.IsInvalidType() &&
+					!memberType.Equal(previousMemberType) {
+
+					checker.report(
+						&RestrictionMemberClashError{
+							Name:                  name,
+							RedeclaringType:       interfaceType,
+							OriginalDeclaringType: previousDeclaringInterfaceType,
+							Range:                 ast.NewRangeFromPositioned(restriction),
+						},
+					)
+				}
 			} else {
 				memberSet[name] = interfaceType
 			}
@@ -1248,13 +1357,23 @@ func (checker *Checker) checkResourceFieldNesting(
 	members map[string]*Member,
 	compositeKind common.CompositeKind,
 ) {
-	if compositeKind == common.CompositeKindResource {
+	// Resource fields are only allowed in resources and contracts
+
+	switch compositeKind {
+	case common.CompositeKindResource,
+		common.CompositeKindContract:
+
 		return
 	}
 
+	// The field is not a resource or contract, check if there are
+	// any fields that have a resource type  and report them
+
 	for name, member := range members {
+
 		// NOTE: check type, not resource annotation:
 		// the field could have a wrong annotation
+
 		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
 		}
@@ -1263,8 +1382,9 @@ func (checker *Checker) checkResourceFieldNesting(
 
 		checker.report(
 			&InvalidResourceFieldError{
-				Name: name,
-				Pos:  field.Identifier.Pos,
+				Name:          name,
+				CompositeKind: compositeKind,
+				Pos:           field.Identifier.Pos,
 			},
 		)
 	}
@@ -1492,22 +1612,34 @@ func (checker *Checker) withSelfResourceInvalidationAllowed(f func()) {
 func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 	var predeclaredMembers []*Member
 
-	// Contracts have a predeclared `account: Account` field
+	addPredeclaredMember := func(member *Member) {
+		member.Predeclared = true
+		predeclaredMembers = append(predeclaredMembers, member)
+	}
 
-	if compositeType, ok := containerType.(*CompositeType); ok &&
-		compositeType.Kind == common.CompositeKindContract {
+	if compositeKindedType, ok := containerType.(CompositeKindedType); ok {
 
-		predeclaredMembers = append(predeclaredMembers,
-			&Member{
-				Predeclared:     true,
-				ContainerType:   compositeType,
-				Access:          ast.AccessPrivate,
-				Identifier:      ast.Identifier{Identifier: "account"},
-				TypeAnnotation:  &TypeAnnotation{Type: &AccountType{}},
-				DeclarationKind: common.DeclarationKindField,
-				VariableKind:    ast.VariableKindConstant,
-			},
-		)
+		switch compositeKindedType.GetCompositeKind() {
+		case common.CompositeKindContract:
+			// Contracts have a predeclared private field `priv let account: Account`
+
+			member := NewPublicConstantFieldMember(
+				containerType,
+				"account",
+				&AccountType{},
+			)
+			member.Access = ast.AccessPrivate
+			addPredeclaredMember(member)
+
+		case common.CompositeKindResource:
+			// Resources have a predeclared field `pub let owner: PublicAccount?`
+
+			addPredeclaredMember(NewPublicConstantFieldMember(
+				containerType,
+				"owner",
+				&OptionalType{&PublicAccountType{}},
+			))
+		}
 	}
 
 	return predeclaredMembers
