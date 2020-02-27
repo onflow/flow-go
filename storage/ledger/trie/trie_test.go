@@ -3,7 +3,6 @@ package trie
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
@@ -762,8 +761,6 @@ func TestGetProof_MultipleValueTree(t *testing.T) {
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
 	_ = trie.Update(keys, values)
-
-	fmt.Println(">><<<<<<<<<", trie.root.FmtStr(""))
 
 	flag, proof, size, inclusion := trie.GetProof(key1)
 	if inclusion == false {

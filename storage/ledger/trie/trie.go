@@ -89,8 +89,8 @@ func (n *node) ComputeValue() []byte {
 	if n.Rchild != nil {
 		h2 = n.Rchild.ComputeValue()
 	}
-	// for debugging purpose uncomment this
-	n.value = Hash(h1, h2)
+	// For debugging purpose uncomment this
+	// n.value = Hash(h1, h2)
 	return Hash(h1, h2)
 }
 
