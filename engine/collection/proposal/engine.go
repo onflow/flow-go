@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
@@ -246,12 +247,44 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
-	_ = parent
+	blockID := proposal.Header.ID()
+	collection := proposal.Payload.Collection
 
-	// TODO handle missing transactions
-	// TODO store block contents
-	// TODO ensure block is valid extension of cluster state
-	// TODO submit to coldstuff
+	// ensure we have received and validated all transactions in the proposal
+	var missingTxErr *multierror.Error
+	for _, txID := range collection.Transactions {
+		if !e.pool.Has(txID) {
+			// reject the block, request the transaction
+			missingTxErr = multierror.Append(missingTxErr, fmt.Errorf("cannot validate missing transaction (id=%x)", txID))
+			// TODO submit transaction request
+		}
+	}
+	if err := missingTxErr.ErrorOrNil(); err != nil {
+		return fmt.Errorf("cannot validate block proposal (id=%x) with missing transactions: %w", proposal.Header.ID(), err)
+	}
+
+	// store the collection
+	err = e.collections.StoreLight(&collection)
+	if err != nil {
+		return fmt.Errorf("could not store collection: %w", err)
+	}
+
+	// store the header
+	err = e.headers.Store(proposal.Header)
+	if err != nil {
+		return fmt.Errorf("could not store header: %w", err)
+	}
+
+	// ensure the block is a valid extension of cluster state
+	// TODO update extend logic to ensure no duplicate transactions like https://github.com/dapperlabs/flow-go/pull/2664
+	err = e.state.Mutate().Extend(blockID)
+	if err != nil {
+		return fmt.Errorf("could not extend cluster state: %w", err)
+	}
+
+	// submit the proposal to hotstuff for processing
+	e.coldstuff.SubmitProposal(proposal.Header, parent.View)
+
 	// TODO check for buffered descendants of the block
 
 	return nil
