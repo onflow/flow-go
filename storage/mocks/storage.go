@@ -167,6 +167,21 @@ func (mr *MockCollectionsMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockCollections)(nil).ByID), arg0)
 }
 
+// LightByID mocks base method
+func (m *MockCollections) LightByID(arg0 flow.Identifier) (*flow.LightCollection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LightByID", arg0)
+	ret0, _ := ret[0].(*flow.LightCollection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LightByID indicates an expected call of LightByID
+func (mr *MockCollectionsMockRecorder) LightByID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LightByID", reflect.TypeOf((*MockCollections)(nil).LightByID), arg0)
+}
+
 // Remove mocks base method
 func (m *MockCollections) Remove(arg0 flow.Identifier) error {
 	m.ctrl.T.Helper()
@@ -195,6 +210,20 @@ func (mr *MockCollectionsMockRecorder) Store(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockCollections)(nil).Store), arg0)
 }
 
+// StoreLight mocks base method
+func (m *MockCollections) StoreLight(arg0 *flow.LightCollection) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoreLight", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StoreLight indicates an expected call of StoreLight
+func (mr *MockCollectionsMockRecorder) StoreLight(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreLight", reflect.TypeOf((*MockCollections)(nil).StoreLight), arg0)
+}
+
 // MockCommits is a mock of Commits interface
 type MockCommits struct {
 	ctrl     *gomock.Controller
@@ -216,21 +245,6 @@ func NewMockCommits(ctrl *gomock.Controller) *MockCommits {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockCommits) EXPECT() *MockCommitsMockRecorder {
 	return m.recorder
-}
-
-// ByFinalID mocks base method
-func (m *MockCommits) ByFinalID(arg0 flow.Identifier) ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ByFinalID", arg0)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ByFinalID indicates an expected call of ByFinalID
-func (mr *MockCommitsMockRecorder) ByFinalID(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByFinalID", reflect.TypeOf((*MockCommits)(nil).ByFinalID), arg0)
 }
 
 // ByID mocks base method

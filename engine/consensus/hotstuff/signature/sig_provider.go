@@ -20,8 +20,11 @@ type SigProvider struct {
 	protocolState          protocol.State
 	stakingPrivateKey      crypto.PrivateKey // private staking key
 	randomBeaconPrivateKey crypto.PrivateKey // private key for random beacon signature
+
+	isRandomBeaconEnabled bool // indicates whether random beacon signature is enabled for the cluster
 }
 
+// NewSigProvider creates an instance of SigProvider
 func NewSigProvider(
 	myID flow.Identifier,
 	protocolState protocol.State,
@@ -30,20 +33,38 @@ func NewSigProvider(
 	dkgPubData *DKGPublicData,
 	randomBeaconSigTag string,
 	randomBeaconPrivateKey crypto.PrivateKey,
+	isRandomBeaconEnabled bool,
 ) *SigProvider {
 	return &SigProvider{
-		StakingSigVerifier: NewStakingSigVerifier(stakingSigTag),
+		StakingSigVerifier:      NewStakingSigVerifier(stakingSigTag),
 		RandomBeaconSigVerifier: NewRandomBeaconSigVerifier(dkgPubData, randomBeaconSigTag),
-		myID:                   myID,
-		protocolState: protocolState,
-		stakingPrivateKey:      stakingPrivateKey,
-		randomBeaconPrivateKey: randomBeaconPrivateKey,
+		myID:                    myID,
+		protocolState:           protocolState,
+		stakingPrivateKey:       stakingPrivateKey,
+		randomBeaconPrivateKey:  randomBeaconPrivateKey,
+		isRandomBeaconEnabled:   isRandomBeaconEnabled,
 	}
 }
 
-// CanReconstruct returns if the given number of signature shares is enough to reconstruct the random beaccon sigs
-func (s *SigProvider) CanReconstruct(numOfSigShares int) bool {
-	return crypto.EnoughShares(s.dkgPubData.Size(), numOfSigShares)
+// VerifyRandomBeaconSig verifies a single random beacon signature for a block using the given public key
+// sig - the signature to be verified
+// block - the block that the signature was signed for.
+// randomBeaconSignerIndex - the signer index of signer's random beacon key share.
+func (s *SigProvider) VerifyRandomBeaconSig(sig crypto.Signature, block *model.Block, signerPubKey crypto.PublicKey) (bool, error) {
+	// skip the validation if random beacon is not enabled
+	if !s.isRandomBeaconEnabled {
+		return true, nil
+	}
+	return s.RandomBeaconSigVerifier.VerifyRandomBeaconSig(sig, block, signerPubKey)
+}
+
+// VerifyAggregatedRandomBeaconSignature verifies an aggregated random beacon signature, which is a threshold signature
+func (s *SigProvider) VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *model.Block) (bool, error) {
+	// skip the validation if random beacon is not enabled
+	if !s.isRandomBeaconEnabled {
+		return true, nil
+	}
+	return s.RandomBeaconSigVerifier.VerifyAggregatedRandomBeaconSignature(sig, block)
 }
 
 // Aggregate aggregates the given signature that signed on the given block
@@ -60,30 +81,31 @@ func (s *SigProvider) Aggregate(block *model.Block, sigs []*model.SingleSignatur
 	// aggregate staking sigs
 	aggStakingSigs, signerIDs := aggregateStakingSignature(sigs)
 
-	// convert signerIDs into random beacon pubkey shares
-	sigShares, found, err := s.getSignerIDsAndSigShares(block.BlockID, sigs)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get random beacon key shares: %w", err)
-	}
-
-	if !found {
-		// has unstaked nodes
-		return nil, fmt.Errorf("no staked nodes found: %w", err)
-	}
-
-	msg := BlockToBytesForSign(block)
-
-	// reconstruct random beacon sig
-	reconstructedRandomBeaconSig, err := Reconstruct(msg, s.dkgPubData, sigShares)
-	if err != nil {
-		return nil, fmt.Errorf("cannot reconstruct random beacon sig: %w", err)
-	}
-
-	return &model.AggregatedSignature{
+	aggsig := model.AggregatedSignature{
 		StakingSignatures:     aggStakingSigs,
-		RandomBeaconSignature: reconstructedRandomBeaconSig,
+		RandomBeaconSignature: nil,
 		SignerIDs:             signerIDs,
-	}, nil
+	}
+
+	// add random beacon sig if enabled
+	if s.isRandomBeaconEnabled {
+		// convert signerIDs into random beacon pubkey shares
+		sigShares, err := s.getSignerIDsAndSigShares(block.BlockID, sigs)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get random beacon key shares: %w", err)
+		}
+
+		msg := BlockToBytesForSign(block)
+
+		// reconstruct random beacon sig
+		reconstructedRandomBeaconSig, err := Reconstruct(msg, s.dkgPubData, sigShares)
+		if err != nil {
+			return nil, fmt.Errorf("cannot reconstruct random beacon sig: %w", err)
+		}
+		aggsig.RandomBeaconSignature = reconstructedRandomBeaconSig
+	}
+
+	return &aggsig, nil
 }
 
 func aggregateStakingSignature(sigs []*model.SingleSignature) ([]crypto.Signature, []flow.Identifier) {
@@ -116,20 +138,25 @@ func (s *SigProvider) VoteFor(block *model.Block) (*model.Vote, error) {
 		return nil, fmt.Errorf("fail to sign block (%x) to vote: %w", block.BlockID, err)
 	}
 
-	// generate random beacon signature
-	randomBeaconSig, err := s.randomBeaconPrivateKey.Sign(msg, s.randomBeaconHasher)
-	if err != nil {
-		return nil, fmt.Errorf("fail to sign block (%x) to vote: %w", block.BlockID, err)
+	sig := model.SingleSignature{
+		StakingSignature:      stakingSig,
+		RandomBeaconSignature: nil,
+		SignerID:              s.myID,
+	}
+
+	if s.isRandomBeaconEnabled {
+		// generate random beacon signature
+		randomBeaconSig, err := s.randomBeaconPrivateKey.Sign(msg, s.randomBeaconHasher)
+		if err != nil {
+			return nil, fmt.Errorf("fail to sign block (%x) to vote: %w", block.BlockID, err)
+		}
+		sig.RandomBeaconSignature = randomBeaconSig
 	}
 
 	return &model.Vote{
-		BlockID: block.BlockID,
-		View:    block.View,
-		Signature: &model.SingleSignature{
-			StakingSignature:      stakingSig,
-			RandomBeaconSignature: randomBeaconSig,
-			SignerID:              s.myID,
-		},
+		BlockID:   block.BlockID,
+		View:      block.View,
+		Signature: &sig,
 	}, nil
 }
 
@@ -144,23 +171,28 @@ func (s *SigProvider) Propose(block *model.Block) (*model.Proposal, error) {
 		return nil, fmt.Errorf("fail to sign block (%x) to propose: %w", block.BlockID, err)
 	}
 
-	// generate random beacon signature
-	randomBeaconSig, err := s.randomBeaconPrivateKey.Sign(msg, s.randomBeaconHasher)
-	if err != nil {
-		return nil, fmt.Errorf("fail to sign block (%x) to propose: %w", block.BlockID, err)
-	}
-
-	return &model.Proposal{
+	proposal := model.Proposal{
 		Block:                 block,
 		StakingSignature:      stakingSig,
-		RandomBeaconSignature: randomBeaconSig,
-	}, nil
+		RandomBeaconSignature: nil,
+	}
+
+	if s.isRandomBeaconEnabled {
+		// generate random beacon signature
+		randomBeaconSig, err := s.randomBeaconPrivateKey.Sign(msg, s.randomBeaconHasher)
+		if err != nil {
+			return nil, fmt.Errorf("fail to sign block (%x) to propose: %w", block.BlockID, err)
+		}
+		proposal.RandomBeaconSignature = randomBeaconSig
+	}
+
+	return &proposal, nil
 }
 
-func (s *SigProvider) getSignerIDsAndSigShares(blockID flow.Identifier, sigs []*model.SingleSignature) ([]*SigShare, bool, error) {
+func (s *SigProvider) getSignerIDsAndSigShares(blockID flow.Identifier, sigs []*model.SingleSignature) ([]*SigShare, error) {
 	// sanity check
 	if len(sigs) == 0 {
-		return nil, false, fmt.Errorf("signatures should not be empty")
+		return nil, fmt.Errorf("signatures should not be empty")
 	}
 
 	// lookup signer by signer ID and make SigShare
@@ -169,7 +201,7 @@ func (s *SigProvider) getSignerIDsAndSigShares(blockID flow.Identifier, sigs []*
 		// TODO: confirm if combining into one query is possible and faster
 		signer, err := s.protocolState.AtBlockID(blockID).Identity(sig.SignerID)
 		if err != nil {
-			return nil, false, fmt.Errorf("cannot get identity by signer ID: %v, %w", sig.SignerID, err)
+			return nil, fmt.Errorf("cannot get identity by signer ID: %v, %w", sig.SignerID, err)
 		}
 
 		sigShare := SigShare{
@@ -179,7 +211,7 @@ func (s *SigProvider) getSignerIDsAndSigShares(blockID flow.Identifier, sigs []*
 		sigShares[i] = &sigShare
 	}
 
-	return sigShares, true, nil
+	return sigShares, nil
 }
 
 // BlockToBytesForSign generates the bytes that was signed for a block

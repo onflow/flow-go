@@ -48,21 +48,21 @@ func (v *Validator) ValidateQC(qc *hotstuff.QuorumCertificate, block *hotstuff.B
 		signerMap[signerID] = struct{}{}
 	}
 
-	// get all staked signers' identities
-	stakedSigners, err := v.viewState.GetStakedIdentitiesAtBlock(qc.BlockID, qc.AggregatedSignature.SignerIDs...)
+	stakedSigners, err := v.viewState.ConsensusIdentities(qc.BlockID, qc.AggregatedSignature.SignerIDs...)
 	if err != nil {
 		return fmt.Errorf("cannot get signer identities at blockID (%x) to validate QC, %w", qc.BlockID, err)
 	}
 
-	// since we've checked there is no duplication in QC.AggregatedSignature.Signers,
+	// Given the fact we've checked there is no duplication in QC.AggregatedSignature.Signers,
+	// in other words, signers are all unique, then:
 	// if the counts are equal, then the aggregated signature contains all staked signers' signatures.
-	// if the counts are not equal, then some signer is not staked.
+	// if the counts are not equal, then some signer must be unstaked or not among the consensus members
 	if int(stakedSigners.Count()) != len(qc.AggregatedSignature.SignerIDs) {
 		return newInvalidBlockError(block, fmt.Sprintf("QC has signatures from unstaked signers or non-consensus nodes"))
 	}
 
 	// get all staked nodes at qc's Block
-	allStakedNodes, err := v.viewState.GetStakedIdentitiesAtBlock(qc.BlockID)
+	allStakedNodes, err := v.viewState.ConsensusIdentities(qc.BlockID)
 	if err != nil {
 		return fmt.Errorf("cannot get identities at blockID (%x) to validate QC, %w", qc.BlockID, err)
 	}
@@ -116,9 +116,7 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 	blockID := proposal.Block.BlockID
 
 	// get claimed signer
-	// ToDo The following is O(N) as the filter will iterate over _all_ consensus nodes.
-	//      Instead, Calling protocol state.AtBlockID(blockID).Identity(proposal.Block.ProposerID) will only require O(1)
-	signers, err := v.viewState.GetStakedIdentitiesAtBlock(proposal.Block.BlockID, proposal.Block.ProposerID)
+	signers, err := v.viewState.ConsensusIdentities(proposal.Block.BlockID, proposal.Block.ProposerID)
 	if err != nil {
 		return fmt.Errorf("cannot get signer for block: %x", blockID)
 	}
@@ -177,7 +175,11 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 		// for sure if the parent block exists. But we know for sure is even if it's invalid we won't vote
 		// for it, because the QC.View is below finalized block. So, we could simply consider this block
 		// as "valid", and we won't vote for it or build a block on top of it.
-		return nil
+
+		// TODO: note other components will expect Validator has validated, and might re-validate it,
+		// if the validation failed there, it will cause crash.
+		// should we return a new error here to ignore?
+		return hotstuff.ErrUnverifiableBlock
 	}
 
 	// validate QC - keep the most expensive the last to check
@@ -203,9 +205,7 @@ func (v *Validator) ValidateVote(vote *hotstuff.Vote, block *hotstuff.Block) (*f
 
 	// get claimed signer
 	signerID := vote.Signature.SignerID
-	// ToDo The following is O(N) as the filter will iterate over _all_ consensus nodes.
-	//      Instead, Calling protocol state.AtBlockID(blockID).Identity(proposal.Block.ProposerID) will only require O(1)
-	signers, err := v.viewState.GetStakedIdentitiesAtBlock(blockID, signerID)
+	signers, err := v.viewState.ConsensusIdentities(blockID, signerID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get signer (%x) to validate vote (%x): %w", signerID, voteID, err)
 	}
