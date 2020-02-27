@@ -8,10 +8,25 @@ import (
 
 // InsertExecutionResult inserts a transaction keyed by transaction fingerprint.
 func InsertExecutionResult(result *flow.ExecutionResult) func(*badger.Txn) error {
-	return insert(makePrefix(codeResult, result.ID()), result)
+	return insert(makePrefix(codeExecutionResult, result.ID()), result)
 }
 
 // RetrieveExecutionResult retrieves a transaction by fingerprint.
 func RetrieveExecutionResult(resultID flow.Identifier, result *flow.ExecutionResult) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeResult, resultID), result)
+	return retrieve(makePrefix(codeExecutionResult, resultID), result)
 }
+
+// IndexExecutionResult inserts an execution result ID keyed by block ID
+func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
+}
+
+// LookupExecutionResult finds execution result ID by block
+func LookupExecutionResult(blockID flow.Identifier, resultID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
+}
+
+
+
+
+

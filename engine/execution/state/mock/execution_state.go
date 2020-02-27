@@ -80,6 +80,29 @@ func (_m *ExecutionState) GetChunkRegisters(_a0 flow.Identifier) (flow.Ledger, e
 	return r0, r1
 }
 
+// GetExecutionResultID provides a mock function with given fields: blockID
+func (_m *ExecutionState) GetExecutionResultID(blockID flow.Identifier) (*flow.Identifier, error) {
+	ret := _m.Called(blockID)
+
+	var r0 *flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Identifier); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Identifier)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRegisters provides a mock function with given fields: _a0, _a1
 func (_m *ExecutionState) GetRegisters(_a0 []byte, _a1 [][]byte) ([][]byte, error) {
 	ret := _m.Called(_a0, _a1)
@@ -126,6 +149,20 @@ func (_m *ExecutionState) PersistChunkHeader(_a0 *flow.ChunkHeader) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.ChunkHeader) error); ok {
 		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// PersistExecutionResult provides a mock function with given fields: blockID, result
+func (_m *ExecutionState) PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error {
+	ret := _m.Called(blockID, result)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.ExecutionResult) error); ok {
+		r0 = rf(blockID, result)
 	} else {
 		r0 = ret.Error(0)
 	}

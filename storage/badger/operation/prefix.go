@@ -23,19 +23,20 @@ const (
 	codeSeal      = 13
 
 	// entities that are related to block formation & validation
-	codeTransaction = 21
-	codeCollection  = 22
-	codeCommit      = 23
-	codeResult      = 24
-	// codeReceipt     = 25
-	// codeApproval    = 26
+	codeTransaction     = 21
+	codeCollection      = 22
+	codeCommit          = 23
+	codeExecutionResult = 24
+	// codeReceipt       = 25
+	// codeApproval      = 26
 	codeChunkHeader = 27
 
-	codeIndexIdentity    = 100
-	codeIndexGuarantee   = 101
-	codeIndexSeal        = 102
-	codeIndexCollection  = 104
-	codeIndexSealByBlock = 105
+	codeIndexIdentity               = 100
+	codeIndexGuarantee              = 101
+	codeIndexSeal                   = 102
+	codeIndexCollection             = 104
+	codeIndexSealByBlock            = 105
+	codeIndexExecutionResultByBlock = 106
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

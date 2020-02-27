@@ -30,6 +30,9 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 	result := unittest.ComputationResultFixture()
 
 	t.Run("failed to load identities", func(t *testing.T) {
+
+		// TODO - this should only test broadcastExecutionReceipt
+
 		protocolState := &protocol.State{}
 		ss := &protocol.Snapshot{}
 		con := &network.Conduit{}
@@ -51,6 +54,9 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 
 		execState.On("CommitDelta", mock.Anything).Return(nil, nil).Times(len(result.StateViews))
 		execState.On("PersistChunkHeader", mock.Anything).Return(nil).Times(len(result.StateViews))
+		previousExecutionResultID := unittest.IdentifierFixture()
+		execState.On("GetExecutionResultID", mock.Anything).Return(&previousExecutionResultID, nil)
+		execState.On("PersistExecutionResult", mock.Anything, mock.Anything).Return(nil)
 
 		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.Error(t, err)
@@ -61,6 +67,9 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 	})
 
 	t.Run("failed to broadcast", func(t *testing.T) {
+
+		// TODO - this should only test broadcastExecutionReceipt
+
 		protocolState := &protocol.State{}
 		ss := &protocol.Snapshot{}
 		con := &network.Conduit{}
@@ -71,6 +80,9 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 
 		execState.On("CommitDelta", mock.Anything).Return(nil, nil).Times(len(result.StateViews))
 		execState.On("PersistChunkHeader", mock.Anything).Return(nil).Times(len(result.StateViews))
+		previousExecutionResultID := unittest.IdentifierFixture()
+		execState.On("GetExecutionResultID", mock.Anything).Return(&previousExecutionResultID, nil)
+		execState.On("PersistExecutionResult", mock.Anything, mock.Anything).Return(nil)
 
 		e := Engine{
 			state:      protocolState,
@@ -143,6 +155,10 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 		execState.On("CommitDelta", mock.Anything).Return(nil, nil).Times(len(result.StateViews))
 		execState.On("PersistChunkHeader", mock.Anything).Return(nil).Times(len(result.StateViews))
 		execState.On("PersistStateCommitment", result.CompleteBlock.Block.ID(), mock.Anything).Return(nil)
+		previousExecutionResultID := unittest.IdentifierFixture()
+		execState.On("GetExecutionResultID", mock.Anything).Return(&previousExecutionResultID, nil)
+		execState.On("PersistExecutionResult", mock.Anything, mock.Anything).Return(nil)
+
 
 		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.NoError(t, err)
@@ -152,6 +168,29 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 		con.AssertExpectations(t)
 		execState.AssertExpectations(t)
 	})
+}
+
+func TestExecutionGenerationResultsAreChained(t *testing.T) {
+
+	execState := new(state.ExecutionState)
+
+	e := Engine{
+		execState: execState,
+	}
+
+	completeBlock := unittest.CompleteBlockFixture()
+	endState := unittest.StateCommitmentFixture()
+	previousExecutionResultID := unittest.IdentifierFixture()
+
+	execState.On("GetExecutionResultID", completeBlock.Block.ParentID).Return(previousExecutionResultID, nil)
+	execState.On("PersistExecutionResult", completeBlock.Block.ID(), mock.Anything).Return(nil)
+
+	er, err := e.generateExecutionResultForBlock(completeBlock, nil, endState)
+	assert.NoError(t, err)
+
+	assert.Equal(t, previousExecutionResultID, er.PreviousResultID)
+
+	execState.AssertExpectations(t)
 }
 
 func TestProviderEngine_OnExecutionStateRequest(t *testing.T) {

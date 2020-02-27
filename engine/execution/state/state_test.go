@@ -34,7 +34,9 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 			chunkHeaders := new(storage.ChunkHeaders)
 
-			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders)
+			executionResults := new(storage.ExecutionResults)
+
+			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders, executionResults)
 
 			f(t, es)
 		})
@@ -144,22 +146,29 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
+		er := new(storage.ExecutionResults)
 
 		chunkID := unittest.IdentifierFixture()
 
 		ch.On("ByID", chunkID).Return(nil, fmt.Errorf("storage error"))
 
-		es := state.NewExecutionState(ls, sc, ch)
+		es := state.NewExecutionState(ls, sc, ch, er)
 
 		ledger, err := es.GetChunkRegisters(chunkID)
 		assert.Nil(t, ledger)
 		assert.Error(t, err)
+
+		ch.AssertExpectations(t)
+		ls.AssertExpectations(t)
+		sc.AssertExpectations(t)
+		er.AssertExpectations(t)
 	})
 
 	t.Run("ledger storage error", func(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
+		er := new(storage.ExecutionResults)
 
 		chunkHeader := unittest.ChunkHeaderFixture()
 		chunkID := chunkHeader.ChunkID
@@ -170,7 +179,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).
 			Return(nil, fmt.Errorf("storage error"))
 
-		es := state.NewExecutionState(ls, sc, ch)
+		es := state.NewExecutionState(ls, sc, ch, er)
 
 		registers, err := es.GetChunkRegisters(chunkID)
 		assert.Error(t, err)
@@ -178,12 +187,15 @@ func TestState_GetChunkRegisters(t *testing.T) {
 
 		ch.AssertExpectations(t)
 		ls.AssertExpectations(t)
+		sc.AssertExpectations(t)
+		er.AssertExpectations(t)
 	})
 
 	t.Run("existing chunk", func(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
+		er := new(storage.ExecutionResults)
 
 		chunkHeader := unittest.ChunkHeaderFixture()
 		chunkID := chunkHeader.ChunkID
@@ -194,7 +206,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ch.On("ByID", chunkID).Return(&chunkHeader, nil)
 		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).Return(registerValues, nil)
 
-		es := state.NewExecutionState(ls, sc, ch)
+		es := state.NewExecutionState(ls, sc, ch, er)
 
 		actualRegisters, err := es.GetChunkRegisters(chunkID)
 		assert.NoError(t, err)
@@ -209,5 +221,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 
 		ch.AssertExpectations(t)
 		ls.AssertExpectations(t)
+		sc.AssertExpectations(t)
+		er.AssertExpectations(t)
 	})
 }

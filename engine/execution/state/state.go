@@ -7,6 +7,10 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
+// TODO Many operations here are should be transactional, so we need to refactor this
+// to store a reference to DB and compose operations and procedures rather then
+// just being amalgamate of proxies for single transactions operation
+
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
 type ExecutionState interface {
 	// NewView creates a new ready-only view at the given state commitment.
@@ -26,12 +30,17 @@ type ExecutionState interface {
 	ChunkHeaderByChunkID(flow.Identifier) (*flow.ChunkHeader, error)
 	// PersistChunkHeader saves a chunk header by chunk ID.
 	PersistChunkHeader(*flow.ChunkHeader) error
+
+	GetExecutionResultID(blockID flow.Identifier) (*flow.Identifier, error)
+	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
+
 }
 
 type state struct {
-	ls           storage.Ledger
-	commits      storage.Commits
-	chunkHeaders storage.ChunkHeaders
+	ls               storage.Ledger
+	commits          storage.Commits
+	chunkHeaders     storage.ChunkHeaders
+	executionResults storage.ExecutionResults
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -39,11 +48,13 @@ func NewExecutionState(
 	ls storage.Ledger,
 	commits storage.Commits,
 	chunkHeaders storage.ChunkHeaders,
+	executionResult storage.ExecutionResults,
 ) ExecutionState {
 	return &state{
-		ls:           ls,
-		commits:      commits,
-		chunkHeaders: chunkHeaders,
+		ls:               ls,
+		commits:          commits,
+		chunkHeaders:     chunkHeaders,
+		executionResults: executionResult,
 	}
 }
 
@@ -108,16 +119,6 @@ func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) 
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	return s.commits.ByID(blockID)
-	// commit, err := s.commits.ByID(blockID)
-	// if err != nil {
-	// 	if errors.Is(err, storage.ErrNotFound) {
-	// 		//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
-	// 		panic(fmt.Sprintf("storage commitment for id %v does not exist", blockID))
-	// 	} else {
-	// 		return nil, err
-	// 	}
-	// }
-	// return commit, nil
 }
 
 func (s *state) PersistStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) error {
@@ -130,4 +131,19 @@ func (s *state) ChunkHeaderByChunkID(chunkID flow.Identifier) (*flow.ChunkHeader
 
 func (s *state) PersistChunkHeader(c *flow.ChunkHeader) error {
 	return s.chunkHeaders.Store(c)
+}
+
+func (s *state) GetExecutionResultID(blockID flow.Identifier) (*flow.Identifier, error) {
+	return s.executionResults.Lookup(blockID)
+}
+
+
+func (s *state) PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error {
+	err := s.executionResults.Store(&result)
+	if err != nil {
+		return fmt.Errorf("could not persist execution result: %w", err)
+	}
+	// TODO if the second operation fails we should remove stored execution result
+	// This is global execution storage problem - see TODO at the top
+	return s.executionResults.Index(blockID, result.ID())
 }

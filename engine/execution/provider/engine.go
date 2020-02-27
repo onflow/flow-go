@@ -139,7 +139,10 @@ func (e *Engine) onExecutionResult(originID flow.Identifier, result *execution.C
 		startState = endState
 	}
 
-	executionResult := generateExecutionResultForBlock(result.CompleteBlock, chunks, endState)
+	executionResult, err := e.generateExecutionResultForBlock(result.CompleteBlock, chunks, endState)
+	if err != nil {
+		return fmt.Errorf("could not generate execution result: %w", err)
+	}
 
 	receipt := &flow.ExecutionReceipt{
 		ExecutionResult: *executionResult,
@@ -149,7 +152,7 @@ func (e *Engine) onExecutionResult(originID flow.Identifier, result *execution.C
 		ExecutorSignature: nil,
 	}
 
-	err := e.broadcastExecutionReceipt(receipt)
+	err = e.broadcastExecutionReceipt(receipt)
 	if err != nil {
 		return fmt.Errorf("could not broadcast receipt: %w", err)
 	}
@@ -218,20 +221,32 @@ func (e *Engine) broadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error
 
 // generateExecutionResultForBlock creates a new execution result for a block from
 // the provided chunk results.
-func generateExecutionResultForBlock(
+func (e *Engine) generateExecutionResultForBlock(
 	block *execution.CompleteBlock,
 	chunks []*flow.Chunk,
 	endState flow.StateCommitment,
-) *flow.ExecutionResult {
-	return &flow.ExecutionResult{
+) (*flow.ExecutionResult, error) {
+
+	previousErID, err := e.execState.GetExecutionResultID(block.Block.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get previous execution result ID: %w", err)
+	}
+
+	er := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			// TODO: populate with real value
-			PreviousResultID: flow.ZeroID,
+			PreviousResultID: *previousErID,
 			BlockID:          block.Block.ID(),
 			FinalStateCommit: endState,
 			Chunks:           chunks,
 		},
 	}
+
+	err = e.execState.PersistExecutionResult(block.Block.ID(), *er)
+	if err != nil {
+		return nil, fmt.Errorf("could not persist execution result: %w", err)
+	}
+
+	return er, nil
 }
 
 // generateChunk creates a chunk from the provided execution data.

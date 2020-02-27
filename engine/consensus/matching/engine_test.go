@@ -34,7 +34,7 @@ func TestNewEngine(t *testing.T) {
 
 	state := &protocol.State{}
 	me := &module.Local{}
-	results := &storage.Results{}
+	results := &storage.ExecutionResults{}
 	receipts := &mempool.Receipts{}
 	approvals := &mempool.Approvals{}
 	seals := &mempool.Seals{}

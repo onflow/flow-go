@@ -127,7 +127,11 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	exeNode.BlocksEngine.Submit(conID.NodeID, block)
+	exeNode.IngestionEngine.Submit(conID.NodeID, block)
 
 	assert.Eventually(t, func() bool { return receipt != nil }, time.Second*3, time.Millisecond*500)
+
+	colEngine.AssertExpectations(t)
+	verEngine.AssertExpectations(t)
+	conEngine.AssertExpectations(t)
 }
