@@ -95,6 +95,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			step := steps[i]
 			var payload cluster.Payload
 			err = procedure.RetrieveClusterPayload(step.PayloadHash, &payload)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve cluster payload: %w", err)
+			}
 
 			// remove the transactions from the memory pool
 			for _, txID := range payload.Collection.Transactions {
