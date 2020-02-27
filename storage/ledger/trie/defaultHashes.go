@@ -24,5 +24,5 @@ func GetDefaultHashes() [256][]byte {
 // For each tree level N, there is a default hash equal to the chained
 // hashing of the default value N times.
 func GetDefaultHashForHeight(height int) []byte {
-	return defaultHashes[height-1]
+	return defaultHashes[height]
 }
