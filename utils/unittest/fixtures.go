@@ -61,6 +61,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	}
 
 	header := flow.Header{
+		Height:      parent.Height + 1,
 		View:        parent.View + 1,
 		ChainID:     parent.ChainID,
 		Timestamp:   time.Now(),
