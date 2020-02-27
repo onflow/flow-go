@@ -3,9 +3,12 @@
 package proposal
 
 import (
+	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
@@ -40,8 +43,14 @@ type Engine struct {
 	headers     storage.Headers
 	build       module.Builder
 	finalizer   module.Finalizer
+	cache       map[flow.Identifier][]cacheItem
 
 	coldstuff module.ColdStuff
+}
+
+type cacheItem struct {
+	OriginID flow.Identifier
+	Proposal *messages.ClusterBlockProposal
 }
 
 func New(
@@ -72,6 +81,7 @@ func New(
 		headers:     headers,
 		build:       build,
 		finalizer:   finalizer,
+		cache:       make(map[flow.Identifier][]cacheItem),
 	}
 
 	cold, err := coldstuff.New(log, state, me, e, build, finalizer, 3*time.Second, 8*time.Second)
@@ -240,21 +250,34 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 	// retrieve the parent block
 	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
-	// TODO handle block buffering https://github.com/dapperlabs/flow-go/issues/2408
-	//if errors.Is(err, storage.ErrNotFound) {}
+	if errors.Is(err, storage.ErrNotFound) {
+		return e.processPendingProposal(originID, proposal)
+	}
 	if err != nil {
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
 	_ = parent
+	blockID := proposal.Header.ID()
 
 	// TODO handle missing transactions
 	// TODO store block contents
 	// TODO ensure block is valid extension of cluster state
 	// TODO submit to coldstuff
-	// TODO check for buffered descendants of the block
 
-	return nil
+	children, ok := e.cache[blockID]
+	if !ok {
+		return nil
+	}
+	var result *multierror.Error
+	for _, child := range children {
+		err := e.onBlockProposal(child.OriginID, child.Proposal)
+		if err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
+	return result.ErrorOrNil()
 }
 
 // onBlockVote handles votes for blocks by passing them to the core consensus
@@ -319,6 +342,35 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 // to HotStuff.
 func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
 	e.coldstuff.SubmitCommit(commit)
+	return nil
+}
+
+// processPendingProposal handles proposals where the parent is missing.
+func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
+
+	// cache the proposal so we can process it when we receive its parent
+	parentID := proposal.Header.ParentID
+	item := cacheItem{
+		OriginID: originID,
+		Proposal: proposal,
+	}
+	e.cache[parentID] = append(e.cache[parentID], item)
+
+	// request the parent block
+	req := &messages.BlockRequest{
+		BlockID: parentID,
+		Nonce:   rand.Uint64(),
+	}
+	err := e.con.Submit(req, originID)
+	if err != nil {
+		return fmt.Errorf("could not send block request: %w", err)
+	}
+
+	// NOTE: at this point, if he doesn't send us the parent, we should probably think about a way
+	// to blacklist him, as this can be exploited by sending us lots of children without parent;
+	// a second mitigation strategy is to put a strict limit on children we cache, and possibly a
+	// limit on children we cache coming from a single other node
+
 	return nil
 }
 

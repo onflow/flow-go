@@ -370,15 +370,16 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) e
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
 	// first, we cache the proposal with its origin ID, so we can process it once possible
+	parentID := proposal.Header.ParentID
 	item := cacheItem{
 		OriginID: originID,
 		Proposal: proposal,
 	}
-	e.cache[proposal.Header.ParentID] = append(e.cache[proposal.Header.ParentID], item)
+	e.cache[parentID] = append(e.cache[parentID], item)
 
 	// send the block request
 	request := messages.BlockRequest{
-		BlockID: proposal.Header.ParentID,
+		BlockID: parentID,
 		Nonce:   rand.Uint64(),
 	}
 	err := e.con.Submit(&request, originID)
