@@ -5,11 +5,13 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	cluster "github.com/dapperlabs/flow-go/cluster/badger"
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/finalizer/collection"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
@@ -31,14 +33,15 @@ func TestFinalizer(t *testing.T) {
 		pool, err := stdmap.NewTransactions()
 		require.NoError(t, err)
 
-		prov := new(networkmock.Engine)
-
-		finalizer := collection.NewFinalizer(db, pool, prov, chainID)
-
-		// a helper function to wipe the DB to clean up in between tests
+		// a helper function to clean up shared state between tests
 		cleanup := func() {
+			// wipe the DB
 			err := db.DropAll()
 			require.Nil(t, err)
+			// clear the mempool
+			for _, tx := range pool.All() {
+				pool.Rem(tx.ID())
+			}
 		}
 
 		// a helper function to bootstrap with the genesis block
@@ -61,6 +64,10 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
+			prov := new(networkmock.Engine)
+			prov.On("SubmitLocal", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
+
 			fakeBlockID := unittest.IdentifierFixture()
 			err := finalizer.MakeFinal(fakeBlockID)
 			assert.Error(t, err)
@@ -69,6 +76,10 @@ func TestFinalizer(t *testing.T) {
 		t.Run("already finalized block", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
+
+			prov := new(networkmock.Engine)
+			prov.On("SubmitLocal", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
@@ -92,6 +103,10 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
+			prov := new(networkmock.Engine)
+			prov.On("SubmitLocal", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
+
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.ParentID = unittest.IdentifierFixture()
@@ -105,6 +120,10 @@ func TestFinalizer(t *testing.T) {
 		t.Run("finalize single block", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
+
+			prov := new(networkmock.Engine)
+			prov.On("SubmitLocal", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
@@ -131,6 +150,15 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block.ID(), final.ID())
+
+			// block should be passed to provider
+			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
+			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
+				Guarantee: flow.CollectionGuarantee{
+					CollectionID: block.Payload.Collection.ID(),
+					Signatures:   nil,
+				},
+			})
 		})
 
 		// when finalizing a block with un-finalized ancestors, those ancestors
@@ -138,6 +166,10 @@ func TestFinalizer(t *testing.T) {
 		t.Run("finalize multiple blocks together", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
+
+			prov := new(networkmock.Engine)
+			prov.On("SubmitLocal", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
@@ -168,11 +200,30 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block2.ID(), final.ID())
+
+			// both blocks should be passed to provider
+			prov.AssertNumberOfCalls(t, "SubmitLocal", 2)
+			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
+				Guarantee: flow.CollectionGuarantee{
+					CollectionID: block1.Payload.Collection.ID(),
+					Signatures:   nil,
+				},
+			})
+			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
+				Guarantee: flow.CollectionGuarantee{
+					CollectionID: block2.Payload.Collection.ID(),
+					Signatures:   nil,
+				},
+			})
 		})
 
 		t.Run("finalize with un-finalized child", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
+
+			prov := new(networkmock.Engine)
+			prov.On("SubmitLocal", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
@@ -191,7 +242,7 @@ func TestFinalizer(t *testing.T) {
 			block2.SetPayload(model.PayloadFromTransactions([]flow.Identifier{tx2.ID()}))
 			insert(block2)
 
-			// finalize block1 (should NOT finalize block1)
+			// finalize block1 (should NOT finalize block2)
 			err := finalizer.MakeFinal(block1.ID())
 			assert.Nil(t, err)
 
@@ -204,6 +255,15 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
+
+			// block should be passed to provider
+			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
+			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
+				Guarantee: flow.CollectionGuarantee{
+					CollectionID: block1.Payload.Collection.ID(),
+					Signatures:   nil,
+				},
+			})
 		})
 
 		// when finalizing a block with a conflicting fork, the fork should
@@ -211,6 +271,10 @@ func TestFinalizer(t *testing.T) {
 		t.Run("conflicting fork", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
+
+			prov := new(networkmock.Engine)
+			prov.On("SubmitLocal", mock.Anything)
+			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
@@ -239,11 +303,18 @@ func TestFinalizer(t *testing.T) {
 			assert.True(t, pool.Has(tx2.ID()))
 
 			// check finalized boundary using cluster state
-			t.Log("1: ", block1.ID())
-			t.Log("2: ", block2.ID())
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
+
+			// block should be passed to provider
+			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
+			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
+				Guarantee: flow.CollectionGuarantee{
+					CollectionID: block1.Payload.Collection.ID(),
+					Signatures:   nil,
+				},
+			})
 		})
 	})
 }
