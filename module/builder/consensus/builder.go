@@ -129,8 +129,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		//create a copy to avoid modifying when referenced in an array
 		loopSeal := &seal
 		for {
-
-			var previousSeal *flow.Seal
 			// get a seal that extends the last known state commitment
 			previousSeal, err := b.seals.ByPreviousState(loopSeal.FinalState)
 			if errors.Is(err, mempool.ErrEntityNotFound) {

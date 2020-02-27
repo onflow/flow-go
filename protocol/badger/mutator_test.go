@@ -59,7 +59,6 @@ func TestBootStrapValid(t *testing.T) {
 		var storedSeal flow.Seal
 		err = db.View(procedure.LookupSealByBlock(storedHeader.ID(), &storedSeal))
 		require.NoError(t, err)
-		require.NotNil(t, storedSeal)
 		require.Equal(t, flow.ZeroID, storedSeal.BlockID) //genesis seal is special
 
 		assert.Zero(t, boundary)
