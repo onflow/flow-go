@@ -36,9 +36,6 @@ func IndexSeals(payloadHash flow.Identifier, seals []*flow.Seal) func(*badger.Tx
 
 func RetrieveSeals(payloadHash flow.Identifier, seals *[]*flow.Seal) func(*badger.Txn) error {
 
-	// make sure we have a zero value
-	//*seals = make([]*flow.Seal, 0)
-
 	return func(tx *badger.Txn) error {
 
 		var retrievedSeals []*flow.Seal
@@ -63,6 +60,26 @@ func RetrieveSeals(payloadHash flow.Identifier, seals *[]*flow.Seal) func(*badge
 
 		*seals = retrievedSeals
 
+		return nil
+	}
+}
+
+// LookupSealByBlock retrieves seal by block for which it was the highest seal.
+func LookupSealByBlock(blockID flow.Identifier, seal *flow.Seal) func(*badger.Txn) error {
+
+	return func(tx *badger.Txn) error {
+
+		var sealID flow.Identifier
+
+		err := operation.LookupSealIDByBlock(blockID, &sealID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup seal ID by block: %w", err)
+		}
+
+		err = operation.RetrieveSeal(sealID, seal)(tx)
+		if err != nil {
+			return fmt.Errorf("coulnd not retrieve seal for sealID (%x): %w", sealID, err)
+		}
 		return nil
 	}
 }

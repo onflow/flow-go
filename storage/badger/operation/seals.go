@@ -27,3 +27,14 @@ func IndexSeal(payloadHash flow.Identifier, index uint64, sealID flow.Identifier
 func LookupSeals(payloadHash flow.Identifier, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
 	return traverse(makePrefix(codeIndexSeal, payloadHash), lookup(sealIDs))
 }
+
+// IndexSealIDByBlock indexes latest known sealID by the block. This allows to retrieve a highest sealID
+// for every finalized block in a chain
+func IndexSealIDByBlock(blockID flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexSealByBlock, blockID), sealID)
+}
+
+// LookupSealIDByBlock retrieves sealID by block for which it was the highest seal.
+func LookupSealIDByBlock(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexSealByBlock, blockID), sealID)
+}

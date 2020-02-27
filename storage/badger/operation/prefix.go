@@ -31,11 +31,11 @@ const (
 	// codeApproval    = 26
 	codeChunkHeader = 27
 
-	codeIndexIdentity   = 100
-	codeIndexGuarantee  = 101
-	codeIndexSeal       = 102
-	codeIndexCommit     = 103
-	codeIndexCollection = 104
+	codeIndexIdentity    = 100
+	codeIndexGuarantee   = 101
+	codeIndexSeal        = 102
+	codeIndexCollection  = 104
+	codeIndexSealByBlock = 105
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

@@ -247,21 +247,6 @@ func (m *MockCommits) EXPECT() *MockCommitsMockRecorder {
 	return m.recorder
 }
 
-// ByFinalID mocks base method
-func (m *MockCommits) ByFinalID(arg0 flow.Identifier) ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ByFinalID", arg0)
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ByFinalID indicates an expected call of ByFinalID
-func (mr *MockCommitsMockRecorder) ByFinalID(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByFinalID", reflect.TypeOf((*MockCommits)(nil).ByFinalID), arg0)
-}
-
 // ByID mocks base method
 func (m *MockCommits) ByID(arg0 flow.Identifier) ([]byte, error) {
 	m.ctrl.T.Helper()
