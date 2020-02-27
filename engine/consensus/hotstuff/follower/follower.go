@@ -10,7 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	models "github.com/dapperlabs/flow-go/model/hotstuff"
+	model "github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -70,7 +70,7 @@ func initConsensusSigVerifier(dkgPubData *signature.DKGPublicData) hotstuff.SigV
 	return &sigVerifier
 }
 
-func (f *Follower) FinalizedBlock() *models.Block {
+func (f *Follower) FinalizedBlock() *model.Block {
 	return f.finalizationLogic.FinalizedBlock()
 }
 
@@ -78,16 +78,16 @@ func (f *Follower) FinalizedView() uint64 {
 	return f.finalizationLogic.FinalizedView()
 }
 
-func (f *Follower) AddBlock(blockProposal *models.Proposal) error {
+func (f *Follower) AddBlock(blockProposal *model.Proposal) error {
 	// validate the block. exit if the proposal is invalid
 	err := f.validator.ValidateProposal(blockProposal)
-	if errors.Is(err, models.ErrorInvalidBlock{}) {
+	if errors.Is(err, model.ErrorInvalidBlock{}) {
 		f.log.Warn().Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
 					 Msg("invalid proposal")
 		return nil
 	}
 
-	if errors.Is(err, models.ErrUnverifiableBlock) {
+	if errors.Is(err, model.ErrUnverifiableBlock) {
 		f.log.Warn().
 			Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
 			Hex("qc_block_id", logging.ID(blockProposal.Block.QC.BlockID)).
