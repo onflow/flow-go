@@ -10,29 +10,6 @@ type Commits struct {
 	mock.Mock
 }
 
-// ByFinalID provides a mock function with given fields: finalID
-func (_m *Commits) ByFinalID(finalID flow.Identifier) ([]byte, error) {
-	ret := _m.Called(finalID)
-
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []byte); ok {
-		r0 = rf(finalID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(finalID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // ByID provides a mock function with given fields: blockID
 func (_m *Commits) ByID(blockID flow.Identifier) ([]byte, error) {
 	ret := _m.Called(blockID)

@@ -48,22 +48,3 @@ func (c *Commits) ByID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	}
 	return commitment, nil
 }
-
-func (c *Commits) ByFinalID(finalID flow.Identifier) (flow.StateCommitment, error) {
-	var commitment flow.StateCommitment
-	err := c.db.View(func(btx *badger.Txn) error {
-		err := operation.LookupCommit(finalID, &commitment)(btx)
-		if err != nil {
-			if err == storage.ErrNotFound {
-				return err
-			}
-			return fmt.Errorf("could not retrerieve state commitment: %w", err)
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return commitment, nil
-}

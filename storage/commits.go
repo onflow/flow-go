@@ -12,7 +12,4 @@ type Commits interface {
 
 	// ByID will retrieve a commit by its ID from persistent storage.
 	ByID(blockID flow.Identifier) (flow.StateCommitment, error)
-
-	// ByFinalID will retrieve a commit by the block it was finalized in.
-	ByFinalID(finalID flow.Identifier) (flow.StateCommitment, error)
 }
