@@ -317,3 +317,12 @@ func ChunkHeaderFixture() flow.ChunkHeader {
 		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
 	}
 }
+
+func ChunkDataPackFixture() flow.ChunkDataPack {
+	return flow.ChunkDataPack{
+		ChunkID:     IdentifierFixture(),
+		StartState:  StateCommitmentFixture(),
+		RegisterIds: [][]byte{[]byte{'1'}, []byte{'2'}, []byte{'3'}},
+		Values:      [][]byte{[]byte{'c'}, []byte{'c'}, []byte{'c'}},
+	}
+}
