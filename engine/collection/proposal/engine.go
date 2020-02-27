@@ -3,14 +3,18 @@
 package proposal
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model/cluster"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -20,16 +24,10 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type Config struct {
-	// ProposalPeriod the interval at which the engine will propose a collection.
-	ProposalPeriod time.Duration
-}
-
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
 type Engine struct {
 	unit        *engine.Unit
-	conf        Config
 	log         zerolog.Logger
 	tracer      trace.Tracer
 	con         network.Conduit
@@ -39,11 +37,15 @@ type Engine struct {
 	pool        mempool.Transactions
 	collections storage.Collections
 	guarantees  storage.Guarantees
+	headers     storage.Headers
+	build       module.Builder
+	finalizer   module.Finalizer
+
+	coldstuff module.ColdStuff
 }
 
 func New(
 	log zerolog.Logger,
-	conf Config,
 	net module.Network,
 	me module.Local,
 	state protocol.State,
@@ -52,11 +54,13 @@ func New(
 	pool mempool.Transactions,
 	collections storage.Collections,
 	guarantees storage.Guarantees,
+	headers storage.Headers,
+	build module.Builder,
+	finalizer module.Finalizer,
 ) (*Engine, error) {
 
 	e := &Engine{
 		unit:        engine.NewUnit(),
-		conf:        conf,
 		log:         log.With().Str("engine", "proposal").Logger(),
 		me:          me,
 		state:       state,
@@ -65,13 +69,22 @@ func New(
 		pool:        pool,
 		collections: collections,
 		guarantees:  guarantees,
+		headers:     headers,
+		build:       build,
+		finalizer:   finalizer,
 	}
+
+	cold, err := coldstuff.New(log, state, me, e, build, finalizer, 3*time.Second, 8*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize coldstuff: %w", err)
+	}
+
+	e.coldstuff = cold
 
 	con, err := net.Register(engine.CollectionProposal, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
-
 	e.con = con
 
 	return e, nil
@@ -80,13 +93,16 @@ func New(
 // Ready returns a ready channel that is closed once the engine has fully
 // started.
 func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.propose)
-	return e.unit.Ready()
+	return e.unit.Ready(func() {
+		<-e.coldstuff.Ready()
+	})
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		<-e.coldstuff.Done()
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -121,29 +137,189 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the proposal engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
+	switch ev := event.(type) {
+	case *messages.ClusterBlockProposal:
+		return e.onBlockProposal(originID, ev)
+	case *messages.ClusterBlockVote:
+		return e.onBlockVote(originID, ev)
+	case *messages.ClusterBlockRequest:
+		return e.onBlockRequest(originID, ev)
+	case *messages.ClusterBlockResponse:
+		return e.onBlockResponse(originID, ev)
+	case *model.Commit:
+		return e.onBlockCommit(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-func (e *Engine) propose() {
+// SendVote will send a vote to the desired node.
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, _ crypto.Signature, recipientID flow.Identifier) error {
 
-	for {
-		select {
-		case <-time.After(e.conf.ProposalPeriod):
-
-			err := e.createProposal()
-			if errors.Is(err, ErrEmptyTxpool) {
-				e.log.Debug().Msg("skipping collection proposal due to empty txpool")
-			} else if err != nil {
-				e.log.Error().Err(err).Msg("failed to create new proposal")
-			}
-
-		case <-e.unit.Quit():
-			return
-		}
+	// build the vote message
+	vote := &messages.ClusterBlockVote{
+		BlockID:   blockID,
+		View:      view,
+		Signature: sig,
 	}
+
+	err := e.con.Submit(vote, recipientID)
+	if err != nil {
+		return fmt.Errorf("could not send vote: %w", err)
+	}
+
+	return nil
+}
+
+// BroadcastProposal submits a cluster block proposal (effectively a proposal
+// for the next collection) to all the collection nodes in our cluster.
+func (e *Engine) BroadcastProposal(header *flow.Header) error {
+
+	// first, check that we are the proposer of the block
+	if header.ProposerID != e.me.NodeID() {
+		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
+	}
+
+	// retrieve the payload for the block
+	// NOTE: relies on the fact that cluster payload hash is the ID of its collection
+	collectionID := header.PayloadHash
+	collection, err := e.collections.LightByID(collectionID)
+	if err != nil {
+		return fmt.Errorf("could not get payload for block: %w", err)
+	}
+	payload := cluster.Payload{Collection: *collection}
+
+	// retrieve all collection nodes in our cluster
+	// TODO filter by cluster
+	recipients, err := e.state.Final().Identities(
+		filter.HasRole(flow.RoleCollection),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
+	if err != nil {
+		return fmt.Errorf("could not get cluster members: %w", err)
+	}
+
+	// create the proposal message for the collection
+	msg := &messages.ClusterBlockProposal{
+		Header:  header,
+		Payload: &payload,
+	}
+
+	err = e.con.Submit(msg, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not broadcast proposal: %w", err)
+	}
+
+	return nil
+}
+
+// BroadcastCommit broadcasts a commit message to all collection nodes in our
+// cluster.
+func (e *Engine) BroadcastCommit(commit *model.Commit) error {
+
+	// retrieve all collection nodes in our cluster
+	// TODO filter by cluster
+	recipients, err := e.state.Final().Identities(
+		filter.HasRole(flow.RoleCollection),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
+	if err != nil {
+		return fmt.Errorf("could not get cluster members: %w", err)
+	}
+
+	err = e.con.Submit(commit, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not send commit message: %w", err)
+	}
+
+	return err
+}
+
+// onBlockProposal handles proposals for new blocks.
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
+
+	// retrieve the parent block
+	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
+	// TODO handle block buffering https://github.com/dapperlabs/flow-go/issues/2408
+	//if errors.Is(err, storage.ErrNotFound) {}
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
+	_ = parent
+
+	// TODO handle missing transactions
+	// TODO store block contents
+	// TODO ensure block is valid extension of cluster state
+	// TODO submit to coldstuff
+	// TODO check for buffered descendants of the block
+
+	return nil
+}
+
+// onBlockVote handles votes for blocks by passing them to the core consensus
+// algorithm
+func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature, nil)
+	return nil
+}
+
+// onBlockRequest handles requests from other nodes for blocks we have.
+// We always respond to these requests if we have the block in question.
+func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterBlockRequest) error {
+
+	// retrieve the block header
+	header, err := e.headers.ByBlockID(req.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not find requested block: %w", err)
+	}
+
+	// retrieve the block payload
+	collection, err := e.collections.LightByID(header.PayloadHash)
+	if err != nil {
+		return fmt.Errorf("could not find requested block: %w", err)
+	}
+
+	payload := &cluster.Payload{Collection: *collection}
+
+	proposal := &messages.ClusterBlockProposal{
+		Header:  header,
+		Payload: payload,
+	}
+
+	res := &messages.ClusterBlockResponse{
+		Proposal: proposal,
+		Nonce:    req.Nonce,
+	}
+
+	err = e.con.Submit(res, originID)
+	if err != nil {
+		return fmt.Errorf("could not send block response: %w", err)
+	}
+
+	return nil
+}
+
+// onBlockResponse handles responses to queries for particular blocks we have made.
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) error {
+
+	// process the block response as we would a regular proposal
+	err := e.onBlockProposal(originID, res.Proposal)
+	if err != nil {
+		return fmt.Errorf("could not process block response: %w", err)
+	}
+
+	return nil
+}
+
+// onBlockCommit handles incoming block commits by passing them to the core
+// consensus algorithm.
+//
+// NOTE: This is only necessary for ColdStuff and can be removed when we switch
+// to HotStuff.
+func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
+	e.coldstuff.SubmitCommit(commit)
+	return nil
 }
 
 // createProposal creates a new proposal

@@ -24,7 +24,8 @@ import (
 type communicationMode int
 
 const (
-	OneToOne communicationMode = iota
+	NoOp communicationMode = iota
+	OneToOne
 	OneToK
 )
 
@@ -140,23 +141,25 @@ func (m *Middleware) Stop() {
 // If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.sendDirect
 // Otherwise, middleware.publish is used, which uses the PubSub method of communication.
 func (m *Middleware) Send(channelID uint8, msg interface{}, targetIDs ...flow.Identifier) error {
-
+	var err error
+	mode := m.chooseMode(channelID, msg, targetIDs...)
 	// decide what mode of communication to use
-	mode, err := m.chooseMode(channelID, msg, targetIDs...)
-	if err == nil {
-		switch mode {
-		case OneToOne:
-			if targetIDs[0] == m.me {
-				// to avoid self dial by the underlay
-				m.log.Debug().Msg("self dial attempt")
-				return nil
-			}
-			err = m.sendDirect(targetIDs[0], msg)
-		case OneToK:
-			err = m.publish(strconv.Itoa(int(channelID)), msg)
-		default:
-			err = fmt.Errorf("invalid communcation mode: %d", mode)
+	switch mode {
+	case NoOp:
+		// TODO: Decide if this is actually an error or not
+		// return fmt.Errorf("empty list of target Ids")
+		return nil
+	case OneToOne:
+		if targetIDs[0] == m.me {
+			// to avoid self dial by the underlay
+			m.log.Debug().Msg("self dial attempt")
+			return nil
 		}
+		err = m.sendDirect(targetIDs[0], msg)
+	case OneToK:
+		err = m.publish(strconv.Itoa(int(channelID)), msg)
+	default:
+		err = fmt.Errorf("invalid communcation mode: %d", mode)
 	}
 
 	if err != nil {
@@ -166,14 +169,14 @@ func (m *Middleware) Send(channelID uint8, msg interface{}, targetIDs ...flow.Id
 }
 
 // chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
-func (m *Middleware) chooseMode(_ uint8, _ interface{}, targetIDs ...flow.Identifier) (communicationMode, error) {
+func (m *Middleware) chooseMode(_ uint8, _ interface{}, targetIDs ...flow.Identifier) communicationMode {
 	switch len(targetIDs) {
 	case 0:
-		return 0, fmt.Errorf("empty list of target Ids")
+		return NoOp
 	case 1:
-		return OneToOne, nil
+		return OneToOne
 	default:
-		return OneToK, nil
+		return OneToK
 	}
 }
 

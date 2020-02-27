@@ -186,5 +186,5 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 // is enough to reconstruct a threshold signature
 // The function assumes the threshold value is equal to floor((n-1)/2)
 func EnoughShares(size int, sharesNumber int) bool {
-	panic("TODO")
+	return sharesNumber >= (optimalThreshold(size) + 1)
 }
