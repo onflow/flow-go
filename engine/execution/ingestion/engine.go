@@ -205,12 +205,13 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	}
 
 	err = e.mempool.Run(func(backdata *Backdata) error {
-		// Incase we have all the collections, or the block is empty
+		// In case we have all the collections, or the block is empty
 		if e.isComplete(maybeCompleteBlock) {
 			e.removeCollections(maybeCompleteBlock, backdata)
-			e.execution.SubmitLocal(maybeCompleteBlock)
+			e.handleCompleteBlock(maybeCompleteBlock)
 			return nil
 		}
+
 		for _, guarantee := range block.Guarantees {
 			completeBlock, err := backdata.ByID(guarantee.ID())
 			if err == mempool.ErrEntityNotFound {
