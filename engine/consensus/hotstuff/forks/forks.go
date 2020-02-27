@@ -33,7 +33,7 @@ func (f *Forks) FinalizedBlock() *hotstuff.Block {
 }
 
 func (f *Forks) FinalizedView() uint64 {
-	return f.FinalizedBlock().View
+	return f.finalizer.FinalizedView()
 }
 
 func (f *Forks) IsSafeBlock(block *hotstuff.Block) bool {

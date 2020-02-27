@@ -63,6 +63,7 @@ func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, noti
 func (r *Finalizer) LockedBlock() *hotstuff.Block                  { return r.lastLocked.Block }
 func (r *Finalizer) LockedBlockQC() *hotstuff.QuorumCertificate    { return r.lastLocked.QC }
 func (r *Finalizer) FinalizedBlock() *hotstuff.Block               { return r.lastFinalized.Block }
+func (r *Finalizer) FinalizedView() uint64                         { return r.lastFinalized.Block.View }
 func (r *Finalizer) FinalizedBlockQC() *hotstuff.QuorumCertificate { return r.lastFinalized.QC }
 
 // GetBlock returns block for given ID

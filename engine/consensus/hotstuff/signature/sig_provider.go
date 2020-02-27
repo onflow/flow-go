@@ -31,13 +31,12 @@ func NewSigProvider(
 	stakingSigTag string,
 	stakingPrivateKey crypto.PrivateKey,
 	dkgPubData *DKGPublicData,
-	randomBeaconSigTag string,
 	randomBeaconPrivateKey crypto.PrivateKey,
 	isRandomBeaconEnabled bool,
 ) *SigProvider {
 	return &SigProvider{
 		StakingSigVerifier:      NewStakingSigVerifier(stakingSigTag),
-		RandomBeaconSigVerifier: NewRandomBeaconSigVerifier(dkgPubData, randomBeaconSigTag),
+		RandomBeaconSigVerifier: NewRandomBeaconSigVerifier(dkgPubData),
 		myID:                    myID,
 		protocolState:           protocolState,
 		stakingPrivateKey:       stakingPrivateKey,
