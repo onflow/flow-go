@@ -29,7 +29,7 @@ func (d *DKGPublicData) LookupIndex(signerKeys []crypto.PublicKey) (bool, []int)
 }
 
 // Size returns the total number of participants
-func (d *DKGPublicData) Size() int {
+func (d DKGPublicData) Size() int {
 	return len(d.SignerIndexMapping)
 }
 
