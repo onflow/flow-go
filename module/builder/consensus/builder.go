@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Builder is the builder for consensus block payloads. Upon providing a payload
@@ -116,29 +117,33 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		// get the finalized state commitment at the parent
-		var commit flow.StateCommitment
-		err = operation.LookupCommit(parentID, &commit)(tx)
+		var seal flow.Seal
+		err = procedure.LookupSealByBlock(parentID, &seal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not get parent state commit: %w", err)
 		}
 
 		// we then keep adding seals that follow this state commit from the pool
 		var seals []*flow.Seal
-		for {
 
+		//create a copy to avoid modifying when referenced in an array
+		loopSeal := &seal
+		for {
 			// get a seal that extends the last known state commitment
-			seal, err := b.seals.ByPreviousState(commit)
+			previousSeal, err := b.seals.ByPreviousState(loopSeal.FinalState)
 			if errors.Is(err, mempool.ErrEntityNotFound) {
 				break
 			}
 			if err != nil {
-				return fmt.Errorf("could not get extending seal (%x): %w", commit, err)
+				return fmt.Errorf("could not get extending seal (%x): %w", loopSeal.FinalState, err)
 			}
 
 			// add the seal to our list and forward to the known last valid state
-			seals = append(seals, seal)
-			commit = seal.FinalState
+			seals = append(seals, previousSeal)
+			loopSeal = previousSeal
 		}
+
+		seal = *loopSeal
 
 		// STEP THREE: we have the guarantees and seals we can validly include
 		// in the payload built on top of the given block. Now we need to build
@@ -202,9 +207,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// apply the custom fields setter of the consensus algorithm
 		setter(header)
 
-		// index the state commitment for this block
+		// index the seal for this block
 		// TODO this is also done by Mutator.Extend, perhaps refactor that into a procedure
-		err = operation.IndexCommit(header.ID(), commit)(tx)
+		err = operation.IndexSealIDByBlock(header.ID(), seal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index commit: %w", err)
 		}
