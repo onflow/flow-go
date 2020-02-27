@@ -36,7 +36,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 
 	block := flow.Block{
 		Header: flow.Header{
-			Number: 42,
+			View: 42,
 		},
 		Payload: flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},

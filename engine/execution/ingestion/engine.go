@@ -206,7 +206,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	err = e.mempool.Run(func(backdata *Backdata) error {
 		// Incase we have all the collections, or the block is empty
-		if e.checkForCompleteness(maybeCompleteBlock) {
+		if e.isComplete(maybeCompleteBlock) {
 			e.removeCollections(maybeCompleteBlock, backdata)
 			e.execution.SubmitLocal(maybeCompleteBlock)
 			return nil
