@@ -33,7 +33,6 @@ type ExecutionState interface {
 
 	GetExecutionResultID(blockID flow.Identifier) (*flow.Identifier, error)
 	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
-
 }
 
 type state struct {
@@ -136,7 +135,6 @@ func (s *state) PersistChunkHeader(c *flow.ChunkHeader) error {
 func (s *state) GetExecutionResultID(blockID flow.Identifier) (*flow.Identifier, error) {
 	return s.executionResults.Lookup(blockID)
 }
-
 
 func (s *state) PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error {
 	err := s.executionResults.Store(&result)

@@ -25,8 +25,3 @@ func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) fun
 func LookupExecutionResult(blockID flow.Identifier, resultID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
-
-
-
-
-

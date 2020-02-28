@@ -159,7 +159,6 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 		execState.On("GetExecutionResultID", mock.Anything).Return(&previousExecutionResultID, nil)
 		execState.On("PersistExecutionResult", mock.Anything, mock.Anything).Return(nil)
 
-
 		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.NoError(t, err)
 
