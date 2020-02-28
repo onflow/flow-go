@@ -4,11 +4,9 @@ package proposal
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/cluster"
@@ -38,8 +36,6 @@ type Engine struct {
 	collections storage.Collections
 	guarantees  storage.Guarantees
 	headers     storage.Headers
-	build       module.Builder
-	finalizer   module.Finalizer
 
 	coldstuff module.ColdStuff
 }
@@ -55,8 +51,6 @@ func New(
 	collections storage.Collections,
 	guarantees storage.Guarantees,
 	headers storage.Headers,
-	build module.Builder,
-	finalizer module.Finalizer,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -70,16 +64,7 @@ func New(
 		collections: collections,
 		guarantees:  guarantees,
 		headers:     headers,
-		build:       build,
-		finalizer:   finalizer,
 	}
-
-	cold, err := coldstuff.New(log, state, me, e, build, finalizer, 3*time.Second, 8*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize coldstuff: %w", err)
-	}
-
-	e.coldstuff = cold
 
 	con, err := net.Register(engine.CollectionProposal, e)
 	if err != nil {
@@ -90,9 +75,21 @@ func New(
 	return e, nil
 }
 
+// WithConsensus adds the consensus algorithm to the engine. This must be
+// called before the engine can start.
+func (e *Engine) WithConsensus(cold module.ColdStuff) *Engine {
+	e.coldstuff = cold
+	return e
+}
+
 // Ready returns a ready channel that is closed once the engine has fully
-// started.
+// started. For proposal engine, this is true once the underlying consensus
+// algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
+	if e.coldstuff == nil {
+		panic("cannot start proposal engine without consensus algorithm")
+	}
+
 	return e.unit.Ready(func() {
 		<-e.coldstuff.Ready()
 	})
