@@ -1,12 +1,14 @@
 package testutil
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
@@ -45,7 +47,17 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 		option(state)
 	}
 
-	me, err := local.New(identity)
+	// Generates test signing oracle for the nodes
+	// Disclaimer: it should not be used for practical applications
+	//
+	// uses identity of node as its seed
+	seed, err := json.Marshal(identity)
+	require.NoError(t, err)
+	// creates signing key of the node
+	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	require.NoError(t, err)
+
+	me, err := local.New(identity, sk)
 	require.NoError(t, err)
 
 	stub := stub.NewNetwork(state, me, hub)

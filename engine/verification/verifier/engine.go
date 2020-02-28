@@ -6,11 +6,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/language/runtime"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -29,6 +32,7 @@ type Engine struct {
 	me      module.Local    // used to access local node information
 	state   protocol.State  // used to access the protocol state
 	runtime runtime.Runtime // used to execute transactions
+	rah     crypto.Hasher   // used as hasher to sign the result approvals
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -45,6 +49,7 @@ func New(
 		state:   state,
 		me:      me,
 		runtime: runtime.NewInterpreterRuntime(),
+		rah:     utils.NewResultApprovalHasher(),
 	}
 
 	var err error
@@ -132,12 +137,24 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 		}
 		// TODO for now, we discard the computed end state and approve the ER
 		_ = computedEndState
-		approval := &flow.ResultApproval{
-			ResultApprovalBody: flow.ResultApprovalBody{
-				ExecutionResultID: res.Receipt.ExecutionResult.ID(),
-				ChunkIndex:        uint64(i),
-			},
+
+		// prepares and signs result approval body part
+		body := flow.ResultApprovalBody{
+			ExecutionResultID: res.Receipt.ExecutionResult.ID(),
+			ChunkIndex:        uint64(i),
 		}
+
+		// generates a signature over the attestation part of approval
+		sign, err := e.signAttestation(&body)
+		if err != nil {
+			return fmt.Errorf("could not generate attestation signature: %w", err)
+		}
+
+		approval := &flow.ResultApproval{
+			ResultApprovalBody: body,
+			VerifierSignature:  sign,
+		}
+
 		// broadcast result approval to consensus nodes
 		err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
 		if err != nil {
@@ -186,4 +203,24 @@ func (e *Engine) executeChunk(res *verification.CompleteExecutionResult, chunkIn
 	// TODO compute and return state commitment
 
 	return nil, nil
+}
+
+// signAttestation extracts, signs and returns the attestation part of the result approval
+func (e *Engine) signAttestation(body *flow.ResultApprovalBody) (crypto.Signature, error) {
+	// extracts attestation part
+	atst := body.Attestation()
+
+	// encodes attestation into bytes
+	batst, err := encoding.DefaultEncoder.Encode(atst)
+	if err != nil {
+		return nil, fmt.Errorf("could encode attestation: %w", err)
+	}
+
+	// signs attestation
+	signature, err := e.me.Sign(batst, e.rah)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign attestation: %w", err)
+	}
+
+	return signature, nil
 }
