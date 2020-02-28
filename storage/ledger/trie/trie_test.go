@@ -3,7 +3,6 @@ package trie
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
@@ -3250,7 +3249,6 @@ func TestComputeCompactValue(t *testing.T) {
 	level6 := Hash(level5, GetDefaultHashForHeight(5))
 	level7 := Hash(GetDefaultHashForHeight(6), level6)
 
-	fmt.Println(">>>", key, hex.EncodeToString(level0))
 	// leaf node
 	assert.Equal(t, ComputeCompactValue(key, value, 0, trieHeight), level0)
 	// intermediate levels
