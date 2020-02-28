@@ -3,11 +3,13 @@ package trie
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -3228,6 +3230,38 @@ func TestKVDB_Pruned2(t *testing.T) {
 	if err2 != nil {
 		t.Fatal(err2)
 	}
+}
+func TestComputeCompactValue(t *testing.T) {
+	trieHeight := 8
+
+	key := make([]byte, 1) // 01010101 (1)
+	utils.SetBit(key, 1)
+	utils.SetBit(key, 3)
+	utils.SetBit(key, 5)
+	utils.SetBit(key, 7)
+	value := []byte{'V'}
+
+	level0 := Hash(key, value)
+	level1 := Hash(GetDefaultHashForHeight(0), level0)
+	level2 := Hash(level1, GetDefaultHashForHeight(1))
+	level3 := Hash(GetDefaultHashForHeight(2), level2)
+	level4 := Hash(level3, GetDefaultHashForHeight(3))
+	level5 := Hash(GetDefaultHashForHeight(4), level4)
+	level6 := Hash(level5, GetDefaultHashForHeight(5))
+	level7 := Hash(GetDefaultHashForHeight(6), level6)
+
+	fmt.Println(">>>", key, hex.EncodeToString(level0))
+	// leaf node
+	assert.Equal(t, ComputeCompactValue(key, value, 0, trieHeight), level0)
+	// intermediate levels
+	assert.Equal(t, ComputeCompactValue(key, value, 1, trieHeight), level1)
+	assert.Equal(t, ComputeCompactValue(key, value, 2, trieHeight), level2)
+	assert.Equal(t, ComputeCompactValue(key, value, 3, trieHeight), level3)
+	assert.Equal(t, ComputeCompactValue(key, value, 4, trieHeight), level4)
+	assert.Equal(t, ComputeCompactValue(key, value, 5, trieHeight), level5)
+	assert.Equal(t, ComputeCompactValue(key, value, 6, trieHeight), level6)
+	// root node
+	assert.Equal(t, ComputeCompactValue(key, value, 7, trieHeight), level7)
 }
 
 func TestRead_HistoricalValuesPruned(t *testing.T) {

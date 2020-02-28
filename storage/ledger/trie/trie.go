@@ -879,6 +879,7 @@ func (s *SMT) SafeClose() (error, error) {
 	return nil, nil
 }
 
+// ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []byte {
 	computedHash := Hash(key, value)
 	for j := maxHeight - 1; j > maxHeight-height-1; j-- {
