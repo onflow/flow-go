@@ -277,6 +277,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		}
 	}
 
+	// remove children from cache
+	delete(e.cache, blockID)
+
 	return result.ErrorOrNil()
 }
 
