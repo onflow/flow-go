@@ -2,11 +2,8 @@ package test
 
 import (
 	"fmt"
-	"os"
-	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mock"
@@ -15,126 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
-
-func CreateSubnets(nodesNum, subnetNum, linkNum int) (map[int][]*libp2p.Network, map[int][]flow.Identifier, error) {
-	if nodesNum < subnetNum || nodesNum%subnetNum != 0 {
-		return nil, nil, fmt.Errorf("number of subnets should divide number of nodes")
-	}
-
-	// subSize of subnets
-	subSize := nodesNum / subnetNum
-	if subSize < linkNum {
-		return nil, nil,
-			fmt.Errorf("number of links (%d) greater than subnet size (%d)", subSize, linkNum)
-	}
-
-	// all nodes ids
-	all := CreateIDs(nodesNum)
-	// map of subnet ids
-	subnetIdList := groupIDs(all, subSize, linkNum)
-
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws, err := CreateMiddleware(logger, all)
-	if err != nil {
-		return nil, nil, err
-	}
-	//nets, err := CreateNetworks(logger, mws, all, nodesNum, false)
-	//if err != nil {
-	//	return nil, nil, err
-	//}
-
-	//netMap := make(map[flow.Identity]*libp2p.Network)
-	//for index, net := range nets {
-	//	netid := *all[index]
-	//	netMap[netid] = net
-	//}
-
-	mwMap := make(map[flow.Identity]*libp2p.Middleware)
-	for index, mw := range mws {
-		netid := *all[index]
-		mwMap[netid] = mw
-	}
-
-	// inventory of all networks in each subnet of the network
-	subnets := make(map[int][]*libp2p.Network)
-	// inventory of all ids in each subnet of the network
-	subids := make(map[int][]flow.Identifier)
-
-	// creates topology over the nodes of each subnet
-	created := make(map[flow.Identity]*libp2p.Network)
-	for index, subnetids := range subnetIdList {
-		subnets[index] = make([]*libp2p.Network, 0)
-		subids[index] = make([]flow.Identifier, 0)
-		// iterates over ids of a single subnet
-		for _, id := range subnetids {
-			idList := flow.IdentityList{}
-			idList = append(idList, &id)
-			if _, ok := created[id]; !ok {
-				// creates a new network instance
-				net, err := CreateNetworks(logger, []*libp2p.Middleware{mwMap[id]}, idList, nodesNum, false)
-				if err != nil {
-					return nil, nil, err
-				}
-				created[id] = net[0]
-				subnets[index] = append(subnets[index], net[0])
-			} else {
-				subnets[index] = append(subnets[index], created[id])
-			}
-
-			subids[index] = append(subids[index], id.NodeID)
-		}
-	}
-
-	// allows nodes to find each other
-	time.Sleep(5 * time.Second)
-
-	return subnets, subids, nil
-}
-
-// groupIDs groups ids into sub-many groups
-func groupIDs(ids flow.IdentityList, subNum, linkNum int) map[int][]flow.Identity {
-	sIndx := -1
-	subnets := make(map[flow.Identity]int)
-
-	// keeps ids of the nodes in each subnet
-	subnetIdList := make(map[int][]flow.Identity)
-	// clusters ids into subnets
-	for index, id := range ids {
-		// checks if we reach end of current subnet
-		if index%subNum == 0 {
-			// moves to next subnet
-			sIndx++
-		}
-
-		// assigns subnet index of the net
-		subnets[*id] = sIndx
-		if subnetIdList[sIndx] == nil {
-			// initializes list
-			subnetIdList[sIndx] = make([]flow.Identity, 0)
-		}
-
-		// adding nodes' id to the current Identity
-		subnetIdList[sIndx] = append(subnetIdList[sIndx], *id)
-	}
-
-	// creates links between subnets
-	if linkNum > 0 {
-		for this := range subnetIdList {
-			for other := range subnetIdList {
-				if this == other {
-					continue
-				}
-
-				// adds links from this subnet to other subnet
-				for i := 0; i < linkNum; i++ {
-					subnetIdList[other] = append(subnetIdList[other], subnetIdList[this][i])
-				}
-			}
-		}
-	}
-
-	return subnetIdList
-}
 
 // helper offers a set of functions that are shared among different tests
 // CreateIDs creates and initializes count-many flow identifiers instances
