@@ -88,7 +88,7 @@ func main() {
 			node.MustNot(err).Msg("could not initialize consensus engine")
 
 			cold, err := coldstuff.New(node.Logger, node.State, node.Me, eng, build, final, 3*time.Second, 6*time.Second)
-			node.MustNot(err).Msg("could not initialize coldstuff engine")
+			node.MustNot(err).Msg("could not initialize coldstuff")
 
 			return eng.WithConsensus(cold)
 		}).

@@ -69,10 +69,10 @@ func main() {
 			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees, headers)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 
-			eng, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, 3*time.Second, 6*time.Second)
-			node.MustNot(err).Msg("could not initialize coldstuff engine")
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, 3*time.Second, 6*time.Second)
+			node.MustNot(err).Msg("could not initialize coldstuff")
 
-			return prop.WithConsensus(eng)
+			return prop.WithConsensus(cold)
 		}).
 		Run()
 }
