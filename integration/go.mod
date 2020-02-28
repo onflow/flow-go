@@ -3,7 +3,7 @@ module github.com/dapperlabs/flow-go/integration
 go 1.13
 
 require (
-	github.com/dapperlabs/flow-go v0.2.5-beta
+	github.com/dapperlabs/flow-go v0.3.1
 	github.com/dapperlabs/flow-go-sdk v0.0.0-20200114214559-9ed2f832fcdc
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
