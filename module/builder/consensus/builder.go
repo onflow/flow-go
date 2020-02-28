@@ -14,8 +14,8 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-// Builder is the builder for block payloads. Upon providing a payload hash, it
-// also memorizes which entities were included into the payload.
+// Builder is the builder for consensus block payloads. Upon providing a payload
+// hash, it also memorizes which entities were included into the payload.
 type Builder struct {
 	db         *badger.DB
 	guarantees mempool.Guarantees
@@ -74,7 +74,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 			// look up the ancestor's guarantees
 			var guaranteeIDs []flow.Identifier
-			err := operation.LookupGuarantees(ancestor.PayloadHash, &guaranteeIDs)(tx)
+			err = operation.LookupGuarantees(ancestor.PayloadHash, &guaranteeIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up ancestor guarantees (%x): %w", ancestor.PayloadHash, err)
 			}
@@ -190,11 +190,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			// the following fields should be set by the custom function as needed
 			// NOTE: we could abstract all of this away into an interface{} field,
 			// but that would be over the top as we will probably always use hotstuff
-			View:          0,
-			ParentSigners: nil,
-			ParentSigs:    nil,
-			ProposerID:    flow.ZeroID,
-			ProposerSig:   nil,
+			View:                    0,
+			ParentSigners:           nil,
+			ParentStakingSigs:       nil,
+			ParentRandomBeaconSig:   nil,
+			ProposerID:              flow.ZeroID,
+			ProposerStakingSig:      nil,
+			ProposerRandomBeaconSig: nil,
 		}
 
 		// apply the custom fields setter of the consensus algorithm

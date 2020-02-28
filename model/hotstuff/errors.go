@@ -37,17 +37,10 @@ type ExistingQCError struct {
 }
 
 var ErrInsufficientVotes = errors.New("received insufficient votes")
+var ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
 
 func (e MissingSignerError) Error() string {
 	return fmt.Sprintf("missing signer of vote %v", e.Vote)
-}
-
-func (e InvalidVoteError) Error() string {
-	return fmt.Sprintf("invalid vote found (vote: %x)", e.VoteID)
-}
-
-func (e DoubleVoteError) Error() string {
-	return fmt.Sprintf("double voting detected (original vote: %v, double vote: %v)", e.OriginalVote, e.DoubleVote)
 }
 
 func (e StaleVoteError) Error() string {

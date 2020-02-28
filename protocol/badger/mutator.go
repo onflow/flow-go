@@ -65,6 +65,16 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
+		// insert result
+		err = operation.InsertResult(&flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: flow.ZeroID,
+			BlockID:          genesis.ID(),
+			FinalStateCommit: seal.FinalState,
+		}})(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis result: %w", err)
+		}
+
 		// insert the block number mapping
 		err = operation.InsertNumber(0, genesis.ID())(tx)
 		if err != nil {
@@ -314,19 +324,21 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	// badger has efficient caching, so no reason to complicate the algorithm
 	// here to try avoiding one extra header loading
 
+	var currentHeader = *header
+
 	// trace back from new block until we find a block that has the latest
 	// finalized block as its parent
-	for header.ParentID != headID {
+	for currentHeader.ParentID != headID {
 
 		// get the parent of current block
-		err = operation.RetrieveHeader(header.ParentID, header)(tx)
+		err = operation.RetrieveHeader(currentHeader.ParentID, &currentHeader)(tx)
 		if err != nil {
 			return fmt.Errorf("could not get parent (%x): %w", header.ParentID, err)
 		}
 
 		// if its number is below current boundary, the block does not connect
 		// to the finalized protocol state and would break database consistency
-		if header.View < boundary {
+		if currentHeader.View < boundary {
 			return fmt.Errorf("block doesn't connect to finalized state")
 		}
 

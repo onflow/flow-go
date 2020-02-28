@@ -5,23 +5,17 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Signature is a signature from a single signer, which can be aggregaged
+// SingleSignature is a signature from a single signer, which can be aggregaged
 // into aggregated signature.
 type SingleSignature struct {
-	// The raw bytes of the signature.
-	Raw []byte
-
-	// The identifier of the signer, which identifies signer's role, stake, etc.
-	SignerID flow.Identifier
+	StakingSignature      crypto.Signature // The raw bytes for BLS signature
+	RandomBeaconSignature crypto.Signature // The raw bytes for Threshold Signature for generating random beacon
+	SignerID              flow.Identifier  // The identifier of the signer, which identifies signer's role, stake, etc.
 }
 
 // AggregatedSignature is the aggregated signatures signed by all the signers on the same message.
 type AggregatedSignature struct {
-	// Raw is the raw signature bytes.
-	// It might be a aggregated BLS signature or a combination of aggregated BLS signature
-	// and threshold signature.
-	Raw []crypto.Signature
-
-	// the Identifiers of all the signers
-	SignerIDs []flow.Identifier
+	StakingSignatures     []crypto.Signature // The raw bytes for aggregated BLS signature
+	RandomBeaconSignature crypto.Signature   // The aggregated threshold signature for generating random beacon
+	SignerIDs             []flow.Identifier  // The Identifiers of all the signers
 }

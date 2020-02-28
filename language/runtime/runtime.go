@@ -341,17 +341,17 @@ func (r *interpreterRuntime) newInterpreter(
 			},
 		),
 		interpreter.WithStorageReadHandler(
-			func(_ *interpreter.Interpreter, storageIdentifier string, key string) interpreter.OptionalValue {
-				return runtimeStorage.readValue(storageIdentifier, key)
+			func(_ *interpreter.Interpreter, address common.Address, key string) interpreter.OptionalValue {
+				return runtimeStorage.readValue(address.Hex(), key)
 			},
 		),
 		interpreter.WithStorageWriteHandler(
-			func(_ *interpreter.Interpreter, storageIdentifier string, key string, value interpreter.OptionalValue) {
-				runtimeStorage.writeValue(storageIdentifier, key, value)
+			func(_ *interpreter.Interpreter, address common.Address, key string, value interpreter.OptionalValue) {
+				runtimeStorage.writeValue(address.Hex(), key, value)
 			},
 		),
 		interpreter.WithStorageKeyHandler(
-			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+			func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
 				return string(indexingType.ID())
 			},
 		),
@@ -699,7 +699,9 @@ func (r *interpreterRuntime) updateAccountCode(
 		contractValue = interpreter.NewSomeValueOwningNonCopying(contract)
 	}
 
-	contractValue.SetOwner(addressValue.Hex())
+	address := common.Address(addressValue)
+
+	contractValue.SetOwner(&address)
 
 	// NOTE: only update account code if contract instantiation succeeded
 
@@ -956,12 +958,12 @@ func (v BlockValue) Copy() Value {
 	return v
 }
 
-func (BlockValue) GetOwner() string {
+func (BlockValue) GetOwner() *common.Address {
 	// value is never owned
-	return ""
+	return nil
 }
 
-func (BlockValue) SetOwner(_ string) {
+func (BlockValue) SetOwner(_ *common.Address) {
 	// NO-OP: value cannot be owned
 }
 

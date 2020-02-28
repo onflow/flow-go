@@ -30,11 +30,37 @@ func TestCheckInvalidContractAccountField(t *testing.T) {
 	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
 }
 
+func TestCheckInvalidContractInterfaceAccountField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract interface Test {
+          let account: Account
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
 func TestCheckInvalidContractAccountFunction(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       contract Test {
           fun account() {}
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidContractInterfaceAccountFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract interface Test {
+          fun account()
       }
     `)
 
@@ -50,6 +76,20 @@ func TestCheckContractAccountFieldUse(t *testing.T) {
 
           init() {
               self.account.address
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckContractInterfaceAccountFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract interface Test {
+
+          fun test() {
+              pre { self.account.address == Address(0x42) }
           }
       }
     `)

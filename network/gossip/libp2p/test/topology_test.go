@@ -113,7 +113,8 @@ func (n *TopologyTestSuite) TestUniqueness() {
 		previous = current
 		current = nil
 		// generate a new topology with a the same ids, size but a different seed for each iteration
-		idMap, err := top.Subset(n.ids, topSize, n.ids.Get(uint(i)).NodeID.String())
+		identity, _ := n.ids.ByIndex(uint(i))
+		idMap, err := top.Subset(n.ids, topSize, identity.NodeID.String())
 		require.NoError(n.Suite.T(), err)
 
 		for _, v := range idMap {
