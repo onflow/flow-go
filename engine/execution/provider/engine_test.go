@@ -55,7 +55,7 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 		execState.On("CommitDelta", mock.Anything).Return(nil, nil).Times(len(result.StateViews))
 		execState.On("PersistChunkHeader", mock.Anything).Return(nil).Times(len(result.StateViews))
 		previousExecutionResultID := unittest.IdentifierFixture()
-		execState.On("GetExecutionResultID", mock.Anything).Return(&previousExecutionResultID, nil)
+		execState.On("GetExecutionResultID", mock.Anything).Return(previousExecutionResultID, nil)
 		execState.On("PersistExecutionResult", mock.Anything, mock.Anything).Return(nil)
 
 		err := e.onExecutionResult(e.me.NodeID(), result)
@@ -81,7 +81,7 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 		execState.On("CommitDelta", mock.Anything).Return(nil, nil).Times(len(result.StateViews))
 		execState.On("PersistChunkHeader", mock.Anything).Return(nil).Times(len(result.StateViews))
 		previousExecutionResultID := unittest.IdentifierFixture()
-		execState.On("GetExecutionResultID", mock.Anything).Return(&previousExecutionResultID, nil)
+		execState.On("GetExecutionResultID", mock.Anything).Return(previousExecutionResultID, nil)
 		execState.On("PersistExecutionResult", mock.Anything, mock.Anything).Return(nil)
 
 		e := Engine{
@@ -156,7 +156,7 @@ func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 		execState.On("PersistChunkHeader", mock.Anything).Return(nil).Times(len(result.StateViews))
 		execState.On("PersistStateCommitment", result.CompleteBlock.Block.ID(), mock.Anything).Return(nil)
 		previousExecutionResultID := unittest.IdentifierFixture()
-		execState.On("GetExecutionResultID", mock.Anything).Return(&previousExecutionResultID, nil)
+		execState.On("GetExecutionResultID", mock.Anything).Return(previousExecutionResultID, nil)
 		execState.On("PersistExecutionResult", mock.Anything, mock.Anything).Return(nil)
 
 		err := e.onExecutionResult(e.me.NodeID(), result)
@@ -181,7 +181,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	endState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
 
-	execState.On("GetExecutionResultID", completeBlock.Block.ParentID).Return(&previousExecutionResultID, nil)
+	execState.On("GetExecutionResultID", completeBlock.Block.ParentID).Return(previousExecutionResultID, nil)
 	execState.On("PersistExecutionResult", completeBlock.Block.ID(), mock.Anything).Return(nil)
 
 	er, err := e.generateExecutionResultForBlock(completeBlock, nil, endState)

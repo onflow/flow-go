@@ -23,7 +23,7 @@ const (
 	// Execution 100-199
 	ExecutionReceiptProvider = 100
 	ExecutionStateProvider   = 101
-	ExecutionExecution       = 102
+	ExecutionComputer        = 102
 
 	// Verification 150-199
 	ApprovalProvider = 150

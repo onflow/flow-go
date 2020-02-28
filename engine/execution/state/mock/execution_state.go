@@ -81,15 +81,15 @@ func (_m *ExecutionState) GetChunkRegisters(_a0 flow.Identifier) (flow.Ledger, e
 }
 
 // GetExecutionResultID provides a mock function with given fields: blockID
-func (_m *ExecutionState) GetExecutionResultID(blockID flow.Identifier) (*flow.Identifier, error) {
+func (_m *ExecutionState) GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error) {
 	ret := _m.Called(blockID)
 
-	var r0 *flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Identifier); ok {
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Identifier)
+			r0 = ret.Get(0).(flow.Identifier)
 		}
 	}
 

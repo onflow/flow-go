@@ -40,16 +40,16 @@ func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifi
 	})
 }
 
-func (r *ExecutionResults) Lookup(blockID flow.Identifier) (*flow.Identifier, error) {
+func (r *ExecutionResults) Lookup(blockID flow.Identifier) (flow.Identifier, error) {
 	var result flow.Identifier
 	err := r.db.View(func(tx *badger.Txn) error {
 		return operation.LookupExecutionResult(blockID, &result)(tx)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("coulnd not lookup execution result: %w", err)
+		return flow.Identifier{}, fmt.Errorf("coulnd not lookup execution result: %w", err)
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {

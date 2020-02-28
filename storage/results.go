@@ -17,6 +17,6 @@ type ExecutionResults interface {
 	// Index result ID by a blockID
 	Index(blockID flow.Identifier, resultID flow.Identifier) error
 
-	// Lookup exeuction result by block ID
-	Lookup(blockID flow.Identifier) (*flow.Identifier, error)
+	// Lookup execution result by block ID
+	Lookup(blockID flow.Identifier) (flow.Identifier, error)
 }

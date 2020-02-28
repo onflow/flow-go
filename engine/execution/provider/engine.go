@@ -235,7 +235,7 @@ func (e *Engine) generateExecutionResultForBlock(
 
 	er := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: *previousErID,
+			PreviousResultID: previousErID,
 			BlockID:          block.Block.ID(),
 			FinalStateCommit: endState,
 			Chunks:           chunks,

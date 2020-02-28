@@ -31,7 +31,7 @@ type ExecutionState interface {
 	// PersistChunkHeader saves a chunk header by chunk ID.
 	PersistChunkHeader(*flow.ChunkHeader) error
 
-	GetExecutionResultID(blockID flow.Identifier) (*flow.Identifier, error)
+	GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error)
 	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
 }
 
@@ -132,7 +132,7 @@ func (s *state) PersistChunkHeader(c *flow.ChunkHeader) error {
 	return s.chunkHeaders.Store(c)
 }
 
-func (s *state) GetExecutionResultID(blockID flow.Identifier) (*flow.Identifier, error) {
+func (s *state) GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error) {
 	return s.executionResults.Lookup(blockID)
 }
 

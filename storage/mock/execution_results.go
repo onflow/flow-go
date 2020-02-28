@@ -48,15 +48,15 @@ func (_m *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identif
 }
 
 // Lookup provides a mock function with given fields: blockID
-func (_m *ExecutionResults) Lookup(blockID flow.Identifier) (*flow.Identifier, error) {
+func (_m *ExecutionResults) Lookup(blockID flow.Identifier) (flow.Identifier, error) {
 	ret := _m.Called(blockID)
 
-	var r0 *flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Identifier); ok {
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Identifier)
+			r0 = ret.Get(0).(flow.Identifier)
 		}
 	}
 
