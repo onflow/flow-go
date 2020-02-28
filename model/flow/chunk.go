@@ -30,11 +30,11 @@ func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
-// Register touch captures the register value before an update or read
+// RegisterTouch captures the register value before an update or read
 type RegisterTouch struct {
 	RegisterID RegisterID
-	Value      []byte
-	Proof      []byte
+	Value      RegisterValue
+	Proof      StorageProof
 }
 
 // ChunkDataPack holds all register touches (any read, or write)
