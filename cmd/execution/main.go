@@ -4,12 +4,12 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/receipts"
+	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage"
@@ -23,10 +23,12 @@ func main() {
 	var (
 		stateCommitments storage.Commits
 		ledgerStorage    storage.Ledger
-		receiptsEng      *receipts.Engine
-		executionEng     *execution.Engine
+		receiptsEng      *provider.Engine
+		executionEng     *computation.Engine
+		ingestionEng     *ingestion.Engine
 		rpcConf          rpc.Config
 		err              error
+		executionState   state.ExecutionState
 	)
 
 	cmd.
@@ -46,11 +48,16 @@ func main() {
 		Component("receipts engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing receipts engine")
 
-			receiptsEng, err = receipts.New(
+			chunkHeaders := badger.NewChunkHeaders(node.DB)
+
+			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
+
+			receiptsEng, err = provider.New(
 				node.Logger,
 				node.Network,
 				node.State,
 				node.Me,
+				executionState,
 			)
 			node.MustNot(err).Msg("could not initialize receipts engine")
 
@@ -62,16 +69,11 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 
-			chunkHeaders := badger.NewChunkHeaders(node.DB)
-
-			execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
-
-			executionEng, err = execution.New(
+			executionEng, err = computation.New(
 				node.Logger,
 				node.Network,
 				node.Me,
 				node.State,
-				execState,
 				receiptsEng,
 				vm,
 			)
@@ -86,7 +88,7 @@ func main() {
 			collections := badger.NewCollections(node.DB)
 			payloads := badger.NewPayloads(node.DB)
 
-			ingestionEng, err := ingestion.New(
+			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -95,6 +97,7 @@ func main() {
 				payloads,
 				collections,
 				executionEng,
+				executionState,
 			)
 			node.MustNot(err).Msg("could not initialize ingestion engine")
 
@@ -103,7 +106,7 @@ func main() {
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing gRPC server")
 
-			rpcEng := rpc.New(node.Logger, rpcConf, executionEng)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng)
 			return rpcEng
 		}).Run()
 

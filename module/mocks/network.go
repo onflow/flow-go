@@ -5,6 +5,7 @@
 package mocks
 
 import (
+	crypto "github.com/dapperlabs/flow-go/crypto"
 	flow "github.com/dapperlabs/flow-go/model/flow"
 	network "github.com/dapperlabs/flow-go/network"
 	gomock "github.com/golang/mock/gomock"
@@ -98,4 +99,19 @@ func (m *MockLocal) NodeID() flow.Identifier {
 func (mr *MockLocalMockRecorder) NodeID() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NodeID", reflect.TypeOf((*MockLocal)(nil).NodeID))
+}
+
+// Sign mocks base method
+func (m *MockLocal) Sign(arg0 []byte, arg1 crypto.Hasher) (crypto.Signature, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Sign", arg0, arg1)
+	ret0, _ := ret[0].(crypto.Signature)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Sign indicates an expected call of Sign
+func (mr *MockLocalMockRecorder) Sign(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sign", reflect.TypeOf((*MockLocal)(nil).Sign), arg0, arg1)
 }
