@@ -10,10 +10,13 @@ import (
 )
 
 func TestDelta_Get(t *testing.T) {
+	registerID1 := make([]byte, 32)
+	copy(registerID1, "fruit")
+
 	t.Run("ValueNotSet", func(t *testing.T) {
 		d := state.NewDelta()
 
-		b, exists := d.Get(flow.RegisterID("fruit"))
+		b, exists := d.Get(registerID1)
 		assert.Nil(t, b)
 		assert.False(t, exists)
 	})
@@ -21,37 +24,43 @@ func TestDelta_Get(t *testing.T) {
 	t.Run("ValueSet", func(t *testing.T) {
 		d := state.NewDelta()
 
-		d.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		d.Set(registerID1, flow.RegisterValue("apple"))
 
-		b, exists := d.Get(flow.RegisterID("fruit"))
+		b, exists := d.Get(registerID1)
 		assert.Equal(t, flow.RegisterValue("apple"), b)
 		assert.True(t, exists)
 	})
 }
 
 func TestDelta_Set(t *testing.T) {
+	registerID1 := make([]byte, 32)
+	copy(registerID1, "fruit")
+
 	d := state.NewDelta()
 
-	d.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+	d.Set(registerID1, flow.RegisterValue("apple"))
 
-	b1, exists := d.Get(flow.RegisterID("fruit"))
+	b1, exists := d.Get(registerID1)
 	assert.Equal(t, flow.RegisterValue("apple"), b1)
 	assert.True(t, exists)
 
-	d.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
+	d.Set(registerID1, flow.RegisterValue("orange"))
 
-	b2, exists := d.Get(flow.RegisterID("fruit"))
+	b2, exists := d.Get(registerID1)
 	assert.Equal(t, flow.RegisterValue("orange"), b2)
 	assert.True(t, exists)
 }
 
 func TestDelta_Delete(t *testing.T) {
+	registerID1 := make([]byte, 32)
+	copy(registerID1, "fruit")
+
 	t.Run("ValueNotSet", func(t *testing.T) {
 		d := state.NewDelta()
 
-		d.Delete(flow.RegisterID("fruit"))
+		d.Delete(registerID1)
 
-		b, exists := d.Get(flow.RegisterID("fruit"))
+		b, exists := d.Get(registerID1)
 		assert.Nil(t, b)
 		assert.True(t, exists)
 	})
@@ -59,29 +68,35 @@ func TestDelta_Delete(t *testing.T) {
 	t.Run("ValueSet", func(t *testing.T) {
 		d := state.NewDelta()
 
-		d.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
-		d.Delete(flow.RegisterID("fruit"))
+		d.Set(registerID1, flow.RegisterValue("apple"))
+		d.Delete(registerID1)
 
-		b, exists := d.Get(flow.RegisterID("fruit"))
+		b, exists := d.Get(registerID1)
 		assert.Nil(t, b)
 		assert.True(t, exists)
 	})
 }
 
 func TestDelta_MergeWith(t *testing.T) {
+	registerID1 := make([]byte, 32)
+	copy(registerID1, "fruit")
+
+	registerID2 := make([]byte, 32)
+	copy(registerID2, "vegetable")
+
 	t.Run("NoCollisions", func(t *testing.T) {
 		d1 := state.NewDelta()
 		d2 := state.NewDelta()
 
-		d1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
-		d2.Set(flow.RegisterID("vegetable"), flow.RegisterValue("carrot"))
+		d1.Set(registerID1, flow.RegisterValue("apple"))
+		d2.Set(registerID2, flow.RegisterValue("carrot"))
 
 		d1.MergeWith(d2)
 
-		b1, _ := d1.Get(flow.RegisterID("fruit"))
+		b1, _ := d1.Get(registerID1)
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-		b2, _ := d1.Get(flow.RegisterID("vegetable"))
+		b2, _ := d1.Get(registerID2)
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 	})
 
@@ -89,12 +104,12 @@ func TestDelta_MergeWith(t *testing.T) {
 		d1 := state.NewDelta()
 		d2 := state.NewDelta()
 
-		d1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
-		d2.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
+		d1.Set(registerID1, flow.RegisterValue("apple"))
+		d2.Set(registerID1, flow.RegisterValue("orange"))
 
 		d1.MergeWith(d2)
 
-		b, _ := d1.Get(flow.RegisterID("fruit"))
+		b, _ := d1.Get(registerID1)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
 
@@ -102,14 +117,14 @@ func TestDelta_MergeWith(t *testing.T) {
 		d1 := state.NewDelta()
 		d2 := state.NewDelta()
 
-		d1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
-		d1.Delete(flow.RegisterID("fruit"))
+		d1.Set(registerID1, flow.RegisterValue("apple"))
+		d1.Delete(registerID1)
 
-		d2.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
+		d2.Set(registerID1, flow.RegisterValue("orange"))
 
 		d1.MergeWith(d2)
 
-		b, _ := d1.Get(flow.RegisterID("fruit"))
+		b, _ := d1.Get(registerID1)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
 
@@ -117,15 +132,15 @@ func TestDelta_MergeWith(t *testing.T) {
 		d1 := state.NewDelta()
 		d2 := state.NewDelta()
 
-		d1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		d1.Set(registerID1, flow.RegisterValue("apple"))
 
-		d2.Delete(flow.RegisterID("fruit"))
+		d2.Delete(registerID1)
 
 		d1.MergeWith(d2)
 
-		b, exists := d1.Get(flow.RegisterID("fruit"))
+		b, exists := d1.Get(registerID1)
 		assert.Nil(t, b)
 		assert.True(t, exists)
-		assert.True(t, d1.HasBeenDeleted(flow.RegisterID("fruit")))
+		assert.True(t, d1.HasBeenDeleted(registerID1))
 	})
 }
