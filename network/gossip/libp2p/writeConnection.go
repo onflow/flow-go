@@ -4,7 +4,6 @@ package libp2p
 
 import (
 	"bufio"
-	"fmt"
 	"sync"
 
 	ggio "github.com/gogo/protobuf/io"
@@ -59,7 +58,7 @@ SendLoop:
 
 			err := writer.WriteMsg(msg)
 			if err != nil {
-				fmt.Println(err)
+				wc.log.Error().Err(err).Msg("failed to write message")
 			}
 
 			bufw.Flush()

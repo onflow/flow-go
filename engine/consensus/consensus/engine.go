@@ -6,12 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
@@ -52,8 +50,6 @@ func New(
 	state protocol.State,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	build module.Builder,
-	finalizer module.Finalizer,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -67,13 +63,6 @@ func New(
 		cache:    make(map[flow.Identifier][]cacheItem),
 	}
 
-	cold, err := coldstuff.New(log, state, me, e, build, finalizer, 3*time.Second, 8*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize coldstuff: %w", err)
-	}
-
-	e.coldstuff = cold
-
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ProtocolConsensus, e)
 	if err != nil {
@@ -84,9 +73,21 @@ func New(
 	return e, nil
 }
 
+// WithConsensus adds the consensus algorithm to the engine. This must be
+// called before the engine can start.
+func (e *Engine) WithConsensus(cold module.ColdStuff) *Engine {
+	e.coldstuff = cold
+	return e
+}
+
 // Ready returns a ready channel that is closed once the engine has fully
-// started. For the consensus, we consider it ready right away.
+// started. For consensus engine, this is true once the underlying consensus
+// algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
+	if e.coldstuff == nil {
+		panic("cannot start consensus engine without consensus algorithm")
+	}
+
 	return e.unit.Ready(func() {
 		<-e.coldstuff.Ready()
 	})
