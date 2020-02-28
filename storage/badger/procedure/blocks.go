@@ -136,6 +136,11 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 			FinalStateCommit: seal.FinalState,
 		}}
 
+		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index commit: %w", err)
+		}
+
 		// insert result
 		err = operation.InsertExecutionResult(&executionResult)(tx)
 		if err != nil {

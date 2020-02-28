@@ -41,7 +41,7 @@ func New(logger zerolog.Logger, net module.Network, state protocol.State, me mod
 		execState: execState,
 	}
 
-	receiptCon, err := net.Register(engine.ReceiptProvider, &eng)
+	receiptCon, err := net.Register(engine.ExecutionReceiptProvider, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register receipt provider engine")
 	}

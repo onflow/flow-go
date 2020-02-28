@@ -13,7 +13,7 @@ import (
 func ExecutionStateBootstrap(tx *badger.Txn, genesis *flow.Block) error {
 
 	// insert the block seal commit
-	err := operation.InsertCommit(genesis.ID(), genesis.Seals[0].FinalState)(tx)
+	err := operation.IndexCommit(genesis.ID(), genesis.Seals[0].FinalState)(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert state commit: %w", err)
 	}

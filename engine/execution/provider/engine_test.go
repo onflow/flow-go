@@ -182,7 +182,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	endState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
 
-	execState.On("GetExecutionResultID", completeBlock.Block.ParentID).Return(previousExecutionResultID, nil)
+	execState.On("GetExecutionResultID", completeBlock.Block.ParentID).Return(&previousExecutionResultID, nil)
 	execState.On("PersistExecutionResult", completeBlock.Block.ID(), mock.Anything).Return(nil)
 
 	er, err := e.generateExecutionResultForBlock(completeBlock, nil, endState)
