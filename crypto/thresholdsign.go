@@ -41,7 +41,7 @@ type ThresholdSigner struct {
 	thresholdSignature Signature
 }
 
-const ThresholdSignaureTag = "Threshold Signatures"
+const ThresholdSignatureTag = "Threshold Signatures"
 
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
@@ -170,8 +170,8 @@ func (s *ThresholdSigner) AddSignatureShare(orig int, share Signature) (bool, bo
 	return verif, s.enoughShares(), nil
 }
 
-// ThresholdSignaure returns the threshold signature if the threshold was reached, nil otherwise
-func (s *ThresholdSigner) ThresholdSignaure() (Signature, error) {
+// ThresholdSignature returns the threshold signature if the threshold was reached, nil otherwise
+func (s *ThresholdSigner) ThresholdSignature() (Signature, error) {
 	// thresholdSignature is only computed once
 	if s.thresholdSignature != nil {
 		return s.thresholdSignature, nil
