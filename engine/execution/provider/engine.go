@@ -150,7 +150,7 @@ func (e *Engine) onExecutionResult(originID flow.Identifier, result *execution.C
 		Spocks: nil,
 		// TODO: sign execution receipt
 		ExecutorSignature: nil,
-		ExecutorID: e.me.NodeID(),
+		ExecutorID:        e.me.NodeID(),
 	}
 
 	err = e.broadcastExecutionReceipt(receipt)
