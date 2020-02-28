@@ -68,7 +68,7 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 }
 
 func (m *Mutator) Extend(blockID flow.Identifier) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return m.state.db.View(func(tx *badger.Txn) error {
 
 		// retrieve the block
 		var block cluster.Block
