@@ -37,9 +37,9 @@ func (v *TrieVerifier) VerifyRegistersProof(
 	for i := 0; i < length; i++ {
 		flag, singleProof, inclusion, size := proofHldr.ExportProof(i)
 		if inclusion {
-			verify = trie.VerifyInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.defaultHashes, v.height)
+			verify = trie.VerifyInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.height)
 		} else {
-			verify = trie.VerifyNonInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.defaultHashes, v.height)
+			verify = trie.VerifyNonInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.height)
 		}
 		if !verify {
 			return verify, errors.New("Incorrect Proof")
