@@ -40,7 +40,7 @@ func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
 	})
 }
 
-func (ch *ChunkDataPacks) ByID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	var c flow.ChunkDataPack
 	err := ch.db.View(func(btx *badger.Txn) error {
 		err := operation.RetrieveChunkDataPack(chunkID, &c)(btx)

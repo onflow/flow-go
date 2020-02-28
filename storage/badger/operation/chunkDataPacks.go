@@ -17,6 +17,6 @@ func RetrieveChunkDataPack(chunkID flow.Identifier, c *flow.ChunkDataPack) func(
 }
 
 // RemoveChunkDataPack removes the chunk data pack with the given chunk ID.
-func RemoveChunkDataPack(txID flow.Identifier) func(*badger.Txn) error {
-	return remove(makePrefix(codeChunkDataPack, txID))
+func RemoveChunkDataPack(chunkID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeChunkDataPack, chunkID))
 }

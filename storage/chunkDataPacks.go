@@ -13,6 +13,6 @@ type ChunkDataPacks interface {
 	// Remove removes the chunk data for the given chunk ID, if it exists.
 	Remove(chunkID flow.Identifier) error
 
-	// ByID returns the chunk data for the given chunk ID.
-	ByID(chunkID flow.Identifier) (*flow.ChunkDataPack, error)
+	// ByChunkID returns the chunk data for the given a chunk ID.
+	ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error)
 }
