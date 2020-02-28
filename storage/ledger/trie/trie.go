@@ -881,7 +881,6 @@ func (s *SMT) SafeClose() (error, error) {
 
 func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []byte {
 	computedHash := Hash(key, value)
-	fmt.Println(">->->->>", hex.EncodeToString(computedHash), height, maxHeight, len(key), key, value)
 	for j := maxHeight - 1; j > maxHeight-height-1; j-- {
 		if utils.IsBitSet(key, j) { // right branching
 			computedHash = Hash(GetDefaultHashForHeight(maxHeight-j-1), computedHash)
