@@ -1,6 +1,6 @@
 // +build relic
 
-package signature
+package dep
 
 import (
 	"fmt"
@@ -34,8 +34,6 @@ func NewSigProvider(
 	randomBeaconHasher crypto.Hasher,
 	isRandomBeaconEnabled bool,
 ) *SigProvider {
-
-
 	return &SigProvider{
 		myID:                   myID,
 		protocolState:          protocolState,

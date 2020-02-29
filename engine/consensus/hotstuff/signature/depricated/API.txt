@@ -1,0 +1,41 @@
+
+VerifyStakingSig(sig crypto.Signature, block *hotstuff.Block, signerKey crypto.PublicKey) (bool, error)
+
+
+VerifyRandomBeaconSig(sig crypto.Signature, block *hotstuff.Block, signerPubKey crypto.PublicKey) (bool, error)
+
+
+VerifyAggregatedStakingSignature(aggsig []crypto.Signature, block *hotstuff.Block, signerKeys []crypto.PublicKey) (bool, error)
+
+
+VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *hotstuff.Block) (bool, error)
+
+
+CanReconstruct(numOfSigShares int) bool
+
+
+Aggregate(block *hotstuff.Block, sigs []*hotstuff.SingleSignature) (*hotstuff.AggregatedSignature, error)
+
+
+VoteFor(block *hotstuff.Block) (*hotstuff.Vote, error)
+
+
+Propose(block *hotstuff.Block) (*hotstuff.Proposal, error)
+
+
+getSignerIDsAndSigShares(blockID flow.Identifier, sigs []*hotstuff.SingleSignature) ([]*SigShare, error)
+
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+LookupIndex(signerKeys []crypto.PublicKey) (bool, []int)
+
+
+Size() int
+
+
+Reconstruct(msg []byte, dkgPubData *DKGPublicData, sigShares []*SigShare) (crypto.Signature, error)
+
+
