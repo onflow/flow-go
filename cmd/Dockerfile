@@ -1,8 +1,16 @@
 # syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
+FROM golang:1.13 AS build-setup
+
+RUN apt-get update
+RUN apt-get -y install cmake zip sudo
+# add the pubkey of github.com to knownhosts, so ssh-agent doesn't bark
+RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
+RUN git config --global 'url.ssh://git@github.com/.insteadof' https://github.com/
+
 ## (1) Build Relic first to maximize caching
-FROM gcr.io/dl-flow/golang-cmake:v0.0.7 AS build-relic
+FROM build-setup AS build-relic
 
 RUN mkdir /build
 WORKDIR /build
@@ -17,11 +25,7 @@ COPY crypto/relic_build.sh .
 RUN bash ./relic_build.sh
 
 ## (2) Build the app binary
-FROM gcr.io/dl-flow/golang-cmake:v0.0.7 AS build-env
-
-# add the pubkey of github.com to knownhosts, so ssh-agent doesn't bark
-RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
-RUN git config --global 'url.ssh://git@github.com/.insteadof' https://github.com/
+FROM build-setup AS build-env
 
 # Build the app binary in /app
 RUN mkdir /app
@@ -36,6 +40,7 @@ COPY --from=build-relic /build/relic/build ./crypto/relic/build
 
 FROM build-env as build-production
 WORKDIR /app
+
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
 # Also, allow ssh access
