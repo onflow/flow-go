@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -65,10 +66,13 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	ctx.builder = new(module.Builder)
 	ctx.finalizer = new(module.Finalizer)
 
-	e, err := New(log, ctx.net, ctx.me, ctx.state, tracer, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees, ctx.headers, ctx.builder, ctx.finalizer)
+	eng, err := New(log, ctx.net, ctx.me, ctx.state, tracer, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees, ctx.headers)
 	require.NoError(t, err)
 
-	run(ctx, e)
+	cold, err := coldstuff.New(log, ctx.state, ctx.me, eng, ctx.builder, ctx.finalizer, time.Second, time.Second)
+	require.NoError(t, err)
+
+	run(ctx, eng.WithConsensus(cold))
 }
 
 func TestStartStop(t *testing.T) {
