@@ -87,6 +87,9 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 		log[i] = make([]string, 0)
 	}
 
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(2 * time.Second)
+
 	// Each node broadcasting a message to all others
 	for i := range m.nets {
 		event := &message.Echo{
