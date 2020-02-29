@@ -37,6 +37,7 @@ COPY . .
 
 # Copy over Relic build artifacts
 COPY --from=build-relic /build/relic/build ./crypto/relic/build
+COPY --from=build-relic /build/relic/include/relic_conf.h ./crypto/relic/include/
 
 FROM build-env as build-production
 WORKDIR /app
