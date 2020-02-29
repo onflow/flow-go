@@ -2,7 +2,7 @@
 # NOTE: Must be run in the context of the repo's root directory
 
 ## (1) Build Relic first to maximize caching
-FROM golang:1.13 AS build-relic
+FROM gcr.io/dl-flow/golang-cmake:v0.0.7 AS build-relic
 
 RUN mkdir /build
 WORKDIR /build
@@ -17,7 +17,7 @@ COPY crypto/relic_build.sh .
 RUN bash ./relic_build.sh
 
 ## (2) Build the app binary
-FROM golang:1.13 AS build-env
+FROM gcr.io/dl-flow/golang-cmake:v0.0.7 AS build-env
 
 # add the pubkey of github.com to knownhosts, so ssh-agent doesn't bark
 RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
@@ -42,7 +42,7 @@ WORKDIR /app
 RUN --mount=type=ssh \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static" -o ./app ./cmd/${TARGET}
+    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags relic -ldflags "-extldflags -static" -o ./app ./cmd/${TARGET}
 
 RUN chmod a+x /app/app
 
