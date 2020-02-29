@@ -44,14 +44,20 @@ RecvLoop:
 
 		var msg message.Message
 		err := r.ReadMsg(&msg)
-		// error handling done similiar to comm.go in pubsub (as suggested by libp2p folks)
+		// error handling done similar to comm.go in pubsub (as suggested by libp2p folks)
 		if err != nil {
 			// if the sender closes the connection an EOF is received otherwise an actual error is received
 			if err != io.EOF {
-				rc.stream.Reset()
-				rc.log.Error().Str("peer", rc.stream.Conn().RemotePeer().String()).Err(err)
+				rc.log.Error().Err(err)
+				err = rc.stream.Reset()
+				if err != nil {
+					rc.log.Error().Err(err)
+				}
 			} else {
-				rc.stream.Close()
+				err = rc.stream.Close()
+				if err != nil {
+					rc.log.Error().Err(err)
+				}
 			}
 			rc.stop()
 			return

@@ -199,7 +199,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 			wg.Done()
 		}()
 		wg.Wait()
-		// Assert that the stream count within libp2p incremented (a new stream was created)
+		// assert that the stream count within libp2p decremented
 		require.Equal(l.T(), i, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
 	}
 }
@@ -292,8 +292,9 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 						s.Close()
 						return
 					}
-					s.Reset()
 					assert.Fail(l.T(), fmt.Sprintf("received error %v", err))
+					err = s.Reset()
+					assert.NoError(l.T(), err)
 					return
 				}
 				select {

@@ -110,7 +110,8 @@ func (stt *SparseTopologyTestSuite) TestDisjointedNetwork() {
 	}
 
 	// wait for nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	// this is a sparse network so it may need a at least 3 seconds (1 for each subnet)
+	time.Sleep(4 * time.Second)
 
 	// node 0 broadcasting a message to ALL targets
 	event := &message.Echo{
