@@ -39,6 +39,11 @@ func NewRandomBeaconSigner(
 	}
 }
 
+// CanReconstruct returns if the given number of signature shares is enough to reconstruct the random beaccon sigs
+func (s *RandomBeaconSigner) CanReconstruct(numOfSigShares int) bool {
+	return crypto.EnoughShares(s.dkgPubData.Size(), numOfSigShares)
+}
+
 // Reconstruct reconstructs a threshold signature from a list of the signature shares.
 //
 // msg - the message every signature share was signed on.
@@ -48,11 +53,13 @@ func NewRandomBeaconSigner(
 // sig - the reconstructed signature
 // error - some unknown error if exists
 //
-// It assumes the caller has called CanReconstruct to ensure enough signatures have been collected
-// It assumes the sigShares are all distinct.
+// Preconditions:
+//    * ensure enough signatures have been collected (verified by calling `CanReconstruct`)
+//    * the sigShares are all distinct
+// Violating preconditions will result in an error (but not the reconstruction of an invalid threshold signature)
 func (s *RandomBeaconSigner) Reconstruct(msg []byte, sigShares []*SigShare) (crypto.Signature, error) {
 	// double check if there are enough shares.
-	if !crypto.EnoughShares(s.dkgPubData.Size(), len(sigShares)) {
+	if !s.CanReconstruct(len(sigShares)) {
 		// the should not happen, since it assumes the caller has checked before
 		return nil, fmt.Errorf("not enough shares to reconstruct random beacon sig, expect: %v, got: %v", s.dkgPubData.Size(), len(sigShares))
 	}
