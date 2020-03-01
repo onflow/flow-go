@@ -14,9 +14,9 @@ import (
 // StakingSigner provides symmetry functions to generate and verify signatures
 type StakingSigner struct {
 	StakingSigVerifier
-	myID                   flow.Identifier
-	protocolState          protocol.State
-	stakingPrivateKey      crypto.PrivateKey // private staking key
+	myID              flow.Identifier
+	protocolState     protocol.State
+	stakingPrivateKey crypto.PrivateKey // private staking key
 }
 
 // NewStakingSigner creates an instance of StakingSigner
@@ -28,12 +28,11 @@ func NewStakingSigner(
 ) *StakingSigner {
 	return &StakingSigner{
 		StakingSigVerifier: NewStakingSigVerifier(stakingSigTag),
-		myID:                    myID,
-		protocolState:           protocolState,
-		stakingPrivateKey:       stakingPrivateKey,
+		myID:               myID,
+		protocolState:      protocolState,
+		stakingPrivateKey:  stakingPrivateKey,
 	}
 }
-
 
 // Aggregate aggregates the given signature that signed on the given block
 // block - it is needed in order to double check the reconstruct signature is valid
@@ -46,7 +45,7 @@ func (s *StakingSigner) Aggregate(block *model.Block, sigs []*model.SingleSignat
 
 	// aggregate staking sigs
 	aggStakingSigs, signerIDs := aggregateStakingSignature(sigs)
-
+	ok, err := s.VerifyAggregatedStakingSignature(aggStakingSigs, block, signerIDs) // sanity check
 	aggsig := model.AggregatedSignature{
 		StakingSignatures:     aggStakingSigs,
 		RandomBeaconSignature: nil,
@@ -74,5 +73,3 @@ func aggregateStakingSignature(sigs []*model.SingleSignature) ([]crypto.Signatur
 
 	return aggsig, signerIDs
 }
-
-

@@ -2,7 +2,6 @@ package hotstuff
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -50,32 +49,90 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 	return v.IsSelf(v.LeaderForView(view).ID())
 }
 
-// ConsensusIdentities returns all the staked nodes for my role at a certain block.
-// blockID - specifies the block to be queried.
-// nodeIDs - only return identities that matches the given nodeIDs.
-func (v *ViewState) ConsensusIdentities(blockID flow.Identifier, nodeIDs ...flow.Identifier) (flow.IdentityList, error) {
+// ConsensusParticipants returns all _staked_ consensus participants at block with blockID.
+// Which node is considered an eligible consensus participant is determined by
+// `ViewState.consensusMembersFilter` (defined at construction time).
+func (v *ViewState) AllConsensusParticipants(blockID flow.Identifier) (flow.IdentityList, error) {
 	// create filters
 	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake}
-	if len(nodeIDs) > 0 {
-		filters = append(filters, filter.HasNodeID(nodeIDs...))
-	}
-
-	// query all staked identities
+	// query all staked consensus participants
 	identities, err := v.protocolState.AtBlockID(blockID).Identities(filters...)
 	if err != nil {
-		return nil, fmt.Errorf("cannot find consensus identities: %w", err)
+		return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
+	}
+	return identities, nil
+}
+
+// IdentityForConsensusParticipant returns the flow.Identity corresponding to the consensus participant
+// with ID `participantId`. Errors, if participantId is not a valid and staked consensus participant
+// at blockID, this method error. Which node is considered an eligible consensus participant is
+// determined by `ViewState.consensusMembersFilter` (defined at construction time).
+func (v *ViewState) IdentityForConsensusParticipant(blockID flow.Identifier, participantId flow.Identifier) (*flow.Identity, error) {
+	id, err := v.protocolState.AtBlockID(blockID).Identity(participantId)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving identity for %s: %w", participantId, err)
+	}
+	if !v.consensusMembersFilter(id) { // participantId is not a consensus participant
+		return nil, fmt.Errorf("not a consensus participant: %s", participantId)
+	}
+	if id.Stake == 0 {
+		return nil, fmt.Errorf("not a staked node: %s", participantId)
+	}
+	return id, nil
+}
+
+// IdentitiesForConsensusParticipant translates the given consensus IDs to flow.Identifiers.
+//    blockID - specifies the block to be queried.
+//    consensusNodeIDs - nodeIDs of consensus nodes
+// Return:
+//    List L := flow.IdentityList where L[k] is the flow.Identifier for consensusNodeIDs[k]
+//    error: if any consensusNodeIDs[k] does not correspond to a _staked_ consensus member at blockID
+// Intended application:
+//    * counting stake. Hence, we don't want duplicated identities (i.e. we just error)
+//
+// Caution:
+//   * PRESERVED ORDER: each element in `consensusNodeIDs` is expected to be a valid consensus member,
+//     i.e. pass the `ViewState.consensusMembersFilter` (defined at construction time)
+// ERROR conditions:
+//   * DUPLICATES: consensusNodeIDs contains duplicates
+//   * DUPLICATES: an element in consensusNodeIDs does NOT correspond to staked consensus node
+func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, consensusNodeIDs ...flow.Identifier) (flow.IdentityList, error) {
+	if len(consensusNodeIDs) == 0 { // Special case: consensusNodeIDs is empty
+		// _no_ filter will be applied and all consensus participants are returned.
+		return v.AllConsensusParticipants(blockID)
+	}
+	if len(consensusNodeIDs) == 1 { // Special case: consensusNodeIDs is single
+		identity, err := v.IdentityForConsensusParticipant(blockID, consensusNodeIDs[0])
+		if err != nil {
+			return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
+		}
+		return []*flow.Identity{identity}, nil
 	}
 
-	// build the indice map for sorting
+	// we have a restricted set of consensus nodes:
+	// construct map from nodeId to Index in original list
 	indices := make(map[flow.Identifier]int)
-	for i, nodeID := range nodeIDs {
-		indices[nodeID] = i
+	for idx, id := range consensusNodeIDs {
+		indices[id] = idx
+	}
+	if len(indices) < len(consensusNodeIDs) {
+		return nil, fmt.Errorf("duplicates in consensusNodeIDs")
 	}
 
-	// sort the identities to be the same order as nodeIDs
-	sort.Slice(identities, func(i int, j int) bool {
-		return indices[identities[i].NodeID] < indices[identities[j].NodeID]
-	})
+	// Select Identities at block via Filters: consensus participants, staked, element of consensusNodeIDs
+	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake, filter.HasNodeID(consensusNodeIDs...)}
+	identitiesInDefaultOrder, err := v.protocolState.AtBlockID(blockID).Identities(filters...)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
+	}
+
+	// create flow.IdentityList with Identities in order as in consensusNodeIDs
+	l := len(consensusNodeIDs)
+	identities := make([]*flow.Identity, l, l)
+	for _, id := range identitiesInDefaultOrder {
+		origIdx := indices[id.NodeID]
+		identities[origIdx] = id
+	}
 	return identities, nil
 }
 

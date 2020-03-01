@@ -54,10 +54,11 @@ func (s *StakingSigVerifier) VerifyStakingSig(sig crypto.Signature, block *model
 //   * However, for security, we are explicitly verifying that the vote matches the full block.
 //     We do this by converting the block to the byte-sequence which we expect an honest voter to have signed
 //     and then check the provided signature against this self-computed byte-sequence.
+//
+// For now, the aggregated BLS staking signature is implemented as a slice of individual signatures.
+// To verify it, we just verify every single signature. The implementation (and method signature)
+// will later be updated, once full BLS sigmnature aggregation is implemented.
 func (s *StakingSigVerifier) VerifyAggregatedStakingSignature(aggsig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
-	// for now the aggregated staking signature for BLS signatures is implemented as a slice of all the signatures.
-	// to verify it, we basically verify every single signature
-
 	// check that the number of keys and signatures should match
 	if len(aggsig) != len(signerKeys) {
 		return false, nil
