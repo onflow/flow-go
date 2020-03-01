@@ -193,8 +193,8 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
 //
-// TODO: this function is unbounded – should at least check whether end is a valid end, or
-// define a limit of iterations to prevent unbounded loops
+// TODO: this function is unbounded – pass context.Context to this or calling
+// functions to allow timing functions out.
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		if bytes.Compare(start, end) > 0 {
