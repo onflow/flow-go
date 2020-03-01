@@ -11,7 +11,6 @@ import (
 type VotingStatus struct {
 	sigAggregator    SigAggregator
 	block            *hotstuff.Block
-	view             uint64
 	stakeThreshold   uint64
 	accumulatedStake uint64
 	// assume votes are all valid to build QC
@@ -19,11 +18,10 @@ type VotingStatus struct {
 }
 
 // NewVotingStatus creates a new Voting Status instance
-func NewVotingStatus(sigAggregator SigAggregator, stakeThreshold uint64, view uint64, voter *flow.Identity, block *hotstuff.Block) *VotingStatus {
+func NewVotingStatus(block *hotstuff.Block, stakeThreshold uint64, sigAggregator SigAggregator) *VotingStatus {
 	return &VotingStatus{
 		sigAggregator:    sigAggregator,
 		block:            block,
-		view:             view,
 		stakeThreshold:   stakeThreshold,
 		accumulatedStake: 0,
 		votes:            make(map[flow.Identifier]*hotstuff.Vote),
@@ -72,7 +70,7 @@ func (vs *VotingStatus) TryBuildQC() (*hotstuff.QuorumCertificate, bool, error) 
 
 	// build the QC
 	qc := &hotstuff.QuorumCertificate{
-		View:                vs.view,
+		View:                vs.block.View,
 		BlockID:             vs.block.BlockID,
 		AggregatedSignature: aggregatedSig,
 	}
