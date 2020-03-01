@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	mockverifier "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/engine/consensus/hotstuff/mocks"
+	mockverifier "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/mocks"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -680,7 +680,7 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	}).AnyTimes()
 	// mock sig verifier and aggregator
 	mockSigVerifier := mockverifier.NewMockSigVerifier(ctrl)
-	mockSigVerifier.EXPECT().VerifyAggregatedRandomBeaconSignature(gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	mockSigVerifier.EXPECT().VerifyAggregatedRandomBeaconSignature(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigVerifier.EXPECT().VerifyAggregatedStakingSignature(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigVerifier.EXPECT().VerifyRandomBeaconSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigVerifier.EXPECT().VerifyStakingSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
