@@ -65,3 +65,19 @@ func TestSealIndexAndLookup(t *testing.T) {
 		assert.Equal(t, expected, actual)
 	})
 }
+
+func TestSealIDByBlockIndexLookup(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		sealID := unittest.IdentifierFixture()
+		blockID := unittest.IdentifierFixture()
+
+		err := db.Update(IndexSealIDByBlock(blockID, sealID))
+		require.Nil(t, err)
+
+		var actual flow.Identifier
+		err = db.View(LookupSealIDByBlock(blockID, &actual))
+		require.Nil(t, err)
+
+		assert.Equal(t, sealID, actual)
+	})
+}
