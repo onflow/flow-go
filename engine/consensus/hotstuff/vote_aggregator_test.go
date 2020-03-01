@@ -616,9 +616,15 @@ func TestInSufficientRBSig(t *testing.T) {
 // then a qc should be built
 func TestSufficientRBSig(t *testing.T) {
 	va, ids := newMockVoteAggregator(t)
-	// first two node has 80% of stake in total
-	ids[0].Stake = 2800
-	ids[1].Stake = 2800
+	// Define Stakes: first two node has 80% of stake in total
+	ids[0].Stake = 40
+	ids[1].Stake = 40
+	ids[2].Stake = 4
+	ids[3].Stake = 4
+	ids[4].Stake = 4
+	ids[5].Stake = 4
+	ids[6].Stake = 4
+
 	testView := uint64(5)
 	bp := newMockBlock(testView, ids[0].NodeID)
 	va.StoreProposerVote(bp.ProposerVote())
@@ -627,14 +633,14 @@ func TestSufficientRBSig(t *testing.T) {
 	_, _, _ = va.StoreVoteAndBuildQC(vote1, bp.Block)
 	vote2 := newMockVote(testView, bp.Block.BlockID, ids[2].NodeID)
 	qc, built, err := va.StoreVoteAndBuildQC(vote2, bp.Block)
-	require.Nil(t, qc)
-	require.False(t, built)
 	require.NoError(t, err)
+	require.False(t, built)
+	require.Nil(t, qc)
 	vote3 := newMockVote(testView, bp.Block.BlockID, ids[3].NodeID)
 	qc, built, err = va.StoreVoteAndBuildQC(vote3, bp.Block)
-	require.NotNil(t, qc)
-	require.True(t, built)
 	require.NoError(t, err)
+	require.True(t, built)
+	require.NotNil(t, qc)
 }
 
 func newMockBlock(view uint64, proposerID flow.Identifier) *hotmodel.Proposal {
@@ -675,8 +681,10 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	mockSnapshot := protocol.NewMockSnapshot(ctrl)
 	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(mockSnapshot).AnyTimes()
 	mockProtocolState.EXPECT().Final().Return(mockSnapshot).AnyTimes()
-	signer := unittest.IdentityFixture()
-	mockSnapshot.EXPECT().Identity(gomock.AssignableToTypeOf(signer.NodeID)).Return(signer, nil).AnyTimes()
+	// signer := unittest.IdentityFixture()
+	for _, id := range ids {
+		mockSnapshot.EXPECT().Identity(id.NodeID).Return(id, nil).AnyTimes()
+	}
 	mockSnapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f ...flow.IdentityFilter) (flow.IdentityList, error) {
 		return ids.Filter(f...), nil
 	}).AnyTimes()
@@ -688,7 +696,9 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	mockSigVerifier.EXPECT().VerifyStakingSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigAggregator := mockverifier.NewMockSigAggregator(ctrl)
 	mockSigAggregator.EXPECT().Aggregate(gomock.Any(), gomock.Any()).Return(&hotmodel.AggregatedSignature{}, nil).AnyTimes()
-	mockSigAggregator.EXPECT().CanReconstruct(gomock.Any()).Return(true).AnyTimes()
+	mockSigAggregator.EXPECT().CanReconstruct(gomock.Any()).DoAndReturn(func(numOfSigShares int) bool {
+		return float64(numOfSigShares) > float64(VALIDATOR_SIZE) / 2.0
+	}).AnyTimes()
 
 	viewState, _ := NewViewState(mockProtocolState, nil, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
 	voteValidator := NewValidator(viewState, nil, mockSigVerifier)
