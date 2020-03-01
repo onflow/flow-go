@@ -15,8 +15,8 @@ import (
 // StakingSigner provides symmetry functions to generate and verify signatures
 type StakingSigner struct {
 	StakingSigVerifier
-	viewState         *hotstuff.ViewState
-	me module.Local
+	viewState *hotstuff.ViewState
+	me        module.Local
 }
 
 // NewStakingSigner creates an instance of StakingSigner
@@ -28,7 +28,7 @@ func NewStakingSigner(
 	return &StakingSigner{
 		StakingSigVerifier: NewStakingSigVerifier(stakingSigTag),
 		viewState:          viewState,
-		me:  me,
+		me:                 me,
 	}
 }
 
