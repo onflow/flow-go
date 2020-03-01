@@ -9,31 +9,32 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
+	"github.com/dapperlabs/flow-go/module"
 )
 
 // StakingSigner provides symmetry functions to generate and verify signatures
 type StakingSigner struct {
 	StakingSigVerifier
 	viewState         *hotstuff.ViewState
-	stakingPrivateKey crypto.PrivateKey // private staking key
+	me module.Local
 }
 
 // NewStakingSigner creates an instance of StakingSigner
 func NewStakingSigner(
 	viewState *hotstuff.ViewState,
 	stakingSigTag string,
-	stakingPrivateKey crypto.PrivateKey,
+	me module.Local,
 ) *StakingSigner {
 	return &StakingSigner{
 		StakingSigVerifier: NewStakingSigVerifier(stakingSigTag),
 		viewState:          viewState,
-		stakingPrivateKey:  stakingPrivateKey,
+		me:  me,
 	}
 }
 
 // Sign signs a the message with the node's staking key
 func (s *StakingSigner) Sign(msg []byte) (crypto.Signature, error) {
-	return s.stakingPrivateKey.Sign(msg, s.stakingHasher)
+	return s.me.Sign(msg, s.stakingHasher)
 }
 
 // Aggregate aggregates the given signature that signed on the given block
