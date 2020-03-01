@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -112,6 +114,40 @@ func ExecutionReceiptFixture() *flow.ExecutionReceipt {
 		ExecutionResult:   *ExecutionResultFixture(),
 		Spocks:            nil,
 		ExecutorSignature: SignatureFixture(),
+	}
+}
+
+func StateViewFixture() *state.View {
+	return state.NewView(func(key flow.RegisterID) (bytes []byte, err error) {
+		return nil, nil
+	})
+}
+
+func CompleteCollectionFixture() *execution.CompleteCollection {
+	txBody := TransactionBodyFixture()
+	return &execution.CompleteCollection{
+		Guarantee:    CollectionGuaranteeFixture(),
+		Transactions: []*flow.TransactionBody{&txBody},
+	}
+}
+
+func CompleteBlockFixture() *execution.CompleteBlock {
+
+	cc1 := CompleteCollectionFixture()
+	cc2 := CompleteCollectionFixture()
+
+	block := BlockFixture()
+	return &execution.CompleteBlock{
+		Block:               &block,
+		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{cc1.Guarantee.CollectionID: cc1, cc2.Guarantee.CollectionID: cc2},
+	}
+}
+
+func ComputationResultFixture() *execution.ComputationResult {
+	return &execution.ComputationResult{
+		CompleteBlock: CompleteBlockFixture(),
+		StateViews:    []*state.View{StateViewFixture(), StateViewFixture()},
+		StartState:    StateCommitmentFixture(),
 	}
 }
 
@@ -315,5 +351,13 @@ func ChunkHeaderFixture() flow.ChunkHeader {
 		ChunkID:     IdentifierFixture(),
 		StartState:  StateCommitmentFixture(),
 		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
+	}
+}
+
+func ChunkDataPackFixture() flow.ChunkDataPack {
+	return flow.ChunkDataPack{
+		ChunkID:         IdentifierFixture(),
+		StartState:      StateCommitmentFixture(),
+		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
 	}
 }

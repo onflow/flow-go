@@ -78,6 +78,7 @@ func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*hotstuff.Block, *ho
 // updateQC updates `preferredParent` according to the fork-choice rule.
 // Currently, we implement 'Chained HotStuff Protocol' where the fork-choice
 // rule is: "build on newest QC"
+// It assumes the QC has been validated
 func (fc *NewestForkChoice) AddQC(qc *hotstuff.QuorumCertificate) error {
 	if qc.View <= fc.preferredParent.Block.View {
 		// Per construction, preferredParent.View() is always larger than the last finalized block's view.
@@ -105,6 +106,14 @@ func (fc *NewestForkChoice) AddQC(qc *hotstuff.QuorumCertificate) error {
 func (fc *NewestForkChoice) ensureBlockStored(qc *hotstuff.QuorumCertificate) (*hotstuff.Block, error) {
 	block, haveBlock := fc.finalizer.GetBlock(qc.BlockID)
 	if !haveBlock {
+		// This should never happen and indicates an implementation bug.
+		// Finding the block to which the qc points to should always be possible for the folling reason:
+		// * Check in function AddQC guarantees: qc.View > fc.preferredParent.Block.View
+		// * Forks guarantees that every block's qc is also processed by ForkChoice
+		//   => fc.preferredParent.Block.View > fc.finalizer.FinalizedBlock().View()
+		//   (as NewestForkChoice tracks the qc with the largest view)
+		// => qc.View > fc.finalizer.FinalizedBlock().View()
+		//    any block whose view is larger than the latest finalized block should be stored in finalizer
 		return nil, &hotstuff.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
 	}
 	if block.View != qc.View {

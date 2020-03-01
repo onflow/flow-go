@@ -47,22 +47,26 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		// get first seal
 		seal := genesis.Seals[0]
 
-		// insert the block seal commit
-		err = operation.InsertCommit(genesis.ID(), seal.FinalState)(tx)
+		// index the block seal
+		err = operation.IndexSealIDByBlock(genesis.ID(), seal.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert state commit: %w", err)
-		}
-
-		// index the block seal commit
-		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index state commit: %w", err)
+			return fmt.Errorf("could not index seal by block: %w", err)
 		}
 
 		// insert the genesis block
 		err = procedure.InsertBlock(genesis)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
+		}
+
+		// insert result
+		err = operation.InsertResult(&flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: flow.ZeroID,
+			BlockID:          genesis.ID(),
+			FinalStateCommit: seal.FinalState,
+		}})(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis result: %w", err)
 		}
 
 		// insert the block number mapping
@@ -91,11 +95,11 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// retrieve the state commitment for the parent
-		var parentCommit flow.StateCommitment
-		err = operation.LookupCommit(block.ParentID, &parentCommit)(tx)
+		// retrieve the seal for the parent
+		var parentSeal flow.Seal
+		err = procedure.LookupSealByBlock(block.ParentID, &parentSeal)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve parent: %w", err)
+			return fmt.Errorf("could not retrieve parent seal: %w", err)
 		}
 
 		// check the header validity
@@ -125,24 +129,24 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 		// starting with what was the state commitment at the parent block, we
 		// match each seal into the chain of commits
-		nextCommit := parentCommit
+		nextSeal := &parentSeal
 		for len(lookup) > 0 {
 
 			// first check if we have a seal connecting to current latest commit
-			nextSeal, ok := lookup[string(nextCommit)]
+			possibleNextSeal, ok := lookup[string(nextSeal.FinalState)]
 			if !ok {
-				return fmt.Errorf("seals not connected to state chain (%x)", nextCommit)
+				return fmt.Errorf("seals not connected to state chain (%x)", nextSeal.FinalState)
 			}
 
 			// delete matched seal from lookup and forward to point to seal commit
-			delete(lookup, string(nextCommit))
-			nextCommit = nextSeal.FinalState
+			delete(lookup, string(nextSeal.FinalState))
+			nextSeal = possibleNextSeal
 		}
 
-		// insert the the commit state into our state commitment timeline
-		err = operation.IndexCommit(blockID, nextCommit)(tx)
+		// insert the the seal into our seals timeline
+		err = operation.IndexSealIDByBlock(blockID, nextSeal.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert commit: %w", err)
+			return fmt.Errorf("could not index seal by block: %w", err)
 		}
 
 		return nil
@@ -178,12 +182,17 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		// we thus start at the youngest remember all of the intermediary steps
 		// while tracing back until we reach the finalized state
 		headers := []*flow.Header{&header}
-		for header.ParentID != headID {
-			err = operation.RetrieveHeader(header.ParentID, &header)(tx)
+
+		//create a copy to avoid modifying content of header which is referenced in an array
+		loopHeader := header
+		for loopHeader.ParentID != headID {
+			var retrievedHeader flow.Header
+			err = operation.RetrieveHeader(loopHeader.ParentID, &retrievedHeader)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve parent (%x): %w", header.ParentID, err)
 			}
-			headers = append(headers, &header)
+			headers = append(headers, &retrievedHeader)
+			loopHeader = retrievedHeader
 		}
 
 		// now we can step backwards in order to go from oldest to youngest; for

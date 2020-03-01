@@ -19,7 +19,7 @@ type VotingStatus struct {
 }
 
 // NewVotingStatus creates a new Voting Status instance
-func NewVotingStatus(sigAggregator SigAggregator, stakeThreshold uint64, view uint64, signerCount uint32, voter *flow.Identity, block *hotstuff.Block) *VotingStatus {
+func NewVotingStatus(sigAggregator SigAggregator, stakeThreshold uint64, view uint64, voter *flow.Identity, block *hotstuff.Block) *VotingStatus {
 	return &VotingStatus{
 		sigAggregator:    sigAggregator,
 		block:            block,

@@ -19,12 +19,14 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 )
 
 type communicationMode int
 
 const (
-	OneToOne communicationMode = iota
+	NoOp communicationMode = iota
+	OneToOne
 	OneToK
 )
 
@@ -44,6 +46,7 @@ type Middleware struct {
 	me         flow.Identifier
 	host       string
 	port       string
+	validators []validators.MessageValidator
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -56,6 +59,12 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 
 	p2p := &P2PNode{}
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// add validators to filter out unwanted messages received by this node
+	validators := []validators.MessageValidator{
+		validators.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
+		validators.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
+	}
 
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
@@ -70,6 +79,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		me:         flowID,
 		host:       ip,
 		port:       port,
+		validators: validators,
 	}
 
 	return m, err
@@ -94,12 +104,15 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
 
 	// create PubSub options for libp2p to use the discovery object
-	psOption := pubsub.WithDiscovery(d)
+	psOptions := []pubsub.Option{pubsub.WithDiscovery(d),
+		pubsub.WithMessageSigning(false),
+		pubsub.WithStrictSignatureVerification(false),
+	}
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 
 	// start the libp2p node
-	err := m.libP2PNode.Start(m.ctx, nodeAddress, m.log, m.handleIncomingStream, psOption)
+	err := m.libP2PNode.Start(m.ctx, nodeAddress, m.log, m.handleIncomingStream, psOptions...)
 
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
@@ -140,23 +153,25 @@ func (m *Middleware) Stop() {
 // If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.sendDirect
 // Otherwise, middleware.publish is used, which uses the PubSub method of communication.
 func (m *Middleware) Send(channelID uint8, msg interface{}, targetIDs ...flow.Identifier) error {
-
+	var err error
+	mode := m.chooseMode(channelID, msg, targetIDs...)
 	// decide what mode of communication to use
-	mode, err := m.chooseMode(channelID, msg, targetIDs...)
-	if err == nil {
-		switch mode {
-		case OneToOne:
-			if targetIDs[0] == m.me {
-				// to avoid self dial by the underlay
-				m.log.Debug().Msg("self dial attempt")
-				return nil
-			}
-			err = m.sendDirect(targetIDs[0], msg)
-		case OneToK:
-			err = m.publish(strconv.Itoa(int(channelID)), msg)
-		default:
-			err = fmt.Errorf("invalid communcation mode: %d", mode)
+	switch mode {
+	case NoOp:
+		// TODO: Decide if this is actually an error or not
+		// return fmt.Errorf("empty list of target Ids")
+		return nil
+	case OneToOne:
+		if targetIDs[0] == m.me {
+			// to avoid self dial by the underlay
+			m.log.Debug().Msg("self dial attempt")
+			return nil
 		}
+		err = m.sendDirect(targetIDs[0], msg)
+	case OneToK:
+		err = m.publish(strconv.Itoa(int(channelID)), msg)
+	default:
+		err = fmt.Errorf("invalid communcation mode: %d", mode)
 	}
 
 	if err != nil {
@@ -166,14 +181,14 @@ func (m *Middleware) Send(channelID uint8, msg interface{}, targetIDs ...flow.Id
 }
 
 // chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
-func (m *Middleware) chooseMode(_ uint8, _ interface{}, targetIDs ...flow.Identifier) (communicationMode, error) {
+func (m *Middleware) chooseMode(_ uint8, _ interface{}, targetIDs ...flow.Identifier) communicationMode {
 	switch len(targetIDs) {
 	case 0:
-		return 0, fmt.Errorf("empty list of target Ids")
+		return NoOp
 	case 1:
-		return OneToOne, nil
+		return OneToOne
 	default:
-		return OneToK, nil
+		return OneToK
 	}
 }
 
@@ -374,16 +389,19 @@ SubscriptionLoop:
 	}
 }
 
-// processMessager processes a message and eventuall passes it to the overlay
+// processMessage processes a message and eventually passes it to the overlay
 func (m *Middleware) processMessage(msg *message.Message) {
-	nodeID, err := getSenderID(msg)
-	if err != nil {
-		log.Error().Err(err).Msg("could not extract sender ID")
+
+	// run through all the message validators
+	for _, v := range m.validators {
+		// if any one fails, stop message propagation
+		if !v.Validate(*msg) {
+			return
+		}
 	}
-	if nodeID == m.me {
-		return
-	}
-	err = m.ov.Receive(nodeID, msg)
+
+	// if validation passed, send the message to the overlay
+	err := m.ov.Receive(flow.HashToID(msg.OriginID), msg)
 	if err != nil {
 		log.Error().Err(err).Msg("could not deliver payload")
 	}
@@ -413,15 +431,4 @@ func (m *Middleware) publish(topic string, msg interface{}) error {
 		return err
 	}
 	return nil
-}
-
-func getSenderID(msg *message.Message) (flow.Identifier, error) {
-	// Extract sender id
-	if len(msg.OriginID) < 32 {
-		err := fmt.Errorf("invalid sender id")
-		return flow.ZeroID, err
-	}
-	var id flow.Identifier
-	copy(id[:], msg.OriginID)
-	return id, nil
 }

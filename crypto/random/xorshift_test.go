@@ -3,6 +3,7 @@ package random
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"gonum.org/v1/gonum/stat"
 )
 
@@ -39,9 +40,8 @@ func TestRandomPermutationSubset(t *testing.T) {
 	}
 
 	shuffledlist, err := PermutateSubset(listSize, subsetSize, rng)
-	if err != nil {
-		t.Errorf("PermutateSubset returned an error")
-	}
+	require.NoError(t, err)
+
 	if len(shuffledlist) != subsetSize {
 		t.Errorf("PermutateSubset returned a list with a wrong size")
 	}
