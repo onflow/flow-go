@@ -3,6 +3,7 @@ package hotstuff
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -17,10 +18,18 @@ type ViewState struct {
 	consensusMembersFilter flow.IdentityFilter
 	// the cached all consensus members for finding leaders for a certain view
 	allNodes flow.IdentityList
+
+	dkgPublicData *DKGPublicData
+}
+
+// DKGPublicData is the public data for DKG participants who generated their key shares
+type DKGPublicData struct {
+	GroupPubKey        crypto.PublicKey         // the group public key
+	SignerIndexMapping map[crypto.PublicKey]int // the mapping from public key to signer index
 }
 
 // NewViewState creates a new ViewState instance
-func NewViewState(protocolState protocol.State, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
+func NewViewState(protocolState protocol.State, dkgPublicData *DKGPublicData, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
 	// finding all consensus members
 	allNodes, err := protocolState.Final().Identities(consensusMembersFilter)
 	if err != nil {
@@ -36,6 +45,7 @@ func NewViewState(protocolState protocol.State, myID flow.Identifier, consensusM
 		myID:                   myID,
 		consensusMembersFilter: consensusMembersFilter,
 		allNodes:               allNodes,
+		dkgPublicData:          dkgPublicData,
 	}, nil
 }
 
@@ -47,6 +57,11 @@ func (v *ViewState) IsSelf(nodeID flow.Identifier) bool {
 // IsSelfLeaderForView returns if myself is the leader at a given view
 func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 	return v.IsSelf(v.LeaderForView(view).ID())
+}
+
+// DKGPublicData returns the public DKG data for block
+func (v *ViewState) DKGPublicData() *DKGPublicData {
+	return v.dkgPublicData
 }
 
 // ConsensusParticipants returns all _staked_ consensus participants at block with blockID.

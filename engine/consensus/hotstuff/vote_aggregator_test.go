@@ -688,8 +688,8 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	mockSigAggregator.EXPECT().Aggregate(gomock.Any(), gomock.Any()).Return(&hotmodel.AggregatedSignature{}, nil).AnyTimes()
 	mockSigAggregator.EXPECT().CanReconstruct(gomock.Any()).Return(true).AnyTimes()
 
-	viewState, _ := NewViewState(mockProtocolState, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
-	voteValidator := &Validator{viewState: viewState, sigVerifier: mockSigVerifier}
+	viewState, _ := NewViewState(mockProtocolState, nil, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
+	voteValidator := NewValidator(viewState, nil, mockSigVerifier)
 	return NewVoteAggregator(&mockdist.Consumer{}, 0, viewState, voteValidator, mockSigAggregator), ids
 }
 

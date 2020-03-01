@@ -63,7 +63,8 @@ func (vs *VotingStatus) TryBuildQC() (*hotstuff.QuorumCertificate, bool, error) 
 	}
 
 	// build the aggregated signature
-	aggregatedSig, err := vs.aggregateSig()
+	sigs := getSigsSliceFromVotes(vs.votes)
+	aggregatedSig, err := vs.sigAggregator.Aggregate(vs.block, sigs)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not build aggregate signatures for building QC: %w", err)
 	}
@@ -84,11 +85,6 @@ func (vs *VotingStatus) hasEnoughStake() bool {
 
 func (vs *VotingStatus) hasEnoughSigShares() bool {
 	return vs.sigAggregator.CanReconstruct(len(vs.votes))
-}
-
-func (vs *VotingStatus) aggregateSig() (*hotstuff.AggregatedSignature, error) {
-	sigs := getSigsSliceFromVotes(vs.votes)
-	return vs.sigAggregator.Aggregate(vs.block, sigs)
 }
 
 func getSigsSliceFromVotes(votes map[flow.Identifier]*hotstuff.Vote) []*hotstuff.SingleSignature {

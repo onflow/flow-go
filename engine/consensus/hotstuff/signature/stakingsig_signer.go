@@ -6,32 +6,34 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
-	"github.com/dapperlabs/flow-go/protocol"
 )
 
 // StakingSigner provides symmetry functions to generate and verify signatures
 type StakingSigner struct {
 	StakingSigVerifier
-	myID              flow.Identifier
-	protocolState     protocol.State
+	viewState         *hotstuff.ViewState
 	stakingPrivateKey crypto.PrivateKey // private staking key
 }
 
 // NewStakingSigner creates an instance of StakingSigner
 func NewStakingSigner(
-	myID flow.Identifier,
-	protocolState protocol.State,
+	viewState *hotstuff.ViewState,
 	stakingSigTag string,
 	stakingPrivateKey crypto.PrivateKey,
 ) *StakingSigner {
 	return &StakingSigner{
 		StakingSigVerifier: NewStakingSigVerifier(stakingSigTag),
-		myID:               myID,
-		protocolState:      protocolState,
+		viewState:          viewState,
 		stakingPrivateKey:  stakingPrivateKey,
 	}
+}
+
+// Sign signs a the message with the node's staking key
+func (s *StakingSigner) Sign(msg []byte) (crypto.Signature, error) {
+	return s.stakingPrivateKey.Sign(msg, s.stakingHasher)
 }
 
 // Aggregate aggregates the given signature that signed on the given block
@@ -43,33 +45,62 @@ func (s *StakingSigner) Aggregate(block *model.Block, sigs []*model.SingleSignat
 		return nil, fmt.Errorf("cannot aggregate an empty slice of signatures")
 	}
 
-	// aggregate staking sigs
-	aggStakingSigs, signerIDs := aggregateStakingSignature(sigs)
-	ok, err := s.VerifyAggregatedStakingSignature(aggStakingSigs, block, signerIDs) // sanity check
-	aggsig := model.AggregatedSignature{
-		StakingSignatures:     aggStakingSigs,
-		RandomBeaconSignature: nil,
-		SignerIDs:             signerIDs,
+	aggStakingSig, signerIDs := s.unsafeAggregate(sigs)              // unsafe aggregate staking sigs: crypto math only; will not catch error
+	err := s.verifyAggregatedRawSig(aggStakingSig, block, signerIDs) // safety: verify aggregated signature:
+	if err != nil {
+		return nil, fmt.Errorf("error aggregating staking signatures for block %s: %w", block.BlockID, err)
 	}
 
-	return &aggsig, nil
+	return &model.AggregatedSignature{
+		StakingSignatures:     aggStakingSig,
+		RandomBeaconSignature: nil,
+		SignerIDs:             signerIDs,
+	}, nil
 }
 
-func aggregateStakingSignature(sigs []*model.SingleSignature) ([]crypto.Signature, []flow.Identifier) {
+// verifyAggregatedRawSig verifies the aggregated staking signature as a sanity check
+// any failure indicates an internal bug and results in a fatal error
+func (s *StakingSigner) verifyAggregatedRawSig(aggStakingSig []crypto.Signature, block *model.Block, signerIDs []flow.Identifier) error {
+	// This implementation will eventually be replaced by verifying the proper aggregated BLS signature:
+	// Steps: (1) aggregate all the public keys
+	//        (2) use aggregated public key to verify aggregated signature
+	//
+	// As we don't have signature aggregation implemented for now, we use the much more resource-intensive
+	// way of verifying each signature individually
+	stakedSigners, err := s.viewState.IdentitiesForConsensusParticipants(block.BlockID, signerIDs...)
+	if err != nil {
+		// if this happens, we have a bug in the calling logic
+		return fmt.Errorf("constructed aggregated staking signature has invalid signers: %w", err)
+	}
+	// method IdentitiesForConsensusParticipants guarantees that there are no duplicated signers
+	// and all signers are valid, staked consensus nodes
+
+	// validate signature:
+	// collect staking keys for for nodes that contributed to qc's aggregated sig:
+	stakingPubKeys := make([]crypto.PublicKey, 0, len(stakedSigners))
+	for _, signer := range stakedSigners {
+		stakingPubKeys = append(stakingPubKeys, signer.StakingPubKey)
+	}
+	valid, err := s.VerifyAggregatedStakingSignature(aggStakingSig, block, stakingPubKeys)
+	if err != nil {
+		return fmt.Errorf("error validating constructed aggregated staking signature: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("constructed aggregated staking signature is invalid")
+	}
+	return nil
+}
+
+func (s *StakingSigner) unsafeAggregate(sigs []*model.SingleSignature) ([]crypto.Signature, []flow.Identifier) {
 	// This implementation is a naive way of aggregation the signatures. It will work, with
 	// the downside of costing more bandwidth.
 	// The more optimal way, which is the real aggregation, will be implemented when the crypto
 	// API is available.
-	aggsig := make([]crypto.Signature, len(sigs))
-	for i, sig := range sigs {
-		aggsig[i] = sig.StakingSignature
-	}
-
-	// pick signer IDs from signatures
+	aggStakingSig := make([]crypto.Signature, len(sigs))
 	signerIDs := make([]flow.Identifier, len(sigs))
 	for i, sig := range sigs {
+		aggStakingSig[i] = sig.StakingSignature
 		signerIDs[i] = sig.SignerID
 	}
-
-	return aggsig, signerIDs
+	return aggStakingSig, signerIDs
 }

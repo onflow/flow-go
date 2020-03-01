@@ -17,5 +17,5 @@ type SigVerifier interface {
 	VerifyAggregatedStakingSignature(aggsig []crypto.Signature, block *hotstuff.Block, signerKeys []crypto.PublicKey) (bool, error)
 
 	// VerifyAggregatedRandomBeaconSignature verifies an aggregated random beacon signature
-	VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *hotstuff.Block) (bool, error)
+	VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *hotstuff.Block, groupPubKey crypto.PublicKey) (bool, error)
 }

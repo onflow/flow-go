@@ -15,17 +15,12 @@ import (
 type RandomBeaconSigVerifier struct {
 	// the hasher for signer random beacon signature
 	randomBeaconHasher crypto.Hasher
-
-	// the dkg public data for the only epoch.
-	// TODO for Epoch switch: should be retrieved from protocol state
-	dkgPubData *DKGPublicData
 }
 
 // NewRandomBeaconSigVerifier constructs a new RandomBeaconSigVerifier
-func NewRandomBeaconSigVerifier(dkgPubData *DKGPublicData) RandomBeaconSigVerifier {
+func NewRandomBeaconSigVerifier() RandomBeaconSigVerifier {
 	// The random beacon is only run by consensus nodes. Hence, the tag used for identifying the vote can be hard-coded.
 	return RandomBeaconSigVerifier{
-		dkgPubData:         dkgPubData,
 		randomBeaconHasher: crypto.NewBLS_KMAC(messages.RandomBeaconTag),
 	}
 }
@@ -60,10 +55,10 @@ func (s *RandomBeaconSigVerifier) VerifyRandomBeaconSig(sig crypto.Signature, bl
 //   * However, for security, we are explicitly verifying that the vote matches the full block.
 //     We do this by converting the block to the byte-sequence which we expect an honest voter to have signed
 //     and then check the provided signature against this self-computed byte-sequence.
-func (s *RandomBeaconSigVerifier) VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *model.Block) (bool, error) {
+func (s *RandomBeaconSigVerifier) VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *model.Block, groupPubKey crypto.PublicKey) (bool, error) {
 	msg := BlockToBytesForSign(block)
 	// the reconstructed signature is also a BLS signature which can be verified by the group public key
-	valid, err := s.dkgPubData.GroupPubKey.Verify(sig, msg, s.randomBeaconHasher)
+	valid, err := groupPubKey.Verify(sig, msg, s.randomBeaconHasher)
 	if err != nil {
 		return false, fmt.Errorf("cannot verify reconstructed random beacon sig: %w", err)
 	}

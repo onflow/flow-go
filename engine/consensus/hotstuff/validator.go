@@ -69,7 +69,8 @@ func (v *Validator) ValidateQC(qc *hotstuff.QuorumCertificate, block *hotstuff.B
 	}
 
 	// validate qc's random beacon signature (reconstructed threshold signature)
-	valid, err = v.sigVerifier.VerifyAggregatedRandomBeaconSignature(qc.AggregatedSignature.RandomBeaconSignature, block)
+	groupPubKey := v.viewState.DKGPublicData().GroupPubKey
+	valid, err = v.sigVerifier.VerifyAggregatedRandomBeaconSignature(qc.AggregatedSignature.RandomBeaconSignature, block, groupPubKey)
 	if err != nil {
 		return fmt.Errorf("cannot verify reconstructed random beacon sig from qc: %w", err)
 	}
@@ -91,7 +92,7 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 	// get signer's Identity (will error if signer is not a staked consensus participant at block)
 	signer, err := v.viewState.IdentityForConsensusParticipant(proposal.Block.BlockID, proposal.Block.ProposerID)
 	if err != nil {
-		return newInvalidBlockError(block, fmt.Sprintf("invalid proposed identity for block %s: %w", blockID, err))
+		return newInvalidBlockError(block, fmt.Sprintf("invalid proposed identity for block %s: %s", blockID, err.Error()))
 	}
 	// check the signer is the leader for that block
 	leader := v.viewState.LeaderForView(proposal.Block.View)
@@ -134,7 +135,7 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 	// if the parent block is equal or above the finalized view, then Forks should have it
 	parent, found := v.forks.GetBlock(qc.BlockID) // get parent block
 	if !found {                                   // parent is missing
-		return &hotstuff.ErrorMissingBlock{qc.View, qc.BlockID}
+		return &hotstuff.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
 	}
 	return v.ValidateQC(qc, parent) // validate QC; very expensive crypto check; kept to the last
 }
