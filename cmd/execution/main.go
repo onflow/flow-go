@@ -50,7 +50,9 @@ func main() {
 
 			chunkHeaders := badger.NewChunkHeaders(node.DB)
 
-			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
+			executionResults := badger.NewExecutionResults(node.DB)
+
+			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders, executionResults)
 
 			receiptsEng, err = provider.New(
 				node.Logger,

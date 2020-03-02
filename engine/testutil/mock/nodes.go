@@ -58,7 +58,7 @@ type ConsensusNode struct {
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	BlocksEngine    *ingestion.Engine
+	IngestionEngine *ingestion.Engine
 	ExecutionEngine *computation.Engine
 	ReceiptsEngine  *executionprovider.Engine
 	BadgerDB        *badger.DB
@@ -68,7 +68,7 @@ type ExecutionNode struct {
 }
 
 func (en ExecutionNode) Done() {
-	<-en.BlocksEngine.Done()
+	<-en.IngestionEngine.Done()
 	<-en.ExecutionEngine.Done()
 	<-en.ReceiptsEngine.Done()
 	en.BadgerDB.Close()
