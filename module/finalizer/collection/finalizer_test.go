@@ -53,7 +53,7 @@ func TestFinalizer(t *testing.T) {
 		// a helper function to insert a block
 		insert := func(block model.Block) {
 			// first insert the payload
-			err = db.Update(operation.AllowDuplicates(operation.InsertCollection(&block.Collection)))
+			err = db.Update(operation.SkipDuplicates(operation.InsertCollection(&block.Collection)))
 			assert.Nil(t, err)
 			// then insert the block
 			err = db.Update(procedure.InsertClusterBlock(&block))
