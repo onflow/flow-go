@@ -948,7 +948,7 @@ func fromBytes(buf []byte) *interpreter.ArrayValue {
 func compositeTypesToIDValues(types []*sema.CompositeType) *interpreter.ArrayValue {
 	typeIDValues := make([]Value, len(types))
 	for i, typ := range types {
-		typeIDValues[i] = &interpreter.StringValue{Str: string(typ.ID())}
+		typeIDValues[i] = interpreter.NewStringValue(string(typ.ID()))
 	}
 
 	return &interpreter.ArrayValue{
