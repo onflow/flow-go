@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// InsertExecutionResult inserts a transaction keyed by transaction fingerprint.
+// InsertExecutionResult inserts an execution result by ID.
 func InsertExecutionResult(result *flow.ExecutionResult) func(*badger.Txn) error {
 	return insert(makePrefix(codeExecutionResult, result.ID()), result)
 }

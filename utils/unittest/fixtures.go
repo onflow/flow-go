@@ -63,6 +63,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	}
 
 	header := flow.Header{
+		Height:      parent.Height + 1,
 		View:        parent.View + 1,
 		ChainID:     parent.ChainID,
 		Timestamp:   time.Now(),
@@ -351,5 +352,13 @@ func ChunkHeaderFixture() flow.ChunkHeader {
 		ChunkID:     IdentifierFixture(),
 		StartState:  StateCommitmentFixture(),
 		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
+	}
+}
+
+func ChunkDataPackFixture() flow.ChunkDataPack {
+	return flow.ChunkDataPack{
+		ChunkID:         IdentifierFixture(),
+		StartState:      StateCommitmentFixture(),
+		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
 	}
 }
