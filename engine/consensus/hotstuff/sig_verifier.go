@@ -27,6 +27,8 @@ type SigVerifier interface {
 	//    aggStakingSig - the aggregated staking signature to be verified
 	//    block - the block that the signature was signed for.
 	//    signerKeys - the signer's public staking key
+	// Note: the aggregated BLS staking signature is currently implemented as a slice of individual signatures.
+	// The implementation (and method signature) will later be updated, once full BLS sigmnature aggregation is implemented.
 	VerifyAggregatedStakingSignature(aggStakingSig []crypto.Signature, block *hotstuff.Block, signerKeys []crypto.PublicKey) (bool, error)
 
 	// VerifyAggregatedRandomBeaconSignature verifies a (reconstructed) random beacon threshold signature for a block.

@@ -3,57 +3,65 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 VerifyStakingSig(sig crypto.Signature, block *hotstuff.Block, signerKey crypto.PublicKey) (bool, error)
-* for SigVerifier interface
--> StakingSigVerifier
+* for `SigVerifier` interface
+-> `StakingSigVerifier`
 
 VerifyAggregatedStakingSignature(aggsig []crypto.Signature, block *hotstuff.Block, signerKeys []crypto.PublicKey) (bool, error)
-* for SigVerifier interface
--> StakingSigVerifier
+* for `SigVerifier` interface
+-> `StakingSigVerifier`
 
 
 VerifyRandomBeaconSig(sig crypto.Signature, block *hotstuff.Block, signerPubKey crypto.PublicKey) (bool, error)
-* for SigVerifier interface
--> RandomBeaconSigVerifier
+* for `SigVerifier` interface
+-> `RandomBeaconSigVerifier`
 
 VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *hotstuff.Block) (bool, error)
-* for SigVerifier interface
--> RandomBeaconSigVerifier
+* for `SigVerifier` interface
+-> `RandomBeaconSigVerifier`
 
 
 
 
 CanReconstruct(numOfSigShares int) bool
-* for SigAggregator interface
--> MOVED to RandomBeaconSigner
+* for `SigAggregator` interface
+-> MOVED to `RandomBeaconSigner`
 
 Aggregate(block *hotstuff.Block, sigs []*hotstuff.SingleSignature) (*hotstuff.AggregatedSignature, error)
-* for SigAggregator interface
-
+* for `SigAggregator` interface
+->
 
 VoteFor(block *hotstuff.Block) (*hotstuff.Vote, error)
-* for Signer interface
+* for `Signer` interface
 
 
 Propose(block *hotstuff.Block) (*hotstuff.Proposal, error)
-* for Signer interface
+* for `Signer` interface
 
 getSignerIDsAndSigShares(blockID flow.Identifier, sigs []*hotstuff.SingleSignature) ([]*SigShare, error)
-* internally used for Aggregate method
+* internally used for `Aggregate( .. )` method
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 |              DKGPublicData                   |
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-LookupIndex(signerKeys []crypto.PublicKey) (bool, []int)
-* interally used by DKGPublicData.Reconstruct
--> remains in DKGPublicData
-
-Size() int
-* internally used by SigProvider.CanReconstruct
--> remains in DKGPublicData
+DKGPublicData struct
+-> MOVED to ViewState
 
 Reconstruct(msg []byte, dkgPubData *DKGPublicData, sigShares []*SigShare) (crypto.Signature, error)
-* internally used by SigProvider.Aggregate
--> MOVED to RandomBeaconSigner
+* only package-internally used at a single place: by method `SigProvider.Aggregate( .. )`
+* `RandomBeaconSigner` now provides  aggregation to / reconstruction of threshold signatures
+-> MOVED to `RandomBeaconSigner`
+
+
+LookupIndex(signerKeys []crypto.PublicKey) (bool, []int)
+* only package-internally used at a single place: by method `DKGPublicData.Reconstruct( .. )`
+* `RandomBeaconSigner` now provides  aggregation to / reconstruction of threshold signatures
+-> REPLACED by unexported method `RandomBeaconSigner.lookupDKGIndices( .. )`
+
+Size() int
+* only package-internally used at a single place: by method `SigProvider.CanReconstruct()`
+`RandomBeaconSigner` now provides  aggregation to / reconstruction of threshold signatures
+-> REPLACED by unexported method `RandomBeaconSigner.dkgGroupSize()`
+
 
