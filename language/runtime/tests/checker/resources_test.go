@@ -735,9 +735,10 @@ func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
 				common.CompositeKindContract,
 				common.CompositeKindEvent:
 
-				errs := ExpectCheckerErrors(t, err, 1)
+				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -746,6 +747,7 @@ func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
 	}
 }
 
+// NOTE: variable type instead of function parameter
 func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
 
 	for _, kind := range common.AllCompositeKinds {
@@ -762,12 +764,13 @@ func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
 					`
                       %[1]s T %[2]s
 
-                      let test: ((T): Void) = fun (r: T) {
-                          %[3]s r
+                      let test: ((T): Void) = fun (r: %[3]sT) {
+                          %[4]s r
                       }
                     `,
 					kind.Keyword(),
 					body,
+					kind.Annotation(),
 					kind.DestructionKeyword(),
 				),
 			)
@@ -830,15 +833,17 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindStructure,
 				common.CompositeKindContract:
 
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
-
-			case common.CompositeKindEvent:
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 3)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[1])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[2])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -881,9 +886,10 @@ func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
 
 			switch compositeKind {
 			case common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 1)
+				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[1])
 
 			case common.CompositeKindStructure,
 				common.CompositeKindContract:

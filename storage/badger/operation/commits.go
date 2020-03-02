@@ -10,13 +10,14 @@ import (
 
 // IndexCommit indexes a state commitment.
 //
-// State commitments are keyed by the block ID of the block whose final state
-// is the state being committed to.
+// State commitments are keyed by the block whose execution results in the state with the given commit.
 func IndexCommit(blockID flow.Identifier, commit flow.StateCommitment) func(*badger.Txn) error {
 	return insert(makePrefix(codeCommit, blockID), commit)
 }
 
 // LookupCommit gets a state commitment keyed by block ID
+//
+// State commitments are keyed by the block whose execution results in the state with the given commit.
 func LookupCommit(blockID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCommit, blockID), commit)
 }

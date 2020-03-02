@@ -12,6 +12,26 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+func TestGuaranteeInsertCheckRetrieve(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		g := unittest.CollectionGuaranteeFixture()
+
+		err := db.Update(InsertGuarantee(g))
+		require.Nil(t, err)
+
+		var exists bool
+		err = db.View(CheckGuarantee(g.CollectionID, &exists))
+		require.NoError(t, err)
+		require.True(t, exists)
+
+		var retrieved flow.CollectionGuarantee
+		err = db.View(RetrieveGuarantee(g.CollectionID, &retrieved))
+		require.NoError(t, err)
+
+		assert.Equal(t, g, &retrieved)
+	})
+}
+
 func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		blockID := flow.Identifier{0x12, 0x34}
