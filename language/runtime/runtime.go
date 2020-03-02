@@ -951,9 +951,7 @@ func compositeTypesToIDValues(types []*sema.CompositeType) *interpreter.ArrayVal
 		typeIDValues[i] = interpreter.NewStringValue(string(typ.ID()))
 	}
 
-	return &interpreter.ArrayValue{
-		Values: typeIDValues,
-	}
+	return interpreter.NewArrayValueUnownedNonCopying(typeIDValues...)
 }
 
 // Block
