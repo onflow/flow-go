@@ -185,38 +185,6 @@ func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parame
 	}
 }
 
-func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.Position) {
-	checker.checkResourceAnnotation(
-		typeAnnotation.Type,
-		typeAnnotation.IsResource,
-		pos,
-	)
-}
-
-func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, pos ast.Position) {
-	if ty.IsInvalidType() {
-		return
-	}
-
-	if ty.IsResourceType() {
-		if !isResourceMove {
-			checker.report(
-				&MissingResourceAnnotationError{
-					Pos: pos,
-				},
-			)
-		}
-	} else {
-		if isResourceMove {
-			checker.report(
-				&InvalidResourceAnnotationError{
-					Pos: pos,
-				},
-			)
-		}
-	}
-}
-
 // checkArgumentLabels checks that all argument labels (if any) are unique
 //
 func (checker *Checker) checkArgumentLabels(parameterList *ast.ParameterList) {
