@@ -23,11 +23,8 @@ type SigShare struct {
 }
 
 // NewSigProvider creates an instance of SigProvider
-func NewRandomBeaconSigner(
-	viewState *hotstuff.ViewState,
-	randomBeaconPrivateKey crypto.PrivateKey,
-) *RandomBeaconSigner {
-	return &RandomBeaconSigner{
+func NewRandomBeaconSigner(viewState *hotstuff.ViewState, randomBeaconPrivateKey crypto.PrivateKey) RandomBeaconSigner {
+	return RandomBeaconSigner{
 		RandomBeaconSigVerifier: NewRandomBeaconSigVerifier(),
 		viewState:               viewState,
 		randomBeaconPrivateKey:  randomBeaconPrivateKey,

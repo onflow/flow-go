@@ -31,10 +31,10 @@ type SigVerifier interface {
 	// The implementation (and method signature) will later be updated, once full BLS sigmnature aggregation is implemented.
 	VerifyAggregatedStakingSignature(aggStakingSig []crypto.Signature, block *hotstuff.Block, signerKeys []crypto.PublicKey) (bool, error)
 
-	// VerifyAggregatedRandomBeaconSignature verifies a (reconstructed) random beacon threshold signature for a block.
+	// VerifyRandomBeaconThresholdSig verifies a (reconstructed) random beacon threshold signature for a block.
 	// Inputs:
 	//    sig - random beacon threshold signature
 	//    block - the signed block
 	//    groupPubKey - the DKG group public key
-	VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *hotstuff.Block, groupPubKey crypto.PublicKey) (bool, error)
+	VerifyRandomBeaconThresholdSig(sig crypto.Signature, block *hotstuff.Block, groupPubKey crypto.PublicKey) (bool, error)
 }

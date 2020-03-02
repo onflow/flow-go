@@ -690,7 +690,7 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	}).AnyTimes()
 	// mock sig verifier and aggregator
 	mockSigVerifier := mockverifier.NewMockSigVerifier(ctrl)
-	mockSigVerifier.EXPECT().VerifyAggregatedRandomBeaconSignature(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+	mockSigVerifier.EXPECT().VerifyRandomBeaconThresholdSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigVerifier.EXPECT().VerifyAggregatedStakingSignature(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigVerifier.EXPECT().VerifyRandomBeaconSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
 	mockSigVerifier.EXPECT().VerifyStakingSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()

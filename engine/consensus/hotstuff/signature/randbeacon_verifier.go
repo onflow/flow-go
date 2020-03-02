@@ -36,16 +36,16 @@ func NewRandomBeaconSigVerifier() RandomBeaconSigVerifier {
 //   * However, for security, we are explicitly verifying that the vote matches the full block.
 //     We do this by converting the block to the byte-sequence which we expect an honest voter to have signed
 //     and then check the provided signature against this self-computed byte-sequence.
-func (s *RandomBeaconSigVerifier) VerifyRandomBeaconSig(sigShare crypto.Signature, block *model.Block, signerPubKey crypto.PublicKey) (bool, error) {
+func (v *RandomBeaconSigVerifier) VerifyRandomBeaconSig(sigShare crypto.Signature, block *model.Block, signerPubKey crypto.PublicKey) (bool, error) {
 	msg := BlockToBytesForSign(block)
-	valid, err := signerPubKey.Verify(sigShare, msg, s.randomBeaconHasher)
+	valid, err := signerPubKey.Verify(sigShare, msg, v.randomBeaconHasher)
 	if err != nil {
 		return false, fmt.Errorf("cannot verify random beacon signature: %w", err)
 	}
 	return valid, nil
 }
 
-// VerifyAggregatedRandomBeaconSignature verifies a (reconstructed) random beacon threshold signature for a block.
+// VerifyRandomBeaconThresholdSig verifies a (reconstructed) random beacon threshold signature for a block.
 // Inputs:
 //    sig - random beacon threshold signature
 //    block - the signed block
@@ -57,10 +57,10 @@ func (s *RandomBeaconSigVerifier) VerifyRandomBeaconSig(sigShare crypto.Signatur
 //   * However, for security, we are explicitly verifying that the vote matches the full block.
 //     We do this by converting the block to the byte-sequence which we expect an honest voter to have signed
 //     and then check the provided signature against this self-computed byte-sequence.
-func (s *RandomBeaconSigVerifier) VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *model.Block, groupPubKey crypto.PublicKey) (bool, error) {
+func (v *RandomBeaconSigVerifier) VerifyRandomBeaconThresholdSig(sig crypto.Signature, block *model.Block, groupPubKey crypto.PublicKey) (bool, error) {
 	msg := BlockToBytesForSign(block)
 	// the reconstructed signature is also a BLS signature which can be verified by the group public key
-	valid, err := groupPubKey.Verify(sig, msg, s.randomBeaconHasher)
+	valid, err := groupPubKey.Verify(sig, msg, v.randomBeaconHasher)
 	if err != nil {
 		return false, fmt.Errorf("cannot verify reconstructed random beacon sig: %w", err)
 	}

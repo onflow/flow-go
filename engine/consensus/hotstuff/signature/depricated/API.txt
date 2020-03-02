@@ -17,7 +17,7 @@ VerifyRandomBeaconSig(sig crypto.Signature, block *hotstuff.Block, signerPubKey 
 
 VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *hotstuff.Block) (bool, error)
 * for `SigVerifier` interface
--> `RandomBeaconSigVerifier`
+-> `RandomBeaconSigVerifier.VerifyRandomBeaconThresholdSig( .. )`
 
 
 

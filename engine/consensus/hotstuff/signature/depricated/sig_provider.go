@@ -120,7 +120,7 @@ func (s *SigProvider) VerifyAggregatedStakingSignature(aggsig []crypto.Signature
 	return true, nil
 }
 
-// VerifyAggregatedRandomBeaconSignature verifies an aggregated random beacon signature, which is a threshold signature
+// VerifyRandomBeaconThresholdSig verifies an aggregated random beacon signature, which is a threshold signature
 func (s *SigProvider) VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *model.Block) (bool, error) {
 	// skip the validation if random beacon is not enabled
 	if !s.isRandomBeaconEnabled {

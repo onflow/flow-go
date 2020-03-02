@@ -34,9 +34,9 @@ func NewStakingSigVerifier(stakingSigTag string) StakingSigVerifier {
 //   * However, for security, we are explicitly verifying that the vote matches the full block.
 //     We do this by converting the block to the byte-sequence which we expect an honest voter to have signed
 //     and then check the provided signature against this self-computed byte-sequence.
-func (s *StakingSigVerifier) VerifyStakingSig(sig crypto.Signature, block *model.Block, signerKey crypto.PublicKey) (bool, error) {
+func (v *StakingSigVerifier) VerifyStakingSig(sig crypto.Signature, block *model.Block, signerKey crypto.PublicKey) (bool, error) {
 	msg := BlockToBytesForSign(block)
-	valid, err := signerKey.Verify(sig, msg, s.stakingHasher)
+	valid, err := signerKey.Verify(sig, msg, v.stakingHasher)
 	if err != nil {
 		return false, fmt.Errorf("cannot verify staking sig: %w", err)
 	}
@@ -59,7 +59,7 @@ func (s *StakingSigVerifier) VerifyStakingSig(sig crypto.Signature, block *model
 // Note: the aggregated BLS staking signature is currently implemented as a slice of individual signatures.
 // The implementation (and method signature) will later be updated, once full BLS sigmnature aggregation is implemented.
 // To verify it, we just verify every single signature. The implementation (and method signature)
-func (s *StakingSigVerifier) VerifyAggregatedStakingSignature(aggStakingSig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
+func (v *StakingSigVerifier) VerifyAggregatedStakingSignature(aggStakingSig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
 	// check that the number of keys and signatures should match
 	if len(aggStakingSig) != len(signerKeys) {
 		return false, nil
@@ -72,7 +72,7 @@ func (s *StakingSigVerifier) VerifyAggregatedStakingSignature(aggStakingSig []cr
 		signerKey := signerKeys[i]
 
 		// validate the staking signature
-		valid, err := signerKey.Verify(sig, msg, s.stakingHasher)
+		valid, err := signerKey.Verify(sig, msg, v.stakingHasher)
 		if err != nil {
 			return false, fmt.Errorf("cannot verify aggregated staking sig for (%d)-th sig: %w", i, err)
 		}

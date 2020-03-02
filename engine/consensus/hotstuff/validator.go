@@ -70,7 +70,7 @@ func (v *Validator) ValidateQC(qc *hotstuff.QuorumCertificate, block *hotstuff.B
 
 	// validate qc's random beacon signature (reconstructed threshold signature)
 	groupPubKey := v.viewState.DKGPublicData().GroupPubKey
-	valid, err = v.sigVerifier.VerifyAggregatedRandomBeaconSignature(qc.AggregatedSignature.RandomBeaconSignature, block, groupPubKey)
+	valid, err = v.sigVerifier.VerifyRandomBeaconThresholdSig(qc.AggregatedSignature.RandomBeaconSignature, block, groupPubKey)
 	if err != nil {
 		return fmt.Errorf("cannot verify reconstructed random beacon sig from qc: %w", err)
 	}

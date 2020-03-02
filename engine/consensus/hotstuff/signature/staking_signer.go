@@ -20,12 +20,8 @@ type StakingSigner struct {
 }
 
 // NewStakingSigner creates an instance of StakingSigner
-func NewStakingSigner(
-	viewState *hotstuff.ViewState,
-	stakingSigTag string,
-	me module.Local,
-) *StakingSigner {
-	return &StakingSigner{
+func NewStakingSigner(viewState *hotstuff.ViewState, stakingSigTag string, me module.Local) StakingSigner {
+	return StakingSigner{
 		StakingSigVerifier: NewStakingSigVerifier(stakingSigTag),
 		viewState:          viewState,
 		me:                 me,
@@ -38,6 +34,7 @@ func (s *StakingSigner) Sign(msg []byte) (crypto.Signature, error) {
 }
 
 // Aggregate aggregates the given signature that signed on the given block
+// Implementation is OBLIVIOUS to RANDOM BEACON: RandomBeaconSignature in returned AggregatedSignature wil be nil.
 // block - it is needed in order to double check the reconstruct signature is valid
 // And verifying the sig requires the signed message, which is the block
 // sigs - the signatures to be aggregated. Assuming each signature has been verified already.
