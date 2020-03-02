@@ -26,7 +26,7 @@ func IndexGuarantees(payloadHash flow.Identifier, guarantees []*flow.CollectionG
 			}
 
 			// TODO: Revisit duplicate handling logic
-			err = operation.AllowDuplicates(operation.IndexGuarantee(payloadHash, uint64(i), guarantee.CollectionID))(tx)
+			err = operation.SkipDuplicates(operation.IndexGuarantee(payloadHash, uint64(i), guarantee.CollectionID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.CollectionID, err)
 			}

@@ -354,3 +354,11 @@ func ChunkHeaderFixture() flow.ChunkHeader {
 		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
 	}
 }
+
+func ChunkDataPackFixture() flow.ChunkDataPack {
+	return flow.ChunkDataPack{
+		ChunkID:         IdentifierFixture(),
+		StartState:      StateCommitmentFixture(),
+		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
+	}
+}
