@@ -26,14 +26,13 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit    *engine.Unit    // used to control startup/shutdown
-	log     zerolog.Logger  // used to log relevant actions
-	conduit network.Conduit // used to propagate result approvals
-	me      module.Local    // used to access local node information
-	state   protocol.State  // used to access the protocol state
-	runtime runtime.Runtime // used to execute transactions
-	rah     crypto.Hasher   // used as hasher to sign the result approvals
-	vm      virtualmachine.VirtualMachine
+	unit    *engine.Unit                  // used to control startup/shutdown
+	log     zerolog.Logger                // used to log relevant actions
+	conduit network.Conduit               // used to propagate result approvals
+	me      module.Local                  // used to access local node information
+	state   protocol.State                // used to access the protocol state
+	rah     crypto.Hasher                 // used as hasher to sign the result approvals
+	vm      virtualmachine.VirtualMachine // used to execute transactions
 }
 
 // New creates and returns a new instance of a verifier engine.
