@@ -10,13 +10,14 @@ import (
 
 // InsertCommit inserts a state commitment.
 //
-// State commitments are keyed by the block ID of the block whose final state
-// is the state being committed to.
+// State commitments are keyed by the block whose execution results in the state with the given commit.
 func InsertCommit(blockID flow.Identifier, commit flow.StateCommitment) func(*badger.Txn) error {
 	return insert(makePrefix(codeCommit, blockID), commit)
 }
 
 // RetrieveCommit gets a state commitment.
+//
+// State commitments are keyed by the block whose execution results in the state with the given commit.
 func RetrieveCommit(blockID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCommit, blockID), commit)
 }

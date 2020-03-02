@@ -95,10 +95,10 @@ func TestBootstrap(t *testing.T) {
 				assert.Equal(t, genesis.Collection, collection)
 
 				// should index collection
-				var collectionID flow.Identifier
-				err = operation.LookupCollection(genesis.PayloadHash, &collectionID)(tx)
+				var collectionIDs []flow.Identifier
+				err = operation.LookupCollections(genesis.PayloadHash, &collectionIDs)(tx)
 				assert.Nil(t, err)
-				assert.Equal(t, genesis.Collection.ID(), collectionID)
+				assert.Equal(t, []flow.Identifier{genesis.Collection.ID()}, collectionIDs)
 
 				// should insert header
 				var header flow.Header
@@ -151,7 +151,7 @@ func TestExtend(t *testing.T) {
 		// a helper function to insert a block
 		insert := func(block cluster.Block) {
 			// first insert the payload
-			err = db.Update(operation.AllowDuplicates(operation.InsertCollection(&block.Collection)))
+			err = db.Update(operation.SkipDuplicates(operation.InsertCollection(&block.Collection)))
 			assert.Nil(t, err)
 			// then insert the block
 			err = db.Update(procedure.InsertClusterBlock(&block))
