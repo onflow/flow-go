@@ -157,6 +157,22 @@ var AccountCreatedEventType = newFlowEventType(
 			&sema.StringType{},
 		),
 	},
+	&sema.Parameter{
+		Identifier: "codeHash",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		),
+	},
+	&sema.Parameter{
+		Identifier: "contracts",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
+				Type: &sema.StringType{},
+			},
+		),
+	},
 )
 
 var AccountKeyAddedEventType = newFlowEventType(
@@ -208,6 +224,14 @@ var AccountCodeUpdatedEventType = newFlowEventType(
 		TypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VariableSizedType{
 				Type: &sema.IntType{},
+			},
+		),
+	},
+	&sema.Parameter{
+		Identifier: "contracts",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
+				Type: &sema.StringType{},
 			},
 		),
 	},
