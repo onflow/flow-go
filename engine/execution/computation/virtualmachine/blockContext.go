@@ -12,31 +12,46 @@ import (
 // A BlockContext is used to execute transactions in the context of a block.
 type BlockContext interface {
 	// ExecuteTransaction computes the result of a transaction.
-	ExecuteTransaction(ledger Ledger, tx *flow.TransactionBody) (*TransactionResult, error)
+	ExecuteTransaction(
+		ledger Ledger,
+		tx *flow.TransactionBody,
+		options ...TransactionContextOption,
+	) (*TransactionResult, error)
+
 	// ExecuteScript computes the result of a read-only script.
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
 }
-
 
 type blockContext struct {
 	vm     *virtualMachine
 	header *flow.Header
 }
 
-func (bc *blockContext) newTransactionContext(ledger Ledger, tx *flow.TransactionBody) *transactionContext {
+func (bc *blockContext) newTransactionContext(
+	ledger Ledger,
+	tx *flow.TransactionBody,
+	options ...TransactionContextOption,
+) *TransactionContext {
+
 	signingAccounts := make([]runtime.Address, len(tx.ScriptAccounts))
 	for i, addr := range tx.ScriptAccounts {
 		signingAccounts[i] = runtime.Address(addr)
 	}
 
-	return &transactionContext{
+	ctx := &TransactionContext{
 		ledger:          ledger,
 		signingAccounts: signingAccounts,
 	}
+
+	for _, option := range options {
+		option(ctx)
+	}
+
+	return ctx
 }
 
-func (bc *blockContext) newScriptContext(ledger Ledger) *transactionContext {
-	return &transactionContext{
+func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
+	return &TransactionContext{
 		ledger: ledger,
 	}
 }
@@ -46,11 +61,16 @@ func (bc *blockContext) newScriptContext(ledger Ledger) *transactionContext {
 // Register updates are recorded in the provided ledger view. An error is returned
 // if an unexpected error occurs during execution. If the transaction reverts due to
 // a normal runtime error, the error is recorded in the transaction result.
-func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.TransactionBody) (*TransactionResult, error) {
+func (bc *blockContext) ExecuteTransaction(
+	ledger Ledger,
+	tx *flow.TransactionBody,
+	options ...TransactionContextOption,
+) (*TransactionResult, error) {
+
 	txID := tx.ID()
 	location := runtime.TransactionLocation(txID[:])
 
-	ctx := bc.newTransactionContext(ledger, tx)
+	ctx := bc.newTransactionContext(ledger, tx, options...)
 
 	err := bc.vm.executeTransaction(tx.Script, ctx, location)
 	if err != nil {
