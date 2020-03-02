@@ -763,7 +763,7 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 
 // GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
 // we just return the children
-func (n *node) GetandSetChildren(hashes [256][]byte) (*node, *node) {
+func (n *node) GetandSetChildren(hashes [257][]byte) (*node, *node) {
 	if n.Lchild == nil {
 		n.Lchild = newNode(nil, n.height-1)
 	}
@@ -882,11 +882,11 @@ func (s *SMT) SafeClose() (error, error) {
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []byte {
 	computedHash := Hash(key, value)
-	for j := maxHeight - 1; j > maxHeight-height-1; j-- {
+	for j := maxHeight - 2; j > maxHeight-height-2; j-- {
 		if utils.IsBitSet(key, j) { // right branching
-			computedHash = Hash(GetDefaultHashForHeight(maxHeight-j-1), computedHash)
+			computedHash = Hash(GetDefaultHashForHeight(maxHeight-j-2), computedHash)
 		} else { // left branching
-			computedHash = Hash(computedHash, GetDefaultHashForHeight(maxHeight-j-1))
+			computedHash = Hash(computedHash, GetDefaultHashForHeight(maxHeight-j-2))
 		}
 	}
 	return computedHash

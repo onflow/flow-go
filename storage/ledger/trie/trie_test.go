@@ -3231,7 +3231,7 @@ func TestKVDB_Pruned2(t *testing.T) {
 	}
 }
 func TestComputeCompactValue(t *testing.T) {
-	trieHeight := 8
+	trieHeight := 9
 
 	key := make([]byte, 1) // 01010101 (1)
 	utils.SetBit(key, 1)

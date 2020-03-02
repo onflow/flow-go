@@ -1,7 +1,7 @@
 package trie
 
 var defaultLeafHash []byte = Hash(EmptySlice)
-var defaultHashes [256][]byte // The zero hashes of the level of the tree
+var defaultHashes [257][]byte // The zero hashes of the level of the tree
 
 func init() {
 	// Creates the Default hashes from base to level height
@@ -15,7 +15,7 @@ func init() {
 //
 // For each tree level N, there is a default hash equal to the chained
 // hashing of the default value N times.
-func GetDefaultHashes() [256][]byte {
+func GetDefaultHashes() [257][]byte {
 	return defaultHashes
 }
 
