@@ -1732,3 +1732,23 @@ func (checker *Checker) rewritePostConditions(postConditions []*ast.Condition) P
 		RewrittenPostConditions: rewrittenPostConditions,
 	}
 }
+
+func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.Position) {
+
+	switch typeAnnotation.TypeAnnotationState() {
+	case TypeAnnotationStateMissingResourceAnnotation:
+		checker.report(
+			&MissingResourceAnnotationError{
+				Pos: pos,
+			},
+		)
+
+	case TypeAnnotationStateInvalidResourceAnnotation:
+		checker.report(
+			&InvalidResourceAnnotationError{
+				Pos: pos,
+			},
+		)
+	}
+
+}

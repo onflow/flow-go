@@ -90,7 +90,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.net.On("Register", uint8(engine.CollectionProvider), testifymock.Anything).
 		Return(suite.collectionsConduit, nil).
 		Once()
-	suite.net.On("Register", uint8(engine.ReceiptProvider), testifymock.Anything).
+	suite.net.On("Register", uint8(engine.ExecutionReceiptProvider), testifymock.Anything).
 		Return(suite.receiptsConduit, nil).
 		Once()
 	suite.net.On("Register", uint8(engine.ExecutionStateProvider), testifymock.Anything).

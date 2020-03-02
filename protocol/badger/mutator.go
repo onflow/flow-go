@@ -32,56 +32,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 			return fmt.Errorf("genesis identities not valid: %w", err)
 		}
 
-		// insert the block payload
-		err = procedure.InsertPayload(&genesis.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis payload: %w", err)
-		}
-
-		// apply the stake deltas
-		err = procedure.ApplyDeltas(genesis.View, genesis.Identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not apply stake deltas: %w", err)
-		}
-
-		// get first seal
-		seal := genesis.Seals[0]
-
-		// index the block seal
-		err = operation.IndexSealIDByBlock(genesis.ID(), seal.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index seal by block: %w", err)
-		}
-
-		// insert the genesis block
-		err = procedure.InsertBlock(genesis)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis block: %w", err)
-		}
-
-		// insert result
-		err = operation.InsertResult(&flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,
-			BlockID:          genesis.ID(),
-			FinalStateCommit: seal.FinalState,
-		}})(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis result: %w", err)
-		}
-
-		// insert the block number mapping
-		err = operation.InsertNumber(0, genesis.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not initialize boundary: %w", err)
-		}
-
-		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.View)(tx)
-		if err != nil {
-			return fmt.Errorf("could not update boundary: %w", err)
-		}
-
-		return nil
+		return procedure.Bootstrap(genesis)(tx)
 	})
 }
 

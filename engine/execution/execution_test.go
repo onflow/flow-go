@@ -73,13 +73,13 @@ func TestExecutionFlow(t *testing.T) {
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
 	defer exeNode.Done()
 
-	colNode := testutil.GenericNode(t, hub, colID, identities)
-	verNode := testutil.GenericNode(t, hub, verID, identities)
-	conNode := testutil.GenericNode(t, hub, conID, identities)
+	collectionNode := testutil.GenericNode(t, hub, colID, identities)
+	verificationNode := testutil.GenericNode(t, hub, verID, identities)
+	consensusNode := testutil.GenericNode(t, hub, conID, identities)
 
-	colEngine := new(network.Engine)
-	colConduit, _ := colNode.Net.Register(engine.CollectionProvider, colEngine)
-	colEngine.On("Process", exeID.NodeID, mock.Anything).
+	collectionEngine := new(network.Engine)
+	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
+	collectionEngine.On("Process", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID, _ := args[0].(flow.Identifier)
 			req, _ := args[1].(*messages.CollectionRequest)
@@ -99,9 +99,9 @@ func TestExecutionFlow(t *testing.T) {
 
 	var receipt *flow.ExecutionReceipt
 
-	verEngine := new(network.Engine)
-	_, _ = verNode.Net.Register(engine.ReceiptProvider, verEngine)
-	verEngine.On("Process", exeID.NodeID, mock.Anything).
+	verificationEngine := new(network.Engine)
+	_, _ = verificationNode.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
+	verificationEngine.On("Process", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 
@@ -110,9 +110,9 @@ func TestExecutionFlow(t *testing.T) {
 		Return(nil).
 		Once()
 
-	conEngine := new(network.Engine)
-	_, _ = conNode.Net.Register(engine.ReceiptProvider, conEngine)
-	conEngine.On("Process", exeID.NodeID, mock.Anything).
+	consensusEngine := new(network.Engine)
+	_, _ = consensusNode.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	consensusEngine.On("Process", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 
@@ -127,7 +127,11 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	exeNode.BlocksEngine.Submit(conID.NodeID, block)
+	exeNode.IngestionEngine.Submit(conID.NodeID, block)
 
-	assert.Eventually(t, func() bool { return receipt != nil }, time.Second*3, time.Millisecond*500)
+	assert.Eventually(t, func() bool { return receipt != nil }, time.Second*30, time.Millisecond*500)
+
+	collectionEngine.AssertExpectations(t)
+	verificationEngine.AssertExpectations(t)
+	consensusEngine.AssertExpectations(t)
 }
