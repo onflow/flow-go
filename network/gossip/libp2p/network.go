@@ -2,7 +2,6 @@ package libp2p
 
 import (
 	"fmt"
-	"hash"
 	"sync"
 
 	"github.com/dchest/siphash"
@@ -16,7 +15,6 @@ import (
 	libp2perrors "github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
-	"github.com/dapperlabs/flow-go/protocol"
 )
 
 // Network represents the overlay network of our peer-to-peer network, including
@@ -25,11 +23,10 @@ type Network struct {
 	sync.RWMutex
 	logger  zerolog.Logger
 	codec   network.Codec
-	state   protocol.State
+	ids     flow.IdentityList
 	me      module.Local
 	mw      middleware.Middleware
 	top     middleware.Topology
-	sip     hash.Hash
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
 	fanout  int             // used to determine number of nodes' neighbors on overlay
@@ -42,7 +39,7 @@ type Network struct {
 func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
-	state protocol.State,
+	ids flow.IdentityList,
 	me module.Local,
 	mw middleware.Middleware,
 	csize int,
@@ -53,22 +50,16 @@ func NewNetwork(
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
 
-	netSize, err := state.Final().Identities()
-	if err != nil {
-		return nil, fmt.Errorf("could not extract network size: %w", err)
-	}
-
-	// todo fanout optimization #2244
 	// fanout is set to half of the system size for connectivity assurance w.h.p
-	fanout := (len(netSize) + 1) / 2
+	// ids contain the address of this node itself (hence fanout is (len(ids) - 1) + 1) / 2) = len(ids) / 2
+	fanout := len(ids) / 2
 
 	o := &Network{
 		logger:  log,
 		codec:   codec,
-		state:   state,
+		ids:     ids,
 		me:      me,
 		mw:      mw,
-		sip:     siphash.New([]byte("daflowtrickleson")),
 		engines: make(map[uint8]network.Engine),
 		rcache:  rcache,
 		fanout:  fanout,
@@ -133,26 +124,16 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 
 // Identity returns a map of all flow.Identifier to flow identity by querying the flow state
 func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
-	ids, err := n.state.Final().Identities()
-	if err != nil {
-		return nil, fmt.Errorf("could not get identities: %w", err)
-	}
 	identifierToID := make(map[flow.Identifier]flow.Identity)
-	for _, id := range ids {
+	for _, id := range n.ids {
 		identifierToID[id.NodeID] = *id
 	}
 	return identifierToID, nil
 }
 
-// Topology returns the identities of a uniform subset of nodes in protocol state
-// size indicates size of the subset
+// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	ids, err := n.state.Final().Identities()
-	if err != nil {
-		return nil, fmt.Errorf("could not get identities: %w", err)
-	}
-
-	return n.top.Subset(ids, n.fanout, n.me.NodeID().String())
+	return n.top.Subset(n.ids, n.fanout, n.me.NodeID().String())
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
