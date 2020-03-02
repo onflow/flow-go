@@ -9,6 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -32,62 +33,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 			return fmt.Errorf("genesis identities not valid: %w", err)
 		}
 
-		// insert the block payload
-		err = procedure.InsertPayload(&genesis.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis payload: %w", err)
-		}
-
-		// apply the stake deltas
-		err = procedure.ApplyDeltas(genesis.View, genesis.Identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not apply stake deltas: %w", err)
-		}
-
-		// get first seal
-		seal := genesis.Seals[0]
-
-		// insert the block seal commit
-		err = operation.InsertCommit(genesis.ID(), seal.FinalState)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert state commit: %w", err)
-		}
-
-		// index the block seal commit
-		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index state commit: %w", err)
-		}
-
-		// insert the genesis block
-		err = procedure.InsertBlock(genesis)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis block: %w", err)
-		}
-
-		// insert result
-		err = operation.InsertResult(&flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,
-			BlockID:          genesis.ID(),
-			FinalStateCommit: seal.FinalState,
-		}})(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis result: %w", err)
-		}
-
-		// insert the block number mapping
-		err = operation.InsertNumber(0, genesis.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not initialize boundary: %w", err)
-		}
-
-		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.View)(tx)
-		if err != nil {
-			return fmt.Errorf("could not update boundary: %w", err)
-		}
-
-		return nil
+		return procedure.Bootstrap(genesis)(tx)
 	})
 }
 
@@ -101,11 +47,11 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// retrieve the state commitment for the parent
-		var parentCommit flow.StateCommitment
-		err = operation.LookupCommit(block.ParentID, &parentCommit)(tx)
+		// retrieve the seal for the parent
+		var parentSeal flow.Seal
+		err = procedure.LookupSealByBlock(block.ParentID, &parentSeal)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve parent: %w", err)
+			return fmt.Errorf("could not retrieve parent seal: %w", err)
 		}
 
 		// check the header validity
@@ -115,7 +61,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		}
 
 		// check the payload validity
-		err = checkExtendPayload(&block.Payload)
+		err = checkExtendPayload(tx, &block)
 		if err != nil {
 			return fmt.Errorf("extend payload not valid: %w", err)
 		}
@@ -135,24 +81,24 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 		// starting with what was the state commitment at the parent block, we
 		// match each seal into the chain of commits
-		nextCommit := parentCommit
+		nextSeal := &parentSeal
 		for len(lookup) > 0 {
 
 			// first check if we have a seal connecting to current latest commit
-			nextSeal, ok := lookup[string(nextCommit)]
+			possibleNextSeal, ok := lookup[string(nextSeal.FinalState)]
 			if !ok {
-				return fmt.Errorf("seals not connected to state chain (%x)", nextCommit)
+				return fmt.Errorf("seals not connected to state chain (%x)", nextSeal.FinalState)
 			}
 
 			// delete matched seal from lookup and forward to point to seal commit
-			delete(lookup, string(nextCommit))
-			nextCommit = nextSeal.FinalState
+			delete(lookup, string(nextSeal.FinalState))
+			nextSeal = possibleNextSeal
 		}
 
-		// insert the the commit state into our state commitment timeline
-		err = operation.IndexCommit(blockID, nextCommit)(tx)
+		// insert the the seal into our seals timeline
+		err = operation.IndexSealIDByBlock(blockID, nextSeal.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert commit: %w", err)
+			return fmt.Errorf("could not index seal by block: %w", err)
 		}
 
 		return nil
@@ -188,12 +134,17 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		// we thus start at the youngest remember all of the intermediary steps
 		// while tracing back until we reach the finalized state
 		headers := []*flow.Header{&header}
-		for header.ParentID != headID {
-			err = operation.RetrieveHeader(header.ParentID, &header)(tx)
+
+		//create a copy to avoid modifying content of header which is referenced in an array
+		loopHeader := header
+		for loopHeader.ParentID != headID {
+			var retrievedHeader flow.Header
+			err = operation.RetrieveHeader(loopHeader.ParentID, &retrievedHeader)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve parent (%x): %w", header.ParentID, err)
 			}
-			headers = append(headers, &header)
+			headers = append(headers, &retrievedHeader)
+			loopHeader = retrievedHeader
 		}
 
 		// now we can step backwards in order to go from oldest to youngest; for
@@ -215,8 +166,8 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 func checkGenesisHeader(header *flow.Header) error {
 
 	// the initial finalized boundary needs to be height zero
-	if header.View != 0 {
-		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.View)
+	if header.Height != 0 {
+		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.Height)
 	}
 
 	// the parent must be zero hash
@@ -315,8 +266,8 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	}
 
 	// if new block number has a lower number, we can't add it
-	if header.View <= parent.View {
-		return fmt.Errorf("block needs higher number (%d <= %d)", header.View, parent.View)
+	if header.Height <= parent.Height {
+		return fmt.Errorf("block needs height above parent (%d <= %d)", header.Height, parent.Height)
 	}
 
 	// NOTE: in the default case, the first parent is the boundary, so we don't
@@ -338,7 +289,7 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 
 		// if its number is below current boundary, the block does not connect
 		// to the finalized protocol state and would break database consistency
-		if currentHeader.View < boundary {
+		if currentHeader.Height < boundary {
 			return fmt.Errorf("block doesn't connect to finalized state")
 		}
 
@@ -347,11 +298,33 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	return nil
 }
 
-func checkExtendPayload(payload *flow.Payload) error {
+func checkExtendPayload(tx *badger.Txn, block *flow.Block) error {
 
 	// currently we don't support identities except for genesis block
-	if len(payload.Identities) > 0 {
+	if len(block.Payload.Identities) > 0 {
 		return fmt.Errorf("extend block has identities")
+	}
+
+	// we check contents for duplicates from the parent height and ID
+	height := block.Header.Height - 1
+	blockID := block.Header.ParentID
+
+	// check we have no duplicate guarantees
+	err := operation.VerifyGuaranteePayload(height, blockID, flow.GetIDs(block.Payload.Guarantees))(tx)
+	if errors.Is(err, storage.ErrAlreadyIndexed) {
+		return fmt.Errorf("found duplicate guarantee in payload: %w", err)
+	}
+	if err != nil {
+		return fmt.Errorf("could not verify guarantee payload: %w", err)
+	}
+
+	// check we have no duplicate block seals
+	err = operation.VerifySealPayload(height, blockID, flow.GetIDs(block.Payload.Seals))(tx)
+	if errors.Is(err, storage.ErrAlreadyIndexed) {
+		return fmt.Errorf("found duplicate seal in payload: %w", err)
+	}
+	if err != nil {
+		return fmt.Errorf("could not verify seal payload: %w", err)
 	}
 
 	return nil

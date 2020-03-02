@@ -14,6 +14,6 @@ func Test_ComputeStakeThreshold(t *testing.T) {
 
 		boundaryValue := float64(i) * 2.0 / 3.0
 		assert.True(t, boundaryValue < float64(threshold))
-		assert.False(t, boundaryValue < float64(threshold - 1))
+		assert.False(t, boundaryValue < float64(threshold-1))
 	}
 }

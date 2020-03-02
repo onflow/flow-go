@@ -16,6 +16,6 @@ type Seals interface {
 	// fingerprint.
 	ByID(sealID flow.Identifier) (*flow.Seal, error)
 
-	// ByBlockID retrieves all guarantees for a given block ID.
+	// ByBlockID retrieves all seals for a given block ID.
 	ByBlockID(blockID flow.Identifier) ([]*flow.Seal, error)
 }

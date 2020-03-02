@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -71,6 +72,7 @@ type FlowNodeBuilder struct {
 	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
 	postInitFns    []func(*FlowNodeBuilder)
 	genesis        *flow.Block
+	sk             crypto.PrivateKey
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -96,7 +98,10 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID())
 		fnb.MustNot(err).Msg("could not initialize flow middleware")
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
+		ids, err := fnb.State.Final().Identities()
+		fnb.MustNot(err).Msg("could not retrieve state identities")
+
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
 		fnb.MustNot(err).Msg("could not initialize flow network")
 		fnb.Network = net
 		return net
@@ -195,7 +200,10 @@ func (fnb *FlowNodeBuilder) initState() {
 	id, err := state.Final().Identity(myID)
 	fnb.MustNot(err).Msg("could not get identity")
 
-	fnb.Me, err = local.New(id)
+	fnb.sk, err = loadPrivateKey()
+	fnb.MustNot(err).Msg("could load private key")
+
+	fnb.Me, err = local.New(id, fnb.sk)
 	fnb.MustNot(err).Msg("could not initialize local")
 
 	fnb.State = state
@@ -360,4 +368,27 @@ func (fnb *FlowNodeBuilder) Run() {
 
 func (fnb *FlowNodeBuilder) handlePostInit(f func(node *FlowNodeBuilder)) {
 	f(fnb)
+}
+
+// load private key loads the private key of the node, e.g., from disk
+//
+// DISCLAIMER: should not use the current version at the production-level
+// https://github.com/dapperlabs/flow-go/issues/2667
+//
+// The current version generates and returns a private key. It is solely to keep the
+// code compiled correctly, and avoid nil panics. However, the implementation of this
+// function should be replaced with a proper loading/generating functionality of the key
+func loadPrivateKey() (crypto.PrivateKey, error) {
+	// todo: replace the following implementation with a proper loading or generating functionality for keys
+	// todo: https://github.com/dapperlabs/flow-go/issues/2667
+	// generates a seed soley for sake of integration tests
+	// seed should be replaced by a secure functionality as part of the mentioned issue
+	seed := make([]byte, 48)
+	_, err := rand.Read(seed)
+	if err != nil {
+		return nil, err
+	}
+
+	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	return sk, err
 }

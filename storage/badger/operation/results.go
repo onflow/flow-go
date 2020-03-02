@@ -6,12 +6,22 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// InsertResult inserts a transaction keyed by transaction fingerprint.
-func InsertResult(result *flow.ExecutionResult) func(*badger.Txn) error {
-	return insert(makePrefix(codeResult, result.ID()), result)
+// InsertExecutionResult inserts an execution result by ID.
+func InsertExecutionResult(result *flow.ExecutionResult) func(*badger.Txn) error {
+	return insert(makePrefix(codeExecutionResult, result.ID()), result)
 }
 
-// RetrieveResult retrieves a transaction by fingerprint.
-func RetrieveResult(resultID flow.Identifier, result *flow.ExecutionResult) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeResult, resultID), result)
+// RetrieveExecutionResult retrieves a transaction by fingerprint.
+func RetrieveExecutionResult(resultID flow.Identifier, result *flow.ExecutionResult) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeExecutionResult, resultID), result)
+}
+
+// IndexExecutionResult inserts an execution result ID keyed by block ID
+func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
+}
+
+// LookupExecutionResult finds execution result ID by block
+func LookupExecutionResult(blockID flow.Identifier, resultID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
