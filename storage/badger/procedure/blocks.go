@@ -17,11 +17,17 @@ func InsertBlock(block *flow.Block) func(*badger.Txn) error {
 		// store the block header
 		err := operation.InsertHeader(&block.Header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not store block header: %w", err)
+			return fmt.Errorf("could not insert block header: %w", err)
+		}
+
+		// store the block contents
+		err = InsertPayload(&block.Payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert block payload: %w", err)
 		}
 
 		// index the block payload
-		err = IndexPayload(&block.Payload)(tx)
+		err = IndexPayload(&block.Header, &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index block payload: %w", err)
 		}
@@ -41,7 +47,7 @@ func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn)
 		}
 
 		// get the block payload
-		err = RetrievePayload(block.Header.PayloadHash, &block.Payload)(tx)
+		err = RetrievePayload(block.Header.ID(), &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
@@ -103,14 +109,14 @@ func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
 func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// insert the block payload
-		err := InsertPayload(&genesis.Payload)(tx)
+		// insert the block header & payload
+		err := InsertBlock(genesis)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert genesis payload: %w", err)
+			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
 		// apply the stake deltas
-		err = ApplyDeltas(genesis.View, genesis.Identities)(tx)
+		err = ApplyDeltas(genesis.Height, genesis.Identities)(tx)
 		if err != nil {
 			return fmt.Errorf("could not apply stake deltas: %w", err)
 		}
@@ -124,30 +130,26 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 			return fmt.Errorf("could not index seal by block: %w", err)
 		}
 
-		// insert the genesis block
-		err = InsertBlock(genesis)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis block: %w", err)
-		}
-
-		executionResult := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
+		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: flow.ZeroID,
 			BlockID:          genesis.ID(),
 			FinalStateCommit: seal.FinalState,
 		}}
 
+		// index the commit for the execution node
 		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index commit: %w", err)
 		}
 
-		// insert result
-		err = operation.InsertExecutionResult(&executionResult)(tx)
+		// insert first execution result
+		err = operation.InsertExecutionResult(&result)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis result: %w", err)
 		}
 
-		err = operation.IndexExecutionResult(genesis.ID(), executionResult.ID())(tx)
+		// index first execution block for genesis block
+		err = operation.IndexExecutionResult(genesis.ID(), result.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index genesis result: %w", err)
 		}
@@ -159,7 +161,7 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 		}
 
 		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.View)(tx)
+		err = operation.InsertBoundary(genesis.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update boundary: %w", err)
 		}

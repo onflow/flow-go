@@ -89,14 +89,14 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// look up the list of guarantee IDs included in the payload
 			step := steps[i]
 			var guaranteeIDs []flow.Identifier
-			err = operation.LookupGuarantees(step.PayloadHash, &guaranteeIDs)(tx)
+			err = operation.LookupGuaranteePayload(step.Height, step.ID(), step.ParentID, &guaranteeIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up guarantees (block_id=%x): %w", step.ID(), err)
 			}
 
 			// look up list of seal IDs included in the payload
 			var sealIDs []flow.Identifier
-			err = operation.LookupSeals(step.PayloadHash, &sealIDs)(tx)
+			err = operation.LookupSealPayload(step.Height, step.ID(), step.ParentID, &sealIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up seals (block_id=%x): %w", step.ID(), err)
 			}
@@ -130,7 +130,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		{
 			// get the payload
 			var payload flow.Payload
-			err = procedure.RetrievePayload(header.PayloadHash, &payload)(tx)
+			err = procedure.RetrievePayload(header.ID(), &payload)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve payload: %w", err)
 			}

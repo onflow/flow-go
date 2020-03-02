@@ -174,19 +174,13 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		Uint64("block_view", block.View).
 		Msg("received block")
 
-	err := e.payloads.Store(&block.Payload)
+	err := e.blocks.Store(block)
 	if err != nil {
-		return fmt.Errorf("could not save block payload: %w", err)
+		return fmt.Errorf("could not store block: %w", err)
 	}
-
-	err = e.blocks.Store(block)
-	if err != nil {
-		return fmt.Errorf("could not save block: %w", err)
-	}
-
-	blockID := block.ID()
 
 	// TODO: for MVP assume we're only receiving finalized blocks
+	blockID := block.Header.ID()
 	err = e.state.Mutate().Finalize(blockID)
 	if err != nil {
 		return fmt.Errorf("could not finalize block: %w", err)

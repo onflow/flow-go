@@ -8,25 +8,31 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func saveAndRetrieve(t *testing.T, db *badger.DB, payload *flow.Payload, retrievedPayload *flow.Payload) {
-	err := db.Update(InsertPayload(payload))
+func saveAndRetrieve(t *testing.T, db *badger.DB, header *flow.Header, payload *flow.Payload, retrievedPayload *flow.Payload) {
+
+	header.PayloadHash = payload.Hash()
+	err := db.Update(operation.InsertHeader(header))
 	require.NoError(t, err)
 
-	err = db.Update(IndexPayload(payload))
+	err = db.Update(InsertPayload(payload))
 	require.NoError(t, err)
 
-	err = db.View(RetrievePayload(payload.Hash(), retrievedPayload))
+	err = db.Update(IndexPayload(header, payload))
+	require.NoError(t, err)
+
+	err = db.View(RetrievePayload(header.ID(), retrievedPayload))
 	require.NoError(t, err)
 }
 
-func check(t *testing.T, db *badger.DB, payload *flow.Payload) {
+func check(t *testing.T, db *badger.DB, header *flow.Header, payload *flow.Payload) {
 
 	var retrievedPayload flow.Payload
 
-	saveAndRetrieve(t, db, payload, &retrievedPayload)
+	saveAndRetrieve(t, db, header, payload, &retrievedPayload)
 
 	assert.Equal(t, *payload, retrievedPayload)
 	assert.Equal(t, payload.Hash(), retrievedPayload.Hash())
@@ -35,24 +41,24 @@ func check(t *testing.T, db *badger.DB, payload *flow.Payload) {
 func TestPayloadNilSeals(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		payload := unittest.BlockFixture().Payload
-		payload.Seals = nil
+		block := unittest.BlockFixture()
+		block.Payload.Seals = nil
 
-		check(t, db, &payload)
+		check(t, db, &block.Header, &block.Payload)
 	})
 }
 
 func TestPayloadEmptySeals(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		payload := unittest.BlockFixture().Payload
-		payload.Seals = make([]*flow.Seal, 0)
+		block := unittest.BlockFixture()
+		block.Payload.Seals = make([]*flow.Seal, 0)
 
 		var retrievedPayload flow.Payload
-		saveAndRetrieve(t, db, &payload, &retrievedPayload)
+		saveAndRetrieve(t, db, &block.Header, &block.Payload, &retrievedPayload)
 
-		//check(t, db, &payload)
-		assert.Equal(t, payload.Hash(), retrievedPayload.Hash())
+		//check(t, db, &block.Header, &block.Payload)
+		assert.Equal(t, block.Payload.Hash(), retrievedPayload.Hash())
 		assert.Nil(t, retrievedPayload.Seals)
 	})
 }
@@ -60,41 +66,41 @@ func TestPayloadEmptySeals(t *testing.T) {
 func TestPayloadOrderedSeals(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		payload := unittest.BlockFixture().Payload
+		block := unittest.BlockFixture()
 
 		seal1 := unittest.SealFixture()
 		seal2 := unittest.SealFixture()
 		seal3 := unittest.SealFixture()
 
-		payload.Seals = []*flow.Seal{
+		block.Payload.Seals = []*flow.Seal{
 			&seal1, &seal2, &seal3,
 		}
 
-		check(t, db, &payload)
+		check(t, db, &block.Header, &block.Payload)
 	})
 }
 
 func TestPayloadNilGuarantees(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		payload := unittest.BlockFixture().Payload
-		payload.Guarantees = nil
+		block := unittest.BlockFixture()
+		block.Payload.Guarantees = nil
 
-		check(t, db, &payload)
+		check(t, db, &block.Header, &block.Payload)
 	})
 }
 
 func TestPayloadEmptyGuarantees(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		payload := unittest.BlockFixture().Payload
-		payload.Guarantees = make([]*flow.CollectionGuarantee, 0)
+		block := unittest.BlockFixture()
+		block.Payload.Guarantees = make([]*flow.CollectionGuarantee, 0)
 
 		var retrievedPayload flow.Payload
-		saveAndRetrieve(t, db, &payload, &retrievedPayload)
+		saveAndRetrieve(t, db, &block.Header, &block.Payload, &retrievedPayload)
 
-		//check(t, db, &payload)
-		assert.Equal(t, payload.Hash(), retrievedPayload.Hash())
+		//check(t, db, &block.Header, &block.Payload)
+		assert.Equal(t, block.Payload.Hash(), retrievedPayload.Hash())
 		assert.Nil(t, retrievedPayload.Guarantees)
 	})
 }
@@ -102,34 +108,34 @@ func TestPayloadEmptyGuarantees(t *testing.T) {
 func TestPayloadOrderedGuarantees(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		payload := unittest.BlockFixture().Payload
-		payload.Guarantees = unittest.CollectionGuaranteesFixture(5)
+		block := unittest.BlockFixture()
+		block.Payload.Guarantees = unittest.CollectionGuaranteesFixture(5)
 
-		check(t, db, &payload)
+		check(t, db, &block.Header, &block.Payload)
 	})
 }
 
 func TestPayloadNilIdentities(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		payload := unittest.BlockFixture().Payload
-		payload.Identities = nil
+		block := unittest.BlockFixture()
+		block.Payload.Identities = nil
 
-		check(t, db, &payload)
+		check(t, db, &block.Header, &block.Payload)
 	})
 }
 
 func TestPayloadEmptyIdentities(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		payload := unittest.BlockFixture().Payload
-		payload.Identities = make([]*flow.Identity, 0)
+		block := unittest.BlockFixture()
+		block.Payload.Identities = make([]*flow.Identity, 0)
 
 		var retrievedPayload flow.Payload
-		saveAndRetrieve(t, db, &payload, &retrievedPayload)
+		saveAndRetrieve(t, db, &block.Header, &block.Payload, &retrievedPayload)
 
-		//check(t, db, &payload)
-		assert.Equal(t, payload.Hash(), retrievedPayload.Hash())
+		//check(t, db, &block.Header, &block.Payload)
+		assert.Equal(t, block.Payload.Hash(), retrievedPayload.Hash())
 		assert.Nil(t, retrievedPayload.Identities)
 	})
 }
@@ -137,9 +143,9 @@ func TestPayloadEmptyIdentities(t *testing.T) {
 func TestPayloadOrderedIdentities(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		payload := unittest.BlockFixture().Payload
-		payload.Identities = unittest.IdentityListFixture(5)
+		block := unittest.BlockFixture()
+		block.Payload.Identities = unittest.IdentityListFixture(5)
 
-		check(t, db, &payload)
+		check(t, db, &block.Header, &block.Payload)
 	})
 }

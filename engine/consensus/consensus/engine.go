@@ -171,7 +171,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	header.Height = parent.Height + 1
 
 	// retrieve the payload for the block
-	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
+	blockID := header.ID()
+	payload, err := e.payloads.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
@@ -252,7 +253,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// store all of the block contents
-	err = e.payloads.Store(proposal.Payload)
+	err = e.payloads.Store(proposal.Header, proposal.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store block payload: %w", err)
 	}
@@ -313,7 +314,7 @@ func (e *Engine) onBlockRequest(originID flow.Identifier, request *messages.Bloc
 	}
 
 	// try to retrieve the block payload from storage
-	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
+	payload, err := e.payloads.ByBlockID(request.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not find requested payload: %w", err)
 	}
