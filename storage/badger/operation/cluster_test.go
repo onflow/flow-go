@@ -77,7 +77,10 @@ func TestClusterBoundaries(t *testing.T) {
 		})
 
 		t.Run("insert/retrieve", func(t *testing.T) {
-			err = db.Update(operation.InsertBoundaryForCluster(clusterID, expected))
+			err = db.Update(operation.InsertBoundaryForCluster(clusterID, 21))
+			assert.Nil(t, err)
+
+			err = db.Update(operation.UpdateBoundaryForCluster(clusterID, expected))
 			assert.Nil(t, err)
 
 			var actual uint64

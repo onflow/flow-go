@@ -22,8 +22,8 @@ type Snapshot interface {
 	// exist or if its stake is zero.
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
-	// Commit returns the execution state commitment at the selected snapshot.
-	Commit() (flow.StateCommitment, error)
+	// Seal return the highest seal at the selected snapshot.
+	Seal() (flow.Seal, error)
 
 	// Cluster selects the given cluster from the node selection. You have to
 	// manually filter the identities to the desired set of nodes before

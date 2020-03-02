@@ -98,15 +98,18 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=engine/consensus/hotstuff/mocks/sig_aggregator.go -package=mocks github.com/dapperlabs/flow-go/engine/consensus/hotstuff SigAggregator
 	GO111MODULE=on mockgen -destination=protocol/mocks/snapshot.go -package=mocks github.com/dapperlabs/flow-go/protocol Snapshot
 	GO111MODULE=on mockgen -destination=protocol/mocks/mutator.go -package=mocks github.com/dapperlabs/flow-go/protocol Mutator
+	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'BlockComputer' -dir=engine/execution/computation/computer -case=underscore -output="engine/execution/computation/computer/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ComputationEngine' -dir=engine/execution/computation -case=underscore -output="engine/execution/computation/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	GO111MODULE=on mockery -name '.*' -dir=module/trace -case=underscore -output="./module/trace/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/virtualmachine -case=underscore -output="./engine/execution/computation/virtualmachine/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Consumer' -dir="./engine/consensus/hotstuff/notifications/" -case=underscore -output="./engine/consensus/hotstuff/notifications/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Vertex' -dir="./engine/consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./engine/consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
@@ -119,7 +122,7 @@ tidy:
 .PHONY: lint
 lint:
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v ./...
+	 golangci-lint run -v --build-tags relic ./...
 
 .PHONY: ci
 ci: install-tools tidy lint test coverage
@@ -144,23 +147,43 @@ docker-ci-team-city:
 
 .PHONY: docker-build-collection
 docker-build-collection:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection --target production \
 		-t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection:$(IMAGE_TAG) .
+
+.PHONY: docker-build-collection-debug
+docker-build-collection-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection --target debug \
+		-t gcr.io/dl-flow/collection-debug:latest -t "gcr.io/dl-flow/collection-debug:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection-debug:$(IMAGE_TAG) .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus --target production \
 		-t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-consensus-debug
+docker-build-consensus-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus --target debug \
+		-t gcr.io/dl-flow/consensus-debug:latest -t "gcr.io/dl-flow/consensus-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution
 docker-build-execution:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution --target production \
 		-t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-execution-debug
+docker-build-execution-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution --target debug \
+		-t gcr.io/dl-flow/execution-debug:latest -t "gcr.io/dl-flow/execution-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification
 docker-build-verification:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target production \
 		-t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-verification-debug
+docker-build-verification-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target debug \
+		-t gcr.io/dl-flow/verification-debug:latest -t "gcr.io/dl-flow/verification-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification

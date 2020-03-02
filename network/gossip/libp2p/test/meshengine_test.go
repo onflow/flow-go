@@ -37,7 +37,7 @@ func TestMeshNetTestSuite(t *testing.T) {
 // SetupTest is executed prior to each test in this test suit
 // it creates and initializes a set of network instances
 func (m *MeshNetTestSuite) SetupTest() {
-	// defines total number of nodes in our network
+	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
 	const cacheSize = 100
 	//golog.SetAllLoggers(gologging.INFO)
@@ -86,6 +86,9 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 		engs = append(engs, eng)
 		log[i] = make([]string, 0)
 	}
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(2 * time.Second)
 
 	// Each node broadcasting a message to all others
 	for i := range m.nets {
@@ -140,6 +143,63 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 				assert.False(m.Suite.T(), (receivedIndices)[index],
 					fmt.Sprintf("Message not found in node #%v's messages. Expected: Message from node %v. Got: No message", index, j))
 			}
+		}
+	}
+}
+
+// TestTargetValidator tests if only the intended recipients in a 1-k messaging actually receive the message
+func (m *MeshNetTestSuite) TestTargetValidator() {
+	// creating engines
+	count := len(m.nets)
+	engs := make([]*MeshEngine, 0)
+	wg := sync.WaitGroup{}
+
+	for i := range m.nets {
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, 1)
+		engs = append(engs, eng)
+	}
+
+	// choose half of the nodes as target
+	allIds := m.ids.NodeIDs()
+	var targets []flow.Identifier
+	// create a target list of half of the nodes
+	for i := 0; i < len(allIds)/2; i++ {
+		targets = append(targets, allIds[i])
+	}
+
+	// node 0 broadcasting a message to all targets
+	event := &message.Echo{
+		Text: "hello from node 0",
+	}
+	require.NoError(m.Suite.T(), engs[0].con.Submit(event, targets...))
+
+	// fires a goroutine for all engines to listens for the incoming message
+	for i := 1; i < len(allIds)/2; i++ {
+		wg.Add(1)
+		go func(e *MeshEngine) {
+			<-e.received
+			wg.Done()
+		}(engs[i])
+	}
+
+	c := make(chan struct{})
+	go func() {
+		wg.Wait()
+		c <- struct{}{}
+	}()
+
+	select {
+	case <-c:
+	case <-time.After(10 * time.Second):
+		assert.Fail(m.Suite.T(), "test timed out on broadcast dissemination")
+	}
+
+	// evaluates that all messages are received
+	for index, e := range engs {
+		if index < len(engs)/2 && index != 0 {
+			assert.Len(m.Suite.T(), e.event, 1, fmt.Sprintf("message not received %v", index))
+		} else {
+			assert.Len(m.Suite.T(), e.event, 0, fmt.Sprintf("message received when none was expected %v", index))
 		}
 	}
 }
