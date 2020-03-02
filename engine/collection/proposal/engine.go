@@ -39,7 +39,9 @@ type Engine struct {
 	collections storage.Collections
 	guarantees  storage.Guarantees
 	headers     storage.Headers
-	cache       map[flow.Identifier][]cacheItem
+
+	cache      map[flow.Identifier][]cacheItem // pending block cache, keyed by parent ID
+	cacheDedup map[flow.Identifier]struct{}    // prevent dupes in cache
 
 	coldstuff module.ColdStuff
 }
@@ -74,6 +76,7 @@ func New(
 		guarantees:  guarantees,
 		headers:     headers,
 		cache:       make(map[flow.Identifier][]cacheItem),
+		cacheDedup:  make(map[flow.Identifier]struct{}),
 	}
 
 	con, err := net.Register(engine.CollectionProposal, e)
@@ -276,6 +279,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 	// remove children from cache
 	delete(e.cache, blockID)
+	for _, child := range children {
+		delete(e.cacheDedup, child.Proposal.Header.ID())
+	}
 
 	return result.ErrorOrNil()
 }
@@ -348,13 +354,22 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) e
 // processPendingProposal handles proposals where the parent is missing.
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
-	// cache the proposal so we can process it when we receive its parent
+	blockID := proposal.Header.ID()
 	parentID := proposal.Header.ParentID
+
+	// cache the proposal so we can process it when we receive its parent
 	item := cacheItem{
 		OriginID: originID,
 		Proposal: proposal,
 	}
+	// check that we haven't already buffered this block
+	if _, exists := e.cacheDedup[blockID]; exists {
+		return nil
+	}
+
+	// cache the block
 	e.cache[parentID] = append(e.cache[parentID], item)
+	e.cacheDedup[blockID] = struct{}{}
 
 	// request the parent block
 	req := &messages.BlockRequest{
