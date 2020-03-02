@@ -166,8 +166,8 @@ type iterationFunc func() (checkFunc, createFunc, handleFunc)
 
 // lookup is the default iteration function allowing us to collect a list of
 // entity IDs from an index.
-func lookup(entityIDs *[]flow.Identifier) iterationFunc {
-	*entityIDs = make([]flow.Identifier, 0)
+func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleFunc) {
+	*entityIDs = make([]flow.Identifier, 0, len(*entityIDs))
 	return func() (checkFunc, createFunc, handleFunc) {
 		check := func(key []byte) bool {
 			return true
@@ -192,8 +192,14 @@ func lookup(entityIDs *[]flow.Identifier) iterationFunc {
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
+//
+// TODO: this function is unbounded – pass context.Context to this or calling
+// functions to allow timing functions out.
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
+		if bytes.Compare(start, end) > 0 {
+			return fmt.Errorf("start must be before end")
+		}
 
 		it := tx.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -252,6 +258,9 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 // functions specific to processing the given key-value pair.
 func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
+		if len(prefix) == 0 {
+			return fmt.Errorf("prefix must not be empty")
+		}
 
 		opts := badger.DefaultIteratorOptions
 		// NOTE: this is an optimization only, it does not enforce that all

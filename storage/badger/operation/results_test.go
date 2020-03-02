@@ -1,3 +1,5 @@
+// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
+
 package operation
 
 import (
@@ -11,16 +13,17 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestStateCommitments(t *testing.T) {
+func TestResultsInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.StateCommitmentFixture()
-		id := unittest.IdentifierFixture()
-		err := db.Update(InsertCommit(id, expected))
+		expected := unittest.ExecutionResultFixture()
+
+		err := db.Update(InsertResult(expected))
 		require.Nil(t, err)
 
-		var actual flow.StateCommitment
-		err = db.View(RetrieveCommit(id, &actual))
+		var actual flow.ExecutionResult
+		err = db.View(RetrieveResult(expected.ID(), &actual))
 		require.Nil(t, err)
-		assert.Equal(t, expected, actual)
+
+		assert.Equal(t, expected, &actual)
 	})
 }
