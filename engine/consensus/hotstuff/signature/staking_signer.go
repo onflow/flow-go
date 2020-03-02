@@ -29,15 +29,22 @@ func NewStakingSigner(viewState *hotstuff.ViewState, stakingSigTag string, me mo
 }
 
 // Sign signs a the message with the node's staking key
-func (s *StakingSigner) Sign(msg []byte) (crypto.Signature, error) {
+func (s *StakingSigner) Sign(block *model.Block) (crypto.Signature, error) {
+	msg := BlockToBytesForSign(block)
 	return s.me.Sign(msg, s.stakingHasher)
 }
 
 // Aggregate aggregates the given signature that signed on the given block
 // Implementation is OBLIVIOUS to RANDOM BEACON: RandomBeaconSignature in returned AggregatedSignature wil be nil.
-// block - it is needed in order to double check the reconstruct signature is valid
-// And verifying the sig requires the signed message, which is the block
-// sigs - the signatures to be aggregated. Assuming each signature has been verified already.
+// Inputs:
+//    * block - it is needed in order to double check the reconstruct signature is valid
+//    * And verifying the sig requires the signed message, which is the block
+//    * sigs - the signatures to be aggregated. Assuming each signature has been verified already.
+//
+// Preconditions:
+//    * each staking signature has been verified
+//    * all signatures are from different parties
+// Violating preconditions will result in an error (but not the reconstruction of an invalid threshold signature).
 func (s *StakingSigner) Aggregate(block *model.Block, sigs []*model.SingleSignature) (*model.AggregatedSignature, error) {
 	if len(sigs) == 0 { // ensure that sigs is not empty
 		return nil, fmt.Errorf("cannot aggregate an empty slice of signatures")
@@ -56,8 +63,8 @@ func (s *StakingSigner) Aggregate(block *model.Block, sigs []*model.SingleSignat
 	}, nil
 }
 
-// verifyAggregatedRawSig verifies the aggregated staking signature as a sanity check
-// any failure indicates an internal bug and results in a fatal error
+// verifyAggregatedRawSig verifies the aggregated staking signature as a sanity check.
+// Errors on duplicated signers. Any error indicates an internal bug and results in a fatal error.
 func (s *StakingSigner) verifyAggregatedRawSig(aggStakingSig []crypto.Signature, block *model.Block, signerIDs []flow.Identifier) error {
 	// This implementation will eventually be replaced by verifying the proper aggregated BLS signature:
 	// Steps: (1) aggregate all the public keys

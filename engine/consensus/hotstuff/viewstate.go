@@ -12,20 +12,25 @@ import (
 // ViewState provides method for querying identities related information by view or block ID
 type ViewState struct {
 	protocolState protocol.State
-	// my own identifier
-	myID flow.Identifier
-	// identityFilter to find only the consensus members for the cluster
-	consensusMembersFilter flow.IdentityFilter
-	// the cached all consensus members for finding leaders for a certain view
-	allNodes flow.IdentityList
+
+	myID                   flow.Identifier     // my own identifier
+	consensusMembersFilter flow.IdentityFilter // identityFilter to find only the consensus members for the cluster
+	allNodes               flow.IdentityList   // the cached all consensus members for finding leaders for a certain view
 
 	dkgPublicData *DKGPublicData
 }
 
 // DKGPublicData is the public data for DKG participants who generated their key shares
 type DKGPublicData struct {
-	GroupPubKey        crypto.PublicKey         // the group public key
-	SignerIndexMapping map[crypto.PublicKey]int // the mapping from public key to signer index
+	GroupPubKey           crypto.PublicKey                   // the group public key
+	IdToDKGParticipantMap map[flow.Identifier]DKGParticipant // the mapping from DKG participants Identifier to its full DKGParticipant info
+}
+
+// DKGParticipant contains an individual participant's DKG data
+type DKGParticipant struct {
+	Id             flow.Identifier
+	PublicKeyShare crypto.PublicKey
+	DKGIndex       int
 }
 
 // NewViewState creates a new ViewState instance

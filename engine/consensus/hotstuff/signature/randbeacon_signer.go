@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
+	model "github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // SigProvider provides symmetry functions to generate and verify signatures
@@ -14,12 +15,6 @@ type RandomBeaconSigner struct {
 	RandomBeaconSigVerifier
 	viewState              *hotstuff.ViewState
 	randomBeaconPrivateKey crypto.PrivateKey // private key for random beacon signature
-}
-
-// SigShare is the signature share for reconstructing threshold signature
-type SigShare struct {
-	Signature    crypto.Signature // the signature share
-	SignerPubKey crypto.PublicKey // the public key of the signer
 }
 
 // NewSigProvider creates an instance of SigProvider
@@ -32,7 +27,8 @@ func NewRandomBeaconSigner(viewState *hotstuff.ViewState, randomBeaconPrivateKey
 }
 
 // Sign signs a the message with the node's random beacon key
-func (s *RandomBeaconSigner) Sign(msg []byte) (crypto.Signature, error) {
+func (s *RandomBeaconSigner) Sign(block *model.Block) (crypto.Signature, error) {
+	msg := BlockToBytesForSign(block)
 	return s.randomBeaconPrivateKey.Sign(msg, s.randomBeaconHasher)
 }
 
@@ -43,47 +39,43 @@ func (s *RandomBeaconSigner) CanReconstruct(numOfSigShares int) bool {
 
 // Reconstruct reconstructs a threshold signature from a list of the signature shares.
 //
-// msg - the message every signature share was signed on.
-// sigShares - the list of signature shares to be reconstructed. Note it assumes each signature has been verified.
-//
-// The return value:
-// sig - the reconstructed signature
-// error - some unknown error if exists
+// Inputs:
+//    * msg - the message every signature share was signed on.
+//    * signatures - the list of signature from which the threshold sig should be reconstructed
 //
 // Preconditions:
-//    * ensure enough signatures have been collected (verified by calling `CanReconstruct`)
-//    * the sigShares are all distinct
-// Violating preconditions will result in an error (but not the reconstruction of an invalid threshold signature)
-func (s *RandomBeaconSigner) Reconstruct(msg []byte, sigShares []*SigShare) (crypto.Signature, error) {
+//    * each random beacon sig share has been verified
+//    * enough signatures have been collected (can be verified by calling `CanReconstruct`)
+//    * all signatures are from different parties
+// Violating preconditions will result in an error (but not the reconstruction of an invalid threshold signature).
+func (s *RandomBeaconSigner) Reconstruct(block *model.Block, signatures []*model.SingleSignature) (crypto.Signature, error) {
 	// double check if there are enough shares.
-	if !s.CanReconstruct(len(sigShares)) {
+	if !s.CanReconstruct(len(signatures)) {
 		// the should not happen, since it assumes the caller has checked before
-		return nil, fmt.Errorf("not enough shares to reconstruct random beacon sig, expect: %v, got: %v", s.dkgGroupSize(), len(sigShares))
+		return nil, fmt.Errorf("not enough shares to reconstruct random beacon sig, expect: %v, got: %v", s.dkgGroupSize(), len(signatures))
 	}
 
-	// pick signatures
-	sigs := make([]crypto.Signature, 0, len(sigShares))
-	signerKeys := make([]crypto.PublicKey, 0, len(sigShares))
-
-	for _, share := range sigShares {
-		sigs = append(sigs, share.Signature)
-		signerKeys = append(signerKeys, share.SignerPubKey)
+	// collect random beacon sig share and dkg index for each signer
+	sigShares := make([]crypto.Signature, 0, len(signatures))
+	dkgIndices := make([]int, 0, len(signatures))
+	dkgParticipantForID := s.viewState.DKGPublicData().IdToDKGParticipantMap
+	for _, sig := range signatures {
+		sigShares = append(sigShares, sig.RandomBeaconSignature)
+		participant, found := dkgParticipantForID[sig.SignerID]
+		if !found {
+			return nil, fmt.Errorf(fmt.Sprintf("no DKG Participant info for id %s", sig.SignerID))
+		}
+		dkgIndices = append(dkgIndices, participant.DKGIndex)
 	}
-
-	// lookup signer indexes
-	found, dkgIndices := s.lookupDKGIndices(signerKeys)
-	if !found {
-		return nil, fmt.Errorf("signer index for sig shares can't be found")
-	}
-
 	// reconstruct the threshold sig
-	reconstructedSig, err := crypto.ReconstructThresholdSignature(s.dkgGroupSize(), sigs, dkgIndices)
+	reconstructedSig, err := crypto.ReconstructThresholdSignature(s.dkgGroupSize(), sigShares, dkgIndices)
 	if err != nil {
-		return nil, fmt.Errorf("failed to reconstruct threshold sig: %w", err)
+		return nil, fmt.Errorf("reconstructing threshold sig failed: %w", err)
 	}
 
-	// verify the reconstruct signature is valid
+	// sanity check: verify the reconstruct signature is valid
 	publicGroupKey := s.viewState.DKGPublicData().GroupPubKey
+	msg := BlockToBytesForSign(block)
 	valid, err := publicGroupKey.Verify(msg, reconstructedSig, s.randomBeaconHasher)
 	if err != nil {
 		return nil, fmt.Errorf("cannot verify the reconstructed signature, %w", err)
@@ -97,19 +89,5 @@ func (s *RandomBeaconSigner) Reconstruct(msg []byte, sigShares []*SigShare) (cry
 }
 
 func (s *RandomBeaconSigner) dkgGroupSize() int {
-	return len(s.viewState.DKGPublicData().SignerIndexMapping)
-}
-
-// lookupDKGIndices looks up the signer indices for given slice of public keys
-func (s *RandomBeaconSigner) lookupDKGIndices(signerKeys []crypto.PublicKey) (bool, []int) {
-	signerIndexMapping := s.viewState.DKGPublicData().SignerIndexMapping
-	signerIndexes := make([]int, 0, len(signerKeys))
-	for _, signerKey := range signerKeys {
-		signerIndex, found := signerIndexMapping[signerKey]
-		if !found {
-			return false, nil
-		}
-		signerIndexes = append(signerIndexes, signerIndex)
-	}
-	return true, signerIndexes
+	return len(s.viewState.DKGPublicData().IdToDKGParticipantMap)
 }
