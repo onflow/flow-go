@@ -32,7 +32,9 @@ type Engine struct {
 	headers  storage.Headers
 	payloads storage.Payloads
 	con      network.Conduit
-	cache    map[flow.Identifier][]cacheItem
+
+	cache      map[flow.Identifier][]cacheItem // pending block cache, keyed by parent ID
+	cacheDedup map[flow.Identifier]struct{}    // prevent dupes in cache
 
 	coldstuff module.ColdStuff
 }
@@ -290,6 +292,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	// remove the children from cache
 	delete(e.cache, blockID)
+	for _, child := range children {
+		delete(e.cacheDedup, child.Proposal.Header.ID())
+	}
 
 	return result.ErrorOrNil()
 }
@@ -370,13 +375,22 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) e
 // processPendingProposal will deal with proposals where the parent is missing.
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	// first, we cache the proposal with its origin ID, so we can process it once possible
+	blockID := proposal.Header.ID()
 	parentID := proposal.Header.ParentID
+
+	// first, we cache the proposal with its origin ID, so we can process it once possible
 	item := cacheItem{
 		OriginID: originID,
 		Proposal: proposal,
 	}
+	// check that we haven't already buffered this block
+	if _, exists := e.cacheDedup[blockID]; exists {
+		return nil
+	}
+
+	// cache the block
 	e.cache[parentID] = append(e.cache[parentID], item)
+	e.cacheDedup[blockID] = struct{}{}
 
 	// send the block request
 	request := messages.BlockRequest{

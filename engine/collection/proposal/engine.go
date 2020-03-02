@@ -357,7 +357,7 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 	blockID := proposal.Header.ID()
 	parentID := proposal.Header.ParentID
 
-	// cache the proposal so we can process it when we receive its parent
+	// first, we cache the proposal with its origin ID, so we can process it once possible
 	item := cacheItem{
 		OriginID: originID,
 		Proposal: proposal,
