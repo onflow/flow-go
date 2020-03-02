@@ -44,9 +44,10 @@ func (s *StakingSigVerifier) VerifyStakingSig(sig crypto.Signature, block *model
 }
 
 // VerifyAggregatedStakingSignature verifies an aggregated BLS signature.
-// aggsig - the aggregated signature to be verified
-// block - the block that the signature was signed for.
-// signerKeys - the public keys of all the signers who signed the block.
+// Inputs:
+//    aggStakingSig - the aggregated staking signature to be verified
+//    block - the block that the signature was signed for.
+//    signerKeys - the signer's public staking key
 //
 // Note: we are specifically choosing safety over performance here.
 //   * The vote itself contains all the information for verifying the signature: the blockID and the block's view
@@ -58,16 +59,16 @@ func (s *StakingSigVerifier) VerifyStakingSig(sig crypto.Signature, block *model
 // For now, the aggregated BLS staking signature is implemented as a slice of individual signatures.
 // To verify it, we just verify every single signature. The implementation (and method signature)
 // will later be updated, once full BLS sigmnature aggregation is implemented.
-func (s *StakingSigVerifier) VerifyAggregatedStakingSignature(aggsig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
+func (s *StakingSigVerifier) VerifyAggregatedStakingSignature(aggStakingSig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
 	// check that the number of keys and signatures should match
-	if len(aggsig) != len(signerKeys) {
+	if len(aggStakingSig) != len(signerKeys) {
 		return false, nil
 	}
 
 	msg := BlockToBytesForSign(block)
 
 	// check each signature
-	for i, sig := range aggsig {
+	for i, sig := range aggStakingSig {
 		signerKey := signerKeys[i]
 
 		// validate the staking signature

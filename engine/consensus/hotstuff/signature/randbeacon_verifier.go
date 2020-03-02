@@ -25,10 +25,10 @@ func NewRandomBeaconSigVerifier() RandomBeaconSigVerifier {
 	}
 }
 
-// VerifyRandomBeaconSig verifies a single random beacon signature share for a block using the using signer's public key
-// sig - the signature to be verified
-// block - the block that the signature was signed for.
-// randomBeaconSignerIndex - the signer index of signer's random beacon key share.
+// VerifyRandomBeaconSig verifies a random beacon signature share for a block using provided signer's public key
+// sigShare - the signature share (from individual random beacon member) to be verified
+// block - the signed block
+// signerPubKey - thesigner's public key
 //
 // Note: we are specifically choosing safety over performance here.
 //   * The vote itself contains all the information for verifying the signature: the blockID and the block's view
@@ -36,18 +36,20 @@ func NewRandomBeaconSigVerifier() RandomBeaconSigVerifier {
 //   * However, for security, we are explicitly verifying that the vote matches the full block.
 //     We do this by converting the block to the byte-sequence which we expect an honest voter to have signed
 //     and then check the provided signature against this self-computed byte-sequence.
-func (s *RandomBeaconSigVerifier) VerifyRandomBeaconSig(sig crypto.Signature, block *model.Block, signerPubKey crypto.PublicKey) (bool, error) {
+func (s *RandomBeaconSigVerifier) VerifyRandomBeaconSig(sigShare crypto.Signature, block *model.Block, signerPubKey crypto.PublicKey) (bool, error) {
 	msg := BlockToBytesForSign(block)
-	valid, err := signerPubKey.Verify(sig, msg, s.randomBeaconHasher)
+	valid, err := signerPubKey.Verify(sigShare, msg, s.randomBeaconHasher)
 	if err != nil {
 		return false, fmt.Errorf("cannot verify random beacon signature: %w", err)
 	}
 	return valid, nil
 }
 
-// VerifyAggregatedRandomBeaconSignature verifies a random beacon threshold signature for a block
-// sig - the signature to be verified
-// block - the block that the signature was signed for.
+// VerifyAggregatedRandomBeaconSignature verifies a (reconstructed) random beacon threshold signature for a block.
+// Inputs:
+//    sig - random beacon threshold signature
+//    block - the signed block
+//    groupPubKey - the DKG group public key
 //
 // Note: we are specifically choosing safety over performance here.
 //   * The vote itself contains all the information for verifying the signature: the blockID and the block's view

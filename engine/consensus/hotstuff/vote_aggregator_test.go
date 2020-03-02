@@ -697,7 +697,7 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 	mockSigAggregator := mockverifier.NewMockSigAggregator(ctrl)
 	mockSigAggregator.EXPECT().Aggregate(gomock.Any(), gomock.Any()).Return(&hotmodel.AggregatedSignature{}, nil).AnyTimes()
 	mockSigAggregator.EXPECT().CanReconstruct(gomock.Any()).DoAndReturn(func(numOfSigShares int) bool {
-		return float64(numOfSigShares) > float64(VALIDATOR_SIZE) / 2.0
+		return float64(numOfSigShares) > float64(VALIDATOR_SIZE)/2.0
 	}).AnyTimes()
 
 	viewState, _ := NewViewState(mockProtocolState, nil, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))

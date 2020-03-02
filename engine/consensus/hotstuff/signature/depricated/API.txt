@@ -4,17 +4,20 @@
 
 VerifyStakingSig(sig crypto.Signature, block *hotstuff.Block, signerKey crypto.PublicKey) (bool, error)
 * for SigVerifier interface
-
-VerifyRandomBeaconSig(sig crypto.Signature, block *hotstuff.Block, signerPubKey crypto.PublicKey) (bool, error)
-* for SigVerifier interface
-
+-> StakingSigVerifier
 
 VerifyAggregatedStakingSignature(aggsig []crypto.Signature, block *hotstuff.Block, signerKeys []crypto.PublicKey) (bool, error)
 * for SigVerifier interface
+-> StakingSigVerifier
+
+
+VerifyRandomBeaconSig(sig crypto.Signature, block *hotstuff.Block, signerPubKey crypto.PublicKey) (bool, error)
+* for SigVerifier interface
+-> RandomBeaconSigVerifier
 
 VerifyAggregatedRandomBeaconSignature(sig crypto.Signature, block *hotstuff.Block) (bool, error)
 * for SigVerifier interface
-
+-> RandomBeaconSigVerifier
 
 
 
