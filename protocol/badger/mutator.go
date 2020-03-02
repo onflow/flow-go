@@ -184,6 +184,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		headers := []*flow.Header{&header}
 
 		//create a copy to avoid modifying content of header which is referenced in an array
+		// TODO this is not a deep copy, slices are still pointing to same underlying arrays as `header`
 		loopHeader := header
 		for loopHeader.ParentID != headID {
 			var retrievedHeader flow.Header
@@ -212,6 +213,10 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 }
 
 func checkGenesisHeader(header *flow.Header) error {
+	// the initial height needs to be height zero
+	if header.Height != 0 {
+		return fmt.Errorf("invalid initial height (%d != 0)", header.Height)
+	}
 
 	// the initial finalized boundary needs to be height zero
 	if header.View != 0 {
@@ -280,6 +285,16 @@ func checkGenesisPayload(tx *badger.Txn, payload *flow.Payload) error {
 		lookup[identity.NodeID] = struct{}{}
 	}
 
+	// check identities do not have duplicate addresses
+	lookup2 := make(map[string]struct{})
+	for _, identity := range payload.Identities {
+		_, ok := lookup2[identity.Address]
+		if ok {
+			return fmt.Errorf("duplicate node address (%x)", identity.Address)
+		}
+		lookup2[identity.Address] = struct{}{}
+	}
+
 	// for each identity, check it has a non-zero stake
 	for _, identity := range payload.Identities {
 		if identity.Stake == 0 {
@@ -315,7 +330,12 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 
 	// if new block number has a lower number, we can't add it
 	if header.View <= parent.View {
-		return fmt.Errorf("block needs higher number (%d <= %d)", header.View, parent.View)
+		return fmt.Errorf("block needs higher view (%d <= %d)", header.View, parent.View)
+	}
+
+	// if new block number has a lower number, we can't add it
+	if header.Height != parent.Height+1 {
+		return fmt.Errorf("block needs height equal to parent height+1 (%d != %d+1)", header.Height, parent.Height)
 	}
 
 	// NOTE: in the default case, the first parent is the boundary, so we don't

@@ -10,8 +10,8 @@ type ChunkDataPacks struct {
 	mock.Mock
 }
 
-// ByID provides a mock function with given fields: chunkID
-func (_m *ChunkDataPacks) ByID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+// ByChunkID provides a mock function with given fields: chunkID
+func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	ret := _m.Called(chunkID)
 
 	var r0 *flow.ChunkDataPack
