@@ -13,7 +13,7 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 	checker.Elaboration.CastingStaticValueTypes[expression] = leftHandType
 
 	rightHandTypeAnnotation := checker.ConvertTypeAnnotation(expression.TypeAnnotation)
-	checker.checkTypeAnnotation(rightHandTypeAnnotation, expression.TypeAnnotation.StartPos)
+	checker.checkTypeAnnotation(rightHandTypeAnnotation, expression.TypeAnnotation)
 
 	rightHandType := rightHandTypeAnnotation.Type
 

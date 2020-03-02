@@ -247,6 +247,10 @@ func (*BlockType) String() string {
 	return "Block"
 }
 
+func (*BlockType) QualifiedString() string {
+	return "Block"
+}
+
 func (*BlockType) ID() sema.TypeID {
 	return "Block"
 }
