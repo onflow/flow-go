@@ -5,7 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// A VirtualMachine augments the Cadence runtime with the Flow host functionality required
+// VirtualMachine augments the Cadence runtime with the Flow host functionality required
 // to execute transactions.
 type VirtualMachine interface {
 	// NewBlockContext creates a new block context for executing transactions.
