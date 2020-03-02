@@ -29,12 +29,12 @@ func TestNewEngine(t *testing.T) {
 	log := zerolog.New(ioutil.Discard)
 
 	net := &module.Network{}
-	net.On("Register", uint8(engine.ReceiptProvider), mock.Anything).Return(&network.Conduit{}, nil).Once()
+	net.On("Register", uint8(engine.ExecutionReceiptProvider), mock.Anything).Return(&network.Conduit{}, nil).Once()
 	net.On("Register", uint8(engine.ApprovalProvider), mock.Anything).Return(&network.Conduit{}, nil).Once()
 
 	state := &protocol.State{}
 	me := &module.Local{}
-	results := &storage.Results{}
+	results := &storage.ExecutionResults{}
 	receipts := &mempool.Receipts{}
 	approvals := &mempool.Approvals{}
 	seals := &mempool.Seals{}

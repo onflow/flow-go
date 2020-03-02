@@ -17,11 +17,11 @@ func TestResultsInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.ExecutionResultFixture()
 
-		err := db.Update(InsertResult(expected))
+		err := db.Update(InsertExecutionResult(expected))
 		require.Nil(t, err)
 
 		var actual flow.ExecutionResult
-		err = db.View(RetrieveResult(expected.ID(), &actual))
+		err = db.View(RetrieveExecutionResult(expected.ID(), &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)
