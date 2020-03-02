@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -25,12 +26,16 @@ import (
 // testcontext contains the context for a test case.
 type testcontext struct {
 	state       *protocol.State
+	snapshot    *protocol.Snapshot
 	me          *module.Local
 	net         *stub.Network
 	provider    *network.Engine
 	pool        *mempool.Transactions
 	collections *storage.Collections
 	guarantees  *storage.Guarantees
+	headers     *storage.Headers
+	builder     *module.Builder
+	finalizer   *module.Finalizer
 }
 
 // WithEngine initializes the dependencies for a test case, then runs the test
@@ -43,25 +48,31 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	require.NoError(t, err)
 
 	ctx.state = new(protocol.State)
+	ctx.snapshot = new(protocol.Snapshot)
+	ctx.state.On("Final").Return(ctx.snapshot)
+	ctx.snapshot.On("Head").Return(&flow.Header{}, nil)
+	ctx.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
 	ctx.me = new(module.Local)
 	ctx.me.On("NodeID").Return(flow.Identifier{})
 
 	hub := stub.NewNetworkHub()
 	ctx.net = stub.NewNetwork(ctx.state, ctx.me, hub)
 
-	conf := Config{
-		ProposalPeriod: time.Millisecond,
-	}
-
 	ctx.provider = new(network.Engine)
 	ctx.pool = new(mempool.Transactions)
 	ctx.collections = new(storage.Collections)
 	ctx.guarantees = new(storage.Guarantees)
+	ctx.headers = new(storage.Headers)
+	ctx.builder = new(module.Builder)
+	ctx.finalizer = new(module.Finalizer)
 
-	e, err := New(log, conf, ctx.net, ctx.me, ctx.state, tracer, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees)
+	eng, err := New(log, ctx.net, ctx.me, ctx.state, tracer, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees, ctx.headers)
 	require.NoError(t, err)
 
-	run(ctx, e)
+	cold, err := coldstuff.New(log, ctx.state, ctx.me, eng, ctx.builder, ctx.finalizer, time.Second, time.Second)
+	require.NoError(t, err)
+
+	run(ctx, eng.WithConsensus(cold))
 }
 
 func TestStartStop(t *testing.T) {

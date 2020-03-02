@@ -11,29 +11,36 @@ type HotStuff struct {
 	mock.Mock
 }
 
-// Start provides a mock function with given fields:
-func (_m *HotStuff) Start() (func(), <-chan struct{}) {
+// Done provides a mock function with given fields:
+func (_m *HotStuff) Done() <-chan struct{} {
 	ret := _m.Called()
 
-	var r0 func()
-	if rf, ok := ret.Get(0).(func() func()); ok {
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(func())
+			r0 = ret.Get(0).(<-chan struct{})
 		}
 	}
 
-	var r1 <-chan struct{}
-	if rf, ok := ret.Get(1).(func() <-chan struct{}); ok {
-		r1 = rf()
+	return r0
+}
+
+// Ready provides a mock function with given fields:
+func (_m *HotStuff) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(<-chan struct{})
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
 		}
 	}
 
-	return r0, r1
+	return r0
 }
 
 // SubmitProposal provides a mock function with given fields: proposal, parentView
@@ -41,7 +48,7 @@ func (_m *HotStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
 	_m.Called(proposal, parentView)
 }
 
-// SubmitVote provides a mock function with given fields: originID, blockID, view, sig
-func (_m *HotStuff) SubmitVote(originID flow.Identifier, blockID flow.Identifier, view uint64, sig crypto.Signature) {
-	_m.Called(originID, blockID, view, sig)
+// SubmitVote provides a mock function with given fields: originID, blockID, view, stakingSig, randomBeaconSig
+func (_m *HotStuff) SubmitVote(originID flow.Identifier, blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature) {
+	_m.Called(originID, blockID, view, stakingSig, randomBeaconSig)
 }

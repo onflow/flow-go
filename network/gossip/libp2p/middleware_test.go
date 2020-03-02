@@ -44,6 +44,10 @@ func (m *MiddlewareTestSuit) SetupTest() {
 	m.StartMiddlewares()
 }
 
+func (m *MiddlewareTestSuit) TearDownTest() {
+	m.StopMiddlewares()
+}
+
 // TestPingRawReception tests the middleware for solely the
 // reception of a single ping message by a node that is sent from another node
 // it does not evaluate the type and content of the message
@@ -144,7 +148,7 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 
 	msg := createMessage(m.ids[firstNode], m.ids[lastNode])
 
-	err = m.mws[firstNode].Send(m.ids[lastNode], msg)
+	err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	select {
@@ -176,7 +180,7 @@ func (m *MiddlewareTestSuit) MultiPing(count int) {
 				wg.Done()
 			})
 		go func() {
-			err = m.mws[firstNode].Send(m.ids[lastNode], msg)
+			err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
 			require.NoError(m.Suite.T(), err)
 		}()
 	}
@@ -211,7 +215,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			err = m.mws[lastNode].Send(m.mws[firstNode].me, replyMsg)
+			err = m.mws[lastNode].Send(0, replyMsg, m.mws[firstNode].me)
 			assert.NoError(m.T(), err)
 
 		})
@@ -222,7 +226,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 			wg.Done()
 		})
 
-	err = m.mws[firstNode].Send(m.ids[lastNode], sendMsg)
+	err = m.mws[firstNode].Send(0, sendMsg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	wg.Wait()
@@ -283,4 +287,16 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 	}
 
 	return message
+}
+
+func (m *MiddlewareTestSuit) StopMiddlewares() {
+	// start all the middlewares
+	for i := 0; i < m.size; i++ {
+		// start the middleware
+		m.mws[i].Stop()
+	}
+	m.mws = nil
+	m.ov = nil
+	m.ids = nil
+	m.size = 0
 }

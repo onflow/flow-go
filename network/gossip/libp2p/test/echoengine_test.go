@@ -4,14 +4,17 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	gologging "github.com/whyrusleeping/go-logging"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
@@ -35,7 +38,7 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *StubEngineTestSuite) SetupTest() {
 	const count = 2
-	//golog.SetAllLoggers(gologging.INFO)
+	golog.SetAllLoggers(gologging.INFO)
 	s.ids = CreateIDs(count)
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -154,11 +157,15 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 	}
 
 	// sends the same message 10 times
+	wg := sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
 		}()
 	}
+	wg.Wait()
 	time.Sleep(1 * time.Second)
 
 	// receiver should only see the message once, and the rest should be dropped due to
@@ -201,8 +208,11 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 	}
 
 	// sends the same message 10 times on both channels
+	wg := sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			// sender1 to receiver1 on channel1
 			require.NoError(s.Suite.T(), sender1.con.Submit(event, s.ids[rcvNode].NodeID))
 
@@ -210,6 +220,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 			require.NoError(s.Suite.T(), sender2.con.Submit(event, s.ids[rcvNode].NodeID))
 		}()
 	}
+	wg.Wait()
 	time.Sleep(1 * time.Second)
 
 	// each receiver should only see the message once, and the rest should be dropped due to

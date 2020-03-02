@@ -735,9 +735,10 @@ func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
 				common.CompositeKindContract,
 				common.CompositeKindEvent:
 
-				errs := ExpectCheckerErrors(t, err, 1)
+				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -746,6 +747,7 @@ func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
 	}
 }
 
+// NOTE: variable type instead of function parameter
 func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
 
 	for _, kind := range common.AllCompositeKinds {
@@ -762,12 +764,13 @@ func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
 					`
                       %[1]s T %[2]s
 
-                      let test: ((T): Void) = fun (r: T) {
-                          %[3]s r
+                      let test: ((T): Void) = fun (r: %[3]sT) {
+                          %[4]s r
                       }
                     `,
 					kind.Keyword(),
 					body,
+					kind.Annotation(),
 					kind.DestructionKeyword(),
 				),
 			)
@@ -830,15 +833,17 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindStructure,
 				common.CompositeKindContract:
 
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
-
-			case common.CompositeKindEvent:
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 3)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[1])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[2])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -881,9 +886,10 @@ func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
 
 			switch compositeKind {
 			case common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 1)
+				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[1])
 
 			case common.CompositeKindStructure,
 				common.CompositeKindContract:
@@ -2332,8 +2338,7 @@ func testResourceNesting(
 		_, err := ParseAndCheck(t, program)
 
 		switch outerCompositeKind {
-		case common.CompositeKindStructure,
-			common.CompositeKindContract:
+		case common.CompositeKindStructure:
 
 			switch innerCompositeKind {
 			case common.CompositeKindStructure,
@@ -2350,13 +2355,56 @@ func testResourceNesting(
 				panic(errors.NewUnreachableError())
 			}
 
-		case common.CompositeKindResource:
+		case common.CompositeKindResource,
+			common.CompositeKindContract:
+
 			require.NoError(t, err)
 
 		default:
 			panic(errors.NewUnreachableError())
 		}
 	})
+}
+
+func TestCheckContractResourceField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      contract C {
+          let r: @R
+
+          init(r: @R) {
+              self.r <- r
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidContractResourceFieldMove(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      contract C {
+          let r: @R
+
+          init(r: @R) {
+              self.r <- r
+          }
+      }
+
+      fun test() {
+          let r <- C.r
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 }
 
 // TestCheckResourceInterfaceConformance tests the check
@@ -3594,4 +3642,104 @@ func TestCheckResourceCreationAndInvalidationInLoop(t *testing.T) {
     `)
 
 	require.NoError(t, err)
+}
+
+func TestCheckInvalidResourceOwnerField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Test {
+          let owner: PublicAccount
+
+          init(owner: PublicAccount) {
+              self.owner = owner
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceInterfaceOwnerField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+         let owner: PublicAccount
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceOwnerFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+         fun owner() {}
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceInterfaceOwnerFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+         fun owner()
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckResourceOwnerFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+
+         fun test(): PublicAccount? {
+             return self.owner
+         }
+     }
+   `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckResourceInterfaceOwnerFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+
+         fun test() {
+             pre { self.owner != nil }
+         }
+     }
+   `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidResourceOwnerFieldInitialization(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+
+         init(owner: PublicAccount) {
+             self.owner = owner
+         }
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
 }

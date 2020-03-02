@@ -12,10 +12,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
-// Builder is the builder for block payloads. Upon providing a payload hash, it
-// also memorizes which entities were included into the payload.
+// Builder is the builder for consensus block payloads. Upon providing a payload
+// hash, it also memorizes which entities were included into the payload.
 type Builder struct {
 	db         *badger.DB
 	guarantees mempool.Guarantees
@@ -74,7 +75,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 			// look up the ancestor's guarantees
 			var guaranteeIDs []flow.Identifier
-			err := operation.LookupGuarantees(ancestor.PayloadHash, &guaranteeIDs)(tx)
+			err = operation.LookupGuarantees(ancestor.PayloadHash, &guaranteeIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up ancestor guarantees (%x): %w", ancestor.PayloadHash, err)
 			}
@@ -116,29 +117,33 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		// get the finalized state commitment at the parent
-		var commit flow.StateCommitment
-		err = operation.LookupCommit(parentID, &commit)(tx)
+		var seal flow.Seal
+		err = procedure.LookupSealByBlock(parentID, &seal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not get parent state commit: %w", err)
 		}
 
 		// we then keep adding seals that follow this state commit from the pool
 		var seals []*flow.Seal
-		for {
 
+		//create a copy to avoid modifying when referenced in an array
+		loopSeal := &seal
+		for {
 			// get a seal that extends the last known state commitment
-			seal, err := b.seals.ByPreviousState(commit)
+			previousSeal, err := b.seals.ByPreviousState(loopSeal.FinalState)
 			if errors.Is(err, mempool.ErrEntityNotFound) {
 				break
 			}
 			if err != nil {
-				return fmt.Errorf("could not get extending seal (%x): %w", commit, err)
+				return fmt.Errorf("could not get extending seal (%x): %w", loopSeal.FinalState, err)
 			}
 
 			// add the seal to our list and forward to the known last valid state
-			seals = append(seals, seal)
-			commit = seal.FinalState
+			seals = append(seals, previousSeal)
+			loopSeal = previousSeal
 		}
+
+		seal = *loopSeal
 
 		// STEP THREE: we have the guarantees and seals we can validly include
 		// in the payload built on top of the given block. Now we need to build
@@ -153,20 +158,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		payloadHash := payload.Hash()
 
 		// index the guarantees for the payload
-		for _, guarantee := range guarantees {
+		for i, guarantee := range guarantees {
 			err = operation.InsertGuarantee(guarantee)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert guarantee (%x): %w", guarantee.ID(), err)
 			}
-			err = operation.IndexGuarantee(payloadHash, guarantee.ID())(tx)
+			err = operation.IndexGuarantee(payloadHash, uint64(i), guarantee.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.ID(), err)
 			}
 		}
 
 		// index the seals for the payload
-		for _, seal := range seals {
-			err = operation.IndexSeal(payloadHash, seal.ID())(tx)
+		for i, seal := range seals {
+			err = operation.IndexSeal(payloadHash, uint64(i), seal.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index seal (%x): %w", seal.ID(), err)
 			}
@@ -190,15 +195,24 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			// the following fields should be set by the custom function as needed
 			// NOTE: we could abstract all of this away into an interface{} field,
 			// but that would be over the top as we will probably always use hotstuff
-			View:          0,
-			ParentSigners: nil,
-			ParentSigs:    nil,
-			ProposerID:    flow.ZeroID,
-			ProposerSig:   nil,
+			View:                    0,
+			ParentSigners:           nil,
+			ParentStakingSigs:       nil,
+			ParentRandomBeaconSig:   nil,
+			ProposerID:              flow.ZeroID,
+			ProposerStakingSig:      nil,
+			ProposerRandomBeaconSig: nil,
 		}
 
 		// apply the custom fields setter of the consensus algorithm
 		setter(header)
+
+		// index the seal for this block
+		// TODO this is also done by Mutator.Extend, perhaps refactor that into a procedure
+		err = operation.IndexSealIDByBlock(header.ID(), seal.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index commit: %w", err)
+		}
 
 		// insert the block header
 		err = operation.InsertHeader(header)(tx)

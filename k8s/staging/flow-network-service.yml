@@ -18,6 +18,9 @@ spec:
     app: flow-test-net
     env: staging
     version: v1
+  # Headless Service, gives each pod a DNS address only.
+  # Did not play well with cgo addrinfo lookup, which is used due to the DNS names ending in .local
+  # best to use pure go implementation
   clusterIP: None
   ports:
     - name: http

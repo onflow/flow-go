@@ -185,6 +185,7 @@ func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parame
 	}
 }
 
+
 func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.HasPosition) {
 	checker.checkResourceAnnotation(
 		typeAnnotation.Type,

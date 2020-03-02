@@ -13,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -20,26 +21,31 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func TestBootStrapValid(t *testing.T) {
+var identities = flow.IdentityList{
+	{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+	{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+	{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+	{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+}
 
-	identities := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
+var genesis = flow.Genesis(identities)
 
-	genesis := flow.Genesis(identities)
-	blockID := genesis.ID()
+func testWithBootstraped(t *testing.T, f func(t *testing.T, mutator *Mutator, db *badger.DB)) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-
 		mutator := &Mutator{state: &State{db: db}}
 		err := mutator.Bootstrap(genesis)
 		require.Nil(t, err)
 
+		f(t, mutator, db)
+	})
+}
+
+func TestBootStrapValid(t *testing.T) {
+
+	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		var boundary uint64
-		err = db.View(operation.RetrieveBoundary(&boundary))
+		err := db.View(operation.RetrieveBoundary(&boundary))
 		require.Nil(t, err)
 
 		var storedID flow.Identifier
@@ -50,18 +56,106 @@ func TestBootStrapValid(t *testing.T) {
 		err = db.View(operation.RetrieveHeader(genesis.ID(), &storedHeader))
 		require.Nil(t, err)
 
+		var storedSeal flow.Seal
+		err = db.View(procedure.LookupSealByBlock(storedHeader.ID(), &storedSeal))
+		require.NoError(t, err)
+		require.Equal(t, flow.ZeroID, storedSeal.BlockID) //genesis seal is special
+
 		assert.Zero(t, boundary)
-		assert.Equal(t, blockID, storedID)
+		assert.Equal(t, genesis.ID(), storedID)
 		assert.Equal(t, genesis.Header, storedHeader)
 
 		for _, identity := range identities {
-
 			var delta int64
 			err = db.View(operation.RetrieveDelta(genesis.Header.View, identity.Role, identity.NodeID, &delta))
 			require.Nil(t, err)
 
 			assert.Equal(t, int64(identity.Stake), delta)
 		}
+	})
+}
+
+func TestExtendSealedBoundary(t *testing.T) {
+	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
+
+		state := State{db: db}
+
+		seal, err := state.Final().Seal()
+		assert.NoError(t, err)
+		assert.Equal(t, genesis.Seals[0], &seal)
+		assert.Equal(t, flow.ZeroID, seal.BlockID) //genesis seal seals block with ID 0x00
+
+		block := unittest.BlockFixture()
+		block.Payload.Identities = nil
+		block.Payload.Guarantees = nil
+		block.Height = 1
+		block.View = 1
+		block.ParentID = genesis.ID()
+		block.PayloadHash = block.Payload.Hash()
+
+		sealingBlock := unittest.BlockFixture()
+		sealingBlock.Seals = make([]*flow.Seal, 1)
+		sealingBlock.Height = 2
+		sealingBlock.View = 2
+		sealingBlock.Identities = nil
+		sealingBlock.Guarantees = nil
+		sealingBlock.ParentID = block.ID()
+
+		// seal
+		newSeal := &flow.Seal{
+			BlockID:       block.ID(),
+			PreviousState: genesis.Seals[0].FinalState,
+			FinalState:    unittest.StateCommitmentFixture(),
+			Signature:     nil,
+		}
+		sealingBlock.Seals[0] = newSeal
+		sealingBlock.PayloadHash = sealingBlock.Payload.Hash()
+
+		err = db.Update(func(txn *badger.Txn) error {
+			err = procedure.InsertPayload(&block.Payload)(txn)
+			if err != nil {
+				return err
+			}
+			err = procedure.InsertBlock(&block)(txn)
+			if err != nil {
+				return err
+			}
+			err := operation.InsertSeal(newSeal)(txn)
+			if err != nil {
+				return err
+			}
+			err = procedure.InsertPayload(&sealingBlock.Payload)(txn)
+			if err != nil {
+				return err
+			}
+			err = procedure.InsertBlock(&sealingBlock)(txn)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		assert.NoError(t, err)
+
+		err = mutator.Extend(block.ID())
+		assert.NoError(t, err)
+
+		err = mutator.Extend(sealingBlock.ID())
+		assert.NoError(t, err)
+
+		sealed, err := state.Final().Seal()
+		assert.NoError(t, err)
+
+		// Sealed only moves after a block is finalized
+		// so here we still want to check for genesis seal
+		assert.Equal(t, flow.ZeroID, sealed.BlockID)
+
+		err = mutator.Finalize(sealingBlock.ID())
+		assert.NoError(t, err)
+
+		sealed, err = state.Final().Seal()
+		assert.NoError(t, err)
+
+		assert.Equal(t, block.ID(), sealed.BlockID)
 	})
 }
 

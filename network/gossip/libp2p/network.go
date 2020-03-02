@@ -3,16 +3,12 @@ package libp2p
 import (
 	"fmt"
 	"hash"
-	"math"
-	"strconv"
 	"sync"
 
 	"github.com/dchest/siphash"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -32,6 +28,7 @@ type Network struct {
 	state   protocol.State
 	me      module.Local
 	mw      middleware.Middleware
+	top     middleware.Topology
 	sip     hash.Hash
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
@@ -48,7 +45,8 @@ func NewNetwork(
 	state protocol.State,
 	me module.Local,
 	mw middleware.Middleware,
-	csize int) (*Network, error) {
+	csize int,
+	top middleware.Topology) (*Network, error) {
 
 	rcache, err := cache.NewRcvCache(csize)
 	if err != nil {
@@ -62,7 +60,7 @@ func NewNetwork(
 
 	// todo fanout optimization #2244
 	// fanout is set to half of the system size for connectivity assurance w.h.p
-	fanout := int(math.Round(float64(len(netSize)) / 2.0))
+	fanout := (len(netSize) + 1) / 2
 
 	o := &Network{
 		logger:  log,
@@ -74,6 +72,7 @@ func NewNetwork(
 		engines: make(map[uint8]network.Engine),
 		rcache:  rcache,
 		fanout:  fanout,
+		top:     top,
 	}
 
 	return o, nil
@@ -148,55 +147,12 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 // Topology returns the identities of a uniform subset of nodes in protocol state
 // size indicates size of the subset
 func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
-	idMap, err := n.Identity()
+	ids, err := n.state.Final().Identities()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// extracts a list of ids out of the idList
-	idList := make([]flow.Identity, 0)
-	for _, id := range idMap {
-		idList = append(idList, id)
-	}
-
-	// uses hash of the node's identifier as the seed to generate randomized topology
-	// step-1: creating hasher
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
-	if err != nil {
-		return nil, err
-	}
-	// step-2: computing hash of node's identifier
-	hash := hasher.ComputeHash([]byte(n.me.NodeID().String()))
-	// step-3: converting hash to an uint64 slice
-	seed := make([]uint64, 0)
-	for _, b := range hash {
-		seed = append(seed, uint64(b+1))
-	}
-
-	// selects subset of the nodes in idMap as large as the size
-	if len(idList) < n.fanout {
-		return nil, fmt.Errorf("cannot sample topology idList %d smaller than fanout %d", len(idList), n.fanout)
-	}
-
-	// creates a new random generator based on the seed
-	rng, err := random.NewRand(seed)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse hash: %w", err)
-	}
-	topListInd, err := random.PermutateSubset(len(idList), n.fanout, rng)
-
-	if err != nil {
-		return nil, fmt.Errorf("cannot sample topology: %w", err)
-	}
-
-	// creates a map of the selected ids
-	topMap := make(map[flow.Identifier]flow.Identity)
-	for _, v := range topListInd {
-		id := idList[v]
-		topMap[id.NodeID] = id
-	}
-
-	return topMap, nil
+	return n.top.Subset(ids, n.fanout, n.me.NodeID().String())
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
@@ -259,7 +215,10 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 
 	var emTargets [][]byte
 	for _, t := range targetIDs {
-		emTargets = append(emTargets, t[:])
+		// copy the array to a temp var by value
+		temp := t
+		// create a slice out of the temp var
+		emTargets = append(emTargets, temp[:])
 	}
 
 	// get origin ID (inplace slicing n.me.NodeID()[:] doesn't work)
@@ -289,39 +248,10 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 
 	// TODO: debup the message here
 
-	err = n.send(channelID, msg, targetIDs...)
+	err = n.mw.Send(channelID, msg, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not gossip event")
 	}
 
-	return nil
-}
-
-// send sends the message to the set of target ids through the middleware
-// send is the last method within the pipeline of message shipping in network layer
-// once it is called, the message slips through the network layer towards the middleware
-// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.send
-// Otherwise, middleware.Publish is used, which uses the PubSub method of communication.
-// TODO: Move this decision making to the Middleware Issue#2246
-func (n *Network) send(channelID uint8, msg *message.Message, nodeIDs ...flow.Identifier) error {
-	var err error
-	switch len(nodeIDs) {
-	case 0:
-		n.logger.Debug().Msg("list of target node IDs empty")
-		return nil
-	case 1:
-		if nodeIDs[0] == n.me.NodeID() {
-			// to avoid self dial by the underlay
-			n.logger.Debug().Msg("self dial attempt")
-			return nil
-		}
-		err = n.mw.Send(nodeIDs[0], msg)
-	default:
-		err = n.mw.Publish(strconv.Itoa(int(channelID)), msg)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to send message to %s:%w", nodeIDs, err)
-	}
 	return nil
 }

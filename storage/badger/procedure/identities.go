@@ -15,7 +15,7 @@ func IndexIdentities(payloadHash flow.Identifier, identities []*flow.Identity) f
 	return func(tx *badger.Txn) error {
 
 		// check and index the identities
-		for _, identity := range identities {
+		for i, identity := range identities {
 			var exists bool
 			err := operation.CheckIdentity(identity.NodeID, &exists)(tx)
 			if err != nil {
@@ -24,7 +24,7 @@ func IndexIdentities(payloadHash flow.Identifier, identities []*flow.Identity) f
 			if !exists {
 				return fmt.Errorf("node identity missing in DB (%x)", identity.NodeID)
 			}
-			err = operation.IndexIdentity(payloadHash, identity.NodeID)(tx)
+			err = operation.IndexIdentity(payloadHash, uint64(i), identity.NodeID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index identity (%x): %w", identity.NodeID, err)
 			}
@@ -36,10 +36,9 @@ func IndexIdentities(payloadHash flow.Identifier, identities []*flow.Identity) f
 
 func RetrieveIdentities(payloadHash flow.Identifier, identities *[]*flow.Identity) func(*badger.Txn) error {
 
-	// make sure we have a zero value
-	*identities = make([]*flow.Identity, 0)
-
 	return func(tx *badger.Txn) error {
+
+		var retrievedIdentities []*flow.Identity
 
 		// get the collection IDs for the identities
 		var nodeIDs []flow.Identifier
@@ -49,15 +48,16 @@ func RetrieveIdentities(payloadHash flow.Identifier, identities *[]*flow.Identit
 		}
 
 		// get all identities
-		*identities = make([]*flow.Identity, 0, len(nodeIDs))
 		for _, nodeID := range nodeIDs {
 			var identity flow.Identity
 			err = operation.RetrieveIdentity(nodeID, &identity)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve identity (%x): %w", nodeID, err)
 			}
-			*identities = append(*identities, &identity)
+			retrievedIdentities = append(retrievedIdentities, &identity)
 		}
+
+		*identities = retrievedIdentities
 
 		return nil
 	}

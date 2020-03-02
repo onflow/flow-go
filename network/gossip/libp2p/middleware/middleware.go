@@ -12,8 +12,7 @@ import (
 type Middleware interface {
 	Start(overlay Overlay) error
 	Stop()
-	Send(nodeID flow.Identifier, msg interface{}) error
-	Publish(topic string, msg interface{}) error
+	Send(channelID uint8, msg interface{}, targetIDs ...flow.Identifier) error
 	Subscribe(channelID uint8) error
 }
 
@@ -31,4 +30,9 @@ type Overlay interface {
 type Connection interface {
 	Send(msg interface{}) error
 	Receive() (interface{}, error)
+}
+
+// Topology represents an interface to get subset of nodes which a given node should directly connect to for 1-k messaging
+type Topology interface {
+	Subset(idList flow.IdentityList, size int, seed string) (map[flow.Identifier]flow.Identity, error)
 }

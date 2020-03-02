@@ -143,9 +143,9 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return identities[0], nil
 }
 
-func (s *Snapshot) Commit() (flow.StateCommitment, error) {
+func (s *Snapshot) Seal() (flow.Seal, error) {
 
-	var commit flow.StateCommitment
+	var seal flow.Seal
 	err := s.state.db.View(func(tx *badger.Txn) error {
 
 		// get the head at the requested snapshot
@@ -155,20 +155,18 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
 
-		// try getting the commit directly from the block
-		var commit flow.StateCommitment
-		err = operation.LookupCommit(header.ID(), &commit)(tx)
+		err = procedure.LookupSealByBlock(header.ID(), &seal)(tx)
 		if err != nil {
-			return fmt.Errorf("could not get commit: %w", err)
+			return fmt.Errorf("could not get seal by block: %w", err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve commit: %w", err)
+		return flow.Seal{}, fmt.Errorf("could not retrieve seal: %w", err)
 	}
 
-	return commit, nil
+	return seal, nil
 }
 
 // Clusters sorts the list of node identities after filtering into the given

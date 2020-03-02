@@ -240,6 +240,10 @@ func (*BlockType) IsResourceType() bool {
 	return false
 }
 
+func (*BlockType) TypeAnnotationState() sema.TypeAnnotationState {
+	return sema.TypeAnnotationStateValid
+}
+
 func (*BlockType) IsInvalidType() bool {
 	return false
 }

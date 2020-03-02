@@ -45,11 +45,7 @@ func (g *Collections) All() []*flow.Collection {
 	entities := g.Backend.All()
 	colls := make([]*flow.Collection, 0, len(entities))
 	for _, entity := range entities {
-		coll, ok := entity.(*flow.Collection)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in collection pool (%T)", entity))
-		}
-		colls = append(colls, coll)
+		colls = append(colls, entity.(*flow.Collection))
 	}
 	return colls
 }

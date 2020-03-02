@@ -50,12 +50,13 @@ type TypeID string
 
 type Type interface {
 	IsType()
+	ID() TypeID
 	String() string
 	QualifiedString() string
 	Equal(other Type) bool
 	IsResourceType() bool
 	IsInvalidType() bool
-	ID() TypeID
+	TypeAnnotationState() TypeAnnotationState
 }
 
 // ValueIndexableType is a type which can be indexed into using a value
@@ -110,6 +111,27 @@ type LocatedType interface {
 type TypeAnnotation struct {
 	IsResource bool
 	Type       Type
+}
+
+func (a *TypeAnnotation) TypeAnnotationState() TypeAnnotationState {
+	if a.Type.IsInvalidType() {
+		return TypeAnnotationStateValid
+	}
+
+	innerState := a.Type.TypeAnnotationState()
+	if innerState != TypeAnnotationStateValid {
+		return innerState
+	}
+
+	isResourceType := a.Type.IsResourceType()
+	switch {
+	case isResourceType && !a.IsResource:
+		return TypeAnnotationStateMissingResourceAnnotation
+	case !isResourceType && a.IsResource:
+		return TypeAnnotationStateInvalidResourceAnnotation
+	default:
+		return TypeAnnotationStateValid
+	}
 }
 
 func (a *TypeAnnotation) String() string {
@@ -172,6 +194,10 @@ func (*AnyType) IsInvalidType() bool {
 	return false
 }
 
+func (*AnyType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 // AnyStructType represents the top type of all non-resource types
 type AnyStructType struct{}
 
@@ -200,6 +226,10 @@ func (*AnyStructType) IsResourceType() bool {
 
 func (*AnyStructType) IsInvalidType() bool {
 	return false
+}
+
+func (*AnyStructType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 // AnyResourceType represents the top type of all resource types
@@ -232,6 +262,10 @@ func (*AnyResourceType) IsInvalidType() bool {
 	return false
 }
 
+func (*AnyResourceType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 // NeverType represents the bottom type
 type NeverType struct{}
 
@@ -262,6 +296,10 @@ func (*NeverType) IsInvalidType() bool {
 	return false
 }
 
+func (*NeverType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 // VoidType represents the void type
 type VoidType struct{}
 
@@ -290,6 +328,10 @@ func (*VoidType) IsResourceType() bool {
 
 func (*VoidType) IsInvalidType() bool {
 	return false
+}
+
+func (*VoidType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 // InvalidType represents a type that is invalid.
@@ -323,6 +365,10 @@ func (*InvalidType) IsResourceType() bool {
 
 func (*InvalidType) IsInvalidType() bool {
 	return true
+}
+
+func (*InvalidType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 // OptionalType represents the optional variant of another type
@@ -370,6 +416,10 @@ func (t *OptionalType) IsInvalidType() bool {
 	return t.Type.IsInvalidType()
 }
 
+func (t *OptionalType) TypeAnnotationState() TypeAnnotationState {
+	return t.Type.TypeAnnotationState()
+}
+
 // BoolType represents the boolean type
 type BoolType struct{}
 
@@ -398,6 +448,10 @@ func (*BoolType) IsResourceType() bool {
 
 func (*BoolType) IsInvalidType() bool {
 	return false
+}
+
+func (*BoolType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 // CharacterType represents the character type
@@ -431,6 +485,10 @@ func (*CharacterType) IsInvalidType() bool {
 	return false
 }
 
+func (*CharacterType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 // StringType represents the string type
 type StringType struct{}
 
@@ -459,6 +517,10 @@ func (*StringType) IsResourceType() bool {
 
 func (*StringType) IsInvalidType() bool {
 	return false
+}
+
+func (*StringType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 func (*StringType) CanHaveMembers() bool {
@@ -568,6 +630,10 @@ func (*NumberType) IsInvalidType() bool {
 	return false
 }
 
+func (*NumberType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 func (*NumberType) MinInt() *big.Int {
 	return nil
 }
@@ -604,6 +670,10 @@ func (*SignedNumberType) IsResourceType() bool {
 
 func (*SignedNumberType) IsInvalidType() bool {
 	return false
+}
+
+func (*SignedNumberType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 func (*SignedNumberType) MinInt() *big.Int {
@@ -659,6 +729,10 @@ func (*IntegerType) IsInvalidType() bool {
 	return false
 }
 
+func (*IntegerType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 func (*IntegerType) MinInt() *big.Int {
 	return nil
 }
@@ -695,6 +769,10 @@ func (*SignedIntegerType) IsResourceType() bool {
 
 func (*SignedIntegerType) IsInvalidType() bool {
 	return false
+}
+
+func (*SignedIntegerType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 func (*SignedIntegerType) MinInt() *big.Int {
@@ -735,6 +813,10 @@ func (*IntType) IsInvalidType() bool {
 	return false
 }
 
+func (*IntType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 func (*IntType) MinInt() *big.Int {
 	return nil
 }
@@ -772,6 +854,10 @@ func (*Int8Type) IsResourceType() bool {
 
 func (*Int8Type) IsInvalidType() bool {
 	return false
+}
+
+func (*Int8Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var Int8TypeMinInt = big.NewInt(0).SetInt64(math.MinInt8)
@@ -815,6 +901,10 @@ func (*Int16Type) IsInvalidType() bool {
 	return false
 }
 
+func (*Int16Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 var Int16TypeMinInt = big.NewInt(0).SetInt64(math.MinInt16)
 var Int16TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt16)
 
@@ -854,6 +944,10 @@ func (*Int32Type) IsResourceType() bool {
 
 func (*Int32Type) IsInvalidType() bool {
 	return false
+}
+
+func (*Int32Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var Int32TypeMinInt = big.NewInt(0).SetInt64(math.MinInt32)
@@ -897,6 +991,10 @@ func (*Int64Type) IsInvalidType() bool {
 	return false
 }
 
+func (*Int64Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 var Int64TypeMinInt = big.NewInt(0).SetInt64(math.MinInt64)
 var Int64TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt64)
 
@@ -936,6 +1034,10 @@ func (*Int128Type) IsResourceType() bool {
 
 func (*Int128Type) IsInvalidType() bool {
 	return false
+}
+
+func (*Int128Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var Int128TypeMinInt *big.Int
@@ -991,6 +1093,10 @@ func (*Int256Type) IsInvalidType() bool {
 	return false
 }
 
+func (*Int256Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 var Int256TypeMinInt *big.Int
 
 func init() {
@@ -1044,6 +1150,10 @@ func (*UIntType) IsInvalidType() bool {
 	return false
 }
 
+func (*UIntType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 var UIntTypeMin = big.NewInt(0)
 
 func (*UIntType) MinInt() *big.Int {
@@ -1083,6 +1193,10 @@ func (*UInt8Type) IsResourceType() bool {
 
 func (*UInt8Type) IsInvalidType() bool {
 	return false
+}
+
+func (*UInt8Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var UInt8TypeMinInt = big.NewInt(0)
@@ -1127,6 +1241,10 @@ func (*UInt16Type) IsInvalidType() bool {
 	return false
 }
 
+func (*UInt16Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 var UInt16TypeMinInt = big.NewInt(0)
 var UInt16TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint16)
 
@@ -1167,6 +1285,10 @@ func (*UInt32Type) IsResourceType() bool {
 
 func (*UInt32Type) IsInvalidType() bool {
 	return false
+}
+
+func (*UInt32Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var UInt32TypeMinInt = big.NewInt(0)
@@ -1211,6 +1333,10 @@ func (*UInt64Type) IsInvalidType() bool {
 	return false
 }
 
+func (*UInt64Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 var UInt64TypeMinInt = big.NewInt(0)
 var UInt64TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint64)
 
@@ -1251,6 +1377,10 @@ func (*UInt128Type) IsResourceType() bool {
 
 func (*UInt128Type) IsInvalidType() bool {
 	return false
+}
+
+func (*UInt128Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var UInt128TypeMinInt = big.NewInt(0)
@@ -1301,6 +1431,10 @@ func (*UInt256Type) IsInvalidType() bool {
 	return false
 }
 
+func (*UInt256Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 var UInt256TypeMinInt = big.NewInt(0)
 var UInt256TypeMaxInt *big.Int
 
@@ -1349,6 +1483,10 @@ func (*Word8Type) IsInvalidType() bool {
 	return false
 }
 
+func (*Word8Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 var Word8TypeMinInt = big.NewInt(0)
 var Word8TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint8)
 
@@ -1389,6 +1527,10 @@ func (*Word16Type) IsResourceType() bool {
 
 func (*Word16Type) IsInvalidType() bool {
 	return false
+}
+
+func (*Word16Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var Word16TypeMinInt = big.NewInt(0)
@@ -1433,6 +1575,10 @@ func (*Word32Type) IsInvalidType() bool {
 	return false
 }
 
+func (*Word32Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 var Word32TypeMinInt = big.NewInt(0)
 var Word32TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint32)
 
@@ -1473,6 +1619,10 @@ func (*Word64Type) IsResourceType() bool {
 
 func (*Word64Type) IsInvalidType() bool {
 	return false
+}
+
+func (*Word64Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var Word64TypeMinInt = big.NewInt(0)
@@ -1516,6 +1666,14 @@ func (*FixedPointType) IsInvalidType() bool {
 	return false
 }
 
+func (*FixedPointType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
+func (*FixedPointType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
+
 func (*FixedPointType) MinInt() *big.Int {
 	return nil
 }
@@ -1552,6 +1710,10 @@ func (*SignedFixedPointType) IsResourceType() bool {
 
 func (*SignedFixedPointType) IsInvalidType() bool {
 	return false
+}
+
+func (*SignedFixedPointType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 func (*SignedFixedPointType) MinInt() *big.Int {
@@ -1594,6 +1756,10 @@ func (*Fix64Type) IsResourceType() bool {
 
 func (*Fix64Type) IsInvalidType() bool {
 	return false
+}
+
+func (*Fix64Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var Fix64TypeMinInt = big.NewInt(0).SetInt64(math.MinInt64 / Fix64Factor)
@@ -1654,6 +1820,10 @@ func (*UFix64Type) IsResourceType() bool {
 
 func (*UFix64Type) IsInvalidType() bool {
 	return false
+}
+
+func (*UFix64Type) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var UFix64TypeMinInt = big.NewInt(0)
@@ -1944,6 +2114,10 @@ func (t *VariableSizedType) IsInvalidType() bool {
 	return t.Type.IsInvalidType()
 }
 
+func (t *VariableSizedType) TypeAnnotationState() TypeAnnotationState {
+	return t.Type.TypeAnnotationState()
+}
+
 func (t *VariableSizedType) isValueIndexableType() bool {
 	return true
 }
@@ -2001,6 +2175,10 @@ func (t *ConstantSizedType) IsResourceType() bool {
 
 func (t *ConstantSizedType) IsInvalidType() bool {
 	return t.Type.IsInvalidType()
+}
+
+func (t *ConstantSizedType) TypeAnnotationState() TypeAnnotationState {
+	return t.Type.TypeAnnotationState()
 }
 
 func (t *ConstantSizedType) isValueIndexableType() bool {
@@ -2216,6 +2394,22 @@ func (t *FunctionType) IsInvalidType() bool {
 	return false
 }
 
+func (t *FunctionType) TypeAnnotationState() TypeAnnotationState {
+	returnTypeAnnotationState := t.ReturnTypeAnnotation.TypeAnnotationState()
+	if returnTypeAnnotationState != TypeAnnotationStateValid {
+		return returnTypeAnnotationState
+	}
+
+	for _, parameter := range t.Parameters {
+		parameterTypeAnnotationState := parameter.TypeAnnotation.TypeAnnotationState()
+		if parameterTypeAnnotationState != TypeAnnotationStateValid {
+			return parameterTypeAnnotationState
+		}
+	}
+
+	return TypeAnnotationStateValid
+}
+
 // SpecialFunctionType is the the type representing a special function,
 // i.e., a constructor or destructor
 
@@ -2264,6 +2458,7 @@ func init() {
 		&StringType{},
 		&AddressType{},
 		&AccountType{},
+		&PublicAccountType{},
 	}
 
 	types := append(
@@ -2504,9 +2699,12 @@ func (t *CompositeType) IsResourceType() bool {
 	return t.Kind == common.CompositeKindResource
 }
 
-func (t *CompositeType) IsInvalidType() bool {
-	// TODO: maybe if any member has an invalid type?
+func (*CompositeType) IsInvalidType() bool {
 	return false
+}
+
+func (*CompositeType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 func (t *CompositeType) InterfaceType() *InterfaceType {
@@ -2575,6 +2773,10 @@ func (*AccountType) IsResourceType() bool {
 
 func (*AccountType) IsInvalidType() bool {
 	return false
+}
+
+func (*AccountType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 func (*AccountType) CanHaveMembers() bool {
@@ -2701,6 +2903,10 @@ func (*PublicAccountType) IsResourceType() bool {
 
 func (*PublicAccountType) IsInvalidType() bool {
 	return false
+}
+
+func (*PublicAccountType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 func (*PublicAccountType) CanHaveMembers() bool {
@@ -2886,8 +3092,11 @@ func (t *InterfaceType) IsResourceType() bool {
 }
 
 func (t *InterfaceType) IsInvalidType() bool {
-	// TODO: maybe if any member has an invalid type?
 	return false
+}
+
+func (*InterfaceType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 // DictionaryType
@@ -2941,6 +3150,20 @@ func (t *DictionaryType) IsResourceType() bool {
 func (t *DictionaryType) IsInvalidType() bool {
 	return t.KeyType.IsInvalidType() ||
 		t.ValueType.IsInvalidType()
+}
+
+func (t *DictionaryType) TypeAnnotationState() TypeAnnotationState {
+	keyTypeAnnotationState := t.KeyType.TypeAnnotationState()
+	if keyTypeAnnotationState != TypeAnnotationStateValid {
+		return keyTypeAnnotationState
+	}
+
+	valueTypeAnnotationState := t.ValueType.TypeAnnotationState()
+	if valueTypeAnnotationState != TypeAnnotationStateValid {
+		return valueTypeAnnotationState
+	}
+
+	return TypeAnnotationStateValid
 }
 
 func (t *DictionaryType) CanHaveMembers() bool {
@@ -3084,6 +3307,10 @@ func (t *StorageType) IsInvalidType() bool {
 	return false
 }
 
+func (*StorageType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 func (t *StorageType) isTypeIndexableType() {}
 
 func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string) {
@@ -3148,6 +3375,10 @@ func (t *ReferencesType) IsResourceType() bool {
 
 func (t *ReferencesType) IsInvalidType() bool {
 	return false
+}
+
+func (*ReferencesType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 func (t *ReferencesType) isTypeIndexableType() {}
@@ -3244,6 +3475,10 @@ func (t *ReferenceType) IsInvalidType() bool {
 	return t.Type.IsInvalidType()
 }
 
+func (*ReferenceType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 func (t *ReferenceType) CanHaveMembers() bool {
 	referencedType, ok := t.Type.(MemberAccessibleType)
 	if !ok {
@@ -3313,6 +3548,10 @@ func (*AddressType) IsResourceType() bool {
 
 func (*AddressType) IsInvalidType() bool {
 	return false
+}
+
+func (*AddressType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
 }
 
 var AddressTypeMinInt = big.NewInt(0)
@@ -3858,6 +4097,10 @@ func (*TransactionType) IsInvalidType() bool {
 	return false
 }
 
+func (*TransactionType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
 func (t *TransactionType) CanHaveMembers() bool {
 	return true
 }
@@ -3983,6 +4226,9 @@ func (*RestrictedResourceType) IsInvalidType() bool {
 	return false
 }
 
+func (*RestrictedResourceType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
 func (t *RestrictedResourceType) CanHaveMembers() bool {
 	return true
 }

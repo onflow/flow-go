@@ -5,6 +5,8 @@ package json
 import (
 	"encoding/json"
 
+	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/messages"
 
 	"github.com/pkg/errors"
@@ -35,6 +37,14 @@ func encode(v interface{}) (*Envelope, error) {
 	case *message.Echo:
 		code = CodeEcho
 
+	// Consensus
+	case *messages.BlockProposal:
+		code = CodeBlockProposal
+	case *messages.BlockVote:
+		code = CodeBlockVote
+	case *coldstuff.Commit:
+		code = CodeBlockCommit
+
 	case *flow.CollectionGuarantee:
 		code = CodeCollectionGuarantee
 	case *flow.Transaction:
@@ -54,6 +64,11 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeExecutionStateRequest
 	case *messages.ExecutionStateResponse:
 		code = CodeExecutionStateResponse
+
+	case *execution.CompleteBlock:
+		code = CodeExecutionCompleteBlock
+	case *execution.ComputationOrder:
+		code = CodeExecutionComputationOrder
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)

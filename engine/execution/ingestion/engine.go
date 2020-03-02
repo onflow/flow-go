@@ -8,6 +8,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -30,8 +32,9 @@ type Engine struct {
 	blocks            storage.Blocks
 	payloads          storage.Payloads
 	collections       storage.Collections
-	execution         network.Engine
+	execution         computation.ComputationEngine
 	mempool           *Mempool
+	execState         state.ExecutionState
 }
 
 func New(
@@ -42,7 +45,8 @@ func New(
 	blocks storage.Blocks,
 	payloads storage.Payloads,
 	collections storage.Collections,
-	executionEngine network.Engine,
+	executionEngine computation.ComputationEngine,
+	execState state.ExecutionState,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
@@ -61,6 +65,7 @@ func New(
 		collections: collections,
 		execution:   executionEngine,
 		mempool:     mempool,
+		execState:   execState,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -142,7 +147,7 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	return identifiers, nil
 }
 
-func (e *Engine) checkForCompleteness(block *execution.CompleteBlock) bool {
+func (e *Engine) isComplete(block *execution.CompleteBlock) bool {
 
 	for _, collection := range block.Block.Guarantees {
 
@@ -157,7 +162,6 @@ func (e *Engine) checkForCompleteness(block *execution.CompleteBlock) bool {
 }
 
 func (e *Engine) removeCollections(block *execution.CompleteBlock, backdata *Backdata) {
-
 	for _, collection := range block.Block.Guarantees {
 		backdata.Rem(collection.ID())
 	}
@@ -199,12 +203,13 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	}
 
 	err = e.mempool.Run(func(backdata *Backdata) error {
-		// Incase we have all the collections, or the block is empty
-		if e.checkForCompleteness(maybeCompleteBlock) {
+		// In case we have all the collections, or the block is empty
+		if e.isComplete(maybeCompleteBlock) {
 			e.removeCollections(maybeCompleteBlock, backdata)
-			e.execution.SubmitLocal(maybeCompleteBlock)
+			e.handleCompleteBlock(maybeCompleteBlock)
 			return nil
 		}
+
 		for _, guarantee := range block.Guarantees {
 			completeBlock, err := backdata.ByID(guarantee.ID())
 			if err == mempool.ErrEntityNotFound {
@@ -245,6 +250,53 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	return err
 }
 
+func (e *Engine) handleOrphanedCompleteBlock(completeBlock *execution.CompleteBlock) {
+
+}
+
+func (e *Engine) handleCompleteBlock(completeBlock *execution.CompleteBlock) {
+
+	//get initial start state from parent block
+	startState, err := e.execState.StateCommitmentByBlockID(completeBlock.Block.ParentID)
+
+	if err == storage.ErrNotFound {
+		e.handleOrphanedCompleteBlock(completeBlock)
+		return
+	}
+
+	if err != nil {
+		e.log.Err(err).
+			Hex("parent_block_id", logging.ID(completeBlock.Block.ParentID)).
+			Msg("error while fetching state commitment")
+		return
+	}
+
+	view := e.execState.NewView(startState)
+
+	e.execution.SubmitLocal(&execution.ComputationOrder{
+		Block: completeBlock,
+		View:  view,
+	})
+}
+
+func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
+
+	//TODO: replace with latest sealed block
+	block, err := e.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
+	}
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(block.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block state commitment: %w", err)
+	}
+
+	blockView := e.execState.NewView(stateCommit)
+
+	return e.execution.ExecuteScript(script, block, blockView)
+}
+
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
 
 	collection := response.Collection
@@ -257,19 +309,26 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 
 	return e.mempool.Run(func(backdata *Backdata) error {
 		completeBlock, err := backdata.ByID(collID)
-		if err == nil {
-			if completeCollection, ok := completeBlock.Block.CompleteCollections[collID]; ok {
-				if completeCollection.Transactions == nil {
-					completeCollection.Transactions = collection.Transactions
-					if e.checkForCompleteness(completeBlock.Block) {
-						e.removeCollections(completeBlock.Block, backdata)
-						e.execution.SubmitLocal(completeBlock.Block)
-					}
-				}
-			} else {
-				return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
-			}
+		if err != nil {
+			return err
 		}
+		completeCollection, ok := completeBlock.Block.CompleteCollections[collID]
+		if !ok {
+			return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
+		}
+		// already received transactions for this collection
+		// TODO - check if data stored is the same
+		if completeCollection.Transactions != nil {
+			return nil
+		}
+
+		completeCollection.Transactions = collection.Transactions
+		if !e.isComplete(completeBlock.Block) {
+			return nil
+		}
+
+		e.removeCollections(completeBlock.Block, backdata)
+		e.handleCompleteBlock(completeBlock.Block)
 		return nil
 	})
 }

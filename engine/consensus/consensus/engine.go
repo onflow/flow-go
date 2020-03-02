@@ -12,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -30,9 +31,10 @@ type Engine struct {
 	state    protocol.State
 	headers  storage.Headers
 	payloads storage.Payloads
-	hotstuff module.HotStuff
 	con      network.Conduit
 	cache    map[flow.Identifier][]cacheItem
+
+	coldstuff module.ColdStuff
 }
 
 type cacheItem struct {
@@ -41,7 +43,14 @@ type cacheItem struct {
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, hotstuff module.HotStuff) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	me module.Local,
+	state protocol.State,
+	headers storage.Headers,
+	payloads storage.Payloads,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -51,7 +60,6 @@ func New(log zerolog.Logger, net module.Network, me module.Local, state protocol
 		state:    state,
 		headers:  headers,
 		payloads: payloads,
-		hotstuff: hotstuff,
 		cache:    make(map[flow.Identifier][]cacheItem),
 	}
 
@@ -65,16 +73,32 @@ func New(log zerolog.Logger, net module.Network, me module.Local, state protocol
 	return e, nil
 }
 
+// WithConsensus adds the consensus algorithm to the engine. This must be
+// called before the engine can start.
+func (e *Engine) WithConsensus(cold module.ColdStuff) *Engine {
+	e.coldstuff = cold
+	return e
+}
+
 // Ready returns a ready channel that is closed once the engine has fully
-// started. For the consensus, we consider it ready right away.
+// started. For consensus engine, this is true once the underlying consensus
+// algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	if e.coldstuff == nil {
+		panic("cannot start consensus engine without consensus algorithm")
+	}
+
+	return e.unit.Ready(func() {
+		<-e.coldstuff.Ready()
+	})
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		<-e.coldstuff.Done()
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -108,13 +132,14 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // SendVote will send a vote to the desired node.
-func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, recipientID flow.Identifier) error {
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature, recipientID flow.Identifier) error {
 
 	// build the vote message
-	vote := messages.BlockVote{
-		BlockID:   blockID,
-		View:      view,
-		Signature: sig,
+	vote := &messages.BlockVote{
+		BlockID:               blockID,
+		View:                  view,
+		StakingSignature:      stakingSig,
+		RandomBeaconSignature: randomBeaconSig,
 	}
 
 	// send the vote the desired recipient
@@ -127,7 +152,23 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signa
 }
 
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
+// Note the header has incomplete fields, because it was converted from a hotstuff.Proposal type
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
+
+	// first, check that we are the proposer of the block
+	if header.ProposerID != e.me.NodeID() {
+		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
+	}
+
+	// get the parent of the block
+	parent, err := e.headers.ByBlockID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
+	// fill in the fields that can't be populated by HotStuff
+	header.ChainID = parent.ChainID
+	header.Height = parent.Height + 1
 
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
@@ -147,18 +188,37 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
-	msg := messages.BlockProposal{
+	msg := &messages.BlockProposal{
 		Header:  header,
 		Payload: payload,
 	}
 
 	// broadcast the proposal to consensus nodes
-	err = e.con.Submit(&msg, recipients.NodeIDs()...)
+	err = e.con.Submit(msg, recipients.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
 
 	return nil
+}
+
+func (e *Engine) BroadcastCommit(commit *model.Commit) error {
+
+	// retrieve all consensus nodes without our ID
+	recipients, err := e.state.Final().Identities(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
+	if err != nil {
+		return fmt.Errorf("could not get consensus recipients: %w", err)
+	}
+
+	err = e.con.Submit(commit, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not send commit message: %w", err)
+	}
+
+	return err
 }
 
 // process processes events for the propagation engine on the consensus node.
@@ -172,6 +232,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onBlockRequest(originID, ev)
 	case *messages.BlockResponse:
 		return e.onBlockResponse(originID, ev)
+	case *model.Commit:
+		return e.onBlockCommit(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -209,7 +271,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// submit the model to hotstuff for processing
-	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
+	e.coldstuff.SubmitProposal(proposal.Header, parent.View)
 
 	// check for any descendants of the block to process
 	children, ok := e.cache[blockID]
@@ -235,8 +297,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // onBlockVote handles incoming block votes.
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
-	// forward the vote to hotstuff for processing
-	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature)
+	// forward the vote to coldstuff for processing
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.StakingSignature, vote.RandomBeaconSignature)
 
 	return nil
 }
@@ -292,6 +354,16 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, response *messages.Bl
 		return fmt.Errorf("could not process block response: %w", err)
 	}
 
+	return nil
+}
+
+// onBlockCommit handles incoming block commits by passing them to the core
+// consensus algorithm.
+//
+// NOTE: This is only necessary for ColdStuff and can be removed when we switch
+// to HotStuff.
+func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
+	e.coldstuff.SubmitCommit(commit)
 	return nil
 }
 

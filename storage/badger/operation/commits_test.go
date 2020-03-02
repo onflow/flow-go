@@ -12,7 +12,6 @@ import (
 )
 
 func TestStateCommitments(t *testing.T) {
-
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.StateCommitmentFixture()
 		id := unittest.IdentifierFixture()
