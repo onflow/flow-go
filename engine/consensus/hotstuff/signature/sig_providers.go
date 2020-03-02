@@ -130,7 +130,7 @@ func (p *StakingSigProvider) CanReconstruct(numOfSigShares int) bool {
 func (p *StakingSigProvider) VoteFor(block *model.Block) (*model.Vote, error) {
 	stakingSig, err := p.Sign(block) // generate staking signature
 	if err != nil {
-		return nil, fmt.Errorf("vote generation failed: error signing block %p: %w", block.BlockID, err)
+		return nil, fmt.Errorf("vote generation failed: error signing block %s: %w", block.BlockID, err)
 	}
 	sig := model.SingleSignature{
 		StakingSignature:      stakingSig,
@@ -149,7 +149,7 @@ func (p *StakingSigProvider) VoteFor(block *model.Block) (*model.Vote, error) {
 func (p *StakingSigProvider) Propose(block *model.Block) (*model.Proposal, error) {
 	stakingSig, err := p.Sign(block) // generate staking signature
 	if err != nil {
-		return nil, fmt.Errorf("proposal generation failed: error signing block %p: %w", block.BlockID, err)
+		return nil, fmt.Errorf("proposal generation failed: error signing block %s: %w", block.BlockID, err)
 	}
 	return &model.Proposal{
 		Block:                 block,
