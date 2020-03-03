@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -23,12 +24,11 @@ type RandomBeaconAwareSigProvider struct {
 
 func NewRandomBeaconAwareSigProvider(
 	viewState *hotstuff.ViewState,
-	stakingSigTag string,
 	me module.Local,
 	randomBeaconPrivateKey crypto.PrivateKey,
 ) RandomBeaconAwareSigProvider {
 	return RandomBeaconAwareSigProvider{
-		StakingSigProvider: NewStakingSigProvider(viewState, stakingSigTag, me),
+		StakingSigProvider: NewStakingSigProvider(viewState, messages.ConsensusVoteTag, me),
 		RandomBeaconSigner: NewRandomBeaconSigner(viewState, randomBeaconPrivateKey),
 	}
 }
@@ -56,12 +56,6 @@ func (p *RandomBeaconAwareSigProvider) Aggregate(block *model.Block, sigs []*mod
 	}
 	aggSig.RandomBeaconSignature = reconstructedRandomBeaconSig // add Random Beacon Threshold signature to aggregated sig
 	return aggSig, nil
-}
-
-// CanReconstruct checks whether the given sig shares are enough to reconstruct the threshold signature.
-// It assumes the DKG group size never change.
-func (p *RandomBeaconAwareSigProvider) CanReconstruct(numOfSigShares int) bool {
-	return p.RandomBeaconSigner.CanReconstruct(numOfSigShares)
 }
 
 // VoteFor signs a Block and returns the Vote for that Block. Returned vote includes proper Random Beacon sig share.

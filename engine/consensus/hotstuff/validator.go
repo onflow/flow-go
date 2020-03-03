@@ -89,10 +89,10 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 	block := proposal.Block
 	blockID := proposal.Block.BlockID
 
-	// get signer's Identity (will error if signer is not a staked consensus participant at block)
-	signer, err := v.viewState.IdentityForConsensusParticipant(proposal.Block.BlockID, proposal.Block.ProposerID)
+	// Validate Proposer's signatures and ensure that proposer is leader for respective view
+	signer, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
 	if err != nil {
-		return newInvalidBlockError(block, fmt.Sprintf("invalid proposed identity for block %s: %s", blockID, err.Error()))
+		return newInvalidBlockError(block, fmt.Sprintf("invalid proposer for block %s: %s", blockID, err.Error()))
 	}
 	// check the signer is the leader for that block
 	leader := v.viewState.LeaderForView(proposal.Block.View)
@@ -100,44 +100,25 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%s), expected leader: (%s)", signer.ID(), leader.ID()))
 	}
 
-	// check signer's staking signature
-	valid, err := v.sigVerifier.VerifyStakingSig(proposal.StakingSignature, proposal.Block, signer.StakingPubKey)
-	if err != nil {
-		return fmt.Errorf("cannot verify block %s 's staking signature: %w", blockID, err)
-	}
-	if !valid {
-		return newInvalidBlockError(block, "block proposer's staking signature is invalid")
-	}
+	// check proposal's parent
+	parent, found := v.forks.GetBlock(qc.BlockID)
+	if !found {
+		// Forks is _allowed_ to (but obliged to) prune blocks whose view is below the newest finalized block.
+		if qc.View >= v.forks.FinalizedView() {
+			// If the parent block is equal or above the finalized view, then Forks should have it. Otherwise, we are missing a block!
+			return &hotstuff.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
+		}
 
-	// check signer's random beacon signature
-	valid, err = v.sigVerifier.VerifyRandomBeaconSig(proposal.RandomBeaconSignature, proposal.Block, signer.RandomBeaconPubKey)
-	if err != nil {
-		return fmt.Errorf("cannot verify block %s 's random beacon signature: %w", blockID, err)
-	}
-	if !valid {
-		return newInvalidBlockError(block, "block proposer's random beacon signature is invalid")
-	}
-
-	// check parent
-	if proposal.Block.View <= qc.View { // block's view must be larger than block.qc's view
-		return newInvalidBlockError(block, fmt.Sprintf("block's view (%d) must be higher than QC's view (%d)", proposal.Block.View, qc.View))
-	}
-	if qc.View < v.forks.FinalizedView() {
-		// It Forks has already pruned the parent block. I.e., we can't validate that the qc matches
-		// a known (and valid) parent. Nevertheless, we just store this block, because there migth already exists
-		// children of this block, we will receive later. However, we know for sure that the block's fork
-		// cannot keep growing anymore because it conflicts with a finalized block.
-
+		// Forks has already pruned the parent block. I.e., we can't validate that the qc matches
+		// a known (and valid) parent. Nevertheless, we just store this block, because there might already
+		// exists children of this block, which we could receive later. However, we know for sure that the
+		// block's fork cannot keep growing anymore because it conflicts with a finalized block.
 		// TODO: note other components will expect Validator has validated, and might re-validate it,
 		return hotstuff.ErrUnverifiableBlock
 	}
 
-	// if the parent block is equal or above the finalized view, then Forks should have it
-	parent, found := v.forks.GetBlock(qc.BlockID) // get parent block
-	if !found {                                   // parent is missing
-		return &hotstuff.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
-	}
-	return v.ValidateQC(qc, parent) // validate QC; very expensive crypto check; kept to the last
+	// validate QC - keep the most expensive the last to check
+	return v.ValidateQC(qc, parent)
 }
 
 // ValidateVote validates the vote and returns the signer identity who signed the vote

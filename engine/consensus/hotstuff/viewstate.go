@@ -122,6 +122,10 @@ func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, 
 		return v.AllConsensusParticipants(blockID)
 	}
 	if len(consensusNodeIDs) == 1 { // Special case: consensusNodeIDs is single
+		// Theoretically, this case is correctly computed, by the logic below. However, the logic below will
+		// go over _all_ consensus nodes and just retain the single input.
+		// In contrast, IdentityForConsensusParticipant allows for a potentially more efficient DataBase lookup.
+		// Hence, we call into the potentially optimized logic here:
 		identity, err := v.IdentityForConsensusParticipant(blockID, consensusNodeIDs[0])
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
@@ -129,31 +133,31 @@ func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, 
 		return []*flow.Identity{identity}, nil
 	}
 
-	// we have a restricted set of consensus nodes:
-	// construct map from nodeId to Index in original list
-	indices := make(map[flow.Identifier]int)
-	for idx, id := range consensusNodeIDs {
-		indices[id] = idx
-	}
-	if len(indices) < len(consensusNodeIDs) {
-		return nil, fmt.Errorf("duplicates in consensusNodeIDs")
-	}
-
+	// Retrieve full flow.Identity for each element in consensusNodeIDs:
 	// Select Identities at block via Filters: consensus participants, staked, element of consensusNodeIDs
 	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake, filter.HasNodeID(consensusNodeIDs...)}
-	identitiesInDefaultOrder, err := v.protocolState.AtBlockID(blockID).Identities(filters...)
+	consensusIdentities, err := v.protocolState.AtBlockID(blockID).Identities(filters...)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
 	}
 
-	// create flow.IdentityList with Identities in order as in consensusNodeIDs
-	l := len(consensusNodeIDs)
-	identities := make([]*flow.Identity, l)
-	for _, id := range identitiesInDefaultOrder {
-		origIdx := indices[id.NodeID]
-		identities[origIdx] = id
+	// create a lookup for consensus identities by ID
+	lookup := make(map[flow.Identifier]*flow.Identity)
+	for _, identity := range consensusIdentities {
+		lookup[identity.ID()] = identity
 	}
-	return identities, nil
+	if len(lookup) != len(consensusNodeIDs) { // fail fast if there are missing or duplicated identities
+		return nil, fmt.Errorf("duplicates in consensusNodeIDs")
+	}
+
+	// create a list of identities to populate based on ordering of consensusNodeIDs
+	orderedConsensusIdentities := make([]*flow.Identity, 0, len(consensusIdentities))
+	for _, nodeID := range consensusNodeIDs {
+		// By construction, we _always_ have the Identity for nodeID in the lookup:
+		// lookup is a subset of consensusNodeIDs.
+		orderedConsensusIdentities = append(orderedConsensusIdentities, lookup[nodeID])
+	}
+	return orderedConsensusIdentities, nil
 }
 
 // LeaderForView returns the identity of the leader at given view

@@ -113,8 +113,6 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Consumer' -dir="./engine/consensus/hotstuff/notifications/" -case=underscore -output="./engine/consensus/hotstuff/notifications/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Vertex' -dir="./engine/consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./engine/consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
-#	GO111MODULE=on mockery -name 'SigVerifier' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks/" -outpkg="mock"
-#	GO111MODULE=on mockery -name 'SigAggregator' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks/" -outpkg="mock"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
