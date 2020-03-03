@@ -216,6 +216,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not broadcast proposal: %w", err)
 	}
 
+	trace.StartCollectionSpan(e.tracer, &payload.Collection).
+		SetTag("node_type", "collection").
+		SetTag("node_id", e.me.NodeID().String())
+
 	return nil
 }
 
@@ -448,43 +452,4 @@ func (e *Engine) dropPendingProposalsWithParent(blockID flow.Identifier) {
 		delete(e.cacheDedup, child.Proposal.Header.ID())
 	}
 	delete(e.cache, blockID)
-}
-
-// createProposal creates a new proposal
-func (e *Engine) createProposal() error {
-	if e.pool.Size() == 0 {
-		return ErrEmptyTxpool
-	}
-
-	transactions := e.pool.All()
-	coll := flow.CollectionFromTransactions(transactions)
-
-	err := e.collections.Store(&coll)
-	if err != nil {
-		return fmt.Errorf("could not save proposed collection: %w", err)
-	}
-
-	guarantee := coll.Guarantee()
-
-	trace.StartCollectionGuaranteeSpan(e.tracer, guarantee, transactions).
-		SetTag("node_type", "collection").
-		SetTag("node_id", e.me.NodeID().String())
-
-	//err = e.guarantees.Store(&guarantee)
-	//if err != nil {
-	//	return fmt.Errorf("could not save proposed collection guarantee %s: %w", guarantee.ID(), err)
-	//}
-
-	// Collection guarantee is saved, we can now delete Txs from the mem pool
-	for _, tx := range transactions {
-		e.pool.Rem(tx.ID())
-		e.tracer.FinishSpan(tx.ID())
-	}
-
-	err = e.provider.ProcessLocal(&messages.SubmitCollectionGuarantee{Guarantee: guarantee})
-	if err != nil {
-		return fmt.Errorf("could not submit collection guarantee: %w", err)
-	}
-
-	return nil
 }

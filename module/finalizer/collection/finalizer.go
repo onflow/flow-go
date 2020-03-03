@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -22,15 +23,17 @@ type Finalizer struct {
 	db           *badger.DB
 	transactions mempool.Transactions
 	prov         network.Engine
+	tracer       trace.Tracer
 	chainID      string // aka cluster ID
 }
 
 // NewFinalizer creates a new finalizer for collection nodes.
-func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, chainID string) *Finalizer {
+func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, tracer trace.Tracer, chainID string) *Finalizer {
 	f := &Finalizer{
 		db:           db,
 		transactions: transactions,
 		prov:         prov,
+		tracer:       tracer,
 		chainID:      chainID,
 	}
 	return f
@@ -105,6 +108,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				if !ok {
 					return fmt.Errorf("could not remove transaction from mempool (id=%x)", txID)
 				}
+				f.tracer.FinishSpan(txID)
 			}
 
 			// finalize the block in cluster state

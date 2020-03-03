@@ -66,7 +66,7 @@ func main() {
 			payloads := storage.NewClusterPayloads(node.DB)
 			// TODO determine chain ID for clusters
 			build := builder.NewBuilder(node.DB, pool, "TODO")
-			final := finalizer.NewFinalizer(node.DB, pool, providerEng, "TODO")
+			final := finalizer.NewFinalizer(node.DB, pool, providerEng, node.Tracer, "TODO")
 
 			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, transactions, headers, payloads)
 			node.MustNot(err).Msg("could not initialize proposal engine")
