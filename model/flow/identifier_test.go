@@ -20,7 +20,7 @@ func TestIdentifierFormat(t *testing.T) {
 
 	// should print hex representation with %s formatting verb
 	t.Run("%s", func(t *testing.T) {
-		formatted := fmt.Sprintf("%s", id)
+		formatted := fmt.Sprintf("%s", id) //nolint:gosimple
 		assert.Equal(t, id.String(), formatted)
 	})
 
