@@ -28,7 +28,7 @@ func NewRandomBeaconSigVerifier() RandomBeaconSigVerifier {
 // VerifyRandomBeaconSig verifies a random beacon signature share for a block using provided signer's public key
 // sigShare - the signature share (from individual random beacon member) to be verified
 // block - the signed block
-// signerPubKey - thesigner's public key
+// signerPubKey - the signer's public key
 //
 // Note: we are specifically choosing safety over performance here.
 //   * The vote itself contains all the information for verifying the signature: the blockID and the block's view

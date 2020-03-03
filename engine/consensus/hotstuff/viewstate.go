@@ -105,7 +105,7 @@ func (v *ViewState) IdentityForConsensusParticipant(blockID flow.Identifier, par
 //    blockID - specifies the block to be queried.
 //    consensusNodeIDs - nodeIDs of consensus nodes
 // Return:
-//    List L := flow.IdentityList where L[k] is the flow.Identifier for consensusNodeIDs[k]
+//    List L := flow.IdentityList where L[k] is the flow.Identity for consensusNodeIDs[k]
 //    error: if any consensusNodeIDs[k] does not correspond to a _staked_ consensus member at blockID
 // Intended application:
 //    * counting stake. Hence, we don't want duplicated identities (i.e. we just error)
@@ -148,7 +148,7 @@ func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, 
 
 	// create flow.IdentityList with Identities in order as in consensusNodeIDs
 	l := len(consensusNodeIDs)
-	identities := make([]*flow.Identity, l, l)
+	identities := make([]*flow.Identity, l)
 	for _, id := range identitiesInDefaultOrder {
 		origIdx := indices[id.NodeID]
 		identities[origIdx] = id
