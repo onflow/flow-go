@@ -6,7 +6,7 @@ package messages
 // type of the hashed-and-signed object.
 
 const (
-	RandomBeaconTag = "RandomBeacon"
+	RandomBeaconTag  = "RandomBeacon"
 	ConsensusVoteTag = "ConsensusVote"
 	CollectorVoteTag = "CollectorVote"
 )
