@@ -1,5 +1,7 @@
 # Cadence Programming Language
 
+*Bastian Müller, Dieter Shirley, Joshua Hannan*
+
 ## Table of Contents
 
 ## Introduction
@@ -43,7 +45,7 @@ Resources are based on liner types which were popularized by Rust.
 Events are inspired by Solidity.
 
 **Disclaimer:** In real Cadence code, all type definitions and code
-must be defined and contained in [contracts](#contracts) or [transactions](#transactions),
+must be declared and contained in [contracts](#contracts) or [transactions](#transactions),
 but we omit these containers in examples for simplicity.
 
 ## Comments
@@ -370,38 +372,41 @@ let binaryNumber = 0b10_11_01
 
 Integers are numbers without a fractional part.
 They are either *signed* (positive, zero, or negative)
-or *unsigned* (positive or zero)
-and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
+or *unsigned* (positive or zero).
 
-Signed integer types which check for overflow and underflow have an `Int` prefix.
-They are `Int8`, `Int16`, `Int32`, and `Int64`.
-They can represent values in the following ranges:
+Signed integer types which check for overflow and underflow have an `Int` prefix
+and can represent values in the following ranges:
 
-- **`Int8`**: -128 through 127
-- **`Int16`**: -32768 through 32767
-- **`Int32`**: -2147483648 through 2147483647
-- **`Int64`**: -9223372036854775808 through 9223372036854775807
+- **`Int8`**: −2^7 through 2^7 − 1 (-128 through 127)
+- **`Int16`**: −2^15 through 2^15 − 1 (-32768 through 32767)
+- **`Int32`**: −2^31 through 2^31 − 1 (-2147483648 through 2147483647)
+- **`Int64`**: −2^63 through 2^63 − 1 (-9223372036854775808 through 9223372036854775807)
+- **`Int128`**: −2^127 through 2^127 − 1
+- **`Int256`**: −2^255 through 2^255 − 1
 
-Unsigned integer types which check for overflow and underflow have a `UInt` prefix.
-They are `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
+Unsigned integer types which check for overflow and underflow have a `UInt` prefix
+and can represent values in the following ranges:
 
-- **`UInt8`**: 0 through 255
-- **`UInt16`**: 0 through 65535
-- **`UInt32`**: 0 through 4294967295
-- **`UInt64`**: 0 through 18446744073709551615
+- **`UInt8`**: 0 through 2^8 − 1 (255)
+- **`UInt16`**: 0 through 2^16 − 1 (65535)
+- **`UInt32`**: 0 through 2^32 − 1 (4294967295)
+- **`UInt64`**: 0 through 2^64 − 1 (18446744073709551615)
+- **`UInt128`**: 0 through 2^128 − 1
+- **`UInt256`**: 0 through 2^256 − 1
 
 Unsigned integer types which do **not** check for overflow and underflow,
-i.e. wrap around, have the `Word` prefix:
+i.e. wrap around, have the `Word` prefix
+and can represent values in the following ranges:
 
-- **`Word8`**: 0 through 255
-- **`Word16`**: 0 through 65535
-- **`Word32`**: 0 through 4294967295
-- **`Word64`**: 0 through 18446744073709551615
+- **`Word8`**: 0 through 2^8 − 1 (255)
+- **`Word16`**: 0 through 2^16 − 1 (65535)
+- **`Word32`**: 0 through 2^32 − 1 (4294967295)
+- **`Word64`**: 0 through 2^64 − 1 (18446744073709551615)
 
 The types are independent types, i.e. not subtypes of each other.
 
 See the section about [artihmetic operators](#arithmetic) for further
-information aout the behavior of the different integer types.
+information about the behavior of the different integer types.
 
 ```cadence
 // Declare a constant that has type `UInt8` and the value 10.
@@ -453,13 +458,36 @@ let a = Int16(x) + y
 let b = x + 1000000000000000000000000
 ```
 
+### Fixed-Point Numbers
+
+Fixed-point numbers are useful for representing fractional values.
+They have a fixed number of digits after decimal point.
+
+They are essentially integers which are scaled by a factor.
+For example, the value 1.23 can be represented as 1230 with a scaling factor of 1/1000.
+The scaling factor is the same for all values of the same type and stays the same during calculations.
+
+Fixed-point numbers in Cadence have a scaling factor with a power of 10, instead or a power of 2,
+i.e. they are decimal, not binary.
+
+Signed fixed-point number types have the prefix `Fix`,
+have the following factors, and can represent values in the following ranges:
+
+- **`Fix64`**: Factor 1/100,000,000; -92233720368.54775808 through 92233720368.54775807
+
+Unsigned fixed-point number types have the prefix `UFix`,
+have the following factors, and can represent values in the following ranges:
+
+- **`UFix64`**: Factor 1/100,000,000; 0.0 through 184467440737.09551615
+
 ### Floating-Point Numbers
 
 There is **no** support for floating point numbers.
 
 Smart Contracts are not intended to work with values with error margins
 and therefore floating point arithmetic is not appropriate here.
-Fixed point numbers should be simulated using integers and a scale factor for now.
+
+Instead, consider using [fixed point numbers](#fixed-point-numbers).
 
 ### Addresses
 
@@ -1615,8 +1643,8 @@ The result is always the same type as the arguments.
 
 The division and remainder operators abort the program when the divisor is zero.
 
-Arithmetic operations on the signed integer types `Int8`, `Int16`, `Int32`, `Int64`,
-and on the unsigned integer types `UInt8`, `UInt16`, `UInt32`, `UInt64`
+Arithmetic operations on the signed integer types `Int8`, `Int16`, `Int32`, `Int64`, `Int128`, `Int256`,
+and on the unsigned integer types `UInt8`, `UInt16`, `UInt32`, `UInt64`, `UInt128`, `UInt256`,
 do not cause values to overflow or underflow.
 
 ```cadence,file=operator-add-overflow.cdc
@@ -2765,16 +2793,17 @@ let maybeSomething = nil
 let maybeSomething: Int? = nil
 ```
 
-## Composite Data Types
+## Composite Types
 
-Composite data types allow composing simpler types into more complex types,
+Composite types allow composing simpler types into more complex types,
 i.e., they allow the composition of multiple values into one.
-Composite data types have a name and consist of zero or more named fields,
+Composite types have a name and consist of zero or more named fields,
 and zero or more functions that operate on the data.
-Each field may have a different type.  Composite data types can
-only be declared within a [contract](#contracts) and nowhere else.
+Each field may have a different type.
 
-There are two kinds of composite data types.
+Composite types can only be declared within a [contract](#contracts) and nowhere else.
+
+There are two kinds of composite types.
 The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable,
 when the value is assigned to a variable,
 when the value is passed as an argument to a function,
@@ -2802,11 +2831,11 @@ Nesting of resources is only allowed within other resource types,
 or in data structures like arrays and dictionaries,
 but not in structures, as that would allow resources to be copied.
 
-### Composite Data Type Declaration and Creation
+### Composite Type Declaration and Creation
 
 Structures are declared using the `struct` keyword and resources are declared using the `resource` keyword. The keyword is followed by the name.
 
-```cadence,file=composite-data-type-declaration.cdc
+```cadence,file=composite-type-declaration.cdc
 struct SomeStruct {
     // ...
 }
@@ -2824,20 +2853,22 @@ Structures are created (instantiated) by calling the type like a function.
 SomeStruct()
 ```
 
+The constructor function may require parameters if the [initializer](#composite-type-fields)
+of the composite type requires them.
+
+Composite types can only be declared within [contract](#contracts)
+and not locally in functions.
+They can also not be nested.
+
 Resource must be created (instantiated) by using the `create` keyword and calling the type like a function.
+
+Resources can only be created in functions and types that are declared in the same contract in which the resource is declared.
 
 ```cadence,file=resource-instantiation.cdc
 create SomeResource()
 ```
 
-The constructor function may require parameters if the [initializer](#composite-data-type-fields)
-of the composite data type requires them.
-
-Composite data types can only be declared within [contract](#contracts)
-and not locally in functions.
-They can also not be nested.
-
-### Composite Data Type Fields
+### Composite Type Fields
 
 Fields are declared like variables and constants.
 However, the initial values for fields are set in the initializer,
@@ -2881,8 +2912,8 @@ There are three kinds of fields:
     Synthetic fields are declared using the `synthetic` keyword.
 
     Synthetic fields must have a getter and a setter.
-    Getters and setters are explained in the [next section](#composite-data-type-field-getters-and-setters).
-    Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
+    Getters and setters are explained in the [next section](#composite-type-field-getters-and-setters).
+    Synthetic fields are explained in a [separate section](#synthetic-composite-type-fields).
 
 | Field Kind           | Stored in memory | Assignable         | Keyword     |
 |----------------------|------------------|--------------------|-------------|
@@ -2897,7 +2928,7 @@ Fields can be read (if they are constant or variable) and set (if they are varia
 using the access syntax: the composite value is followed by a dot (`.`)
 and the name of the field.
 
-```cadence,file=composite-data-type-fields-and-init.cdc
+```cadence,file=composite-type-fields-and-init.cdc
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
@@ -2957,7 +2988,7 @@ struct Token {
 
 A composite value can be created by calling the constructor and the value's fields can be accessed.
 
-```cadence,file=composite-data-type-fields-assignment.cdc
+```cadence,file=composite-type-fields-assignment.cdc
 let token = Token(id: 42, balance: 1_000_00)
 
 token.id  // is `42`
@@ -2971,9 +3002,22 @@ token.balance = 1
 token.id = 23
 ```
 
+Resources have the implicit field `let owner: PublicAccount?`.
+If the resource is currently [stored in an account](#account-storage),
+then the field contains the publicly accessible portion of the account.
+Otherwise the field is `nil`.
+
+The field's value changes when the resource is moved from outside account storage
+into account storage, when it is moved from the storage of one account
+to the storage of another account, and when it is moved out of account storage.
+
+### Composite Data Initializer Overloading
+
+> 🚧 Status: Initializer overloading is not implemented yet.
+
 Initializers support overloading. This allows for example providing default values for certain parameters.
 
-```cadence,file=composite-data-type-initializer-overloading.cdc
+```cadence,file=composite-type-initializer-overloading.cdc
 // Declare a structure named `Token`, which has a constant field
 // named `id` and a variable field named `balance`.
 //
@@ -2998,7 +3042,7 @@ struct Token {
 }
 ```
 
-### Composite Data Type Field Getters and Setters
+### Composite Type Field Getters and Setters
 
 Fields may have an optional getter and an optional setter.
 Getters are functions that are called when a field is read,
@@ -3010,7 +3054,7 @@ Getters and setters are enclosed in opening and closing braces, after the field'
 Getters are declared using the `get` keyword.
 Getters have no parameters and their return type is implicitly the type of the field.
 
-```cadence,file=composite-data-type-field-getter.cdc
+```cadence,file=composite-type-field-getter.cdc
 struct GetterExample {
 
     // Declare a variable field named `balance` with a getter
@@ -3047,7 +3091,7 @@ Another type cannot be specified. Setters have no return type.
 
 The types of values assigned to setters must always match the field's type.
 
-```cadence,file=composite-data-type-field-setter.cdc
+```cadence,file=composite-type-field-setter.cdc
 struct SetterExample {
 
     // Declare a variable field named `balance` with a setter
@@ -3074,7 +3118,9 @@ let example = SetterExample(balance: 10)
 example.balance = -50
 ```
 
-### Synthetic Composite Data Type Fields
+### Synthetic Composite Type Fields
+
+> 🚧 Status: Synthetic fields are not implemented yet.
 
 Fields which are not stored in the composite value are *synthetic*,
 i.e., the field value is computed.
@@ -3164,12 +3210,14 @@ tracker.left = 8
 
 It is invalid to declare a synthetic field with only a setter.
 
-### Composite Data Type Functions
+### Composite Type Functions
 
-Composite data types may contain functions.
+> 🚧 Status: Function overloading is not implemented yet.
+
+Composite types may contain functions.
 Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
 
-```cadence,file=composite-data-type-function.cdc
+```cadence,file=composite-type-function.cdc
 // Declare a structure named "Rectangle", which represents a rectangle
 // and has variable fields for the width and height.
 //
@@ -3199,7 +3247,7 @@ rectangle.scale(factor: 4)
 
 Functions support overloading.
 
-```cadence,file=composite-data-type-function-overloading.cdc
+```cadence,file=composite-type-function-overloading.cdc
 // Declare a structure named "Rectangle", which represents a rectangle
 // and has variable fields for the width and height.
 //
@@ -3233,15 +3281,15 @@ struct Rectangle {
 }
 ```
 
-### Composite Data Type Subtyping
+### Composite Type Subtyping
 
-Two composite data types are compatible if and only if they refer to the same declaration by name,
+Two composite types are compatible if and only if they refer to the same declaration by name,
 i.e., nominal typing applies instead of structural typing.
 
-Even if two composite data types declare the same fields and functions,
+Even if two composite types declare the same fields and functions,
 the types are only compatible if their names match.
 
-```cadence,file=composite-data-type.cdc
+```cadence,file=composite-type.cdc
 // Declare a structure named `A` which has a function `test`
 // which has type `((): Void)`.
 //
@@ -3272,7 +3320,7 @@ something = B()
 something = A()
 ```
 
-### Composite Data Type Behaviour
+### Composite Type Behaviour
 
 #### Structures
 
@@ -3314,9 +3362,9 @@ b.increment()
 // `b.value` is 2, `a.value` is `0`
 ```
 
-#### Accessing Fields and Functions of Composite Data Types Using Optional Chaining
+#### Accessing Fields and Functions of Composite Types Using Optional Chaining
 
-If a composite data type with fields and functions is wrapped in an optional,
+If a composite type with fields and functions is wrapped in an optional,
 optional chaining can be used to get those values or call the function without
 having to get the value of the optional first.
 
@@ -3605,7 +3653,7 @@ fun returnBeforeDestroy(: Bool) {
 }
 ```
 
-#### Resource variables
+#### Resource Variables
 
 Resource variables cannot be assigned to as that would lead to the loss of the variable's current resource value.
 
@@ -3656,7 +3704,7 @@ destroy res
 
 #### Nested Resources
 
-Fields in composite data types behave differently when they have a resource type.
+Fields in composite types behave differently when they have a resource type.
 
 If a resource type has fields that have a resource type,
 it **must** declare a destructor,
@@ -4263,9 +4311,9 @@ Contract interfaces can only be declared globally and not inside contracts.
 ### Interface Implementation
 
 Declaring that a type implements (conforms) to an interface
-is done in the type declaration of the composite data type (e.g., structure, resource):
-The kind and the name of the composite data type is followed by a colon (`:`)
-and the name of one or more interfaces that the composite data type implements.
+is done in the type declaration of the composite type (e.g., structure, resource):
+The kind and the name of the composite type is followed by a colon (`:`)
+and the name of one or more interfaces that the composite type implements.
 
 This will tell the checker to enforce any requirements from the specified interfaces onto the declared type.
 
@@ -4616,7 +4664,6 @@ resource ExampleToken: FungibleToken {
         }
     }
 }
-
 ```
 
 ### `Equatable` Interface
@@ -4998,11 +5045,11 @@ Imagine that the next example is from a different account as before.
 
 // Get the public account object for the account that published the reference.
 //
-let acct = getAccount(0x72)
+let account = getAccount(0x72)
 
 // Read the `&HasCount` reference from their published object.
 //
-let countRef = acct.published[&HasCount] ?? panic("missing Count reference!")
+let countRef = account.published[&HasCount] ?? panic("missing Count reference!")
 
 // Read one of the exposed fields in the reference.
 //
@@ -5016,14 +5063,13 @@ countRef.increment()
 // Invalid: Cannot access the account.storage object
 // from the public account object.
 //
-let countObj = acct.storage[Counter]
-
+let counter = account.storage[Counter]
 ```
 
 ## Contracts
 
 A contract in Cadence is a collection of type definitions
-of interfaces, structs, resources,  data (its state), and code (its functions)
+of interfaces, structs, resources, data (its state), and code (its functions)
 that lives in the contract storage area of an account in Flow.
 Contracts are where all composite types like structs, resources,
 events, and interfaces for these types in Cadence have to be defined.
@@ -5056,7 +5102,7 @@ pub contract SomeContract {
 
 Contracts cannot be nested in each other.
 
-```cadence,file=contract_invalidnesting.cdc
+```cadence,file=contract-invalidnesting.cdc
 pub contract Invalid {
 
     // Invalid: Contracts cannot be nested in any other type.
@@ -5069,7 +5115,7 @@ pub contract Invalid {
 One of the simplest forms of a contract would just be one with a state field,
 a function, and an `init` function that initializes the field:
 
-```cadence,file=contract_hello.cdc
+```cadence,file=contract-hello.cdc
 // HelloWorldResource.cdc
 
 pub contract HelloWorld {
@@ -5100,7 +5146,7 @@ Anyone could call the above contract's `hello` function by importing
 the contract from the account it was deployed to and using the imported
 object to call the hello function.
 
-```cadence,file=contract_call.cdc
+```cadence,file=contract-call.cdc
 import HelloWorld from 0x42
 
 // Invalid: The contract does not know where hello comes from
@@ -5122,11 +5168,11 @@ HelloWorld.init()    // Error
 ```
 
 There can be any number of contracts per account
-and they can include an arbitrary amount of data. This means that
-a contract can have any number of fields, functions, and type definitions,
+and they can include an arbitrary amount of data.
+This means that a contract can have any number of fields, functions, and type definitions,
 but they have to be in the contract and not another top-level definition.
 
-```cadence,file=bad_decl.cdc
+```cadence,file=bad-top-level-declarations.cdc
 // Invalid: Top-level declarations are restricted to only be contracts
 //          or contract interfaces. Therefore, all of these would be invalid
 //          if they were deployed to the account contract storage and
@@ -5139,15 +5185,16 @@ let num: Int
 ```
 
 Another important feature of contracts is that instances of resources and events
-that are defined in contracts can only be created within functions or types
-that are defined in that contract.
-Code outside the contract cannot arbitrarily create instances of resources and events.
+that are declared in contracts can only be created/emitted within functions or types
+that are declared in the same contract.
+
+It is not possible create instances of resources and events outside the contract.
 
 The contract below defines a resource interface `Receiver` and a resource `Vault`
 that implements that interface.  The way this example is written,
 there is no way to create this resource, so it would not be usable.
 
-```cadence,file=ft_contract.cdc
+```cadence,file=fungible-token-contract.cdc
 // Valid
 pub contract FungibleToken {
 
@@ -5198,7 +5245,7 @@ If a user tried to run a transaction that created an instance of the `Vault` typ
 the type checker would not allow it because only code in the `FungibleToken`
 contract can create new `Vault`s.
 
-```cadence,file=contract_invalid_create.cdc
+```cadence,file=contract-invalid-create.cdc
 import FungibleToken from 0x42
 
 // Invalid: Cannot create an instance of the `Vault` type outside
@@ -5213,12 +5260,12 @@ store it in the owner's account storage.
 
 This brings up another key feature of contracts in Cadence.  Contracts
 can interact with its account's `storage` and `published` objects to store
-resources, structs, and references.  They do so by using the special
-`self.account` object that is only accessible within the contract.
+resources, structs, and references.
+They do so by using the special `self.account` object that is only accessible within the contract.
 
-Imagine that these were defined in the above `FungibleToken` contract.
+Imagine that these were declared in the above `FungibleToken` contract.
 
-```cadence,file=ft_contract_additions.cdc
+```cadence,file=fungible-token-contract-additions.cdc
 
     pub fun createVault(initialBalance: Int): @Vault {
         return <-create Vault(balance: initialBalance)
@@ -5230,17 +5277,25 @@ Imagine that these were defined in the above `FungibleToken` contract.
     }
 ```
 
-Now, any account could call the `createVault` function defined in the contract
-to create a `Vault` object.  Or the owner could call the `withdraw` function
-on their own `Vault` to send new vaults to others.
+Now, any account could call the `createVault` function declared in the contract
+to create a `Vault` object.
+Or the owner could call the `withdraw` function on their own `Vault` to send new vaults to others.
 
-```cadence,file=ft_contract_tx.cdc
+```cadence,file=fungible-contract-transaction.cdc
 import FungibleToken from 0x42
 
 // Valid: Create an instance of the `Vault` type by calling the contract's
 // `createVault` function.
 //
 let newVault <- create FungibleToken.createVault(initialBalance: 10)
+```
+
+Contracts have the implicit field `let account: Account`,
+which is the account in which the contract is deployed too.
+This gives the contract the ability to e.g. read and write to the account's storage.
+
+```cadence,file=contract-account.cdc
+
 ```
 
 ### Deploying and Updating Contracts
@@ -5255,7 +5310,7 @@ Additional arguments are passed to the initializer of the contract.
 
 For example, assuming the following contract code should be deployed:
 
-```cadence,file=test_contract.cdc
+```cadence,file=test-contract.cdc
 contract Test {
     let message: String
 
@@ -5267,7 +5322,7 @@ contract Test {
 
 The contract can be deployed as follows:
 
-```cadence,file=deploy_setCode.cdc
+```cadence,file=deploy-setCode.cdc
 let signer: Account = ...
 signer.setCode(
     [0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61/*, ... */],
@@ -5277,7 +5332,7 @@ signer.setCode(
 
 The contract can also be deployed when creating an account by using the `Account` constructor.
 
-```cadence,file=deploy_setCode.cdc
+```cadence,file=deploy-setCode.cdc
 let newAccount = Account(
     publicKeys: [],
     code: [0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61/*, ... */],
@@ -5300,7 +5355,7 @@ If a contract interface declares an interface type, the implementing contract
 does not have to also define that interface.  They can refer to that nested
 interface by saying `{ContractInterfaceName}.{NestedInterfaceName}`
 
-```cadence,file=contract_interface.cdc
+```cadence,file=contract-interface.cdc
 // Declare a contract interface that declares an interface and a resource
 // that needs to implement that interface in the contract implementation.
 //
@@ -5398,7 +5453,7 @@ Emitting events has the following restrictions:
 
   This means events cannot be assigned to variables or used as function parameters.
 
-- Events can only be emitted from the location in which they are defined.
+- Events can only be emitted from the location in which they are declared.
 
 ## Transactions
 
@@ -5414,7 +5469,7 @@ Next is the body of the transaction, which is broken into three main phases:
 Preparation, execution, and postconditions, only in that order.
 Each phase is a block of code that executes sequentially.
 
-- The **prepare phase** acts like the initializer in a composite data type,
+- The **prepare phase** acts like the initializer in a composite type,
   i.e., it initializes fields that can then be used in the execution phase.
 
   The prepare phase has the permissions to read from and write to the storage

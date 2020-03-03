@@ -10,6 +10,7 @@
   <body class="markdown-body">
     <section>
       <h1 id="cadence-programming-language"><a href="#cadence-programming-language" aria-hidden="true"><span class="icon icon-link"></span></a>Cadence Programming Language</h1>
+      <p><em>Bastian Müller, Dieter Shirley, Joshua Hannan</em></p>
       <section>
         <h2 id="table-of-contents"><a href="#table-of-contents" aria-hidden="true"><span class="icon icon-link"></span></a>Table of Contents</h2>
         <ul>
@@ -51,6 +52,9 @@
               </li>
               <li>
                 <p><a href="#integers">Integers</a></p>
+              </li>
+              <li>
+                <p><a href="#fixed-point-numbers">Fixed-Point Numbers</a></p>
               </li>
               <li>
                 <p><a href="#floating-point-numbers">Floating-Point Numbers</a></p>
@@ -150,33 +154,36 @@
             <p><a href="#type-inference">Type Inference</a></p>
           </li>
           <li>
-            <p><a href="#composite-data-types">Composite Data Types</a></p>
+            <p><a href="#composite-types">Composite Types</a></p>
             <ul>
               <li>
-                <p><a href="#composite-data-type-declaration-and-creation">Composite Data Type Declaration and Creation</a></p>
+                <p><a href="#composite-type-declaration-and-creation">Composite Type Declaration and Creation</a></p>
               </li>
               <li>
-                <p><a href="#composite-data-type-fields">Composite Data Type Fields</a></p>
+                <p><a href="#composite-type-fields">Composite Type Fields</a></p>
               </li>
               <li>
-                <p><a href="#composite-data-type-field-getters-and-setters">Composite Data Type Field Getters and Setters</a></p>
+                <p><a href="#composite-data-initializer-overloading">Composite Data Initializer Overloading</a></p>
               </li>
               <li>
-                <p><a href="#synthetic-composite-data-type-fields">Synthetic Composite Data Type Fields</a></p>
+                <p><a href="#composite-type-field-getters-and-setters">Composite Type Field Getters and Setters</a></p>
               </li>
               <li>
-                <p><a href="#composite-data-type-functions">Composite Data Type Functions</a></p>
+                <p><a href="#synthetic-composite-type-fields">Synthetic Composite Type Fields</a></p>
               </li>
               <li>
-                <p><a href="#composite-data-type-subtyping">Composite Data Type Subtyping</a></p>
+                <p><a href="#composite-type-functions">Composite Type Functions</a></p>
               </li>
               <li>
-                <p><a href="#composite-data-type-behaviour">Composite Data Type Behaviour</a></p>
+                <p><a href="#composite-type-subtyping">Composite Type Subtyping</a></p>
+              </li>
+              <li>
+                <p><a href="#composite-type-behaviour">Composite Type Behaviour</a></p>
                 <ul>
                   <li><a href="#structures">Structures</a></li>
-                  <li><a href="#accessing-fields-and-functions-of-composite-data-types-using-optional-chaining">Accessing Fields and Functions of Composite Data Types Using Optional Chaining</a></li>
+                  <li><a href="#accessing-fields-and-functions-of-composite-types-using-optional-chaining">Accessing Fields and Functions of Composite Types Using Optional Chaining</a></li>
                   <li><a href="#resources">Resources</a></li>
-                  <li><a href="#resource-variables">Resource variables</a></li>
+                  <li><a href="#resource-variables">Resource Variables</a></li>
                   <li><a href="#resource-destructors">Resource Destructors</a></li>
                   <li><a href="#nested-resources">Nested Resources</a></li>
                   <li><a href="#resources-in-closures">Resources in Closures</a></li>
@@ -323,7 +330,7 @@
         <p>Events are inspired by Solidity.</p>
         <p>
           <strong>Disclaimer:</strong> In real Cadence code, all type definitions and code
-          must be defined and contained in <a href="#contracts">contracts</a> or <a href="#transactions">transactions</a>,
+          must be declared and contained in <a href="#contracts">contracts</a> or <a href="#transactions">transactions</a>,
           but we omit these containers in examples for simplicity.
         </p>
       </section>
@@ -478,7 +485,7 @@
 </span><span style="color: #008000">// This declaration is valid because the integer literal `1` fits into the range of the type `Int8`,</span><span>
 </span><span style="color: #008000">// the type of 8-bit signed integers.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> smallIntegerWithAnnotation: Int8 = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> smallIntegerWithAnnotation: </span><span style="color: #0000FF">Int8</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span></code></pre>
         <p>
           If a type annotation is provided, the initial value must be of this type.
@@ -659,54 +666,57 @@
           <p>
             Integers are numbers without a fractional part.
             They are either <em>signed</em> (positive, zero, or negative)
-            or <em>unsigned</em> (positive or zero)
-            and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
+            or <em>unsigned</em> (positive or zero).
           </p>
           <p>
-            Signed integer types which check for overflow and underflow have an <code>Int</code> prefix.
-            They are <code>Int8</code>, <code>Int16</code>, <code>Int32</code>, and <code>Int64</code>.
-            They can represent values in the following ranges:
+            Signed integer types which check for overflow and underflow have an <code>Int</code> prefix
+            and can represent values in the following ranges:
           </p>
           <ul>
-            <li><strong><code>Int8</code></strong>: -128 through 127</li>
-            <li><strong><code>Int16</code></strong>: -32768 through 32767</li>
-            <li><strong><code>Int32</code></strong>: -2147483648 through 2147483647</li>
-            <li><strong><code>Int64</code></strong>: -9223372036854775808 through 9223372036854775807</li>
+            <li><strong><code>Int8</code></strong>: −2^7 through 2^7 − 1 (-128 through 127)</li>
+            <li><strong><code>Int16</code></strong>: −2^15 through 2^15 − 1 (-32768 through 32767)</li>
+            <li><strong><code>Int32</code></strong>: −2^31 through 2^31 − 1 (-2147483648 through 2147483647)</li>
+            <li><strong><code>Int64</code></strong>: −2^63 through 2^63 − 1 (-9223372036854775808 through 9223372036854775807)</li>
+            <li><strong><code>Int128</code></strong>: −2^127 through 2^127 − 1</li>
+            <li><strong><code>Int256</code></strong>: −2^255 through 2^255 − 1</li>
           </ul>
           <p>
-            Unsigned integer types which check for overflow and underflow have a <code>UInt</code> prefix.
-            They are <code>UInt8</code>, <code>UInt16</code>, <code>UInt32</code>, and <code>UInt64</code>.
+            Unsigned integer types which check for overflow and underflow have a <code>UInt</code> prefix
+            and can represent values in the following ranges:
           </p>
           <ul>
-            <li><strong><code>UInt8</code></strong>: 0 through 255</li>
-            <li><strong><code>UInt16</code></strong>: 0 through 65535</li>
-            <li><strong><code>UInt32</code></strong>: 0 through 4294967295</li>
-            <li><strong><code>UInt64</code></strong>: 0 through 18446744073709551615</li>
+            <li><strong><code>UInt8</code></strong>: 0 through 2^8 − 1 (255)</li>
+            <li><strong><code>UInt16</code></strong>: 0 through 2^16 − 1 (65535)</li>
+            <li><strong><code>UInt32</code></strong>: 0 through 2^32 − 1 (4294967295)</li>
+            <li><strong><code>UInt64</code></strong>: 0 through 2^64 − 1 (18446744073709551615)</li>
+            <li><strong><code>UInt128</code></strong>: 0 through 2^128 − 1</li>
+            <li><strong><code>UInt256</code></strong>: 0 through 2^256 − 1</li>
           </ul>
           <p>
             Unsigned integer types which do <strong>not</strong> check for overflow and underflow,
-            i.e. wrap around, have the <code>Word</code> prefix:
+            i.e. wrap around, have the <code>Word</code> prefix
+            and can represent values in the following ranges:
           </p>
           <ul>
-            <li><strong><code>Word8</code></strong>: 0 through 255</li>
-            <li><strong><code>Word16</code></strong>: 0 through 65535</li>
-            <li><strong><code>Word32</code></strong>: 0 through 4294967295</li>
-            <li><strong><code>Word64</code></strong>: 0 through 18446744073709551615</li>
+            <li><strong><code>Word8</code></strong>: 0 through 2^8 − 1 (255)</li>
+            <li><strong><code>Word16</code></strong>: 0 through 2^16 − 1 (65535)</li>
+            <li><strong><code>Word32</code></strong>: 0 through 2^32 − 1 (4294967295)</li>
+            <li><strong><code>Word64</code></strong>: 0 through 2^64 − 1 (18446744073709551615)</li>
           </ul>
           <p>The types are independent types, i.e. not subtypes of each other.</p>
           <p>
             See the section about <a href="#arithmetic">artihmetic operators</a> for further
-            information aout the behavior of the different integer types.
+            information about the behavior of the different integer types.
           </p>
           <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant that has type `UInt8` and the value 10.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> smallNumber: UInt8 = </span><span style="color: #09885A">10</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> smallNumber: </span><span style="color: #0000FF">UInt8</span><span style="color: #000000"> = </span><span style="color: #09885A">10</span><span>
 </span></code></pre>
           <pre><code class="language-cadence"><span style="color: #008000">// Invalid: negative literal cannot be used as an unsigned integer</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> invalidNumber: UInt8 = </span><span style="color: #09885A">-10</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> invalidNumber: </span><span style="color: #0000FF">UInt8</span><span style="color: #000000"> = </span><span style="color: #09885A">-10</span><span>
 </span></code></pre>
           <p>In addition, the arbitrary precision integer type <code>Int</code> is provided.</p>
-          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> veryLargeNumber: Int = </span><span style="color: #09885A">10000000000000000000000000000000</span><span>
+          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> veryLargeNumber: </span><span style="color: #0000FF">Int</span><span style="color: #000000"> = </span><span style="color: #09885A">10000000000000000000000000000000</span><span>
 </span></code></pre>
           <p>
             Integer literals are <a href="#type-inference">inferred</a> to have type <code>Int</code>,
@@ -722,8 +732,8 @@
             Integer types are not converted automatically. Types must be explicitly converted,
             which can be done by calling the constructor of the type with the integer type.
           </p>
-          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int8 = </span><span style="color: #09885A">1</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int16 = </span><span style="color: #09885A">2</span><span>
+          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int8</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: </span><span style="color: #0000FF">Int16</span><span style="color: #000000"> = </span><span style="color: #09885A">2</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: the types of the operands, `Int8` and `Int16` are incompatible.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> z = x + y</span><span>
@@ -740,13 +750,43 @@
 </span></code></pre>
         </section>
         <section>
+          <h3 id="fixed-point-numbers"><a href="#fixed-point-numbers" aria-hidden="true"><span class="icon icon-link"></span></a>Fixed-Point Numbers</h3>
+          <p>
+            Fixed-point numbers are useful for representing fractional values.
+            They have a fixed number of digits after decimal point.
+          </p>
+          <p>
+            They are essentially integers which are scaled by a factor.
+            For example, the value 1.23 can be represented as 1230 with a scaling factor of 1/1000.
+            The scaling factor is the same for all values of the same type and stays the same during calculations.
+          </p>
+          <p>
+            Fixed-point numbers in Cadence have a scaling factor with a power of 10, instead or a power of 2,
+            i.e. they are decimal, not binary.
+          </p>
+          <p>
+            Signed fixed-point number types have the prefix <code>Fix</code>,
+            have the following factors, and can represent values in the following ranges:
+          </p>
+          <ul>
+            <li><strong><code>Fix64</code></strong>: Factor 1/100,000,000; -92233720368.54775808 through 92233720368.54775807</li>
+          </ul>
+          <p>
+            Unsigned fixed-point number types have the prefix <code>UFix</code>,
+            have the following factors, and can represent values in the following ranges:
+          </p>
+          <ul>
+            <li><strong><code>UFix64</code></strong>: Factor 1/100,000,000; 0.0 through 184467440737.09551615</li>
+          </ul>
+        </section>
+        <section>
           <h3 id="floating-point-numbers"><a href="#floating-point-numbers" aria-hidden="true"><span class="icon icon-link"></span></a>Floating-Point Numbers</h3>
           <p>There is <strong>no</strong> support for floating point numbers.</p>
           <p>
             Smart Contracts are not intended to work with values with error margins
             and therefore floating point arithmetic is not appropriate here.
-            Fixed point numbers should be simulated using integers and a scale factor for now.
           </p>
+          <p>Instead, consider using <a href="#fixed-point-numbers">fixed point numbers</a>.</p>
         </section>
         <section>
           <h3 id="addresses"><a href="#addresses" aria-hidden="true"><span class="icon icon-link"></span></a>Addresses</h3>
@@ -861,7 +901,7 @@
             <code>AnyStruct</code> is also the super-type of all non-resource optional types,
             and <code>AnyResource</code> is the super-type of all resource optional types.
           </p>
-          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeInt: Int? = </span><span style="color: #09885A">1</span><span>
+          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeInt: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> anything: </span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000"> = maybeInt</span><span>
 </span></code></pre>
           <p>
@@ -884,12 +924,12 @@
           <pre><code class="language-cadence,file=optional.cdc"><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
 </span><span style="color: #008000">// with nil as its initial value.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #0000FF">nil</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
 </span><span style="color: #008000">// with 42 as its initial value.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">42</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">42</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: `b` has type `Int?`, which does not support arithmetic.</span><span>
 </span><span style="color: #000000">b + </span><span style="color: #09885A">23</span><span>
@@ -897,7 +937,7 @@
 </span><span style="color: #008000">// Invalid: Declare a constant with a non-optional integer type `Int`,</span><span>
 </span><span style="color: #008000">// but the initial value is `nil`, which in this context has type `Int?`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span style="color: #000000"> = </span><span style="color: #0000FF">nil</span><span>
 </span></code></pre>
           <p>Optionals can be created for any value, not just for literals.</p>
           <pre><code class="language-cadence,file=optional-wrapping.cdc"><span style="color: #008000">// Declare a constant which has a non-optional integer type,</span><span>
@@ -908,7 +948,7 @@
 </span><span style="color: #008000">// Declare a constant which has an optional integer type.</span><span>
 </span><span style="color: #008000">// An optional with the value of `x` is created.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int? = x</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = x</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a variable which has an optional any type, i.e. the variable</span><span>
 </span><span style="color: #008000">// may be `nil`, or any other value.</span><span>
@@ -917,7 +957,7 @@
 </span><span style="color: #0000FF">var</span><span style="color: #000000"> z: </span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000">? = x</span><span>
 </span></code></pre>
           <p>A non-optional type is a subtype of its optional type.</p>
-          <pre><code class="language-cadence"><span style="color: #0000FF">var</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+          <pre><code class="language-cadence"><span style="color: #0000FF">var</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #0000FF">nil</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">a = b</span><span>
 </span><span>
@@ -925,11 +965,11 @@
 </span></code></pre>
           <p>Optional types may be contained in other types, for example <a href="#arrays">arrays</a> or even optionals.</p>
           <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant which has an array type of optional integers.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> xs: [Int?] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">nil</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #0000FF">nil</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> xs: [</span><span style="color: #0000FF">Int</span><span style="color: #000000">?] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">nil</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #0000FF">nil</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a constant which has a double optional type.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> doubleOptional: Int?? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> doubleOptional: </span><span style="color: #0000FF">Int</span><span style="color: #000000">?? = </span><span style="color: #0000FF">nil</span><span>
 </span></code></pre>
           <section>
             <h4 id="nil-coalescing-operator"><a href="#nil-coalescing-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Nil-Coalescing Operator</h4>
@@ -942,12 +982,12 @@
             <p>If the left-hand side is non-nil, the right-hand side is not evaluated.</p>
             <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant which has an optional integer type</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #0000FF">nil</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a constant with a non-optional integer type,</span><span>
 </span><span style="color: #008000">// which is initialized to `a` if it is non-nil, or 42 otherwise.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int = a ?? </span><span style="color: #09885A">42</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: </span><span style="color: #0000FF">Int</span><span style="color: #000000"> = a ?? </span><span style="color: #09885A">42</span><span>
 </span><span style="color: #008000">// `b` is 42, as `a` is nil</span><span>
 </span></code></pre>
             <p>
@@ -975,8 +1015,8 @@
             </p>
             <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant with an optional integer type.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a ?? b</span><span>
 </span><span style="color: #008000">// `c` is `1` and has type `Int?`</span><span>
 </span><span>
@@ -1054,18 +1094,18 @@
           <pre><code class="language-cadence"><span style="color: #008000">// Declare a function named `crashAndBurn` which will never return,</span><span>
 </span><span style="color: #008000">// because it calls the function named `panic`, which never returns.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn(): Never {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn(): </span><span style="color: #0000FF">Never</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    panic(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Declare a constant with a `Never` type, but the initial value is an integer.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Never = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Never</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Declare a function which returns an invalid return value `nil`,</span><span>
 </span><span style="color: #008000">// which is not a value of type `Never`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> returnNever(): Never {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> returnNever(): </span><span style="color: #0000FF">Never</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">nil</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -1231,24 +1271,24 @@
             </p>
             <pre><code class="language-cadence,file=array-types.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> size = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #008000">// Invalid: Array-size must be an integer literal</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers: [Int; </span><span style="color: #0000FF">size</span><span style="color: #000000">] = []</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers: [</span><span style="color: #0000FF">Int</span><span style="color: #000000">; </span><span style="color: #0000FF">size</span><span style="color: #000000">] = []</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a fixed-sized array of integers</span><span>
 </span><span style="color: #008000">// which always contains exactly two elements.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> array: [Int8; 2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> array: [</span><span style="color: #0000FF">Int8</span><span style="color: #000000">; 2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a fixed-sized array of fixed-sized arrays of integers.</span><span>
 </span><span style="color: #008000">// The inner arrays always contain exactly three elements,</span><span>
 </span><span style="color: #008000">// the outer array always contains two elements.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays: [[Int16; 3]; 2] = [</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays: [[</span><span style="color: #0000FF">Int16</span><span style="color: #000000">; 3]; 2] = [</span><span>
 </span><span style="color: #000000">    [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #09885A">3</span><span style="color: #000000">],</span><span>
 </span><span style="color: #000000">    [</span><span style="color: #09885A">4</span><span style="color: #000000">, </span><span style="color: #09885A">5</span><span style="color: #000000">, </span><span style="color: #09885A">6</span><span style="color: #000000">]</span><span>
 </span><span style="color: #000000">]</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a variable length array of integers</span><span>
-</span><span style="color: #0000FF">var</span><span style="color: #000000"> variableLengthArray: [Int] = []</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> variableLengthArray: [</span><span style="color: #0000FF">Int</span><span style="color: #000000">] = []</span><span>
 </span></code></pre>
             <p>
               Array types are covariant in their element types.
@@ -1887,26 +1927,26 @@
           </p>
           <p>The division and remainder operators abort the program when the divisor is zero.</p>
           <p>
-            Arithmetic operations on the signed integer types <code>Int8</code>, <code>Int16</code>, <code>Int32</code>, <code>Int64</code>,
-            and on the unsigned integer types <code>UInt8</code>, <code>UInt16</code>, <code>UInt32</code>, <code>UInt64</code>
+            Arithmetic operations on the signed integer types <code>Int8</code>, <code>Int16</code>, <code>Int32</code>, <code>Int64</code>, <code>Int128</code>, <code>Int256</code>,
+            and on the unsigned integer types <code>UInt8</code>, <code>UInt16</code>, <code>UInt32</code>, <code>UInt64</code>, <code>UInt128</code>, <code>UInt256</code>,
             do not cause values to overflow or underflow.
           </p>
-          <pre><code class="language-cadence,file=operator-add-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: UInt8 = </span><span style="color: #09885A">255</span><span>
+          <pre><code class="language-cadence,file=operator-add-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">UInt8</span><span style="color: #000000"> = </span><span style="color: #09885A">255</span><span>
 </span><span>
 </span><span style="color: #008000">// Error: The result `256` does not fit in the range of `UInt8`,</span><span>
 </span><span style="color: #008000">// thus a fatal overflow error is raised and the program aborts</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a + </span><span style="color: #09885A">1</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=operator-times-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int8 = </span><span style="color: #09885A">100</span><span>
+          <pre><code class="language-cadence,file=operator-times-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Int8</span><span style="color: #000000"> = </span><span style="color: #09885A">100</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: </span><span style="color: #0000FF">Int8</span><span style="color: #000000"> = </span><span style="color: #09885A">100</span><span>
 </span><span>
 </span><span style="color: #008000">// Error: The result `10000` does not fit in the range of `Int8`,</span><span>
 </span><span style="color: #008000">// thus a fatal overflow error is raised and the program aborts</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a * b</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=operator-unary-negate-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">-128</span><span>
+          <pre><code class="language-cadence,file=operator-unary-negate-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Int8</span><span style="color: #000000"> = </span><span style="color: #09885A">-128</span><span>
 </span><span>
 </span><span style="color: #008000">// Error: The result `128` does not fit in the range of `Int8`,</span><span>
 </span><span style="color: #008000">// thus a fatal overflow error is raised and the program aborts</span><span>
@@ -1985,20 +2025,20 @@
 </span><span>
 </span><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-equal-optional-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+              <pre><code class="language-cadence,file=operator-equal-optional-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-equal-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+              <pre><code class="language-cadence,file=operator-equal-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
               <pre><code class="language-cadence,file=operator-equal-int-nil.cdc"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: </span><span style="color: #0000FF">Int</span><span style="color: #000000">?? = </span><span style="color: #0000FF">nil</span><span>
 </span><span style="color: #000000">x == y  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
               <pre><code class="language-cadence,file=operator-equal-optional-int-optionals-int.cdc"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: </span><span style="color: #0000FF">Int</span><span style="color: #000000">?? = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">x == y  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
             </li>
@@ -2016,20 +2056,20 @@
 </span><span>
 </span><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-not-equal-optional-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+              <pre><code class="language-cadence,file=operator-not-equal-optional-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
-              <pre><code class="language-cadence,file=operator-not-equal-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+              <pre><code class="language-cadence,file=operator-not-equal-int-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
               <pre><code class="language-cadence,file=operator-not-equal-int-nil.cdc"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: </span><span style="color: #0000FF">Int</span><span style="color: #000000">?? = </span><span style="color: #0000FF">nil</span><span>
 </span><span style="color: #000000">x != y  </span><span style="color: #008000">// is `true`</span><span>
 </span></code></pre>
               <pre><code class="language-cadence,file=operator-not-equal-optional-int-optionals-int.cdc"><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: </span><span style="color: #0000FF">Int</span><span style="color: #000000">?? = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">x != y  </span><span style="color: #008000">// is `false`</span><span>
 </span></code></pre>
             </li>
@@ -2178,7 +2218,7 @@
 </span><span style="color: #008000">// The special argument label _ is specified for the parameter,</span><span>
 </span><span style="color: #008000">// so no argument label has to be provided in a function call.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2204,7 +2244,7 @@
 </span><span style="color: #008000">// so the parameter names are the argument labels, i.e., the parameter names</span><span>
 </span><span style="color: #008000">// have to be given as argument labels in a function call.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> clamp(_ value: Int, min: Int, max: Int): Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> clamp(_ value: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, min: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, max: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> value > max {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> max</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -2253,7 +2293,7 @@
 </span><span style="color: #008000">// the function and also in a function call, so no argument label is given,</span><span>
 </span><span style="color: #008000">// and the parameter name is required as the argument label in a function call.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> send(from sendingAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">, to receivingAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">, amount: Int) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> send(from sendingAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">, to receivingAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">, amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The function code is omitted for brevity.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -2290,7 +2330,7 @@
           </p>
           <pre><code class="language-cadence,file=function-test.cdc"><span style="color: #008000">// Declare a function named `test`, which accepts two parameters, named `first` and `second`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(first: Int, second: Int) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(first: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, second: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2305,11 +2345,11 @@
           </p>
           <pre><code class="language-cadence,file=function-doubleAndAddOne.cdc"><span style="color: #008000">// Declare a function which multiplies a number by two, and adds one.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ x: Int): Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a nested function which multiplies a number by two.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
@@ -2369,7 +2409,7 @@
             Functions can be called (invoked). Function calls
             need to provide exactly as many argument values as the function has parameters.
           </p>
-          <pre><code class="language-cadence,file=function-call.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
+          <pre><code class="language-cadence,file=function-call.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2399,13 +2439,13 @@
           </p>
           <pre><code class="language-cadence,file=function-type.cdc"><span style="color: #008000">// Declare a function named `add`, with the function type `((Int, Int): Int)`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(a: Int, b: Int): Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(a: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, b: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <pre><code class="language-cadence,file=function-type-expression.cdc"><span style="color: #008000">// Declare a constant named `add`, with the function type `((Int, Int): Int)`</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> add: ((Int, Int): Int) =</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> add: ((</span><span style="color: #0000FF">Int</span><span style="color: #000000">, </span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000">) =</span><span>
 </span><span style="color: #000000">    fun (a: Int, b: Int): Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -2439,7 +2479,7 @@
           <pre><code class="language-cadence,file=function-no-argument-labels.cdc"><span style="color: #008000">// Declare a function which takes one argument that has type `Int`.</span><span>
 </span><span style="color: #008000">// The function has type `((Int): Void)`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> foo1(x: Int) {}</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> foo1(x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {}</span><span>
 </span><span>
 </span><span style="color: #008000">// Call function `foo1`. This requires an argument label.</span><span>
 </span><span style="color: #000000">foo1(x: </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
@@ -2447,7 +2487,7 @@
 </span><span style="color: #008000">// Declare another function which takes one argument that has type `Int`.</span><span>
 </span><span style="color: #008000">// The function also has type `((Int): Void)`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> foo2(y: Int) {}</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> foo2(y: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {}</span><span>
 </span><span>
 </span><span style="color: #008000">// Call function `foo2`. This requires an argument label.</span><span>
 </span><span style="color: #000000">foo2(y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
@@ -2455,7 +2495,7 @@
 </span><span style="color: #008000">// Declare a variable which has type `((Int): Void)` and use `foo1`</span><span>
 </span><span style="color: #008000">// as its initial value.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">var</span><span style="color: #000000"> someFoo: ((Int): </span><span style="color: #0000FF">Void</span><span style="color: #000000">) = foo1</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> someFoo: ((</span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Void</span><span style="color: #000000">) = foo1</span><span>
 </span><span>
 </span><span style="color: #008000">// Call the function assigned to variable `someFoo`.</span><span>
 </span><span style="color: #008000">// This is valid as the function types match.</span><span>
@@ -2487,7 +2527,7 @@
           <pre><code class="language-cadence,file=closures-counter.cdc"><span style="color: #008000">// Declare a function named `makeCounter` which returns a function that</span><span>
 </span><span style="color: #008000">// each time when called, returns the next integer, starting at 1.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCounter(): ((): Int) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCounter(): ((): </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> count = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> fun (): Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: read from and assign to the non-local variable</span><span>
@@ -2514,7 +2554,7 @@
           <pre><code class="language-cadence,file=function-change.cdc"><span style="color: #008000">// Declare a function that changes the first two elements</span><span>
 </span><span style="color: #008000">// of an array of integers.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> change(_ numbers: [Int]) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> change(_ numbers: [</span><span style="color: #0000FF">Int</span><span style="color: #000000">]) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Change the elements of the passed in array.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The changes are only local, as the array was copied.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -2529,7 +2569,7 @@
 </span><span style="color: #008000">// `numbers` is still `[0, 1]`</span><span>
 </span></code></pre>
           <p>Parameters are constant, i.e., it is not allowed to assign to them.</p>
-          <pre><code class="language-cadence,file=function-parameter-assignment.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> test(x: Int) {</span><span>
+          <pre><code class="language-cadence,file=function-parameter-assignment.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> test(x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: cannot assign to a parameter (constant)</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    x = </span><span style="color: #09885A">2</span><span>
@@ -2548,7 +2588,7 @@
             The condition description is used as an error message when the condition fails.
           </p>
           <p>In postconditions, the special constant <code>result</code> refers to the result of the function.</p>
-          <pre><code class="language-cadence,file=function-factorial.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int): Int {</span><span>
+          <pre><code class="language-cadence,file=function-factorial.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Require the parameter `n` to be greater than or equal to zero.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
@@ -2670,7 +2710,7 @@
           </p>
           <p>If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.</p>
           <p>Optional bindings are declared using the <code>if</code> keyword like an if-statement, but instead of the boolean test value, it is followed by the <code>let</code> or <code>var</code> keywords, to either introduce a constant or variable, followed by a name, the equal sign (<code>=</code>), and the optional value.</p>
-          <pre><code class="language-cadence,file=control-flow-optional-binding-not-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeNumber: Int? = </span><span style="color: #09885A">1</span><span>
+          <pre><code class="language-cadence,file=control-flow-optional-binding-not-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> maybeNumber: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #09885A">1</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = maybeNumber {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This branch is executed as `maybeNumber` is not `nil`.</span><span>
@@ -2679,7 +2719,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// This branch is *not* executed as `maybeNumber` is not `nil`</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
-          <pre><code class="language-cadence,file=control-flow-optional-binding-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> noNumber: Int? = </span><span style="color: #0000FF">nil</span><span>
+          <pre><code class="language-cadence,file=control-flow-optional-binding-nil.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> noNumber: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #0000FF">nil</span><span>
 </span><span>
 </span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = noNumber {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This branch is *not* executed as `noNumber` is `nil`.</span><span>
@@ -2746,7 +2786,7 @@
         <p>Every function and block (<code>{</code> ... <code>}</code>) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.</p>
         <pre><code class="language-cadence,file=scope.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> y = </span><span style="color: #09885A">10</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x + y</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -2757,8 +2797,8 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">y</span><span>
 </span></code></pre>
-        <pre><code class="language-cadence,file=scope-doubleAndAddOne.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ n: Int): Int {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) {</span><span>
+        <pre><code class="language-cadence,file=scope-doubleAndAddOne.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ n: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> double(n) + </span><span style="color: #09885A">1</span><span>
@@ -2771,7 +2811,7 @@
         <p>Each scope can introduce new declarations, i.e., the outer declaration is shadowed.</p>
         <pre><code class="language-cadence,file=scope-test.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(): Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -2781,11 +2821,11 @@
         <p>Scope is lexical, not dynamic.</p>
         <pre><code class="language-cadence,file=scope-lexical.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">   </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> g(): Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> g(): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">   </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">20</span><span>
 </span><span style="color: #000000">   </span><span style="color: #0000FF">return</span><span style="color: #000000"> f()</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -2795,7 +2835,7 @@
         <p>Declarations are <strong>not</strong> moved to the top of the enclosing function (hoisted).</p>
         <pre><code class="language-cadence,file=scope-no-hoisting.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
@@ -2839,7 +2879,7 @@
           automatically converted to a non-optional integer <code>Int</code>,
           or vice-versa.
         </p>
-        <pre><code class="language-cadence,file=type-safety-add.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: Int8, _ b: Int8): Int {</span><span>
+        <pre><code class="language-cadence,file=type-safety-add.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: </span><span style="color: #0000FF">Int8</span><span style="color: #000000">, _ b: </span><span style="color: #0000FF">Int8</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2849,8 +2889,8 @@
 </span><span>
 </span><span style="color: #008000">// Declare two constants which have type `Int32`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int32 = </span><span style="color: #09885A">3_000_000_000</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int32 = </span><span style="color: #09885A">3_000_000_000</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Int32</span><span style="color: #000000"> = </span><span style="color: #09885A">3_000_000_000</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: </span><span style="color: #0000FF">Int32</span><span style="color: #000000"> = </span><span style="color: #09885A">3_000_000_000</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: cannot pass arguments which have type `Int32` to parameters which have type `Int8`.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2911,7 +2951,7 @@
 </span><span>
 </span><span style="color: #008000">// Instead, specify the array type and the concrete element type, e.g. `Int`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrary: [Int] = []</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrary: [</span><span style="color: #0000FF">Int</span><span style="color: #000000">] = []</span><span>
 </span></code></pre>
         <pre><code class="language-cadence"><span style="color: #008000">// Invalid: not possible to infer type based on dictionary literal's keys and values.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2920,7 +2960,7 @@
 </span><span style="color: #008000">// Instead, specify the dictionary type and the concrete key</span><span>
 </span><span style="color: #008000">// and value types, e.g. `String` and `Int`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> dictionary: {</span><span style="color: #0000FF">String</span><span style="color: #000000">: Int} = {}</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> dictionary: {</span><span style="color: #0000FF">String</span><span style="color: #000000">: </span><span style="color: #0000FF">Int</span><span style="color: #000000">} = {}</span><span>
 </span></code></pre>
         <pre><code class="language-cadence"><span style="color: #008000">// Invalid: not possible to infer type based on nil literal.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2928,21 +2968,21 @@
 </span><span>
 </span><span style="color: #008000">// Instead, specify the optional type and the concrete element type, e.g. `Int`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> maybeSomething: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> maybeSomething: </span><span style="color: #0000FF">Int</span><span style="color: #000000">? = </span><span style="color: #0000FF">nil</span><span>
 </span></code></pre>
       </section>
       <section>
-        <h2 id="composite-data-types"><a href="#composite-data-types" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Types</h2>
+        <h2 id="composite-types"><a href="#composite-types" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Types</h2>
         <p>
-          Composite data types allow composing simpler types into more complex types,
+          Composite types allow composing simpler types into more complex types,
           i.e., they allow the composition of multiple values into one.
-          Composite data types have a name and consist of zero or more named fields,
+          Composite types have a name and consist of zero or more named fields,
           and zero or more functions that operate on the data.
-          Each field may have a different type. Composite data types can
-          only be declared within a <a href="#contracts">contract</a> and nowhere else.
+          Each field may have a different type.
         </p>
+        <p>Composite types can only be declared within a <a href="#contracts">contract</a> and nowhere else.</p>
         <p>
-          There are two kinds of composite data types.
+          There are two kinds of composite types.
           The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable,
           when the value is assigned to a variable,
           when the value is passed as an argument to a function,
@@ -2974,9 +3014,9 @@
           but not in structures, as that would allow resources to be copied.
         </p>
         <section>
-          <h3 id="composite-data-type-declaration-and-creation"><a href="#composite-data-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Declaration and Creation</h3>
+          <h3 id="composite-type-declaration-and-creation"><a href="#composite-type-declaration-and-creation" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Type Declaration and Creation</h3>
           <p>Structures are declared using the <code>struct</code> keyword and resources are declared using the <code>resource</code> keyword. The keyword is followed by the name.</p>
-          <pre><code class="language-cadence,file=composite-data-type-declaration.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
+          <pre><code class="language-cadence,file=composite-type-declaration.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -2988,21 +3028,22 @@
           <p>Structures are created (instantiated) by calling the type like a function.</p>
           <pre><code class="language-cadence,file=structure-instantiation.cdc"><span style="color: #000000">SomeStruct()</span><span>
 </span></code></pre>
-          <p>Resource must be created (instantiated) by using the <code>create</code> keyword and calling the type like a function.</p>
-          <pre><code class="language-cadence,file=resource-instantiation.cdc"><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
-</span></code></pre>
           <p>
-            The constructor function may require parameters if the <a href="#composite-data-type-fields">initializer</a>
-            of the composite data type requires them.
+            The constructor function may require parameters if the <a href="#composite-type-fields">initializer</a>
+            of the composite type requires them.
           </p>
           <p>
-            Composite data types can only be declared within <a href="#contracts">contract</a>
+            Composite types can only be declared within <a href="#contracts">contract</a>
             and not locally in functions.
             They can also not be nested.
           </p>
+          <p>Resource must be created (instantiated) by using the <code>create</code> keyword and calling the type like a function.</p>
+          <p>Resources can only be created in functions and types that are declared in the same contract in which the resource is declared.</p>
+          <pre><code class="language-cadence,file=resource-instantiation.cdc"><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
+</span></code></pre>
         </section>
         <section>
-          <h3 id="composite-data-type-fields"><a href="#composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Fields</h3>
+          <h3 id="composite-type-fields"><a href="#composite-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Type Fields</h3>
           <p>
             Fields are declared like variables and constants.
             However, the initial values for fields are set in the initializer,
@@ -3053,8 +3094,8 @@
               <p>Synthetic fields are declared using the <code>synthetic</code> keyword.</p>
               <p>
                 Synthetic fields must have a getter and a setter.
-                Getters and setters are explained in the <a href="#composite-data-type-field-getters-and-setters">next section</a>.
-                Synthetic fields are explained in a <a href="#synthetic-composite-data-type-fields">separate section</a>.
+                Getters and setters are explained in the <a href="#composite-type-field-getters-and-setters">next section</a>.
+                Synthetic fields are explained in a <a href="#synthetic-composite-type-fields">separate section</a>.
               </p>
             </li>
           </ul>
@@ -3097,7 +3138,7 @@
             using the access syntax: the composite value is followed by a dot (<code>.</code>)
             and the name of the field.
           </p>
-          <pre><code class="language-cadence,file=composite-data-type-fields-and-init.cdc"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
+          <pre><code class="language-cadence,file=composite-type-fields-and-init.cdc"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
 </span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// Both fields are initialized through the initializer.</span><span>
@@ -3108,10 +3149,10 @@
 </span><span style="color: #008000">// Access control will be explained in a later section.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: </span><span style="color: #0000FF">Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, balance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3122,14 +3163,14 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: It is invalid to provide an initial value in the field declaration.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The field must be initialized by setting the initial value in the initializer.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: </span><span style="color: #0000FF">Int</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>The field access syntax must be used to access fields – fields are not available as variables.</p>
           <pre><code class="language-cadence"><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(initialID: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(initialID: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Invalid: There is no variable with the name `id` available.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// The field `id` must be initialized by setting `self.id`.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
@@ -3139,13 +3180,13 @@
 </span></code></pre>
           <p>The initializer is <strong>not</strong> automatically derived from the fields, it must be explicitly declared.</p>
           <pre><code class="language-cadence"><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: Missing initializer initializing field `id`.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>A composite value can be created by calling the constructor and the value's fields can be accessed.</p>
-          <pre><code class="language-cadence,file=composite-data-type-fields-assignment.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">42</span><span style="color: #000000">, balance: </span><span style="color: #09885A">1_000_00</span><span style="color: #000000">)</span><span>
+          <pre><code class="language-cadence,file=composite-type-fields-assignment.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">42</span><span style="color: #000000">, balance: </span><span style="color: #09885A">1_000_00</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #000000">token.id  </span><span style="color: #008000">// is `42`</span><span>
 </span><span style="color: #000000">token.balance  </span><span style="color: #008000">// is `1_000_000`</span><span>
@@ -3157,8 +3198,25 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">token.id = </span><span style="color: #09885A">23</span><span>
 </span></code></pre>
+          <p>
+            Resources have the implicit field <code>let owner: PublicAccount?</code>.
+            If the resource is currently <a href="#account-storage">stored in an account</a>,
+            then the field contains the publicly accessible portion of the account.
+            Otherwise the field is <code>nil</code>.
+          </p>
+          <p>
+            The field's value changes when the resource is moved from outside account storage
+            into account storage, when it is moved from the storage of one account
+            to the storage of another account, and when it is moved out of account storage.
+          </p>
+        </section>
+        <section>
+          <h3 id="composite-data-initializer-overloading"><a href="#composite-data-initializer-overloading" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Initializer Overloading</h3>
+          <blockquote>
+            <p>🚧 Status: Initializer overloading is not implemented yet.</p>
+          </blockquote>
           <p>Initializers support overloading. This allows for example providing default values for certain parameters.</p>
-          <pre><code class="language-cadence,file=composite-data-type-initializer-overloading.cdc"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
+          <pre><code class="language-cadence,file=composite-type-initializer-overloading.cdc"><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
 </span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// The first initializer allows initializing both fields with a given value.</span><span>
@@ -3167,15 +3225,15 @@
 </span><span style="color: #008000">// with a given value, and the `balance` field with the default value `0`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: </span><span style="color: #0000FF">Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, balance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3183,7 +3241,7 @@
 </span></code></pre>
         </section>
         <section>
-          <h3 id="composite-data-type-field-getters-and-setters"><a href="#composite-data-type-field-getters-and-setters" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Field Getters and Setters</h3>
+          <h3 id="composite-type-field-getters-and-setters"><a href="#composite-type-field-getters-and-setters" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Type Field Getters and Setters</h3>
           <p>
             Fields may have an optional getter and an optional setter.
             Getters are functions that are called when a field is read,
@@ -3195,12 +3253,12 @@
             Getters are declared using the <code>get</code> keyword.
             Getters have no parameters and their return type is implicitly the type of the field.
           </p>
-          <pre><code class="language-cadence,file=composite-data-type-field-getter.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> GetterExample {</span><span>
+          <pre><code class="language-cadence,file=composite-type-field-getter.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> GetterExample {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a getter</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// which ensures the read value is always non-negative.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
 </span><span>
 </span><span style="color: #000000">           </span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance &#x3C; </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
@@ -3211,7 +3269,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -3230,12 +3288,12 @@
             Another type cannot be specified. Setters have no return type.
           </p>
           <p>The types of values assigned to setters must always match the field's type.</p>
-          <pre><code class="language-cadence,file=composite-data-type-field-setter.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> SetterExample {</span><span>
+          <pre><code class="language-cadence,file=composite-type-field-setter.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> SetterExample {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a setter</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// which requires written values to be positive.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                newBalance >= </span><span style="color: #09885A">0</span><span>
@@ -3244,7 +3302,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -3257,7 +3315,10 @@
 </span></code></pre>
         </section>
         <section>
-          <h3 id="synthetic-composite-data-type-fields"><a href="#synthetic-composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Synthetic Composite Data Type Fields</h3>
+          <h3 id="synthetic-composite-type-fields"><a href="#synthetic-composite-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Synthetic Composite Type Fields</h3>
+          <blockquote>
+            <p>🚧 Status: Synthetic fields are not implemented yet.</p>
+          </blockquote>
           <p>
             Fields which are not stored in the composite value are <em>synthetic</em>,
             i.e., the field value is computed.
@@ -3266,8 +3327,8 @@
           <p>Synthetic fields are declared using the <code>synthetic</code> keyword.</p>
           <p>Synthetic fields are read-only when only a getter is provided.</p>
           <pre><code class="language-cadence,file=composite-type-synthetic-field-getter-only.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: </span><span style="color: #0000FF">Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a synthetic field named `area`,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// which computes the area based on the `width` and `height` fields.</span><span>
@@ -3282,7 +3343,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// As `area` is synthetic and there is only a getter provided for it,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// the `area` field it cannot be assigned a value.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, height: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3298,8 +3359,8 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> GoalTracker {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> goal: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> completed: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> goal: </span><span style="color: #0000FF">Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> completed: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a synthetic field which is both readable and writable.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -3321,7 +3382,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(goal: Int, completed: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(goal: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, completed: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal = goal</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed = completed</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3341,19 +3402,22 @@
           <p>It is invalid to declare a synthetic field with only a setter.</p>
         </section>
         <section>
-          <h3 id="composite-data-type-functions"><a href="#composite-data-type-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Functions</h3>
+          <h3 id="composite-type-functions"><a href="#composite-type-functions" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Type Functions</h3>
+          <blockquote>
+            <p>🚧 Status: Function overloading is not implemented yet.</p>
+          </blockquote>
           <p>
-            Composite data types may contain functions.
+            Composite types may contain functions.
             Just like in the initializer, the special constant <code>self</code> refers to the composite value that the function is called on.
           </p>
-          <pre><code class="language-cadence,file=composite-data-type-function.cdc"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
+          <pre><code class="language-cadence,file=composite-type-function.cdc"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
 </span><span style="color: #008000">// and has variable fields for the width and height.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: </span><span style="color: #0000FF">Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, height: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3361,7 +3425,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a function named "scale", which scales</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// the rectangle by the given factor.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3373,14 +3437,14 @@
 </span><span style="color: #008000">// `rectangle.height` is `12`</span><span>
 </span></code></pre>
           <p>Functions support overloading.</p>
-          <pre><code class="language-cadence,file=composite-data-type-function-overloading.cdc"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
+          <pre><code class="language-cadence,file=composite-type-function-overloading.cdc"><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
 </span><span style="color: #008000">// and has variable fields for the width and height.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: </span><span style="color: #0000FF">Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, height: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3388,7 +3452,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a function named "scale", which independently scales</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// the width by a given factor and the height by a given factor.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(widthFactor: Int, heightFactor: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(widthFactor: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, heightFactor: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * widthFactor</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * heightFactor</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3397,7 +3461,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// both width and height by a given factor.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The function calls the `scale` function declared above.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.scale(</span><span>
 </span><span style="color: #000000">            widthFactor: factor,</span><span>
 </span><span style="color: #000000">            heightFactor: factor</span><span>
@@ -3407,16 +3471,16 @@
 </span></code></pre>
         </section>
         <section>
-          <h3 id="composite-data-type-subtyping"><a href="#composite-data-type-subtyping" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Subtyping</h3>
+          <h3 id="composite-type-subtyping"><a href="#composite-type-subtyping" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Type Subtyping</h3>
           <p>
-            Two composite data types are compatible if and only if they refer to the same declaration by name,
+            Two composite types are compatible if and only if they refer to the same declaration by name,
             i.e., nominal typing applies instead of structural typing.
           </p>
           <p>
-            Even if two composite data types declare the same fields and functions,
+            Even if two composite types declare the same fields and functions,
             the types are only compatible if their names match.
           </p>
-          <pre><code class="language-cadence,file=composite-data-type.cdc"><span style="color: #008000">// Declare a structure named `A` which has a function `test`</span><span>
+          <pre><code class="language-cadence,file=composite-type.cdc"><span style="color: #008000">// Declare a structure named `A` which has a function `test`</span><span>
 </span><span style="color: #008000">// which has type `((): Void)`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> A {</span><span>
@@ -3447,7 +3511,7 @@
 </span></code></pre>
         </section>
         <section>
-          <h3 id="composite-data-type-behaviour"><a href="#composite-data-type-behaviour" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Behaviour</h3>
+          <h3 id="composite-type-behaviour"><a href="#composite-type-behaviour" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Type Behaviour</h3>
           <section>
             <h4 id="structures"><a href="#structures" aria-hidden="true"><span class="icon icon-link"></span></a>Structures</h4>
             <p>
@@ -3461,9 +3525,9 @@
             <pre><code class="language-cadence,file=struct-behavior.cdc"><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(value: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(value: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.value = value</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
@@ -3488,9 +3552,9 @@
 </span></code></pre>
           </section>
           <section>
-            <h4 id="accessing-fields-and-functions-of-composite-data-types-using-optional-chaining"><a href="#accessing-fields-and-functions-of-composite-data-types-using-optional-chaining" aria-hidden="true"><span class="icon icon-link"></span></a>Accessing Fields and Functions of Composite Data Types Using Optional Chaining</h4>
+            <h4 id="accessing-fields-and-functions-of-composite-types-using-optional-chaining"><a href="#accessing-fields-and-functions-of-composite-types-using-optional-chaining" aria-hidden="true"><span class="icon icon-link"></span></a>Accessing Fields and Functions of Composite Types Using Optional Chaining</h4>
             <p>
-              If a composite data type with fields and functions is wrapped in an optional,
+              If a composite type with fields and functions is wrapped in an optional,
               optional chaining can be used to get those values or call the function without
               having to get the value of the optional first.
             </p>
@@ -3515,17 +3579,17 @@
             </p>
             <pre><code class="language-cadence,file=optional-chaining.cdc"><span style="color: #008000">// Declare a struct with a field and method.</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Value {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> number: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> number: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">() {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.number = </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> set(new: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> set(new: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.number = new</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> setAndReturn(new: Int): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> setAndReturn(new: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): </span><span style="color: #0000FF">Int</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.number = new</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> new</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3596,9 +3660,9 @@
             <pre><code class="language-cadence,file=resource-behavior.cdc"><span style="color: #008000">// Declare a resource named `SomeResource`, with a variable integer field.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeResource {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(value: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(value: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.value = value</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -3765,7 +3829,7 @@
 </span></code></pre>
           </section>
           <section>
-            <h4 id="resource-variables"><a href="#resource-variables" aria-hidden="true"><span class="icon icon-link"></span></a>Resource variables</h4>
+            <h4 id="resource-variables"><a href="#resource-variables" aria-hidden="true"><span class="icon icon-link"></span></a>Resource Variables</h4>
             <p>Resource variables cannot be assigned to as that would lead to the loss of the variable's current resource value.</p>
             <p>Instead, use a swap statement (<code>&#x3C;-></code>) to replace the resource variable with another resource.</p>
             <pre><code class="language-cadence,file=resource-variable-invalid-assignment.cdc"><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
@@ -3812,7 +3876,7 @@
           </section>
           <section>
             <h4 id="nested-resources"><a href="#nested-resources" aria-hidden="true"><span class="icon icon-link"></span></a>Nested Resources</h4>
-            <p>Fields in composite data types behave differently when they have a resource type.</p>
+            <p>Fields in composite types behave differently when they have a resource type.</p>
             <p>
               If a resource type has fields that have a resource type,
               it <strong>must</strong> declare a destructor,
@@ -4230,27 +4294,27 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a private constant field which is only readable</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// in the current and inner scopes.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a public constant field which is readable in all scopes.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a private variable field which is only readable</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// and writable in the current and inner scopes.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> c: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> c: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a public variable field which is not settable,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// so it is only writable in the current and inner scopes,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// and readable in all scopes.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> d: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> d: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a public variable field which is settable,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// so it is readable and writable in all scopes.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> e: Int</span><span>
+</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> e: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The initializer is omitted for brevity.</span><span>
 </span><span>
@@ -4403,7 +4467,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide an initializer that</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// given the initial balance, must initialize the balance field.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            balance >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
@@ -4428,7 +4492,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: `@Self` is the resource type implementing this interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @Self {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): @</span><span style="color: #0000FF">Self</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be positive"</span><span>
@@ -4457,7 +4521,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the first parameter has the type `@Self`,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// i.e. the resource type implementing this interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: @Self) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: @</span><span style="color: #0000FF">Self</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
@@ -4478,9 +4542,9 @@
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
           <p>
             Declaring that a type implements (conforms) to an interface
-            is done in the type declaration of the composite data type (e.g., structure, resource):
-            The kind and the name of the composite data type is followed by a colon (<code>:</code>)
-            and the name of one or more interfaces that the composite data type implements.
+            is done in the type declaration of the composite type (e.g., structure, resource):
+            The kind and the name of the composite type is followed by a colon (<code>:</code>)
+            and the name of one or more interfaces that the composite type implements.
           </p>
           <p>This will tell the checker to enforce any requirements from the specified interfaces onto the declared type.</p>
           <p>
@@ -4512,7 +4576,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// but limit outer scopes to only read from the field, it is declared variable,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// and only has public access (non-settable).</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required initializer for the `FungibleToken` interface:</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// accept an initial balance and initialize the `balance` field.</span><span>
@@ -4522,7 +4586,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the postcondition declared in the interface</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// does not have to be repeated here in the implementation.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
@@ -4536,7 +4600,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -4618,9 +4682,9 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// The field is at least publicly readable, but this implementation also</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// allows the field to be written to in all scopes.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> a: Int</span><span>
+</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> a: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(a: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(a: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.a = a</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -4640,7 +4704,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Shape {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> area: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: </span><span style="color: #0000FF">Int</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a structure named `Square` the implements the `Shape` interface.</span><span>
@@ -4649,7 +4713,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// In addition to the required fields from the interface,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// the type can also declare additional fields.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> length: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> length: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Provided the field `area`  which is required to conform</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// to the interface `Shape`.</span><span>
@@ -4663,14 +4727,14 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(length: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(length: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.length = length</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Provided the implementation of the function `scale`</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// which is required to conform to the interface `Shape`.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.length = </span><span style="color: #0000FF">self</span><span style="color: #000000">.length * factor</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -4678,8 +4742,8 @@
 </span><span style="color: #008000">// Declare a structure named `Rectangle` that also implements the `Shape` interface.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle: Shape {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: </span><span style="color: #0000FF">Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Provided the field `area  which is required to conform</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// to the interface `Shape`.</span><span>
@@ -4690,7 +4754,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, height: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -4698,7 +4762,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Provided the implementation of the function `scale`</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// which is required to conform to the interface `Shape`.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -4818,14 +4882,13 @@
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken: FungibleToken {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
-</span><span>
 </span></code></pre>
         </section>
         <section>
@@ -4838,7 +4901,7 @@
           <p>Most of the built-in types are equatable, like booleans and integers. Arrays are equatable when their elements are equatable. Dictionaries are equatable when their values are equatable.</p>
           <p>To make a type equatable the <code>Equatable</code> interface must be implemented, which requires the implementation of the function <code>equals</code>, which accepts another value that the given value should be compared for equality. Note that the parameter type is <code>Self</code>, i.e., the other value must have the same type as the implementing type.</p>
           <pre><code class="language-cadence,file=equatable.cdc"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Equatable {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: </span><span style="color: #0000FF">Self</span><span style="color: #000000">): </span><span style="color: #0000FF">Bool</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <pre><code class="language-cadence,file=equatable-impl.cdc"><span style="color: #008000">// Declare a struct named `Cat`, which has one field named `id`</span><span>
@@ -4848,13 +4911,13 @@
 </span><span style="color: #008000">// to allow cats to be compared for equality.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Cat: Equatable {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: </span><span style="color: #0000FF">Self</span><span style="color: #000000">): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Cats are equal if their identifier matches.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> other.id == </span><span style="color: #0000FF">self</span><span style="color: #000000">.id</span><span>
@@ -4917,10 +4980,10 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Point: Hashable {</span><span>
 </span><span>
-</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> x: Int</span><span>
-</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> y: Int</span><span>
+</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> x: </span><span style="color: #0000FF">Int</span><span>
+</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> y: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(x: Int, y: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(x: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, y: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.x = x</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.y = y</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -4928,7 +4991,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Implementing the function `equals` will allow points to be compared</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// for equality and satisfies the `Equatable` interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: </span><span style="color: #0000FF">Self</span><span style="color: #000000">): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Points are equal if their coordinates match.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// The essential components are therefore the fields `x` and `y`,</span><span>
@@ -5006,9 +5069,9 @@
         <pre><code class="language-cadence,file=account-storage.cdc"><span style="color: #008000">// Declare a resource named `Counter`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(count: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(count: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.count = count</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -5069,9 +5132,9 @@
 </span><span style="color: #008000">// Declare a resource named `Counter`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter: {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(count: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(count: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.count = count</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
@@ -5135,7 +5198,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Require implementations of the interface to provide</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// a field named `count` which can be publicly read.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: </span><span style="color: #0000FF">Int</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
@@ -5175,7 +5238,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// Require implementations of the interface to provide</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// a field named `count` which can be publicly read.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: </span><span style="color: #0000FF">Int</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
@@ -5201,11 +5264,11 @@
         <pre><code class="language-cadence,file=published-reading"><span>
 </span><span style="color: #008000">// Get the public account object for the account that published the reference.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> acct = getAccount(</span><span style="color: #09885A">0x72</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> account = getAccount(</span><span style="color: #09885A">0x72</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Read the `&#x26;HasCount` reference from their published object.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> countRef = acct.published[&#x26;HasCount] ?? panic(</span><span style="color: #A31515">"missing Count reference!"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> countRef = account.published[&#x26;HasCount] ?? panic(</span><span style="color: #A31515">"missing Count reference!"</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Read one of the exposed fields in the reference.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -5219,8 +5282,7 @@
 </span><span style="color: #008000">// Invalid: Cannot access the account.storage object</span><span>
 </span><span style="color: #008000">// from the public account object.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> countObj = acct.storage[Counter]</span><span>
-</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> counter = account.storage[Counter]</span><span>
 </span></code></pre>
       </section>
       <section>
@@ -5261,7 +5323,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
         <p>Contracts cannot be nested in each other.</p>
-        <pre><code class="language-cadence,file=contract_invalidnesting.cdc"><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Invalid {</span><span>
+        <pre><code class="language-cadence,file=contract-invalidnesting.cdc"><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Invalid {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: Contracts cannot be nested in any other type.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
@@ -5273,7 +5335,7 @@
 </span><span style="color: #000000">One of the simplest forms of a </span><span style="color: #0000FF">contract</span><span style="color: #000000"> would just be one with a state field,</span><span>
 </span><span style="color: #000000">a function, and an `init` function that initializes the field:</span><span>
 </span><span>
-</span><span style="color: #000000">```cadence,file=contract_hello.cdc</span><span>
+</span><span style="color: #000000">```cadence,file=contract-hello.cdc</span><span>
 </span><span style="color: #008000">// HelloWorldResource.cdc</span><span>
 </span><span>
 </span><span style="color: #000000">pub contract HelloWorld {</span><span>
@@ -5305,7 +5367,7 @@
           the contract from the account it was deployed to and using the imported
           object to call the hello function.
         </p>
-        <pre><code class="language-cadence,file=contract_call.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> HelloWorld </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+        <pre><code class="language-cadence,file=contract-call.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> HelloWorld </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: The contract does not know where hello comes from</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -5326,11 +5388,11 @@
 </span></code></pre>
         <p>
           There can be any number of contracts per account
-          and they can include an arbitrary amount of data. This means that
-          a contract can have any number of fields, functions, and type definitions,
+          and they can include an arbitrary amount of data.
+          This means that a contract can have any number of fields, functions, and type definitions,
           but they have to be in the contract and not another top-level definition.
         </p>
-        <pre><code class="language-cadence,file=bad_decl.cdc"><span style="color: #008000">// Invalid: Top-level declarations are restricted to only be contracts</span><span>
+        <pre><code class="language-cadence,file=bad-top-level-declarations.cdc"><span style="color: #008000">// Invalid: Top-level declarations are restricted to only be contracts</span><span>
 </span><span style="color: #008000">//          or contract interfaces. Therefore, all of these would be invalid</span><span>
 </span><span style="color: #008000">//          if they were deployed to the account contract storage and</span><span>
 </span><span style="color: #008000">//          the deployment would be rejected.</span><span>
@@ -5338,20 +5400,20 @@
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {}</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Hat {}</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> helloWorld(): </span><span style="color: #0000FF">String</span><span style="color: #000000"> {}</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> num: Int</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> num: </span><span style="color: #0000FF">Int</span><span>
 </span></code></pre>
         <p>
           Another important feature of contracts is that instances of resources and events
-          that are defined in contracts can only be created within functions or types
-          that are defined in that contract.
-          Code outside the contract cannot arbitrarily create instances of resources and events.
+          that are declared in contracts can only be created/emitted within functions or types
+          that are declared in the same contract.
         </p>
+        <p>It is not possible create instances of resources and events outside the contract.</p>
         <p>
           The contract below defines a resource interface <code>Receiver</code> and a resource <code>Vault</code>
           that implements that interface. The way this example is written,
           there is no way to create this resource, so it would not be usable.
         </p>
-        <pre><code class="language-cadence,file=ft_contract.cdc"><span style="color: #008000">// Valid</span><span>
+        <pre><code class="language-cadence,file=fungible-token-contract.cdc"><span style="color: #008000">// Valid</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> FungibleToken {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Receiver {</span><span>
@@ -5373,15 +5435,15 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault: Receiver {</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// keeps track of the total balance of the accounts tokens</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// withdraw subtracts amount from the vaults balance and</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// returns a vault object with the subtracted balance</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): @</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> Vault(balance: amount)</span><span>
 </span><span style="color: #000000">        }</span><span>
@@ -5401,7 +5463,7 @@
           the type checker would not allow it because only code in the <code>FungibleToken</code>
           contract can create new <code>Vault</code>s.
         </p>
-        <pre><code class="language-cadence,file=contract_invalid_create.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+        <pre><code class="language-cadence,file=contract-invalid-create.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Cannot create an instance of the `Vault` type outside</span><span>
 </span><span style="color: #008000">// of the contract that defines `Vault`</span><span>
@@ -5416,31 +5478,38 @@
         <p>
           This brings up another key feature of contracts in Cadence. Contracts
           can interact with its account's <code>storage</code> and <code>published</code> objects to store
-          resources, structs, and references. They do so by using the special
-          <code>self.account</code> object that is only accessible within the contract.
+          resources, structs, and references.
+          They do so by using the special <code>self.account</code> object that is only accessible within the contract.
         </p>
-        <p>Imagine that these were defined in the above <code>FungibleToken</code> contract.</p>
-        <pre><code class="language-cadence,file=ft_contract_additions.cdc"><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> createVault(initialBalance: Int): @</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
+        <p>Imagine that these were declared in the above <code>FungibleToken</code> contract.</p>
+        <pre><code class="language-cadence,file=fungible-token-contract-additions.cdc"><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> createVault(initialBalance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): @</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> Vault(balance: initialBalance)</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> oldVault &#x3C;- </span><span style="color: #0000FF">self</span><span style="color: #000000">.account.storage[Vault] &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Vault(balance: </span><span style="color: #09885A">1000</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> oldVault</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span></code></pre>
         <p>
-          Now, any account could call the <code>createVault</code> function defined in the contract
-          to create a <code>Vault</code> object. Or the owner could call the <code>withdraw</code> function
-          on their own <code>Vault</code> to send new vaults to others.
+          Now, any account could call the <code>createVault</code> function declared in the contract
+          to create a <code>Vault</code> object.
+          Or the owner could call the <code>withdraw</code> function on their own <code>Vault</code> to send new vaults to others.
         </p>
-        <pre><code class="language-cadence,file=ft_contract_tx.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+        <pre><code class="language-cadence,file=fungible-contract-transaction.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
 </span><span>
 </span><span style="color: #008000">// Valid: Create an instance of the `Vault` type by calling the contract's</span><span>
 </span><span style="color: #008000">// `createVault` function.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> newVault &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> FungibleToken.createVault(initialBalance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span></code></pre>
+        <p>
+          Contracts have the implicit field <code>let account: Account</code>,
+          which is the account in which the contract is deployed too.
+          This gives the contract the ability to e.g. read and write to the account's storage.
+        </p>
+        <pre><code class="language-cadence,file=contract-account.cdc"><span>
 </span></code></pre>
         <section>
           <h3 id="deploying-and-updating-contracts"><a href="#deploying-and-updating-contracts" aria-hidden="true"><span class="icon icon-link"></span></a>Deploying and Updating Contracts</h3>
@@ -5455,7 +5524,7 @@
             Additional arguments are passed to the initializer of the contract.
           </p>
           <p>For example, assuming the following contract code should be deployed:</p>
-          <pre><code class="language-cadence,file=test_contract.cdc"><span style="color: #0000FF">contract</span><span style="color: #000000"> Test {</span><span>
+          <pre><code class="language-cadence,file=test-contract.cdc"><span style="color: #0000FF">contract</span><span style="color: #000000"> Test {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> message: </span><span style="color: #0000FF">String</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(message: </span><span style="color: #0000FF">String</span><span style="color: #000000">) {</span><span>
@@ -5464,14 +5533,14 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>The contract can be deployed as follows:</p>
-          <pre><code class="language-cadence,file=deploy_setCode.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> signer: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = ...</span><span>
+          <pre><code class="language-cadence,file=deploy-setCode.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> signer: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = ...</span><span>
 </span><span style="color: #000000">signer.setCode(</span><span>
 </span><span style="color: #000000">    [</span><span style="color: #09885A">0x63</span><span style="color: #000000">, </span><span style="color: #09885A">0x6f</span><span style="color: #000000">, </span><span style="color: #09885A">0x6e</span><span style="color: #000000">, </span><span style="color: #09885A">0x74</span><span style="color: #000000">, </span><span style="color: #09885A">0x72</span><span style="color: #000000">, </span><span style="color: #09885A">0x61</span><span style="color: #008000">/*, ... */</span><span style="color: #000000">],</span><span>
 </span><span style="color: #000000">    message: </span><span style="color: #A31515">"I'm a new contract in an existing account"</span><span>
 </span><span style="color: #000000">)</span><span>
 </span></code></pre>
           <p>The contract can also be deployed when creating an account by using the <code>Account</code> constructor.</p>
-          <pre><code class="language-cadence,file=deploy_setCode.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> newAccount = Account(</span><span>
+          <pre><code class="language-cadence,file=deploy-setCode.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> newAccount = Account(</span><span>
 </span><span style="color: #000000">    publicKeys: [],</span><span>
 </span><span style="color: #000000">    code: [</span><span style="color: #09885A">0x63</span><span style="color: #000000">, </span><span style="color: #09885A">0x6f</span><span style="color: #000000">, </span><span style="color: #09885A">0x6e</span><span style="color: #000000">, </span><span style="color: #09885A">0x74</span><span style="color: #000000">, </span><span style="color: #09885A">0x72</span><span style="color: #000000">, </span><span style="color: #09885A">0x61</span><span style="color: #008000">/*, ... */</span><span style="color: #000000">],</span><span>
 </span><span style="color: #000000">    message: </span><span style="color: #A31515">"I'm a new contract in a new account"</span><span>
@@ -5497,10 +5566,10 @@
             does not have to also define that interface. They can refer to that nested
             interface by saying <code>{ContractInterfaceName}.{NestedInterfaceName}</code>
           </p>
-          <pre><code class="language-cadence,file=contract_interface.cdc"><span style="color: #008000">// Declare a contract interface that declares an interface and a resource</span><span>
+          <pre><code class="language-cadence,file=contract-interface.cdc"><span style="color: #008000">// Declare a contract interface that declares an interface and a resource</span><span>
 </span><span style="color: #008000">// that needs to implement that interface in the contract implementation.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> interface InterfaceExample {</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract interface</span><span style="color: #000000"> InterfaceExample {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Implementations do not need to declare this</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// They refer to it as InterfaceExample.NestedInterface</span><span>
@@ -5574,12 +5643,12 @@
 </span><span style="color: #000000">    event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> events() {</span><span>
-</span><span style="color: #000000">        emit FooEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">emit</span><span style="color: #000000"> FooEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Emit event with explicit argument labels</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Note that the emitted event will only contain the field names,</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// not the argument labels used at the invocation site.</span><span>
-</span><span style="color: #000000">        emit FooEvent(labelA: </span><span style="color: #09885A">1</span><span style="color: #000000">, labelB: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">emit</span><span style="color: #000000"> FooEvent(labelA: </span><span style="color: #09885A">1</span><span style="color: #000000">, labelB: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -5590,7 +5659,7 @@
               <p>This means events cannot be assigned to variables or used as function parameters.</p>
             </li>
             <li>
-              <p>Events can only be emitted from the location in which they are defined.</p>
+              <p>Events can only be emitted from the location in which they are declared.</p>
             </li>
           </ul>
         </section>
@@ -5614,7 +5683,7 @@
         <ul>
           <li>
             <p>
-              The <strong>prepare phase</strong> acts like the initializer in a composite data type,
+              The <strong>prepare phase</strong> acts like the initializer in a composite type,
               i.e., it initializes fields that can then be used in the execution phase.
             </p>
             <p>
@@ -5682,7 +5751,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Provider {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): @</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"withdrawal amount must be positive"</span><span>
@@ -5693,7 +5762,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Receiver {</span><span>
@@ -5716,14 +5785,14 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the balance must be initialized to the initial balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @Self {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): @</span><span style="color: #0000FF">Self</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
@@ -5734,14 +5803,14 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: @Self) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: @</span><span style="color: #0000FF">Self</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"Insufficient funds"</span><span>
@@ -5795,13 +5864,13 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken: FungibleToken {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: </span><span style="color: #0000FF">Int</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -5813,7 +5882,7 @@
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The function `transfer` combines the functions `withdraw` and `deposit`</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// into a single function call</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Deposit the tokens that withdraw creates into the</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// recipient's account using their deposit reference</span><span>
 </span><span style="color: #000000">        to.deposit(from: &#x3C;-</span><span style="color: #0000FF">self</span><span style="color: #000000">.withdraw(amount: amount))</span><span>
@@ -5950,7 +6019,7 @@
         </section>
         <section>
           <h3 id="panic"><a href="#panic" aria-hidden="true"><span class="icon icon-link"></span></a><code>panic</code></h3>
-          <pre><code class="language-cadence"><span style="color: #0000FF">fun</span><span style="color: #000000"> panic(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">): Never</span><span>
+          <pre><code class="language-cadence"><span style="color: #0000FF">fun</span><span style="color: #000000"> panic(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">): </span><span style="color: #0000FF">Never</span><span>
 </span></code></pre>
           <p>Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.</p>
           <section>
