@@ -57,7 +57,7 @@ func (v *StakingSigVerifier) VerifyStakingSig(sig crypto.Signature, block *model
 //     and then check the provided signature against this self-computed byte-sequence.
 //
 // Note: the aggregated BLS staking signature is currently implemented as a slice of individual signatures.
-// The implementation (and method signature) will later be updated, once full BLS sigmnature aggregation is implemented.
+// The implementation (and method signature) will later be updated, once full BLS signature aggregation is implemented.
 // To verify it, we just verify every single signature. The implementation (and method signature)
 func (v *StakingSigVerifier) VerifyStakingAggregatedSig(aggStakingSig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
 	// check that the number of keys and signatures should match
