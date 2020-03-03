@@ -11,11 +11,11 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-func IndexSeals(payloadHash flow.Identifier, seals []*flow.Seal) func(*badger.Txn) error {
+func IndexSeals(height uint64, blockID flow.Identifier, parentID flow.Identifier, seals []*flow.Seal) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// check and index the seals
-		for i, seal := range seals {
+		// check that all seals are in the database
+		for _, seal := range seals {
 			var exists bool
 			err := operation.CheckSeal(seal.ID(), &exists)(tx)
 			if err != nil {
@@ -24,41 +24,50 @@ func IndexSeals(payloadHash flow.Identifier, seals []*flow.Seal) func(*badger.Tx
 			if !exists {
 				return fmt.Errorf("node seal missing in DB (%x)", seal.ID())
 			}
-			err = operation.IndexSeal(payloadHash, uint64(i), seal.ID())(tx)
-			if err != nil {
-				return fmt.Errorf("could not index seal (%x): %w", seal.ID(), err)
-			}
+		}
+
+		// insert the list of IDs into the payload index
+		err := operation.IndexSealPayload(height, blockID, parentID, flow.GetIDs(seals))(tx)
+		if err != nil {
+			return fmt.Errorf("could not index seals: %w", err)
 		}
 
 		return nil
 	}
 }
 
-func RetrieveSeals(payloadHash flow.Identifier, seals *[]*flow.Seal) func(*badger.Txn) error {
-
+func RetrieveSeals(blockID flow.Identifier, seals *[]*flow.Seal) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		var retrievedSeals []*flow.Seal
+		// get the header so we have the height
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header: %w", err)
+		}
 
 		// get the sealection IDs for the seals
 		var sealIDs []flow.Identifier
-		err := operation.LookupSeals(payloadHash, &sealIDs)(tx)
+		err = operation.LookupSealPayload(header.Height, blockID, header.ParentID, &sealIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup seals: %w", err)
 		}
 
+		// return if there are no seals
+		if len(sealIDs) == 0 {
+			return nil
+		}
+
 		// get all seals
-		//*seals = make([]*flow.Seal, 0, len(sealIDs))
+		*seals = make([]*flow.Seal, 0, len(sealIDs))
 		for _, sealID := range sealIDs {
 			var seal flow.Seal
 			err = operation.RetrieveSeal(sealID, &seal)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve seal (%x): %w", sealID, err)
 			}
-			retrievedSeals = append(retrievedSeals, &seal)
+			*seals = append(*seals, &seal)
 		}
-
-		*seals = retrievedSeals
 
 		return nil
 	}

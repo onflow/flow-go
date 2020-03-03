@@ -88,43 +88,29 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
-		block.Height = 1
-		block.View = 1
-		block.ParentID = genesis.ID()
-		block.PayloadHash = block.Payload.Hash()
-
-		sealingBlock := unittest.BlockFixture()
-		sealingBlock.Seals = make([]*flow.Seal, 1)
-		sealingBlock.Height = 2
-		sealingBlock.View = 2
-		sealingBlock.Identities = nil
-		sealingBlock.Guarantees = nil
-		sealingBlock.ParentID = block.ID()
+		block.Payload.Seals = nil
+		block.Header.Height = 1
+		block.Header.ParentID = genesis.ID()
+		block.Header.PayloadHash = block.Payload.Hash()
 
 		// seal
-		newSeal := &flow.Seal{
+		newSeal := flow.Seal{
 			BlockID:       block.ID(),
 			PreviousState: genesis.Seals[0].FinalState,
 			FinalState:    unittest.StateCommitmentFixture(),
 			Signature:     nil,
 		}
-		sealingBlock.Seals[0] = newSeal
-		sealingBlock.PayloadHash = sealingBlock.Payload.Hash()
+
+		sealingBlock := unittest.BlockFixture()
+		sealingBlock.Payload.Identities = nil
+		sealingBlock.Payload.Guarantees = nil
+		sealingBlock.Payload.Seals = []*flow.Seal{&newSeal}
+		sealingBlock.Header.Height = 2
+		sealingBlock.Header.ParentID = block.ID()
+		sealingBlock.Header.PayloadHash = sealingBlock.Payload.Hash()
 
 		err = db.Update(func(txn *badger.Txn) error {
-			err = procedure.InsertPayload(&block.Payload)(txn)
-			if err != nil {
-				return err
-			}
 			err = procedure.InsertBlock(&block)(txn)
-			if err != nil {
-				return err
-			}
-			err := operation.InsertSeal(newSeal)(txn)
-			if err != nil {
-				return err
-			}
-			err = procedure.InsertPayload(&sealingBlock.Payload)(txn)
 			if err != nil {
 				return err
 			}

@@ -100,33 +100,33 @@ func (m *MockPayloads) EXPECT() *MockPayloadsMockRecorder {
 	return m.recorder
 }
 
-// ByPayloadHash mocks base method
-func (m *MockPayloads) ByPayloadHash(arg0 flow.Identifier) (*flow.Payload, error) {
+// ByBlockID mocks base method
+func (m *MockPayloads) ByBlockID(arg0 flow.Identifier) (*flow.Payload, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ByPayloadHash", arg0)
+	ret := m.ctrl.Call(m, "ByBlockID", arg0)
 	ret0, _ := ret[0].(*flow.Payload)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ByPayloadHash indicates an expected call of ByPayloadHash
-func (mr *MockPayloadsMockRecorder) ByPayloadHash(arg0 interface{}) *gomock.Call {
+// ByBlockID indicates an expected call of ByBlockID
+func (mr *MockPayloadsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByPayloadHash", reflect.TypeOf((*MockPayloads)(nil).ByPayloadHash), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockID", reflect.TypeOf((*MockPayloads)(nil).ByBlockID), arg0)
 }
 
 // Store mocks base method
-func (m *MockPayloads) Store(arg0 *flow.Payload) error {
+func (m *MockPayloads) Store(arg0 *flow.Header, arg1 *flow.Payload) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Store", arg0)
+	ret := m.ctrl.Call(m, "Store", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Store indicates an expected call of Store
-func (mr *MockPayloadsMockRecorder) Store(arg0 interface{}) *gomock.Call {
+func (mr *MockPayloadsMockRecorder) Store(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockPayloads)(nil).Store), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockPayloads)(nil).Store), arg0, arg1)
 }
 
 // MockCollections is a mock of Collections interface
