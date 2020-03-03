@@ -36,10 +36,11 @@ func NewFinalizer(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Se
 
 // MakeFinal will finalize the block with the given ID and clean up the memory
 // pools after it.
-// NOTE: introducing entities into the persistent state should happen at the
-// point of reception of a new block proposal; between entering the
-// non-finalized chain state and being finalized, entities should be present in
-// both the volatile memory pools and the persistent on-disk storage.
+//
+// This assumes that transactions are added to persistent state when they are
+// included in a block proposal. Between entering the non-finalized chain state
+// and being finalized, entities should be present in both the volatile memory
+// pools and persistent storage.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	return f.db.Update(func(tx *badger.Txn) error {
 
@@ -88,16 +89,16 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// look up the list of guarantee IDs included in the payload
 			step := steps[i]
 			var guaranteeIDs []flow.Identifier
-			err = operation.LookupGuarantees(step.PayloadHash, &guaranteeIDs)(tx)
+			err = operation.LookupGuaranteePayload(step.Height, step.ID(), step.ParentID, &guaranteeIDs)(tx)
 			if err != nil {
-				return fmt.Errorf("could not look up guarantees (%x): %w", blockID, err)
+				return fmt.Errorf("could not look up guarantees (block_id=%x): %w", step.ID(), err)
 			}
 
 			// look up list of seal IDs included in the payload
 			var sealIDs []flow.Identifier
-			err = operation.LookupSeals(step.PayloadHash, &sealIDs)(tx)
+			err = operation.LookupSealPayload(step.Height, step.ID(), step.ParentID, &sealIDs)(tx)
 			if err != nil {
-				return fmt.Errorf("could not look up seals (%x): %w", blockID, err)
+				return fmt.Errorf("could not look up seals (block_id=%x): %w", step.ID(), err)
 			}
 
 			// remove the guarantees from the memory pool
@@ -117,7 +118,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// finalize the block in the protocol state
-			err := procedure.FinalizeBlock(blockID)(tx)
+			err := procedure.FinalizeBlock(step.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not finalize block (%x): %w", blockID, err)
 			}
@@ -129,7 +130,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		{
 			// get the payload
 			var payload flow.Payload
-			err = procedure.RetrievePayload(header.PayloadHash, &payload)(tx)
+			err = procedure.RetrievePayload(header.ID(), &payload)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve payload: %w", err)
 			}

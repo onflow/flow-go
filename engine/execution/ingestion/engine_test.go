@@ -74,7 +74,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	protocolState.On("Mutate").Return(mutator)
 	mutator.On("Finalize", mock.Anything).Return(nil)
-	payloads.EXPECT().Store(gomock.Any()).AnyTimes()
+	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
 

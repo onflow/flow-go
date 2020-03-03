@@ -50,7 +50,7 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 		},
 	)
 
-	checker.checkResourceFieldsInvalidated(transactionType.String(), transactionType.Members)
+	checker.checkResourceFieldsInvalidated(transactionType, transactionType.Members)
 
 	return nil
 }
@@ -129,7 +129,7 @@ func (checker *Checker) visitTransactionPrepareFunction(
 
 	checker.checkFunction(
 		prepareFunction.ParameterList,
-		ast.Position{},
+		nil,
 		prepareFunctionType,
 		prepareFunction.FunctionBlock,
 		true,
@@ -177,7 +177,7 @@ func (checker *Checker) visitTransactionExecuteFunction(
 
 	checker.checkFunction(
 		&ast.ParameterList{},
-		ast.Position{},
+		nil,
 		executeFunctionType,
 		executeFunction.FunctionBlock,
 		true,

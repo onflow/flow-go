@@ -98,7 +98,10 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID())
 		fnb.MustNot(err).Msg("could not initialize flow middleware")
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
+		ids, err := fnb.State.Final().Identities()
+		fnb.MustNot(err).Msg("could not retrieve state identities")
+
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
 		fnb.MustNot(err).Msg("could not initialize flow network")
 		fnb.Network = net
 		return net

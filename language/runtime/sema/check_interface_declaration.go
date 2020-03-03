@@ -83,7 +83,6 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		interfaceType.Members,
 		interfaceType,
 		declaration.DeclarationKind(),
-		declaration.Identifier.Identifier,
 		kind,
 	)
 

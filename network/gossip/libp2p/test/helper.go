@@ -10,7 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
 // helper offers a set of functions that are shared among different tests
@@ -36,14 +35,9 @@ func CreateIDs(count int) []*flow.Identity {
 func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool, tops ...middleware.Topology) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
-	// create a identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
+	// create an empty identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
+	// identities are set to appropriate IP Port after the network and middleware are started
 	identities := make(flow.IdentityList, len(ids))
-
-	// creates and mocks the state
-	snapshot := &SnapshotMock{ids: identities}
-
-	state := &protocol.State{}
-	state.On("Final").Return(snapshot)
 
 	// if no topology is passed in, use the default topology for all networks
 	if tops == nil {
@@ -58,7 +52,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), state, me, mws[i], csize, tops[i])
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), identities, me, mws[i], csize, tops[i])
 		if err != nil {
 			return nil, fmt.Errorf("could not create error %w", err)
 		}
@@ -73,6 +67,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		}
 	}
 
+	// set the identities to appropriate ip and port
 	for i := range ids {
 		// retrieves IP and port of the middleware
 		var ip, port string
@@ -88,7 +83,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 			Role:    flow.RoleCollection,
 			Stake:   0,
 		}
-		snapshot.ids[i] = &id
+		identities[i] = &id
 	}
 
 	return nets, nil
