@@ -108,7 +108,7 @@ func (fc *NewestForkChoice) ensureBlockStored(qc *hotstuff.QuorumCertificate) (*
 	if !haveBlock {
 		// This should never happen and indicates an implementation bug.
 		// Finding the block to which the qc points to should always be possible for the folling reason:
-		// * Check in function AddQC guarantees: qc.View > fc.preferredParent.Block.View 
+		// * Check in function AddQC guarantees: qc.View > fc.preferredParent.Block.View
 		// * Forks guarantees that every block's qc is also processed by ForkChoice
 		//   => fc.preferredParent.Block.View > fc.finalizer.FinalizedBlock().View()
 		//   (as NewestForkChoice tracks the qc with the largest view)

@@ -1,22 +1,24 @@
 package testutil
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/receipts"
+	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
@@ -45,7 +47,17 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 		option(state)
 	}
 
-	me, err := local.New(identity)
+	// Generates test signing oracle for the nodes
+	// Disclaimer: it should not be used for practical applications
+	//
+	// uses identity of node as its seed
+	seed, err := json.Marshal(identity)
+	require.NoError(t, err)
+	// creates signing key of the node
+	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	require.NoError(t, err)
+
+	me, err := local.New(identity, sk)
 	require.NoError(t, err)
 
 	stub := stub.NewNetwork(state, me, hub)
@@ -106,7 +118,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node := GenericNode(t, hub, identity, identities)
 
-	results := storage.NewResults(node.DB)
+	results := storage.NewExecutionResults(node.DB)
 
 	guarantees, err := stdmap.NewGuarantees()
 	require.NoError(t, err)
@@ -165,33 +177,34 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	collectionsStorage := storage.NewCollections(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
-
-	receiptsEngine, err := receipts.New(node.Log, node.Net, node.State, node.Me)
-	require.NoError(t, err)
-
-	rt := runtime.NewInterpreterRuntime()
-	vm := virtualmachine.New(rt)
+	executionResults := storage.NewExecutionResults(node.DB)
 
 	levelDB := unittest.TempLevelDB(t)
 
 	ls, err := ledger.NewTrieStorage(levelDB)
 	require.NoError(t, err)
 
-	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage)
+	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, executionResults)
 
-	execEngine, err := execution.New(
+	receiptsEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
+	require.NoError(t, err)
+
+	rt := runtime.NewInterpreterRuntime()
+	vm := virtualmachine.New(rt)
+
+	require.NoError(t, err)
+
+	execEngine, err := computation.New(
 		node.Log,
 		node.Net,
 		node.Me,
 		node.State,
-		execState,
 		receiptsEngine,
 		vm,
 	)
 	require.NoError(t, err)
 
-	blocksEngine, err := ingestion.New(
-		node.Log,
+	blocksEngine, err := ingestion.New(node.Log,
 		node.Net,
 		node.Me,
 		node.State,
@@ -199,12 +212,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		payloadsStorage,
 		collectionsStorage,
 		execEngine,
+		execState,
 	)
 	require.NoError(t, err)
 
 	return mock.ExecutionNode{
 		GenericNode:     node,
-		BlocksEngine:    blocksEngine,
+		IngestionEngine: blocksEngine,
 		ExecutionEngine: execEngine,
 		ReceiptsEngine:  receiptsEngine,
 		BadgerDB:        node.DB,

@@ -3,9 +3,12 @@
 package main
 
 import (
+	"time"
+
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/consensus"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
@@ -57,7 +60,7 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing result matching engine")
-			results := storage.NewResults(node.DB)
+			results := storage.NewExecutionResults(node.DB)
 			match, err := matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
 			node.MustNot(err).Msg("could not initialize matching engine")
 			return match
@@ -81,9 +84,13 @@ func main() {
 			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
 
-			cons, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, build, final)
+			eng, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB)
 			node.MustNot(err).Msg("could not initialize consensus engine")
-			return cons
+
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, eng, build, final, 3*time.Second, 6*time.Second)
+			node.MustNot(err).Msg("could not initialize coldstuff")
+
+			return eng.WithConsensus(cold)
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)

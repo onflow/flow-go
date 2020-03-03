@@ -20,18 +20,18 @@ import (
 // Engine is the propagation engine, which makes sure that new collections are
 // propagated to the other consensus nodes on the network.
 type Engine struct {
-	unit      *engine.Unit      // used to control startup/shutdown
-	log       zerolog.Logger    // used to log relevant actions with context
-	state     protocol.State    // used to access the  protocol state
-	me        module.Local      // used to access local node information
-	results   storage.Results   // used to permanently store results
-	receipts  mempool.Receipts  // holds collection guarantees in memory
-	approvals mempool.Approvals // holds result approvals in memory
-	seals     mempool.Seals     // holds block seals in memory
+	unit      *engine.Unit             // used to control startup/shutdown
+	log       zerolog.Logger           // used to log relevant actions with context
+	state     protocol.State           // used to access the  protocol state
+	me        module.Local             // used to access local node information
+	results   storage.ExecutionResults // used to permanently store results
+	receipts  mempool.Receipts         // holds collection guarantees in memory
+	approvals mempool.Approvals        // holds result approvals in memory
+	seals     mempool.Seals            // holds block seals in memory
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, results storage.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, results storage.ExecutionResults, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -46,7 +46,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	}
 
 	// register engine with the receipt provider
-	_, err := net.Register(engine.ReceiptProvider, e)
+	_, err := net.Register(engine.ExecutionReceiptProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}

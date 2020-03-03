@@ -148,7 +148,8 @@ ConsentLoop:
 			}
 
 			log.Info().Msg("proposal committed")
-			payload, err := e.payloads.ByPayloadHash(proposal.PayloadHash)
+
+			payload, err := e.payloads.ByBlockID(proposalID)
 			if err != nil {
 				e.log.Error().Err(err).Msg("could retrieve payload hash")
 				continue ConsentLoop

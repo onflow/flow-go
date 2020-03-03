@@ -6,15 +6,17 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	engineCommon "github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution"
+	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
+	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
-	protocol "github.com/dapperlabs/flow-go/protocol/mocks"
+	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -24,7 +26,19 @@ var (
 	myIdentity         = unittest.IdentityFixture()
 )
 
-func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine)) {
+type testingContext struct {
+	t                 *testing.T
+	engine            *Engine
+	blocks            *storage.MockBlocks
+	collections       *storage.MockCollections
+	state             *protocol.State
+	conduit           *network.MockConduit
+	collectionConduit *network.MockConduit
+	executionEngine   *computation.ComputationEngine
+	executionState    *state.ExecutionState
+}
+
+func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	collectionIdentity.Role = flow.RoleCollection
 	myIdentity.Role = flow.RoleExecution
@@ -45,21 +59,22 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	executionEngine := network.NewMockEngine(ctrl)
-	state := protocol.NewMockState(ctrl)
-	mutator := protocol.NewMockMutator(ctrl)
-	snapshot := protocol.NewMockSnapshot(ctrl)
+	computationEngine := new(computation.ComputationEngine)
+	protocolState := new(protocol.State)
+	executionState := new(state.ExecutionState)
+	mutator := new(protocol.Mutator)
+	snapshot := new(protocol.Snapshot)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
 
-	state.EXPECT().Final().Return(snapshot).AnyTimes()
-	snapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f flow.IdentityFilter) (flow.IdentityList, error) {
-		return identityList.Filter(f), nil
-	})
-	state.EXPECT().Mutate().Return(mutator).AnyTimes()
-	mutator.EXPECT().Finalize(gomock.Any()).AnyTimes()
+	protocolState.On("Final").Return(snapshot)
+	snapshot.On("Identities", mock.Anything).Return(func(f ...flow.IdentityFilter) flow.IdentityList {
+		return identityList.Filter(f[0])
+	}, nil)
 
-	payloads.EXPECT().Store(gomock.Any()).AnyTimes()
+	protocolState.On("Mutate").Return(mutator)
+	mutator.On("Finalize", mock.Anything).Return(nil)
+	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
 
@@ -68,10 +83,24 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err := New(log, net, me, state, blocks, payloads, collections, executionEngine)
+	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, computationEngine, executionState)
 	require.NoError(t, err)
 
-	f(t, engine, blocks, collections, state, conduit, collectionConduit, executionEngine)
+	f(testingContext{
+		t:                 t,
+		engine:            engine,
+		blocks:            blocks,
+		collections:       collections,
+		state:             protocolState,
+		conduit:           conduit,
+		collectionConduit: collectionConduit,
+		executionEngine:   computationEngine,
+		executionState:    executionState,
+	})
+
+	computationEngine.AssertExpectations(t)
+	protocolState.AssertExpectations(t)
+	executionState.AssertExpectations(t)
 }
 
 // TODO Currently those tests check if objects are stored directly
@@ -79,49 +108,49 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 // tests will have to change to reflect this
 func TestBlockStorage(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
+	runWithEngine(t, func(ctx testingContext) {
 
 		block := unittest.BlockFixture()
 
-		blocks.EXPECT().Store(gomock.Eq(&block))
-		collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(len(block.Guarantees))
+		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
+		ctx.collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(len(block.Guarantees))
 
-		err := engine.ProcessLocal(&block)
+		err := ctx.engine.ProcessLocal(&block)
 		assert.NoError(t, err)
 	})
 }
 
 func TestCollectionRequests(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
+	runWithEngine(t, func(ctx testingContext) {
 
 		block := unittest.BlockFixture()
 		//To make sure we always have collection if the block fixture changes
 		block.Guarantees = unittest.CollectionGuaranteesFixture(5)
 
-		blocks.EXPECT().Store(gomock.Eq(&block))
+		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
 		for _, col := range block.Guarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
-		err := engine.ProcessLocal(&block)
+		err := ctx.engine.ProcessLocal(&block)
 		require.NoError(t, err)
 	})
 }
 
 func TestValidatingCollectionResponse(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
+	runWithEngine(t, func(ctx testingContext) {
 
 		block, colls := makeRealBlock(1)
 
-		blocks.EXPECT().Store(gomock.Eq(&block))
+		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
 
 		id := block.Guarantees[0].ID()
 
-		collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
+		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
 
-		err := engine.ProcessLocal(&block)
+		err := ctx.engine.ProcessLocal(&block)
 		require.NoError(t, err)
 
 		rightResponse := messages.CollectionResponse{
@@ -140,36 +169,40 @@ func TestValidatingCollectionResponse(t *testing.T) {
 		// no interaction with conduit for finished block
 		// </TODO enable>
 
-		executionEngine.EXPECT().SubmitLocal(gomock.AssignableToTypeOf(&execution.CompleteBlock{})).Times(1)
+		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+		ctx.executionState.On("NewView", mock.Anything).Return(nil)
+		ctx.executionEngine.On("SubmitLocal", mock.AnythingOfType("*execution.ComputationOrder")).Once()
 
-		err = engine.ProcessLocal(&rightResponse)
+		err = ctx.engine.ProcessLocal(&rightResponse)
 		require.NoError(t, err)
 	})
 }
 
 func TestForwardingToExecution(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
+	runWithEngine(t, func(ctx testingContext) {
 
 		block, colls := makeRealBlock(3)
 
-		blocks.EXPECT().Store(gomock.Eq(&block))
+		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
 
 		for _, col := range block.Guarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
-		err := engine.ProcessLocal(&block)
+		err := ctx.engine.ProcessLocal(&block)
 		require.NoError(t, err)
 
-		executionEngine.EXPECT().SubmitLocal(gomock.AssignableToTypeOf(&execution.CompleteBlock{})).Times(1)
+		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+		ctx.executionState.On("NewView", mock.Anything).Return(nil)
+		ctx.executionEngine.On("SubmitLocal", mock.AnythingOfType("*execution.ComputationOrder")).Once()
 
 		for _, col := range colls {
 			rightResponse := messages.CollectionResponse{
 				Collection: col,
 			}
 
-			err := engine.ProcessLocal(&rightResponse)
+			err := ctx.engine.ProcessLocal(&rightResponse)
 			require.NoError(t, err)
 		}
 	})
@@ -177,26 +210,26 @@ func TestForwardingToExecution(t *testing.T) {
 
 func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
+	runWithEngine(t, func(ctx testingContext) {
 
 		block, colls := makeRealBlock(3)
 
 		for _, col := range block.Guarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
-		blocks.EXPECT().Store(gomock.Eq(&block))
+		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
 
-		err := engine.ProcessLocal(&block)
+		err := ctx.engine.ProcessLocal(&block)
 		require.NoError(t, err)
 
-		executionEngine.EXPECT().SubmitLocal(gomock.AssignableToTypeOf(execution.CompleteBlock{})).Times(0)
+		// No expected calls to "SubmitLocal", so test should fail if any occurs
 
 		rightResponse := messages.CollectionResponse{
 			Collection: colls[1],
 		}
 
-		err = engine.ProcessLocal(&rightResponse)
+		err = ctx.engine.ProcessLocal(&rightResponse)
 		require.NoError(t, err)
 	})
 }

@@ -157,6 +157,22 @@ var AccountCreatedEventType = newFlowEventType(
 			&sema.StringType{},
 		),
 	},
+	&sema.Parameter{
+		Identifier: "codeHash",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		),
+	},
+	&sema.Parameter{
+		Identifier: "contracts",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
+				Type: &sema.StringType{},
+			},
+		),
+	},
 )
 
 var AccountKeyAddedEventType = newFlowEventType(
@@ -211,6 +227,14 @@ var AccountCodeUpdatedEventType = newFlowEventType(
 			},
 		),
 	},
+	&sema.Parameter{
+		Identifier: "contracts",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
+				Type: &sema.StringType{},
+			},
+		),
+	},
 )
 
 // BlockType
@@ -220,6 +244,10 @@ type BlockType struct{}
 func (*BlockType) IsType() {}
 
 func (*BlockType) String() string {
+	return "Block"
+}
+
+func (*BlockType) QualifiedString() string {
 	return "Block"
 }
 
@@ -234,6 +262,10 @@ func (*BlockType) Equal(other sema.Type) bool {
 
 func (*BlockType) IsResourceType() bool {
 	return false
+}
+
+func (*BlockType) TypeAnnotationState() sema.TypeAnnotationState {
+	return sema.TypeAnnotationStateValid
 }
 
 func (*BlockType) IsInvalidType() bool {

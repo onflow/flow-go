@@ -9,11 +9,11 @@ import (
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/receipts"
+	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -58,9 +58,9 @@ type ConsensusNode struct {
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	BlocksEngine    *ingestion.Engine
-	ExecutionEngine *execution.Engine
-	ReceiptsEngine  *receipts.Engine
+	IngestionEngine *ingestion.Engine
+	ExecutionEngine *computation.Engine
+	ReceiptsEngine  *executionprovider.Engine
 	BadgerDB        *badger.DB
 	LevelDB         *leveldb.LevelDB
 	VM              virtualmachine.VirtualMachine
@@ -68,7 +68,7 @@ type ExecutionNode struct {
 }
 
 func (en ExecutionNode) Done() {
-	<-en.BlocksEngine.Done()
+	<-en.IngestionEngine.Done()
 	<-en.ExecutionEngine.Done()
 	<-en.ReceiptsEngine.Done()
 	en.BadgerDB.Close()
