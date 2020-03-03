@@ -18,12 +18,14 @@ func RetrieveGuarantee(collID flow.Identifier, guarantee *flow.CollectionGuarant
 	return retrieve(makePrefix(codeGuarantee, collID), guarantee)
 }
 
-func IndexGuarantee(payloadHash flow.Identifier, index uint64, guaranteeID flow.Identifier) func(*badger.Txn) error {
-	//BadgerDB iterates the keys in order - https://github.com/dgraph-io/badger/blob/master/iterator.go#L710
-	//Hence adding index at the end should make us retrieve them in order
-	return insert(makePrefix(codeIndexGuarantee, payloadHash, index), guaranteeID)
+func IndexGuaranteePayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, guaranteeIDs []flow.Identifier) func(*badger.Txn) error {
+	return insert(toPayloadIndex(codeIndexGuarantee, height, blockID, parentID), guaranteeIDs)
 }
 
-func LookupGuarantees(payloadHash flow.Identifier, collIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return traverse(makePrefix(codeIndexGuarantee, payloadHash), lookup(collIDs))
+func LookupGuaranteePayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, collIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(toPayloadIndex(codeIndexGuarantee, height, blockID, parentID), collIDs)
+}
+
+func VerifyGuaranteePayload(height uint64, blockID flow.Identifier, collIDs []flow.Identifier) func(*badger.Txn) error {
+	return iterate(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(0)), verifypayload(blockID, collIDs))
 }

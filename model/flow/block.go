@@ -27,18 +27,11 @@ func Genesis(ids IdentityList) *Block {
 
 	// create the header
 	header := Header{
-		ChainID:                 "flow",
-		ParentID:                ZeroID,
-		ProposerID:              ZeroID,
-		View:                    0,
-		Height:                  0,
-		PayloadHash:             payload.Hash(),
-		Timestamp:               time.Unix(1575244800, 0).UTC(),
-		ParentStakingSigs:       nil,
-		ParentRandomBeaconSig:   nil,
-		ParentSigners:           nil,
-		ProposerStakingSig:      nil,
-		ProposerRandomBeaconSig: nil,
+		ChainID:     "flow",
+		ParentID:    ZeroID,
+		Height:      0,
+		PayloadHash: payload.Hash(),
+		Timestamp:   time.Unix(1575244800, 0).UTC(),
 	}
 
 	// combine to block

@@ -21,7 +21,6 @@ func (h Hash) Hex() string {
 }
 
 // Hasher interface
-
 type Hasher interface {
 	// Algorithm returns the hashing algorithm for this hasher.
 	Algorithm() HashingAlgorithm

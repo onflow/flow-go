@@ -57,7 +57,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		typeAnnotation := checker.ConvertTypeAnnotation(declaration.TypeAnnotation)
 		declarationType = typeAnnotation.Type
 
-		checker.checkTypeAnnotation(typeAnnotation, declaration.TypeAnnotation.StartPos)
+		checker.checkTypeAnnotation(typeAnnotation, declaration.TypeAnnotation)
 
 		// check the value type is a subtype of the declaration type
 		if declarationType != nil && valueType != nil && !valueIsInvalid && !declarationType.IsInvalidType() {

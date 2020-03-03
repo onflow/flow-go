@@ -2,12 +2,13 @@ package flowmc
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	mockproc "github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/pacemaker/mock"
 	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/pacemaker/primary"
 	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 type MockEventProcessor struct {

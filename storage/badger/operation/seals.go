@@ -18,12 +18,14 @@ func RetrieveSeal(sealID flow.Identifier, seal *flow.Seal) func(*badger.Txn) err
 	return retrieve(makePrefix(codeSeal, sealID), seal)
 }
 
-func IndexSeal(payloadHash flow.Identifier, index uint64, sealID flow.Identifier) func(*badger.Txn) error {
-	//BadgerDB iterates the keys in order - https://github.com/dgraph-io/badger/blob/master/iterator.go#L710
-	//Hence adding index at the end should make us retrieve them in order
-	return insert(makePrefix(codeIndexSeal, payloadHash, index), sealID)
+func IndexSealPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
+	return insert(toPayloadIndex(codeIndexSeal, height, blockID, parentID), sealIDs)
 }
 
-func LookupSeals(payloadHash flow.Identifier, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return traverse(makePrefix(codeIndexSeal, payloadHash), lookup(sealIDs))
+func LookupSealPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(toPayloadIndex(codeIndexSeal, height, blockID, parentID), sealIDs)
+}
+
+func VerifySealPayload(height uint64, blockID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
+	return iterate(makePrefix(codeIndexSeal, height), makePrefix(codeIndexSeal, uint64(0)), verifypayload(blockID, sealIDs))
 }

@@ -19,6 +19,7 @@ type Validator struct {
 func NewValidator(viewState *ViewState, forks ForksReader, sigVerifier SigVerifier) *Validator {
 	return &Validator{
 		viewState:   viewState,
+		forks:       forks,
 		sigVerifier: sigVerifier,
 	}
 }
@@ -27,78 +28,52 @@ func NewValidator(viewState *ViewState, forks ForksReader, sigVerifier SigVerifi
 // qc - the qc to be validated
 // block - the block that the qc is pointing to
 func (v *Validator) ValidateQC(qc *hotstuff.QuorumCertificate, block *hotstuff.Block) error {
-	// check block ID
-	if qc.BlockID != block.BlockID {
-		return newInvalidBlockError(block, fmt.Sprintf("qc.BlockID (%x) doesn't match with block's ID (%x)", qc.BlockID, block.BlockID))
+	if qc.BlockID != block.BlockID { // check block ID
+		return newInvalidBlockError(block, fmt.Sprintf("qc.BlockID (%s) doesn't match with block's ID (%s)", qc.BlockID, block.BlockID))
 	}
-
-	// check view
-	if qc.View != block.View {
+	if qc.View != block.View { // check view
 		return newInvalidBlockError(block, fmt.Sprintf("qc.View (%d) doesn't match with block's View (%d)", qc.View, block.View))
 	}
 
-	// check if there is duplicates in QC.AggregatedSignature.Signers
-	signerMap := make(map[flow.Identifier]struct{}, len(qc.AggregatedSignature.SignerIDs))
-	for _, signerID := range qc.AggregatedSignature.SignerIDs {
-		_, found := signerMap[signerID]
-		if found {
-			return newInvalidBlockError(block, "duplicated signers in QC")
-		}
-		signerMap[signerID] = struct{}{}
-	}
-
-	stakedSigners, err := v.viewState.ConsensusIdentities(qc.BlockID, qc.AggregatedSignature.SignerIDs...)
+	stakedSigners, err := v.viewState.IdentitiesForConsensusParticipants(qc.BlockID, qc.AggregatedSignature.SignerIDs...)
 	if err != nil {
-		return fmt.Errorf("cannot get signer identities at blockID (%x) to validate QC, %w", qc.BlockID, err)
+		return fmt.Errorf("invalid signer identities in qc of blockID %s: %w", qc.BlockID, err)
 	}
+	// method IdentitiesForConsensusParticipants guarantees that there are no duplicated signers
+	// and all signers are valid, staked consensus nodes
 
-	// Given the fact we've checked there is no duplication in QC.AggregatedSignature.Signers,
-	// in other words, signers are all unique, then:
-	// if the counts are equal, then the aggregated signature contains all staked signers' signatures.
-	// if the counts are not equal, then some signer must be unstaked or not among the consensus members
-	if int(stakedSigners.Count()) != len(qc.AggregatedSignature.SignerIDs) {
-		return newInvalidBlockError(block, fmt.Sprintf("QC has signatures from unstaked signers or non-consensus nodes"))
-	}
-
-	// get all staked nodes at qc's Block
-	allStakedNodes, err := v.viewState.ConsensusIdentities(qc.BlockID)
+	// determine whether stakedSigners reach minimally required stake threshold for consensus:
+	allConsensusParticipants, err := v.viewState.AllConsensusParticipants(qc.BlockID)
 	if err != nil {
-		return fmt.Errorf("cannot get identities at blockID (%x) to validate QC, %w", qc.BlockID, err)
+		return fmt.Errorf("cannot get identities at blockID (%s) to validate QC, %w", qc.BlockID, err)
 	}
-
-	// compute the threshold of stake required for a valid QC
-	threshold := ComputeStakeThresholdForBuildingQC(allStakedNodes.TotalStake())
-
-	// compute total stakes of all signers from the QC
-	totalStakes := stakedSigners.TotalStake()
-
-	// check if there are enough stake for building QC
-	if totalStakes < threshold {
+	threshold := ComputeStakeThresholdForBuildingQC(allConsensusParticipants.TotalStake()) // compute required stake threshold
+	totalStakes := stakedSigners.TotalStake()                                              // total stakes of all signers
+	if totalStakes < threshold {                                                           // if stake is below minimally required threshold: qc is invalid
 		return newInvalidBlockError(block, fmt.Sprintf("insufficient stake (required=%d, got=%d) before signatures are verified", threshold, totalStakes))
 	}
 
-	// convert to public keys
+	// validate signature:
+	// collect staking keys for for nodes that contributed to qc's aggregated sig:
 	stakingPubKeys := make([]crypto.PublicKey, 0, len(stakedSigners))
 	for _, signer := range stakedSigners {
 		stakingPubKeys = append(stakingPubKeys, signer.StakingPubKey)
 	}
-
-	// validate qc's aggregated staking signatures.
-	valid, err := v.sigVerifier.VerifyAggregatedStakingSignature(qc.AggregatedSignature.StakingSignatures, block, stakingPubKeys)
+	// validate qc's aggregated staking signature using staking keys
+	valid, err := v.sigVerifier.VerifyStakingAggregatedSig(qc.AggregatedSignature.StakingSignatures, block, stakingPubKeys)
 	if err != nil {
-		return fmt.Errorf("cannot verify qc's aggregated signature, qc.BlockID: %x", qc.BlockID)
+		return fmt.Errorf("cannot verify qc's aggregated signature, qc.BlockID: %s", qc.BlockID)
 	}
-
 	if !valid {
 		return newInvalidBlockError(block, "aggregated staking signature in QC is invalid")
 	}
 
-	// validate qc's reconstructed random beacon signatures.
-	valid, err = v.sigVerifier.VerifyAggregatedRandomBeaconSignature(qc.AggregatedSignature.RandomBeaconSignature, block)
+	// validate qc's random beacon signature (reconstructed threshold signature)
+	groupPubKey := v.viewState.DKGPublicData().GroupPubKey
+	valid, err = v.sigVerifier.VerifyRandomBeaconThresholdSig(qc.AggregatedSignature.RandomBeaconSignature, block, groupPubKey)
 	if err != nil {
 		return fmt.Errorf("cannot verify reconstructed random beacon sig from qc: %w", err)
 	}
-
 	if !valid {
 		return newInvalidBlockError(block, "reconstructed random beacon signature in QC is invalid")
 	}
@@ -114,70 +89,31 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 	block := proposal.Block
 	blockID := proposal.Block.BlockID
 
-	// get claimed signer
-	signers, err := v.viewState.ConsensusIdentities(proposal.Block.BlockID, proposal.Block.ProposerID)
+	// Validate Proposer's signatures and ensure that proposer is leader for respective view
+	signer, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
 	if err != nil {
-		return fmt.Errorf("cannot get signer for block: %x", blockID)
+		return newInvalidBlockError(block, fmt.Sprintf("invalid proposer for block %s: %s", blockID, err.Error()))
 	}
-
-	if len(signers) != 1 {
-		return newInvalidBlockError(block, fmt.Sprintf("signer is not staked. signerID: %x", proposal.Block.ProposerID))
-	}
-
-	// the only signer
-	signer := signers[0]
-
 	// check the signer is the leader for that block
 	leader := v.viewState.LeaderForView(proposal.Block.View)
 	if leader.ID() != signer.ID() {
-		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%x), expected leader: (%x)", signer.ID(), leader.ID()))
+		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%s), expected leader: (%s)", signer.ID(), leader.ID()))
 	}
 
-	// check staking signature
-	valid, err := v.sigVerifier.VerifyStakingSig(proposal.StakingSignature, proposal.Block, signer.StakingPubKey)
-	if err != nil {
-		return fmt.Errorf("cannot verify block %x 's staking signature: %w", blockID, err)
-	}
-
-	if !valid {
-		return newInvalidBlockError(block, "block proposer's staking signature is invalid")
-	}
-
-	// check random beacon signature
-	valid, err = v.sigVerifier.VerifyRandomBeaconSig(proposal.RandomBeaconSignature, proposal.Block, signer.RandomBeaconPubKey)
-	if err != nil {
-		return fmt.Errorf("cannot verify block %x 's random beacon signature: %w", blockID, err)
-	}
-
-	if !valid {
-		return newInvalidBlockError(block, "block proposer's random beacon signature is invalid")
-	}
-
-	// check view
-	if proposal.Block.View <= qc.View {
-		return newInvalidBlockError(block, fmt.Sprintf("block's view (%d) must be higher than QC's view (%d)", proposal.Block.View, qc.View))
-	}
-
-	// get parent block
+	// check proposal's parent
 	parent, found := v.forks.GetBlock(qc.BlockID)
 	if !found {
-		// parent is missing
-
-		// if the parent block is equal or above the finalized view, then Forks should have it
+		// Forks is _allowed_ to (but obliged to) prune blocks whose view is below the newest finalized block.
 		if qc.View >= v.forks.FinalizedView() {
-			// if Forks doesn't have it, then it's an invalid block
-			return newInvalidBlockError(block, fmt.Sprintf("qc is pointing to unknown block (%x)", qc.BlockID))
+			// If the parent block is equal or above the finalized view, then Forks should have it. Otherwise, we are missing a block!
+			return &hotstuff.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
 		}
 
-		// It could be the case where Forks has pruned the parent block.
-		// At this point, we can't verify the QC, because Forks doesn't the parent block, and we can't tell
-		// for sure if the parent block exists. But we know for sure is even if it's invalid we won't vote
-		// for it, because the QC.View is below finalized block. So, we could simply consider this block
-		// as "valid", and we won't vote for it or build a block on top of it.
-
+		// Forks has already pruned the parent block. I.e., we can't validate that the qc matches
+		// a known (and valid) parent. Nevertheless, we just store this block, because there might already
+		// exists children of this block, which we could receive later. However, we know for sure that the
+		// block's fork cannot keep growing anymore because it conflicts with a finalized block.
 		// TODO: note other components will expect Validator has validated, and might re-validate it,
-		// if the validation failed there, it will cause crash.
-		// should we return a new error here to ignore?
 		return hotstuff.ErrUnverifiableBlock
 	}
 
@@ -189,54 +125,40 @@ func (v *Validator) ValidateProposal(proposal *hotstuff.Proposal) error {
 // vote - the vote to be validated
 // block - the voting block. Assuming the block has been validated.
 func (v *Validator) ValidateVote(vote *hotstuff.Vote, block *hotstuff.Block) (*flow.Identity, error) {
-	blockID := block.BlockID
-	voteID := vote.ID()
-
 	// view must match with the block's view
 	if vote.View != block.View {
 		return nil, newInvalidVoteError(vote, fmt.Sprintf("wrong view number. expected (%d), got (%d)", block.View, vote.View))
 	}
-
 	// block hash must match
-	if vote.BlockID != blockID {
-		return nil, newInvalidVoteError(vote, fmt.Sprintf("wrong block ID. expected (%x), got (%d)", blockID, vote.BlockID))
+	if vote.BlockID != block.BlockID {
+		return nil, newInvalidVoteError(vote, fmt.Sprintf("wrong block ID. expected (%s), got (%d)", block.BlockID, vote.BlockID))
 	}
 
-	// get claimed signer
-	signerID := vote.Signature.SignerID
-	signers, err := v.viewState.ConsensusIdentities(blockID, signerID)
+	// get voter's Identity (will error if voter is not a staked consensus participant at block)
+	voter, err := v.viewState.IdentityForConsensusParticipant(block.BlockID, vote.Signature.SignerID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get signer (%x) to validate vote (%x): %w", signerID, voteID, err)
+		return nil, newInvalidVoteError(vote, fmt.Sprintf("invalid voter identity: %s", err.Error()))
 	}
-
-	if len(signers) != 1 {
-		return nil, newInvalidVoteError(vote, fmt.Sprintf("signer (%x) is not staked", signerID))
-	}
-
-	// the only signer
-	signer := signers[0]
 
 	// check staking signature
-	valid, err := v.sigVerifier.VerifyStakingSig(vote.Signature.StakingSignature, block, signer.StakingPubKey)
+	valid, err := v.sigVerifier.VerifyStakingSig(vote.Signature.StakingSignature, block, voter.StakingPubKey)
 	if err != nil {
-		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", voteID, err)
+		return nil, fmt.Errorf("cannot verify signature for vote (%s): %w", vote.ID(), err)
 	}
-
 	if !valid {
-		return nil, newInvalidVoteError(vote, "vote's staking signature is invalid")
+		return nil, newInvalidVoteError(vote, "invalid staking signature")
 	}
 
 	// check random beacon signature
-	valid, err = v.sigVerifier.VerifyRandomBeaconSig(vote.Signature.RandomBeaconSignature, block, signer.RandomBeaconPubKey)
+	valid, err = v.sigVerifier.VerifyRandomBeaconSig(vote.Signature.RandomBeaconSignature, block, voter.RandomBeaconPubKey)
 	if err != nil {
-		return nil, fmt.Errorf("cannot verify vote %x 's random beacon signature: %w", blockID, err)
+		return nil, fmt.Errorf("cannot verify vote %s 's random beacon signature: %w", vote.ID(), err)
 	}
-
 	if !valid {
-		return nil, newInvalidVoteError(vote, "vote's random beacon signature is invalid")
+		return nil, newInvalidVoteError(vote, "invalid random beacon signature")
 	}
 
-	return signer, nil
+	return voter, nil
 }
 
 func newInvalidBlockError(block *hotstuff.Block, msg string) error {
