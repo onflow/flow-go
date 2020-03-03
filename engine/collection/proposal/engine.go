@@ -12,7 +12,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/cluster"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -28,17 +27,16 @@ import (
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
 type Engine struct {
-	unit        *engine.Unit
-	log         zerolog.Logger
-	tracer      trace.Tracer
-	con         network.Conduit
-	me          module.Local
-	state       protocol.State
-	provider    network.Engine // provider engine to propagate guarantees
-	pool        mempool.Transactions
-	collections storage.Collections
-	guarantees  storage.Guarantees
-	headers     storage.Headers
+	unit     *engine.Unit
+	log      zerolog.Logger
+	tracer   trace.Tracer
+	con      network.Conduit
+	me       module.Local
+	state    protocol.State
+	provider network.Engine // provider engine to propagate guarantees
+	pool     mempool.Transactions
+	headers  storage.Headers
+	payloads storage.ClusterPayloads
 
 	cache      map[flow.Identifier][]cacheItem // pending block cache, keyed by parent ID
 	cacheDedup map[flow.Identifier]struct{}    // prevent dupes in cache
@@ -59,24 +57,22 @@ func New(
 	tracer trace.Tracer,
 	provider network.Engine,
 	pool mempool.Transactions,
-	collections storage.Collections,
-	guarantees storage.Guarantees,
 	headers storage.Headers,
+	payloads storage.ClusterPayloads,
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log.With().Str("engine", "proposal").Logger(),
-		me:          me,
-		state:       state,
-		tracer:      tracer,
-		provider:    provider,
-		pool:        pool,
-		collections: collections,
-		guarantees:  guarantees,
-		headers:     headers,
-		cache:       make(map[flow.Identifier][]cacheItem),
-		cacheDedup:  make(map[flow.Identifier]struct{}),
+		unit:       engine.NewUnit(),
+		log:        log.With().Str("engine", "proposal").Logger(),
+		me:         me,
+		state:      state,
+		tracer:     tracer,
+		provider:   provider,
+		pool:       pool,
+		headers:    headers,
+		payloads:   payloads,
+		cache:      make(map[flow.Identifier][]cacheItem),
+		cacheDedup: make(map[flow.Identifier]struct{}),
 	}
 
 	con, err := net.Register(engine.CollectionProposal, e)
@@ -191,13 +187,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// retrieve the payload for the block
-	// NOTE: relies on the fact that cluster payload hash is the ID of its collection
-	collectionID := header.PayloadHash
-	collection, err := e.collections.LightByID(collectionID)
+	payload, err := e.payloads.ByBlockID(header.ID())
 	if err != nil {
 		return fmt.Errorf("could not get payload for block: %w", err)
 	}
-	payload := cluster.Payload{Collection: *collection}
 
 	// retrieve all collection nodes in our cluster
 	// TODO filter by cluster
@@ -212,7 +205,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	// create the proposal message for the collection
 	msg := &messages.ClusterBlockProposal{
 		Header:  header,
-		Payload: &payload,
+		Payload: payload,
 	}
 
 	err = e.con.Submit(msg, recipients.NodeIDs()...)
@@ -273,10 +266,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		return fmt.Errorf("cannot validate block proposal (id=%x) with missing transactions: %w", proposal.Header.ID(), err)
 	}
 
-	// store the collection
-	err = e.collections.StoreLight(&collection)
+	// store the payload
+	err = e.payloads.Store(proposal.Header, proposal.Payload)
 	if err != nil {
-		return fmt.Errorf("could not store collection: %w", err)
+		return fmt.Errorf("could not store payload: %w", err)
 	}
 
 	// store the header
@@ -286,7 +279,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	// ensure the block is a valid extension of cluster state
-	// TODO update extend logic to ensure no duplicate transactions like https://github.com/dapperlabs/flow-go/pull/2664
 	err = e.state.Mutate().Extend(blockID)
 	if err != nil {
 		return fmt.Errorf("could not extend cluster state: %w", err)
@@ -332,12 +324,10 @@ func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterB
 	}
 
 	// retrieve the block payload
-	collection, err := e.collections.LightByID(header.PayloadHash)
+	payload, err := e.payloads.ByBlockID(header.ID())
 	if err != nil {
 		return fmt.Errorf("could not find requested block: %w", err)
 	}
-
-	payload := &cluster.Payload{Collection: *collection}
 
 	proposal := &messages.ClusterBlockProposal{
 		Header:  header,
@@ -465,10 +455,10 @@ func (e *Engine) createProposal() error {
 		SetTag("node_type", "collection").
 		SetTag("node_id", e.me.NodeID().String())
 
-	err = e.guarantees.Store(&guarantee)
-	if err != nil {
-		return fmt.Errorf("could not save proposed collection guarantee %s: %w", guarantee.ID(), err)
-	}
+	//err = e.guarantees.Store(&guarantee)
+	//if err != nil {
+	//	return fmt.Errorf("could not save proposed collection guarantee %s: %w", guarantee.ID(), err)
+	//}
 
 	// Collection guarantee is saved, we can now delete Txs from the mem pool
 	for _, tx := range transactions {
