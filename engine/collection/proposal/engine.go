@@ -278,10 +278,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	// remove children from cache
-	delete(e.cache, blockID)
-	for _, child := range children {
-		delete(e.cacheDedup, child.Proposal.Header.ID())
-	}
+	e.dropPendingProposalsWithParent(blockID)
 
 	return result.ErrorOrNil()
 }
@@ -357,19 +354,13 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 	blockID := proposal.Header.ID()
 	parentID := proposal.Header.ParentID
 
-	// first, we cache the proposal with its origin ID, so we can process it once possible
-	item := cacheItem{
-		OriginID: originID,
-		Proposal: proposal,
-	}
-	// check that we haven't already buffered this block
-	if _, exists := e.cacheDedup[blockID]; exists {
+	// check that we haven't already cached this block
+	if e.isPendingProposalCached(blockID) {
 		return nil
 	}
 
 	// cache the block
-	e.cache[parentID] = append(e.cache[parentID], item)
-	e.cacheDedup[blockID] = struct{}{}
+	e.cachePendingProposal(originID, proposal)
 
 	// request the parent block
 	req := &messages.BlockRequest{
@@ -426,4 +417,38 @@ func (e *Engine) createProposal() error {
 	}
 
 	return nil
+}
+
+// Caches a pending proposal in the block buffer cache, keyed by the block's
+// parent ID.
+func (e *Engine) cachePendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) {
+
+	blockID := proposal.Header.ID()
+	parentID := proposal.Header.ParentID
+
+	item := cacheItem{
+		OriginID: originID,
+		Proposal: proposal,
+	}
+
+	e.cache[parentID] = append(e.cache[parentID], item)
+	e.cacheDedup[blockID] = struct{}{}
+}
+
+// Returns true if the proposal with the given block ID has been cached.
+func (e *Engine) isPendingProposalCached(blockID flow.Identifier) bool {
+	_, cached := e.cacheDedup[blockID]
+	return cached
+}
+
+// Removes from the pending proposal cache all the children of the block with
+// the given ID. Since buffered blocks are keyed by parent, this function
+// should be called when the parent for a set of children is received.
+func (e *Engine) dropPendingProposalsWithParent(blockID flow.Identifier) {
+
+	children := e.cache[blockID]
+	for _, child := range children {
+		delete(e.cacheDedup, child.Proposal.Header.ID())
+	}
+	delete(e.cache, blockID)
 }
