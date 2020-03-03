@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -223,12 +224,13 @@ func BlockToBytesForSign(block *model.Block) []byte {
 	// in crypto library will always hash it.
 	// so instead of using MakeID, we could just return the encoded tuple
 	// of BlockID and View
-	msg := flow.MakeID(struct {
+	msg := encoding.DefaultEncoder.MustEncode(struct {
 		BlockID flow.Identifier
 		View    uint64
 	}{
 		BlockID: block.BlockID,
 		View:    block.View,
 	})
-	return msg[:]
+
+	return msg
 }
