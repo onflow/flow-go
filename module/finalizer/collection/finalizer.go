@@ -114,6 +114,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// TODO add signatures here
+			// https://github.com/dapperlabs/flow-go/issues/2711
 			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: payload.Collection.ID(),

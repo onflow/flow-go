@@ -1,12 +1,14 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -68,7 +70,7 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 }
 
 func (m *Mutator) Extend(blockID flow.Identifier) error {
-	return m.state.db.View(func(tx *badger.Txn) error {
+	return m.state.db.Update(func(tx *badger.Txn) error {
 
 		// retrieve the block
 		var block cluster.Block
@@ -80,6 +82,17 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		// check chain ID
 		if block.ChainID != m.state.chainID {
 			return fmt.Errorf("new block chain ID (%s) does not match configured (%s)", block.ChainID, m.state.chainID)
+		}
+
+		// check for duplicate transactions in block's ancestry
+		parentHeight := block.Height - 1
+		parentID := block.ParentID
+		err = operation.VerifyCollectionPayload(parentHeight, parentID, block.Payload.Collection.Transactions)(tx)
+		if errors.Is(err, storage.ErrAlreadyIndexed) {
+			return fmt.Errorf("found duplicate transaction in payload: %w", err)
+		}
+		if err != nil {
+			return fmt.Errorf("could not verify collection payload: %w", err)
 		}
 
 		// get the chain ID, which determines which cluster state to query
@@ -126,6 +139,12 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			if block.View < boundary {
 				return fmt.Errorf("block doesn't connect to finalized state")
 			}
+		}
+
+		// index the transactions included in this block's collection
+		err = procedure.IndexClusterPayload(&block)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index block payload: %w", err)
 		}
 
 		return nil
