@@ -44,14 +44,14 @@ func (s *StakingSigner) Sign(block *model.Block) (crypto.Signature, error) {
 // Preconditions:
 //    * each staking signature has been verified
 //    * all signatures are from different parties
-// Violating preconditions will result in an error (but not the reconstruction of an invalid threshold signature).
+// Violating preconditions will result in an error (but not the construction of an invalid staking signature).
 func (s *StakingSigner) Aggregate(block *model.Block, sigs []*model.SingleSignature) (*model.AggregatedSignature, error) {
 	if len(sigs) == 0 { // ensure that sigs is not empty
 		return nil, fmt.Errorf("cannot aggregate an empty slice of signatures")
 	}
 
 	aggStakingSig, signerIDs := s.unsafeAggregate(sigs)              // unsafe aggregate staking sigs: crypto math only; will not catch error
-	err := s.verifyAggregatedRawSig(aggStakingSig, block, signerIDs) // safety: verify aggregated signature:
+	err := s.verifyAggregatedStakingSig(aggStakingSig, block, signerIDs) // safety: verify aggregated signature:
 	if err != nil {
 		return nil, fmt.Errorf("error aggregating staking signatures for block %s: %w", block.BlockID, err)
 	}
@@ -63,9 +63,9 @@ func (s *StakingSigner) Aggregate(block *model.Block, sigs []*model.SingleSignat
 	}, nil
 }
 
-// verifyAggregatedRawSig verifies the aggregated staking signature as a sanity check.
+// verifyAggregatedStakingSig verifies the aggregated staking signature as a sanity check.
 // Errors on duplicated signers. Any error indicates an internal bug and results in a fatal error.
-func (s *StakingSigner) verifyAggregatedRawSig(aggStakingSig []crypto.Signature, block *model.Block, signerIDs []flow.Identifier) error {
+func (s *StakingSigner) verifyAggregatedStakingSig(aggStakingSig []crypto.Signature, block *model.Block, signerIDs []flow.Identifier) error {
 	// This implementation will eventually be replaced by verifying the proper aggregated BLS signature:
 	// Steps: (1) aggregate all the public keys
 	//        (2) use aggregated public key to verify aggregated signature

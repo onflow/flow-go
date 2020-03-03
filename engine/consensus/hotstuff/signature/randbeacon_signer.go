@@ -75,12 +75,10 @@ func (s *RandomBeaconSigner) Reconstruct(block *model.Block, signatures []*model
 
 	// sanity check: verify the reconstruct signature is valid
 	publicGroupKey := s.viewState.DKGPublicData().GroupPubKey
-	msg := BlockToBytesForSign(block)
-	valid, err := publicGroupKey.Verify(msg, reconstructedSig, s.randomBeaconHasher)
+	valid, err := s.VerifyRandomBeaconThresholdSig(reconstructedSig, block, publicGroupKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot verify the reconstructed signature, %w", err)
 	}
-
 	if !valid {
 		return nil, fmt.Errorf("reconstructed an invalid threshold signature")
 	}
