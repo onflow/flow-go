@@ -28,7 +28,7 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 		}
 
 		// index the block payload
-		err = IndexClusterPayload(block)(tx)
+		err = IndexClusterPayload(&block.Header, &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
 		}
@@ -114,13 +114,27 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	}
 }
 
+// InsertClusterPayload inserts the payload for a cluster block.
+func InsertClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// cluster payloads only contain a single collection
+		err := operation.InsertCollection(&payload.Collection)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert collection: %w", err)
+		}
+
+		return nil
+	}
+}
+
 // IndexClusterPayload indexes a cluster consensus block payload.
-func IndexClusterPayload(block *cluster.Block) func(*badger.Txn) error {
+func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// only index a collection if it exists
 		var exists bool
-		err := operation.CheckCollection(block.Payload.Collection.ID(), &exists)(tx)
+		err := operation.CheckCollection(payload.Collection.ID(), &exists)(tx)
 		if err != nil {
 			return fmt.Errorf("could not check collection: %w", err)
 		}
@@ -130,7 +144,7 @@ func IndexClusterPayload(block *cluster.Block) func(*badger.Txn) error {
 		}
 
 		// index the transaction IDs within the collection
-		err = operation.SkipDuplicates(operation.IndexCollectionPayload(block.Height, block.ID(), block.ParentID, &block.Payload.Collection))(tx)
+		err = operation.SkipDuplicates(operation.IndexCollectionPayload(header.Height, header.ID(), header.ParentID, &payload.Collection))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}
