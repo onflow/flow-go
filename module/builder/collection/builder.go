@@ -99,8 +99,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// used in the payload, store and index it in storage, and insert the
 		// header.
 
+		// insert transactions included in this collection
+		for _, txID := range txIDs {
+			flowTx, err := b.transactions.ByID(txID)
+			if err != nil {
+				return fmt.Errorf("could not insert missing transaction: %w", err)
+			}
+			err = operation.SkipDuplicates(operation.InsertTransaction(&flowTx.TransactionBody))(tx)
+			if err != nil {
+				return fmt.Errorf("could not ")
+			}
+		}
+
 		// create and insert the collection
-		// TODO when are individual transactions inserted to storage? may need to do that here
 		collection := flow.LightCollection{Transactions: txIDs}
 		err = operation.InsertCollection(&collection)(tx)
 		if err != nil {
@@ -110,12 +121,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// build the payload
 		payload := cluster.Payload{
 			Collection: collection,
-		}
-
-		// index the payload by hash
-		err = procedure.IndexClusterPayload(&payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index payload: %w", err)
 		}
 
 		// retrieve the parent to set the height
@@ -149,6 +154,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		err = operation.InsertHeader(header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
+		}
+
+		// index the payload by block ID
+		err = procedure.IndexClusterPayload(header, &payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index payload: %w", err)
 		}
 
 		return nil

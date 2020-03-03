@@ -27,16 +27,17 @@ import (
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	tracer   trace.Tracer
-	con      network.Conduit
-	me       module.Local
-	state    protocol.State
-	provider network.Engine // provider engine to propagate guarantees
-	pool     mempool.Transactions
-	headers  storage.Headers
-	payloads storage.ClusterPayloads
+	unit         *engine.Unit
+	log          zerolog.Logger
+	tracer       trace.Tracer
+	con          network.Conduit
+	me           module.Local
+	state        protocol.State
+	provider     network.Engine // provider engine to propagate guarantees
+	pool         mempool.Transactions
+	transactions storage.Transactions
+	headers      storage.Headers
+	payloads     storage.ClusterPayloads
 
 	cache      map[flow.Identifier][]cacheItem // pending block cache, keyed by parent ID
 	cacheDedup map[flow.Identifier]struct{}    // prevent dupes in cache
@@ -57,22 +58,24 @@ func New(
 	tracer trace.Tracer,
 	provider network.Engine,
 	pool mempool.Transactions,
+	transactions storage.Transactions,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:       engine.NewUnit(),
-		log:        log.With().Str("engine", "proposal").Logger(),
-		me:         me,
-		state:      state,
-		tracer:     tracer,
-		provider:   provider,
-		pool:       pool,
-		headers:    headers,
-		payloads:   payloads,
-		cache:      make(map[flow.Identifier][]cacheItem),
-		cacheDedup: make(map[flow.Identifier]struct{}),
+		unit:         engine.NewUnit(),
+		log:          log.With().Str("engine", "proposal").Logger(),
+		me:           me,
+		state:        state,
+		tracer:       tracer,
+		provider:     provider,
+		pool:         pool,
+		transactions: transactions,
+		headers:      headers,
+		payloads:     payloads,
+		cache:        make(map[flow.Identifier][]cacheItem),
+		cacheDedup:   make(map[flow.Identifier]struct{}),
 	}
 
 	con, err := net.Register(engine.CollectionProposal, e)
@@ -264,6 +267,18 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 	if err := missingTxErr.ErrorOrNil(); err != nil {
 		return fmt.Errorf("cannot validate block proposal (id=%x) with missing transactions: %w", proposal.Header.ID(), err)
+	}
+
+	// store the transactions
+	for _, txID := range collection.Transactions {
+		tx, err := e.pool.ByID(txID)
+		if err != nil {
+			return fmt.Errorf("could not store missing transaction: %w", err)
+		}
+		err = e.transactions.Store(&tx.TransactionBody)
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+			return fmt.Errorf("could not store transaction: %w", err)
+		}
 	}
 
 	// store the payload

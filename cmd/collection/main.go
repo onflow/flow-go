@@ -61,13 +61,14 @@ func main() {
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing proposal engine")
+			transactions := storage.NewTransactions(node.DB)
 			headers := storage.NewHeaders(node.DB)
 			payloads := storage.NewClusterPayloads(node.DB)
 			// TODO determine chain ID for clusters
 			build := builder.NewBuilder(node.DB, pool, "TODO")
 			final := finalizer.NewFinalizer(node.DB, pool, providerEng, "TODO")
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, headers, payloads)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, transactions, headers, payloads)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 
 			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, 3*time.Second, 6*time.Second)
