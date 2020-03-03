@@ -21,9 +21,9 @@ const (
 	ProtocolConsensus = 60
 
 	// Execution 100-199
-	ReceiptProvider        = 100
-	ExecutionStateProvider = 101
-	ExecutionExecution     = 102
+	ExecutionReceiptProvider = 100
+	ExecutionStateProvider   = 101
+	ExecutionComputer        = 102
 
 	// Verification 150-199
 	ApprovalProvider = 150

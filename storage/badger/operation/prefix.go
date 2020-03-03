@@ -23,20 +23,21 @@ const (
 	codeSeal      = 13
 
 	// entities that are related to block formation & validation
-	codeTransaction = 21
-	codeCollection  = 22
-	codeCommit      = 23
-	codeResult      = 24
-	// codeReceipt     = 25
-	// codeApproval    = 26
+	codeTransaction     = 21
+	codeCollection      = 22
+	codeCommit          = 23
+	codeExecutionResult = 24
+	// codeReceipt       = 25
+	// codeApproval      = 26
 	codeChunkHeader   = 27
 	codeChunkDataPack = 28
 
-	codeIndexIdentity    = 100
-	codeIndexGuarantee   = 101
-	codeIndexSeal        = 102
-	codeIndexCollection  = 104
-	codeIndexSealByBlock = 105
+	codeIndexIdentity               = 100
+	codeIndexGuarantee              = 101
+	codeIndexSeal                   = 102
+	codeIndexCollection             = 104
+	codeIndexSealByBlock            = 105
+	codeIndexExecutionResultByBlock = 106
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {
@@ -50,6 +51,10 @@ func makePrefix(code byte, keys ...interface{}) []byte {
 
 func b(v interface{}) []byte {
 	switch i := v.(type) {
+	case uint32:
+		b := make([]byte, 4)
+		binary.BigEndian.PutUint32(b, i)
+		return b
 	case uint64:
 		b := make([]byte, 8)
 		binary.BigEndian.PutUint64(b, i)

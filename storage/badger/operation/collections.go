@@ -21,13 +21,13 @@ func CheckCollection(collID flow.Identifier, exists *bool) func(*badger.Txn) err
 }
 
 // IndexCollection indexes the collection by payload hash.
-func IndexCollection(payloadHash flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexCollection, payloadHash), collection.ID())
+func IndexCollection(payloadHash flow.Identifier, index uint64, collection *flow.LightCollection) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexCollection, payloadHash, index), collection.ID())
 }
 
 // LookupCollection looks up a collection ID by payload hash.
-func LookupCollection(payloadHash flow.Identifier, collectionID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexCollection, payloadHash), collectionID)
+func LookupCollections(payloadHash flow.Identifier, collIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return traverse(makePrefix(codeIndexCollection, payloadHash), lookup(collIDs))
 }
 
 func RetrieveCollection(collID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {

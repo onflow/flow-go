@@ -8,15 +8,16 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// InsertCommit inserts a state commitment.
+// IndexCommit indexes a state commitment.
 //
-// State commitments are keyed by the block ID of the block whose final state
-// is the state being committed to.
-func InsertCommit(blockID flow.Identifier, commit flow.StateCommitment) func(*badger.Txn) error {
+// State commitments are keyed by the block whose execution results in the state with the given commit.
+func IndexCommit(blockID flow.Identifier, commit flow.StateCommitment) func(*badger.Txn) error {
 	return insert(makePrefix(codeCommit, blockID), commit)
 }
 
-// RetrieveCommit gets a state commitment.
-func RetrieveCommit(blockID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
+// LookupCommit gets a state commitment keyed by block ID
+//
+// State commitments are keyed by the block whose execution results in the state with the given commit.
+func LookupCommit(blockID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCommit, blockID), commit)
 }

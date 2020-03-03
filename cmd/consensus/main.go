@@ -60,7 +60,7 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing result matching engine")
-			results := storage.NewResults(node.DB)
+			results := storage.NewExecutionResults(node.DB)
 			match, err := matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
 			node.MustNot(err).Msg("could not initialize matching engine")
 			return match

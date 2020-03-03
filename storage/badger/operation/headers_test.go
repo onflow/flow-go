@@ -15,7 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestHeaderInsertRetrieve(t *testing.T) {
+func TestHeaderInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := flow.Header{
 			View:                  1337,
@@ -31,6 +31,11 @@ func TestHeaderInsertRetrieve(t *testing.T) {
 
 		err := db.Update(InsertHeader(&expected))
 		require.Nil(t, err)
+
+		var exists bool
+		err = db.View(CheckHeader(blockID, &exists))
+		require.Nil(t, err)
+		require.True(t, exists)
 
 		var actual flow.Header
 		err = db.View(RetrieveHeader(blockID, &actual))

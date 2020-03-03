@@ -26,13 +26,13 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit    *engine.Unit    // used to control startup/shutdown
-	log     zerolog.Logger  // used to log relevant actions
-	conduit network.Conduit // used to propagate result approvals
-	me      module.Local    // used to access local node information
-	state   protocol.State  // used to access the protocol state
-	runtime runtime.Runtime // used to execute transactions
-	rah     crypto.Hasher   // used as hasher to sign the result approvals
+	unit    *engine.Unit                  // used to control startup/shutdown
+	log     zerolog.Logger                // used to log relevant actions
+	conduit network.Conduit               // used to propagate result approvals
+	me      module.Local                  // used to access local node information
+	state   protocol.State                // used to access the protocol state
+	rah     crypto.Hasher                 // used as hasher to sign the result approvals
+	vm      virtualmachine.VirtualMachine // used to execute transactions
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -43,13 +43,15 @@ func New(
 	me module.Local,
 ) (*Engine, error) {
 
+	rt := runtime.NewInterpreterRuntime()
+
 	e := &Engine{
-		unit:    engine.NewUnit(),
-		log:     log,
-		state:   state,
-		me:      me,
-		runtime: runtime.NewInterpreterRuntime(),
-		rah:     utils.NewResultApprovalHasher(),
+		unit:  engine.NewUnit(),
+		log:   log,
+		state: state,
+		me:    me,
+		vm:    virtualmachine.New(rt),
+		rah:   utils.NewResultApprovalHasher(),
 	}
 
 	var err error
@@ -172,7 +174,7 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 // executeChunk executes the transactions for a single chunk and returns the
 // resultant end state, or an error if execution failed.
 func (e *Engine) executeChunk(res *verification.CompleteExecutionResult, chunkIndex int) (flow.StateCommitment, error) {
-	blockCtx := virtualmachine.NewBlockContext(e.runtime, &res.Block.Header)
+	blockCtx := e.vm.NewBlockContext(&res.Block.Header)
 
 	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
 		registers := res.ChunkStates[0].Registers

@@ -34,13 +34,20 @@ func (_m *BlockContext) ExecuteScript(ledger virtualmachine.Ledger, script []byt
 	return r0, r1
 }
 
-// ExecuteTransaction provides a mock function with given fields: ledger, tx
-func (_m *BlockContext) ExecuteTransaction(ledger virtualmachine.Ledger, tx *flow.TransactionBody) (*virtualmachine.TransactionResult, error) {
-	ret := _m.Called(ledger, tx)
+// ExecuteTransaction provides a mock function with given fields: ledger, tx, options
+func (_m *BlockContext) ExecuteTransaction(ledger virtualmachine.Ledger, tx *flow.TransactionBody, options ...virtualmachine.TransactionContextOption) (*virtualmachine.TransactionResult, error) {
+	_va := make([]interface{}, len(options))
+	for _i := range options {
+		_va[_i] = options[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ledger, tx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 *virtualmachine.TransactionResult
-	if rf, ok := ret.Get(0).(func(virtualmachine.Ledger, *flow.TransactionBody) *virtualmachine.TransactionResult); ok {
-		r0 = rf(ledger, tx)
+	if rf, ok := ret.Get(0).(func(virtualmachine.Ledger, *flow.TransactionBody, ...virtualmachine.TransactionContextOption) *virtualmachine.TransactionResult); ok {
+		r0 = rf(ledger, tx, options...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*virtualmachine.TransactionResult)
@@ -48,8 +55,8 @@ func (_m *BlockContext) ExecuteTransaction(ledger virtualmachine.Ledger, tx *flo
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(virtualmachine.Ledger, *flow.TransactionBody) error); ok {
-		r1 = rf(ledger, tx)
+	if rf, ok := ret.Get(1).(func(virtualmachine.Ledger, *flow.TransactionBody, ...virtualmachine.TransactionContextOption) error); ok {
+		r1 = rf(ledger, tx, options...)
 	} else {
 		r1 = ret.Error(1)
 	}

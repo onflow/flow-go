@@ -9,10 +9,10 @@ import (
 // Payloads represents persistent storage for payloads.
 type Payloads interface {
 
-	// Store will store a payload and index it.
-	Store(payload *flow.Payload) error
+	// Store will store a payload and index its contents.
+	Store(header *flow.Header, payload *flow.Payload) error
 
-	// ByPayloadHash returns the payload with the given hash. It is available for
+	// ByBlockID returns the payload with the given hash. It is available for
 	// finalized and ambiguous blocks.
-	ByPayloadHash(payloadHash flow.Identifier) (*flow.Payload, error)
+	ByBlockID(blockID flow.Identifier) (*flow.Payload, error)
 }

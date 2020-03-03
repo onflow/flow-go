@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -13,53 +14,37 @@ import (
 
 // SigProvider provides symmetry functions to generate and verify signatures
 type SigProvider struct {
+	StakingSigVerifier
+	RandomBeaconSigVerifier
+
 	myID                   flow.Identifier
 	protocolState          protocol.State
-	stakingPrivateKey      crypto.PrivateKey // the staking private key
-	stakingHasher          crypto.Hasher     // the hasher for signing staking signature
-	randomBeaconPrivateKey crypto.PrivateKey // the private key for signing random beacon signature
-	randomBeaconHasher     crypto.Hasher     // the hasher for signer random beacon signature
-	dkgPubData             *DKGPublicData    // the dkg public data for the only epoch. Should be returned by protocol state if we implement epoch switch
-	isRandomBeaconEnabled  bool              // indicates whether random beacon signature is enabled for the cluster
+	stakingPrivateKey      crypto.PrivateKey // private staking key
+	randomBeaconPrivateKey crypto.PrivateKey // private key for random beacon signature
+
+	isRandomBeaconEnabled bool // indicates whether random beacon signature is enabled for the cluster
 }
 
 // NewSigProvider creates an instance of SigProvider
 func NewSigProvider(
 	myID flow.Identifier,
 	protocolState protocol.State,
+	stakingSigTag string,
 	stakingPrivateKey crypto.PrivateKey,
-	stakingHasher crypto.Hasher,
 	dkgPubData *DKGPublicData,
+	randomBeaconSigTag string,
 	randomBeaconPrivateKey crypto.PrivateKey,
-	randomBeaconHasher crypto.Hasher,
 	isRandomBeaconEnabled bool,
 ) *SigProvider {
 	return &SigProvider{
-		myID:                   myID,
-		protocolState:          protocolState,
-		stakingPrivateKey:      stakingPrivateKey,
-		stakingHasher:          stakingHasher,
-		dkgPubData:             dkgPubData,
-		randomBeaconPrivateKey: randomBeaconPrivateKey,
-		randomBeaconHasher:     randomBeaconHasher,
-		isRandomBeaconEnabled:  isRandomBeaconEnabled,
+		StakingSigVerifier:      NewStakingSigVerifier(stakingSigTag),
+		RandomBeaconSigVerifier: NewRandomBeaconSigVerifier(dkgPubData, randomBeaconSigTag),
+		myID:                    myID,
+		protocolState:           protocolState,
+		stakingPrivateKey:       stakingPrivateKey,
+		randomBeaconPrivateKey:  randomBeaconPrivateKey,
+		isRandomBeaconEnabled:   isRandomBeaconEnabled,
 	}
-}
-
-// VerifyStakingSig verifies a single BLS signature for a block using the given public key
-// sig - the signature to be verified
-// block - the block that the signature was signed for.
-// signerKey - the public key of the signer who signed the block.
-func (s *SigProvider) VerifyStakingSig(sig crypto.Signature, block *model.Block, signerKey crypto.PublicKey) (bool, error) {
-	// convert into message bytes
-	msg := BlockToBytesForSign(block)
-
-	// validate the staking signature
-	valid, err := signerKey.Verify(sig, msg, s.stakingHasher)
-	if err != nil {
-		return false, fmt.Errorf("cannot verify staking sig: %w", err)
-	}
-	return valid, nil
 }
 
 // VerifyRandomBeaconSig verifies a single random beacon signature for a block using the given public key
@@ -71,53 +56,7 @@ func (s *SigProvider) VerifyRandomBeaconSig(sig crypto.Signature, block *model.B
 	if !s.isRandomBeaconEnabled {
 		return true, nil
 	}
-
-	// convert into message bytes
-	msg := BlockToBytesForSign(block)
-
-	// validate random beacon sig with public key
-	valid, err := signerPubKey.Verify(sig, msg, s.randomBeaconHasher)
-	if err != nil {
-		return false, fmt.Errorf("cannot verify random beacon signature: %w", err)
-	}
-
-	return valid, nil
-}
-
-// VerifyAggregatedStakingSignature verifies an aggregated signature.
-// aggsig - the aggregated signature to be verified
-// block - the block that the signature was signed for.
-// signerKeys - the public keys of all the signers who signed the block.
-// Note: since the aggregated sig is a slice of all sigs, it assumes each sig
-// pair up with the coresponding signer key at the same index. That means, it's
-// the caller's responsibility to ensure `aggsig` and `signerKeys` can pair up
-// at each index.
-func (s *SigProvider) VerifyAggregatedStakingSignature(aggsig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
-	// for now the aggregated staking signature for BLS signatures is implemented as a slice of all the signatures.
-	// to verify it, we basically verify every single signature
-
-	// check that the number of keys and signatures should match
-	if len(aggsig) != len(signerKeys) {
-		return false, nil
-	}
-
-	msg := BlockToBytesForSign(block)
-
-	// check each signature
-	for i, sig := range aggsig {
-		signerKey := signerKeys[i]
-
-		// validate the staking signature
-		valid, err := signerKey.Verify(sig, msg, s.stakingHasher)
-		if err != nil {
-			return false, fmt.Errorf("cannot verify aggregated staking sig for (%d)-th sig: %w", i, err)
-		}
-		if !valid {
-			return false, nil
-		}
-	}
-
-	return true, nil
+	return s.RandomBeaconSigVerifier.VerifyRandomBeaconSig(sig, block, signerPubKey)
 }
 
 // VerifyAggregatedRandomBeaconSignature verifies an aggregated random beacon signature, which is a threshold signature
@@ -126,27 +65,7 @@ func (s *SigProvider) VerifyAggregatedRandomBeaconSignature(sig crypto.Signature
 	if !s.isRandomBeaconEnabled {
 		return true, nil
 	}
-
-	// convert into bytes
-	msg := BlockToBytesForSign(block)
-
-	// the reconstructed signature is also a BLS signature which can be verified by the group public key
-	valid, err := s.dkgPubData.GroupPubKey.Verify(sig, msg, s.randomBeaconHasher)
-	if err != nil {
-		return false, fmt.Errorf("cannot verify reconstructed random beacon sig: %w", err)
-	}
-
-	return valid, nil
-}
-
-// CanReconstruct returns if the given number of signature shares is enough to reconstruct the random beaccon sigs
-func (s *SigProvider) CanReconstruct(numOfSigShares int) bool {
-	// skip the check if random beacon is not enabled
-	if !s.isRandomBeaconEnabled {
-		return true
-	}
-
-	return crypto.EnoughShares(s.dkgPubData.Size(), numOfSigShares)
+	return s.RandomBeaconSigVerifier.VerifyAggregatedRandomBeaconSignature(sig, block)
 }
 
 // Aggregate aggregates the given signature that signed on the given block
@@ -305,12 +224,13 @@ func BlockToBytesForSign(block *model.Block) []byte {
 	// in crypto library will always hash it.
 	// so instead of using MakeID, we could just return the encoded tuple
 	// of BlockID and View
-	msg := flow.MakeID(struct {
+	msg := encoding.DefaultEncoder.MustEncode(struct {
 		BlockID flow.Identifier
 		View    uint64
 	}{
 		BlockID: block.BlockID,
 		View:    block.View,
 	})
-	return msg[:]
+
+	return msg
 }
