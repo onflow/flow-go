@@ -11,7 +11,6 @@ import (
 type VotingStatus struct {
 	sigAggregator    SigAggregator
 	block            *hotstuff.Block
-	view             uint64
 	stakeThreshold   uint64
 	accumulatedStake uint64
 	// assume votes are all valid to build QC
@@ -19,11 +18,10 @@ type VotingStatus struct {
 }
 
 // NewVotingStatus creates a new Voting Status instance
-func NewVotingStatus(sigAggregator SigAggregator, stakeThreshold uint64, view uint64, voter *flow.Identity, block *hotstuff.Block) *VotingStatus {
+func NewVotingStatus(block *hotstuff.Block, stakeThreshold uint64, sigAggregator SigAggregator) *VotingStatus {
 	return &VotingStatus{
 		sigAggregator:    sigAggregator,
 		block:            block,
-		view:             view,
 		stakeThreshold:   stakeThreshold,
 		accumulatedStake: 0,
 		votes:            make(map[flow.Identifier]*hotstuff.Vote),
@@ -65,14 +63,15 @@ func (vs *VotingStatus) TryBuildQC() (*hotstuff.QuorumCertificate, bool, error) 
 	}
 
 	// build the aggregated signature
-	aggregatedSig, err := vs.aggregateSig()
+	sigs := getSigsSliceFromVotes(vs.votes)
+	aggregatedSig, err := vs.sigAggregator.Aggregate(vs.block, sigs)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not build aggregate signatures for building QC: %w", err)
 	}
 
 	// build the QC
 	qc := &hotstuff.QuorumCertificate{
-		View:                vs.view,
+		View:                vs.block.View,
 		BlockID:             vs.block.BlockID,
 		AggregatedSignature: aggregatedSig,
 	}
@@ -86,11 +85,6 @@ func (vs *VotingStatus) hasEnoughStake() bool {
 
 func (vs *VotingStatus) hasEnoughSigShares() bool {
 	return vs.sigAggregator.CanReconstruct(len(vs.votes))
-}
-
-func (vs *VotingStatus) aggregateSig() (*hotstuff.AggregatedSignature, error) {
-	sigs := getSigsSliceFromVotes(vs.votes)
-	return vs.sigAggregator.Aggregate(vs.block, sigs)
 }
 
 func getSigsSliceFromVotes(votes map[flow.Identifier]*hotstuff.Vote) []*hotstuff.SingleSignature {

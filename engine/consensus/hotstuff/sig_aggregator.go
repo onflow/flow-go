@@ -13,7 +13,7 @@ type SigAggregator interface {
 	// 3. The signatures contain enough shares to reconstruct the threshold signature
 	Aggregate(block *hotstuff.Block, sigs []*hotstuff.SingleSignature) (*hotstuff.AggregatedSignature, error)
 
-	// CanReconstruct checks whether the given sig shares is enough to reconstruct the threshold signature
+	// CanReconstruct checks whether the given sig shares are enough to reconstruct the threshold signature.
 	// It assumes the DKG group size never change.
 	CanReconstruct(numOfSigShares int) bool
 }
