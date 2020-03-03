@@ -266,15 +266,18 @@ func (e *Engine) handleCompleteBlock(completeBlock *execution.CompleteBlock) {
 
 func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 
-	//TODO: replace with latest sealed block
-	block, err := e.state.Final().Head()
+	seal, err := e.state.Final().Seal()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest block: %w", err)
+		return nil, fmt.Errorf("failed to get latest seal: %w", err)
 	}
 
-	stateCommit, err := e.execState.StateCommitmentByBlockID(block.ID())
+	stateCommit, err := e.execState.StateCommitmentByBlockID(seal.BlockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest block state commitment: %w", err)
+		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", seal.BlockID, err)
+	}
+	block, err := e.state.AtBlockID(seal.BlockID).Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sealed block (%s): %w", seal.BlockID, err)
 	}
 
 	blockView := e.execState.NewView(stateCommit)

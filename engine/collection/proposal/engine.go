@@ -3,7 +3,9 @@
 package proposal
 
 import (
+	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -38,7 +40,15 @@ type Engine struct {
 	guarantees  storage.Guarantees
 	headers     storage.Headers
 
+	cache      map[flow.Identifier][]cacheItem // pending block cache, keyed by parent ID
+	cacheDedup map[flow.Identifier]struct{}    // prevent dupes in cache
+
 	coldstuff module.ColdStuff
+}
+
+type cacheItem struct {
+	OriginID flow.Identifier
+	Proposal *messages.ClusterBlockProposal
 }
 
 func New(
@@ -65,6 +75,8 @@ func New(
 		collections: collections,
 		guarantees:  guarantees,
 		headers:     headers,
+		cache:       make(map[flow.Identifier][]cacheItem),
+		cacheDedup:  make(map[flow.Identifier]struct{}),
 	}
 
 	con, err := net.Register(engine.CollectionProposal, e)
@@ -238,8 +250,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 	// retrieve the parent block
 	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
-	// TODO handle block buffering https://github.com/dapperlabs/flow-go/issues/2408
-	//if errors.Is(err, storage.ErrNotFound) {}
+	if errors.Is(err, storage.ErrNotFound) {
+		return e.processPendingProposal(originID, proposal)
+	}
 	if err != nil {
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
@@ -282,9 +295,23 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	// submit the proposal to hotstuff for processing
 	e.coldstuff.SubmitProposal(proposal.Header, parent.View)
 
-	// TODO check for buffered descendants of the block
+	// check if we have buffered any children of this block
+	children, ok := e.cache[blockID]
+	if !ok {
+		return nil
+	}
+	var result *multierror.Error
+	for _, child := range children {
+		err := e.onBlockProposal(child.OriginID, child.Proposal)
+		if err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
 
-	return nil
+	// remove children from cache
+	e.dropPendingProposalsWithParent(blockID)
+
+	return result.ErrorOrNil()
 }
 
 // onBlockVote handles votes for blocks by passing them to the core consensus
@@ -350,6 +377,72 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
 	e.coldstuff.SubmitCommit(commit)
 	return nil
+}
+
+// processPendingProposal handles proposals where the parent is missing.
+func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
+
+	blockID := proposal.Header.ID()
+	parentID := proposal.Header.ParentID
+
+	// check that we haven't already cached this block
+	if e.isPendingProposalCached(blockID) {
+		return nil
+	}
+
+	// cache the block
+	e.cachePendingProposal(originID, proposal)
+
+	// request the parent block
+	req := &messages.BlockRequest{
+		BlockID: parentID,
+		Nonce:   rand.Uint64(),
+	}
+	err := e.con.Submit(req, originID)
+	if err != nil {
+		return fmt.Errorf("could not send block request: %w", err)
+	}
+
+	// NOTE: at this point, if he doesn't send us the parent, we should probably think about a way
+	// to blacklist him, as this can be exploited by sending us lots of children without parent;
+	// a second mitigation strategy is to put a strict limit on children we cache, and possibly a
+	// limit on children we cache coming from a single other node
+
+	return nil
+}
+
+// Caches a pending proposal in the block buffer cache, keyed by the block's
+// parent ID.
+func (e *Engine) cachePendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) {
+
+	blockID := proposal.Header.ID()
+	parentID := proposal.Header.ParentID
+
+	item := cacheItem{
+		OriginID: originID,
+		Proposal: proposal,
+	}
+
+	e.cache[parentID] = append(e.cache[parentID], item)
+	e.cacheDedup[blockID] = struct{}{}
+}
+
+// Returns true if the proposal with the given block ID has been cached.
+func (e *Engine) isPendingProposalCached(blockID flow.Identifier) bool {
+	_, cached := e.cacheDedup[blockID]
+	return cached
+}
+
+// Removes from the pending proposal cache all the children of the block with
+// the given ID. Since buffered blocks are keyed by parent, this function
+// should be called when the parent for a set of children is received.
+func (e *Engine) dropPendingProposalsWithParent(blockID flow.Identifier) {
+
+	children := e.cache[blockID]
+	for _, child := range children {
+		delete(e.cacheDedup, child.Proposal.Header.ID())
+	}
+	delete(e.cache, blockID)
 }
 
 // createProposal creates a new proposal
