@@ -22,9 +22,6 @@ type kmac128 struct {
 	initBlock []byte
 }
 
-// the parameter maximum bytes-length as defined in NIST SP 800-185
-const maxParams = 2040 / 8
-
 // the cSHAKE128 rate as defined in NIST SP 800-185
 const cSHAKE128BlockSize = 168
 
@@ -37,13 +34,13 @@ const cSHAKE128BlockSize = 168
 func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) {
 	var k kmac128
 	// check the lengths as per NIST.SP.800-185
-	if len(key) >= maxParams || len(customizer) >= maxParams {
+	if len(key) >= KmacMaxParamsLen || len(customizer) >= KmacMaxParamsLen {
 		return nil,
-			cryptoError{fmt.Sprintf("kmac key and customizer lengths must be less than %d", maxParams)}
+			cryptoError{fmt.Sprintf("kmac key and customizer lengths must be less than %d", KmacMaxParamsLen)}
 	}
-	if outputSize >= maxParams || outputSize < 0 {
+	if outputSize >= KmacMaxParamsLen || outputSize < 0 {
 		return nil,
-			cryptoError{fmt.Sprintf("kmac output size must be a positive number less than %d", maxParams)}
+			cryptoError{fmt.Sprintf("kmac output size must be a positive number less than %d", KmacMaxParamsLen)}
 	}
 	k.commonHasher = &commonHasher{
 		algo:       KMAC128,
