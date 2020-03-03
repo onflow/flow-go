@@ -52,7 +52,7 @@ func (s *StakingSigner) Aggregate(block *model.Block, sigs []*model.SingleSignat
 		return nil, fmt.Errorf("cannot aggregate an empty slice of signatures")
 	}
 
-	aggStakingSig, signerIDs := s.unsafeAggregate(sigs)              // unsafe aggregate staking sigs: crypto math only; will not catch error
+	aggStakingSig, signerIDs := s.unsafeAggregate(sigs)                  // unsafe aggregate staking sigs: crypto math only; will not catch error
 	err := s.verifyAggregatedStakingSig(aggStakingSig, block, signerIDs) // safety: verify aggregated signature:
 	if err != nil {
 		return nil, fmt.Errorf("error aggregating staking signatures for block %s: %w", block.BlockID, err)
