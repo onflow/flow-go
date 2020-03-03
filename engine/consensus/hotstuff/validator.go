@@ -60,7 +60,7 @@ func (v *Validator) ValidateQC(qc *hotstuff.QuorumCertificate, block *hotstuff.B
 		stakingPubKeys = append(stakingPubKeys, signer.StakingPubKey)
 	}
 	// validate qc's aggregated staking signature using staking keys
-	valid, err := v.sigVerifier.VerifyAggregatedStakingSignature(qc.AggregatedSignature.StakingSignatures, block, stakingPubKeys)
+	valid, err := v.sigVerifier.VerifyStakingAggregatedSig(qc.AggregatedSignature.StakingSignatures, block, stakingPubKeys)
 	if err != nil {
 		return fmt.Errorf("cannot verify qc's aggregated signature, qc.BlockID: %s", qc.BlockID)
 	}

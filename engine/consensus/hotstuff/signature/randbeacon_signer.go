@@ -10,14 +10,16 @@ import (
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
-// SigProvider provides symmetry functions to generate and verify signatures
+// RandomBeaconSigner provides functions to generate and verify Random Beacon signatures.
+// Specifically, it can generate and verify individual signatures shares (e.g. from a vote)
+// and reconstructed threshold signatures (e.g. from a Quorum Certificate).
 type RandomBeaconSigner struct {
 	RandomBeaconSigVerifier
 	viewState              *hotstuff.ViewState
 	randomBeaconPrivateKey crypto.PrivateKey // private key for random beacon signature
 }
 
-// NewSigProvider creates an instance of SigProvider
+// RandomBeaconSigner creates an instance of RandomBeaconSigner
 func NewRandomBeaconSigner(viewState *hotstuff.ViewState, randomBeaconPrivateKey crypto.PrivateKey) RandomBeaconSigner {
 	return RandomBeaconSigner{
 		RandomBeaconSigVerifier: NewRandomBeaconSigVerifier(),
@@ -26,7 +28,7 @@ func NewRandomBeaconSigner(viewState *hotstuff.ViewState, randomBeaconPrivateKey
 	}
 }
 
-// Sign signs a the message with the node's random beacon key
+// Sign signs the block with the node's random beacon key
 func (s *RandomBeaconSigner) Sign(block *model.Block) (crypto.Signature, error) {
 	msg := BlockToBytesForSign(block)
 	return s.randomBeaconPrivateKey.Sign(msg, s.randomBeaconHasher)
@@ -52,7 +54,7 @@ func (s *RandomBeaconSigner) Reconstruct(block *model.Block, signatures []*model
 	// double check if there are enough shares.
 	if !s.CanReconstruct(len(signatures)) {
 		// the should not happen, since it assumes the caller has checked before
-		return nil, fmt.Errorf("not enough shares to reconstruct random beacon sig, expect: %v, got: %v", s.dkgGroupSize(), len(signatures))
+		return nil, fmt.Errorf("not enough shares to reconstruct random beacon sig, expect: %d, got: %d", s.dkgGroupSize(), len(signatures))
 	}
 
 	// collect random beacon sig share and dkg index for each signer
@@ -63,7 +65,7 @@ func (s *RandomBeaconSigner) Reconstruct(block *model.Block, signatures []*model
 		sigShares = append(sigShares, sig.RandomBeaconSignature)
 		participant, found := dkgParticipantForID[sig.SignerID]
 		if !found {
-			return nil, fmt.Errorf(fmt.Sprintf("no DKG Participant info for id %s", sig.SignerID))
+			return nil, fmt.Errorf("no DKG Participant info for id %s", sig.SignerID)
 		}
 		dkgIndices = append(dkgIndices, participant.DKGIndex)
 	}

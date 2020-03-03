@@ -10,7 +10,7 @@ import (
 )
 
 // StakingSigVerifier verifies signatures generated with staking keys. Specifically, it verifies
-// individual signaturesz (e.g. from a vote) and aggregated signatures (e.g. from a Quorum Certificate).
+// individual signatures (e.g. from a vote) and aggregated signatures (e.g. from a Quorum Certificate).
 type StakingSigVerifier struct {
 	stakingHasher crypto.Hasher // the hasher for staking signature
 }
@@ -43,7 +43,7 @@ func (v *StakingSigVerifier) VerifyStakingSig(sig crypto.Signature, block *model
 	return valid, nil
 }
 
-// VerifyAggregatedStakingSignature verifies an aggregated BLS signature.
+// VerifyStakingAggregatedSig verifies an aggregated BLS signature.
 // Inputs:
 //    aggStakingSig - the aggregated staking signature to be verified
 //    block - the block that the signature was signed for.
@@ -59,7 +59,7 @@ func (v *StakingSigVerifier) VerifyStakingSig(sig crypto.Signature, block *model
 // Note: the aggregated BLS staking signature is currently implemented as a slice of individual signatures.
 // The implementation (and method signature) will later be updated, once full BLS sigmnature aggregation is implemented.
 // To verify it, we just verify every single signature. The implementation (and method signature)
-func (v *StakingSigVerifier) VerifyAggregatedStakingSignature(aggStakingSig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
+func (v *StakingSigVerifier) VerifyStakingAggregatedSig(aggStakingSig []crypto.Signature, block *model.Block, signerKeys []crypto.PublicKey) (bool, error) {
 	// check that the number of keys and signatures should match
 	if len(aggStakingSig) != len(signerKeys) {
 		return false, nil

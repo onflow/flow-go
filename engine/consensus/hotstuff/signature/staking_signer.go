@@ -12,7 +12,9 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
-// StakingSigner provides symmetry functions to generate and verify signatures
+// StakingSigner provides functions to generate and verify staking signatures.
+// Specifically, it can generate and verify individual signatures (e.g. from a vote)
+// and aggregated signatures (e.g. from a Quorum Certificate).
 type StakingSigner struct {
 	StakingSigVerifier
 	viewState *hotstuff.ViewState
@@ -86,7 +88,7 @@ func (s *StakingSigner) verifyAggregatedStakingSig(aggStakingSig []crypto.Signat
 	for _, signer := range stakedSigners {
 		stakingPubKeys = append(stakingPubKeys, signer.StakingPubKey)
 	}
-	valid, err := s.VerifyAggregatedStakingSignature(aggStakingSig, block, stakingPubKeys)
+	valid, err := s.VerifyStakingAggregatedSig(aggStakingSig, block, stakingPubKeys)
 	if err != nil {
 		return fmt.Errorf("error validating constructed aggregated staking signature: %w", err)
 	}

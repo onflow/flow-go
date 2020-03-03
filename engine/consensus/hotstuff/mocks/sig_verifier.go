@@ -34,19 +34,19 @@ func (m *MockSigVerifier) EXPECT() *MockSigVerifierMockRecorder {
 	return m.recorder
 }
 
-// VerifyAggregatedStakingSignature mocks base method
-func (m *MockSigVerifier) VerifyAggregatedStakingSignature(arg0 []crypto.Signature, arg1 *hotstuff.Block, arg2 []crypto.PublicKey) (bool, error) {
+// VerifyStakingAggregatedSig mocks base method
+func (m *MockSigVerifier) VerifyStakingAggregatedSig(arg0 []crypto.Signature, arg1 *hotstuff.Block, arg2 []crypto.PublicKey) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyAggregatedStakingSignature", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "VerifyStakingAggregatedSig", arg0, arg1, arg2)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// VerifyAggregatedStakingSignature indicates an expected call of VerifyAggregatedStakingSignature
+// VerifyStakingAggregatedSig indicates an expected call of VerifyStakingAggregatedSig
 func (mr *MockSigVerifierMockRecorder) VerifyAggregatedStakingSignature(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyAggregatedStakingSignature", reflect.TypeOf((*MockSigVerifier)(nil).VerifyAggregatedStakingSignature), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyStakingAggregatedSig", reflect.TypeOf((*MockSigVerifier)(nil).VerifyStakingAggregatedSig), arg0, arg1, arg2)
 }
 
 // VerifyRandomBeaconSig mocks base method
