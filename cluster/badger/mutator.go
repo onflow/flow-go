@@ -70,7 +70,7 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 }
 
 func (m *Mutator) Extend(blockID flow.Identifier) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return m.state.db.View(func(tx *badger.Txn) error {
 
 		// retrieve the block
 		var block cluster.Block
@@ -139,12 +139,6 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			if block.View < boundary {
 				return fmt.Errorf("block doesn't connect to finalized state")
 			}
-		}
-
-		// index the transactions included in this block's collection
-		err = procedure.IndexClusterPayload(&block)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index block payload: %w", err)
 		}
 
 		return nil

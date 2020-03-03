@@ -51,7 +51,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// retrieve payload
-		err = RetrieveClusterPayload(block.PayloadHash, &block.Payload)(tx)
+		err = RetrieveClusterPayload(block.ID(), &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
@@ -118,8 +118,9 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 func InsertClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// cluster payloads only contain a single collection
-		err := operation.InsertCollection(&payload.Collection)(tx)
+		// cluster payloads only contain a single collection, allow duplicates,
+		// because it is valid for two competing forks to have the same payload.
+		err := operation.SkipDuplicates(operation.InsertCollection(&payload.Collection))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
