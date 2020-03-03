@@ -36,7 +36,7 @@ const BLS_KMACFunction = "H2C"
 // chosen for BLS signatures and verifications
 // tag is the domain separation tag
 func NewBLS_KMAC(tag string) Hasher {
-	// the error is ignored as the parameters length is in the correct range of kmac
+	// the error is ignored as the parameter lengths are in the correct range of kmac
 	kmac, _ := NewKMAC_128([]byte(tag), []byte("BLS_KMACFunction"), OpSwUInputLenBLS_BLS12381)
 	return kmac
 }
