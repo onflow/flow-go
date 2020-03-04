@@ -67,14 +67,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 			// look up the cluster payload (ie. the collection)
 			var payload cluster.Payload
-			err = procedure.RetrieveClusterPayload(ancestor.PayloadHash, &payload)(tx)
+			err = procedure.RetrieveClusterPayload(ancestor.ID(), &payload)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve ancestor payload: %w", err)
 			}
 
 			// insert the transactions into the lookup
-			for _, txHash := range payload.Collection.Transactions {
-				txLookup[txHash] = struct{}{}
+			for _, txID := range payload.Collection.Transactions {
+				txLookup[txID] = struct{}{}
 			}
 
 			// continue with the next ancestor in the chain
