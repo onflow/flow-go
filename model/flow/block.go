@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
@@ -124,4 +125,13 @@ func (p Payload) Hash() Identifier {
 	collHash := MerkleRoot(GetIDs(p.Guarantees)...)
 	sealHash := MerkleRoot(GetIDs(p.Seals)...)
 	return ConcatSum(idHash, collHash, sealHash)
+}
+
+// PendingBlock is a wrapper type representing a block that cannot yet be
+// processed. The block header, payload, and sender ID are stored together
+// while waiting for the block to become processable.
+type PendingBlock struct {
+	OriginID flow.Identifier
+	Header   *Header
+	Payload  *Payload
 }
