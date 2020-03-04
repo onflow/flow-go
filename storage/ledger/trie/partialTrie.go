@@ -27,23 +27,19 @@ func (p *PSMT) GetRootHash() []byte {
 	return p.root.ComputeValue()
 }
 
-// getNodeByKey returns node by key
-func (p *PSMT) getNodeByKey(key []byte) *node {
-	return p.keyLookUp[string(key)]
-}
-
 // Update updates the register values and returns rootValue after updates
 func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, error) {
 	if len(registerIDs) != len(values) {
-		return nil, fmt.Errorf("RegisterIDs and values mismatch")
+		return nil, fmt.Errorf("number of elements in registerIDs and values mismatch")
 	}
 	for i, key := range registerIDs {
 		value := values[i]
-		if node := p.getNodeByKey(key); node != nil {
-			node.value = ComputeCompactValue(key, value, node.height, p.height)
-		} else {
-			return nil, fmt.Errorf("Key %v doesn't exist", key)
+
+		node, found := p.keyLookUp[string(key)]
+		if !found {
+			return nil, fmt.Errorf("key doesn't exist: %x", key)
 		}
+		node.value = ComputeCompactValue(key, value, node.height, p.height)
 	}
 	return p.root.ComputeValue(), nil
 }
@@ -60,25 +56,25 @@ func NewPSMT(
 	psmt := PSMT{newNode(nil, height-1), height, make(map[string]*node)}
 
 	// iterating over proofs
-	for i, size := range proofholder.sizes {
+	for i, proofSize := range proofholder.sizes {
 		value := values[i]
 		key := keys[i]
 		flags := proofholder.flags[i]
 		proof := proofholder.proofs[i]
 		inclusion := proofholder.inclusions[i]
 
-		// if a flag is false, the value is a default value
-		// otherwise the value is stored in the proofs
 		// we keep track of our progress through proofs by proofIndex
 		proofIndex := 0
 
 		// start from the root and walk down the tree
 		currentNode := psmt.root
 
-		// we process the key bit by bit until we reach the size (due to compactness)
-		for j := 0; j < int(size); j++ {
+		// we process the key bit by bit until we reach the end of the proof (due to compactness)
+		for j := 0; j < int(proofSize); j++ {
 			// determine v
 			v := GetDefaultHashForHeight(currentNode.height - 1)
+			// if a flag (bit j in flags) is false, the value is a default value
+			// otherwise the value is stored in the proofs
 			if utils.IsBitSet(flags, j) {
 				// use the proof at index proofIndex
 				v = proof[proofIndex]
@@ -148,7 +144,7 @@ func NewPSMT(
 		// check if the state commitment matches
 		// useing computeValue instead of value for extensive checking
 		if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
-			return nil, fmt.Errorf("Root hash doesn't match the proofs")
+			return nil, fmt.Errorf("root hash doesn't match the proofs")
 		}
 	}
 	return &psmt, nil
