@@ -3,6 +3,7 @@ package follower
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -26,8 +27,7 @@ type Engine struct {
 	headers  storage.Headers
 	payloads storage.Payloads
 
-	cache      map[flow.Identifier][]cacheItem // pending block cache, keyed by parent ID
-	cacheDedup map[flow.Identifier]struct{}    // prevent dupes in cache
+	cache module.PendingBlockBuffer
 
 	follower module.HotStuffFollower
 }
@@ -44,19 +44,19 @@ func New(
 	state protocol.State,
 	headers storage.Headers,
 	payloads storage.Payloads,
+	cache module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:       engine.NewUnit(),
-		log:        log.With().Str("engine", "follower").Logger(),
-		me:         me,
-		state:      state,
-		headers:    headers,
-		payloads:   payloads,
-		follower:   follower,
-		cache:      make(map[flow.Identifier][]cacheItem),
-		cacheDedup: make(map[flow.Identifier]struct{}),
+		unit:     engine.NewUnit(),
+		log:      log.With().Str("engine", "follower").Logger(),
+		me:       me,
+		state:    state,
+		headers:  headers,
+		payloads: payloads,
+		cache:    cache,
+		follower: follower,
 	}
 
 	return e, nil
@@ -147,7 +147,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	e.follower.SubmitProposal(&block.Header, parent.View)
 
 	// check for any descendants of the block that are now processable
-	children, ok := e.cache[block.ID()]
+	children, ok := e.cache.ByParentID(parent.ID())
 	if !ok {
 		return nil
 	}
@@ -155,46 +155,45 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	// then try to process children only this once
 	var result *multierror.Error
 	for _, child := range children {
-		err := e.onBlock(child.OriginID, child.Proposal)
+		block := flow.Block{
+			Header:  *child.Header,
+			Payload: *child.Payload,
+		}
+		err := e.onBlock(child.OriginID, &block)
+		if err != nil {
+			result = multierror.Append(result, err)
+		}
 	}
 
-	return nil
+	// remove children from the cache
+	e.cache.DropForParent(parent.ID())
+
+	return result.ErrorOrNil()
 }
 
 func (e *Engine) processPendingBlock(originID flow.Identifier, block *flow.Block) error {
 
-}
-
-// Caches a pending proposal in the block buffer cache, keyed by the block's
-// parent ID.
-func (e *Engine) cachePendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) {
-
-	blockID := proposal.Header.ID()
-	parentID := proposal.Header.ParentID
-
-	item := cacheItem{
+	pendingBlock := &flow.PendingBlock{
 		OriginID: originID,
-		Proposal: proposal,
+		Header:   &block.Header,
+		Payload:  &block.Payload,
 	}
 
-	e.cache[parentID] = append(e.cache[parentID], item)
-	e.cacheDedup[blockID] = struct{}{}
-}
-
-// Returns true if the proposal with the given block ID has been cached.
-func (e *Engine) isPendingProposalCached(blockID flow.Identifier) bool {
-	_, cached := e.cacheDedup[blockID]
-	return cached
-}
-
-// Removes from the pending proposal cache all the children of the block with
-// the given ID. Since buffered blocks are keyed by parent, this function
-// should be called when the parent for a set of children is received.
-func (e *Engine) dropPendingProposalsWithParent(blockID flow.Identifier) {
-
-	children := e.cache[blockID]
-	for _, child := range children {
-		delete(e.cacheDedup, child.Proposal.Header.ID())
+	// add the block to the buffer
+	exists := e.cache.Add(pendingBlock)
+	if exists {
+		return nil
 	}
-	delete(e.cache, blockID)
+
+	// if the block was not already in the buffer, request its parent
+	req := &messages.BlockRequest{
+		BlockID: block.ParentID,
+		Nonce:   rand.Uint64(),
+	}
+	err := e.con.Submit(req, originID)
+	if err != nil {
+		return fmt.Errorf("could not send block request: %w", err)
+	}
+
+	return nil
 }
