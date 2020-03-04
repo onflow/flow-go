@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
-var EmptySlice []byte
 var nilChild []byte = make([]byte, 32)
 
 // node is a struct for constructing our Tree
@@ -40,15 +39,23 @@ type SMT struct {
 	lruCache             *lru.Cache               // LRU cache of stringified keys to proofs
 }
 
-// Hash hashes any input with SHA256.
-func Hash(data ...[]byte) []byte {
+// HashLeaf generates hash value for leaf nodes (SHA3-256).
+// key, value headers are used to protect the system in case of increase
+// in key size
+func HashLeaf(key []byte, value []byte) []byte {
 	hasher := crypto.NewSHA3_256()
-	for i := 0; i < len(data); i++ {
-		_, err := hasher.Write(data[i])
-		if err != nil {
-			panic(err)
-		}
-	}
+	hasher.Write([]byte("key:"))
+	hasher.Write(key)
+	hasher.Write([]byte("value:"))
+	hasher.Write(value)
+	return hasher.SumHash()
+}
+
+// HashInterNode generates hash value for intermediate nodes (SHA3-256).
+func HashInterNode(hash1 []byte, hash2 []byte) []byte {
+	hasher := crypto.NewSHA3_256()
+	hasher.Write(hash1)
+	hasher.Write(hash2)
 	return hasher.SumHash()
 }
 
@@ -90,8 +97,8 @@ func (n *node) ComputeValue() []byte {
 		h2 = n.Rchild.ComputeValue()
 	}
 	// For debugging purpose uncomment this
-	// n.value = Hash(h1, h2)
-	return Hash(h1, h2)
+	// n.value = HashInterNode(h1, h2)
+	return HashInterNode(h1, h2)
 }
 
 func (n node) String() string {
@@ -532,16 +539,16 @@ func VerifyInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte,
 		// hashing is order dependant
 		if utils.IsBitSet(key, i) {
 			if !utils.IsBitSet(flag, i) {
-				computed = Hash(GetDefaultHashForHeight((height-i)-2), computed)
+				computed = HashInterNode(GetDefaultHashForHeight((height-i)-2), computed)
 			} else {
-				computed = Hash(proof[proofIndex], computed)
+				computed = HashInterNode(proof[proofIndex], computed)
 				proofIndex--
 			}
 		} else {
 			if !utils.IsBitSet(flag, i) {
-				computed = Hash(computed, GetDefaultHashForHeight((height-i)-2))
+				computed = HashInterNode(computed, GetDefaultHashForHeight((height-i)-2))
 			} else {
-				computed = Hash(computed, proof[proofIndex])
+				computed = HashInterNode(computed, proof[proofIndex])
 				proofIndex--
 			}
 		}
@@ -563,16 +570,16 @@ func VerifyNonInclusionProof(key []byte, value []byte, flag []byte, proof [][]by
 		// hashing is order dependant
 		if utils.IsBitSet(key, i) {
 			if !utils.IsBitSet(flag, i) {
-				computed = Hash(GetDefaultHashForHeight((height-i)-2), computed)
+				computed = HashInterNode(GetDefaultHashForHeight((height-i)-2), computed)
 			} else {
-				computed = Hash(proof[proofIndex], computed)
+				computed = HashInterNode(proof[proofIndex], computed)
 				proofIndex--
 			}
 		} else {
 			if !utils.IsBitSet(flag, i) {
-				computed = Hash(computed, GetDefaultHashForHeight((height-i)-2))
+				computed = HashInterNode(computed, GetDefaultHashForHeight((height-i)-2))
 			} else {
-				computed = Hash(computed, proof[proofIndex])
+				computed = HashInterNode(computed, proof[proofIndex])
 				proofIndex--
 			}
 		}
@@ -811,7 +818,6 @@ func (s *SMT) updateRight(lnode *node, rnode *node, rootNode *node, rkeys [][]by
 func (s *SMT) ComputeRootNode(lnode *node, rnode *node, oldRootNode *node, keys [][]byte, values [][]byte, height int) *node {
 	if lnode == nil && rnode == nil {
 		ln := newNode(ComputeCompactValue(keys[0], values[0], height, s.height), height)
-		// ln := newNode(Hash(keys[0], values[0]), height)
 		ln.key = keys[0]
 		s.database.PutIntoBatcher(ln.value, ln.key)
 		return ln
@@ -834,13 +840,13 @@ func (s *SMT) interiorNode(lnode *node, rnode *node, height int) *node {
 
 	// Hashes the children depending on if they are nil or filled
 	if (lnode != nil) && (rnode != nil) {
-		in := newNode(Hash(lnode.value, rnode.value), height)
+		in := newNode(HashInterNode(lnode.value, rnode.value), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		s.database.PutIntoBatcher(in.value, append(in.Lchild.value, in.Rchild.value...))
 		return in
 	} else if lnode == nil && rnode != nil {
-		in := newNode(Hash(GetDefaultHashForHeight(height-1), rnode.value), height)
+		in := newNode(HashInterNode(GetDefaultHashForHeight(height-1), rnode.value), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		// if the left node is nil value of the Rchild attached to key in DB will be prefaced by
@@ -850,7 +856,7 @@ func (s *SMT) interiorNode(lnode *node, rnode *node, height int) *node {
 		s.database.PutIntoBatcher(in.value, append(lFlag, in.Rchild.value...))
 		return in
 	} else if rnode == nil && lnode != nil {
-		in := newNode(Hash(lnode.value, GetDefaultHashForHeight(height-1)), height)
+		in := newNode(HashInterNode(lnode.value, GetDefaultHashForHeight(height-1)), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		rFlag := make([]byte, 1)
@@ -881,12 +887,14 @@ func (s *SMT) SafeClose() (error, error) {
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []byte {
-	computedHash := Hash(key, value)
+
+	computedHash := HashLeaf(key, value)
+
 	for j := maxHeight - 2; j > maxHeight-height-2; j-- {
 		if utils.IsBitSet(key, j) { // right branching
-			computedHash = Hash(GetDefaultHashForHeight(maxHeight-j-2), computedHash)
+			computedHash = HashInterNode(GetDefaultHashForHeight(maxHeight-j-2), computedHash)
 		} else { // left branching
-			computedHash = Hash(computedHash, GetDefaultHashForHeight(maxHeight-j-2))
+			computedHash = HashInterNode(computedHash, GetDefaultHashForHeight(maxHeight-j-2))
 		}
 	}
 	return computedHash
