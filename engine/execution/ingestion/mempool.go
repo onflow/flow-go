@@ -20,7 +20,6 @@ type blockByCollection struct {
 }
 
 func (b *blockByCollection) ID() flow.Identifier {
-
 	return b.CollectionID
 }
 
@@ -39,7 +38,7 @@ func (a *Backdata) ByID(id flow.Identifier) (*blockByCollection, error) {
 	}
 	block, ok := entity.(*blockByCollection)
 	if !ok {
-		panic(fmt.Sprintf("invalid entity in complete block mempool  (%T)", entity))
+		panic(fmt.Sprintf("invalid entity in complete block mempool (%T)", entity))
 	}
 	return block, nil
 }

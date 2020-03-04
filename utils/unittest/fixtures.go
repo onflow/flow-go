@@ -25,11 +25,15 @@ func AccountSignatureFixture() flow.AccountSignature {
 }
 
 func BlockFixture() flow.Block {
+	return BlockWithParentFixture(IdentifierFixture())
+}
+
+func BlockWithParentFixture(parentID flow.Identifier) flow.Block {
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
 		Guarantees: CollectionGuaranteesFixture(16),
 	}
-	header := BlockHeaderFixture()
+	header :=  BlockHeaderWithParentFixture(parentID)
 	header.PayloadHash = payload.Hash()
 	return flow.Block{
 		Header:  header,
@@ -38,8 +42,12 @@ func BlockFixture() flow.Block {
 }
 
 func BlockHeaderFixture() flow.Header {
+	return BlockHeaderWithParentFixture(IdentifierFixture())
+}
+
+func BlockHeaderWithParentFixture(parentID flow.Identifier) flow.Header {
 	return flow.Header{
-		ParentID: IdentifierFixture(),
+		ParentID: parentID,
 		View:     rand.Uint64(),
 	}
 }
@@ -134,10 +142,15 @@ func CompleteCollectionFixture() *execution.CompleteCollection {
 
 func CompleteBlockFixture() *execution.CompleteBlock {
 
+	return CompleteBlockFixtureWithParent(IdentifierFixture())
+}
+
+func CompleteBlockFixtureWithParent(parentID flow.Identifier) *execution.CompleteBlock {
+
 	cc1 := CompleteCollectionFixture()
 	cc2 := CompleteCollectionFixture()
 
-	block := BlockFixture()
+	block := BlockWithParentFixture(parentID)
 	return &execution.CompleteBlock{
 		Block:               &block,
 		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{cc1.Guarantee.CollectionID: cc1, cc2.Guarantee.CollectionID: cc2},

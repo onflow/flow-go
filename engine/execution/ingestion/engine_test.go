@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	engineCommon "github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/execution"
 	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -17,6 +18,7 @@ import (
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	realStorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -234,9 +236,78 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 	})
 }
 
-func makeRealBlock(n int) (flow.Block, []flow.Collection) {
-	colls := make([]flow.Collection, n)
-	collsGuarantees := make([]*flow.CollectionGuarantee, n)
+func TestBlockOutOfOrder(t *testing.T) {
+
+	runWithEngine(t, func(ctx testingContext) {
+
+		blockA, _ := makeRealBlock(0)
+		blockB, _ := makeRealBlockWithParent(0, blockA.ID())
+		blockC, _ := makeRealBlockWithParent(0, blockA.ID())
+		blockD, _ := makeRealBlockWithParent(0, blockC.ID())
+
+		/* Artists recreation of the block structure:
+
+		  b
+		   \
+		    a
+		   /
+		d-c
+
+		*/
+
+		ctx.blocks.EXPECT().Store(gomock.Eq(&blockA))
+		ctx.blocks.EXPECT().Store(gomock.Eq(&blockB))
+		ctx.blocks.EXPECT().Store(gomock.Eq(&blockC))
+		ctx.blocks.EXPECT().Store(gomock.Eq(&blockD))
+
+		stateCommitmentA := unittest.StateCommitmentFixture()
+
+		// no execution state, so puts to waiting queue
+		ctx.executionState.On("StateCommitmentByBlockID", blockB.ParentID).Return(nil, realStorage.ErrNotFound)
+		err := ctx.engine.handleBlock(&blockB)
+		require.NoError(t, err)
+
+		// no execution state, no connection to other nodes
+		ctx.executionState.On("StateCommitmentByBlockID", blockC.ParentID).Return(nil, realStorage.ErrNotFound)
+		err = ctx.engine.handleBlock(&blockC)
+		require.NoError(t, err)
+
+		// child of c so no need to query execution state
+
+		// we account for every call, so if this call would have happen, test will fail
+		// ctx.executionState.On("StateCommitmentByBlockID", blockD.ParentID).Return(nil, realStorage.ErrNotFound)
+		err = ctx.engine.handleBlock(&blockD)
+		require.NoError(t, err)
+
+		// make sure there were no extra calls at this point in test
+		ctx.executionState.AssertExpectations(t)
+		ctx.executionEngine.AssertExpectations(t)
+
+		// existing execution state, should trigger processing all other blocks
+		ctx.executionState.On("StateCommitmentByBlockID", blockA.ParentID).Return(stateCommitmentA, nil)
+		ctx.executionState.On("NewView", stateCommitmentA). Return(nil)
+		ctx.executionEngine.On("SubmitLocal", mock.MatchedBy(func(computationOrder *execution.ComputationOrder) bool {
+			return computationOrder.Block.Block.ID() == blockA.ID()
+		}))
+
+		err = ctx.engine.handleBlock(&blockA)
+		require.NoError(t, err)
+
+		// once block A is computed, it should trigger B and C being sent to compute
+
+		ctx.executionState.AssertExpectations(t)
+
+
+	})
+}
+
+func makeRealBlock(collectionsCount int) (flow.Block, []flow.Collection) {
+	return makeRealBlockWithParent(collectionsCount, unittest.IdentifierFixture())
+}
+
+func makeRealBlockWithParent(collectionsCount int, parentID flow.Identifier) (flow.Block, []flow.Collection) {
+	colls := make([]flow.Collection, collectionsCount)
+	collsGuarantees := make([]*flow.CollectionGuarantee, collectionsCount)
 
 	for i := range colls {
 		tx := unittest.TransactionBodyFixture()
@@ -247,7 +318,7 @@ func makeRealBlock(n int) (flow.Block, []flow.Collection) {
 		}
 	}
 
-	block := unittest.BlockFixture()
+	block := unittest.BlockWithParentFixture(parentID)
 	block.Guarantees = collsGuarantees
 	return block, colls
 }

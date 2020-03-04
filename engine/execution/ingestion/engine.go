@@ -147,20 +147,6 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	return identifiers, nil
 }
 
-func (e *Engine) isComplete(block *execution.CompleteBlock) bool {
-
-	for _, collection := range block.Block.Guarantees {
-
-		completeCollection, ok := block.CompleteCollections[collection.ID()]
-		if ok && completeCollection.Transactions != nil {
-			continue
-		}
-		return false
-	}
-
-	return true
-}
-
 func (e *Engine) removeCollections(block *execution.CompleteBlock, backdata *Backdata) {
 	for _, collection := range block.Block.Guarantees {
 		backdata.Rem(collection.ID())
@@ -180,6 +166,8 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	}
 
 	// TODO: for MVP assume we're only receiving finalized blocks
+	// but in essence, Execution Node doesn't care about finalization of blocks
+	// so this might not be even needed
 	blockID := block.Header.ID()
 	err = e.state.Mutate().Finalize(blockID)
 	if err != nil {
@@ -198,7 +186,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	err = e.mempool.Run(func(backdata *Backdata) error {
 		// In case we have all the collections, or the block is empty
-		if e.isComplete(maybeCompleteBlock) {
+		if maybeCompleteBlock.IsComplete() {
 			e.removeCollections(maybeCompleteBlock, backdata)
 			e.handleCompleteBlock(maybeCompleteBlock)
 			return nil
@@ -226,6 +214,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 				err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID()}, collectionIdentifiers...)
 				if err != nil {
+					// TODO - this should be handled, maybe retried or put into some form of a queue
 					e.log.Err(err).Msg("cannot submit collection requests")
 				}
 				continue
@@ -308,7 +297,7 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		}
 
 		completeCollection.Transactions = collection.Transactions
-		if !e.isComplete(completeBlock.Block) {
+		if !completeBlock.Block.IsComplete() {
 			return nil
 		}
 
