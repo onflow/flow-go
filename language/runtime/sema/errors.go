@@ -141,7 +141,11 @@ type NotDeclaredError struct {
 }
 
 func (e *NotDeclaredError) Error() string {
-	return fmt.Sprintf("cannot find %s in this scope: `%s`", e.ExpectedKind.Name(), e.Name)
+	return fmt.Sprintf(
+		"cannot find %s in this scope: `%s`",
+		e.ExpectedKind.Name(),
+		e.Name,
+	)
 }
 
 func (*NotDeclaredError) isSemanticError() {}
@@ -189,8 +193,8 @@ func (*TypeMismatchError) isSemanticError() {}
 func (e *TypeMismatchError) SecondaryError() string {
 	return fmt.Sprintf(
 		"expected `%s`, got `%s`",
-		e.ExpectedType,
-		e.ActualType,
+		e.ExpectedType.QualifiedString(),
+		e.ActualType.QualifiedString(),
 	)
 }
 
@@ -212,7 +216,7 @@ func (e *TypeMismatchWithDescriptionError) SecondaryError() string {
 	return fmt.Sprintf(
 		"expected %s, got `%s`",
 		e.ExpectedTypeDescription,
-		e.ActualType,
+		e.ActualType.QualifiedString(),
 	)
 }
 
@@ -226,7 +230,7 @@ type NotIndexableTypeError struct {
 func (e *NotIndexableTypeError) Error() string {
 	return fmt.Sprintf(
 		"cannot index into value which has type: `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -242,7 +246,7 @@ type NotIndexingTypeError struct {
 func (e *NotIndexingTypeError) Error() string {
 	return fmt.Sprintf(
 		"cannot index with value which has type: `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -258,7 +262,7 @@ type NotEquatableTypeError struct {
 func (e *NotEquatableTypeError) Error() string {
 	return fmt.Sprintf(
 		"cannot compare value which has type: `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -273,7 +277,7 @@ type NotCallableError struct {
 
 func (e *NotCallableError) Error() string {
 	return fmt.Sprintf("cannot call type: `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -288,8 +292,12 @@ type ArgumentCountError struct {
 }
 
 func (e *ArgumentCountError) Error() string {
+	return "incorrect number of arguments"
+}
+
+func (e *ArgumentCountError) SecondaryError() string {
 	return fmt.Sprintf(
-		"incorrect number of arguments: expected %d, got %d",
+		"expected %d, got %d",
 		e.ParameterCount,
 		e.ArgumentCount,
 	)
@@ -324,12 +332,16 @@ type IncorrectArgumentLabelError struct {
 }
 
 func (e *IncorrectArgumentLabelError) Error() string {
+	return "incorrect argument label"
+}
+
+func (e *IncorrectArgumentLabelError) SecondaryError() string {
 	expected := "none"
 	if e.ExpectedArgumentLabel != "" {
 		expected = e.ExpectedArgumentLabel
 	}
 	return fmt.Sprintf(
-		"incorrect argument label: expected `%s`, got `%s`",
+		"expected `%s`, got `%s`",
 		expected,
 		e.ActualArgumentLabel,
 	)
@@ -348,10 +360,16 @@ type InvalidUnaryOperandError struct {
 
 func (e *InvalidUnaryOperandError) Error() string {
 	return fmt.Sprintf(
-		"cannot apply unary operation %s to type: expected `%s`, got `%s`",
+		"cannot apply unary operation %s to type",
 		e.Operation.Symbol(),
-		e.ExpectedType,
-		e.ActualType,
+	)
+}
+
+func (e *InvalidUnaryOperandError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected `%s`, got `%s`",
+		e.ExpectedType.QualifiedString(),
+		e.ActualType.QualifiedString(),
 	)
 }
 
@@ -369,11 +387,17 @@ type InvalidBinaryOperandError struct {
 
 func (e *InvalidBinaryOperandError) Error() string {
 	return fmt.Sprintf(
-		"cannot apply binary operation %s to %s-hand type: expected `%s`, got `%s`",
+		"cannot apply binary operation %s to %s-hand type",
 		e.Operation.Symbol(),
 		e.Side.Name(),
-		e.ExpectedType,
-		e.ActualType,
+	)
+}
+
+func (e *InvalidBinaryOperandError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected `%s`, got `%s`",
+		e.ExpectedType.QualifiedString(),
+		e.ActualType.QualifiedString(),
 	)
 }
 
@@ -392,8 +416,8 @@ func (e *InvalidBinaryOperandsError) Error() string {
 	return fmt.Sprintf(
 		"cannot apply binary operation %s to types: `%s`, `%s`",
 		e.Operation.Symbol(),
-		e.LeftType,
-		e.RightType,
+		e.LeftType.QualifiedString(),
+		e.RightType.QualifiedString(),
 	)
 }
 
@@ -558,7 +582,7 @@ func (e *MissingInitializerError) Error() string {
 	return fmt.Sprintf(
 		"missing initializer for field `%s` in type `%s`",
 		e.FirstFieldName,
-		e.ContainerType,
+		e.ContainerType.QualifiedString(),
 	)
 }
 
@@ -584,7 +608,7 @@ type NotDeclaredMemberError struct {
 func (e *NotDeclaredMemberError) Error() string {
 	return fmt.Sprintf(
 		"value of type `%s` has no member `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 		e.Name,
 	)
 }
@@ -624,7 +648,7 @@ func (e *FieldUninitializedError) Error() string {
 	return fmt.Sprintf(
 		"missing initialization of field `%s` in type `%s`",
 		e.Name,
-		e.ContainerType,
+		e.ContainerType.QualifiedString(),
 	)
 }
 
@@ -706,7 +730,7 @@ type InvalidConformanceError struct {
 func (e *InvalidConformanceError) Error() string {
 	return fmt.Sprintf(
 		"cannot conform to non-interface type: `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -751,9 +775,9 @@ func (e *ConformanceError) Error() string {
 	return fmt.Sprintf(
 		"%s `%s` does not conform to %s `%s`",
 		e.CompositeType.Kind.Name(),
-		e.CompositeType.Identifier,
+		e.CompositeType.QualifiedString(),
 		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
-		e.InterfaceType.Identifier,
+		e.InterfaceType.QualifiedString(),
 	)
 }
 
@@ -781,9 +805,9 @@ func (e *DuplicateConformanceError) Error() string {
 	return fmt.Sprintf(
 		"%s `%s` repeats conformance to %s `%s`",
 		e.CompositeType.Kind.Name(),
-		e.CompositeType.Identifier,
+		e.CompositeType.QualifiedString(),
 		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
-		e.InterfaceType.Identifier,
+		e.InterfaceType.QualifiedString(),
 	)
 }
 
@@ -801,9 +825,9 @@ func (e *MissingConformanceError) Error() string {
 	return fmt.Sprintf(
 		"%s `%s` is missing a declaration to required conformance to %s `%s`",
 		e.CompositeType.Kind.Name(),
-		e.CompositeType.Identifier,
+		e.CompositeType.QualifiedString(),
 		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
-		e.InterfaceType.Identifier,
+		e.InterfaceType.QualifiedString(),
 	)
 }
 
@@ -852,7 +876,11 @@ type NotExportedError struct {
 }
 
 func (e *NotExportedError) Error() string {
-	return fmt.Sprintf("cannot find declaration `%s` in `%s`", e.Name, e.ImportLocation)
+	return fmt.Sprintf(
+		"cannot find declaration `%s` in `%s`",
+		e.Name,
+		e.ImportLocation,
+	)
 }
 
 func (*NotExportedError) isSemanticError() {}
@@ -875,7 +903,10 @@ type ImportedProgramError struct {
 }
 
 func (e *ImportedProgramError) Error() string {
-	return fmt.Sprintf("checking of imported program `%s` failed", e.ImportLocation)
+	return fmt.Sprintf(
+		"checking of imported program `%s` failed",
+		e.ImportLocation,
+	)
 }
 
 func (e *ImportedProgramError) ChildErrors() []error {
@@ -902,7 +933,7 @@ type UnsupportedTypeError struct {
 func (e *UnsupportedTypeError) Error() string {
 	return fmt.Sprintf(
 		"unsupported type: `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -956,9 +987,13 @@ type InvalidIntegerLiteralRangeError struct {
 }
 
 func (e *InvalidIntegerLiteralRangeError) Error() string {
+	return "integer literal out of range"
+}
+
+func (e *InvalidIntegerLiteralRangeError) SecondaryError() string {
 	return fmt.Sprintf(
-		"integer literal out of range: expected `%s`, in range [%s, %s]",
-		e.ExpectedType,
+		"expected `%s`, in range [%s, %s]",
+		e.ExpectedType.QualifiedString(),
 		e.ExpectedMinInt,
 		e.ExpectedMaxInt,
 	)
@@ -990,9 +1025,13 @@ type InvalidFixedPointLiteralRangeError struct {
 }
 
 func (e *InvalidFixedPointLiteralRangeError) Error() string {
+	return "fixed-point literal out of range"
+}
+
+func (e *InvalidFixedPointLiteralRangeError) SecondaryError() string {
 	return fmt.Sprintf(
-		"fixed-point literal out of range: expected `%s`, in range [%s.%s, %s.%s]",
-		e.ExpectedType,
+		"expected `%s`, in range [%s.%s, %s.%s]",
+		e.ExpectedType.QualifiedString(),
 		e.ExpectedMinInt,
 		e.ExpectedMinFractional,
 		e.ExpectedMaxInt,
@@ -1011,9 +1050,13 @@ type InvalidFixedPointLiteralScaleError struct {
 }
 
 func (e *InvalidFixedPointLiteralScaleError) Error() string {
+	return "fixed-point literal scale out of range"
+}
+
+func (e *InvalidFixedPointLiteralScaleError) SecondaryError() string {
 	return fmt.Sprintf(
-		"fixed-point literal scale out of range: expected `%s`, with maximum scale %d",
-		e.ExpectedType,
+		"expected `%s`, with maximum scale %d",
+		e.ExpectedType.QualifiedString(),
 		e.ExpectedScale,
 	)
 }
@@ -1047,7 +1090,7 @@ func (*UnsupportedOptionalChainingAssignmentError) isSemanticError() {}
 // MissingResourceAnnotationError
 
 type MissingResourceAnnotationError struct {
-	Pos ast.Position
+	ast.Range
 }
 
 func (e *MissingResourceAnnotationError) Error() string {
@@ -1055,14 +1098,6 @@ func (e *MissingResourceAnnotationError) Error() string {
 }
 
 func (*MissingResourceAnnotationError) isSemanticError() {}
-
-func (e *MissingResourceAnnotationError) StartPosition() ast.Position {
-	return e.Pos
-}
-
-func (e *MissingResourceAnnotationError) EndPosition() ast.Position {
-	return e.Pos
-}
 
 // InvalidNestedResourceMoveError
 
@@ -1088,7 +1123,7 @@ func (e *InvalidNestedResourceMoveError) EndPosition() ast.Position {
 // InvalidResourceAnnotationError
 
 type InvalidResourceAnnotationError struct {
-	Pos ast.Position
+	ast.Range
 }
 
 func (e *InvalidResourceAnnotationError) Error() string {
@@ -1097,13 +1132,25 @@ func (e *InvalidResourceAnnotationError) Error() string {
 
 func (*InvalidResourceAnnotationError) isSemanticError() {}
 
-func (e *InvalidResourceAnnotationError) StartPosition() ast.Position {
-	return e.Pos
+// InvalidResourceInterfaceTypeError
+
+type InvalidResourceInterfaceTypeError struct {
+	Type Type
+	ast.Range
 }
 
-func (e *InvalidResourceAnnotationError) EndPosition() ast.Position {
-	return e.Pos.Shifted(len(common.CompositeKindResource.Annotation()) - 1)
+func (e *InvalidResourceInterfaceTypeError) Error() string {
+	return "invalid resource interface type"
 }
+
+func (e *InvalidResourceInterfaceTypeError) SecondaryError() string {
+	return fmt.Sprintf(
+		"got `%[1]s`; consider `AnyResource{...}` when using a resource interface",
+		e.Type.QualifiedString(),
+	)
+}
+
+func (*InvalidResourceInterfaceTypeError) isSemanticError() {}
 
 // IncorrectTransferOperationError
 
@@ -1114,8 +1161,12 @@ type IncorrectTransferOperationError struct {
 }
 
 func (e *IncorrectTransferOperationError) Error() string {
+	return "incorrect transfer operation"
+}
+
+func (e *IncorrectTransferOperationError) SecondaryError() string {
 	return fmt.Sprintf(
-		"incorrect transfer operation: expected `%s`",
+		"expected `%s`",
 		e.ExpectedOperation.Operator(),
 	)
 }
@@ -1306,7 +1357,11 @@ type MissingCreateError struct {
 }
 
 func (e *MissingCreateError) Error() string {
-	return "cannot create resource: expected `create`"
+	return "cannot create resource"
+}
+
+func (e *MissingCreateError) SecondaryError() string {
+	return "expected `create`"
 }
 
 func (*MissingCreateError) isSemanticError() {}
@@ -1338,7 +1393,11 @@ type InvalidMoveOperationError struct {
 }
 
 func (e *InvalidMoveOperationError) Error() string {
-	return "invalid move operation for non-resource: unexpected `<-`"
+	return "invalid move operation for non-resource"
+}
+
+func (e *InvalidMoveOperationError) SecondaryError() string {
+	return "unexpected `<-`"
 }
 
 func (*InvalidMoveOperationError) isSemanticError() {}
@@ -1399,7 +1458,11 @@ type InvalidTypeIndexingError struct {
 }
 
 func (e *InvalidTypeIndexingError) Error() string {
-	return "invalid index: expected type"
+	return "invalid index"
+}
+
+func (e *InvalidTypeIndexingError) SecondaryError() string {
+	return "expected type"
 }
 
 func (*InvalidTypeIndexingError) isSemanticError() {}
@@ -1411,7 +1474,11 @@ type InvalidIndexingError struct {
 }
 
 func (e *InvalidIndexingError) Error() string {
-	return "invalid index: expected expression"
+	return "invalid index"
+}
+
+func (e *InvalidIndexingError) SecondaryError() string {
+	return "expected expression"
 }
 
 func (*InvalidIndexingError) isSemanticError() {}
@@ -1425,9 +1492,13 @@ type InvalidSwapExpressionError struct {
 
 func (e *InvalidSwapExpressionError) Error() string {
 	return fmt.Sprintf(
-		"invalid %s-hand side of swap: expected target expression",
+		"invalid %s-hand side of swap",
 		e.Side.Name(),
 	)
+}
+
+func (e *InvalidSwapExpressionError) SecondaryError() string {
+	return "expected target expression"
 }
 
 func (*InvalidSwapExpressionError) isSemanticError() {}
@@ -1442,7 +1513,7 @@ type InvalidEventParameterTypeError struct {
 func (e *InvalidEventParameterTypeError) Error() string {
 	return fmt.Sprintf(
 		"unsupported event parameter type: `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -1470,7 +1541,7 @@ type EmitNonEventError struct {
 func (e *EmitNonEventError) Error() string {
 	return fmt.Sprintf(
 		"cannot emit non-event type: `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -1484,7 +1555,10 @@ type EmitImportedEventError struct {
 }
 
 func (e *EmitImportedEventError) Error() string {
-	return fmt.Sprintf("cannot emit imported event type: `%s`", e.Type)
+	return fmt.Sprintf(
+		"cannot emit imported event type: `%s`",
+		e.Type.QualifiedString(),
+	)
 }
 
 func (*EmitImportedEventError) isSemanticError() {}
@@ -1525,7 +1599,7 @@ func (e *MissingDestructorError) Error() string {
 	return fmt.Sprintf(
 		"missing destructor for resource field `%s` in type `%s`",
 		e.FirstFieldName,
-		e.ContainerType,
+		e.ContainerType.QualifiedString(),
 	)
 }
 
@@ -1559,7 +1633,7 @@ func (*InvalidDestructorParametersError) isSemanticError() {}
 
 type ResourceFieldNotInvalidatedError struct {
 	FieldName string
-	TypeName  string
+	Type      Type
 	Pos       ast.Position
 }
 
@@ -1567,7 +1641,7 @@ func (e *ResourceFieldNotInvalidatedError) Error() string {
 	return fmt.Sprintf(
 		"field `%s` of type `%s` is not invalidated (moved or destroyed)",
 		e.FieldName,
-		e.TypeName,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -1692,9 +1766,13 @@ type NonResourceReferenceTypeError struct {
 }
 
 func (e *NonResourceReferenceTypeError) Error() string {
+	return "invalid reference type"
+}
+
+func (e *NonResourceReferenceTypeError) SecondaryError() string {
 	return fmt.Sprintf(
-		"invalid reference type: expected resource type, got `%s`",
-		e.ActualType,
+		"expected resource type, got `%s`",
+		e.ActualType.QualifiedString(),
 	)
 }
 
@@ -1708,9 +1786,13 @@ type NonReferenceTypeReferenceError struct {
 }
 
 func (e *NonReferenceTypeReferenceError) Error() string {
+	return "cannot create reference"
+}
+
+func (e *NonReferenceTypeReferenceError) SecondaryError() string {
 	return fmt.Sprintf(
-		"cannot create reference: expected reference type, got `%s`",
-		e.ActualType,
+		"expected reference type, got `%s`",
+		e.ActualType.QualifiedString(),
 	)
 }
 
@@ -1724,9 +1806,13 @@ type NonResourceTypeReferenceError struct {
 }
 
 func (e *NonResourceTypeReferenceError) Error() string {
+	return "cannot create reference"
+}
+
+func (e *NonResourceTypeReferenceError) SecondaryError() string {
 	return fmt.Sprintf(
-		"cannot create reference: expected resource type, got `%s`",
-		e.ActualType,
+		"expected resource type, got `%s`",
+		e.ActualType.QualifiedString(),
 	)
 }
 
@@ -1742,7 +1828,7 @@ type OptionalTypeReferenceError struct {
 func (e *OptionalTypeReferenceError) Error() string {
 	return fmt.Sprintf(
 		"cannot create reference to optional type, got `%s`",
-		e.ActualType,
+		e.ActualType.QualifiedString(),
 	)
 }
 
@@ -1768,7 +1854,10 @@ type InvalidResourceCreationError struct {
 }
 
 func (e *InvalidResourceCreationError) Error() string {
-	return fmt.Sprintf("cannot create resource type outside of containing contract: `%s`", e.Type)
+	return fmt.Sprintf(
+		"cannot create resource type outside of containing contract: `%s`",
+		e.Type.QualifiedString(),
+	)
 }
 
 func (*InvalidResourceCreationError) isSemanticError() {}
@@ -1781,9 +1870,13 @@ type NonResourceTypeError struct {
 }
 
 func (e *NonResourceTypeError) Error() string {
+	return "invalid type"
+}
+
+func (e *NonResourceTypeError) SecondaryError() string {
 	return fmt.Sprintf(
 		"expected resource type, got `%s`",
-		e.ActualType,
+		e.ActualType.QualifiedString(),
 	)
 }
 
@@ -1823,7 +1916,7 @@ type InvalidDictionaryKeyTypeError struct {
 func (e *InvalidDictionaryKeyTypeError) Error() string {
 	return fmt.Sprintf(
 		"cannot use type as dictionary key type: `%s`",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -1859,7 +1952,7 @@ type InvalidOptionalChainingError struct {
 func (e *InvalidOptionalChainingError) Error() string {
 	return fmt.Sprintf(
 		"cannot use optional chaining: type '%s' is not optional",
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -1920,8 +2013,11 @@ type InvalidCharacterLiteralError struct {
 }
 
 func (e *InvalidCharacterLiteralError) Error() string {
-	return fmt.Sprintf(
-		"character literal has invalid length: expected 1, got %d",
+	return "character literal has invalid length"
+}
+
+func (e *InvalidCharacterLiteralError) SecondaryError() string {
+	return fmt.Sprintf("expected 1, got %d",
 		e.Length,
 	)
 }
@@ -1960,8 +2056,12 @@ type InvalidTransactionBlockError struct {
 }
 
 func (e *InvalidTransactionBlockError) Error() string {
+	return "invalid transaction block"
+}
+
+func (e *InvalidTransactionBlockError) SecondaryError() string {
 	return fmt.Sprintf(
-		"invalid transaction block: expected `prepare` or `execute`, got `%s`",
+		"expected `prepare` or `execute`, got `%s`",
 		e.Name,
 	)
 }
@@ -2040,7 +2140,7 @@ func (e *InvalidTransactionPrepareParameterTypeError) Error() string {
 	return fmt.Sprintf(
 		"prepare parameter must be of type `%s`, not `%s`",
 		&AccountType{},
-		e.Type,
+		e.Type.QualifiedString(),
 	)
 }
 
@@ -2071,7 +2171,10 @@ type InvalidNestedTypeError struct {
 }
 
 func (e *InvalidNestedTypeError) Error() string {
-	return fmt.Sprintf("type does not support nested types: `%s`", e.Type)
+	return fmt.Sprintf(
+		"type does not support nested types: `%s`",
+		e.Type,
+	)
 }
 
 func (*InvalidNestedTypeError) isSemanticError() {}
@@ -2189,8 +2292,12 @@ type ConstantSizedArrayLiteralSizeError struct {
 }
 
 func (e *ConstantSizedArrayLiteralSizeError) Error() string {
+	return "incorrect number of array literal elements"
+}
+
+func (e *ConstantSizedArrayLiteralSizeError) SecondaryError() string {
 	return fmt.Sprintf(
-		"incorrect number of array literal elements: expected %d, got %d",
+		"expected %d, got %d",
 		e.ExpectedSize,
 		e.ActualSize,
 	)
@@ -2206,7 +2313,10 @@ type InvalidRestrictedTypeError struct {
 }
 
 func (e *InvalidRestrictedTypeError) Error() string {
-	return fmt.Sprintf("cannot restrict non-resource type: %s", e.Type.String())
+	return fmt.Sprintf(
+		"cannot restrict non-resource type: %s",
+		e.Type.QualifiedString(),
+	)
 }
 
 func (*InvalidRestrictedTypeError) isSemanticError() {}
@@ -2219,7 +2329,10 @@ type InvalidRestrictionTypeError struct {
 }
 
 func (e *InvalidRestrictionTypeError) Error() string {
-	return fmt.Sprintf("cannot restrict using non-resource interface type: %s", e.Type.String())
+	return fmt.Sprintf(
+		"cannot restrict using non-resource interface type: %s",
+		e.Type.QualifiedString(),
+	)
 }
 
 func (*InvalidRestrictionTypeError) isSemanticError() {}
@@ -2232,7 +2345,10 @@ type InvalidRestrictionTypeDuplicateError struct {
 }
 
 func (e *InvalidRestrictionTypeDuplicateError) Error() string {
-	return fmt.Sprintf("duplicate restriction: %s", e.Type.String())
+	return fmt.Sprintf(
+		"duplicate restriction: %s",
+		e.Type.QualifiedString(),
+	)
 }
 
 func (*InvalidRestrictionTypeDuplicateError) isSemanticError() {}
@@ -2245,7 +2361,10 @@ type InvalidNonConformanceRestrictionError struct {
 }
 
 func (e *InvalidNonConformanceRestrictionError) Error() string {
-	return fmt.Sprintf("restricted type does not conform to restricting type: %s", e.Type.String())
+	return fmt.Sprintf(
+		"restricted type does not conform to restricting type: %s",
+		e.Type.QualifiedString(),
+	)
 }
 
 func (*InvalidNonConformanceRestrictionError) isSemanticError() {}
@@ -2275,7 +2394,7 @@ type RestrictionMemberClashError struct {
 func (e *RestrictionMemberClashError) Error() string {
 	return fmt.Sprintf(
 		"restriction has member clash with previous restriction `%s`: %s",
-		e.OriginalDeclaringType.String(),
+		e.OriginalDeclaringType.QualifiedString(),
 		e.Name,
 	)
 }

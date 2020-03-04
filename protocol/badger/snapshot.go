@@ -28,7 +28,7 @@ type Snapshot struct {
 func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
 
 	// execute the transaction that retrieves everything
-	var identities []*flow.Identity
+	var identities flow.IdentityList
 	err := s.state.db.View(func(tx *badger.Txn) error {
 
 		// get the top header at the requested snapshot
@@ -46,8 +46,8 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 		}
 
 		// if the target number is before finalized state, set it as new limit
-		if head.View < boundary {
-			boundary = head.View
+		if head.Height < boundary {
+			boundary = head.Height
 		}
 
 		// get finalized stakes within the boundary
@@ -57,7 +57,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 		}
 
 		// if there are unfinalized blocks, retrieve stakes there
-		if head.View > boundary {
+		if head.Height > boundary {
 
 			// get the final block we want to reach
 			var finalID flow.Identifier
@@ -66,13 +66,14 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 				return fmt.Errorf("could not get final hash: %w", err)
 			}
 
-			// track back from head block to latest finalized block
-			for head.ID() != finalID {
+			// track back from parent block to latest finalized block
+			parentID := head.ParentID
+			for parentID != finalID {
 
 				// get the stake deltas
 				// TODO: separate this from identities
 				var identities []*flow.Identity
-				err = procedure.RetrieveIdentities(head.PayloadHash, &identities)(tx)
+				err = procedure.RetrieveIdentities(parentID, &identities)(tx)
 				if err != nil {
 					return fmt.Errorf("could not add deltas: %w", err)
 				}
@@ -87,22 +88,19 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 					deltas[identity.NodeID] += int64(identity.Stake)
 				}
 
-				// set the head to the parent
-				err = operation.RetrieveHeader(head.ParentID, &head)(tx)
+				// get the next parent and forward pointer
+				var parent flow.Header
+				err = operation.RetrieveHeader(parentID, &parent)(tx)
 				if err != nil {
-					return fmt.Errorf("could not retrieve parent: %w", err)
+					return fmt.Errorf("could not retrieve parent (%s): %w", parentID, err)
 				}
+				parentID = parent.ParentID
 			}
 
 		}
 
 		// get identity for each non-zero stake
 		for nodeID, delta := range deltas {
-
-			// discard nodes where the remaining stake is zero
-			if delta == 0 {
-				continue
-			}
 
 			// retrieve the identity
 			var identity flow.Identity
@@ -116,6 +114,10 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 
 			identities = append(identities, &identity)
 		}
+
+		// apply filters again to filter on stuff that wasn't available while
+		// running through the delta index in the key-value store
+		identities = identities.Filter(filters...)
 
 		sort.Slice(identities, func(i int, j int) bool {
 			return order.ByNodeIDAsc(identities[i], identities[j])
@@ -143,9 +145,9 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return identities[0], nil
 }
 
-func (s *Snapshot) Commit() (flow.StateCommitment, error) {
+func (s *Snapshot) Seal() (flow.Seal, error) {
 
-	var commit flow.StateCommitment
+	var seal flow.Seal
 	err := s.state.db.View(func(tx *badger.Txn) error {
 
 		// get the head at the requested snapshot
@@ -155,20 +157,18 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
 
-		// try getting the commit directly from the block
-		var commit flow.StateCommitment
-		err = operation.LookupCommit(header.ID(), &commit)(tx)
+		err = procedure.LookupSealByBlock(header.ID(), &seal)(tx)
 		if err != nil {
-			return fmt.Errorf("could not get commit: %w", err)
+			return fmt.Errorf("could not get seal by block: %w", err)
 		}
 
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve commit: %w", err)
+		return flow.Seal{}, fmt.Errorf("could not retrieve seal: %w", err)
 	}
 
-	return commit, nil
+	return seal, nil
 }
 
 // Clusters sorts the list of node identities after filtering into the given
@@ -240,7 +240,7 @@ func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, filters []flow.Iden
 
 	// define start and end prefixes for the range scan
 	deltas := make(map[flow.Identifier]int64)
-	err := operation.TraverseDeltas(0, boundary, filters, func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) error {
+	err := operation.TraverseDeltas(0, boundary, filters, func(nodeID flow.Identifier, delta int64) error {
 		deltas[nodeID] += delta
 		return nil
 	})(tx)

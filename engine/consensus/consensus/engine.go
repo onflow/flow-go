@@ -6,12 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
@@ -34,7 +32,9 @@ type Engine struct {
 	headers  storage.Headers
 	payloads storage.Payloads
 	con      network.Conduit
-	cache    map[flow.Identifier][]cacheItem
+
+	cache      map[flow.Identifier][]cacheItem // pending block cache, keyed by parent ID
+	cacheDedup map[flow.Identifier]struct{}    // prevent dupes in cache
 
 	coldstuff module.ColdStuff
 }
@@ -52,8 +52,6 @@ func New(
 	state protocol.State,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	build module.Builder,
-	finalizer module.Finalizer,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -67,13 +65,6 @@ func New(
 		cache:    make(map[flow.Identifier][]cacheItem),
 	}
 
-	cold, err := coldstuff.New(log, state, me, e, build, finalizer, 3*time.Second, 8*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize coldstuff: %w", err)
-	}
-
-	e.coldstuff = cold
-
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ProtocolConsensus, e)
 	if err != nil {
@@ -84,9 +75,21 @@ func New(
 	return e, nil
 }
 
+// WithConsensus adds the consensus algorithm to the engine. This must be
+// called before the engine can start.
+func (e *Engine) WithConsensus(cold module.ColdStuff) *Engine {
+	e.coldstuff = cold
+	return e
+}
+
 // Ready returns a ready channel that is closed once the engine has fully
-// started. For the consensus, we consider it ready right away.
+// started. For consensus engine, this is true once the underlying consensus
+// algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
+	if e.coldstuff == nil {
+		panic("cannot start consensus engine without consensus algorithm")
+	}
+
 	return e.unit.Ready(func() {
 		<-e.coldstuff.Ready()
 	})
@@ -170,7 +173,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	header.Height = parent.Height + 1
 
 	// retrieve the payload for the block
-	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
+	blockID := header.ID()
+	payload, err := e.payloads.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
@@ -251,7 +255,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// store all of the block contents
-	err = e.payloads.Store(proposal.Payload)
+	err = e.payloads.Store(proposal.Header, proposal.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store block payload: %w", err)
 	}
@@ -288,7 +292,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// remove the children from cache
-	delete(e.cache, blockID)
+	e.dropPendingProposalsWithParent(blockID)
 
 	return result.ErrorOrNil()
 }
@@ -312,7 +316,7 @@ func (e *Engine) onBlockRequest(originID flow.Identifier, request *messages.Bloc
 	}
 
 	// try to retrieve the block payload from storage
-	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
+	payload, err := e.payloads.ByBlockID(request.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not find requested payload: %w", err)
 	}
@@ -369,16 +373,20 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) e
 // processPendingProposal will deal with proposals where the parent is missing.
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	// first, we cache the proposal with its origin ID, so we can process it once possible
-	item := cacheItem{
-		OriginID: originID,
-		Proposal: proposal,
+	blockID := proposal.Header.ID()
+	parentID := proposal.Header.ParentID
+
+	// check that we haven't already buffered this block
+	if e.isPendingProposalCached(blockID) {
+		return nil
 	}
-	e.cache[proposal.Header.ParentID] = append(e.cache[proposal.Header.ParentID], item)
+
+	// cache the block
+	e.cachePendingProposal(originID, proposal)
 
 	// send the block request
 	request := messages.BlockRequest{
-		BlockID: proposal.Header.ParentID,
+		BlockID: parentID,
 		Nonce:   rand.Uint64(),
 	}
 	err := e.con.Submit(&request, originID)
@@ -392,4 +400,38 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 	// limit on children we cache coming from a single other node
 
 	return nil
+}
+
+// Caches a pending proposal in the block buffer cache, keyed by the block's
+// parent ID.
+func (e *Engine) cachePendingProposal(originID flow.Identifier, proposal *messages.BlockProposal) {
+
+	blockID := proposal.Header.ID()
+	parentID := proposal.Header.ParentID
+
+	item := cacheItem{
+		OriginID: originID,
+		Proposal: proposal,
+	}
+
+	e.cache[parentID] = append(e.cache[parentID], item)
+	e.cacheDedup[blockID] = struct{}{}
+}
+
+// Returns true if the proposal with the given block ID has been cached.
+func (e *Engine) isPendingProposalCached(blockID flow.Identifier) bool {
+	_, cached := e.cacheDedup[blockID]
+	return cached
+}
+
+// Removes from the pending proposal cache all the children of the block with
+// the given ID. Since buffered blocks are keyed by parent, this function
+// should be called when the parent for a set of children is received.
+func (e *Engine) dropPendingProposalsWithParent(blockID flow.Identifier) {
+
+	children := e.cache[blockID]
+	for _, child := range children {
+		delete(e.cacheDedup, child.Proposal.Header.ID())
+	}
+	delete(e.cache, blockID)
 }

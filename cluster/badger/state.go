@@ -9,7 +9,7 @@ import (
 
 type State struct {
 	db      *badger.DB
-	chainID string
+	chainID string // aka cluster ID
 }
 
 func NewState(db *badger.DB, chainID string) (*State, error) {
