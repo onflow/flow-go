@@ -78,7 +78,7 @@ func NewPSMT(
 		// we process the key bit by bit until we reach the size (due to compactness)
 		for j := 0; j < int(size); j++ {
 			// determine v
-			v := GetDefaultHashForHeight(height - 1 - currentNode.height - 1)
+			v := GetDefaultHashForHeight(currentNode.height - 1)
 			if utils.IsBitSet(flags, j) {
 				// use the proof at index proofIndex
 				v = proof[proofIndex]
