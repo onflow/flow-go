@@ -537,32 +537,8 @@
             "include": "#comments"
           },
           {
-            "include": "#builtin-type"
-          },
-          {
             "match": "([\\p{L}_][\\p{L}_\\p{N}\\p{M}]*)",
             "name": "storage.type.cadence"
-          }
-        ]
-      },
-      "builtin-type": {
-        "comment": "Types provided in the standard library",
-        "patterns": [
-          {
-            "match": "\\bAny(?:Resource|Struct)\\b",
-            "name": "support.type.any.cadence"
-          },
-          {
-            "match": "\\bNever\\b",
-            "name": "support.type.never.cadence"
-          },
-          {
-            "match": "\\bSelf\\b",
-            "name": "support.type.self.cadence"
-          },
-          {
-            "match": "\\bU?(?:Int|Word)(?:8|16|32|64|128|256)?\\b",
-            "name": "support.type.integer.cadence"
           }
         ]
       },
