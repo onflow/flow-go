@@ -9,13 +9,13 @@ import (
 
 type TrieVerifier struct {
 	height        int
-	defaultHashes [256][]byte
+	defaultHashes [257][]byte
 }
 
 // NewTrieVerifier creates a new trie-backed ledger verifier.
 //
 // The verifier is configured with a height and a default hash value for each level.
-func NewTrieVerifier(height int, defaultHashes [256][]byte) *TrieVerifier {
+func NewTrieVerifier(height int, defaultHashes [257][]byte) *TrieVerifier {
 	return &TrieVerifier{
 		height:        height,
 		defaultHashes: defaultHashes,

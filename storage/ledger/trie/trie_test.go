@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -1030,8 +1032,8 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 	if err2 != nil {
 		t.Fatal(err2)
 	}
-
 }
+
 func TestNonInclusionProof_EmptyTree(t *testing.T) {
 	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
