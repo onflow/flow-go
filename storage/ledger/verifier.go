@@ -1,21 +1,21 @@
 package ledger
 
-type TrieVerifier struct {
-	height        int
-	defaultHashes [257][]byte
-}
-
-// NewTrieVerifier creates a new trie-backed ledger verifier.
+// // TODO (Ramtin) this is going to be updated in the next PRs
+// type TrieVerifier struct {
+// 	height        int
+// 	defaultHashes [257][]byte
+// }
 //
-// The verifier is configured with a height and a default hash value for each level.
-func NewTrieVerifier(height int, defaultHashes [257][]byte) *TrieVerifier {
-	return &TrieVerifier{
-		height:        height,
-		defaultHashes: defaultHashes,
-	}
-}
-
-// TODO (Ramtin) this is going to be updated in the next PRs
+// // NewTrieVerifier creates a new trie-backed ledger verifier.
+// //
+// // The verifier is configured with a height and a default hash value for each level.
+// func NewTrieVerifier(height int, defaultHashes [257][]byte) *TrieVerifier {
+// 	return &TrieVerifier{
+// 		height:        height,
+// 		defaultHashes: defaultHashes,
+// 	}
+// }
+//
 // // VerifyRegistersProof takes in an encoded proof along with registers, state, and values,
 // // and verifies if the proofs are correct
 // func (v *TrieVerifier) VerifyRegistersProof(
