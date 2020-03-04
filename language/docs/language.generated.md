@@ -622,7 +622,7 @@ They are essentially integers which are scaled by a factor.
 For example, the value 1.23 can be represented as 1230 with a scaling factor of 1/1000.
 The scaling factor is the same for all values of the same type and stays the same during calculations.
 
-Fixed-point numbers in Cadence have a scaling factor with a power of 10, instead or a power of 2,
+Fixed-point numbers in Cadence have a scaling factor with a power of 10, instead of a power of 2,
 i.e. they are decimal, not binary.
 
 Signed fixed-point number types have the prefix `Fix`,
