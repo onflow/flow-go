@@ -11,61 +11,66 @@ import (
 )
 
 func TestView_Get(t *testing.T) {
+	registerID := make([]byte, 32)
+	copy(registerID, "fruit")
+
 	t.Run("ValueNotSet", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		b, err := v.Get(flow.RegisterID("fruit"))
+		b, err := v.Get(registerID)
 		assert.NoError(t, err)
 		assert.Nil(t, b)
 	})
 
 	t.Run("ValueNotInCache", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			if bytes.Equal(key, flow.RegisterID("fruit")) {
+			if bytes.Equal(key, registerID) {
 				return flow.RegisterValue("orange"), nil
 			}
 
 			return nil, nil
 		})
-
-		b, err := v.Get(flow.RegisterID("fruit"))
+		b, err := v.Get(registerID)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			if bytes.Equal(key, flow.RegisterID("fruit")) {
+			if bytes.Equal(key, registerID) {
 				return flow.RegisterValue("orange"), nil
 			}
 
 			return nil, nil
 		})
 
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		v.Set(registerID, flow.RegisterValue("apple"))
 
-		b, err := v.Get(flow.RegisterID("fruit"))
+		b, err := v.Get(registerID)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b)
 	})
 }
 
 func TestView_Set(t *testing.T) {
+	registerID := make([]byte, 32)
+	copy(registerID, "fruit")
+
 	v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
-	v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+	v.Set(registerID, flow.RegisterValue("apple"))
 
-	b1, err := v.Get(flow.RegisterID("fruit"))
+	b1, err := v.Get(registerID)
 	assert.NoError(t, err)
 	assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-	v.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
+	v.Set(registerID, flow.RegisterValue("orange"))
 
-	b2, err := v.Get(flow.RegisterID("fruit"))
+	b2, err := v.Get(registerID)
 	assert.NoError(t, err)
 	assert.Equal(t, flow.RegisterValue("orange"), b2)
 
@@ -74,82 +79,91 @@ func TestView_Set(t *testing.T) {
 			return nil, nil
 		})
 
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
-		v.Delete(flow.RegisterID("fruit"))
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
+		v.Set(registerID, flow.RegisterValue("apple"))
+		v.Delete(registerID)
+		v.Set(registerID, flow.RegisterValue("orange"))
 
-		b, err := v.Get(flow.RegisterID("fruit"))
+		b, err := v.Get(registerID)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 
 		delta := v.Delta()
-		assert.False(t, delta.HasBeenDeleted(flow.RegisterID("fruit")))
+		assert.False(t, delta.HasBeenDeleted(registerID))
 	})
 }
 
 func TestView_Delete(t *testing.T) {
+	registerID := make([]byte, 32)
+	copy(registerID, "fruit")
+
 	t.Run("ValueNotSet", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		b1, err := v.Get(flow.RegisterID("fruit"))
+		b1, err := v.Get(registerID)
 		assert.NoError(t, err)
 		assert.Nil(t, b1)
 
-		v.Delete(flow.RegisterID("fruit"))
+		v.Delete(registerID)
 
-		b2, err := v.Get(flow.RegisterID("fruit"))
+		b2, err := v.Get(registerID)
 		assert.NoError(t, err)
 		assert.Nil(t, b2)
 
 		delta := v.Delta()
-		assert.True(t, delta.HasBeenDeleted(flow.RegisterID("fruit")))
+		assert.True(t, delta.HasBeenDeleted(registerID))
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			if bytes.Equal(key, flow.RegisterID("fruit")) {
+			if bytes.Equal(key, registerID) {
 				return flow.RegisterValue("orange"), nil
 			}
 
 			return nil, nil
 		})
 
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		v.Set(registerID, flow.RegisterValue("apple"))
 
-		b1, err := v.Get(flow.RegisterID("fruit"))
+		b1, err := v.Get(registerID)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-		v.Delete(flow.RegisterID("fruit"))
+		v.Delete(registerID)
 
-		b2, err := v.Get(flow.RegisterID("fruit"))
+		b2, err := v.Get(registerID)
 		assert.NoError(t, err)
 		assert.Nil(t, b2)
 
 		delta := v.Delta()
-		assert.True(t, delta.HasBeenDeleted(flow.RegisterID("fruit")))
+		assert.True(t, delta.HasBeenDeleted(registerID))
 	})
 }
 
 func TestView_ApplyDelta(t *testing.T) {
+	registerID1 := make([]byte, 32)
+	copy(registerID1, "fruit")
+
+	registerID2 := make([]byte, 32)
+	copy(registerID2, "vegetable")
+
 	t.Run("EmptyView", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		d := state.NewDelta()
-		d.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
-		d.Set(flow.RegisterID("vegetable"), flow.RegisterValue("carrot"))
+		d.Set(registerID1, flow.RegisterValue("apple"))
+		d.Set(registerID2, flow.RegisterValue("carrot"))
 
 		v.ApplyDelta(d)
 
-		b1, err := v.Get(flow.RegisterID("fruit"))
+		b1, err := v.Get(registerID1)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-		b2, err := v.Get(flow.RegisterID("vegetable"))
+		b2, err := v.Get(registerID2)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 	})
@@ -159,18 +173,18 @@ func TestView_ApplyDelta(t *testing.T) {
 			return nil, nil
 		})
 
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
-		v.Set(flow.RegisterID("vegetable"), flow.RegisterValue("carrot"))
+		v.Set(registerID1, flow.RegisterValue("apple"))
+		v.Set(registerID2, flow.RegisterValue("carrot"))
 
 		d := state.NewDelta()
 
 		v.ApplyDelta(d)
 
-		b1, err := v.Get(flow.RegisterID("fruit"))
+		b1, err := v.Get(registerID1)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-		b2, err := v.Get(flow.RegisterID("vegetable"))
+		b2, err := v.Get(registerID2)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 	})
@@ -180,18 +194,18 @@ func TestView_ApplyDelta(t *testing.T) {
 			return nil, nil
 		})
 
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		v.Set(registerID1, flow.RegisterValue("apple"))
 
 		d := state.NewDelta()
-		d.Set(flow.RegisterID("vegetable"), flow.RegisterValue("carrot"))
+		d.Set(registerID2, flow.RegisterValue("carrot"))
 
 		v.ApplyDelta(d)
 
-		b1, err := v.Get(flow.RegisterID("fruit"))
+		b1, err := v.Get(registerID1)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 
-		b2, err := v.Get(flow.RegisterID("vegetable"))
+		b2, err := v.Get(registerID2)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 	})
@@ -201,14 +215,14 @@ func TestView_ApplyDelta(t *testing.T) {
 			return nil, nil
 		})
 
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		v.Set(registerID1, flow.RegisterValue("apple"))
 
 		d := state.NewDelta()
-		d.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
+		d.Set(registerID1, flow.RegisterValue("orange"))
 
 		v.ApplyDelta(d)
 
-		b, err := v.Get(flow.RegisterID("fruit"))
+		b, err := v.Get(registerID1)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
@@ -218,15 +232,15 @@ func TestView_ApplyDelta(t *testing.T) {
 			return nil, nil
 		})
 
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
-		v.Delete(flow.RegisterID("fruit"))
+		v.Set(registerID1, flow.RegisterValue("apple"))
+		v.Delete(registerID1)
 
 		d := state.NewDelta()
-		d.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
+		d.Set(registerID1, flow.RegisterValue("orange"))
 
 		v.ApplyDelta(d)
 
-		b, err := v.Get(flow.RegisterID("fruit"))
+		b, err := v.Get(registerID1)
 		assert.NoError(t, err)
 		assert.Equal(t, flow.RegisterValue("orange"), b)
 	})
@@ -236,20 +250,26 @@ func TestView_ApplyDelta(t *testing.T) {
 			return nil, nil
 		})
 
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		v.Set(registerID1, flow.RegisterValue("apple"))
 
 		d := state.NewDelta()
-		d.Delete(flow.RegisterID("fruit"))
+		d.Delete(registerID1)
 
 		v.ApplyDelta(d)
 
-		b, err := v.Get(flow.RegisterID("fruit"))
+		b, err := v.Get(registerID1)
 		assert.NoError(t, err)
 		assert.Nil(t, b)
 	})
 }
 
 func TestView_Reads(t *testing.T) {
+	registerID1 := make([]byte, 32)
+	copy(registerID1, "fruit")
+
+	registerID2 := make([]byte, 32)
+	copy(registerID2, "vegetable")
+
 	v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 		return nil, nil
 	})
@@ -264,10 +284,10 @@ func TestView_Reads(t *testing.T) {
 			return nil, nil
 		})
 
-		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		v.Set(registerID1, flow.RegisterValue("apple"))
 
 		// cache reads are not recorded
-		_, err := v.Get(flow.RegisterID("fruit"))
+		_, err := v.Get(registerID1)
 		assert.NoError(t, err)
 
 		// read list should be empty
@@ -277,27 +297,27 @@ func TestView_Reads(t *testing.T) {
 
 	t.Run("ValuesNotInCache", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			if bytes.Equal(key, flow.RegisterID("fruit")) {
+			if bytes.Equal(key, registerID1) {
 				return flow.RegisterValue("orange"), nil
 			}
 
-			if bytes.Equal(key, flow.RegisterID("vegetable")) {
+			if bytes.Equal(key, registerID2) {
 				return flow.RegisterValue("carrot"), nil
 			}
 
 			return nil, nil
 		})
 
-		_, err := v.Get(flow.RegisterID("fruit"))
+		_, err := v.Get(registerID1)
 		assert.NoError(t, err)
 
-		_, err = v.Get(flow.RegisterID("vegetable"))
+		_, err = v.Get(registerID2)
 		assert.NoError(t, err)
 
 		reads := v.Reads()
 		assert.Len(t, reads, 2)
 
-		assert.Equal(t, flow.RegisterID("fruit"), reads[0])
-		assert.Equal(t, flow.RegisterID("vegetable"), reads[1])
+		assert.Equal(t, registerID1, reads[0])
+		assert.Equal(t, registerID2, reads[1])
 	})
 }

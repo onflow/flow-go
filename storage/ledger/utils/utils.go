@@ -26,3 +26,13 @@ func IsBitSet(b []byte, i int) bool {
 func SetBit(b []byte, i int) {
 	b[i/8] |= 1 << int(7-i%8)
 }
+
+func GetBits(bs []byte) []int {
+	r := make([]int, len(bs)*8)
+	for i, b := range bs {
+		for j := 0; j < 8; j++ {
+			r[i*8+j] = int(b >> uint(7-j) & 0x01)
+		}
+	}
+	return r
+}

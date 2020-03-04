@@ -5,6 +5,8 @@ package messages
 // type-malleability attacks, the signed data must also include a tag which specifies the
 // type of the hashed-and-signed object.
 
-const RandomBeaconTag = "RandomBeacon"
-const ConsensusVoteTag = "ConsensusVote"
-const CollectorVoteTag = "CollectorVote"
+const (
+	RandomBeaconTag  = "RandomBeacon"
+	ConsensusVoteTag = "ConsensusVote"
+	CollectorVoteTag = "CollectorVote"
+)

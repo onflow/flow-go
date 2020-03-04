@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"golang.org/x/crypto/sha3"
 )
@@ -25,12 +26,22 @@ type kmac128 struct {
 const cSHAKE128BlockSize = 168
 
 // NewKMAC_128 returns a new KMAC instance
-// - key is the KMAC key (in this function, the length is not compared
-// against the security level, this function should not be used in
-// the general KMAC case)
-// - customizer is the customization string
-func NewKMAC_128(key []byte, customizer []byte, outputSize int) Hasher {
+// - key is the KMAC key (the key length is not compared to the security level, if the parameter
+//	is used as a security key and not a domain tag, the caller must make sure the key length is
+//  larger than the security level)
+// - customizer is the customization string. It can be left empty if no customizer
+//   is required.
+func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) {
 	var k kmac128
+	// check the lengths as per NIST.SP.800-185
+	if len(key) >= KmacMaxParamsLen || len(customizer) >= KmacMaxParamsLen {
+		return nil,
+			cryptoError{fmt.Sprintf("kmac key and customizer lengths must be less than %d", KmacMaxParamsLen)}
+	}
+	if outputSize >= KmacMaxParamsLen || outputSize < 0 {
+		return nil,
+			cryptoError{fmt.Sprintf("kmac output size must be a positive number less than %d", KmacMaxParamsLen)}
+	}
 	k.commonHasher = &commonHasher{
 		algo:       KMAC128,
 		outputSize: outputSize}
@@ -42,7 +53,7 @@ func NewKMAC_128(key []byte, customizer []byte, outputSize int) Hasher {
 	// store the encoding of the key
 	k.initBlock = bytepad(encodeString(key), cSHAKE128BlockSize)
 	_, _ = k.Write(k.initBlock)
-	return &k
+	return &k, nil
 }
 
 const maxEncodeLen = 9
