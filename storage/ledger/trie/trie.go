@@ -2,7 +2,6 @@ package trie
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
@@ -42,14 +42,14 @@ type SMT struct {
 
 // Hash hashes any input with SHA256.
 func Hash(data ...[]byte) []byte {
-	hasher := sha256.New()
+	hasher := crypto.NewSHA3_256()
 	for i := 0; i < len(data); i++ {
 		_, err := hasher.Write(data[i])
 		if err != nil {
 			panic(err)
 		}
 	}
-	return hasher.Sum(nil)
+	return hasher.SumHash()
 }
 
 // newNode creates a new node with the provided value and no children
