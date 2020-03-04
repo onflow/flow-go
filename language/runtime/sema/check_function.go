@@ -58,7 +58,7 @@ func (checker *Checker) visitFunctionDeclaration(
 
 	checker.checkFunction(
 		declaration.ParameterList,
-		declaration.ReturnTypeAnnotation.StartPos,
+		declaration.ReturnTypeAnnotation,
 		functionType,
 		declaration.FunctionBlock,
 		options.mustExit,
@@ -92,7 +92,7 @@ func (checker *Checker) declareFunctionDeclaration(
 
 func (checker *Checker) checkFunction(
 	parameterList *ast.ParameterList,
-	returnTypePosition ast.Position,
+	returnTypeAnnotation *ast.TypeAnnotation,
 	functionType *FunctionType,
 	functionBlock *ast.FunctionBlock,
 	mustExit bool,
@@ -105,7 +105,7 @@ func (checker *Checker) checkFunction(
 	checker.checkParameters(parameterList, functionType.Parameters)
 
 	if functionType.ReturnTypeAnnotation != nil {
-		checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, returnTypePosition)
+		checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, returnTypeAnnotation)
 	}
 
 	// NOTE: Always declare the function parameters, even if the function body is empty.
@@ -180,40 +180,8 @@ func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parame
 
 		checker.checkTypeAnnotation(
 			parameterTypeAnnotation,
-			parameter.TypeAnnotation.StartPos,
+			parameter.TypeAnnotation,
 		)
-	}
-}
-
-func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.Position) {
-	checker.checkResourceAnnotation(
-		typeAnnotation.Type,
-		typeAnnotation.IsResource,
-		pos,
-	)
-}
-
-func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, pos ast.Position) {
-	if ty.IsInvalidType() {
-		return
-	}
-
-	if ty.IsResourceType() {
-		if !isResourceMove {
-			checker.report(
-				&MissingResourceAnnotationError{
-					Pos: pos,
-				},
-			)
-		}
-	} else {
-		if isResourceMove {
-			checker.report(
-				&InvalidResourceAnnotationError{
-					Pos: pos,
-				},
-			)
-		}
 	}
 }
 
@@ -387,7 +355,7 @@ func (checker *Checker) VisitFunctionExpression(expression *ast.FunctionExpressi
 
 	checker.checkFunction(
 		expression.ParameterList,
-		expression.ReturnTypeAnnotation.StartPos,
+		expression.ReturnTypeAnnotation,
 		functionType,
 		expression.FunctionBlock,
 		true,

@@ -32,7 +32,9 @@ type Engine struct {
 	headers  storage.Headers
 	payloads storage.Payloads
 	con      network.Conduit
-	cache    map[flow.Identifier][]cacheItem
+
+	cache      map[flow.Identifier][]cacheItem // pending block cache, keyed by parent ID
+	cacheDedup map[flow.Identifier]struct{}    // prevent dupes in cache
 
 	coldstuff module.ColdStuff
 }
@@ -171,7 +173,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	header.Height = parent.Height + 1
 
 	// retrieve the payload for the block
-	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
+	blockID := header.ID()
+	payload, err := e.payloads.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
@@ -252,7 +255,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// store all of the block contents
-	err = e.payloads.Store(proposal.Payload)
+	err = e.payloads.Store(proposal.Header, proposal.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store block payload: %w", err)
 	}
@@ -289,7 +292,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// remove the children from cache
-	delete(e.cache, blockID)
+	e.dropPendingProposalsWithParent(blockID)
 
 	return result.ErrorOrNil()
 }
@@ -313,7 +316,7 @@ func (e *Engine) onBlockRequest(originID flow.Identifier, request *messages.Bloc
 	}
 
 	// try to retrieve the block payload from storage
-	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
+	payload, err := e.payloads.ByBlockID(request.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not find requested payload: %w", err)
 	}
@@ -370,16 +373,20 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) e
 // processPendingProposal will deal with proposals where the parent is missing.
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	// first, we cache the proposal with its origin ID, so we can process it once possible
-	item := cacheItem{
-		OriginID: originID,
-		Proposal: proposal,
+	blockID := proposal.Header.ID()
+	parentID := proposal.Header.ParentID
+
+	// check that we haven't already buffered this block
+	if e.isPendingProposalCached(blockID) {
+		return nil
 	}
-	e.cache[proposal.Header.ParentID] = append(e.cache[proposal.Header.ParentID], item)
+
+	// cache the block
+	e.cachePendingProposal(originID, proposal)
 
 	// send the block request
 	request := messages.BlockRequest{
-		BlockID: proposal.Header.ParentID,
+		BlockID: parentID,
 		Nonce:   rand.Uint64(),
 	}
 	err := e.con.Submit(&request, originID)
@@ -393,4 +400,38 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 	// limit on children we cache coming from a single other node
 
 	return nil
+}
+
+// Caches a pending proposal in the block buffer cache, keyed by the block's
+// parent ID.
+func (e *Engine) cachePendingProposal(originID flow.Identifier, proposal *messages.BlockProposal) {
+
+	blockID := proposal.Header.ID()
+	parentID := proposal.Header.ParentID
+
+	item := cacheItem{
+		OriginID: originID,
+		Proposal: proposal,
+	}
+
+	e.cache[parentID] = append(e.cache[parentID], item)
+	e.cacheDedup[blockID] = struct{}{}
+}
+
+// Returns true if the proposal with the given block ID has been cached.
+func (e *Engine) isPendingProposalCached(blockID flow.Identifier) bool {
+	_, cached := e.cacheDedup[blockID]
+	return cached
+}
+
+// Removes from the pending proposal cache all the children of the block with
+// the given ID. Since buffered blocks are keyed by parent, this function
+// should be called when the parent for a set of children is received.
+func (e *Engine) dropPendingProposalsWithParent(blockID flow.Identifier) {
+
+	children := e.cache[blockID]
+	for _, child := range children {
+		delete(e.cacheDedup, child.Proposal.Header.ID())
+	}
+	delete(e.cache, blockID)
 }

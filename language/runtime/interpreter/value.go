@@ -1263,7 +1263,7 @@ func ConvertInt64(value Value) Value {
 // Int128Value
 
 type Int128Value struct {
-	int *big.Int
+	Int *big.Int
 }
 
 func init() {
@@ -1273,7 +1273,7 @@ func init() {
 func (v Int128Value) IsValue() {}
 
 func (v Int128Value) Copy() Value {
-	return Int128Value{big.NewInt(0).Set(v.int)}
+	return Int128Value{big.NewInt(0).Set(v.Int)}
 }
 
 func (Int128Value) GetOwner() *common.Address {
@@ -1287,15 +1287,15 @@ func (Int128Value) SetOwner(_ *common.Address) {
 
 func (v Int128Value) IntValue() int {
 	// TODO: handle overflow
-	return int(v.int.Int64())
+	return int(v.Int.Int64())
 }
 
 func (v Int128Value) String() string {
-	return v.int.String()
+	return v.Int.String()
 }
 
 func (v Int128Value) KeyString() string {
-	return v.int.String()
+	return v.Int.String()
 }
 
 func (v Int128Value) Negate() NumberValue {
@@ -1303,10 +1303,10 @@ func (v Int128Value) Negate() NumberValue {
 	//   if v == Int128TypeMinInt {
 	//       ...
 	//   }
-	if v.int.Cmp(sema.Int128TypeMinInt) == 0 {
+	if v.Int.Cmp(sema.Int128TypeMinInt) == 0 {
 		panic(&OverflowError{})
 	}
-	return Int128Value{big.NewInt(0).Neg(v.int)}
+	return Int128Value{big.NewInt(0).Neg(v.Int)}
 }
 
 func (v Int128Value) Plus(other NumberValue) NumberValue {
@@ -1324,7 +1324,7 @@ func (v Int128Value) Plus(other NumberValue) NumberValue {
 	//   }
 	//
 	res := big.NewInt(0)
-	res.Add(v.int, o.int)
+	res.Add(v.Int, o.Int)
 	if res.Cmp(sema.Int128TypeMinInt) < 0 {
 		panic(UnderflowError{})
 	} else if res.Cmp(sema.Int128TypeMaxInt) > 0 {
@@ -1348,7 +1348,7 @@ func (v Int128Value) Minus(other NumberValue) NumberValue {
 	//   }
 	//
 	res := big.NewInt(0)
-	res.Sub(v.int, o.int)
+	res.Sub(v.Int, o.Int)
 	if res.Cmp(sema.Int128TypeMinInt) < 0 {
 		panic(UnderflowError{})
 	} else if res.Cmp(sema.Int128TypeMaxInt) > 0 {
@@ -1361,17 +1361,17 @@ func (v Int128Value) Mod(other NumberValue) NumberValue {
 	o := other.(Int128Value)
 	res := big.NewInt(0)
 	// INT33-C
-	if o.int.Cmp(res) == 0 {
+	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	res.Mod(v.int, o.int)
+	res.Mod(v.Int, o.Int)
 	return Int128Value{res}
 }
 
 func (v Int128Value) Mul(other NumberValue) NumberValue {
 	o := other.(Int128Value)
 	res := big.NewInt(0)
-	res.Mul(v.int, o.int)
+	res.Mul(v.Int, o.Int)
 	if res.Cmp(sema.Int128TypeMinInt) < 0 {
 		panic(UnderflowError{})
 	} else if res.Cmp(sema.Int128TypeMaxInt) > 0 {
@@ -1389,34 +1389,34 @@ func (v Int128Value) Div(other NumberValue) NumberValue {
 	//   } else if (v == Int128TypeMinInt) && (o == -1) {
 	//       ...
 	//   }
-	if o.int.Cmp(res) == 0 {
+	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
 	res.SetInt64(-1)
-	if (v.int.Cmp(sema.Int128TypeMinInt) == 0) && (o.int.Cmp(res) == 0) {
+	if (v.Int.Cmp(sema.Int128TypeMinInt) == 0) && (o.Int.Cmp(res) == 0) {
 		panic(OverflowError{})
 	}
-	res.Div(v.int, o.int)
+	res.Div(v.Int, o.Int)
 	return Int128Value{res}
 }
 
 func (v Int128Value) Less(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(Int128Value).int)
+	cmp := v.Int.Cmp(other.(Int128Value).Int)
 	return cmp == -1
 }
 
 func (v Int128Value) LessEqual(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(Int128Value).int)
+	cmp := v.Int.Cmp(other.(Int128Value).Int)
 	return cmp <= 0
 }
 
 func (v Int128Value) Greater(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(Int128Value).int)
+	cmp := v.Int.Cmp(other.(Int128Value).Int)
 	return cmp == 1
 }
 
 func (v Int128Value) GreaterEqual(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(Int128Value).int)
+	cmp := v.Int.Cmp(other.(Int128Value).Int)
 	return cmp >= 0
 }
 
@@ -1425,7 +1425,7 @@ func (v Int128Value) Equal(other Value) BoolValue {
 	if !ok {
 		return false
 	}
-	cmp := v.int.Cmp(otherInt.int)
+	cmp := v.Int.Cmp(otherInt.Int)
 	return cmp == 0
 }
 
@@ -1438,7 +1438,7 @@ func ConvertInt128(value Value) Value {
 // Int256Value
 
 type Int256Value struct {
-	int *big.Int
+	Int *big.Int
 }
 
 func init() {
@@ -1448,7 +1448,7 @@ func init() {
 func (v Int256Value) IsValue() {}
 
 func (v Int256Value) Copy() Value {
-	return Int256Value{big.NewInt(0).Set(v.int)}
+	return Int256Value{big.NewInt(0).Set(v.Int)}
 }
 
 func (Int256Value) GetOwner() *common.Address {
@@ -1462,15 +1462,15 @@ func (Int256Value) SetOwner(_ *common.Address) {
 
 func (v Int256Value) IntValue() int {
 	// TODO: handle overflow
-	return int(v.int.Int64())
+	return int(v.Int.Int64())
 }
 
 func (v Int256Value) String() string {
-	return v.int.String()
+	return v.Int.String()
 }
 
 func (v Int256Value) KeyString() string {
-	return v.int.String()
+	return v.Int.String()
 }
 
 func (v Int256Value) Negate() NumberValue {
@@ -1478,10 +1478,10 @@ func (v Int256Value) Negate() NumberValue {
 	//   if v == Int256TypeMinInt {
 	//       ...
 	//   }
-	if v.int.Cmp(sema.Int256TypeMinInt) == 0 {
+	if v.Int.Cmp(sema.Int256TypeMinInt) == 0 {
 		panic(&OverflowError{})
 	}
-	return Int256Value{big.NewInt(0).Neg(v.int)}
+	return Int256Value{big.NewInt(0).Neg(v.Int)}
 }
 
 func (v Int256Value) Plus(other NumberValue) NumberValue {
@@ -1499,7 +1499,7 @@ func (v Int256Value) Plus(other NumberValue) NumberValue {
 	//   }
 	//
 	res := big.NewInt(0)
-	res.Add(v.int, o.int)
+	res.Add(v.Int, o.Int)
 	if res.Cmp(sema.Int256TypeMinInt) < 0 {
 		panic(UnderflowError{})
 	} else if res.Cmp(sema.Int256TypeMaxInt) > 0 {
@@ -1523,7 +1523,7 @@ func (v Int256Value) Minus(other NumberValue) NumberValue {
 	//   }
 	//
 	res := big.NewInt(0)
-	res.Sub(v.int, o.int)
+	res.Sub(v.Int, o.Int)
 	if res.Cmp(sema.Int256TypeMinInt) < 0 {
 		panic(UnderflowError{})
 	} else if res.Cmp(sema.Int256TypeMaxInt) > 0 {
@@ -1536,17 +1536,17 @@ func (v Int256Value) Mod(other NumberValue) NumberValue {
 	o := other.(Int256Value)
 	res := big.NewInt(0)
 	// INT33-C
-	if o.int.Cmp(res) == 0 {
+	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	res.Mod(v.int, o.int)
+	res.Mod(v.Int, o.Int)
 	return Int256Value{res}
 }
 
 func (v Int256Value) Mul(other NumberValue) NumberValue {
 	o := other.(Int256Value)
 	res := big.NewInt(0)
-	res.Mul(v.int, o.int)
+	res.Mul(v.Int, o.Int)
 	if res.Cmp(sema.Int256TypeMinInt) < 0 {
 		panic(UnderflowError{})
 	} else if res.Cmp(sema.Int256TypeMaxInt) > 0 {
@@ -1564,34 +1564,34 @@ func (v Int256Value) Div(other NumberValue) NumberValue {
 	//   } else if (v == Int256TypeMinInt) && (o == -1) {
 	//       ...
 	//   }
-	if o.int.Cmp(res) == 0 {
+	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
 	res.SetInt64(-1)
-	if (v.int.Cmp(sema.Int256TypeMinInt) == 0) && (o.int.Cmp(res) == 0) {
+	if (v.Int.Cmp(sema.Int256TypeMinInt) == 0) && (o.Int.Cmp(res) == 0) {
 		panic(OverflowError{})
 	}
-	res.Div(v.int, o.int)
+	res.Div(v.Int, o.Int)
 	return Int256Value{res}
 }
 
 func (v Int256Value) Less(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(Int256Value).int)
+	cmp := v.Int.Cmp(other.(Int256Value).Int)
 	return cmp == -1
 }
 
 func (v Int256Value) LessEqual(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(Int256Value).int)
+	cmp := v.Int.Cmp(other.(Int256Value).Int)
 	return cmp <= 0
 }
 
 func (v Int256Value) Greater(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(Int256Value).int)
+	cmp := v.Int.Cmp(other.(Int256Value).Int)
 	return cmp == 1
 }
 
 func (v Int256Value) GreaterEqual(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(Int256Value).int)
+	cmp := v.Int.Cmp(other.(Int256Value).Int)
 	return cmp >= 0
 }
 
@@ -1600,7 +1600,7 @@ func (v Int256Value) Equal(other Value) BoolValue {
 	if !ok {
 		return false
 	}
-	cmp := v.int.Cmp(otherInt.int)
+	cmp := v.Int.Cmp(otherInt.Int)
 	return cmp == 0
 }
 
@@ -2185,7 +2185,7 @@ func ConvertUInt64(value Value) Value {
 // UInt128Value
 
 type UInt128Value struct {
-	int *big.Int
+	Int *big.Int
 }
 
 func init() {
@@ -2195,7 +2195,7 @@ func init() {
 func (v UInt128Value) IsValue() {}
 
 func (v UInt128Value) Copy() Value {
-	return UInt128Value{big.NewInt(0).Set(v.int)}
+	return UInt128Value{big.NewInt(0).Set(v.Int)}
 }
 
 func (UInt128Value) GetOwner() *common.Address {
@@ -2209,15 +2209,15 @@ func (UInt128Value) SetOwner(_ *common.Address) {
 
 func (v UInt128Value) IntValue() int {
 	// TODO: handle overflow
-	return int(v.int.Int64())
+	return int(v.Int.Int64())
 }
 
 func (v UInt128Value) String() string {
-	return v.int.String()
+	return v.Int.String()
 }
 
 func (v UInt128Value) KeyString() string {
-	return v.int.String()
+	return v.Int.String()
 }
 
 func (v UInt128Value) Negate() NumberValue {
@@ -2226,7 +2226,7 @@ func (v UInt128Value) Negate() NumberValue {
 
 func (v UInt128Value) Plus(other NumberValue) NumberValue {
 	sum := big.NewInt(0)
-	sum.Add(v.int, other.(UInt128Value).int)
+	sum.Add(v.Int, other.(UInt128Value).Int)
 	// Given that this value is backed by an arbitrary size integer,
 	// we can just add and check the range of the result.
 	//
@@ -2245,7 +2245,7 @@ func (v UInt128Value) Plus(other NumberValue) NumberValue {
 
 func (v UInt128Value) Minus(other NumberValue) NumberValue {
 	diff := big.NewInt(0)
-	diff.Sub(v.int, other.(UInt128Value).int)
+	diff.Sub(v.Int, other.(UInt128Value).Int)
 	// Given that this value is backed by an arbitrary size integer,
 	// we can just subtract and check the range of the result.
 	//
@@ -2265,17 +2265,17 @@ func (v UInt128Value) Minus(other NumberValue) NumberValue {
 func (v UInt128Value) Mod(other NumberValue) NumberValue {
 	o := other.(UInt128Value)
 	res := big.NewInt(0)
-	if o.int.Cmp(res) == 0 {
+	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	res.Mod(v.int, o.int)
+	res.Mod(v.Int, o.Int)
 	return UInt128Value{res}
 }
 
 func (v UInt128Value) Mul(other NumberValue) NumberValue {
 	o := other.(UInt128Value)
 	res := big.NewInt(0)
-	res.Mul(v.int, o.int)
+	res.Mul(v.Int, o.Int)
 	if res.Cmp(sema.UInt128TypeMaxInt) > 0 {
 		panic(OverflowError{})
 	}
@@ -2285,30 +2285,30 @@ func (v UInt128Value) Mul(other NumberValue) NumberValue {
 func (v UInt128Value) Div(other NumberValue) NumberValue {
 	o := other.(UInt128Value)
 	res := big.NewInt(0)
-	if o.int.Cmp(res) == 0 {
+	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	res.Div(v.int, o.int)
+	res.Div(v.Int, o.Int)
 	return UInt128Value{res}
 }
 
 func (v UInt128Value) Less(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(UInt128Value).int)
+	cmp := v.Int.Cmp(other.(UInt128Value).Int)
 	return cmp == -1
 }
 
 func (v UInt128Value) LessEqual(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(UInt128Value).int)
+	cmp := v.Int.Cmp(other.(UInt128Value).Int)
 	return cmp <= 0
 }
 
 func (v UInt128Value) Greater(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(UInt128Value).int)
+	cmp := v.Int.Cmp(other.(UInt128Value).Int)
 	return cmp == 1
 }
 
 func (v UInt128Value) GreaterEqual(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(UInt128Value).int)
+	cmp := v.Int.Cmp(other.(UInt128Value).Int)
 	return cmp >= 0
 }
 
@@ -2317,7 +2317,7 @@ func (v UInt128Value) Equal(other Value) BoolValue {
 	if !ok {
 		return false
 	}
-	cmp := v.int.Cmp(otherInt.int)
+	cmp := v.Int.Cmp(otherInt.Int)
 	return cmp == 0
 }
 
@@ -2330,7 +2330,7 @@ func ConvertUInt128(value Value) Value {
 // UInt256Value
 
 type UInt256Value struct {
-	int *big.Int
+	Int *big.Int
 }
 
 func init() {
@@ -2340,7 +2340,7 @@ func init() {
 func (v UInt256Value) IsValue() {}
 
 func (v UInt256Value) Copy() Value {
-	return UInt256Value{big.NewInt(0).Set(v.int)}
+	return UInt256Value{big.NewInt(0).Set(v.Int)}
 }
 
 func (UInt256Value) GetOwner() *common.Address {
@@ -2354,15 +2354,15 @@ func (UInt256Value) SetOwner(_ *common.Address) {
 
 func (v UInt256Value) IntValue() int {
 	// TODO: handle overflow
-	return int(v.int.Int64())
+	return int(v.Int.Int64())
 }
 
 func (v UInt256Value) String() string {
-	return v.int.String()
+	return v.Int.String()
 }
 
 func (v UInt256Value) KeyString() string {
-	return v.int.String()
+	return v.Int.String()
 }
 
 func (v UInt256Value) Negate() NumberValue {
@@ -2371,7 +2371,7 @@ func (v UInt256Value) Negate() NumberValue {
 
 func (v UInt256Value) Plus(other NumberValue) NumberValue {
 	sum := big.NewInt(0)
-	sum.Add(v.int, other.(UInt256Value).int)
+	sum.Add(v.Int, other.(UInt256Value).Int)
 	// Given that this value is backed by an arbitrary size integer,
 	// we can just add and check the range of the result.
 	//
@@ -2390,7 +2390,7 @@ func (v UInt256Value) Plus(other NumberValue) NumberValue {
 
 func (v UInt256Value) Minus(other NumberValue) NumberValue {
 	diff := big.NewInt(0)
-	diff.Sub(v.int, other.(UInt256Value).int)
+	diff.Sub(v.Int, other.(UInt256Value).Int)
 	// Given that this value is backed by an arbitrary size integer,
 	// we can just subtract and check the range of the result.
 	//
@@ -2410,17 +2410,17 @@ func (v UInt256Value) Minus(other NumberValue) NumberValue {
 func (v UInt256Value) Mod(other NumberValue) NumberValue {
 	o := other.(UInt256Value)
 	res := big.NewInt(0)
-	if o.int.Cmp(res) == 0 {
+	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	res.Mod(v.int, o.int)
+	res.Mod(v.Int, o.Int)
 	return UInt256Value{res}
 }
 
 func (v UInt256Value) Mul(other NumberValue) NumberValue {
 	o := other.(UInt256Value)
 	res := big.NewInt(0)
-	res.Mul(v.int, o.int)
+	res.Mul(v.Int, o.Int)
 	if res.Cmp(sema.UInt256TypeMaxInt) > 0 {
 		panic(OverflowError{})
 	}
@@ -2430,30 +2430,30 @@ func (v UInt256Value) Mul(other NumberValue) NumberValue {
 func (v UInt256Value) Div(other NumberValue) NumberValue {
 	o := other.(UInt256Value)
 	res := big.NewInt(0)
-	if o.int.Cmp(res) == 0 {
+	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	res.Div(v.int, o.int)
+	res.Div(v.Int, o.Int)
 	return UInt256Value{res}
 }
 
 func (v UInt256Value) Less(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(UInt256Value).int)
+	cmp := v.Int.Cmp(other.(UInt256Value).Int)
 	return cmp == -1
 }
 
 func (v UInt256Value) LessEqual(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(UInt256Value).int)
+	cmp := v.Int.Cmp(other.(UInt256Value).Int)
 	return cmp <= 0
 }
 
 func (v UInt256Value) Greater(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(UInt256Value).int)
+	cmp := v.Int.Cmp(other.(UInt256Value).Int)
 	return cmp == 1
 }
 
 func (v UInt256Value) GreaterEqual(other NumberValue) BoolValue {
-	cmp := v.int.Cmp(other.(UInt256Value).int)
+	cmp := v.Int.Cmp(other.(UInt256Value).Int)
 	return cmp >= 0
 }
 
@@ -2462,7 +2462,7 @@ func (v UInt256Value) Equal(other Value) BoolValue {
 	if !ok {
 		return false
 	}
-	cmp := v.int.Cmp(otherInt.int)
+	cmp := v.Int.Cmp(otherInt.Int)
 	return cmp == 0
 }
 

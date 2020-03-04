@@ -1,7 +1,9 @@
 package trie
 
 var defaultLeafHash []byte = Hash(EmptySlice)
-var defaultHashes [256][]byte // The zero hashes of the level of the tree
+
+// we are currently supporting keys of a size up to 32 bytes. I.e. path length from the root of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
+var defaultHashes [257][]byte
 
 func init() {
 	// Creates the Default hashes from base to level height
@@ -15,7 +17,7 @@ func init() {
 //
 // For each tree level N, there is a default hash equal to the chained
 // hashing of the default value N times.
-func GetDefaultHashes() [256][]byte {
+func GetDefaultHashes() [257][]byte {
 	return defaultHashes
 }
 
@@ -24,5 +26,5 @@ func GetDefaultHashes() [256][]byte {
 // For each tree level N, there is a default hash equal to the chained
 // hashing of the default value N times.
 func GetDefaultHashForHeight(height int) []byte {
-	return defaultHashes[height-1]
+	return defaultHashes[height]
 }

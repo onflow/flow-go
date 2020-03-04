@@ -174,19 +174,13 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		Uint64("block_view", block.View).
 		Msg("received block")
 
-	err := e.payloads.Store(&block.Payload)
+	err := e.blocks.Store(block)
 	if err != nil {
-		return fmt.Errorf("could not save block payload: %w", err)
+		return fmt.Errorf("could not store block: %w", err)
 	}
-
-	err = e.blocks.Store(block)
-	if err != nil {
-		return fmt.Errorf("could not save block: %w", err)
-	}
-
-	blockID := block.ID()
 
 	// TODO: for MVP assume we're only receiving finalized blocks
+	blockID := block.Header.ID()
 	err = e.state.Mutate().Finalize(blockID)
 	if err != nil {
 		return fmt.Errorf("could not finalize block: %w", err)
@@ -250,19 +244,10 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	return err
 }
 
-func (e *Engine) handleOrphanedCompleteBlock(completeBlock *execution.CompleteBlock) {
-
-}
-
 func (e *Engine) handleCompleteBlock(completeBlock *execution.CompleteBlock) {
 
 	//get initial start state from parent block
 	startState, err := e.execState.StateCommitmentByBlockID(completeBlock.Block.ParentID)
-
-	if err == storage.ErrNotFound {
-		e.handleOrphanedCompleteBlock(completeBlock)
-		return
-	}
 
 	if err != nil {
 		e.log.Err(err).
@@ -281,15 +266,18 @@ func (e *Engine) handleCompleteBlock(completeBlock *execution.CompleteBlock) {
 
 func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 
-	//TODO: replace with latest sealed block
-	block, err := e.state.Final().Head()
+	seal, err := e.state.Final().Seal()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest block: %w", err)
+		return nil, fmt.Errorf("failed to get latest seal: %w", err)
 	}
 
-	stateCommit, err := e.execState.StateCommitmentByBlockID(block.ID())
+	stateCommit, err := e.execState.StateCommitmentByBlockID(seal.BlockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest block state commitment: %w", err)
+		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", seal.BlockID, err)
+	}
+	block, err := e.state.AtBlockID(seal.BlockID).Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sealed block (%s): %w", seal.BlockID, err)
 	}
 
 	blockView := e.execState.NewView(stateCommit)

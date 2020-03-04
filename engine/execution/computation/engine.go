@@ -46,7 +46,7 @@ func New(
 	receipts network.Engine,
 	vm virtualmachine.VirtualMachine,
 ) (*Engine, error) {
-	log := logger.With().Str("engine", "execution").Logger()
+	log := logger.With().Str("engine", "computation").Logger()
 
 	executor := computer.NewBlockComputer(vm)
 
@@ -62,7 +62,7 @@ func New(
 
 	var err error
 
-	_, err = net.Register(engine.ExecutionExecution, &e)
+	_, err = net.Register(engine.ExecutionComputer, &e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register execution engine")
 	}

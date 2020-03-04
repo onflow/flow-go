@@ -193,9 +193,12 @@ type testDKGProcessor struct {
 	dkg       DKGstate
 	chans     []chan *message
 	msgType   int
-	ts        *ThresholdSigner // only used when testing a threshold signature
 	pkBytes   []byte
 	malicious bool
+	// only used when testing the threshold signature stateful api
+	ts *ThresholdSigner
+	// only used when testing the threshold signature statless api
+	keys *statelessKeys
 }
 
 const (

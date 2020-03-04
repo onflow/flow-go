@@ -342,12 +342,12 @@ func (r *interpreterRuntime) newInterpreter(
 		),
 		interpreter.WithStorageReadHandler(
 			func(_ *interpreter.Interpreter, address common.Address, key string) interpreter.OptionalValue {
-				return runtimeStorage.readValue(address.Hex(), key)
+				return runtimeStorage.readValue(string(address[:]), key)
 			},
 		),
 		interpreter.WithStorageWriteHandler(
 			func(_ *interpreter.Interpreter, address common.Address, key string, value interpreter.OptionalValue) {
-				runtimeStorage.writeValue(address.Hex(), key, value)
+				runtimeStorage.writeValue(string(address[:]), key, value)
 			},
 		),
 		interpreter.WithStorageKeyHandler(
@@ -515,7 +515,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 		constructorArguments := invocation.Arguments[requiredArgumentCount:]
 		constructorArgumentTypes := invocation.ArgumentTypes[requiredArgumentCount:]
 
-		r.updateAccountCode(
+		contractTypes := r.updateAccountCode(
 			runtimeInterface,
 			runtimeStorage,
 			code,
@@ -526,10 +526,14 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 			invocation.Location.Position,
 		)
 
+		codeValue := fromBytes(code)
+
+		contractTypeIDs := compositeTypesToIDValues(contractTypes)
+
 		r.emitAccountEvent(
 			stdlib.AccountCreatedEventType,
 			runtimeInterface,
-			[]Value{accountAddressValue},
+			[]Value{accountAddressValue, codeValue, contractTypeIDs},
 		)
 
 		account := r.newAccountValue(accountAddressValue, runtimeInterface, runtimeStorage)
@@ -612,7 +616,7 @@ func (r *interpreterRuntime) newSetCodeFunction(
 			constructorArguments := invocation.Arguments[requiredArgumentCount:]
 			constructorArgumentTypes := invocation.ArgumentTypes[requiredArgumentCount:]
 
-			r.updateAccountCode(
+			contractTypes := r.updateAccountCode(
 				runtimeInterface,
 				runtimeStorage,
 				code,
@@ -625,10 +629,12 @@ func (r *interpreterRuntime) newSetCodeFunction(
 
 			codeValue := fromBytes(code)
 
+			contractTypeIDs := compositeTypesToIDValues(contractTypes)
+
 			r.emitAccountEvent(
 				stdlib.AccountCodeUpdatedEventType,
 				runtimeInterface,
-				[]Value{addressValue, codeValue},
+				[]Value{addressValue, codeValue, contractTypeIDs},
 			)
 
 			result := interpreter.VoidValue{}
@@ -646,7 +652,7 @@ func (r *interpreterRuntime) updateAccountCode(
 	constructorArgumentTypes []sema.Type,
 	checkPermission bool,
 	invocationPosition ast.Position,
-) {
+) (contractTypes []*sema.CompositeType) {
 	location := AddressLocation(addressValue[:])
 
 	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
@@ -660,8 +666,6 @@ func (r *interpreterRuntime) updateAccountCode(
 	if err != nil {
 		panic(err)
 	}
-
-	var contractTypes []*sema.CompositeType
 
 	for _, variable := range checker.GlobalTypes {
 		if variable.DeclarationKind == common.DeclarationKindContract {
@@ -711,6 +715,8 @@ func (r *interpreterRuntime) updateAccountCode(
 	}
 
 	r.writeContract(runtimeStorage, addressValue, contractValue)
+
+	return contractTypes
 }
 
 func (r *interpreterRuntime) writeContract(
@@ -718,9 +724,8 @@ func (r *interpreterRuntime) writeContract(
 	addressValue interpreter.AddressValue,
 	contractValue interpreter.OptionalValue,
 ) {
-	addressHex := addressValue.Hex()
 	runtimeStorage.writeValue(
-		addressHex,
+		string(addressValue[:]),
 		contractKey,
 		contractValue,
 	)
@@ -730,9 +735,9 @@ func (r *interpreterRuntime) loadContract(
 	compositeType *sema.CompositeType,
 	runtimeStorage *interpreterRuntimeStorage,
 ) *interpreter.CompositeValue {
-	addressHex := compositeType.Location.(AddressLocation).ToAddress().Hex()
+	address := compositeType.Location.(AddressLocation).ToAddress()
 	storedValue := runtimeStorage.readValue(
-		addressHex,
+		string(address[:]),
 		contractKey,
 	)
 	switch typedValue := storedValue.(type) {
@@ -937,6 +942,15 @@ func fromBytes(buf []byte) *interpreter.ArrayValue {
 	return &interpreter.ArrayValue{
 		Values: values,
 	}
+}
+
+func compositeTypesToIDValues(types []*sema.CompositeType) *interpreter.ArrayValue {
+	typeIDValues := make([]Value, len(types))
+	for i, typ := range types {
+		typeIDValues[i] = interpreter.NewStringValue(string(typ.ID()))
+	}
+
+	return interpreter.NewArrayValueUnownedNonCopying(typeIDValues...)
 }
 
 // Block

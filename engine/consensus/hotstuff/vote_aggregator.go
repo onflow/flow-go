@@ -211,7 +211,6 @@ func (va *VoteAggregator) convertPendingVotes(pendingVotes []*hotstuff.Vote, blo
 func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, block *hotstuff.Block) (bool, error) {
 	// validate the vote
 	voter, err := va.voteValidator.ValidateVote(vote, block)
-
 	if err != nil {
 		switch err.(type) {
 		// does not report invalid vote as an error, notify consumers instead
@@ -225,7 +224,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, 
 	}
 
 	// does not report double vote as an error, notify consumers instead
-	firstVote, detected := va.detectDoubleVote(vote, voter)
+	firstVote, detected := va.detectDoubleVote(vote)
 	if detected {
 		va.notifier.OnDoubleVotingDetected(firstVote, vote)
 		return false, nil
@@ -235,16 +234,14 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *hotstuff.Vote, 
 	votingStatus, exists := va.blockIDToVotingStatus[vote.BlockID]
 	if !exists {
 		// get all identities
-		identities, err := va.viewState.ConsensusIdentities(vote.BlockID)
+		identities, err := va.viewState.AllConsensusParticipants(vote.BlockID)
 		if err != nil {
-			return false, fmt.Errorf("could not get identities: %w", err)
+			return false, fmt.Errorf("error retrieving consensus participants: %w", err)
 		}
 
-		// calculate stake threshold
-		stakeThreshold := ComputeStakeThresholdForBuildingQC(identities.TotalStake())
-
-		// create VotingStatus for collecting valid votes and building QC
-		votingStatus = NewVotingStatus(va.sigAggregator, stakeThreshold, vote.View, voter, block)
+		// create VotingStatus for block
+		stakeThreshold := ComputeStakeThresholdForBuildingQC(identities.TotalStake()) // stake threshold for building valid qc
+		votingStatus = NewVotingStatus(block, stakeThreshold, va.sigAggregator)
 		va.blockIDToVotingStatus[vote.BlockID] = votingStatus
 	}
 	votingStatus.AddVote(vote, voter)
@@ -294,13 +291,13 @@ func (va *VoteAggregator) tryBuildQC(blockID flow.Identifier) (*hotstuff.QuorumC
 }
 
 // double voting is detected when the voter has voted a different block at the same view before
-func (va *VoteAggregator) detectDoubleVote(vote *hotstuff.Vote, sender *flow.Identity) (*hotstuff.Vote, bool) {
+func (va *VoteAggregator) detectDoubleVote(vote *hotstuff.Vote) (*hotstuff.Vote, bool) {
 	idToVotes, ok := va.viewToVoteID[vote.View]
 	if !ok {
 		// never voted by anyone
 		return nil, false
 	}
-	originalVote, exists := idToVotes[sender.ID()]
+	originalVote, exists := idToVotes[vote.Signature.SignerID]
 	if !exists {
 		// never voted by this sender
 		return nil, false
