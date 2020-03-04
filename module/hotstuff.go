@@ -51,7 +51,7 @@ type HotStuffFollower interface {
 	// SubmitProposal feeds a new block proposal into the HotStuffFollower.
 	// This method blocks until the proposal is accepted to the event queue.
 	//
-	// Block proposals must be submitted in order. The proposal's parent must
+	// Block proposals must be submitted in order, i.e. a proposal's parent must
 	// have been previously processed by the HotStuffFollower.
 	SubmitProposal(proposal *flow.Header, parentView uint64)
 }
