@@ -79,7 +79,7 @@ func New(
 		cacheDedup:  make(map[flow.Identifier]struct{}),
 	}
 
-	con, err := net.Register(engine.CollectionProposal, e)
+	con, err := net.Register(engine.ProtocolClusterConsensus, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
