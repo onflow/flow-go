@@ -64,6 +64,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
 		t.Fatal("root hash doesn't match [after update]")
 	}
+	trie.database.SafeClose()
 }
 
 func TestPartialTrieLeafUpdates(t *testing.T) {
@@ -116,6 +117,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
 		t.Fatal("root hash doesn't match [after update]")
 	}
+	trie.database.SafeClose()
 }
 func TestPartialTrieMiddleBranching(t *testing.T) {
 	trieHeight := 9 // should be key size (in bits) + 1
@@ -177,6 +179,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
 		t.Fatal("root hash doesn't match [after update]")
 	}
+	trie.database.SafeClose()
 }
 
 func TestPartialTrieRootUpdates(t *testing.T) {
@@ -235,6 +238,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
 		t.Fatal("root hash doesn't match [after update]")
 	}
+	trie.database.SafeClose()
 }
 
 // TODO add test for incompatible proofs [Byzantine milestone]
