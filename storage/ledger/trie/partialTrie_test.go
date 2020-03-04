@@ -25,7 +25,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, *proofHldr)
 
 	if err != nil {
-		t.Fatal("error building partial trie")
+		t.Fatal("error building partial trie:", err)
 	}
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
@@ -35,12 +35,12 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 	err = trie.Update(keys, values)
 
 	if err != nil {
-		t.Fatal("error updating trie")
+		t.Fatal("error updating trie:", err)
 	}
 
 	_, err = psmt.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating psmt")
+		t.Fatal("error updating psmt:", err)
 	}
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
@@ -54,11 +54,11 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 	err = trie.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating trie")
+		t.Fatal("error updating trie:", err)
 	}
 	_, err = psmt.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating psmt")
+		t.Fatal("error updating psmt:", err)
 	}
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
@@ -88,14 +88,14 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 	trie := newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
 	err := trie.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating trie")
+		t.Fatal("error updating trie:", err)
 	}
 
 	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
 	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, *proofHldr)
 
 	if err != nil {
-		t.Fatal("error building partial trie")
+		t.Fatal("error building partial trie:", err)
 	}
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
@@ -106,12 +106,12 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 	values = append(values, updatedValue1, updatedValue2)
 	err = trie.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating trie")
+		t.Fatal("error updating trie:", err)
 	}
 
 	_, err = psmt.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating psmt")
+		t.Fatal("error updating psmt:", err)
 	}
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
@@ -145,7 +145,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
 	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, *proofHldr)
 	if err != nil {
-		t.Fatal("error building partial trie")
+		t.Fatal("error building partial trie:", err)
 	}
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
 		t.Fatal("root hash doesn't match [before update]")
@@ -153,11 +153,11 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 	// first update
 	err = trie.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating trie")
+		t.Fatal("error updating trie:", err)
 	}
 	_, err = psmt.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating psmt")
+		t.Fatal("error updating psmt:", err)
 	}
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
 		t.Fatal("root hash doesn't match [before update]")
@@ -168,12 +168,12 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 	values = append(values, updatedValue1, updatedValue2, updatedValue3)
 	err = trie.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating trie")
+		t.Fatal("error updating trie:", err)
 	}
 
 	_, err = psmt.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating psmt")
+		t.Fatal("error updating psmt:", err)
 	}
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
@@ -204,7 +204,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, *proofHldr)
 
 	if err != nil {
-		t.Fatal("error building partial trie")
+		t.Fatal("error building partial trie:", err)
 	}
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
@@ -214,11 +214,11 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 	// first update
 	err = trie.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating trie")
+		t.Fatal("error updating trie:", err)
 	}
 	_, err = psmt.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating psmt")
+		t.Fatal("error updating psmt:", err)
 	}
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
 		t.Fatal("root hash doesn't match [before update]")
@@ -229,11 +229,11 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 	values = append(values, updatedValue1, updatedValue2)
 	err = trie.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating trie")
+		t.Fatal("error updating trie:", err)
 	}
 	_, err = psmt.Update(keys, values)
 	if err != nil {
-		t.Fatal("error updating pmst")
+		t.Fatal("error updating pmst:", err)
 	}
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
 		t.Fatal("root hash doesn't match [after update]")
