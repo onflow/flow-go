@@ -148,18 +148,18 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 }
 
 func makeTestValues() ([][]byte, [][]byte) {
-	id1 := make([]byte, 1)
+	id1 := make([]byte, 32)
 	value1 := []byte{'a'}
 
-	id2 := make([]byte, 1)
+	id2 := make([]byte, 32)
 	value2 := []byte{'b'}
 	utils.SetBit(id2, 5)
 
-	id3 := make([]byte, 1)
+	id3 := make([]byte, 32)
 	value3 := []byte{'c'}
 	utils.SetBit(id3, 0)
 
-	id4 := make([]byte, 1)
+	id4 := make([]byte, 32)
 	value4 := []byte{'d'}
 	utils.SetBit(id4, 0)
 	utils.SetBit(id4, 5)
