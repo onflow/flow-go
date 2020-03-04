@@ -279,7 +279,9 @@ func TestExtend(t *testing.T) {
 
 			// create a block extending genesis containing tx1
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			payload1 := cluster.Payload{flow.LightCollection{[]flow.Identifier{tx1.ID()}}}
+			payload1 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
 			block1.SetPayload(payload1)
 			insert(block1)
 
@@ -289,7 +291,9 @@ func TestExtend(t *testing.T) {
 
 			// create a block building on block1 ALSO containing tx1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			payload2 := cluster.Payload{flow.LightCollection{[]flow.Identifier{tx1.ID()}}}
+			payload2 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
 			block2.SetPayload(payload2)
 			insert(block2)
 
@@ -306,7 +310,9 @@ func TestExtend(t *testing.T) {
 
 			// create a block extending genesis containing tx1
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			payload1 := cluster.Payload{flow.LightCollection{[]flow.Identifier{tx1.ID()}}}
+			payload1 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
 			block1.SetPayload(payload1)
 			insert(block1)
 
@@ -320,7 +326,9 @@ func TestExtend(t *testing.T) {
 
 			// create a block building on block1 ALSO containing tx1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			payload2 := cluster.Payload{flow.LightCollection{[]flow.Identifier{tx1.ID()}}}
+			payload2 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
 			block2.SetPayload(payload2)
 			insert(block2)
 
@@ -337,7 +345,9 @@ func TestExtend(t *testing.T) {
 
 			// create a block extending genesis containing tx1
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			payload1 := cluster.Payload{flow.LightCollection{[]flow.Identifier{tx1.ID()}}}
+			payload1 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
 			block1.SetPayload(payload1)
 			insert(block1)
 
@@ -347,7 +357,9 @@ func TestExtend(t *testing.T) {
 
 			// create a block ALSO extending genesis ALSO containing tx1
 			block2 := unittest.ClusterBlockWithParent(genesis)
-			payload2 := cluster.Payload{flow.LightCollection{[]flow.Identifier{tx1.ID()}}}
+			payload2 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
 			block2.SetPayload(payload2)
 			insert(block2)
 
