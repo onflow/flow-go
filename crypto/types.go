@@ -76,8 +76,9 @@ const (
 	DKGMaxSize       int = 254
 	ThresholdMaxSize     = DKGMaxSize
 
-	// MAC
-	MACMinKeySize int = 16
+	// KMAC
+	// the parameter maximum bytes-length as defined in NIST SP 800-185
+	KmacMaxParamsLen = 2040 / 8
 )
 
 // Signature is a generic type, regardless of the signature scheme

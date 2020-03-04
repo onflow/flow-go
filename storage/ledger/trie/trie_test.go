@@ -1031,8 +1031,8 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 	if err2 != nil {
 		t.Fatal(err2)
 	}
-
 }
+
 func TestNonInclusionProof_EmptyTree(t *testing.T) {
 	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
