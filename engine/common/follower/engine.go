@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
-	protocol "github.com/dapperlabs/flow-go/protocol/badger"
+	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
@@ -30,11 +30,6 @@ type Engine struct {
 	cache module.PendingBlockBuffer
 
 	follower module.HotStuffFollower
-}
-
-type cacheItem struct {
-	OriginID flow.Identifier
-	Proposal *messages.ClusterBlockProposal
 }
 
 func New(
@@ -58,6 +53,12 @@ func New(
 		cache:    cache,
 		follower: follower,
 	}
+
+	con, err := net.Register(engine.BlockProvider, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register engine to network: %w", err)
+	}
+	e.con = con
 
 	return e, nil
 }
@@ -179,9 +180,9 @@ func (e *Engine) processPendingBlock(originID flow.Identifier, block *flow.Block
 		Payload:  &block.Payload,
 	}
 
-	// add the block to the buffer
-	exists := e.cache.Add(pendingBlock)
-	if exists {
+	// cache the block, exit early if it already exists in the cache
+	added := e.cache.Add(pendingBlock)
+	if !added {
 		return nil
 	}
 

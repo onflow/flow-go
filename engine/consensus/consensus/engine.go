@@ -38,11 +38,6 @@ type Engine struct {
 	coldstuff module.ColdStuff
 }
 
-type cacheItem struct {
-	OriginID flow.Identifier
-	Proposal *messages.BlockProposal
-}
-
 // New creates a new consensus propagation engine.
 func New(
 	log zerolog.Logger,
@@ -385,9 +380,9 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 		Payload:  proposal.Payload,
 	}
 
-	// cache the block
-	exists := e.cache.Add(pendingBlock)
-	if exists {
+	// add the block to the buffer, exit early if it already exists
+	added := e.cache.Add(pendingBlock)
+	if !added {
 		return nil
 	}
 
