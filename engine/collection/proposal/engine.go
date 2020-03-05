@@ -251,13 +251,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	_ = parent
+	blockID := proposal.Header.ID()
 
 	// TODO handle missing transactions
 	// TODO store block contents
 	// TODO ensure block is valid extension of cluster state
 	// TODO submit to coldstuff
 
-	children, ok := e.cache.ByParentID(parent.ID())
+	children, ok := e.cache.ByParentID(blockID)
 	if !ok {
 		return nil
 	}
@@ -274,7 +275,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	// remove children from cache
-	e.cache.DropForParent(parent.ID())
+	e.cache.DropForParent(blockID)
 
 	return result.ErrorOrNil()
 }
