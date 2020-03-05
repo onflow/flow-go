@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
@@ -131,7 +130,7 @@ func (p Payload) Hash() Identifier {
 // processed. The block header, payload, and sender ID are stored together
 // while waiting for the block to become processable.
 type PendingBlock struct {
-	OriginID flow.Identifier
+	OriginID Identifier
 	Header   *Header
 	Payload  *Payload
 }
