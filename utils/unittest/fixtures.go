@@ -53,6 +53,19 @@ func SealFixture() flow.Seal {
 	}
 }
 
+func ClusterBlockFixture() cluster.Block {
+	payload := cluster.Payload{
+		Collection: flow.LightCollection{
+			Transactions: []flow.Identifier{IdentifierFixture()},
+		},
+	}
+	header := BlockHeaderFixture()
+	return cluster.Block{
+		Header:  header,
+		Payload: payload,
+	}
+}
+
 // ClusterBlockWithParent creates a new cluster consensus block that is valid
 // with respect to the given parent block.
 func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
