@@ -148,7 +148,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	e.follower.SubmitProposal(&block.Header, parent.View)
 
 	// check for any descendants of the block that are now processable
-	children, ok := e.cache.ByParentID(parent.ID())
+	children, ok := e.cache.ByParentID(block.ID())
 	if !ok {
 		return nil
 	}
@@ -167,7 +167,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	}
 
 	// remove children from the cache
-	e.cache.DropForParent(parent.ID())
+	e.cache.DropForParent(block.ID())
 
 	return result.ErrorOrNil()
 }
