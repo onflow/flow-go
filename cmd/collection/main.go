@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/builder/collection"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -66,7 +67,9 @@ func main() {
 			// TODO implement finalizer
 			var final module.Finalizer
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees, headers)
+			cache := buffer.NewPendingClusterBlocks()
+
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees, headers, cache)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 
 			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, 3*time.Second, 6*time.Second)

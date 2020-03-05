@@ -36,6 +36,7 @@ type testcontext struct {
 	headers     *storage.Headers
 	builder     *module.Builder
 	finalizer   *module.Finalizer
+	cache       *module.PendingClusterBlockBuffer
 }
 
 // WithEngine initializes the dependencies for a test case, then runs the test
@@ -65,8 +66,9 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	ctx.headers = new(storage.Headers)
 	ctx.builder = new(module.Builder)
 	ctx.finalizer = new(module.Finalizer)
+	ctx.cache = new(module.PendingClusterBlockBuffer)
 
-	eng, err := New(log, ctx.net, ctx.me, ctx.state, tracer, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees, ctx.headers)
+	eng, err := New(log, ctx.net, ctx.me, ctx.state, tracer, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees, ctx.headers, ctx.cache)
 	require.NoError(t, err)
 
 	cold, err := coldstuff.New(log, ctx.state, ctx.me, eng, ctx.builder, ctx.finalizer, time.Second, time.Second)
