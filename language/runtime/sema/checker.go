@@ -1353,9 +1353,9 @@ func (checker *Checker) checkAccessResourceLoss(expressionType Type, expression 
 // in non resource composites (concrete or interface)
 //
 func (checker *Checker) checkResourceFieldNesting(
-	fields map[string]*ast.FieldDeclaration,
 	members map[string]*Member,
 	compositeKind common.CompositeKind,
+	fieldPositionGetter func(name string) ast.Position,
 ) {
 	// Resource fields are only allowed in resources and contracts
 
@@ -1378,13 +1378,13 @@ func (checker *Checker) checkResourceFieldNesting(
 			continue
 		}
 
-		field := fields[name]
+		pos := fieldPositionGetter(name)
 
 		checker.report(
 			&InvalidResourceFieldError{
 				Name:          name,
 				CompositeKind: compositeKind,
-				Pos:           field.Identifier.Pos,
+				Pos:           pos,
 			},
 		)
 	}
