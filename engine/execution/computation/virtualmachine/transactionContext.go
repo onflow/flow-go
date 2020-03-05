@@ -77,7 +77,7 @@ func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 
 	accountID := accountAddress[:]
 
-	r.ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
+	r.ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(5).Bytes())
 
 	err := r.setAccountPublicKeys(accountID, publicKeys)
 	if err != nil {
