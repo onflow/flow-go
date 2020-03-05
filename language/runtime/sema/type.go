@@ -136,7 +136,11 @@ func (a *TypeAnnotation) TypeAnnotationState() TypeAnnotationState {
 
 func (a *TypeAnnotation) String() string {
 	if a.IsResource {
-		return fmt.Sprintf("<-%s", a.Type)
+		return fmt.Sprintf(
+			"%s%s",
+			common.CompositeKindResource.Annotation(),
+			a.Type,
+		)
 	} else {
 		return fmt.Sprint(a.Type)
 	}
@@ -145,7 +149,11 @@ func (a *TypeAnnotation) String() string {
 func (a *TypeAnnotation) QualifiedString() string {
 	qualifiedString := a.Type.QualifiedString()
 	if a.IsResource {
-		return fmt.Sprintf("<-%s", qualifiedString)
+		return fmt.Sprintf(
+			"%s%s",
+			common.CompositeKindResource.Annotation(),
+			qualifiedString,
+		)
 	} else {
 		return fmt.Sprint(qualifiedString)
 	}
