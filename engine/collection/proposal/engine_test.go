@@ -17,8 +17,8 @@ import (
 	module "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -30,7 +30,8 @@ type Suite struct {
 	snapshot     *protocol.Snapshot
 	mutator      *protocol.Mutator
 	me           *module.Local
-	net          *stub.Network
+	net          *module.Network
+	con          *network.Conduit
 	provider     *network.Engine
 	pool         *mempool.Transactions
 	transactions *storage.Transactions
@@ -61,8 +62,9 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(flow.Identifier{})
 
-	hub := stub.NewNetworkHub()
-	suite.net = stub.NewNetwork(suite.state, suite.me, hub)
+	suite.net = new(module.Network)
+	suite.con = new(network.Conduit)
+	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
 
 	suite.provider = new(network.Engine)
 	suite.pool = new(mempool.Transactions)
@@ -112,11 +114,93 @@ func (suite *Suite) TestHandleProposal() {
 	suite.coldstuff.AssertExpectations(suite.T())
 }
 
-func (suite *Suite) TestHandleProposalWithUnknownTransactions() {}
+func (suite *Suite) TestHandleProposalWithUnknownTransactions() {
+	originID := unittest.IdentifierFixture()
+	parent := unittest.ClusterBlockFixture()
+	block := unittest.ClusterBlockWithParent(&parent)
 
-func (suite *Suite) TestHandlePendingProposal() {}
+	proposal := &messages.ClusterBlockProposal{
+		Header:  &block.Header,
+		Payload: &block.Payload,
+	}
 
-func (suite *Suite) TestHandleProposalWithPendingChildren() {}
+	// we have already received and stored the parent
+	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
+	// we are missing some transactions
+	suite.pool.On("Has", mock.Anything).Return(false)
+	// TODO assert that the missing transaction(s) is requested
+
+	err := suite.eng.Process(originID, proposal)
+	suite.Assert().Error(err)
+
+	// should not store block
+	suite.headers.AssertNotCalled(suite.T(), "Store", mock.Anything)
+	suite.payloads.AssertNotCalled(suite.T(), "Store", mock.Anything, mock.Anything)
+	// proposal should not have been submitted to consensus algo
+	suite.coldstuff.AssertNotCalled(suite.T(), "SubmitProposal", mock.Anything, mock.Anything)
+}
+
+func (suite *Suite) TestHandlePendingProposal() {
+	originID := unittest.IdentifierFixture()
+	block := unittest.ClusterBlockFixture()
+
+	proposal := &messages.ClusterBlockProposal{
+		Header:  &block.Header,
+		Payload: &block.Payload,
+	}
+
+	// we do not have the parent yet
+	suite.headers.On("ByBlockID", block.ParentID).Return(nil, realstorage.ErrNotFound)
+	// should request parent block
+	suite.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once()
+
+	err := suite.eng.Process(originID, proposal)
+	suite.Assert().Nil(err)
+
+	// proposal should not have been submitted to consensus algo
+	suite.coldstuff.AssertNotCalled(suite.T(), "SubmitProposal")
+	// parent block should be requested
+	suite.con.AssertExpectations(suite.T())
+}
+
+// TODO needs changes from https://github.com/dapperlabs/flow-go/pull/2742 to
+// effectively mock cached children
+func (suite *Suite) TestHandleProposalWithPendingChildren() {
+	originID := unittest.IdentifierFixture()
+	parent := unittest.ClusterBlockFixture()
+	block := unittest.ClusterBlockWithParent(&parent)
+	child := unittest.ClusterBlockWithParent(&block)
+
+	proposal := &messages.ClusterBlockProposal{
+		Header:  &block.Header,
+		Payload: &block.Payload,
+	}
+	tx := unittest.TransactionFixture()
+
+	// we have already received and stored the parent
+	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
+	// we have all transactions
+	suite.pool.On("Has", mock.Anything).Return(true)
+	// should store transactions
+	suite.pool.On("ByID", mock.Anything).Return(&tx, nil)
+	suite.transactions.On("Store", mock.Anything).Return(nil)
+	// should store payload and header
+	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Once()
+	suite.headers.On("Store", mock.Anything).Return(nil).Once()
+	// should extend state with new block
+	suite.mutator.On("Extend", block.ID()).Return(nil).Once()
+	// should submit to consensus algo
+	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.View).Once()
+
+	// TODO mock getting child from cache
+	_ = child
+
+	err := suite.eng.Process(originID, proposal)
+	suite.Assert().Nil(err)
+
+	// assert that the proposal was submitted to consensus algo
+	suite.coldstuff.AssertExpectations(suite.T())
+}
 
 func (suite *Suite) TestReceiveVote() {
 
@@ -132,4 +216,6 @@ func (suite *Suite) TestReceiveVote() {
 
 	err := suite.eng.Process(originID, vote)
 	suite.Assert().Nil(err)
+
+	suite.coldstuff.AssertExpectations(suite.T())
 }
