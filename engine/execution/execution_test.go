@@ -142,7 +142,6 @@ func TestExecutionFlow(t *testing.T) {
 
 func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
-	hub.EnableSyncDelivery()
 
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	con1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -190,7 +189,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	consensusEngine := new(network.Engine)
 	_, _ = consensus1Node.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
 	_, _ = consensus2Node.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
-	consensusEngine.On("Process", exeID.NodeID, mock.Anything).
+	consensusEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) { actualCalls++ }).
 		Return(nil)
 
@@ -199,10 +198,12 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	// exeNode.IngestionEngine.Submit(con2ID.NodeID, block3)
 	// exeNode.IngestionEngine.Submit(con2ID.NodeID, fork)
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, block2)
-	eventuallyEqual(t, 2, &actualCalls)
+	hub.Eventually(t, equal(2, &actualCalls))
+	//eventuallyEqual(t, 2, &actualCalls)
 
 	exeNode.IngestionEngine.Submit(con2ID.NodeID, block3)
-	eventuallyEqual(t, 4, &actualCalls)
+	//eventuallyEqual(t, 4, &actualCalls)
+	hub.Eventually(t, equal(4, &actualCalls))
 
 	var res flow.Identifier
 	err := exeNode.BadgerDB.View(operation.RetrieveNumber(2, &res))
@@ -218,7 +219,6 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 
 func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
-	hub.EnableSyncDelivery()
 
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
@@ -249,7 +249,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	verificationEngine := new(network.Engine)
 	_, _ = verification1Node.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
 	_, _ = verification2Node.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
-	verificationEngine.On("Process", exeID.NodeID, mock.Anything).
+	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			actualCalls++
 
@@ -261,11 +261,13 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	exeNode.IngestionEngine.SubmitLocal(block)
 
-	eventuallyEqual(t, 2, &actualCalls)
+	hub.Eventually(t, equal(2, &actualCalls))
 
 	verificationEngine.AssertExpectations(t)
 }
 
-func eventuallyEqual(t *testing.T, expected int, actual *int) {
-	require.Eventually(t, func() bool { return expected == *actual }, time.Second*30, time.Millisecond*500)
+func equal(expected int, actual *int) func() bool {
+	return func() bool {
+		return expected == *actual
+	}
 }
