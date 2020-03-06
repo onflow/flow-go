@@ -75,7 +75,7 @@ func New(
 		return nil, fmt.Errorf("could not register engine on execution state provider channel: %w", err)
 	}
 
-	_, err = net.Register(engine.ReceiptProvider, e)
+	_, err = net.Register(engine.ExecutionReceiptProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on execution receipt provider channel: %w", err)
 	}

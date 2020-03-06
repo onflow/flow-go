@@ -36,6 +36,17 @@ func (id Identifier) String() string {
 	return hex.EncodeToString(id[:])
 }
 
+// Format handles formatting of id for different verbs. This is called when
+// formatting an identifier with fmt.
+func (id Identifier) Format(state fmt.State, verb rune) {
+	switch verb {
+	case 'x', 's', 'v':
+		_, _ = state.Write([]byte(id.String()))
+	default:
+		_, _ = state.Write([]byte(fmt.Sprintf("%%!%c(%s=%s)", verb, reflect.TypeOf(id), id)))
+	}
+}
+
 func HashToID(hash []byte) Identifier {
 	var id Identifier
 	copy(id[:], hash)

@@ -12,46 +12,52 @@ import (
 
 type CheckerFunc func([]byte, runtime.Location) error
 
-type transactionContext struct {
-	ledger          Ledger
-	signingAccounts []runtime.Address
-	checker         CheckerFunc
-	logs            []string
-	events          []runtime.Event
+type TransactionContext struct {
+	ledger            Ledger
+	signingAccounts   []runtime.Address
+	checker           CheckerFunc
+	logs              []string
+	events            []runtime.Event
+	OnSetValueHandler func(owner, controller, key, value []byte)
 }
+
+type TransactionContextOption func(*TransactionContext)
 
 // GetSigningAccounts gets the signing accounts for this context.
 //
 // Signing accounts are the accounts that signed the transaction executing
 // inside this context.
-func (r *transactionContext) GetSigningAccounts() []runtime.Address {
+func (r *TransactionContext) GetSigningAccounts() []runtime.Address {
 	return r.signingAccounts
 }
 
 // SetChecker sets the semantic checker function for this context.
-func (r *transactionContext) SetChecker(checker CheckerFunc) {
+func (r *TransactionContext) SetChecker(checker CheckerFunc) {
 	r.checker = checker
 }
 
 // Events returns all events emitted by the runtime to this context.
-func (r *transactionContext) Events() []runtime.Event {
+func (r *TransactionContext) Events() []runtime.Event {
 	return r.events
 }
 
 // Logs returns all logs emitted by the runtime to this context.
-func (r *transactionContext) Logs() []string {
+func (r *TransactionContext) Logs() []string {
 	return r.logs
 }
 
 // GetValue gets a register value from the world state.
-func (r *transactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
+func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
 	v, _ := r.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
-func (r *transactionContext) SetValue(owner, controller, key, value []byte) error {
+func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
 	r.ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
+	if r.OnSetValueHandler != nil {
+		r.OnSetValueHandler(owner, controller, key, value)
+	}
 	return nil
 }
 
@@ -61,7 +67,7 @@ func (r *transactionContext) SetValue(owner, controller, key, value []byte) erro
 //
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
-func (r *transactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address, error) {
+func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address, error) {
 	latestAccountID, _ := r.ledger.Get(fullKeyHash("", "", keyLatestAccount))
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
@@ -90,7 +96,7 @@ func (r *transactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 //
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
-func (r *transactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
+func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	accountID := address[:]
 
 	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
@@ -115,7 +121,7 @@ func (r *transactionContext) AddAccountKey(address runtime.Address, publicKey []
 //
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
-func (r *transactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	accountID := address[:]
 
 	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
@@ -147,7 +153,7 @@ func (r *transactionContext) RemoveAccountKey(address runtime.Address, index int
 	return removedKey, nil
 }
 
-func (r *transactionContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, err error) {
+func (r *TransactionContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, err error) {
 	countBytes, err := r.ledger.Get(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 	)
@@ -181,7 +187,7 @@ func (r *transactionContext) getAccountPublicKeys(accountID []byte) (publicKeys 
 	return publicKeys, nil
 }
 
-func (r *transactionContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte) error {
+func (r *TransactionContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte) error {
 	var existingCount int
 
 	countBytes, err := r.ledger.Get(
@@ -220,7 +226,7 @@ func (r *transactionContext) setAccountPublicKeys(accountID []byte, publicKeys [
 }
 
 // CheckCode checks the code for its validity.
-func (r *transactionContext) CheckCode(address runtime.Address, code []byte) (err error) {
+func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (err error) {
 	return r.checkProgram(code, address)
 }
 
@@ -228,7 +234,7 @@ func (r *transactionContext) CheckCode(address runtime.Address, code []byte) (er
 //
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
-func (r *transactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
+func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
 	accountID := address[:]
 
 	if checkPermission && !r.isValidSigningAccount(address) {
@@ -252,7 +258,7 @@ func (r *transactionContext) UpdateAccountCode(address runtime.Address, code []b
 //
 // This function returns an error if the import location is not an account address,
 // or if there is no code deployed at the specified address.
-func (r *transactionContext) ResolveImport(location runtime.Location) ([]byte, error) {
+func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, error) {
 	addressLocation, ok := location.(runtime.AddressLocation)
 	if !ok {
 		return nil, fmt.Errorf("import location must be an account address")
@@ -275,16 +281,16 @@ func (r *transactionContext) ResolveImport(location runtime.Location) ([]byte, e
 }
 
 // Log captures a log message from the runtime.
-func (r *transactionContext) Log(message string) {
+func (r *TransactionContext) Log(message string) {
 	r.logs = append(r.logs, message)
 }
 
 // EmitEvent is called when an event is emitted by the runtime.
-func (r *transactionContext) EmitEvent(event runtime.Event) {
+func (r *TransactionContext) EmitEvent(event runtime.Event) {
 	r.events = append(r.events, event)
 }
 
-func (r *transactionContext) isValidSigningAccount(address runtime.Address) bool {
+func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
 	for _, accountAddress := range r.GetSigningAccounts() {
 		if accountAddress == address {
 			return true
@@ -295,7 +301,7 @@ func (r *transactionContext) isValidSigningAccount(address runtime.Address) bool
 }
 
 // checkProgram checks the given code for syntactic and semantic correctness.
-func (r *transactionContext) checkProgram(code []byte, address runtime.Address) error {
+func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) error {
 	if code == nil {
 		return nil
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -32,56 +33,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 			return fmt.Errorf("genesis identities not valid: %w", err)
 		}
 
-		// insert the block payload
-		err = procedure.InsertPayload(&genesis.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis payload: %w", err)
-		}
-
-		// apply the stake deltas
-		err = procedure.ApplyDeltas(genesis.View, genesis.Identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not apply stake deltas: %w", err)
-		}
-
-		// get first seal
-		seal := genesis.Seals[0]
-
-		// index the block seal
-		err = operation.IndexSealIDByBlock(genesis.ID(), seal.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index seal by block: %w", err)
-		}
-
-		// insert the genesis block
-		err = procedure.InsertBlock(genesis)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis block: %w", err)
-		}
-
-		// insert result
-		err = operation.InsertResult(&flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,
-			BlockID:          genesis.ID(),
-			FinalStateCommit: seal.FinalState,
-		}})(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis result: %w", err)
-		}
-
-		// insert the block number mapping
-		err = operation.InsertNumber(0, genesis.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not initialize boundary: %w", err)
-		}
-
-		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.View)(tx)
-		if err != nil {
-			return fmt.Errorf("could not update boundary: %w", err)
-		}
-
-		return nil
+		return procedure.Bootstrap(genesis)(tx)
 	})
 }
 
@@ -109,7 +61,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		}
 
 		// check the payload validity
-		err = checkExtendPayload(&block.Payload)
+		err = checkExtendPayload(tx, &block)
 		if err != nil {
 			return fmt.Errorf("extend payload not valid: %w", err)
 		}
@@ -219,8 +171,8 @@ func checkGenesisHeader(header *flow.Header) error {
 	}
 
 	// the initial finalized boundary needs to be height zero
-	if header.View != 0 {
-		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.View)
+	if header.Height != 0 {
+		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.Height)
 	}
 
 	// the parent must be zero hash
@@ -357,7 +309,7 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 
 		// if its number is below current boundary, the block does not connect
 		// to the finalized protocol state and would break database consistency
-		if currentHeader.View < boundary {
+		if currentHeader.Height < boundary {
 			return fmt.Errorf("block doesn't connect to finalized state")
 		}
 
@@ -366,11 +318,33 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	return nil
 }
 
-func checkExtendPayload(payload *flow.Payload) error {
+func checkExtendPayload(tx *badger.Txn, block *flow.Block) error {
 
 	// currently we don't support identities except for genesis block
-	if len(payload.Identities) > 0 {
+	if len(block.Payload.Identities) > 0 {
 		return fmt.Errorf("extend block has identities")
+	}
+
+	// we check contents for duplicates from the parent height and ID
+	height := block.Header.Height - 1
+	blockID := block.Header.ParentID
+
+	// check we have no duplicate guarantees
+	err := operation.VerifyGuaranteePayload(height, blockID, flow.GetIDs(block.Payload.Guarantees))(tx)
+	if errors.Is(err, storage.ErrAlreadyIndexed) {
+		return fmt.Errorf("found duplicate guarantee in payload: %w", err)
+	}
+	if err != nil {
+		return fmt.Errorf("could not verify guarantee payload: %w", err)
+	}
+
+	// check we have no duplicate block seals
+	err = operation.VerifySealPayload(height, blockID, flow.GetIDs(block.Payload.Seals))(tx)
+	if errors.Is(err, storage.ErrAlreadyIndexed) {
+		return fmt.Errorf("found duplicate seal in payload: %w", err)
+	}
+	if err != nil {
+		return fmt.Errorf("could not verify seal payload: %w", err)
 	}
 
 	return nil

@@ -675,7 +675,7 @@ func uint128(v string) UInt128Value {
 	if res.Cmp(sema.UInt128TypeMaxInt) > 0 {
 		panic(fmt.Sprintf("invalid value: larger than max: %s", v))
 	}
-	return UInt128Value{int: res}
+	return UInt128Value{Int: res}
 }
 
 func TestPlusUInt128(t *testing.T) {
@@ -801,7 +801,7 @@ func uint256(v string) UInt256Value {
 	if res.Cmp(sema.UInt256TypeMaxInt) > 0 {
 		panic(fmt.Sprintf("invalid value: larger than max: %s", v))
 	}
-	return UInt256Value{int: res}
+	return UInt256Value{Int: res}
 }
 
 func TestPlusUInt256(t *testing.T) {
@@ -1932,7 +1932,7 @@ func int128(v string) Int128Value {
 	if res.Cmp(sema.Int128TypeMaxInt) > 0 {
 		panic(fmt.Sprintf("invalid value: larger than max: %s", v))
 	}
-	return Int128Value{int: res}
+	return Int128Value{Int: res}
 }
 
 func TestPlusInt128(t *testing.T) {
@@ -2057,7 +2057,7 @@ func int256(v string) Int256Value {
 	if res.Cmp(sema.Int256TypeMaxInt) > 0 {
 		panic(fmt.Sprintf("invalid value: larger than max: %s", v))
 	}
-	return Int256Value{int: res}
+	return Int256Value{Int: res}
 }
 
 func TestPlusInt256(t *testing.T) {

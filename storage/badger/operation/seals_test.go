@@ -40,26 +40,27 @@ func TestSealIndexAndLookup(t *testing.T) {
 
 		seals := []*flow.Seal{&seal1, &seal2}
 
-		payload := flow.MakeID([]byte{0x42})
+		height := uint64(1337)
+		blockID := flow.MakeID([]byte{0x42})
+		parentID := flow.MakeID([]byte{0x99})
 
-		expected := make([]flow.Identifier, len(seals))
+		expected := flow.GetIDs(seals)
 
 		err := db.Update(func(tx *badger.Txn) error {
-			for i, seal := range seals {
-				expected[i] = seal.ID()
+			for _, seal := range seals {
 				if err := InsertSeal(seal)(tx); err != nil {
 					return err
 				}
-				if err := IndexSeal(payload, uint64(i), seal.ID())(tx); err != nil {
-					return err
-				}
+			}
+			if err := IndexSealPayload(height, blockID, parentID, expected)(tx); err != nil {
+				return err
 			}
 			return nil
 		})
 		require.Nil(t, err)
 
 		var actual []flow.Identifier
-		err = db.View(LookupSeals(payload, &actual))
+		err = db.View(LookupSealPayload(height, blockID, parentID, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)

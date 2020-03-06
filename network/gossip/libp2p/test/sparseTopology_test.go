@@ -38,6 +38,7 @@ func TestSparseTopologyTestSuite(t *testing.T) {
 // 0,1,2,3 <-> 3,4,5,6 <-> 6,7,8,9
 // Message sent by a node from one subset should be able to make it to nodes all subsets
 func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetwork() {
+	stt.T().Skip()
 
 	// total number of nodes in the network
 	const count = 9
@@ -85,6 +86,7 @@ func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetwork() {
 // each node does have the ip addresses of all other nodes and could just disregard topology all together and connect
 // to every other node directly making the TestSparselyConnectedNetwork test meaningless
 func (stt *SparseTopologyTestSuite) TestDisjointedNetwork() {
+	stt.T().Skip()
 	// total number of nodes in the network
 	const count = 9
 	// total number of subnets (should be less than count)
@@ -110,7 +112,8 @@ func (stt *SparseTopologyTestSuite) TestDisjointedNetwork() {
 	}
 
 	// wait for nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	// this is a sparse network so it may need a at least 3 seconds (1 for each subnet)
+	time.Sleep(4 * time.Second)
 
 	// node 0 broadcasting a message to ALL targets
 	event := &message.Echo{

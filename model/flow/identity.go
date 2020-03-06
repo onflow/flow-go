@@ -15,13 +15,13 @@ var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|obs
 
 // Identity represents a node identity.
 type Identity struct {
-	NodeID        Identifier
-	Address       string
-	Role          Role
-	Stake         uint64
-	StakingPubKey crypto.PublicKey
-	// TODO add this to constructor
+	NodeID             Identifier
+	Address            string
+	Role               Role
+	Stake              uint64
+	StakingPubKey      crypto.PublicKey
 	RandomBeaconPubKey crypto.PublicKey
+	NetworkPubKey      crypto.PublicKey
 }
 
 // ParseIdentity parses a string representation of an identity.

@@ -81,7 +81,8 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.NodeID, "nodeid", notSet, "identity of our node")
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
-	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e", []string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
+	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e",
+		[]string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
@@ -98,7 +99,10 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID())
 		fnb.MustNot(err).Msg("could not initialize flow middleware")
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
+		ids, err := fnb.State.Final().Identities()
+		fnb.MustNot(err).Msg("could not retrieve state identities")
+
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
 		fnb.MustNot(err).Msg("could not initialize flow network")
 		fnb.Network = net
 		return net

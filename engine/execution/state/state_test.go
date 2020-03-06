@@ -34,7 +34,9 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 			chunkHeaders := new(storage.ChunkHeaders)
 
-			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders)
+			executionResults := new(storage.ExecutionResults)
+
+			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders, executionResults)
 
 			f(t, es)
 		})
@@ -42,6 +44,12 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 }
 
 func TestExecutionStateWithTrieStorage(t *testing.T) {
+	registerID1 := make([]byte, 32)
+	copy(registerID1, "fruit")
+
+	registerID2 := make([]byte, 32)
+	copy(registerID2, "vegetable")
+
 	t.Run("commit write and read new state", prepareTest(func(t *testing.T, es state.ExecutionState) {
 		// TODO: use real block ID
 		sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
@@ -49,17 +57,17 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1 := es.NewView(sc1)
 
-		view1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
-		view1.Set(flow.RegisterID("vegetable"), flow.RegisterValue("carrot"))
+		view1.Set(registerID1, flow.RegisterValue("apple"))
+		view1.Set(registerID2, flow.RegisterValue("carrot"))
 
 		sc2, err := es.CommitDelta(view1.Delta())
 		assert.NoError(t, err)
 
 		view2 := es.NewView(sc2)
 
-		b1, err := view2.Get(flow.RegisterID("fruit"))
+		b1, err := view2.Get(registerID1)
 		assert.NoError(t, err)
-		b2, err := view2.Get(flow.RegisterID("vegetable"))
+		b2, err := view2.Get(registerID2)
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -73,14 +81,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1 := es.NewView(sc1)
 
-		view1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		view1.Set(registerID1, flow.RegisterValue("apple"))
 
 		sc2, err := es.CommitDelta(view1.Delta())
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
-		view2.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
+		view2.Set(registerID1, flow.RegisterValue("orange"))
 
 		sc3, err := es.CommitDelta(view2.Delta())
 		assert.NoError(t, err)
@@ -92,10 +100,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view4 := es.NewView(sc3)
 
 		// fetch the value at both versions
-		b1, err := view3.Get(flow.RegisterID("fruit"))
+		b1, err := view3.Get(registerID1)
 		assert.NoError(t, err)
 
-		b2, err := view4.Get(flow.RegisterID("fruit"))
+		b2, err := view4.Get(registerID1)
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -109,14 +117,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// set initial value
 		view1 := es.NewView(sc1)
-		view1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		view1.Set(registerID1, flow.RegisterValue("apple"))
 
 		sc2, err := es.CommitDelta(view1.Delta())
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
-		view2.Delete(flow.RegisterID("fruit"))
+		view2.Delete(registerID1)
 
 		sc3, err := es.CommitDelta(view2.Delta())
 		assert.NoError(t, err)
@@ -128,10 +136,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view4 := es.NewView(sc3)
 
 		// fetch the value at both versions
-		b1, err := view3.Get(flow.RegisterID("fruit"))
+		b1, err := view3.Get(registerID1)
 		assert.NoError(t, err)
 
-		b2, err := view4.Get(flow.RegisterID("fruit"))
+		b2, err := view4.Get(registerID1)
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -144,22 +152,29 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
+		er := new(storage.ExecutionResults)
 
 		chunkID := unittest.IdentifierFixture()
 
 		ch.On("ByID", chunkID).Return(nil, fmt.Errorf("storage error"))
 
-		es := state.NewExecutionState(ls, sc, ch)
+		es := state.NewExecutionState(ls, sc, ch, er)
 
 		ledger, err := es.GetChunkRegisters(chunkID)
 		assert.Nil(t, ledger)
 		assert.Error(t, err)
+
+		ch.AssertExpectations(t)
+		ls.AssertExpectations(t)
+		sc.AssertExpectations(t)
+		er.AssertExpectations(t)
 	})
 
 	t.Run("ledger storage error", func(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
+		er := new(storage.ExecutionResults)
 
 		chunkHeader := unittest.ChunkHeaderFixture()
 		chunkID := chunkHeader.ChunkID
@@ -170,7 +185,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).
 			Return(nil, fmt.Errorf("storage error"))
 
-		es := state.NewExecutionState(ls, sc, ch)
+		es := state.NewExecutionState(ls, sc, ch, er)
 
 		registers, err := es.GetChunkRegisters(chunkID)
 		assert.Error(t, err)
@@ -178,12 +193,15 @@ func TestState_GetChunkRegisters(t *testing.T) {
 
 		ch.AssertExpectations(t)
 		ls.AssertExpectations(t)
+		sc.AssertExpectations(t)
+		er.AssertExpectations(t)
 	})
 
 	t.Run("existing chunk", func(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
+		er := new(storage.ExecutionResults)
 
 		chunkHeader := unittest.ChunkHeaderFixture()
 		chunkID := chunkHeader.ChunkID
@@ -194,7 +212,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ch.On("ByID", chunkID).Return(&chunkHeader, nil)
 		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).Return(registerValues, nil)
 
-		es := state.NewExecutionState(ls, sc, ch)
+		es := state.NewExecutionState(ls, sc, ch, er)
 
 		actualRegisters, err := es.GetChunkRegisters(chunkID)
 		assert.NoError(t, err)
@@ -209,5 +227,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 
 		ch.AssertExpectations(t)
 		ls.AssertExpectations(t)
+		sc.AssertExpectations(t)
+		er.AssertExpectations(t)
 	})
 }
