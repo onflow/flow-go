@@ -47,9 +47,19 @@ func HashLeaf(key []byte, value []byte) []byte {
 	// this is necessary for the future expansion of key size
 	keysize := make([]byte, 4)
 	binary.LittleEndian.PutUint32(keysize, uint32(len(key)))
-	hasher.Write(keysize)
-	hasher.Write(key)
-	hasher.Write(value)
+	_, err := hasher.Write(keysize)
+	if err != nil {
+		panic(err)
+	}
+	_, err = hasher.Write(key)
+	if err != nil {
+		panic(err)
+	}
+	_, err = hasher.Write(value)
+	if err != nil {
+		panic(err)
+	}
+
 	return hasher.SumHash()
 }
 
