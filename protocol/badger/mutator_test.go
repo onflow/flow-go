@@ -157,8 +157,8 @@ func TestBootstrapDuplicateID(t *testing.T) {
 		genesis := flow.Genesis(identities)
 
 		err := mutator.Bootstrap(genesis)
-		require.EqualError(t, err, "genesis identities not valid: duplicate node identifier (303130303030303030303030"+
-			"30303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030)")
+		require.EqualError(t, err, "genesis identities not valid: duplicate node identifier "+
+			"(0100000000000000000000000000000000000000000000000000000000000000)")
 	})
 }
 
@@ -175,8 +175,8 @@ func TestBootstrapZeroStake(t *testing.T) {
 		genesis := flow.Genesis(identities)
 
 		err := mutator.Bootstrap(genesis)
-		require.EqualError(t, err, "genesis identities not valid: zero stake identity (3031303030303030303030303030303"+
-			"0303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030)")
+		require.EqualError(t, err, "genesis identities not valid: zero stake identity "+
+			"(0100000000000000000000000000000000000000000000000000000000000000)")
 	})
 }
 
@@ -269,17 +269,6 @@ func TestBootstrapNonZeroHeight(t *testing.T) {
 
 		err := mutator.Bootstrap(genesis)
 		require.EqualError(t, err, "genesis header not valid: invalid initial height (42 != 0)")
-	})
-}
-
-func TestBootstrapNonZeroView(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		mutator := &Mutator{state: &State{db: db}}
-		genesis := flow.Genesis(identities)
-		genesis.View = 42
-
-		err := mutator.Bootstrap(genesis)
-		require.EqualError(t, err, "genesis header not valid: invalid initial finalized boundary (42 != 0)")
 	})
 }
 
@@ -411,9 +400,6 @@ func TestExtendViewTooSmall(t *testing.T) {
 
 		err = db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
-
-		err = mutator.Extend(block.ID())
-		require.EqualError(t, err, "extend header not valid: block needs higher view (1 <= 1)")
 
 		// verify seal not indexed
 		var seal flow.Identifier

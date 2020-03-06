@@ -135,8 +135,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		// while tracing back until we reach the finalized state
 		headers := []*flow.Header{&header}
 
-		//create a copy to avoid modifying content of header which is referenced in an array
-		// TODO this is not a deep copy, slices are still pointing to same underlying arrays as `header`
+		// create a copy of header for the loop to not change the header the slice above points to
 		loopHeader := header
 		for loopHeader.ParentID != headID {
 			var retrievedHeader flow.Header
@@ -168,11 +167,6 @@ func checkGenesisHeader(header *flow.Header) error {
 	// the initial height needs to be height zero
 	if header.Height != 0 {
 		return fmt.Errorf("invalid initial height (%d != 0)", header.Height)
-	}
-
-	// the initial finalized boundary needs to be height zero
-	if header.Height != 0 {
-		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.Height)
 	}
 
 	// the parent must be zero hash
@@ -228,23 +222,23 @@ func checkGenesisPayload(tx *badger.Txn, payload *flow.Payload) error {
 	}
 
 	// check that we don't have duplicate identity entries
-	lookup := make(map[flow.Identifier]struct{})
+	identLookup := make(map[flow.Identifier]struct{})
 	for _, identity := range payload.Identities {
-		_, ok := lookup[identity.NodeID]
+		_, ok := identLookup[identity.NodeID]
 		if ok {
 			return fmt.Errorf("duplicate node identifier (%x)", identity.NodeID)
 		}
-		lookup[identity.NodeID] = struct{}{}
+		identLookup[identity.NodeID] = struct{}{}
 	}
 
 	// check identities do not have duplicate addresses
-	lookup2 := make(map[string]struct{})
+	addrLookup := make(map[string]struct{})
 	for _, identity := range payload.Identities {
-		_, ok := lookup2[identity.Address]
+		_, ok := addrLookup[identity.Address]
 		if ok {
 			return fmt.Errorf("duplicate node address (%x)", identity.Address)
 		}
-		lookup2[identity.Address] = struct{}{}
+		addrLookup[identity.Address] = struct{}{}
 	}
 
 	// for each identity, check it has a non-zero stake
@@ -278,11 +272,6 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	err = operation.RetrieveHeader(header.ParentID, &parent)(tx)
 	if err != nil {
 		return fmt.Errorf("could not retrieve header: %w", err)
-	}
-
-	// if new block number has a lower number, we can't add it
-	if header.View <= parent.View {
-		return fmt.Errorf("block needs higher view (%d <= %d)", header.View, parent.View)
 	}
 
 	// if new block number has a lower number, we can't add it
