@@ -123,7 +123,7 @@ func TestInteriorNodeLNil(t *testing.T) {
 		t.Errorf("Interior node has value %b and height %d, should have value %b and height %d", res.value, res.height, exp.value, res.height)
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -148,7 +148,7 @@ func TestInteriorNodeRNil(t *testing.T) {
 		t.Errorf("Interior node has value %b and height %d, should have value %b and height %d", res.value, res.height, exp.value, res.height)
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -328,7 +328,7 @@ func TestUpdateAtomicallySingleValUpdateAndRead(t *testing.T) {
 		t.Fatalf("Trie Read failed")
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -493,7 +493,7 @@ func TestFailedRead(t *testing.T) {
 		t.Fatalf("Read an non-existant value without an error")
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -1052,7 +1052,7 @@ func TestNonInclusionProof_EmptyTree(t *testing.T) {
 		t.Errorf("not producing expected root for tree!")
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}

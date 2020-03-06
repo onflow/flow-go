@@ -514,20 +514,20 @@ func testConcurrency(t *testing.T, erCount, senderCount int) {
 				case 0:
 					// block then receipt
 					sendBlock()
-					verNet.DeliverAllRecursive()
+					verNet.DeliverAll(true)
 					// allow another goroutine to run before sending receipt
 					time.Sleep(time.Nanosecond)
 					sendReceipt()
 				case 1:
 					// receipt then block
 					sendReceipt()
-					verNet.DeliverAllRecursive()
+					verNet.DeliverAll(true)
 					// allow another goroutine to run before sending block
 					time.Sleep(time.Nanosecond)
 					sendBlock()
 				}
 
-				verNet.DeliverAllRecursive()
+				verNet.DeliverAll(true)
 				go senderWG.Done()
 			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.Block, completeER.Receipt)
 		}
@@ -535,9 +535,9 @@ func testConcurrency(t *testing.T, erCount, senderCount int) {
 
 	// wait for all ERs to be sent to VER
 	unittest.AssertReturnsBefore(t, senderWG.Wait, time.Second)
-	verNet.DeliverAllRecursive()
+	verNet.DeliverAll(false)
 	unittest.AssertReturnsBefore(t, verifierEngWG.Wait, time.Second)
-	verNet.DeliverAllRecursive()
+	verNet.DeliverAll(false)
 }
 
 // setupMockExeNode sets up a mocked execution node that responds to requests for
