@@ -127,28 +127,54 @@ func StateViewFixture() *state.View {
 func CompleteCollectionFixture() *execution.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &execution.CompleteCollection{
-		Guarantee:    CollectionGuaranteeFixture(),
+		Guarantee: &flow.CollectionGuarantee{
+			CollectionID: flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
+			Signatures:   SignaturesFixture(16),
+		},
 		Transactions: []*flow.TransactionBody{&txBody},
 	}
 }
 
-func CompleteBlockFixture() *execution.CompleteBlock {
+func CompleteBlockFixture(collections int) *execution.CompleteBlock {
 
-	cc1 := CompleteCollectionFixture()
-	cc2 := CompleteCollectionFixture()
-
+	completeCollections := make(map[flow.Identifier]*execution.CompleteCollection, collections)
 	block := BlockFixture()
+	block.Guarantees = nil
+
+	for i := 0; i < collections; i++ {
+		completeCollection := CompleteCollectionFixture()
+		block.Guarantees = append(block.Guarantees, completeCollection.Guarantee)
+		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
+	}
+
+	block.PayloadHash = block.Payload.Hash()
+
 	return &execution.CompleteBlock{
 		Block:               &block,
-		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{cc1.Guarantee.CollectionID: cc1, cc2.Guarantee.CollectionID: cc2},
+		CompleteCollections: completeCollections,
 	}
 }
 
-func ComputationResultFixture() *execution.ComputationResult {
+func ComputationResultFixture(n int) *execution.ComputationResult {
+	stateViews := make([]*state.View, n)
+	for i := 0; i < n; i++ {
+		stateViews[i] = StateViewFixture()
+	}
 	return &execution.ComputationResult{
-		CompleteBlock: CompleteBlockFixture(),
-		StateViews:    []*state.View{StateViewFixture(), StateViewFixture()},
-		StartState:    StateCommitmentFixture(),
+		CompleteBlock: CompleteBlockFixture(n),
+		StateViews:    stateViews,
+	}
+}
+
+func ComputationResultForBlockFixture(completeBlock *execution.CompleteBlock) *execution.ComputationResult {
+	n := len(completeBlock.CompleteCollections)
+	stateViews := make([]*state.View, n)
+	for i := 0; i < n; i++ {
+		stateViews[i] = StateViewFixture()
+	}
+	return &execution.ComputationResult{
+		CompleteBlock: completeBlock,
+		StateViews:    stateViews,
 	}
 }
 

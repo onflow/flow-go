@@ -69,7 +69,6 @@ type ExecutionNode struct {
 
 func (en ExecutionNode) Done() {
 	<-en.IngestionEngine.Done()
-	<-en.ExecutionEngine.Done()
 	<-en.ReceiptsEngine.Done()
 	en.BadgerDB.Close()
 	en.LevelDB.SafeClose()

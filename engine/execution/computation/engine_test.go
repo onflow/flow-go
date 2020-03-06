@@ -3,20 +3,19 @@ package computation
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gotest.tools/assert"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	computer "github.com/dapperlabs/flow-go/engine/execution/computation/computer/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
+func TestExecutionEngine_ComputeBlock(t *testing.T) {
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute {} }"),
 	}
@@ -53,59 +52,24 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		},
 	}
 
-	startState := unittest.StateCommitmentFixture()
+	computationResult := unittest.ComputationResultFixture(2)
 
-	t.Run("non-local engine", func(t *testing.T) {
-		me := new(module.Local)
-		me.On("NodeID").Return(flow.ZeroID)
+	me := new(module.Local)
+	me.On("NodeID").Return(flow.ZeroID)
 
-		e := Engine{me: me}
+	blockComputer := new(computer.BlockComputer)
+	blockComputer.On("ExecuteBlock", mock.Anything, mock.Anything, mock.Anything).Return(computationResult, nil)
 
-		view := state.NewView(func(key flow.RegisterID) (bytes []byte, e error) {
-			return nil, nil
-		})
+	engine := &Engine{
+		blockComputer: blockComputer,
+		me:            me,
+	}
 
-		// submit using origin ID that does not match node ID
-		err := e.onCompleteBlock(flow.Identifier{42}, completeBlock, view, startState)
-		assert.Error(t, err)
+	view := state.NewView(func(key flow.RegisterID) (bytes []byte, e error) {
+		return nil, nil
 	})
 
-	t.Run("success", func(t *testing.T) {
-		provider := new(network.Engine)
-		me := new(module.Local)
-		me.On("NodeID").Return(flow.ZeroID)
-
-		blockExecutor := new(computer.BlockComputer)
-
-		computationResult := unittest.ComputationResultFixture()
-
-		e := &Engine{
-			provider: provider,
-			executor: blockExecutor,
-			me:       me,
-		}
-
-		provider.On(
-			"SubmitLocal",
-			mock.Anything,
-			mock.Anything,
-		).
-			Run(func(args mock.Arguments) {
-				receipt := args[0].(*execution.ComputationResult)
-
-				assert.Equal(t, computationResult, receipt)
-			}).
-			Return(nil)
-
-		blockExecutor.On("ExecuteBlock", mock.Anything, mock.Anything, mock.Anything).Return(computationResult, nil)
-
-		view := state.NewView(func(key flow.RegisterID) (bytes []byte, e error) {
-			return nil, nil
-		})
-
-		err := e.onCompleteBlock(e.me.NodeID(), completeBlock, view, startState)
-		require.NoError(t, err)
-
-		provider.AssertExpectations(t)
-	})
+	returnedComputationResult, err := engine.ComputeBlock(completeBlock, view)
+	require.NoError(t, err)
+	assert.Equal(t, computationResult, returnedComputationResult)
 }
