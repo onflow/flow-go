@@ -1,6 +1,11 @@
 package stub
 
 import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -23,6 +28,13 @@ func (hub *Hub) DeliverAll() {
 		network.DeliverAll(false)
 	}
 
+}
+
+func (hub *Hub) Eventually(t *testing.T, condition func() bool) {
+	require.Eventually(t, func() bool {
+		hub.DeliverAll()
+		return condition()
+	}, time.Second*30, time.Millisecond*500)
 }
 
 // GetNetwork returns the Network by the network ID (or node ID)
