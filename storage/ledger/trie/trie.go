@@ -66,8 +66,14 @@ func HashLeaf(key []byte, value []byte) []byte {
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	hasher := crypto.NewSHA3_256()
-	hasher.Write(hash1)
-	hasher.Write(hash2)
+	_, err := hasher.Write(hash1)
+	if err != nil {
+		panic(err)
+	}
+	_, err = hasher.Write(hash2)
+	if err != nil {
+		panic(err)
+	}
 	return hasher.SumHash()
 }
 
