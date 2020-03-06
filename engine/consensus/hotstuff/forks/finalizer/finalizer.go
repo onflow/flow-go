@@ -246,6 +246,20 @@ func (r *Finalizer) getThreeChain(blockContainer *BlockContainer) (*ancestryChai
 // If the block's parent is below the pruned view, it will error with an ErrorPrunedAncestry.
 // UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
 func (r *Finalizer) getNextAncestryLevel(block *hotstuff.Block) (*forks.BlockQC, error) {
+	// The finalizer prunes all blocks in forest which are below the most recently finalized block.
+	// Hence, we have a pruned ancestry if and only if either of the following conditions applies:
+	//    (a) if a block's parent view (i.e. block.QC.View) is below the most recently finalized block.
+	//    (b) if a block's view is equal to the most recently finalized block.
+	// Caution:
+	// * Under normal operation, case (b) is covered by the logic for case (a)
+	// * However, the existence of a genesis block requires handling case (b) explicitly:
+	//   The root block is specified and trusted by the node operator. If the root block is the
+	//   genesis block, it might not contain a qc pointing to a parent (as there is no parent).
+	//   In this case, condition (a) cannot be evaluated.
+	if (block.View <= r.lastFinalized.Block.View) || (block.QC.View < r.lastFinalized.Block.View) {
+		return nil, ErrPrunedAncestry
+	}
+
 	if block.QC.View < r.lastFinalized.Block.View {
 		return nil, ErrPrunedAncestry
 	}
