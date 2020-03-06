@@ -2,6 +2,7 @@ package trie
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -40,13 +41,14 @@ type SMT struct {
 }
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
-// key, value headers are used to protect the system in case of increase
-// in key size
 func HashLeaf(key []byte, value []byte) []byte {
 	hasher := crypto.NewSHA3_256()
-	hasher.Write([]byte("key:"))
+	// len of key should be encoded as uint32
+	// this is necessary for the future expansion of key size
+	keysize := make([]byte, 4)
+	binary.LittleEndian.PutUint32(keysize, uint32(len(key)))
+	hasher.Write(keysize)
 	hasher.Write(key)
-	hasher.Write([]byte("value:"))
 	hasher.Write(value)
 	return hasher.SumHash()
 }
