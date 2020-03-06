@@ -2,7 +2,7 @@ package signature
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 // RandomBeaconAwareSigVerifier is an implementation of the SigVerifier interface with
@@ -15,7 +15,7 @@ type RandomBeaconAwareSigVerifier struct {
 
 func NewRandomBeaconAwareSigVerifier() hotstuff.SigVerifier {
 	return &RandomBeaconAwareSigVerifier{
-		StakingSigVerifier:      NewStakingSigVerifier(messages.ConsensusVoteTag),
+		StakingSigVerifier:      NewStakingSigVerifier(encoding.ConsensusVoteTag),
 		RandomBeaconSigVerifier: NewRandomBeaconSigVerifier(),
 	}
 }

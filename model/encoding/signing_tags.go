@@ -1,4 +1,4 @@
-package messages
+package encoding
 
 // List of string constants, aka 'tags' for signature typing
 // Each Protocol-level signature, essentially signs the hash of an entity. To prevent
