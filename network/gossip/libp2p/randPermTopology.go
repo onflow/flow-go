@@ -33,22 +33,13 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 	}
 	// step-2: computing hash of node's identifier
 	hash := hasher.ComputeHash([]byte(seed))
-	// step-3: converting hash to an uint64 slice
-	s := make([]uint64, 0)
-	for _, b := range hash {
-		// avoid overflow
-		if b == 0 {
-			b = b + 1
-		}
-		s = append(s, uint64(b))
-	}
 
-	// creates a new random generator based on the seed
-	rng, err := random.NewRand(s)
+	// creates a new random generator based on the hash as a seed
+	rng, err := random.NewRand(hash)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse hash: %w", err)
 	}
-	topListInd, err := random.PermutateSubset(len(idList), size, rng)
+	topListInd := rng.SubPermutation(len(idList), size)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot sample topology: %w", err)

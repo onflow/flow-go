@@ -22,7 +22,7 @@ type PublicAssignment struct {
 // alpha is the number of assigned verifier nodes to each chunk
 func NewPublicAssignment(ids flow.IdentityList,
 	chunks flow.ChunkList,
-	rng random.RandomGenerator,
+	rng random.Rand,
 	alpha int) (*PublicAssignment, error) {
 
 	a, err := chunkAssignment(ids.NodeIDs(), chunks, rng, alpha)
@@ -43,7 +43,7 @@ func (p *PublicAssignment) Which(this flow.Identifier) []uint64 {
 
 // permute shuffles subset of ids that contains its first m elements in place
 // it implements in-place version of Fisher-Yates shuffling https://doi.org/10.1145%2F364520.364540
-func permute(ids IdentifierList, m int, rng random.RandomGenerator) {
+func permute(ids IdentifierList, m int, rng random.Rand) {
 	for i := m - 1; i > 0; i-- {
 		j := rng.IntN(i)
 		ids.Swap(i, j)
@@ -52,7 +52,7 @@ func permute(ids IdentifierList, m int, rng random.RandomGenerator) {
 
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
-func chunkAssignment(ids IdentifierList, chunks flow.ChunkList, rng random.RandomGenerator, alpha int) (*Assignment, error) {
+func chunkAssignment(ids IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*Assignment, error) {
 	if len(ids) < alpha {
 		return nil, fmt.Errorf("not enough verification nodes for chunk assignment: %d, minumum should be %d", len(ids), alpha)
 	}
