@@ -107,7 +107,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			}
 			err = operation.SkipDuplicates(operation.InsertTransaction(&flowTx.TransactionBody))(tx)
 			if err != nil {
-				return fmt.Errorf("could not ")
+				return fmt.Errorf("could not insert transaction: %w", err)
 			}
 		}
 
