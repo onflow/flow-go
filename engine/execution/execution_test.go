@@ -214,6 +214,56 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	consensusEngine.AssertExpectations(t)
 }
 
+func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
+	hub := stub.NewNetworkHub()
+	hub.EnableSyncDelivery()
+
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	ver1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	ver2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+
+	identities := flow.IdentityList{colID, exeID, ver1ID, ver2ID}
+
+	genesis := flow.Genesis(identities)
+
+	block := &flow.Block{
+		Header: flow.Header{
+			ParentID: genesis.ID(),
+			View:     42,
+		},
+	}
+
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
+	defer exeNode.Done()
+
+	verification1Node := testutil.GenericNode(t, hub, ver1ID, identities)
+	verification2Node := testutil.GenericNode(t, hub, ver2ID, identities)
+
+	actualCalls := 0
+
+	var receipt *flow.ExecutionReceipt
+
+	verificationEngine := new(network.Engine)
+	_, _ = verification1Node.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
+	_, _ = verification2Node.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
+	verificationEngine.On("Process", exeID.NodeID, mock.Anything).
+		Run(func(args mock.Arguments) {
+			actualCalls++
+
+			receipt, _ = args[1].(*flow.ExecutionReceipt)
+
+			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
+		}).
+		Return(nil)
+
+	exeNode.IngestionEngine.SubmitLocal(block)
+
+	eventuallyEqual(t, 2, &actualCalls)
+
+	verificationEngine.AssertExpectations(t)
+}
+
 func eventuallyEqual(t *testing.T, expected int, actual *int) {
 	require.Eventually(t, func() bool { return expected == *actual }, time.Second*30, time.Millisecond*500)
 }
