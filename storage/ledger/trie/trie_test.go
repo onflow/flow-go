@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -121,7 +123,7 @@ func TestInteriorNodeLNil(t *testing.T) {
 		t.Errorf("Interior node has value %b and height %d, should have value %b and height %d", res.value, res.height, exp.value, res.height)
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -146,7 +148,7 @@ func TestInteriorNodeRNil(t *testing.T) {
 		t.Errorf("Interior node has value %b and height %d, should have value %b and height %d", res.value, res.height, exp.value, res.height)
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -326,7 +328,7 @@ func TestUpdateAtomicallySingleValUpdateAndRead(t *testing.T) {
 		t.Fatalf("Trie Read failed")
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -491,7 +493,7 @@ func TestFailedRead(t *testing.T) {
 		t.Fatalf("Read an non-existant value without an error")
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -611,7 +613,7 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeLeft(t *testing.T) {
 		t.Fatalf("Trie Read failed")
 	}
 
-	if !VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, trie.height) {
 		t.Errorf("not producing expected root for tree!")
 	}
 
@@ -715,7 +717,7 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeRight(t *testing.T) {
 		t.Fatalf("Trie Read failed")
 	}
 
-	if !VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, trie.height) {
 		t.Errorf("not producing expected root for tree!")
 	}
 
@@ -767,21 +769,21 @@ func TestGetProof_MultipleValueTree(t *testing.T) {
 		t.Fatalf("Trie Read failed")
 	}
 
-	verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	flag, proof, size, inclusion = trie.GetProof(key2)
 	if inclusion == false {
 		t.Fatalf("Trie Read failed")
 	}
 
-	verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	flag, proof, size, inclusion = trie.GetProof(key3)
 	if inclusion == false {
 		t.Fatalf("Trie Read failed")
 	}
 
-	verify3 := VerifyInclusionProof(key3, value3, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verify3 := VerifyInclusionProof(key3, value3, flag, proof, size, trie.GetRoot().value, trie.height)
 	if !(verify1 && verify2 && verify3) {
 		t.Errorf("not producing expected root for tree!")
 	}
@@ -839,7 +841,7 @@ func TestGetProof_MultipleStaggeredUpdates(t *testing.T) {
 		t.Fatalf("Trie Read failed")
 	}
 
-	verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	if !verify1 {
 		t.Errorf("not producing expected root for tree!")
@@ -865,21 +867,21 @@ func TestGetProof_MultipleStaggeredUpdates(t *testing.T) {
 		t.Errorf("Trie Read failed\n")
 	}
 
-	verify1 = VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verify1 = VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	flag, proof, size, inclusion = trie.GetProof(key2)
 	if inclusion == false {
 		t.Fatalf("Trie Read failed")
 	}
 
-	verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	flag, proof, size, inclusion = trie.GetProof(key3)
 	if inclusion == false {
 		t.Fatalf("Trie Read failed")
 	}
 
-	verify3 := VerifyInclusionProof(key3, value3, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verify3 := VerifyInclusionProof(key3, value3, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	if !(verify1 && verify2 && verify3) {
 		t.Errorf("not producing expected root for tree!")
@@ -942,14 +944,14 @@ func TestGetProof_MultipleValueTreeDeeper(t *testing.T) {
 		t.Fatalf("Trie Read failed 1")
 	}
 
-	verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	flag, proof, size, inclusion = trie.GetProof(key2)
 	if inclusion == false {
 		t.Fatalf("Trie Read failed 2")
 	}
 
-	verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	if !(verify1 && verify2) {
 		t.Errorf("not producing expected root for tree!")
@@ -1008,7 +1010,7 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 		t.Fatalf("Key should not be included in the trie!")
 	}
 
-	verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	if !(verifyNonInclusion) {
 		t.Errorf("not producing expected root for tree!")
@@ -1029,8 +1031,8 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 	if err2 != nil {
 		t.Fatal(err2)
 	}
-
 }
+
 func TestNonInclusionProof_EmptyTree(t *testing.T) {
 	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
@@ -1044,13 +1046,13 @@ func TestNonInclusionProof_EmptyTree(t *testing.T) {
 		t.Fatalf("Key should not be included in the trie!")
 	}
 
-	verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	if !(verifyNonInclusion) {
 		t.Errorf("not producing expected root for tree!")
 	}
 
-	err1, err2 := trie.database.SafeClose()
+	err1, err2 := trie.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -1087,7 +1089,7 @@ func TestNonInclusionProof_SingleValueTree(t *testing.T) {
 		t.Fatalf("Key should not be included in the trie!")
 	}
 
-	verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	if !(verifyNonInclusion) {
 		t.Errorf("not producing expected root for tree!")
@@ -1142,21 +1144,21 @@ func TestNonInclusionProof_IncludedKey(t *testing.T) {
 		t.Fatalf("Key should be included in the trie!")
 	}
 
-	verifyNonInclusion1 := VerifyNonInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verifyNonInclusion1 := VerifyNonInclusionProof(key1, value1, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	flag, proof, size, inclusion = trie.GetProof(key2)
 	if inclusion == false {
 		t.Fatalf("Key should be included in the trie!")
 	}
 
-	verifyNonInclusion2 := VerifyNonInclusionProof(key2, value2, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verifyNonInclusion2 := VerifyNonInclusionProof(key2, value2, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	flag, proof, size, inclusion = trie.GetProof(key3)
 	if inclusion == false {
 		t.Fatalf("Key should be included in the trie!")
 	}
 
-	verifyNonInclusion3 := VerifyNonInclusionProof(key3, value3, flag, proof, size, trie.GetRoot().value, GetDefaultHashes(), trie.height)
+	verifyNonInclusion3 := VerifyNonInclusionProof(key3, value3, flag, proof, size, trie.GetRoot().value, trie.height)
 
 	if verifyNonInclusion1 || verifyNonInclusion2 || verifyNonInclusion3 {
 		t.Errorf("key is included in trie but we are returning that it isn't included 1")
@@ -1731,19 +1733,19 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 
 	flag1, proof1, size1, inclusion1 := trie.GetProof(key1)
 
-	if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 1!")
 	}
 
 	flag2, proof2, size2, inclusion2 := trie.GetProof(key2)
 
-	if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 2!")
 	}
 
 	flag3, proof3, size3, inclusion3 := trie.GetProof(key3)
 
-	if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 3!")
 	}
 
@@ -1940,19 +1942,19 @@ func TestGetProof_Pruned(t *testing.T) {
 
 	flag1, proof1, size1, inclusion1 := trie.GetProof(key1)
 
-	if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 1!")
 	}
 
 	flag2, proof2, size2, inclusion2 := trie.GetProof(key2)
 
-	if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 2!")
 	}
 
 	flag3, proof3, size3, inclusion3 := trie.GetProof(key3)
 
-	if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 3!")
 	}
 
@@ -2160,31 +2162,31 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 
 	flag1, proof1, size1, inclusion1 := trie.GetProof(key1)
 
-	if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 1!")
 	}
 
 	flag2, proof2, size2, inclusion2 := trie.GetProof(key2)
 
-	if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 2!")
 	}
 
 	flag3, proof3, size3, inclusion3 := trie.GetProof(key3)
 
-	if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 3!")
 	}
 
 	flag4, proof4, size4, inclusion4 := trie.GetProof(key4)
 
-	if !VerifyInclusionProof(key4, value4, flag4, proof4, size4, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key4, value4, flag4, proof4, size4, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 4!")
 	}
 
 	flag5, proof5, size5, inclusion5 := trie.GetProof(key5)
 
-	if !VerifyInclusionProof(key5, value5, flag5, proof5, size5, oldRoot3, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key5, value5, flag5, proof5, size5, oldRoot3, trie.height) {
 		t.Errorf("not producing expected root for tree with key 3!")
 	}
 
@@ -2218,31 +2220,31 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 
 	nflag1, nproof1, nsize1, ninclusion1 := trie.GetProof(key1)
 
-	if !VerifyInclusionProof(key1, newvalue1, nflag1, nproof1, nsize1, oldRoot5, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key1, newvalue1, nflag1, nproof1, nsize1, oldRoot5, trie.height) {
 		t.Errorf("not producing expected root for tree with key 1!")
 	}
 
 	nflag2, nproof2, nsize2, ninclusion2 := trie.GetProof(key2)
 
-	if !VerifyInclusionProof(key2, newvalue2, nflag2, nproof2, nsize2, oldRoot5, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key2, newvalue2, nflag2, nproof2, nsize2, oldRoot5, trie.height) {
 		t.Errorf("not producing expected root for tree with key 2!")
 	}
 
 	nflag3, nproof3, nsize3, ninclusion3 := trie.GetProof(key3)
 
-	if !VerifyInclusionProof(key3, value3, nflag3, nproof3, nsize3, oldRoot5, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key3, value3, nflag3, nproof3, nsize3, oldRoot5, trie.height) {
 		t.Errorf("not producing expected root for tree with key 3!")
 	}
 
 	nflag4, nproof4, nsize4, ninclusion4 := trie.GetProof(key4)
 
-	if !VerifyInclusionProof(key4, value4, nflag4, nproof4, nsize4, oldRoot5, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key4, value4, nflag4, nproof4, nsize4, oldRoot5, trie.height) {
 		t.Errorf("not producing expected root for tree with key 4!")
 	}
 
 	nflag5, nproof5, nsize5, ninclusion5 := trie.GetProof(key5)
 
-	if !VerifyInclusionProof(key5, value5, nflag5, nproof5, nsize5, oldRoot5, GetDefaultHashes(), trie.height) {
+	if !VerifyInclusionProof(key5, value5, nflag5, nproof5, nsize5, oldRoot5, trie.height) {
 		t.Errorf("not producing expected root for tree with key 5!")
 	}
 
@@ -3228,6 +3230,37 @@ func TestKVDB_Pruned2(t *testing.T) {
 	if err2 != nil {
 		t.Fatal(err2)
 	}
+}
+func TestComputeCompactValue(t *testing.T) {
+	trieHeight := 9
+
+	key := make([]byte, 1) // 01010101 (1)
+	utils.SetBit(key, 1)
+	utils.SetBit(key, 3)
+	utils.SetBit(key, 5)
+	utils.SetBit(key, 7)
+	value := []byte{'V'}
+
+	level0 := Hash(key, value)
+	level1 := Hash(GetDefaultHashForHeight(0), level0)
+	level2 := Hash(level1, GetDefaultHashForHeight(1))
+	level3 := Hash(GetDefaultHashForHeight(2), level2)
+	level4 := Hash(level3, GetDefaultHashForHeight(3))
+	level5 := Hash(GetDefaultHashForHeight(4), level4)
+	level6 := Hash(level5, GetDefaultHashForHeight(5))
+	level7 := Hash(GetDefaultHashForHeight(6), level6)
+
+	// leaf node
+	assert.Equal(t, ComputeCompactValue(key, value, 0, trieHeight), level0)
+	// intermediate levels
+	assert.Equal(t, ComputeCompactValue(key, value, 1, trieHeight), level1)
+	assert.Equal(t, ComputeCompactValue(key, value, 2, trieHeight), level2)
+	assert.Equal(t, ComputeCompactValue(key, value, 3, trieHeight), level3)
+	assert.Equal(t, ComputeCompactValue(key, value, 4, trieHeight), level4)
+	assert.Equal(t, ComputeCompactValue(key, value, 5, trieHeight), level5)
+	assert.Equal(t, ComputeCompactValue(key, value, 6, trieHeight), level6)
+	// root node
+	assert.Equal(t, ComputeCompactValue(key, value, 7, trieHeight), level7)
 }
 
 func TestRead_HistoricalValuesPruned(t *testing.T) {

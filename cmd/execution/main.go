@@ -21,14 +21,14 @@ import (
 func main() {
 
 	var (
-		stateCommitments storage.Commits
-		ledgerStorage    storage.Ledger
-		receiptsEng      *provider.Engine
-		executionEng     *computation.Engine
-		ingestionEng     *ingestion.Engine
-		rpcConf          rpc.Config
-		err              error
-		executionState   state.ExecutionState
+		stateCommitments  storage.Commits
+		ledgerStorage     storage.Ledger
+		providerEngine    *provider.Engine
+		computationEngine *computation.Engine
+		ingestionEng      *ingestion.Engine
+		rpcConf           rpc.Config
+		err               error
+		executionState    state.ExecutionState
 	)
 
 	cmd.
@@ -44,6 +44,15 @@ func main() {
 
 			ledgerStorage, err = ledger.NewTrieStorage(levelDB)
 			node.MustNot(err).Msg("could not initialize ledger trie storage")
+
+			rt := runtime.NewInterpreterRuntime()
+			vm := virtualmachine.New(rt)
+			computationEngine = computation.New(
+				node.Logger,
+				node.Me,
+				node.State,
+				vm,
+			)
 		}).
 		Component("receipts engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing receipts engine")
@@ -54,7 +63,7 @@ func main() {
 
 			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders, executionResults)
 
-			receiptsEng, err = provider.New(
+			providerEngine, err = provider.New(
 				node.Logger,
 				node.Network,
 				node.State,
@@ -63,25 +72,7 @@ func main() {
 			)
 			node.MustNot(err).Msg("could not initialize receipts engine")
 
-			return receiptsEng
-		}).
-		Component("execution engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing execution engine")
-
-			rt := runtime.NewInterpreterRuntime()
-			vm := virtualmachine.New(rt)
-
-			executionEng, err = computation.New(
-				node.Logger,
-				node.Network,
-				node.Me,
-				node.State,
-				receiptsEng,
-				vm,
-			)
-			node.MustNot(err).Msg("could not initialize execution engine")
-
-			return executionEng
+			return providerEngine
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing ingestion engine")
@@ -98,7 +89,8 @@ func main() {
 				blocks,
 				payloads,
 				collections,
-				executionEng,
+				computationEngine,
+				providerEngine,
 				executionState,
 			)
 			node.MustNot(err).Msg("could not initialize ingestion engine")

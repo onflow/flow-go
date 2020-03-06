@@ -61,8 +61,8 @@ func (b *Mempool) Get(id flow.Identifier) (*blockByCollection, error) {
 }
 
 func (b *Mempool) Run(f func(backdata *Backdata) error) error {
-	b.RLock()
-	defer b.RUnlock()
+	b.Lock()
+	defer b.Unlock()
 
 	err := f(&Backdata{b.Backdata})
 	if err != nil {

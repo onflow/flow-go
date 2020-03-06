@@ -17,7 +17,7 @@ type TrieStorage struct {
 func NewTrieStorage(db databases.DAL) (*TrieStorage, error) {
 	tree, err := trie.NewSMT(
 		db,
-		255,
+		257,
 		10000000,
 		1000,
 		1000000,

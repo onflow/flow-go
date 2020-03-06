@@ -52,12 +52,54 @@ func BlockHeaderWithParentFixture(parentID flow.Identifier) flow.Header {
 	}
 }
 
+// BlockWithParent creates a new block that is valid
+// with respect to the given parent block.
+func BlockWithParent(parent *flow.Block) flow.Block {
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: CollectionGuaranteesFixture(16),
+	}
+
+	header := BlockHeaderFixture()
+	header.View = parent.View + 1
+	header.ChainID = parent.ChainID
+	header.Timestamp = time.Now()
+	header.ParentID = parent.ID()
+	header.PayloadHash = payload.Hash()
+
+	return flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+}
+
 func SealFixture() flow.Seal {
 	return flow.Seal{
 		BlockID:       IdentifierFixture(),
 		PreviousState: StateCommitmentFixture(),
 		FinalState:    StateCommitmentFixture(),
 		Signature:     SignatureFixture(),
+	}
+}
+
+func ClusterBlockFixture() cluster.Block {
+	payload := cluster.Payload{
+		Collection: flow.LightCollection{
+			Transactions: []flow.Identifier{IdentifierFixture()},
+		},
+	}
+	header := ClusterBlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
+	return cluster.Block{
+		Header:  header,
+		Payload: payload,
+	}
+}
+
+func ClusterBlockHeaderFixture() flow.Header {
+	return flow.Header{
+		ParentID: IdentifierFixture(),
+		View:     rand.Uint64(),
 	}
 }
 
@@ -70,14 +112,13 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 		},
 	}
 
-	header := flow.Header{
-		Height:      parent.Height + 1,
-		View:        parent.View + 1,
-		ChainID:     parent.ChainID,
-		Timestamp:   time.Now(),
-		ParentID:    parent.ID(),
-		PayloadHash: payload.Hash(),
-	}
+	header := ClusterBlockHeaderFixture()
+	header.Height = parent.Height + 1
+	header.View = parent.View + 1
+	header.ChainID = parent.ChainID
+	header.Timestamp = time.Now()
+	header.ParentID = parent.ID()
+	header.PayloadHash = payload.Hash()
 
 	block := cluster.Block{
 		Header:  header,
@@ -135,14 +176,32 @@ func StateViewFixture() *state.View {
 func CompleteCollectionFixture() *execution.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &execution.CompleteCollection{
-		Guarantee:    CollectionGuaranteeFixture(),
+		Guarantee: &flow.CollectionGuarantee{
+			CollectionID: flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
+			Signatures:   SignaturesFixture(16),
+		},
 		Transactions: []*flow.TransactionBody{&txBody},
 	}
 }
 
-func CompleteBlockFixture() *execution.CompleteBlock {
+func CompleteBlockFixture(collections int) *execution.CompleteBlock {
 
-	return CompleteBlockFixtureWithParent(IdentifierFixture())
+	completeCollections := make(map[flow.Identifier]*execution.CompleteCollection, collections)
+	block := BlockFixture()
+	block.Guarantees = nil
+
+	for i := 0; i < collections; i++ {
+		completeCollection := CompleteCollectionFixture()
+		block.Guarantees = append(block.Guarantees, completeCollection.Guarantee)
+		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
+	}
+
+	block.PayloadHash = block.Payload.Hash()
+
+	return &execution.CompleteBlock{
+		Block:               &block,
+		CompleteCollections: completeCollections,
+	}
 }
 
 func CompleteBlockFixtureWithParent(parentID flow.Identifier) *execution.CompleteBlock {
@@ -157,11 +216,26 @@ func CompleteBlockFixtureWithParent(parentID flow.Identifier) *execution.Complet
 	}
 }
 
-func ComputationResultFixture() *execution.ComputationResult {
+func ComputationResultFixture(n int) *execution.ComputationResult {
+	stateViews := make([]*state.View, n)
+	for i := 0; i < n; i++ {
+		stateViews[i] = StateViewFixture()
+	}
 	return &execution.ComputationResult{
-		CompleteBlock: CompleteBlockFixture(),
-		StateViews:    []*state.View{StateViewFixture(), StateViewFixture()},
-		StartState:    StateCommitmentFixture(),
+		CompleteBlock: CompleteBlockFixture(n),
+		StateViews:    stateViews,
+	}
+}
+
+func ComputationResultForBlockFixture(completeBlock *execution.CompleteBlock) *execution.ComputationResult {
+	n := len(completeBlock.CompleteCollections)
+	stateViews := make([]*state.View, n)
+	for i := 0; i < n; i++ {
+		stateViews[i] = StateViewFixture()
+	}
+	return &execution.ComputationResult{
+		CompleteBlock: completeBlock,
+		StateViews:    stateViews,
 	}
 }
 

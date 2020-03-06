@@ -12,4 +12,5 @@ type Finalizer interface {
 	GetBlock(blockID flow.Identifier) (*hotstuff.Block, bool)
 	GetBlocksForView(view uint64) []*hotstuff.Block
 	FinalizedBlock() *hotstuff.Block
+	LockedBlock() *hotstuff.Block
 }

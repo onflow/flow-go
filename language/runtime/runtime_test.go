@@ -2266,3 +2266,82 @@ func TestRuntimeTransactionTopLevelDeclarations(t *testing.T) {
 		assert.IsType(t, &sema.InvalidTopLevelDeclarationError{}, errs[0])
 	})
 }
+
+func TestRuntimeStoreIntegerTypes(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	addressValue := interpreter.AddressValue{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
+	}
+
+	for _, integerType := range sema.AllIntegerTypes {
+
+		typeName := integerType.String()
+
+		t.Run(typeName, func(t *testing.T) {
+
+			contract := []byte(
+				fmt.Sprintf(
+					`
+                      pub contract Test {
+
+                          pub let n: %s
+
+                          init() {
+                              self.n = 42
+                          }
+                      }
+                    `,
+					typeName,
+				),
+			)
+
+			deploy := []byte(
+				fmt.Sprintf(
+					`
+                      transaction {
+
+                          prepare(signer: Account) {
+                              signer.setCode(%s)
+                          }
+                      }
+                    `,
+					ArrayValueFromBytes(contract).String(),
+				),
+			)
+
+			storedValues := map[string][]byte{}
+			var accountCode []byte
+			var events []Event
+
+			runtimeInterface := &testRuntimeInterface{
+				resolveImport: func(_ Location) (bytes []byte, err error) {
+					return accountCode, nil
+				},
+				getValue: func(controller, owner, key []byte) (value []byte, err error) {
+					return storedValues[string(key)], nil
+				},
+				setValue: func(controller, owner, key, value []byte) (err error) {
+					storedValues[string(key)] = value
+					return nil
+				},
+				getSigningAccounts: func() []Address {
+					return []Address{addressValue.ToAddress()}
+				},
+				updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
+					accountCode = code
+					return nil
+				},
+				emitEvent: func(event Event) {
+					events = append(events, event)
+				},
+			}
+
+			err := runtime.ExecuteTransaction(deploy, runtimeInterface, utils.TestLocation)
+			require.NoError(t, err)
+
+			assert.NotNil(t, accountCode)
+		})
+	}
+}
