@@ -18,7 +18,6 @@ import (
 
 func TestExecutionFlow(t *testing.T) {
 	hub := stub.NewNetworkHub()
-	hub.EnableSyncDelivery()
 
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -79,7 +78,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
-	collectionEngine.On("Process", exeID.NodeID, mock.Anything).
+	collectionEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID, _ := args[0].(flow.Identifier)
 			req, _ := args[1].(*messages.CollectionRequest)
@@ -101,7 +100,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	verificationEngine := new(network.Engine)
 	_, _ = verificationNode.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
-	verificationEngine.On("Process", exeID.NodeID, mock.Anything).
+	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 
@@ -112,7 +111,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	consensusEngine := new(network.Engine)
 	_, _ = consensusNode.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
-	consensusEngine.On("Process", exeID.NodeID, mock.Anything).
+	consensusEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 
@@ -129,7 +128,10 @@ func TestExecutionFlow(t *testing.T) {
 	// submit block from consensus node
 	exeNode.IngestionEngine.Submit(conID.NodeID, block)
 
-	assert.Eventually(t, func() bool { return receipt != nil }, time.Second*30, time.Millisecond*500)
+	assert.Eventually(t, func() bool {
+		hub.DeliverAll()
+		return receipt != nil
+	}, time.Second*30, time.Millisecond*500)
 
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)

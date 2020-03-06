@@ -90,14 +90,14 @@ func TestHappyPath(t *testing.T) {
 	// flush the chunk state request
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
 	assert.True(t, ok)
-	verNet.DeliverSome(func(m *stub.PendingMessage) bool {
+	verNet.DeliverSome(false, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.ExecutionStateProvider
 	})
 
 	// flush the chunk state response
 	exeNet, ok := hub.GetNetwork(exeIdentity.NodeID)
 	assert.True(t, ok)
-	exeNet.DeliverSome(func(m *stub.PendingMessage) bool {
+	exeNet.DeliverSome(false, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.ExecutionStateProvider
 	})
 
@@ -105,19 +105,19 @@ func TestHappyPath(t *testing.T) {
 	assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
 
 	// flush the collection request
-	verNet.DeliverSome(func(m *stub.PendingMessage) bool {
+	verNet.DeliverSome(false, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})
 
 	// flush the collection response
 	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
 	assert.True(t, ok)
-	colNet.DeliverSome(func(m *stub.PendingMessage) bool {
+	colNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})
 
 	// flush the result approval broadcast
-	verNet.DeliverAllRecursive()
+	verNet.DeliverAll(true)
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
