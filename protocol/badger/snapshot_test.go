@@ -31,7 +31,12 @@ func TestHead(t *testing.T) {
 		require.NoError(t, err)
 		err = db.Update(operation.InsertNumber(block.Height, block.ID()))
 		require.NoError(t, err)
-		err = db.Update(operation.InsertBoundary(block.Height))
+
+		// add a second, outdated boundary to ensure the latest is taken
+		err = db.Update(operation.InsertBoundary(block.Height - 1))
+		require.NoError(t, err)
+
+		err = db.Update(operation.UpdateBoundary(block.Height))
 		require.NoError(t, err)
 
 		state := State{db: db}
@@ -155,7 +160,7 @@ func TestIdentity(t *testing.T) {
 			actual, err := state.AtNumber(3).Identities()
 			require.NoError(t, err)
 			expected := flow.IdentityList{ids[0], ids[1], ids[2]}
-			ids[0].Stake = 0
+			ids[0].Stake = 0 // hot stuff keeps identities with 0 stake in identities list
 			ids[1].Stake = 500
 			ids[2].Stake = 200
 			require.EqualValues(t, expected, actual)
