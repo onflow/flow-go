@@ -2102,6 +2102,22 @@ func (e *TransactionMissingPrepareError) EndPosition() ast.Position {
 	return e.FirstFieldPos.Shifted(length - 1)
 }
 
+// InvalidResourceTransactionParameterError
+
+type InvalidResourceTransactionParameterError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidResourceTransactionParameterError) Error() string {
+	return fmt.Sprintf(
+		"transaction parameter must not be resource type: `%s`",
+		e.Type.QualifiedString(),
+	)
+}
+
+func (*InvalidResourceTransactionParameterError) isSemanticError() {}
+
 // InvalidTransactionFieldAccessModifierError
 
 type InvalidTransactionFieldAccessModifierError struct {
