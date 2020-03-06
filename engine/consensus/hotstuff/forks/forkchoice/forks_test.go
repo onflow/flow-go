@@ -1,16 +1,15 @@
-package forks_test
+package forkchoice
 
 import (
 	"encoding/binary"
 	"fmt"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/forkchoice"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -141,7 +140,7 @@ func initForks(t *testing.T, view uint64) (*forks.Forks, *mockfinalizer.Finalize
 
 	// construct ForkChoice
 	notifier.On("OnQcIncorporated", root.QC).Return().Once()
-	fc, err := forkchoice.NewNewestForkChoice(fnlzr, notifier)
+	fc, err := NewNewestForkChoice(fnlzr, notifier)
 	if err != nil {
 		assert.Fail(t, err.Error())
 	}
