@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
@@ -13,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -134,4 +136,84 @@ func TestExecutionFlow(t *testing.T) {
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)
+}
+
+func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
+	hub := stub.NewNetworkHub()
+	hub.EnableSyncDelivery()
+
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	con1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	con2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+
+	identities := flow.IdentityList{colID, con1ID, con2ID, exeID}
+
+	genesis := flow.Genesis(identities)
+
+	block2 := &flow.Block{
+		Header: flow.Header{
+			ParentID:   genesis.ID(),
+			View:       2,
+			Height:     2,
+			ProposerID: con1ID.ID(),
+		},
+	}
+	// TODO add as soon as engine can process blocks that are not finalized and out of order
+	// fork := &flow.Block{
+	// 	Header: flow.Header{
+	// 		ParentID:   genesis.ID(),
+	// 		View:       2,
+	// 		Height:     2,
+	// 		ProposerID: con2ID.ID(),
+	// 	},
+	// }
+	block3 := &flow.Block{
+		Header: flow.Header{
+			ParentID:   block2.ID(),
+			View:       3,
+			Height:     3,
+			ProposerID: con2ID.ID(),
+		},
+	}
+
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
+	defer exeNode.Done()
+
+	consensus1Node := testutil.GenericNode(t, hub, con1ID, identities)
+	consensus2Node := testutil.GenericNode(t, hub, con2ID, identities)
+
+	actualCalls := 0
+
+	consensusEngine := new(network.Engine)
+	_, _ = consensus1Node.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	_, _ = consensus2Node.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	consensusEngine.On("Process", exeID.NodeID, mock.Anything).
+		Run(func(args mock.Arguments) { actualCalls++ }).
+		Return(nil)
+
+	// TODO submit blocks out of order, add forks and orphans. This is currently not possible
+	// since the block ingestion engine expects finalized, sequential blocks only.
+	// exeNode.IngestionEngine.Submit(con2ID.NodeID, block3)
+	// exeNode.IngestionEngine.Submit(con2ID.NodeID, fork)
+	exeNode.IngestionEngine.Submit(con1ID.NodeID, block2)
+	eventuallyEqual(t, 2, &actualCalls)
+
+	exeNode.IngestionEngine.Submit(con2ID.NodeID, block3)
+	eventuallyEqual(t, 4, &actualCalls)
+
+	var res flow.Identifier
+	err := exeNode.BadgerDB.View(operation.RetrieveNumber(2, &res))
+	require.NoError(t, err)
+	require.Equal(t, block2.ID(), res)
+
+	err = exeNode.BadgerDB.View(operation.RetrieveNumber(3, &res))
+	require.NoError(t, err)
+	require.Equal(t, block3.ID(), res)
+
+	consensusEngine.AssertExpectations(t)
+}
+
+func eventuallyEqual(t *testing.T, expected int, actual *int) {
+	require.Eventually(t, func() bool { return expected == *actual }, time.Second*30, time.Millisecond*500)
 }

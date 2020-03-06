@@ -249,5 +249,6 @@ func makeRealBlock(n int) (flow.Block, []flow.Collection) {
 
 	block := unittest.BlockFixture()
 	block.Guarantees = collsGuarantees
+	block.PayloadHash = block.Payload.Hash()
 	return block, colls
 }
