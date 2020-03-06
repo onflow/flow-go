@@ -90,14 +90,14 @@ func TestHappyPath(t *testing.T) {
 	// flush the chunk state request
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
 	assert.True(t, ok)
-	verNet.DeliverSome(false, func(m *stub.PendingMessage) bool {
+	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.ExecutionStateProvider
 	})
 
 	// flush the chunk state response
 	exeNet, ok := hub.GetNetwork(exeIdentity.NodeID)
 	assert.True(t, ok)
-	exeNet.DeliverSome(false, func(m *stub.PendingMessage) bool {
+	exeNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.ExecutionStateProvider
 	})
 
@@ -105,7 +105,7 @@ func TestHappyPath(t *testing.T) {
 	assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
 
 	// flush the collection request
-	verNet.DeliverSome(false, func(m *stub.PendingMessage) bool {
+	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})
 
