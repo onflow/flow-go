@@ -4,6 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
@@ -14,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
-	"github.com/rs/zerolog"
 )
 
 // FollowerLogic runs in non-consensus nodes. It informs other components within the node
@@ -27,7 +30,7 @@ type FollowerLogic struct {
 	validator            *hotstuff.Validator
 	finalizationLogic    forks.Finalizer
 	finalizationCallback module.Finalizer
-	notifier             finalizer.FinalizationConsumer
+	notifier             notifications.FinalizationConsumer
 	log                  zerolog.Logger
 }
 
@@ -37,7 +40,7 @@ func NewFollowerLogic(
 	dkgPubData *hotstuff.DKGPublicData,
 	trustedRoot *forks.BlockQC,
 	finalizationCallback module.Finalizer,
-	notifier finalizer.FinalizationConsumer,
+	notifier notifications.FinalizationConsumer,
 	log zerolog.Logger,
 ) (*FollowerLogic, error) {
 	viewState, err := hotstuff.NewViewState(protocolState, dkgPubData, me.NodeID(), filter.HasRole(flow.RoleConsensus))
@@ -68,12 +71,8 @@ func (f *FollowerLogic) FinalizedBlock() *model.Block {
 	return f.finalizationLogic.FinalizedBlock()
 }
 
-func (f *FollowerLogic) FinalizedView() uint64 {
-	return f.finalizationLogic.FinalizedView()
-}
-
 func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
-	// validate the block. exit if the proposal is invalid
+	// validate the block. skip if the proposal is invalid
 	err := f.validator.ValidateProposal(blockProposal)
 	if errors.Is(err, model.ErrorInvalidBlock{}) {
 		f.log.Warn().Hex("block_id", logging.ID(blockProposal.Block.BlockID)).

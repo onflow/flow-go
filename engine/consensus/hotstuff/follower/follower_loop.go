@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/model/flow"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
-	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 )
 
 // HotStuffFollower implements interface HotStuffFollower
@@ -34,7 +36,7 @@ func New(
 	trustedRootBlock *flow.Header,
 	rootBlockSigs *model.AggregatedSignature,
 	finalizationCallback module.Finalizer,
-	notifier finalizer.FinalizationConsumer,
+	notifier notifications.FinalizationConsumer,
 	log zerolog.Logger,
 ) (*HotStuffFollower, error) {
 	trustedRoot := unsafeToBlockQC(trustedRootBlock, rootBlockSigs)
