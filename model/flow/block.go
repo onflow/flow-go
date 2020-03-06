@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
-func Genesis(ids IdentityList) *Block {
+func Genesis(identities IdentityList) *Block {
 
 	// create the first seal with zero references
 	seal := Seal{
@@ -20,7 +20,7 @@ func Genesis(ids IdentityList) *Block {
 
 	// create the raw content for the genesis block
 	payload := Payload{
-		Identities: ids,
+		Identities: identities,
 		Guarantees: nil,
 		Seals:      []*Seal{&seal},
 	}

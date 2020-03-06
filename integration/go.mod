@@ -8,7 +8,7 @@ require (
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
 	github.com/m4ksio/testingdock v0.4.1
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 )
 
 replace github.com/dapperlabs/flow-go => ../

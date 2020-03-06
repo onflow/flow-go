@@ -44,6 +44,27 @@ func BlockHeaderFixture() flow.Header {
 	}
 }
 
+// BlockWithParent creates a new block that is valid
+// with respect to the given parent block.
+func BlockWithParent(parent *flow.Block) flow.Block {
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: CollectionGuaranteesFixture(16),
+	}
+
+	header := BlockHeaderFixture()
+	header.View = parent.View + 1
+	header.ChainID = parent.ChainID
+	header.Timestamp = time.Now()
+	header.ParentID = parent.ID()
+	header.PayloadHash = payload.Hash()
+
+	return flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+}
+
 func SealFixture() flow.Seal {
 	return flow.Seal{
 		BlockID:       IdentifierFixture(),
@@ -60,6 +81,7 @@ func ClusterBlockFixture() cluster.Block {
 		},
 	}
 	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
 	return cluster.Block{
 		Header:  header,
 		Payload: payload,
@@ -75,14 +97,13 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 		},
 	}
 
-	header := flow.Header{
-		Height:      parent.Height + 1,
-		View:        parent.View + 1,
-		ChainID:     parent.ChainID,
-		Timestamp:   time.Now(),
-		ParentID:    parent.ID(),
-		PayloadHash: payload.Hash(),
-	}
+	header := BlockHeaderFixture()
+	header.Height = parent.Height + 1
+	header.View = parent.View + 1
+	header.ChainID = parent.ChainID
+	header.Timestamp = time.Now()
+	header.ParentID = parent.ID()
+	header.PayloadHash = payload.Hash()
 
 	block := cluster.Block{
 		Header:  header,
