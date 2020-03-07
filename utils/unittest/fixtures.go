@@ -80,18 +80,11 @@ func ClusterBlockFixture() cluster.Block {
 			Transactions: []flow.Identifier{IdentifierFixture()},
 		},
 	}
-	header := ClusterBlockHeaderFixture()
+	header := BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
 	return cluster.Block{
 		Header:  header,
 		Payload: payload,
-	}
-}
-
-func ClusterBlockHeaderFixture() flow.Header {
-	return flow.Header{
-		ParentID: IdentifierFixture(),
-		View:     rand.Uint64(),
 	}
 }
 
@@ -104,7 +97,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 		},
 	}
 
-	header := ClusterBlockHeaderFixture()
+	header := BlockHeaderFixture()
 	header.Height = parent.Height + 1
 	header.View = parent.View + 1
 	header.ChainID = parent.ChainID
