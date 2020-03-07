@@ -28,7 +28,7 @@ type Suite struct {
 	state    *protocol.State
 	mutator  *protocol.Mutator
 	headers  *storage.Headers
-	payloads *storage.Payloads
+	blocks   *storage.Blocks
 	cache    *module.PendingBlockBuffer
 	follower *module.HotStuffFollower
 
@@ -43,16 +43,16 @@ func (suite *Suite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.mutator = new(protocol.Mutator)
 	suite.headers = new(storage.Headers)
-	suite.payloads = new(storage.Payloads)
+	suite.blocks = new(storage.Blocks)
 	suite.cache = new(module.PendingBlockBuffer)
 	suite.follower = new(module.HotStuffFollower)
 
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
 	suite.state.On("Mutate").Return(suite.mutator)
 	suite.headers.On("Store", mock.Anything, mock.Anything).Return(nil)
-	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil)
+	suite.blocks.On("Store", mock.Anything, mock.Anything).Return(nil)
 
-	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, suite.state, suite.headers, suite.payloads, suite.cache, suite.follower)
+	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, suite.state, suite.headers, suite.blocks, suite.cache, suite.follower)
 	require.Nil(suite.T(), err)
 
 	suite.engine = eng

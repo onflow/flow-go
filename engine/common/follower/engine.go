@@ -24,8 +24,8 @@ type Engine struct {
 	state protocol.State
 	con   network.Conduit
 
-	headers  storage.Headers
-	payloads storage.Payloads
+	headers storage.Headers
+	blocks  storage.Blocks
 
 	cache module.PendingBlockBuffer
 
@@ -38,7 +38,7 @@ func New(
 	me module.Local,
 	state protocol.State,
 	headers storage.Headers,
-	payloads storage.Payloads,
+	blocks storage.Blocks,
 	cache module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 ) (*Engine, error) {
@@ -49,7 +49,7 @@ func New(
 		me:       me,
 		state:    state,
 		headers:  headers,
-		payloads: payloads,
+		blocks:   blocks,
 		cache:    cache,
 		follower: follower,
 	}
@@ -127,15 +127,9 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	}
 
 	// store the block payload
-	err = e.payloads.Store(&block.Header, &block.Payload)
+	err = e.blocks.Store(block)
 	if err != nil {
-		return fmt.Errorf("could not store block payload: %w", err)
-	}
-
-	// insert the block header
-	err = e.headers.Store(&block.Header)
-	if err != nil {
-		return fmt.Errorf("could not store block header: %w", err)
+		return fmt.Errorf("could not store block: %w", err)
 	}
 
 	// ensure the block is a valid extension of protocol state
