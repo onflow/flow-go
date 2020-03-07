@@ -40,8 +40,12 @@ func (n *TopologyTestSuite) SetupTest() {
 	me := n.ids[0]
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+
+	key, err := GenerateNetworkingKey(me.NodeID)
+	require.NoError(n.Suite.T(), err)
+
 	// creates a middleware instance
-	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID)
+	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID, key)
 	require.NoError(n.Suite.T(), err)
 
 	// creates and mocks a network instance
