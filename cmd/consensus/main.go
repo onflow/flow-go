@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -83,8 +84,9 @@ func main() {
 			payloadsDB := storage.NewPayloads(node.DB)
 			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
+			cache := buffer.NewPendingBlocks()
 
-			eng, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB)
+			eng, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cache)
 			node.MustNot(err).Msg("could not initialize consensus engine")
 
 			cold, err := coldstuff.New(node.Logger, node.State, node.Me, eng, build, final, 3*time.Second, 6*time.Second)

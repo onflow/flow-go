@@ -24,3 +24,11 @@ type HotStuff interface {
 	// Votes may be submitted in any order.
 	SubmitVote(originID flow.Identifier, blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature)
 }
+
+// TODO just adding this to un-block follower engine development
+// Full definition in https://github.com/dapperlabs/flow-go/pull/2677
+type HotStuffFollower interface {
+	ReadyDoneAware
+
+	SubmitProposal(proposal *flow.Header, parentView uint64)
+}
