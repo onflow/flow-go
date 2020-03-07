@@ -36,7 +36,7 @@ func (s *Snapshot) Collection() (*flow.LightCollection, error) {
 
 		// get the payload
 		var payload cluster.Payload
-		err = procedure.RetrieveClusterPayload(header.PayloadHash, &payload)(tx)
+		err = procedure.RetrieveClusterPayload(header.ID(), &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("failed to get snapshot payload: %w", err)
 		}
