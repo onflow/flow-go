@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
@@ -71,17 +72,20 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	for i := range ids {
 		// retrieves IP and port of the middleware
 		var ip, port string
+		var key crypto.PublicKey
 		if !dryrun {
 			m := mws[i]
 			ip, port = m.GetIPPort()
+			key = m.PublicKey()
 		}
 
 		// mocks an identity for the middleware
 		id := flow.Identity{
-			NodeID:  ids[i].NodeID,
-			Address: fmt.Sprintf("%s:%s", ip, port),
-			Role:    flow.RoleCollection,
-			Stake:   0,
+			NodeID:        ids[i].NodeID,
+			Address:       fmt.Sprintf("%s:%s", ip, port),
+			Role:          flow.RoleCollection,
+			Stake:         0,
+			NetworkPubKey: key,
 		}
 		identities[i] = &id
 	}
@@ -94,8 +98,14 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 	count := len(identities)
 	mws := make([]*libp2p.Middleware, 0)
 	for i := 0; i < count; i++ {
+
+		key, err := GenerateNetworkingKey(identities[i].NodeID)
+		if err != nil {
+			return nil, err
+		}
+
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID)
+		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key)
 		if err != nil {
 			return nil, err
 		}
@@ -127,4 +137,11 @@ func (s *SnapshotMock) Head() (*flow.Header, error) {
 
 func (s *SnapshotMock) Seal() (flow.Seal, error) {
 	return flow.Seal{}, fmt.Errorf(" not implemented")
+}
+
+// GenerateNetworkingKey generates a Flow ECDSA key using the given seed
+func GenerateNetworkingKey(seed flow.Identifier) (crypto.PrivateKey, error) {
+	s := make([]byte, 48)
+	copy(s, seed[:])
+	return crypto.GeneratePrivateKey(crypto.ECDSA_P256, s)
 }

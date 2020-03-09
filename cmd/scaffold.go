@@ -96,11 +96,20 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		codec := json.NewCodec()
 
-		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID())
+		nk, err := loadPrivateNetworkKey(fnb.Me.NodeID())
+		fnb.MustNot(err).Msg("could not load private key")
+
+		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID(), nk)
 		fnb.MustNot(err).Msg("could not initialize flow middleware")
 
 		ids, err := fnb.State.Final().Identities()
 		fnb.MustNot(err).Msg("could not retrieve state identities")
+
+		// temporary fix to make public keys available to the networking layer
+		// populate the Networking keys for each identity with public keys generated with the node identifier as the seed
+		// TODO: https://github.com/dapperlabs/flow-go/issues/2693 should make this obsolete
+		err = generatePublicNetworkKey(ids)
+		fnb.MustNot(err).Msg("could not generate public key")
 
 		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
 		fnb.MustNot(err).Msg("could not initialize flow network")
@@ -202,7 +211,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("could not get identity")
 
 	fnb.sk, err = loadPrivateKey()
-	fnb.MustNot(err).Msg("could load private key")
+	fnb.MustNot(err).Msg("could not load private key")
 
 	fnb.Me, err = local.New(id, fnb.sk)
 	fnb.MustNot(err).Msg("could not initialize local")
@@ -392,4 +401,45 @@ func loadPrivateKey() (crypto.PrivateKey, error) {
 
 	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
 	return sk, err
+}
+
+// loadPrivateNetworkKey loads the private network key of the node, e.g., from disk (similar to what is being done
+/// for the staking key)
+// The seed for the key is set to the Flow Identifier so that Public keys of remote nodes can also be deterministically generated
+// Eventually, of course this key should come via some external key bootstrapping mechanism
+// DISCLAIMER: should not use the current version at the production-level
+// https://github.com/dapperlabs/flow-go/issues/2693
+//
+// The current version generates and returns a private key. It is solely to keep the
+// code compiled correctly, and avoid nil panics. However, the implementation of this
+// function should be replaced with a proper loading/generating functionality of the key
+func loadPrivateNetworkKey(id flow.Identifier) (crypto.PrivateKey, error) {
+	// todo: replace the following implementation with a proper loading or generating functionality for keys
+	// todo: https://github.com/dapperlabs/flow-go/issues/2693
+	// generates a seed solely for sake of integration tests
+	// seed should be replaced by a secure functionality as part of the mentioned issue
+	seed := make([]byte, 48)
+	copy(seed, id[:])
+	// currently we only support ECDSA 256 keys (TODO: issue #2740)
+	nk, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
+	return nk, err
+}
+
+// generatePublicNetworkKey generates a public network key for each remote node using the node Flow identifier as the seed
+//
+// DISCLAIMER: should not use the current version at the production-level
+// The networking public key depends on the private key, hence till the private key distribution is resolved across nodes
+// the public keys need to be generated on the fly in a deterministic manner to allow one libp2p node to address
+// the other.
+// When issue https://github.com/dapperlabs/flow-go/issues/2693 is done, this code should be redundant as the public keys
+// will be passed is as command line args,
+func generatePublicNetworkKey(ids flow.IdentityList) error {
+	for _, id := range ids {
+		pk, err := loadPrivateNetworkKey(id.ID())
+		if err != nil {
+			return err
+		}
+		id.NetworkPubKey = pk.PublicKey()
+	}
+	return nil
 }

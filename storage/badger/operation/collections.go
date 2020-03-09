@@ -20,20 +20,26 @@ func CheckCollection(collID flow.Identifier, exists *bool) func(*badger.Txn) err
 	return check(makePrefix(codeCollection, collID), exists)
 }
 
-// IndexCollection indexes the collection by payload hash.
-func IndexCollection(payloadHash flow.Identifier, index uint64, collection *flow.LightCollection) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexCollection, payloadHash, index), collection.ID())
-}
-
-// LookupCollection looks up a collection ID by payload hash.
-func LookupCollections(payloadHash flow.Identifier, collIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return traverse(makePrefix(codeIndexCollection, payloadHash), lookup(collIDs))
-}
-
 func RetrieveCollection(collID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollection, collID), collection)
 }
 
 func RemoveCollection(collID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeCollection, collID))
+}
+
+// IndexCollection indexes the transactions within the collection payload of a block.
+func IndexCollectionPayload(height uint64, blockID, parentID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexCollection, height, blockID, parentID), collection.Transactions)
+}
+
+// LookupCollection looks up the collection for a given payload.
+func LookupCollectionPayload(height uint64, blockID, parentID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexCollection, height, blockID, parentID), &collection.Transactions)
+}
+
+// VerifyCollectionPayload verifies that a collection does not contain any
+// transactions that ever been included in a payload in the block's ancestry.
+func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flow.Identifier) func(*badger.Txn) error {
+	return iterate(makePrefix(codeIndexCollection, height), makePrefix(codeIndexCollection, uint64(0)), verifypayload(blockID, txIDs))
 }

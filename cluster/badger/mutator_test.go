@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -95,10 +97,10 @@ func TestBootstrap(t *testing.T) {
 				assert.Equal(t, genesis.Collection, collection)
 
 				// should index collection
-				var collectionIDs []flow.Identifier
-				err = operation.LookupCollections(genesis.PayloadHash, &collectionIDs)(tx)
+				collection = flow.LightCollection{} // reset the collection
+				err = operation.LookupCollectionPayload(genesis.Height, genesis.ID(), genesis.ParentID, &collection)(tx)
 				assert.Nil(t, err)
-				assert.Equal(t, []flow.Identifier{genesis.Collection.ID()}, collectionIDs)
+				assert.Equal(t, genesis.Collection, collection)
 
 				// should insert header
 				var header flow.Header
@@ -150,12 +152,15 @@ func TestExtend(t *testing.T) {
 
 		// a helper function to insert a block
 		insert := func(block cluster.Block) {
-			// first insert the payload
-			err = db.Update(operation.SkipDuplicates(operation.InsertCollection(&block.Collection)))
-			assert.Nil(t, err)
-			// then insert the block
-			err = db.Update(procedure.InsertClusterBlock(&block))
-			assert.Nil(t, err)
+			_ = db.Update(func(tx *badger.Txn) error {
+				// first insert the payload
+				err := procedure.InsertClusterPayload(&block.Payload)(tx)
+				assert.Nil(t, err)
+				// then insert the block
+				err = procedure.InsertClusterBlock(&block)(tx)
+				assert.Nil(t, err)
+				return nil
+			})
 		}
 
 		t.Run("without first bootstrapping", func(t *testing.T) {
@@ -259,11 +264,108 @@ func TestExtend(t *testing.T) {
 
 			block := unittest.ClusterBlockWithParent(genesis)
 			// set an empty collection as the payload
-			block.Collection = flow.LightCollection{}
-			block.PayloadHash = block.Payload.Hash()
+			block.SetPayload(cluster.Payload{})
 			insert(block)
 
 			err = mutator.Extend(block.ID())
+			assert.Nil(t, err)
+		})
+
+		t.Run("extend un-finalized block with duplicated transaction", func(t *testing.T) {
+			defer cleanup()
+			bootstrap()
+
+			tx1 := unittest.TransactionFixture()
+
+			// create a block extending genesis containing tx1
+			block1 := unittest.ClusterBlockWithParent(genesis)
+			payload1 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
+			block1.SetPayload(payload1)
+			insert(block1)
+
+			// should be able to extend block 1
+			err = mutator.Extend(block1.ID())
+			assert.Nil(t, err)
+
+			// create a block building on block1 ALSO containing tx1
+			block2 := unittest.ClusterBlockWithParent(&block1)
+			payload2 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
+			block2.SetPayload(payload2)
+			insert(block2)
+
+			// should be unable to extend block 2, as it contains a dupe transaction
+			err = mutator.Extend(block2.ID())
+			assert.True(t, errors.Is(err, storage.ErrAlreadyIndexed))
+		})
+
+		t.Run("extend finalized block with duplicated transaction", func(t *testing.T) {
+			defer cleanup()
+			bootstrap()
+
+			tx1 := unittest.TransactionFixture()
+
+			// create a block extending genesis containing tx1
+			block1 := unittest.ClusterBlockWithParent(genesis)
+			payload1 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
+			block1.SetPayload(payload1)
+			insert(block1)
+
+			// should be able to extend block 1
+			err = mutator.Extend(block1.ID())
+			assert.Nil(t, err)
+
+			// should be able to finalize block 1
+			err = db.Update(procedure.FinalizeClusterBlock(block1.ID()))
+			assert.Nil(t, err)
+
+			// create a block building on block1 ALSO containing tx1
+			block2 := unittest.ClusterBlockWithParent(&block1)
+			payload2 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
+			block2.SetPayload(payload2)
+			insert(block2)
+
+			// should be unable to extend block 2, as it contains a dupe transaction
+			err = mutator.Extend(block2.ID())
+			assert.True(t, errors.Is(err, storage.ErrAlreadyIndexed))
+		})
+
+		t.Run("extend conflicting fork with duplicated transaction", func(t *testing.T) {
+			defer cleanup()
+			bootstrap()
+
+			tx1 := unittest.TransactionFixture()
+
+			// create a block extending genesis containing tx1
+			block1 := unittest.ClusterBlockWithParent(genesis)
+			payload1 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
+			block1.SetPayload(payload1)
+			insert(block1)
+
+			// should be able to extend block 1
+			err = mutator.Extend(block1.ID())
+			assert.Nil(t, err)
+
+			// create a block ALSO extending genesis ALSO containing tx1
+			block2 := unittest.ClusterBlockWithParent(genesis)
+			payload2 := cluster.Payload{
+				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
+			}
+			block2.SetPayload(payload2)
+			insert(block2)
+
+			// should be able to extend block2, although it conflicts with block1,
+			// it is on a different fork
+			err = mutator.Extend(block2.ID())
 			assert.Nil(t, err)
 		})
 	})

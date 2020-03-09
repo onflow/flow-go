@@ -51,29 +51,24 @@ func TestCollections(t *testing.T) {
 		})
 
 		t.Run("Index and lookup", func(t *testing.T) {
-			payload := flow.MakeID([]byte{0x42})
-			coll1 := unittest.CollectionFixture(1).Light()
-			coll2 := unittest.CollectionFixture(2).Light()
-			colls := []*flow.LightCollection{&coll1, &coll2}
+			expected := unittest.CollectionFixture(1).Light()
+			blockID := unittest.IdentifierFixture()
+			parentID := unittest.IdentifierFixture()
+			height := uint64(1)
 
-			err := db.Update(func(tx *badger.Txn) error {
-				for i, coll := range colls {
-					if err := InsertCollection(coll)(tx); err != nil {
-						return err
-					}
-					if err := IndexCollection(payload, uint64(i), coll)(tx); err != nil {
-						return err
-					}
-				}
+			_ = db.Update(func(tx *badger.Txn) error {
+				err := InsertCollection(&expected)(tx)
+				assert.Nil(t, err)
+				err = IndexCollectionPayload(height, blockID, parentID, &expected)(tx)
+				assert.Nil(t, err)
 				return nil
 			})
-			require.Nil(t, err)
 
-			var actual []flow.Identifier
-			err = db.View(LookupCollections(payload, &actual))
-			require.Nil(t, err)
+			var actual flow.LightCollection
+			err := db.View(LookupCollectionPayload(height, blockID, parentID, &actual))
+			assert.Nil(t, err)
 
-			assert.Equal(t, []flow.Identifier{coll1.ID(), coll2.ID()}, actual)
+			assert.Equal(t, expected, actual)
 		})
 	})
 }
