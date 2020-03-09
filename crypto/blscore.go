@@ -152,9 +152,7 @@ func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool
 // it imports a key through the function DecodePublicKey.
 func (pk *pointG2) checkMembershipG2() bool {
 	verif := C.checkMembership_G2((*C.ep2_st)(pk))
-	const pkValid = 1 // same value as in include.h
-	if verif == pkValid {
-		return true
-	}
-	return false
+	// same value as in include.h
+	const pkValid = 1
+	return verif == pkValid
 }
