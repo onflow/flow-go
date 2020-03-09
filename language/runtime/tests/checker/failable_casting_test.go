@@ -605,7 +605,7 @@ func TestCheckFailableCastingResourceInterface(t *testing.T) {
 	types := []string{
 		"AnyResource",
 		"R",
-		"I",
+		"AnyResource{I}",
 	}
 
 	for _, fromType := range types {
@@ -678,9 +678,9 @@ func TestCheckFailableCastingResourceInterface(t *testing.T) {
 
                      resource interface I2 {}
 
-                     fun test(): @I2? {
+                     fun test(): @AnyResource{I2}? {
                          let i: @%s <- create R()
-                         if let r <- i as? @I2 {
+                         if let r <- i as? @AnyResource{I2} {
                              return <-r
                          } else {
                              destroy i
