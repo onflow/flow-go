@@ -9,8 +9,8 @@ import (
 
 // TransactionForCluster generates a transaction that will be assigned to the
 // target cluster ID.
-func TransactionForCluster(clusters *flow.ClusterList, target flow.IdentityList) *flow.Transaction {
-	tx := unittest.TransactionFixture()
+func TransactionForCluster(clusters *flow.ClusterList, target flow.IdentityList) *flow.TransactionBody {
+	tx := unittest.TransactionBodyFixture()
 
 	// Bound to avoid infinite loop in case the routing algorithm is broken
 	tx.Nonce = 0

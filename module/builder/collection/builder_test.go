@@ -51,7 +51,7 @@ func TestBuilder(t *testing.T) {
 			require.Nil(t, err)
 			// add some transactions to transaction pool
 			for i := 0; i < 3; i++ {
-				transaction := unittest.TransactionFixture(func(tx *flow.Transaction) {
+				transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
 					tx.Nonce = uint64(i)
 				})
 				err = pool.Add(&transaction)

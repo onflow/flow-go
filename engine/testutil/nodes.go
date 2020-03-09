@@ -85,11 +85,12 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	require.NoError(t, err)
 
 	collections := storage.NewCollections(node.DB)
+	transactions := storage.NewTransactions(node.DB)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool)
 	require.Nil(t, err)
 
-	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, collections)
+	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool, collections, transactions)
 	require.Nil(t, err)
 
 	return mock.CollectionNode{

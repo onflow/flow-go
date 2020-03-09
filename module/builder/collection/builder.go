@@ -133,7 +133,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			if err != nil {
 				return fmt.Errorf("could not insert missing transaction: %w", err)
 			}
-			err = operation.SkipDuplicates(operation.InsertTransaction(&flowTx.TransactionBody))(tx)
+			err = operation.SkipDuplicates(operation.InsertTransaction(flowTx))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert transaction: %w", err)
 			}
