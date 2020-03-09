@@ -316,7 +316,7 @@ func TestCheckTransactions(t *testing.T) {
 			"InvalidParameterUseAfterDeclaration",
 			`
 		      transaction(x: Bool) {}
-		
+
 		      let y = x
 		    `,
 			[]error{
