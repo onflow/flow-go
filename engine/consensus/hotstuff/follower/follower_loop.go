@@ -5,12 +5,10 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
-
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/model/flow"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
@@ -23,9 +21,8 @@ type HotStuffFollower struct {
 	log           zerolog.Logger
 	followerLogic *FollowerLogic
 	proposals     chan *model.Proposal
-	started       *atomic.Bool
-	readyChan     chan struct{}
-	doneChan      chan struct{}
+
+	runner SingleRunner // lock for preventing concurrent state transitions
 }
 
 // HotStuffFollower creates an instance of EventLoop
@@ -48,9 +45,7 @@ func New(
 		log:           log,
 		followerLogic: followerLogic,
 		proposals:     make(chan *model.Proposal),
-		started:       atomic.NewBool(false),
-		readyChan:     make(chan struct{}),
-		doneChan:      make(chan struct{}),
+		runner:        NewSingleRunner(),
 	}, nil
 }
 
@@ -98,45 +93,43 @@ func (el *HotStuffFollower) SubmitProposal(proposalHeader *flow.Header, parentVi
 		Msg("busy duration to handle a proposal")
 }
 
-// Start will starts the HotStuffFollower's internal processing loop.
-// Method blocks until the loop exists with a fatal error.
-func (el *HotStuffFollower) Start() error {
-	if el.started.Swap(true) {
-		return nil
-	}
-	close(el.readyChan)
-	err := el.loop()
-	close(el.doneChan)
-	return fmt.Errorf("follower's event loop crashed: %w", err)
-}
-
-func (el *HotStuffFollower) loop() error {
+// loop will synchronously processes all events.
+// All errors from FollowerLogic are fatal:
+//   * known critical error: some prerequisites of the HotStuff follower have been broken
+//   * unknown critical error: bug-related
+func (el *HotStuffFollower) loop() {
+	shutdownSignal := el.runner.ShutdownSignal()
 	for {
-		idleStart := time.Now()
-		p := <-el.proposals
-		idleDuration := time.Now().Sub(idleStart)
-		el.log.Debug().Dur("idle_duration", idleDuration)
+		select { // to ensure we are not skipping over a termination signal
+		case <-shutdownSignal:
+			return
+		default:
+		}
 
-		err := el.followerLogic.AddBlock(p)
-		// HotStuffFollower will run in an event loop to process all events synchronously.
-		// And this point, we are only expecting fatal errors:
-		//   * known critical error: exit the loop (some assumption between components is broken)
-		//   * unknown critical error: it will exit the loop
-		if err != nil {
-			el.log.Error().Hex("block_ID", logging.ID(p.Block.BlockID)).
-				Uint64("view", p.Block.View).
-				Msg("fatal error processing proposal")
-			return err
+		select {
+		case p := <-el.proposals:
+			err := el.followerLogic.AddBlock(p)
+			if err != nil { // all errors are fatal
+				el.log.Error().Hex("block_ID", logging.ID(p.Block.BlockID)).
+					Uint64("view", p.Block.View).
+					Msg("fatal error processing proposal")
+				el.log.Error().Msgf("terminating HotStuffFollower: %s", err.Error())
+				return
+			}
+		case <-shutdownSignal:
+			return
 		}
 	}
 }
 
 // Ready implements interface module.ReadyDoneAware
-func (el *HotStuffFollower) Ready() <-chan struct{} {
-	return el.readyChan
+// Method call will starts the HotStuffFollower's internal processing loop.
+// Multiple calls are handled gracefully and the follower will only start once.
+func (s *HotStuffFollower) Ready() <-chan struct{} {
+	return s.runner.Start(s.loop)
 }
 
 // Done implements interface module.ReadyDoneAware
-func (el *HotStuffFollower) Done() <-chan struct{} {
-	return el.doneChan
+func (s *HotStuffFollower) Done() <-chan struct{} {
+	return s.runner.Stop()
 }
