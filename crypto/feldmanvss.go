@@ -68,14 +68,18 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 
 	// Group public key
 	Y := &PubKeyBLS_BLS12381{
+		alg:   s.blsContext,
 		point: s.A[0],
+		check: valid,
 	}
 
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
 		y[i] = &PubKeyBLS_BLS12381{
+			alg:   s.blsContext,
 			point: p,
+			check: valid,
 		}
 	}
 	return x, Y, y, nil

@@ -6,16 +6,8 @@ package crypto
 type BLS_BLS12381Algo struct {
 	// points to Relic context of BLS12-381 with all the parameters
 	context ctx
-
-	// points to precomputed parameters of BLS12-381 not included in Relic context
-	//precomputed BLSPrecParams
 	// embeds commonSigner
 	*commonSigner
-}
-
-// signHash implements BLS signature on BLS12381 curve
-func (sk *PrKeyBLS_BLS12381) signHash(h Hash) (Signature, error) {
-	return sk.alg.blsSign(&sk.scalar, h), nil
 }
 
 // Sign signs an array of bytes
@@ -27,7 +19,7 @@ func (sk *PrKeyBLS_BLS12381) Sign(data []byte, kmac Hasher) (Signature, error) {
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
-	return sk.signHash(h)
+	return sk.alg.blsSign(&sk.scalar, h), nil
 }
 
 const BLS_KMACFunction = "H2C"
@@ -41,11 +33,6 @@ func NewBLS_KMAC(tag string) Hasher {
 	return kmac
 }
 
-// verifyHash implements BLS signature verification on BLS12381 curve
-func (pk *PubKeyBLS_BLS12381) verifyHash(s Signature, h Hash) (bool, error) {
-	return pk.alg.blsVerify(&pk.point, s, h), nil
-}
-
 // Verify verifies a signature of a byte array
 // This function does not modify the public key, even temporarily
 // If the hasher used is KMAC128, it is not modified by the function, even temporarily
@@ -53,9 +40,12 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac Hasher) (boo
 	if kmac == nil {
 		return false, cryptoError{"VerifyBytes requires a Hasher"}
 	}
+	if pk.check != valid {
+		return false, cryptoError{"verification must use a verified public key."}
+	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
-	return pk.verifyHash(s, h)
+	return pk.alg.blsVerify(&pk.point, s, h), nil
 }
 
 // GeneratePrKey generates a private key for BLS on BLS12381 curve
@@ -82,7 +72,8 @@ func (a *BLS_BLS12381Algo) decodePrivateKey([]byte) (PrivateKey, error) {
 
 func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
 	pk := &PubKeyBLS_BLS12381{
-		alg: a,
+		alg:   a,
+		check: unchecked,
 	}
 	readPointG2(&pk.point, publicKeyBytes)
 	return pk, nil
@@ -112,6 +103,7 @@ func (sk *PrKeyBLS_BLS12381) computePublicKey() {
 	}
 	// compute public key pk = g2^sk
 	_G2scalarGenMult(&(newPk.point), &(sk.scalar))
+	newPk.check = valid
 	sk.pk = newPk
 }
 
@@ -128,12 +120,28 @@ func (a *PrKeyBLS_BLS12381) Encode() ([]byte, error) {
 	return nil, nil
 }
 
-// PubKeyBLS_BLS12381 is the public key of BLS using BLS12_381, it implements PublicKey
+// memCheckState defines the state of the public key
+// membership in G2
+type memCheckState int
+
+const (
+	// states of the public key membership
+	unchecked memCheckState = iota
+	valid
+	invalid
+)
+
+// PubKeyBLS_BLS12381 is the public key of BLS using BLS12_381,
+// it implements PublicKey
 type PubKeyBLS_BLS12381 struct {
 	// the signature algo
 	alg *BLS_BLS12381Algo
 	// public key data
 	point pointG2
+	// membership check in G2
+	// this flag forces validating the public key
+	// before it is used for signature verifcations
+	check memCheckState
 }
 
 func (pk *PubKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
@@ -148,4 +156,14 @@ func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {
 	dest := make([]byte, pubKeyLengthBLS_BLS12381)
 	writePointG2(dest, &a.point)
 	return dest, nil
+}
+
+// ValidityCheck runs a membership check of BLS public keys on BLS12-381 curve.
+// Returns true if the public key is on the correct subgroup of the curve
+// and false otherwise
+// Itr is necessary to run this test once for every public key before
+// it is used to verify BLS signatures
+func (a *PubKeyBLS_BLS12381) ValidityCheck() (bool, error) {
+	a.check = valid
+	return a.check == valid, nil
 }
