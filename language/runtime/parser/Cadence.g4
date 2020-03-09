@@ -83,6 +83,7 @@ declaration
 
 transactionDeclaration
     : Transaction
+      parameterList?
       '{'
       fields
       prepare?
