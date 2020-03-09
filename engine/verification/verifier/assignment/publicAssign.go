@@ -45,7 +45,7 @@ func (p *PublicAssignment) Which(this flow.Identifier) []uint64 {
 // it implements in-place version of Fisher-Yates shuffling https://doi.org/10.1145%2F364520.364540
 func permute(ids IdentifierList, m int, rng random.Rand) {
 	for i := m - 1; i > 0; i-- {
-		j := rng.IntN(i)
+		j, _ := rng.IntN(i)
 		ids.Swap(i, j)
 	}
 }

@@ -80,16 +80,16 @@ func (x *xorshiftp) prn() uint64 {
 // IntN returns an uint64 pseudo-random number in [0,n-1]
 // using the xorshift+ of the current index. The index is updated
 // to use another xorshift+ at the next round
-func (x *xorshifts) IntN(n int) int {
+func (x *xorshifts) IntN(n int) (int, error) {
 	if n <= 0 {
-		panic("input must be positive")
+		return 0, fmt.Errorf("input must be positive")
 	}
 	res := x.states[x.stateIndex].prn() % uint64(n)
 	// update the state
 	x.states[x.stateIndex].next()
 	// update the index
 	x.stateIndex = (x.stateIndex + 1) % len(x.states)
-	return int(res)
+	return int(res), nil
 }
 
 // Permutation returns a permutation of the set [0,n-1]
@@ -97,28 +97,28 @@ func (x *xorshifts) IntN(n int) int {
 // the output space grows very fast with (!n) so that input (n) and the seed length
 // (which fixes the internal state length of xorshifts ) should be chosen carefully
 // O(n) space and O(n) time
-func (x *xorshifts) Permutation(n int) []int {
+func (x *xorshifts) Permutation(n int) ([]int, error) {
 	if n <= 0 {
-		panic("arguments to PermutateSubset must be positive")
+		return nil, fmt.Errorf("arguments to PermutateSubset must be positive")
 	}
 	items := make([]int, n)
 	for i := 0; i < n; i++ {
-		j := x.IntN(i + 1)
+		j, _ := x.IntN(i + 1)
 		if j != i {
 			items[i] = items[j]
 		}
 		items[j] = i
 	}
-	return items
+	return items, nil
 }
 
 // SubPermutation returns the m first elements of a permutation of [0,n-1]
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(n) space and O(n) time
-func (x *xorshifts) SubPermutation(n int, m int) []int {
+func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
 	if m <= 0 {
-		panic("arguments to PermutateSubset must be positive")
+		return nil, fmt.Errorf("arguments to PermutateSubset must be positive")
 	}
-	items := x.Permutation(n)
-	return items[:m]
+	items, _ := x.Permutation(n)
+	return items[:m], nil
 }

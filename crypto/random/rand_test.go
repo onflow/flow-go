@@ -22,7 +22,7 @@ func TestXorshift(t *testing.T) {
 	rand, err := NewRand(seed)
 	require.NoError(t, err)
 	for i := 0; i < sampleSize; i++ {
-		r := rand.IntN(sampleSpace)
+		r, _ := rand.IntN(sampleSpace)
 		distribution[r] += 1.0
 	}
 	stdev := stat.StdDev(distribution, nil)
@@ -52,7 +52,7 @@ func TestRandomPermutationSubset(t *testing.T) {
 	distribution := make([]float64, listSize)
 
 	for i := 0; i < sampleSize; i++ {
-		shuffledlist := rng.SubPermutation(listSize, subsetSize)
+		shuffledlist, _ := rng.SubPermutation(listSize, subsetSize)
 		if len(shuffledlist) != subsetSize {
 			t.Errorf("PermutateSubset returned a list with a wrong size")
 		}
