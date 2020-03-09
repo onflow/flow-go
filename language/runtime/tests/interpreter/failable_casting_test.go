@@ -744,40 +744,6 @@ func TestInterpretFailableCastingResourceInterface(t *testing.T) {
 				result,
 			)
 		})
-
-		t.Run(fmt.Sprintf("invalid: from %s to other resource interface", fromType), func(t *testing.T) {
-
-			inter := parseCheckAndInterpret(t,
-				fmt.Sprintf(
-					`
-                      resource interface I {}
-
-                      resource R: I {}
-
-                      resource interface I2 {}
-
-                      fun test(): @AnyResource{I2}? {
-                          let i: @%s <- create R()
-                          if let r <- i as? @AnyResource{I2} {
-                              return <-r
-                          } else {
-                              destroy i
-                              return nil
-                          }
-                      }
-                    `,
-					fromType,
-				),
-			)
-
-			result, err := inter.Invoke("test")
-			require.NoError(t, err)
-
-			require.IsType(t,
-				interpreter.NilValue{},
-				result,
-			)
-		})
 	}
 }
 
