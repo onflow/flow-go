@@ -86,7 +86,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}
-			prop.WithConsensus(cold)
+
+			prop = prop.WithConsensus(cold)
 			return prop, nil
 		}).
 		Run()
