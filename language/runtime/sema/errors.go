@@ -923,21 +923,57 @@ func (e *ImportedProgramError) EndPosition() ast.Position {
 	return e.Pos
 }
 
-// UnsupportedTypeError
+// UnsupportedCastedTypeError
 
-type UnsupportedTypeError struct {
+type UnsupportedCastedTypeError struct {
 	Type Type
 	ast.Range
 }
 
-func (e *UnsupportedTypeError) Error() string {
+func (e *UnsupportedCastedTypeError) Error() string {
 	return fmt.Sprintf(
-		"unsupported type: `%s`",
+		"cannot cast value of type: `%s`",
 		e.Type.QualifiedString(),
 	)
 }
 
-func (*UnsupportedTypeError) isSemanticError() {}
+func (*UnsupportedCastedTypeError) isSemanticError() {}
+
+// AlwaysFailingNonResourceCastingTypeError
+
+type AlwaysFailingNonResourceCastingTypeError struct {
+	ValueType  Type
+	TargetType Type
+	ast.Range
+}
+
+func (e *AlwaysFailingNonResourceCastingTypeError) Error() string {
+	return fmt.Sprintf(
+		"cast of value of resource-type `%s` to non-resource type `%s` will always fail",
+		e.ValueType.QualifiedString(),
+		e.TargetType.QualifiedString(),
+	)
+}
+
+func (*AlwaysFailingNonResourceCastingTypeError) isSemanticError() {}
+
+// AlwaysFailingResourceCastingTypeError
+
+type AlwaysFailingResourceCastingTypeError struct {
+	ValueType  Type
+	TargetType Type
+	ast.Range
+}
+
+func (e *AlwaysFailingResourceCastingTypeError) Error() string {
+	return fmt.Sprintf(
+		"cast of value of non-resource-type `%s` to resource type `%s` will always fail",
+		e.ValueType.QualifiedString(),
+		e.TargetType.QualifiedString(),
+	)
+}
+
+func (*AlwaysFailingResourceCastingTypeError) isSemanticError() {}
 
 // UnsupportedOverloadingError
 
