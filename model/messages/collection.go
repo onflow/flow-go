@@ -23,6 +23,16 @@ type CollectionResponse struct {
 	Collection flow.Collection
 }
 
+// TransactionRequest is a request message for a single transaction.
+type TransactionRequest struct {
+	ID flow.Identifier
+}
+
+// TransactionResponse is a response to a transaction request.
+type TransactionResponse struct {
+	Transaction flow.TransactionBody
+}
+
 // ClusterBlockProposal is a proposal for a block in collection node cluster
 // consensus. The header contains information about consensus state and the
 // payload contains the proposed collection (may be empty).

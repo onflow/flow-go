@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -22,23 +23,27 @@ import (
 // Engine is the collection provider engine, which provides access to resources
 // held by the collection node.
 type Engine struct {
-	unit        *engine.Unit
-	log         zerolog.Logger
-	tracer      trace.Tracer
-	con         network.Conduit
-	me          module.Local
-	state       protocol.State
-	collections storage.Collections
+	unit         *engine.Unit
+	log          zerolog.Logger
+	tracer       trace.Tracer
+	con          network.Conduit
+	me           module.Local
+	state        protocol.State
+	pool         mempool.Transactions
+	collections  storage.Collections
+	transactions storage.Transactions
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local, collections storage.Collections) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log.With().Str("engine", "provider").Logger(),
-		tracer:      tracer,
-		me:          me,
-		state:       state,
-		collections: collections,
+		unit:         engine.NewUnit(),
+		log:          log.With().Str("engine", "provider").Logger(),
+		tracer:       tracer,
+		me:           me,
+		state:        state,
+		pool:         pool,
+		collections:  collections,
+		transactions: transactions,
 	}
 
 	con, err := net.Register(engine.CollectionProvider, e)
@@ -92,23 +97,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// SubmitCollectionGuarantee submits the collection guarantee to all
-// consensus nodes.
-func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
-	defer e.tracer.FinishSpan(guarantee.ID())
-	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return fmt.Errorf("could not get consensus consensusNodes: %w", err)
-	}
-
-	err = e.con.Submit(guarantee, consensusNodes.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not submit collection guarantee: %w", err)
-	}
-
-	return nil
-}
-
 // process processes events for the provider engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
@@ -116,6 +104,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onCollectionRequest(originID, ev)
 	case *messages.SubmitCollectionGuarantee:
 		return e.onSubmitCollectionGuarantee(originID, ev)
+	case *messages.TransactionRequest:
+		return e.onTransactionRequest(originID, ev)
+	case *messages.TransactionResponse:
+		return e.onTransactionResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -144,4 +136,29 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 	}
 
 	return e.SubmitCollectionGuarantee(&req.Guarantee)
+}
+
+func (e *Engine) onTransactionRequest(originID flow.Identifier, req *messages.TransactionRequest) error {
+	panic("TODO")
+}
+
+func (e *Engine) onTransactionResponse(originID flow.Identifier, res *messages.TransactionResponse) error {
+	panic("TODO")
+}
+
+// SubmitCollectionGuarantee submits the collection guarantee to all
+// consensus nodes.
+func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+	defer e.tracer.FinishSpan(guarantee.ID())
+	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
+	if err != nil {
+		return fmt.Errorf("could not get consensus consensusNodes: %w", err)
+	}
+
+	err = e.con.Submit(guarantee, consensusNodes.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not submit collection guarantee: %w", err)
+	}
+
+	return nil
 }
