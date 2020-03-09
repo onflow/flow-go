@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPRGSeeding(t *testing.T) {
@@ -128,21 +128,18 @@ func TestDecode(t *testing.T) {
 	// generate a key pair
 	seed := []byte{1, 2, 3, 4}
 	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
+	require.NoError(t, err)
 	pk := sk.PublicKey()
 	// encode the publick key
 	pkBytes, err := pk.Encode()
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	// decode the public key including a membership check
 	pkCopy, err := DecodePublicKey(BLS_BLS12381, pkBytes)
 	// membership check should be valid
 	assert.Nil(t, err)
 	// check the encode and decode are consistent
 	pkCopyBytes, err := pkCopy.Encode()
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, pkBytes, pkCopyBytes)
 	// check an invalid membership check
 	pkBytes[5] ^= 1 // alter a bit

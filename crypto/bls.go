@@ -74,7 +74,7 @@ func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, er
 		alg: a,
 	}
 	readPointG2(&pk.point, publicKeyBytes)
-	if (&pk.point).checkMembershipG2() == true {
+	if pk.point.checkMembershipG2() {
 		return pk, nil
 	}
 	return nil, cryptoError{"the public key is not a valid BLS12-381 curve key"}
