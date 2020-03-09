@@ -169,8 +169,6 @@ func (suite *Suite) TestHandlePendingProposal() {
 	suite.con.AssertExpectations(suite.T())
 }
 
-// TODO needs changes from https://github.com/dapperlabs/flow-go/pull/2742 to
-// effectively mock cached children
 func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	originID := unittest.IdentifierFixture()
 	parent := unittest.ClusterBlockFixture()

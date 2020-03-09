@@ -96,6 +96,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 		GenericNode:     node,
 		Pool:            pool,
 		Collections:     collections,
+		Transactions:    transactions,
 		IngestionEngine: ingestionEngine,
 		ProviderEngine:  providerEngine,
 	}
