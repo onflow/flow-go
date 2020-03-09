@@ -23,9 +23,10 @@ import (
 
 type Value interface {
 	IsValue()
+	DynamicType(interpreter *Interpreter) DynamicType
 	Copy() Value
 	GetOwner() *common.Address
-	SetOwner(*common.Address)
+	SetOwner(address *common.Address)
 }
 
 // ValueIndexableValue
@@ -77,6 +78,10 @@ func init() {
 
 func (VoidValue) IsValue() {}
 
+func (VoidValue) DynamicType(_ *Interpreter) DynamicType {
+	return VoidType{}
+}
+
 func (v VoidValue) Copy() Value {
 	return v
 }
@@ -103,6 +108,10 @@ func init() {
 }
 
 func (BoolValue) IsValue() {}
+
+func (BoolValue) DynamicType(_ *Interpreter) DynamicType {
+	return BoolType{}
+}
 
 func (v BoolValue) Copy() Value {
 	return v
@@ -152,6 +161,10 @@ func NewStringValue(str string) *StringValue {
 }
 
 func (*StringValue) IsValue() {}
+
+func (*StringValue) DynamicType(_ *Interpreter) DynamicType {
+	return StringType{}
+}
 
 func (v *StringValue) Copy() Value {
 	return &StringValue{Str: v.Str}
@@ -324,6 +337,18 @@ func NewArrayValueUnownedNonCopying(values ...Value) *ArrayValue {
 }
 
 func (*ArrayValue) IsValue() {}
+
+func (v *ArrayValue) DynamicType(interpreter *Interpreter) DynamicType {
+	elementTypes := make([]DynamicType, len(v.Values))
+
+	for i, value := range v.Values {
+		elementTypes[i] = value.DynamicType(interpreter)
+	}
+
+	return ArrayType{
+		ElementTypes: elementTypes,
+	}
+}
 
 func (v *ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
@@ -586,6 +611,10 @@ func ConvertInt(value Value) Value {
 
 func (v IntValue) IsValue() {}
 
+func (IntValue) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.IntType{}}
+}
+
 func (v IntValue) Copy() Value {
 	return IntValue{big.NewInt(0).Set(v.Int)}
 }
@@ -697,6 +726,10 @@ func init() {
 }
 
 func (Int8Value) IsValue() {}
+
+func (Int8Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int8Type{}}
+}
 
 func (v Int8Value) Copy() Value {
 	return v
@@ -840,6 +873,10 @@ func init() {
 
 func (Int16Value) IsValue() {}
 
+func (Int16Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int16Type{}}
+}
+
 func (v Int16Value) Copy() Value {
 	return v
 }
@@ -982,6 +1019,10 @@ func init() {
 
 func (Int32Value) IsValue() {}
 
+func (Int32Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int32Type{}}
+}
+
 func (v Int32Value) Copy() Value {
 	return v
 }
@@ -1123,6 +1164,10 @@ func init() {
 }
 
 func (Int64Value) IsValue() {}
+
+func (Int64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int64Type{}}
+}
 
 func (v Int64Value) Copy() Value {
 	return v
@@ -1271,6 +1316,10 @@ func init() {
 }
 
 func (v Int128Value) IsValue() {}
+
+func (Int128Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int128Type{}}
+}
 
 func (v Int128Value) Copy() Value {
 	return Int128Value{big.NewInt(0).Set(v.Int)}
@@ -1446,6 +1495,10 @@ func init() {
 }
 
 func (v Int256Value) IsValue() {}
+
+func (Int256Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int256Type{}}
+}
 
 func (v Int256Value) Copy() Value {
 	return Int256Value{big.NewInt(0).Set(v.Int)}
@@ -1634,6 +1687,10 @@ func ConvertUInt(value Value) Value {
 
 func (v UIntValue) IsValue() {}
 
+func (UIntValue) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UIntType{}}
+}
+
 func (v UIntValue) Copy() Value {
 	return UIntValue{big.NewInt(0).Set(v.Int)}
 }
@@ -1749,6 +1806,10 @@ func init() {
 
 func (UInt8Value) IsValue() {}
 
+func (UInt8Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt8Type{}}
+}
+
 func (v UInt8Value) Copy() Value {
 	return v
 }
@@ -1859,6 +1920,10 @@ func init() {
 
 func (UInt16Value) IsValue() {}
 
+func (UInt16Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt16Type{}}
+}
+
 func (v UInt16Value) Copy() Value {
 	return v
 }
@@ -1966,6 +2031,10 @@ func init() {
 }
 
 func (UInt32Value) IsValue() {}
+
+func (UInt32Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt32Type{}}
+}
 
 func (v UInt32Value) Copy() Value {
 	return v
@@ -2076,6 +2145,10 @@ func init() {
 }
 
 func (UInt64Value) IsValue() {}
+
+func (UInt64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt64Type{}}
+}
 
 func (v UInt64Value) Copy() Value {
 	return v
@@ -2193,6 +2266,10 @@ func init() {
 }
 
 func (v UInt128Value) IsValue() {}
+
+func (UInt128Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt128Type{}}
+}
 
 func (v UInt128Value) Copy() Value {
 	return UInt128Value{big.NewInt(0).Set(v.Int)}
@@ -2339,6 +2416,10 @@ func init() {
 
 func (v UInt256Value) IsValue() {}
 
+func (UInt256Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt256Type{}}
+}
+
 func (v UInt256Value) Copy() Value {
 	return UInt256Value{big.NewInt(0).Set(v.Int)}
 }
@@ -2482,6 +2563,10 @@ func init() {
 
 func (Word8Value) IsValue() {}
 
+func (Word8Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Word8Type{}}
+}
+
 func (v Word8Value) Copy() Value {
 	return v
 }
@@ -2578,6 +2663,10 @@ func init() {
 
 func (Word16Value) IsValue() {}
 
+func (Word16Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Word16Type{}}
+}
+
 func (v Word16Value) Copy() Value {
 	return v
 }
@@ -2671,6 +2760,10 @@ func init() {
 }
 
 func (Word32Value) IsValue() {}
+
+func (Word32Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Word32Type{}}
+}
 
 func (v Word32Value) Copy() Value {
 	return v
@@ -2768,6 +2861,10 @@ func init() {
 
 func (Word64Value) IsValue() {}
 
+func (Word64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Word64Type{}}
+}
+
 func (v Word64Value) Copy() Value {
 	return v
 }
@@ -2863,6 +2960,10 @@ func init() {
 }
 
 func (Fix64Value) IsValue() {}
+
+func (Fix64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Fix64Type{}}
+}
 
 func (v Fix64Value) Copy() Value {
 	return v
@@ -3007,6 +3108,10 @@ func init() {
 }
 
 func (UFix64Value) IsValue() {}
+
+func (UFix64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UFix64Type{}}
+}
 
 func (v UFix64Value) Copy() Value {
 	return v
@@ -3195,6 +3300,18 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 }
 
 func (*CompositeValue) IsValue() {}
+
+func (v *CompositeValue) DynamicType(interpreter *Interpreter) DynamicType {
+	locationID, qualifiedIdentifier := sema.SplitCompositeTypeID(v.TypeID)
+	if locationID == "" {
+		panic("failed to split composite type ID")
+	}
+
+	checker := interpreter.allCheckers[locationID]
+	staticType := checker.Elaboration.CompositeTypes[qualifiedIdentifier]
+
+	return CompositeType{StaticType: staticType}
+}
 
 func (v *CompositeValue) Copy() Value {
 	// Resources and contracts are not copied
@@ -3432,6 +3549,22 @@ func init() {
 }
 
 func (*DictionaryValue) IsValue() {}
+
+func (v *DictionaryValue) DynamicType(interpreter *Interpreter) DynamicType {
+	entryTypes := make([]struct{ KeyType, ValueType DynamicType }, len(v.Keys.Values))
+
+	for i, key := range v.Keys.Values {
+		entryTypes[i] =
+			struct{ KeyType, ValueType DynamicType }{
+				KeyType:   key.DynamicType(interpreter),
+				ValueType: v.Entries[dictionaryKey(key)].DynamicType(interpreter),
+			}
+	}
+
+	return DictionaryType{
+		EntryTypes: entryTypes,
+	}
+}
 
 func (v *DictionaryValue) Copy() Value {
 	newKeys := v.Keys.Copy().(*ArrayValue)
@@ -3736,6 +3869,10 @@ func init() {
 
 func (NilValue) IsValue() {}
 
+func (NilValue) DynamicType(_ *Interpreter) DynamicType {
+	return NilType{}
+}
+
 func (NilValue) isOptionalValue() {}
 
 func (v NilValue) Copy() Value {
@@ -3779,6 +3916,11 @@ func NewSomeValueOwningNonCopying(value Value) *SomeValue {
 
 func (*SomeValue) IsValue() {}
 
+func (v *SomeValue) DynamicType(interpreter *Interpreter) DynamicType {
+	innerType := v.Value.DynamicType(interpreter)
+	return SomeType{InnerType: innerType}
+}
+
 func (*SomeValue) isOptionalValue() {}
 
 func (v *SomeValue) Copy() Value {
@@ -3811,56 +3953,6 @@ func (v *SomeValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
-// AnyValue
-
-type AnyValue struct {
-	Value Value
-	// TODO: don't store
-	Type  sema.Type
-	Owner *common.Address
-}
-
-func NewAnyValueOwningNonCopying(value Value, ty sema.Type) *AnyValue {
-	return &AnyValue{
-		Value: value,
-		Type:  ty,
-		Owner: value.GetOwner(),
-	}
-}
-
-func init() {
-	gob.Register(&AnyValue{})
-}
-
-func (*AnyValue) IsValue() {}
-
-func (v *AnyValue) Copy() Value {
-	return &AnyValue{
-		Value: v.Value.Copy(),
-		Type:  v.Type,
-		// NOTE: new value has no owner
-		Owner: nil,
-	}
-}
-
-func (v *AnyValue) GetOwner() *common.Address {
-	return v.Owner
-}
-
-func (v *AnyValue) SetOwner(owner *common.Address) {
-	if v.Owner == owner {
-		return
-	}
-
-	v.Owner = owner
-
-	v.Value.SetOwner(owner)
-}
-
-func (v *AnyValue) String() string {
-	return fmt.Sprint(v.Value)
-}
-
 // StorageValue
 
 type StorageValue struct {
@@ -3868,6 +3960,10 @@ type StorageValue struct {
 }
 
 func (StorageValue) IsValue() {}
+
+func (v StorageValue) DynamicType(_ *Interpreter) DynamicType {
+	return StorageType{}
+}
 
 func (v StorageValue) Copy() Value {
 	return StorageValue{
@@ -3890,6 +3986,10 @@ type PublishedValue struct {
 }
 
 func (PublishedValue) IsValue() {}
+
+func (v PublishedValue) DynamicType(_ *Interpreter) DynamicType {
+	return PublishedType{}
+}
 
 func (v PublishedValue) Copy() Value {
 	return PublishedValue{
@@ -3918,6 +4018,10 @@ func init() {
 }
 
 func (*StorageReferenceValue) IsValue() {}
+
+func (*StorageReferenceValue) DynamicType(_ *Interpreter) DynamicType {
+	return StorageReferenceType{}
+}
 
 func (v *StorageReferenceValue) Copy() Value {
 	return &StorageReferenceValue{
@@ -3988,6 +4092,10 @@ type EphemeralReferenceValue struct {
 }
 
 func (*EphemeralReferenceValue) IsValue() {}
+
+func (*EphemeralReferenceValue) DynamicType(_ *Interpreter) DynamicType {
+	return EphemeralReferenceType{}
+}
 
 func (v *EphemeralReferenceValue) Copy() Value {
 	return v
@@ -4068,6 +4176,10 @@ func ConvertAddress(value Value) Value {
 }
 
 func (AddressValue) IsValue() {}
+
+func (AddressValue) DynamicType(_ *Interpreter) DynamicType {
+	return AddressType{}
+}
 
 func (v AddressValue) Copy() Value {
 	return v

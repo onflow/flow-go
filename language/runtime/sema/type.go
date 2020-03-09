@@ -2862,6 +2862,14 @@ func (t *CompositeType) ID() TypeID {
 	return TypeID(fmt.Sprintf("%s.%s", t.Location.ID(), t.QualifiedIdentifier()))
 }
 
+func SplitCompositeTypeID(compositeTypeID TypeID) (locationID ast.LocationID, qualifiedIdentifier string) {
+	parts := strings.SplitN(string(compositeTypeID), ".", 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return ast.LocationID(parts[0]), parts[1]
+}
+
 func (t *CompositeType) Equal(other Type) bool {
 	otherStructure, ok := other.(*CompositeType)
 	if !ok {
@@ -3804,6 +3812,10 @@ func IsSubType(subType Type, superType Type) bool {
 		return true
 	}
 
+	if _, ok := subType.(*NeverType); ok {
+		return true
+	}
+
 	switch superType.(type) {
 	case *AnyType:
 		return true
@@ -3813,10 +3825,6 @@ func IsSubType(subType Type, superType Type) bool {
 
 	case *AnyResourceType:
 		return subType.IsResourceType()
-	}
-
-	if _, ok := subType.(*NeverType); ok {
-		return true
 	}
 
 	switch typedSuperType := superType.(type) {
