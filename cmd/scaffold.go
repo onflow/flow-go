@@ -3,6 +3,7 @@ package cmd
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -38,8 +39,13 @@ type BaseConfig struct {
 	metricsPort uint
 }
 
-type namedReadyFn struct {
-	fn   func(*FlowNodeBuilder) module.ReadyDoneAware
+type namedModuleFunc struct {
+	fn   func(*FlowNodeBuilder) error
+	name string
+}
+
+type namedComponentFunc struct {
+	fn   func(*FlowNodeBuilder) (module.ReadyDoneAware, error)
 	name string
 }
 
@@ -65,7 +71,8 @@ type FlowNodeBuilder struct {
 	DB             *badger.DB
 	Me             *local.Local
 	State          *protocol.State
-	readyDoneFns   []namedReadyFn
+	modules        []namedModuleFunc
+	components     []namedComponentFunc
 	doneObject     []namedDoneObject
 	sig            chan os.Signal
 	Network        *libp2p.Network
@@ -90,20 +97,24 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
-	fnb.Component("flow network", func(builder *FlowNodeBuilder) module.ReadyDoneAware {
-
-		fnb.Logger.Info().Msg("initializing network stack")
+	fnb.Component("network", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 		codec := json.NewCodec()
 
 		nk, err := loadPrivateNetworkKey(fnb.Me.NodeID())
-		fnb.MustNot(err).Msg("could not load private key")
+		if err != nil {
+			return nil, fmt.Errorf("could not load private key: %w", err)
+		}
 
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID(), nk)
-		fnb.MustNot(err).Msg("could not initialize flow middleware")
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize middleware: %w", err)
+		}
 
 		ids, err := fnb.State.Final().Identities()
-		fnb.MustNot(err).Msg("could not retrieve state identities")
+		if err != nil {
+			return nil, fmt.Errorf("could not get network identities: %w", err)
+		}
 
 		// temporary fix to make public keys available to the networking layer
 		// populate the Networking keys for each identity with public keys generated with the node identifier as the seed
@@ -112,17 +123,19 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		fnb.MustNot(err).Msg("could not generate public key")
 
 		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
-		fnb.MustNot(err).Msg("could not initialize flow network")
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize network: %w", err)
+		}
+
 		fnb.Network = net
-		return net
+		return net, err
 	})
 }
 
 func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
-	fnb.Component("metrics server", func(builder *FlowNodeBuilder) module.ReadyDoneAware {
-		fnb.Logger.Info().Msg("initializing metrics server")
+	fnb.Component("metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
-		return server
+		return server, nil
 	})
 }
 
@@ -219,17 +232,33 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.State = state
 }
 
-func (fnb *FlowNodeBuilder) handleReadyAware(v namedReadyFn) {
+func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
+	err := v.fn(fnb)
+	if err != nil {
+		fnb.Logger.Fatal().Err(err).Str("module", v.name).Msg("module initialization failed")
+	} else {
+		fnb.Logger.Info().Str("module", v.name).Msg("module initialization complete")
+	}
+}
 
-	readyAware := v.fn(fnb)
+func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
+
+	log := fnb.Logger.With().Str("component", v.name).Logger()
+
+	readyAware, err := v.fn(fnb)
+	if err != nil {
+		log.Fatal().Err(err).Msg("component initialization failed")
+	} else {
+		log.Info().Msg("component initialization complete")
+	}
 
 	select {
 	case <-readyAware.Ready():
-		fnb.Logger.Info().Msgf("%s ready", v.name)
+		log.Info().Msg("component startup complete")
 	case <-time.After(fnb.BaseConfig.Timeout):
-		fnb.Logger.Fatal().Msgf("could not start %s", v.name)
+		log.Fatal().Msg("component startup timed out")
 	case <-fnb.sig:
-		fnb.Logger.Warn().Msgf("%s start aborted", v.name)
+		log.Warn().Msg("component startup aborted")
 		os.Exit(1)
 	}
 
@@ -239,15 +268,16 @@ func (fnb *FlowNodeBuilder) handleReadyAware(v namedReadyFn) {
 }
 
 func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
-	fnb.Logger.Info().Msgf("stopping %s", v.name)
+
+	log := fnb.Logger.With().Str("component", v.name).Logger()
 
 	select {
 	case <-v.ob.Done():
-		fnb.Logger.Info().Msgf("%s shutdown complete", v.name)
+		log.Info().Msg("component shutdown complete")
 	case <-time.After(fnb.BaseConfig.Timeout):
-		fnb.Logger.Fatal().Msgf("could not stop %s", v.name)
+		log.Fatal().Msg("component shutdown timed out")
 	case <-fnb.sig:
-		fnb.Logger.Warn().Msgf("%s stop aborted", v.name)
+		log.Warn().Msg("component shutdown aborted")
 		os.Exit(1)
 	}
 }
@@ -258,10 +288,12 @@ func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) *FlowNodeBuilder 
 	return fnb
 }
 
-// Create enables setting up dependencies of the node with the context of the
-// builder.
-func (fnb *FlowNodeBuilder) Create(f func(builder *FlowNodeBuilder)) *FlowNodeBuilder {
-	f(fnb)
+// Module enables setting up dependencies of the engine with the builder context.
+func (fnb *FlowNodeBuilder) Module(name string, f func(builder *FlowNodeBuilder) error) *FlowNodeBuilder {
+	fnb.modules = append(fnb.modules, namedModuleFunc{
+		fn:   f,
+		name: name,
+	})
 	return fnb
 }
 
@@ -282,8 +314,8 @@ func (fnb *FlowNodeBuilder) MustNot(err error) *zerolog.Event {
 // When the node is run, this component will be started with `Ready`. When the
 // node is stopped, we will wait for the component to exit gracefully with
 // `Done`.
-func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) module.ReadyDoneAware) *FlowNodeBuilder {
-	fnb.readyDoneFns = append(fnb.readyDoneFns, namedReadyFn{
+func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) (module.ReadyDoneAware, error)) *FlowNodeBuilder {
+	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:   f,
 		name: name,
 	})
@@ -306,10 +338,9 @@ func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBui
 func FlowNode(name string) *FlowNodeBuilder {
 
 	builder := &FlowNodeBuilder{
-		BaseConfig:   BaseConfig{},
-		flags:        pflag.CommandLine,
-		name:         name,
-		readyDoneFns: make([]namedReadyFn, 0),
+		BaseConfig: BaseConfig{},
+		flags:      pflag.CommandLine,
+		name:       name,
 	}
 
 	builder.baseFlags()
@@ -333,6 +364,11 @@ func (fnb *FlowNodeBuilder) Run() {
 	// parse configuration parameters
 	pflag.Parse()
 
+	// initialize all components
+	for _, f := range fnb.modules {
+		fnb.handleModule(f)
+	}
+
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
@@ -354,8 +390,8 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.genesisHandler(fnb, fnb.genesis)
 	}
 
-	for _, f := range fnb.readyDoneFns {
-		fnb.handleReadyAware(f)
+	for _, f := range fnb.components {
+		fnb.handleComponent(f)
 	}
 
 	fnb.Logger.Info().Msgf("%s node startup complete", fnb.name)

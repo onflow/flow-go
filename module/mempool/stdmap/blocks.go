@@ -14,9 +14,9 @@ type Blocks struct {
 }
 
 // NewBlocks creates a new memory pool for blocks.
-func NewBlocks() (*Blocks, error) {
+func NewBlocks(limit uint) (*Blocks, error) {
 	a := &Blocks{
-		Backend: NewBackend(),
+		Backend: NewBackend(WithLimit(limit)),
 	}
 
 	return a, nil
