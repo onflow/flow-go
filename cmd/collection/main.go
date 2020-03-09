@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -11,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/builder/collection"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -21,58 +23,55 @@ import (
 func main() {
 
 	var (
+		txLimit     uint
 		pool        mempool.Transactions
 		collections *storage.Collections
 		ingressConf ingress.Config
-		providerEng *provider.Engine
-		ingestEng   *ingest.Engine
+		prov        *provider.Engine
+		ing         *ingest.Engine
 		err         error
 	)
 
 	cmd.FlowNode("collection").
-		Create(func(node *cmd.FlowNodeBuilder) {
-			pool, err = stdmap.NewTransactions()
-			node.MustNot(err).Msg("could not initialize transaction pool")
-		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
+			flags.UintVar(&txLimit, "tx-limit", 100000, "maximum number of transactions in the memory pool")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing ingestion engine")
-			ingestEng, err = ingest.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool)
-			node.MustNot(err).Msg("could not initialize ingestion engine")
-
-			return ingestEng
+		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
+			pool, err = stdmap.NewTransactions(txLimit)
+			return err
 		}).
-		Component("ingress server", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing ingress server")
-
-			server := ingress.New(ingressConf, ingestEng)
-			return server
+		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool)
+			return ing, err
 		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing provider engine")
+		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			server := ingress.New(ingressConf, ing)
+			return server, nil
+		}).
+		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collections = storage.NewCollections(node.DB)
-			providerEng, err = provider.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, collections)
-			node.MustNot(err).Msg("could not initialize proposal engine")
-			return providerEng
+			prov, err = provider.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, collections)
+			return prov, err
 		}).
-		Component("proposal engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing proposal engine")
-			guarantees := storage.NewGuarantees(node.DB)
+		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			transactions := storage.NewTransactions(node.DB)
 			headers := storage.NewHeaders(node.DB)
-			// TODO determine chain ID for clusters
+			payloads := storage.NewClusterPayloads(node.DB)
+			cache := buffer.NewPendingClusterBlocks()
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, prov, pool, transactions, headers, payloads, cache)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize engine: %w", err)
+			}
 			build := collection.NewBuilder(node.DB, pool, "TODO")
 			// TODO implement finalizer
 			var final module.Finalizer
-
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees, headers)
-			node.MustNot(err).Msg("could not initialize proposal engine")
-
 			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, 3*time.Second, 6*time.Second)
-			node.MustNot(err).Msg("could not initialize coldstuff")
-
-			return prop.WithConsensus(cold)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
+			}
+			prop.WithConsensus(cold)
+			return prop, nil
 		}).
 		Run()
 }

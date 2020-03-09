@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -15,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -25,77 +27,76 @@ import (
 func main() {
 
 	var (
-		err        error
-		chainID    string
-		guarantees mempool.Guarantees
-		receipts   mempool.Receipts
-		approvals  mempool.Approvals
-		seals      mempool.Seals
-		prop       *propagation.Engine
-		prov       *provider.Engine
+		guaranteeLimit uint
+		receiptLimit   uint
+		approvalLimit  uint
+		sealLimit      uint
+		err            error
+		chainID        string
+		guarantees     mempool.Guarantees
+		receipts       mempool.Receipts
+		approvals      mempool.Approvals
+		seals          mempool.Seals
+		prop           *propagation.Engine
+		prov           *provider.Engine
 	)
 
 	cmd.FlowNode("consensus").
 		ExtraFlags(func(flags *pflag.FlagSet) {
+			flags.UintVar(&guaranteeLimit, "guarantee-limit", 100000, "maximum number of guarantees in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&approvalLimit, "approval-limit", 100000, "maximum number of result approvals in the memory pool")
+			flags.UintVar(&sealLimit, "seal-limit", 100000, "maximum number of block seals in the memory pool")
 			flags.StringVarP(&chainID, "chain-id", "C", "flow", "the chain ID for the protocol chain")
 		}).
-		Create(func(node *cmd.FlowNodeBuilder) {
-			node.Logger.Info().Msg("initializing guarantee mempool")
-			guarantees, err = stdmap.NewGuarantees()
-			node.MustNot(err).Msg("could not initialize guarantee mempool")
+		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {
+			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
+			return err
 		}).
-		Create(func(node *cmd.FlowNodeBuilder) {
-			node.Logger.Info().Msg("initializing receipt mempool")
-			receipts, err = stdmap.NewReceipts()
-			node.MustNot(err).Msg("could not initialize receipt mempool")
+		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			receipts, err = stdmap.NewReceipts(receiptLimit)
+			return err
 		}).
-		Create(func(node *cmd.FlowNodeBuilder) {
-			node.Logger.Info().Msg("initializing approval mempool")
-			approvals, err = stdmap.NewApprovals()
+		Module("result approvals mempool", func(node *cmd.FlowNodeBuilder) error {
+			approvals, err = stdmap.NewApprovals(approvalLimit)
+			return err
 		}).
-		Create(func(node *cmd.FlowNodeBuilder) {
-			node.Logger.Info().Msg("initializing seal mempool")
-			seals, err = stdmap.NewSeals()
-			node.MustNot(err).Msg("could not initialize seal mempool")
+		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
+			seals, err = stdmap.NewSeals(sealLimit)
+			return err
 		}).
-		Component("matching engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing result matching engine")
+		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			results := storage.NewExecutionResults(node.DB)
-			match, err := matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
-			node.MustNot(err).Msg("could not initialize matching engine")
-			return match
+			return matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
 		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing block provider engine")
+		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(node.Logger, node.Network, node.State, node.Me)
-			node.MustNot(err).Msg("could not initialize provider engine")
-			return prov
+			return prov, err
 		}).
-		Component("propagation engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing guarantee propagation engine")
+		Component("propagation engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			prop, err = propagation.New(node.Logger, node.Network, node.State, node.Me, guarantees)
-			node.MustNot(err).Msg("could not initialize propagation engine")
-			return prop
+			return prop, err
 		}).
-		Component("coldstuff engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing coldstuff engine")
+		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
+			return ing, err
+		}).
+		Component("consensus engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
+			cache := buffer.NewPendingBlocks()
+			con, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cache)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize engine: %w", err)
+			}
 			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
-
-			eng, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB)
-			node.MustNot(err).Msg("could not initialize consensus engine")
-
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, eng, build, final, 3*time.Second, 6*time.Second)
-			node.MustNot(err).Msg("could not initialize coldstuff")
-
-			return eng.WithConsensus(cold)
-		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
-			node.MustNot(err).Msg("could not initialize guarantee ingestion engine")
-			return ing
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, con, build, final, 3*time.Second, 6*time.Second)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
+			}
+			con.WithConsensus(cold)
+			return con, nil
 		}).
 		Run()
 }

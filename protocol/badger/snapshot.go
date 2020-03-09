@@ -3,12 +3,14 @@
 package badger
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 	"sort"
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
@@ -234,6 +236,38 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 		return s.head(&header)(tx)
 	})
 	return &header, err
+}
+
+func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
+
+	if len(indices)*4 > crypto.KmacMaxParamsLen {
+		return nil, fmt.Errorf("unsupported number of indices")
+	}
+
+	// get the current state snapshot head
+	var header flow.Header
+	err := s.state.db.View(func(tx *badger.Txn) error {
+		return s.head(&header)(tx)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not get head: %w", err)
+	}
+
+	// create the key used for the KMAC by concatenating all indices
+	key := make([]byte, 4*len(indices))
+	for i, index := range indices {
+		binary.LittleEndian.PutUint32(key[4*i:4*i+4], index)
+	}
+
+	// create a KMAC instance with our key and 32 bytes output size
+	kmac, err := crypto.NewKMAC_128(key, nil, 32)
+	if err != nil {
+		return nil, fmt.Errorf("could not create kmac: %w", err)
+	}
+
+	seed := kmac.ComputeHash(header.ParentRandomBeaconSig)
+
+	return seed, nil
 }
 
 func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, filters []flow.IdentityFilter) (map[flow.Identifier]int64, error) {

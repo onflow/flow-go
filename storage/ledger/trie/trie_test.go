@@ -67,12 +67,15 @@ func TestInteriorNode(t *testing.T) {
 	trie := newTestSMT(t, 255, cacheSize, 10, 100, 10)
 	trie.database.NewBatch()
 
-	s := make([]byte, 5)
+	k1 := make([]byte, 1)
+	k2 := make([]byte, 2)
+	v1 := make([]byte, 5)
+	v2 := make([]byte, 8)
 
-	ln := newNode(Hash(s), 254)
-	rn := newNode(Hash(s), 254)
+	ln := newNode(HashLeaf(k1, v1), 254)
+	rn := newNode(HashLeaf(k2, v2), 254)
 
-	exp := newNode(Hash(Hash(s), Hash(s)), 255)
+	exp := newNode(HashInterNode(HashLeaf(k1, v1), HashLeaf(k2, v2)), 255)
 	res := trie.interiorNode(ln, rn, 255)
 
 	if (res.height != exp.height) && (bytes.Equal(exp.value, res.value)) {
@@ -111,12 +114,12 @@ func TestInteriorNodeLNil(t *testing.T) {
 	trie := newTestSMT(t, 255, cacheSize, 10, 100, 10)
 	trie.database.NewBatch()
 
-	s := make([]byte, 5)
-
-	rn := newNode(Hash(s), 200)
-	rn.value = Hash(s)
-
-	exp := newNode(Hash(Hash(s), GetDefaultHashForHeight(201)), 201)
+	k := make([]byte, 1)
+	v := make([]byte, 5)
+	h := HashLeaf(k, v)
+	rn := newNode(h, 200)
+	rn.value = h
+	exp := newNode(HashInterNode(h, GetDefaultHashForHeight(201)), 201)
 	res := trie.interiorNode(nil, rn, 201)
 
 	if (res.height != exp.height) && (bytes.Equal(exp.value, res.value)) {
@@ -136,12 +139,14 @@ func TestInteriorNodeRNil(t *testing.T) {
 	trie := newTestSMT(t, 255, cacheSize, 10, 100, 10)
 	trie.database.NewBatch()
 
-	s := make([]byte, 5)
+	k := make([]byte, 1)
+	v := make([]byte, 5)
+	h := HashLeaf(k, v)
 
-	ln := newNode(Hash(s), 200)
-	ln.value = Hash(s)
+	ln := newNode(h, 200)
+	ln.value = h
 
-	exp := newNode(Hash(Hash(s), GetDefaultHashForHeight(201)), 201)
+	exp := newNode(HashInterNode(h, GetDefaultHashForHeight(201)), 201)
 	res := trie.interiorNode(ln, nil, 201)
 
 	if (res.height != exp.height) && (bytes.Equal(exp.value, res.value)) {
@@ -3241,14 +3246,14 @@ func TestComputeCompactValue(t *testing.T) {
 	utils.SetBit(key, 7)
 	value := []byte{'V'}
 
-	level0 := Hash(key, value)
-	level1 := Hash(GetDefaultHashForHeight(0), level0)
-	level2 := Hash(level1, GetDefaultHashForHeight(1))
-	level3 := Hash(GetDefaultHashForHeight(2), level2)
-	level4 := Hash(level3, GetDefaultHashForHeight(3))
-	level5 := Hash(GetDefaultHashForHeight(4), level4)
-	level6 := Hash(level5, GetDefaultHashForHeight(5))
-	level7 := Hash(GetDefaultHashForHeight(6), level6)
+	level0 := HashLeaf(key, value)
+	level1 := HashInterNode(GetDefaultHashForHeight(0), level0)
+	level2 := HashInterNode(level1, GetDefaultHashForHeight(1))
+	level3 := HashInterNode(GetDefaultHashForHeight(2), level2)
+	level4 := HashInterNode(level3, GetDefaultHashForHeight(3))
+	level5 := HashInterNode(GetDefaultHashForHeight(4), level4)
+	level6 := HashInterNode(level5, GetDefaultHashForHeight(5))
+	level7 := HashInterNode(GetDefaultHashForHeight(6), level6)
 
 	// leaf node
 	assert.Equal(t, ComputeCompactValue(key, value, 0, trieHeight), level0)

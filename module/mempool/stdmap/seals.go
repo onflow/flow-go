@@ -17,9 +17,9 @@ type Seals struct {
 }
 
 // NewSeals creates a new memory pool for block seals.
-func NewSeals() (*Seals, error) {
+func NewSeals(limit uint) (*Seals, error) {
 	s := &Seals{
-		Backend:    NewBackend(),
+		Backend:    NewBackend(WithLimit(limit)),
 		byPrevious: make(map[string]flow.Identifier),
 	}
 
