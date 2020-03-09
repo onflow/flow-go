@@ -21,9 +21,9 @@ func AccountSignatureToMessage(a flow.AccountSignature) *entities.AccountSignatu
 	}
 }
 
-func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
+func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error) {
 	if m == nil {
-		return flow.Transaction{}, fmt.Errorf("message is empty")
+		return flow.TransactionBody{}, fmt.Errorf("message is empty")
 	}
 
 	scriptAccounts := make([]flow.Address, len(m.ScriptAccounts))
@@ -36,7 +36,7 @@ func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
 		signatures[i] = MessageToAccountSignature(accountSig)
 	}
 
-	return flow.Transaction{TransactionBody: flow.TransactionBody{
+	return flow.TransactionBody{
 		Script:           m.GetScript(),
 		ReferenceBlockID: flow.HashToID(m.ReferenceBlockHash),
 		Nonce:            m.GetNonce(),
@@ -44,8 +44,6 @@ func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
 		PayerAccount:     flow.BytesToAddress(m.PayerAccount),
 		ScriptAccounts:   scriptAccounts,
 		Signatures:       signatures,
-	},
-		Status: flow.TransactionStatus(m.GetStatus()),
 	}, nil
 }
 
