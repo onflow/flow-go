@@ -93,7 +93,7 @@ func (suite *Suite) TestHandleProposal() {
 		Payload: &block.Payload,
 	}
 
-	tx := unittest.TransactionFixture()
+	tx := unittest.TransactionBodyFixture()
 
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
@@ -181,7 +181,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 		Header:  &block.Header,
 		Payload: &block.Payload,
 	}
-	tx := unittest.TransactionFixture()
+	tx := unittest.TransactionBodyFixture()
 
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)

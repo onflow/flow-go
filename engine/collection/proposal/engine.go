@@ -273,7 +273,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		if err != nil {
 			return fmt.Errorf("could not store missing transaction: %w", err)
 		}
-		err = e.transactions.Store(&tx.TransactionBody)
+		err = e.transactions.Store(tx)
 		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 			return fmt.Errorf("could not store transaction: %w", err)
 		}

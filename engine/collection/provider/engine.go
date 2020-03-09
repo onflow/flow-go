@@ -149,7 +149,7 @@ func (e *Engine) onTransactionRequest(originID flow.Identifier, req *messages.Tr
 			return fmt.Errorf("could not get transaction from pool: %w", err)
 		}
 
-		res := &messages.TransactionResponse{Transaction: tx.TransactionBody}
+		res := &messages.TransactionResponse{Transaction: *tx}
 
 		err = e.con.Submit(res, originID)
 		if err != nil {
@@ -177,7 +177,7 @@ func (e *Engine) onTransactionRequest(originID flow.Identifier, req *messages.Tr
 // transaction by adding the transaction
 func (e *Engine) onTransactionResponse(originID flow.Identifier, res *messages.TransactionResponse) error {
 
-	err := e.pool.Add(&flow.Transaction{TransactionBody: res.Transaction})
+	err := e.pool.Add(&res.Transaction)
 	if err != nil {
 		e.log.Debug().
 			Err(err).

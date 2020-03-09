@@ -13,10 +13,10 @@ import (
 )
 
 func TestTransactionPool(t *testing.T) {
-	tx1 := unittest.TransactionFixture()
+	tx1 := unittest.TransactionBodyFixture()
 	item1 := &tx1
 
-	tx2 := unittest.TransactionFixture()
+	tx2 := unittest.TransactionBodyFixture()
 	item2 := &tx2
 
 	pool, err := stdmap.NewTransactions(1000)
