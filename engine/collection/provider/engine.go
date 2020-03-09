@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine is the collection provider engine, which provides access to resources
@@ -138,12 +139,53 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }
 
+// onTransactionRequest handles requests for individual transactions.
 func (e *Engine) onTransactionRequest(originID flow.Identifier, req *messages.TransactionRequest) error {
-	panic("TODO")
+
+	// check the mempool first
+	if e.pool.Has(req.ID) {
+		tx, err := e.pool.ByID(req.ID)
+		if err != nil {
+			return fmt.Errorf("could not get transaction from pool: %w", err)
+		}
+
+		res := &messages.TransactionResponse{Transaction: tx.TransactionBody}
+
+		err = e.con.Submit(res, originID)
+		if err != nil {
+			return fmt.Errorf("could not submit transaction resopnse: %w", err)
+		}
+	}
+
+	// if it isn't in the mempool, check persistent storage
+	tx, err := e.transactions.ByID(req.ID)
+	if err != nil {
+		return fmt.Errorf("could not get transaction from db: %w", err)
+	}
+
+	res := &messages.TransactionResponse{Transaction: *tx}
+
+	err = e.con.Submit(res, originID)
+	if err != nil {
+		return fmt.Errorf("could not submit transaction response: %w", err)
+	}
+
+	return nil
 }
 
+// onTransactionResponse handles responses for requests we have made for a
+// transaction by adding the transaction
 func (e *Engine) onTransactionResponse(originID flow.Identifier, res *messages.TransactionResponse) error {
-	panic("TODO")
+
+	err := e.pool.Add(&flow.Transaction{TransactionBody: res.Transaction})
+	if err != nil {
+		e.log.Debug().
+			Err(err).
+			Hex("tx_id", logging.ID(res.Transaction.ID())).
+			Msg("could not add transaction to mempool")
+	}
+
+	return nil
 }
 
 // SubmitCollectionGuarantee submits the collection guarantee to all
