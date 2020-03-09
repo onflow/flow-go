@@ -116,7 +116,7 @@ func (suite *Suite) TestCollectionRequest() {
 		t := suite.T()
 
 		// create request with invalid/nonexistent fingerprint
-		req := &messages.CollectionRequest{ID: flow.ZeroID}
+		req := &messages.CollectionRequest{ID: unittest.IdentifierFixture()}
 
 		// provider should return error
 		err := suite.colNode.ProviderEngine.ProcessLocal(req)
@@ -195,7 +195,7 @@ func (suite *Suite) TestTransactionRequest() {
 		t := suite.T()
 
 		// create request with invalid/nonexistent fingerprint
-		req := &messages.TransactionRequest{ID: flow.ZeroID}
+		req := &messages.TransactionRequest{ID: unittest.IdentifierFixture()}
 
 		// provider should return error
 		err := suite.colNode.ProviderEngine.ProcessLocal(req)
