@@ -29,6 +29,13 @@ func NewState(db *badger.DB, options ...func(*State)) (*State, error) {
 	return s, nil
 }
 
+// WithClusters returns an initialization option setting the clusters config.
+func WithClusters(n uint) func(*State) {
+	return func(s *State) {
+		s.clusters = n
+	}
+}
+
 func (s *State) Final() protocol.Snapshot {
 	sn := &Snapshot{
 		state:   s,
