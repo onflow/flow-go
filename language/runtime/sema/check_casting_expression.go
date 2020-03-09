@@ -77,7 +77,7 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 
 		if !leftHandType.IsInvalidType() {
 			switch leftHandType.(type) {
-			case *AnyStructType, *AnyResourceType,
+			case *AnyStructType, *AnyResourceType, *RestrictedResourceType,
 				*CompositeType, *InterfaceType,
 				*VoidType, *StringType, *BoolType, *AddressType,
 				*VariableSizedType, *ConstantSizedType,
