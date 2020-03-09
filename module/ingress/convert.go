@@ -47,7 +47,7 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 	}, nil
 }
 
-func TransactionToMessage(t flow.Transaction) *entities.Transaction {
+func TransactionToMessage(t flow.TransactionBody) *entities.Transaction {
 	scriptAccounts := make([][]byte, len(t.ScriptAccounts))
 	for i, account := range t.ScriptAccounts {
 		scriptAccounts[i] = account.Bytes()
@@ -66,6 +66,5 @@ func TransactionToMessage(t flow.Transaction) *entities.Transaction {
 		PayerAccount:       t.PayerAccount.Bytes(),
 		ScriptAccounts:     scriptAccounts,
 		Signatures:         signatures,
-		Status:             entities.TransactionStatus(t.Status),
 	}
 }
