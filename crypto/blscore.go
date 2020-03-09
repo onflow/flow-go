@@ -141,10 +141,20 @@ func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool
 		(C.int)(len(data)))
 
 	const sigValid = 1 // same value as in include.h
-	const sigErr = 0xFF
-
-	if verif == sigErr {
-		panic("Relic memory allocation failed")
-	}
 	return (verif == sigValid)
+}
+
+// membershipCheckG2 runs a membership check of BLS public keys on BLS12-381 curve.
+// Returns true if the public key is on the correct subgroup of the curve
+// and false otherwise
+// It is necessary to run this test once for every public key before
+// it is used to verify BLS signatures. The library calls this function whenever
+// it imports a key through the function DecodePublicKey.
+func (pk *pointG2) checkMembershipG2() bool {
+	verif := C.checkMembership_G2((*C.ep2_st)(pk))
+	const pkValid = 1 // same value as in include.h
+	if verif == pkValid {
+		return true
+	}
+	return false
 }

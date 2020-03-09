@@ -123,7 +123,6 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	Y := &PubKeyBLS_BLS12381{
 		alg:   s.fvss[0].blsContext,
 		point: *jointPublicKey,
-		check: valid,
 	}
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
@@ -131,7 +130,6 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 		y[i] = &PubKeyBLS_BLS12381{
 			alg:   s.fvss[0].blsContext,
 			point: p,
-			check: valid,
 		}
 	}
 	return x, Y, y, nil

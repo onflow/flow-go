@@ -70,7 +70,6 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	Y := &PubKeyBLS_BLS12381{
 		alg:   s.blsContext,
 		point: s.A[0],
-		check: valid,
 	}
 
 	// The nodes public keys
@@ -79,7 +78,6 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 		y[i] = &PubKeyBLS_BLS12381{
 			alg:   s.blsContext,
 			point: p,
-			check: valid,
 		}
 	}
 	return x, Y, y, nil
