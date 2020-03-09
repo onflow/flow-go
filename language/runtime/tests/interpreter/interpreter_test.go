@@ -7658,3 +7658,76 @@ func TestInterpretResourceOwnerFieldUse(t *testing.T) {
 		result,
 	)
 }
+
+func TestInterpretResourceAssignmentForceTransfer(t *testing.T) {
+
+	t.Run("new to nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+          resource X {}
+
+          fun test() {
+              var x: @X? <- nil
+              x <-! create X()
+              destroy x
+          }
+        `)
+
+		_, err := inter.Invoke("test")
+		require.NoError(t, err)
+	})
+
+	t.Run("new to non-nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	     resource X {}
+
+	     fun test() {
+	         var x: @X? <- create X()
+	         x <-! create X()
+	         destroy x
+	     }
+	   `)
+
+		_, err := inter.Invoke("test")
+		require.Error(t, err)
+
+		assert.IsType(t, &interpreter.ForceAssignmentToNoNilResourceError{}, err)
+	})
+
+	t.Run("existing to nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	     resource X {}
+
+	     fun test() {
+	         let x <- create X()
+	         var x2: @X? <- nil
+	         x2 <-! x
+	         destroy x2
+	     }
+	   `)
+
+		_, err := inter.Invoke("test")
+		require.NoError(t, err)
+	})
+
+	t.Run("existing to non-nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	     resource X {}
+
+	     fun test() {
+	         let x <- create X()
+	         var x2: @X? <- create X()
+	         x2 <-! x
+	         destroy x2
+	     }
+	   `)
+
+		_, err := inter.Invoke("test")
+		require.Error(t, err)
+
+		assert.IsType(t, &interpreter.ForceAssignmentToNoNilResourceError{}, err)
+	})
+}

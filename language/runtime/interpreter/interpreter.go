@@ -1081,10 +1081,12 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 			}
 
 			return interpreter.visitAssignment(
+				declaration.Transfer.Operation,
 				declaration.Value,
 				valueType,
 				declaration.SecondValue,
 				secondValueType,
+				declaration,
 			)
 		})
 }
@@ -1112,12 +1114,19 @@ func (interpreter *Interpreter) VisitAssignmentStatement(assignment *ast.Assignm
 	target := assignment.Target
 	value := assignment.Value
 
-	return interpreter.visitAssignment(target, targetType, value, valueType)
+	return interpreter.visitAssignment(
+		assignment.Transfer.Operation,
+		target, targetType,
+		value, valueType,
+		assignment,
+	)
 }
 
 func (interpreter *Interpreter) visitAssignment(
+	transferOperation ast.TransferOperation,
 	target ast.Expression, targetType sema.Type,
 	value ast.Expression, valueType sema.Type,
+	position ast.HasPosition,
 ) Trampoline {
 
 	// First evaluate the target, which results in a getter/setter function pair
@@ -1125,9 +1134,25 @@ func (interpreter *Interpreter) visitAssignment(
 		FlatMap(func(result interface{}) Trampoline {
 			getterSetter := result.(getterSetter)
 
+			// If the assignment is a forced move,
+			// ensure that the target is nil,
+			// otherwise panic
+
+			if transferOperation == ast.TransferOperationMoveForced {
+				target := getterSetter.get()
+				if _, ok := target.(NilValue); !ok {
+					locationRange := interpreter.locationRange(position)
+
+					panic(&ForceAssignmentToNoNilResourceError{
+						LocationRange: locationRange,
+					})
+				}
+			}
+
 			// Finally, evaluate the value, and assign it using the setter function
 			return value.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
+
 					valueCopy := interpreter.copyAndConvert(result.(Value), valueType, targetType)
 					getterSetter.set(valueCopy)
 
