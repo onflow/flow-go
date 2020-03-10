@@ -1651,3 +1651,477 @@ func TestInterpretFailableCastingResourceType(t *testing.T) {
 		)
 	})
 }
+
+func TestInterpretFailableCastingAuthorizedReferenceType(t *testing.T) {
+
+	// Supertype: Restricted resource
+
+	t.Run("restricted resource -> restricted resource: fewer restrictions", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+          resource interface I1 {}
+
+          resource interface I2 {}
+
+          resource R: I1, I2 {}
+
+          let x <- create R()
+          let r = &x as auth &R{I1, I2}
+          let r2 = r as? &R{I2}
+        `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted resource -> restricted resource: more restrictions", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+          resource interface I1 {}
+
+          resource interface I2 {}
+
+          resource R: I1, I2 {}
+
+          let x <- create R()
+          let r = &x as auth &R{I1}
+          let r2 = r as? &R{I1, I2}
+        `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("unrestricted resource -> restricted resource: same resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I {}
+
+	      resource R: I {}
+
+          let x <- create R()
+	      let r = &x as auth &R
+	      let r2 = r as? &R{I}
+	   `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{RI}
+	      let r2 = r as? &R{RI}
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	// TODO: should statically fail?
+	t.Run("restricted AnyResource -> non-conforming restricted resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      resource T {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{RI}
+	      let r2 = r as? &T{}
+	    `)
+
+		assert.IsType(t,
+			interpreter.NilValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource
+	      let r2 = r as? &R{RI}
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("AnyResource -> non-conforming restricted resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+          resource T {}
+
+          let x <- create T()
+	      let r = &x as auth &AnyResource
+	      let r2 = r as? &R{RI}
+	    `)
+
+		assert.IsType(t,
+			interpreter.NilValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	// Supertype: Resource (unrestricted)
+
+	t.Run("restricted resource -> unrestricted resource: same resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I {}
+
+	      resource R: I {}
+
+          let x <- create R()
+	      let r = &x as auth &R{I}
+	      let r2 = r as? &R
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted AnyResource -> conforming resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{RI}
+	      let r2 = r as? &R
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted AnyResource -> non-conforming resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      resource T: RI {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{RI}
+	      let r2 = r as? &T
+	    `)
+
+		assert.IsType(t,
+			interpreter.NilValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("AnyResource -> unrestricted resource: same type", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource
+	      let r2 = r as? &R
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("AnyResource -> unrestricted resource: different type", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      resource T: RI {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource
+	      let r2 = r as? &T
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	// Supertype: restricted AnyResource
+
+	t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+          let x <- create R()
+	      let r = &x as auth &R
+	      let r2 = r as? &AnyResource{RI}
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I {}
+
+	      resource R: I {}
+
+          let x <- create R()
+	      let r = &x as auth &R{I}
+	      let r2 = r as? &AnyResource{I}
+	   `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted resource -> restricted AnyResource with conformance not in restriction", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let x <- create R()
+	      let r = &x as auth &R{I1}
+	      let r2 = r as? &AnyResource{I2}
+        `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{I1, I2}
+	      let r2 = r as? &AnyResource{I2}
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: more restrictions", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{I1}
+	      let r2 = r as? &AnyResource{I1, I2}
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, conforming", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{I1}
+	      let r2 = r as? &AnyResource{I2}
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, non-conforming", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1 {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{I1}
+	      let r2 = r as? &AnyResource{I2}
+	    `)
+
+		assert.IsType(t,
+			interpreter.NilValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1 {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{I1}
+	      let r2 = r as? &AnyResource{I1, I2}
+	    `)
+
+		assert.IsType(t,
+			interpreter.NilValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I {}
+
+	      resource R: I {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource
+	      let r2 = r as? &AnyResource{I}
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	// Supertype: AnyResource
+
+	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let x <- create R()
+	      let r = &x as auth &R{I1}
+          let r2 = r as? &AnyResource
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let x <- create R()
+	      let r = &x as auth &AnyResource{I1}
+	      let r2 = r as? &AnyResource
+	    `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+
+	t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+          let x <- create R()
+	      let r = &x as auth &R
+	      let r2 = r as? &AnyResource
+        `)
+
+		assert.IsType(t,
+			&interpreter.SomeValue{},
+			inter.Globals["r2"].Value,
+		)
+	})
+}
