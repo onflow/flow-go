@@ -21,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	module2 "github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/assignment"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -162,7 +163,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
 
 	// assigns all chunks in the receipt to this node through mocking
-	a := assignment.NewAssignment()
+	a := module2.NewAssignment()
 	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
 		a.Assign(chunk, []flow.Identifier{verIdentity.NodeID})
 	}
@@ -434,7 +435,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collections.On("Rem", suite.collection.ID()).Return(true).Once()
 
 			// we have the assignment of chunk
-			a := assignment.NewAssignment()
+			a := module2.NewAssignment()
 			a.Assign(suite.receipt.ExecutionResult.Chunks.ByIndex(0), assignment.IdentifierList{verIdentity.NodeID})
 			suite.assigner.On("Assigner",
 				testifymock.Anything,
@@ -525,7 +526,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// new chunk assignment
-	a := assignment.NewAssignment()
+	a := module2.NewAssignment()
 
 	// create `erCount` ER fixtures that will be concurrently delivered
 	ers := make([]verification.CompleteExecutionResult, 0)
@@ -715,11 +716,11 @@ func NewMockAssigner(id flow.Identifier) *MockAssigner {
 }
 
 // Assigner assigns all input chunks to the verifer node
-func (m *MockAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*assignment.Assignment, error) {
+func (m *MockAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*module2.Assignment, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("assigner called with empty chunk list")
 	}
-	a := assignment.NewAssignment()
+	a := module2.NewAssignment()
 	for _, c := range chunks {
 		a.Assign(c, assignment.IdentifierList{m.me})
 	}

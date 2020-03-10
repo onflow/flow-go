@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 )
 
 // PublicAssignment implements an instance of the Public Chunk Assignment algorithm
@@ -24,7 +25,7 @@ func NewPublicAssignment(alpha int) *PublicAssignment {
 	return &PublicAssignment{alpha: alpha}
 }
 
-func (p *PublicAssignment) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*Assignment, error) {
+func (p *PublicAssignment) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*module.Assignment, error) {
 	a, err := chunkAssignment(ids.NodeIDs(), chunks, rng, p.alpha)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not complete chunk assignment")
@@ -44,11 +45,11 @@ func permute(ids IdentifierList, m int, rng random.RandomGenerator) {
 
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
-func chunkAssignment(ids IdentifierList, chunks flow.ChunkList, rng random.RandomGenerator, alpha int) (*Assignment, error) {
+func chunkAssignment(ids IdentifierList, chunks flow.ChunkList, rng random.RandomGenerator, alpha int) (*module.Assignment, error) {
 	if len(ids) < alpha {
 		return nil, fmt.Errorf("not enough verification nodes for chunk assignment: %d, minumum should be %d", len(ids), alpha)
 	}
-	assignment := NewAssignment()
+	assignment := module.NewAssignment()
 	// permutes the entire slice
 	permute(ids, len(ids), rng)
 	t := ids

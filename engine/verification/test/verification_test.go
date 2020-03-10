@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/assignment"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -43,7 +43,7 @@ func TestHappyPath(t *testing.T) {
 	completeER := unittest.CompleteExecutionResultFixture(chunkNum)
 
 	// assigns half of the chunks to this verifier
-	a := assignment.NewAssignment()
+	a := module.NewAssignment()
 	for i := 0; i < chunkNum; i++ {
 		if isAssigned(i, chunkNum) {
 			a.Assign(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
