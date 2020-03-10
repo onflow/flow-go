@@ -21,8 +21,10 @@ import (
 
 // checks that an execution result received by the verification node results in:
 // - request of the appropriate collection
-// - formation of a complete execution result by the ingest engine
-// - broadcast of a matching result approval to consensus nodes
+// - selection of the assigned chunks by the ingest engine
+// - formation of a complete verifiable chunk by the ingest engine for each assigned chunk
+// - submitting a verifiable chunk locally to the verify engine by the ingest engine
+// - broadcast of a matching result approval to consensus nodes fo each assigned chunk
 func TestHappyPath(t *testing.T) {
 	// number of chunks in an ER
 	chunkNum := 10

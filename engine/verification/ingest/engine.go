@@ -336,12 +336,11 @@ func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block
 	return block, true
 }
 
-// getChunkStatesForReceipt checks all chunk states depended on by the given
-// execution receipt. If all chunk states are available locally, returns true
-// and an list of the required chunk states, ordered by their block order.
-// Otherwise, returns false and requests any chunk states that are not yet
-// locally available.
-func (e *Engine) getChunkStatesForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkState, bool) {
+// getChunkStateForReceipt checks the chunk state depended on by the given
+// execution receipt. If the chunk state is available locally, returns true
+// as well as the chunk data itself.
+// Otherwise, returns false and requests the chunk state
+func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkState, bool) {
 
 	log := e.log.With().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
@@ -374,10 +373,10 @@ func (e *Engine) getChunkStatesForReceipt(receipt *flow.ExecutionReceipt, chunkI
 	return chunkState, true
 }
 
-// getCollectionsForChunk checks all collections depended on by the
-// given execution receipt. Returns true if all collections are available
-// locally. If the collections are not available locally, they are requested.
-func (e *Engine) getCollectionsForChunk(block *flow.Block, receipt *flow.ExecutionReceipt, chunk *flow.Chunk) (*flow.Collection, bool) {
+// getCollectionForChunk checks the collection depended on the
+// given execution receipt and chunk. Returns true if the collections is available
+// locally. If the collections is not available locally, it is requested.
+func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.ExecutionReceipt, chunk *flow.Chunk) (*flow.Collection, bool) {
 
 	log := e.log.With().
 		Hex("block_id", logging.ID(block.ID())).
@@ -455,14 +454,14 @@ func (e *Engine) checkPendingChunks() {
 		}
 
 		for _, chunk := range mychunks {
-			chunkState, chunkStateReady := e.getChunkStatesForReceipt(receipt, chunk.ID())
+			chunkState, chunkStateReady := e.getChunkStateForReceipt(receipt, chunk.ID())
 			if !chunkStateReady {
 				// can not verify a chunk without its state, moves to the next chunk
 				continue
 			}
 
 			// retrieves collection corresponding to the chunk
-			collection, collectionsReady := e.getCollectionsForChunk(block, receipt, chunk)
+			collection, collectionsReady := e.getCollectionForChunk(block, receipt, chunk)
 			if !collectionsReady {
 				// can not verify a chunk without its collection, moves to the next chunk
 				continue
