@@ -3625,7 +3625,6 @@ func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, e
 // ReferenceType represents the reference to a value
 type ReferenceType struct {
 	Authorized bool
-	Storable   bool
 	Type       Type
 }
 
@@ -3638,9 +3637,6 @@ func (t *ReferenceType) String() string {
 	var builder strings.Builder
 	if t.Authorized {
 		builder.WriteString("auth ")
-	}
-	if t.Storable {
-		builder.WriteString("storable ")
 	}
 	builder.WriteRune('&')
 	builder.WriteString(t.Type.String())
@@ -3655,9 +3651,6 @@ func (t *ReferenceType) QualifiedString() string {
 	if t.Authorized {
 		builder.WriteString("auth ")
 	}
-	if t.Storable {
-		builder.WriteString("storable ")
-	}
 	builder.WriteRune('&')
 	builder.WriteString(t.Type.QualifiedString())
 	return builder.String()
@@ -3667,9 +3660,6 @@ func (t *ReferenceType) ID() TypeID {
 	var builder strings.Builder
 	if t.Authorized {
 		builder.WriteString("auth ")
-	}
-	if t.Storable {
-		builder.WriteString("storable ")
 	}
 	builder.WriteRune('&')
 	if t.Type != nil {
@@ -3685,7 +3675,6 @@ func (t *ReferenceType) Equal(other Type) bool {
 	}
 
 	return t.Authorized == otherReference.Authorized &&
-		t.Storable == otherReference.Storable &&
 		t.Type.Equal(otherReference.Type)
 }
 
@@ -3944,30 +3933,8 @@ func IsSubType(subType Type, superType Type) bool {
 			return false
 		}
 
-		// A storable reference type `T` is a subtype of a reference type `U`,
-		// if the non-storable variant of `T` is a subtype of `U`
-
-		if typedSubType.Storable {
-			return IsSubType(
-				&ReferenceType{
-					Type:       typedSubType.Type,
-					Authorized: typedSubType.Authorized,
-					Storable:   false,
-				},
-				typedSuperType,
-			)
-		}
-
-		// A non-storable reference type is not a (static) subtype of a storable reference.
-		//
-		// The holder of the reference may not gain more permissions without having authorization.
-
-		if typedSuperType.Storable {
-			return false
-		}
-
-		// An authorized reference type `auth &T` (storable or non-storable)
-		// is a subtype of a reference type `&U` (authorized or non-authorized, storable or non-storable),
+		// An authorized reference type `auth &T`
+		// is a subtype of a reference type `&U` (authorized or non-authorized),
 		// if `T` is a subtype of `U`
 
 		if typedSubType.Authorized {

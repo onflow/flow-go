@@ -747,11 +747,9 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 
 	if ctx.Ampersand() != nil {
 		authorized := ctx.Auth() != nil
-		storable := ctx.Storable() != nil
 
 		result = &ast.ReferenceType{
 			Authorized: authorized,
-			Storable:   storable,
 			Type:       result,
 			StartPos:   startPos,
 		}

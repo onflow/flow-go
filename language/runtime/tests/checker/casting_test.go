@@ -1149,44 +1149,6 @@ func TestCheckReferenceTypeSubTyping(t *testing.T) {
 
 			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		})
-
-		t.Run(fmt.Sprintf("storable to non-storable: %s", ty), func(t *testing.T) {
-
-			_, err := ParseAndCheckStorage(t,
-				fmt.Sprintf(`
-                      resource interface I {}
-
-                      resource R: I {}
-
-                      let ref = &storage[R] as storable &%[1]s
-                      let ref2 = ref as &%[1]s
-                    `,
-					ty,
-				),
-			)
-
-			require.NoError(t, err)
-		})
-
-		t.Run(fmt.Sprintf("non-storable to storable: %s", ty), func(t *testing.T) {
-
-			_, err := ParseAndCheckStorage(t,
-				fmt.Sprintf(`
-                      resource interface I {}
-
-                      resource R: I {}
-
-                      let ref = &storage[R] as &%[1]s
-                      let ref2 = ref as storable &%[1]s
-                    `,
-					ty,
-				),
-			)
-
-			errs := ExpectCheckerErrors(t, err, 1)
-
-			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-		})
 	}
 }
 
