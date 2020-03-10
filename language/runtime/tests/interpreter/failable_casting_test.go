@@ -1078,6 +1078,92 @@ func TestInterpretFailableCastingResourceType(t *testing.T) {
 		)
 	})
 
+	// TODO: should statically fail?
+	t.Run("restricted AnyResource -> non-conforming restricted resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      resource T {}
+
+	      fun test(): @T{}? {
+	          let r: @AnyResource{RI} <- create R()
+	          if let r2 <- r as? @T{} {
+	              return <-r2
+	          } else {
+	              destroy r
+	              return nil
+	          }
+	      }
+	    `)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		require.IsType(t,
+			interpreter.NilValue{},
+			result,
+		)
+	})
+
+	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+          fun test(): @R{RI}? {
+	          let r: @AnyResource <- create R()
+	          if let r2 <- r as? @R{RI} {
+	              return <-r2
+	          } else {
+	              destroy r
+	              return nil
+	          }
+	      }
+	    `)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		require.IsType(t,
+			&interpreter.SomeValue{},
+			result,
+		)
+	})
+
+	t.Run("AnyResource -> non-conforming restricted resource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+          resource T {}
+
+          fun test(): @R{RI}? {
+	          let r: @AnyResource <- create T()
+	          if let r2 <- r as? @R{RI} {
+	              return <-r2
+	          } else {
+	              destroy r
+	              return nil
+	          }
+	      }
+	    `)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		require.IsType(t,
+			interpreter.NilValue{},
+			result,
+		)
+	})
+
 	// Supertype: Resource (unrestricted)
 
 	t.Run("restricted resource -> unrestricted resource: same resource", func(t *testing.T) {
@@ -1162,6 +1248,64 @@ func TestInterpretFailableCastingResourceType(t *testing.T) {
 			result,
 		)
 	})
+
+	t.Run("AnyResource -> unrestricted resource: same type", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      fun test(): @R? {
+	          let r: @AnyResource <- create R()
+	          if let r2 <- r as? @R {
+	              return <-r2
+	          } else {
+	              destroy r
+	              return nil
+	          }
+	      }
+	    `)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		require.IsType(t,
+			&interpreter.SomeValue{},
+			result,
+		)
+	})
+
+	t.Run("AnyResource -> unrestricted resource: different type", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface RI {}
+
+	      resource R: RI {}
+
+	      resource T: RI {}
+
+	      fun test(): @T? {
+	          let r: @AnyResource <- create R()
+	          if let r2 <- r as? @T {
+	              return <-r2
+	          } else {
+	              destroy r
+	              return nil
+	          }
+	      }
+	    `)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		require.IsType(t,
+			interpreter.NilValue{},
+			result,
+		)
+	})
+
+	// Supertype: restricted AnyResource
 
 	t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
 
@@ -1304,6 +1448,64 @@ func TestInterpretFailableCastingResourceType(t *testing.T) {
 		)
 	})
 
+	t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, conforming", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1, I2 {}
+
+	      fun test(): @AnyResource{I2}? {
+	          let r: @AnyResource{I1} <- create R()
+	          if let r2 <- r as? @AnyResource{I2} {
+	              return <-r2
+	          } else {
+	              destroy r
+	              return nil
+	          }
+	      }
+	    `)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		require.IsType(t,
+			&interpreter.SomeValue{},
+			result,
+		)
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, non-conforming", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I1 {}
+
+	      resource interface I2 {}
+
+	      resource R: I1 {}
+
+	      fun test(): @AnyResource{I2}? {
+	          let r: @AnyResource{I1} <- create R()
+	          if let r2 <- r as? @AnyResource{I2} {
+	              return <-r2
+	          } else {
+	              destroy r
+	              return nil
+	          }
+	      }
+	    `)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		require.IsType(t,
+			interpreter.NilValue{},
+			result,
+		)
+	})
+
 	t.Run("restricted AnyResource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
 
 		inter := parseCheckAndInterpret(t, `
@@ -1332,6 +1534,35 @@ func TestInterpretFailableCastingResourceType(t *testing.T) {
 			result,
 		)
 	})
+
+	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	      resource interface I {}
+
+	      resource R: I {}
+
+	      fun test(): @AnyResource{I}? {
+	          let r: @AnyResource <- create R()
+	          if let r2 <- r as? @AnyResource{I} {
+	              return <-r2
+	          } else {
+	              destroy r
+	              return nil
+	          }
+	      }
+	    `)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		require.IsType(t,
+			&interpreter.SomeValue{},
+			result,
+		)
+	})
+
+	// Supertype: AnyResource
 
 	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
 
