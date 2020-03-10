@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,7 @@ import (
 // driving the engines with libp2p, in addition to receiving and storing incoming messages
 // it also echos them back
 type EchoEngine struct {
+	sync.Mutex
 	t        *testing.T
 	con      network.Conduit  // used to directly communicate with the network
 	originID flow.Identifier  // used to keep track of the id of the sender of the messages
@@ -68,6 +70,8 @@ func (te *EchoEngine) ProcessLocal(event interface{}) error {
 // EchoEngine. It then flags the received channel on reception of an event.
 // It also sends back an echo of the message to the origin ID
 func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error {
+	te.Lock()
+	defer te.Unlock()
 	te.originID = originID
 	te.event <- event
 	te.received <- struct{}{}
