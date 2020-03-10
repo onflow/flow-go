@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +24,8 @@ import (
 // - formation of a complete execution result by the ingest engine
 // - broadcast of a matching result approval to consensus nodes
 func TestHappyPath(t *testing.T) {
+	// number of chunks in an ER
+	chunkNum := 10
 	hub := stub.NewNetworkHub()
 
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -37,14 +40,15 @@ func TestHappyPath(t *testing.T) {
 	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 
-	completeER := unittest.CompleteExecutionResultFixture(1)
+	completeER := unittest.CompleteExecutionResultFixture(chunkNum)
 
-	// completeER has only one chunk
-	// mocks the assignment of the only chunk
-	// of completeER to this verifier node
+	// assigns half of the chunks to this verifier
 	a := assignment.NewAssignment()
-	a.Assign(completeER.Receipt.ExecutionResult.Chunks.ByIndex(0), []flow.Identifier{verNode.Me.NodeID()})
-
+	for i := 0; i < chunkNum; i++ {
+		if isAssigned(i, chunkNum) {
+			a.Assign(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
+		}
+	}
 	assigner.On("Assigner",
 		testifymock.Anything,
 		completeER.Receipt.ExecutionResult.Chunks,
@@ -56,34 +60,47 @@ func TestHappyPath(t *testing.T) {
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
 	exeEngine := new(network.Engine)
 	exeConduit, err := exeNode.Net.Register(engine.ExecutionStateProvider, exeEngine)
+	exeChunkSeen := make(map[flow.Identifier]struct{})
 	assert.Nil(t, err)
 	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			req, ok := args[1].(*messages.ExecutionStateRequest)
 			require.True(t, ok)
-			assert.Equal(t, completeER.Receipt.ExecutionResult.Chunks.ByIndex(0).ID(), req.ChunkID)
+			for i := 0; i < chunkNum; i++ {
+				chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
+				if chunkID == req.ChunkID {
+					// each assigned chunk should be requested only once
+					_, ok := exeChunkSeen[chunkID]
+					require.False(t, ok)
+					exeChunkSeen[chunkID] = struct{}{}
 
-			res := &messages.ExecutionStateResponse{
-				State: *completeER.ChunkStates[0],
+					// publishes the execution state response to the network
+					res := &messages.ExecutionStateResponse{
+						State: *completeER.ChunkStates[i],
+					}
+					err := exeConduit.Submit(res, verIdentity.NodeID)
+					assert.Nil(t, err)
+					return
+				}
 			}
-			err := exeConduit.Submit(res, verIdentity.NodeID)
-			assert.Nil(t, err)
+			require.Error(t, fmt.Errorf(" requested an unidentifed chunk %v", req))
 		}).
 		Return(nil).
-		Once()
+		Times(chunkNum)
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
 	conNode := testutil.GenericNode(t, hub, conIdentity, identities)
 	conEngine := new(network.Engine)
+
 	conEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			ra, ok := args[1].(*flow.ResultApproval)
+			_, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
-			assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+			// assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
 		}).
-		Return(nil).
-		Once()
+		Return(nil).Times(chunkNum / 2)
+
 	_, err = conNode.Net.Register(engine.ApprovalProvider, conEngine)
 	assert.Nil(t, err)
 
@@ -91,9 +108,11 @@ func TestHappyPath(t *testing.T) {
 	err = verNode.Blocks.Add(completeER.Block)
 	assert.Nil(t, err)
 
-	// inject the collection into the collection node mempool
-	err = colNode.Collections.Store(completeER.Collections[0])
-	assert.Nil(t, err)
+	// inject the collections into the collection node mempool
+	for i := 0; i < chunkNum; i++ {
+		err = colNode.Collections.Store(completeER.Collections[i])
+		assert.Nil(t, err)
+	}
 
 	// send the ER from execution to verification node
 	err = verNode.IngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
@@ -116,8 +135,14 @@ func TestHappyPath(t *testing.T) {
 		return m.ChannelID == engine.ExecutionStateProvider
 	})
 
-	// the chunk state should be added to the mempool
-	assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
+	// only assigned chunks state should be added to the mempool
+	//for i := 0; i < chunkNum; i++ {
+	//	if isAssigned(i, chunkNum) {
+	//		assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
+	//	} else {
+	//		assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
+	//	}
+	//}
 
 	// flush the collection request
 	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
@@ -138,7 +163,17 @@ func TestHappyPath(t *testing.T) {
 	conEngine.AssertExpectations(t)
 
 	// associated resources should be removed from the mempool
-	assert.False(t, verNode.Collections.Has(completeER.Collections[0].ID()))
+	for i := 0; i < chunkNum; i++ {
+		if isAssigned(i, chunkNum) {
+			assert.False(t, verNode.Collections.Has(completeER.Collections[i].ID()))
+		}
+	}
 	// TODO adding complementary tests for claning other resources like the execution receipt
 	// https://github.com/dapperlabs/flow-go/issues/2750
+}
+
+// isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
+func isAssigned(index int, chunkNum int) bool {
+	answer := index >= 0 && index < chunkNum && index%2 == 0
+	return answer
 }
