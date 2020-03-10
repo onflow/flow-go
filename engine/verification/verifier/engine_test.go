@@ -23,14 +23,13 @@ import (
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
-	net    *mockmodule.Network
-	state  *protocol.State
-	ss     *protocol.Snapshot
-	me     *MockLocal
-	sk     crypto.PrivateKey
-	hasher crypto.Hasher
-	// mock conduit for submitting result approvals
-	conduit *network.Conduit
+	net     *mockmodule.Network
+	state   *protocol.State
+	ss      *protocol.Snapshot
+	me      *MockLocal
+	sk      crypto.PrivateKey
+	hasher  crypto.Hasher
+	conduit *network.Conduit // mocks conduit for submitting result approvals
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -78,7 +77,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := unittest.CompleteExecutionResultFixture()
+	completeRA := unittest.CompleteExecutionResultFixture(1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
@@ -88,16 +87,22 @@ func (suite *VerifierEngineTestSuite) TestIncorrectResult() {
 	// TODO when ERs are verified
 }
 
+// TestVerify tests the verification path for a single verifiable chunk, which is
+// assigned to the verifier node, and is passed by the ingest engine
+// The tests evaluates that a result approval is emitted to all consensus nodes
+// about the input execution receipt
 func (suite *VerifierEngineTestSuite) TestVerify() {
 	eng := suite.TestNewEngine()
 
 	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	completeER := unittest.CompleteExecutionResultFixture()
+	// creates a verifiable chunk
+	vChunk := unittest.VerifiableChunkFixture()
 
 	// mocking node ID using the LocalMock
 	suite.me.MockNodeID(myID)
-	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil).Once()
+	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
+
 	suite.conduit.
 		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
 		Return(nil).
@@ -105,7 +110,7 @@ func (suite *VerifierEngineTestSuite) TestVerify() {
 			// check that the approval matches the input execution result
 			ra, ok := args[0].(*flow.ResultApproval)
 			suite.Assert().True(ok)
-			suite.Assert().Equal(completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+			suite.Assert().Equal(vChunk.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
 
 			// verifies the signature over the result approval
 			batst, err := encoding.DefaultEncoder.Encode(ra.ResultApprovalBody.Attestation())
@@ -114,7 +119,7 @@ func (suite *VerifierEngineTestSuite) TestVerify() {
 		}).
 		Once()
 
-	err := eng.Process(myID, &completeER)
+	err := eng.Process(myID, vChunk)
 	suite.Assert().Nil(err)
 
 	suite.ss.AssertExpectations(suite.T())

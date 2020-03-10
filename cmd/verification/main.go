@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/assignment"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
@@ -53,7 +54,14 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates)
+			alpha := 10
+			assigner := assignment.NewPublicAssignment(alpha)
+			// https://github.com/dapperlabs/flow-go/issues/2703
+			// proper place and only referenced here
+			// Todo the hardcoded default value should be parameterized as alpha in a
+			// should be moved to a configuration class
+			// DISCLAIMER: alpha down there is not a production-level value
+			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates, assigner)
 			return eng, err
 		}).
 		Run()
