@@ -119,6 +119,28 @@ func FailableCanSucceed(subType, superType Type) bool {
 	//   => move checks from interpreter here
 
 	switch typedSuperType := superType.(type) {
+	case *ReferenceType:
+		// References types are only subtypes of reference types
+
+		if typedSubType, ok := subType.(*ReferenceType); ok {
+			// An authorized reference type `auth &T`
+			// is a subtype of a reference type `&U` (authorized or non-authorized),
+			// if `T` is a subtype of `U`
+
+			if typedSubType.Authorized {
+				return FailableCanSucceed(typedSubType.Type, typedSuperType.Type)
+			}
+
+			// An unauthorized reference type is not a subtype of an authorized reference type.
+			// Not even dynamically.
+			//
+			// The holder of the reference may not gain more permissions.
+
+			if typedSuperType.Authorized {
+				return false
+			}
+		}
+
 	case *RestrictedResourceType:
 
 		switch typedSubType := subType.(type) {
