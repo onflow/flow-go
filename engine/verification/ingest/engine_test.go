@@ -19,7 +19,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
-	mockassigner "github.com/dapperlabs/flow-go/engine/verification/ingest/mocks/assignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/assignment"
@@ -58,7 +57,7 @@ type TestSuite struct {
 	block      *flow.Block
 	receipt    *flow.ExecutionReceipt
 	chunkState *flow.ChunkState
-	assigner   *mockassigner.ChunkAssigner // mocks chunk assigner
+	assigner   *module.ChunkAssigner // mocks chunk assigner
 }
 
 // Invoking this method executes all TestSuite tests.
@@ -81,7 +80,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}
-	suite.assigner = &mockassigner.ChunkAssigner{}
+	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := unittest.CompleteExecutionResultFixture(1)
 	suite.collection = completeER.Collections[0]
