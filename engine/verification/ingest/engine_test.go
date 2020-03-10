@@ -141,11 +141,12 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// mock the receipt coming from an execution node
 	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 
 	suite.state.On("Final").Return(suite.ss, nil)
 	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
-	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Once()
+	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Twice()
 
 	// we have the corresponding block and chunk state, but not the collection
 	suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil)
@@ -159,6 +160,17 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
+
+	// assigns all chunks in the receipt to this node through mocking
+	a := assignment.NewAssignment()
+	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+		a.Assign(chunk, []flow.Identifier{verIdentity.NodeID})
+	}
+	suite.assigner.On("Assigner",
+		testifymock.Anything,
+		testifymock.Anything,
+		testifymock.Anything).Return(a, nil)
+	suite.me.On("NodeID", testifymock.Anything).Return(verIdentity.NodeID)
 
 	err := eng.Process(execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
