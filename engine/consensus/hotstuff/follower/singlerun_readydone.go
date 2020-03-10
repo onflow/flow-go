@@ -4,8 +4,6 @@ import (
 	"sync"
 )
 
-type state int
-
 // SingleRunner is a support struct for implementing module.ReadyDoneAware
 type SingleRunner struct {
 	stateTransition sync.Mutex // lock for preventing concurrent state transitions
