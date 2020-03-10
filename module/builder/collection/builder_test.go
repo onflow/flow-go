@@ -100,25 +100,15 @@ func TestBuilder(t *testing.T) {
 			assert.Equal(t, expectedView, header.View)
 
 			// should be able to retrieve built block from storage
-			var block model.Block
-			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &block))
+			var built model.Block
+			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 			assert.Nil(t, err)
+			builtCollection := built.Payload.Collection
 
 			// payload should include only items from mempool
 			mempoolTransactions := pool.All()
-			assert.Equal(t, len(mempoolTransactions), len(block.Collection.Transactions))
-
-			// create a lookup for all the transactions in the payload
-			txLookup := make(map[flow.Identifier]struct{})
-			for _, txID := range block.Collection.Transactions {
-				txLookup[txID] = struct{}{}
-			}
-
-			// every transaction in the mempool should be in the payload
-			for _, tx := range mempoolTransactions {
-				_, exists := txLookup[tx.ID()]
-				assert.True(t, exists)
-			}
+			assert.Len(t, builtCollection.Transactions, 3)
+			assert.True(t, collectionContains(builtCollection, flow.GetIDs(mempoolTransactions)...))
 		})
 
 		// with two conflicting forks (tx1 in fork 1, tx2 in fork 2) and tx3 in mempool,
@@ -128,10 +118,9 @@ func TestBuilder(t *testing.T) {
 			defer cleanup()
 
 			mempoolTransactions := pool.All()
-			// the first transaction in the pool will be in fork 1
-			tx1 := mempoolTransactions[0]
-			// the second transaction in the pool will be in fork 2
-			tx2 := mempoolTransactions[1]
+			tx1 := mempoolTransactions[0] // in fork 1
+			tx2 := mempoolTransactions[1] // in fork 2
+			tx3 := mempoolTransactions[2] // in no block
 
 			// build first fork on top of genesis
 			payload1 := model.PayloadFromTransactions([]flow.Identifier{tx1.ID()})
@@ -155,33 +144,134 @@ func TestBuilder(t *testing.T) {
 			require.Nil(t, err)
 
 			// should be able to retrieve built block from storage
-			var block model.Block
-			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &block))
+			var built model.Block
+			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+			assert.Nil(t, err)
+			builtCollection := built.Payload.Collection
+
+			// payload should include ONLY tx2 and tx3
+			assert.Len(t, builtCollection.Transactions, 2)
+			assert.True(t, collectionContains(builtCollection, tx2.ID(), tx3.ID()))
+			assert.False(t, collectionContains(builtCollection, tx1.ID()))
+		})
+
+		// when building a block on a chain containing finalized and
+		// un-finalized blocks, should avoid conflicts with both
+		t.Run("conflicting finalized block", func(t *testing.T) {
+			bootstrap()
+			defer cleanup()
+
+			mempoolTransactions := pool.All()
+			tx1 := mempoolTransactions[0] // in a finalized block
+			tx2 := mempoolTransactions[1] // in an un-finalized block
+			tx3 := mempoolTransactions[2] // in no blocks
+
+			// build a block containing tx1 on genesis
+			finalizedPayload := model.PayloadFromTransactions([]flow.Identifier{tx1.ID()})
+			finalizedBlock := unittest.ClusterBlockWithParent(genesis)
+			finalizedBlock.SetPayload(finalizedPayload)
+			insert(&finalizedBlock)
+
+			// build a block containing tx2 on the first block
+			unFinalizedPayload := model.PayloadFromTransactions([]flow.Identifier{tx2.ID()})
+			unFinalizedBlock := unittest.ClusterBlockWithParent(&finalizedBlock)
+			unFinalizedBlock.SetPayload(unFinalizedPayload)
+			insert(&unFinalizedBlock)
+
+			// finalize first block
+			err = db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
 			assert.Nil(t, err)
 
-			// payload should include only items from mempool
-			// it should have one fewer item (should not include tx1)
-			assert.Equal(t, len(mempoolTransactions)-1, len(block.Collection.Transactions))
+			// build on the un-finalized block
+			builder := collection.NewBuilder(db, pool, chainID)
+			header, err := builder.BuildOn(unFinalizedBlock.ID(), noopSetter)
+			require.Nil(t, err)
 
-			// create a lookup for all the transactions in the payload
-			txLookup := make(map[flow.Identifier]struct{})
-			for _, txID := range block.Collection.Transactions {
-				txLookup[txID] = struct{}{}
-			}
+			// retrieve the built block from storage
+			var built model.Block
+			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+			assert.Nil(t, err)
+			builtCollection := built.Payload.Collection
 
-			// every transaction in the mempool (except tx1) should be in the payload
-			for _, tx := range mempoolTransactions {
-				_, exists := txLookup[tx.ID()]
-				if tx.ID() == tx1.ID() {
-					assert.False(t, exists)
-				} else {
-					assert.True(t, exists)
-				}
-			}
+			// payload should only contain tx3
+			assert.Len(t, builtCollection.Transactions, 1)
+			assert.True(t, collectionContains(builtCollection, tx3.ID()))
+			assert.False(t, collectionContains(builtCollection, tx1.ID(), tx2.ID()))
+
+			// tx1 should be removed from mempool, as it is in a finalized block
+			assert.False(t, pool.Has(tx1.ID()))
+		})
+
+		// should include transactions on a conflicting invalidated fork
+		t.Run("conflicting invalidated fork", func(t *testing.T) {
+			bootstrap()
+			defer cleanup()
+
+			mempoolTransactions := pool.All()
+			tx1 := mempoolTransactions[0] // in a finalized block
+			tx2 := mempoolTransactions[1] // in an invalidated block
+			tx3 := mempoolTransactions[2] // in no blocks
+
+			// build a block containing tx1 on genesis - will be finalized
+			finalizedPayload := model.PayloadFromTransactions([]flow.Identifier{tx1.ID()})
+			finalizedBlock := unittest.ClusterBlockWithParent(genesis)
+			finalizedBlock.SetPayload(finalizedPayload)
+			insert(&finalizedBlock)
+
+			// build a block containing tx2 ALSO on genesis - will be invalidated
+			invalidatedPayload := model.PayloadFromTransactions([]flow.Identifier{tx2.ID()})
+			invalidatedBlock := unittest.ClusterBlockWithParent(genesis)
+			invalidatedBlock.SetPayload(invalidatedPayload)
+			insert(&invalidatedBlock)
+
+			// finalize first block - this indirectly invalidates the second block
+			err = db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
+			assert.Nil(t, err)
+
+			// build on the finalized block
+			builder := collection.NewBuilder(db, pool, chainID)
+			header, err := builder.BuildOn(finalizedBlock.ID(), noopSetter)
+			require.Nil(t, err)
+
+			// retrieve the built block from storage
+			var built model.Block
+			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+			assert.Nil(t, err)
+			builtCollection := built.Payload.Collection
+
+			// tx2 and tx3 should be in the built collection
+			assert.Len(t, builtCollection.Transactions, 2)
+			assert.True(t, collectionContains(builtCollection, tx2.ID(), tx3.ID()))
+			assert.False(t, collectionContains(builtCollection, tx1.ID()))
+
+			// tx1 should be removed from mempool, as it is in a finalized block
+			assert.False(t, pool.Has(tx1.ID()))
+		})
+
+		t.Run("large history", func(t *testing.T) {
+
 		})
 
 		t.Run("empty mempool", func(t *testing.T) {
 			t.Skip()
 		})
 	})
+}
+
+// helper to check whether a collection contains each of the given transactions.
+func collectionContains(collection flow.LightCollection, txIDs ...flow.Identifier) bool {
+
+	lookup := make(map[flow.Identifier]struct{}, len(txIDs))
+	for _, txID := range collection.Transactions {
+		lookup[txID] = struct{}{}
+	}
+
+	for _, txID := range txIDs {
+		_, exists := lookup[txID]
+		if !exists {
+			return false
+		}
+	}
+
+	return true
 }
