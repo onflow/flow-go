@@ -55,12 +55,14 @@ func NewExecutionState(
 	ls storage.Ledger,
 	commits storage.Commits,
 	chunkHeaders storage.ChunkHeaders,
+	chunkDataPacks storage.ChunkDataPacks,
 	executionResult storage.ExecutionResults,
 ) ExecutionState {
 	return &state{
 		ls:               ls,
 		commits:          commits,
 		chunkHeaders:     chunkHeaders,
+		chunkDataPacks:   chunkDataPacks,
 		executionResults: executionResult,
 	}
 }
