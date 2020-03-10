@@ -68,7 +68,7 @@ func TestHappyPath(t *testing.T) {
 			require.True(t, ok)
 			for i := 0; i < chunkNum; i++ {
 				chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
-				if chunkID == req.ChunkID {
+				if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
 					// each assigned chunk should be requested only once
 					_, ok := exeChunkSeen[chunkID]
 					require.False(t, ok)
@@ -136,13 +136,13 @@ func TestHappyPath(t *testing.T) {
 	})
 
 	// only assigned chunks state should be added to the mempool
-	//for i := 0; i < chunkNum; i++ {
-	//	if isAssigned(i, chunkNum) {
-	//		assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
-	//	} else {
-	//		assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
-	//	}
-	//}
+	for i := 0; i < chunkNum; i++ {
+		if isAssigned(i, chunkNum) {
+			assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
+		} else {
+			assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
+		}
+	}
 
 	// flush the collection request
 	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
@@ -164,9 +164,7 @@ func TestHappyPath(t *testing.T) {
 
 	// associated resources should be removed from the mempool
 	for i := 0; i < chunkNum; i++ {
-		if isAssigned(i, chunkNum) {
-			assert.False(t, verNode.Collections.Has(completeER.Collections[i].ID()))
-		}
+		assert.False(t, verNode.Collections.Has(completeER.Collections[i].ID()))
 	}
 	// TODO adding complementary tests for claning other resources like the execution receipt
 	// https://github.com/dapperlabs/flow-go/issues/2750
