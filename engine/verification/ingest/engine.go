@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/assignment"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -37,8 +36,8 @@ type Engine struct {
 	blocks             mempool.Blocks
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
-	checkReceiptsMu    sync.Mutex               // protects the checkPendingChunks method to prevent double-verifying
-	assigner           assignment.ChunkAssigner // used to determine chunks this node needs to verify
+	checkReceiptsMu    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
+	assigner           module.ChunkAssigner // used to determine chunks this node needs to verify
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -52,7 +51,7 @@ func New(
 	blocks mempool.Blocks,
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
-	assigner assignment.ChunkAssigner,
+	assigner module.ChunkAssigner,
 ) (*Engine, error) {
 
 	e := &Engine{
