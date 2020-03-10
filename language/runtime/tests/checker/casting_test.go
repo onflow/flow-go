@@ -327,6 +327,50 @@ func TestCheckCastResourceType(t *testing.T) {
 		})
 	})
 
+	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+		const types = `
+          resource interface RI {}
+
+          resource R: RI {}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  let r: @AnyResource <- create R()
+                  let r2 <- r as @R{RI}
+                `,
+			)
+
+			// NOTE: static cast not allowed, only dynamic
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  fun test(): @R{RI}? {
+                      let r: @AnyResource <- create R()
+                      if let r2 <- r as? @R{RI} {
+                          return <-r2
+                      } else {
+                          destroy r
+                          return nil
+                      }
+                  }
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
 	t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
 
 		const types = `
@@ -601,6 +645,48 @@ func TestCheckCastResourceType(t *testing.T) {
 			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+	})
+
+	t.Run("AnyResource -> unrestricted resource", func(t *testing.T) {
+
+		const types = `
+           resource interface RI {}
+
+           resource R: RI {}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  let r: @AnyResource <- create R()
+                  let r2 <- r as @R
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  fun test(): @R? {
+                      let r: @AnyResource <- create R()
+                      if let r2 <- r as? @R {
+                          return <-r2
+                      } else {
+                          destroy r
+                          return nil
+                      }
+                  }
+                `,
+			)
+
+			require.NoError(t, err)
 		})
 	})
 
@@ -981,6 +1067,50 @@ func TestCheckCastResourceType(t *testing.T) {
 			require.NoError(t, err)
 		})
 	})
+
+	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
+
+		const types = `
+          resource interface I {}
+
+          resource R: I {}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  let r: @AnyResource <- create R()
+                  let r2 <- r as @AnyResource{I}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  fun test(): @AnyResource{I}? {
+                      let r: @AnyResource <- create R()
+                      if let r2 <- r as? @AnyResource{I} {
+                          return <-r2
+                      } else {
+                          destroy r
+                          return nil
+                      }
+                  }
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	// Supertype: AnyResource
 
 	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
 
