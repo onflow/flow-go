@@ -405,7 +405,7 @@ func verifypayload(blockID flow.Identifier, checkIDs []flow.Identifier) iteratio
 //
 // This is useful when building a payload locally, where we want to know which
 // entities are valid for inclusion so we can produce a valid block proposal.
-func checkpayload(blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *[]flow.Identifier) iterationFunc {
+func checkpayload(blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) iterationFunc {
 
 	// build lookup table for candidate payload entities
 	lookup := make(map[flow.Identifier]struct{})
@@ -415,9 +415,6 @@ func checkpayload(blockID flow.Identifier, candidateIDs []flow.Identifier, inval
 
 	// to track when we find an invalid ID to avoid double-adding to `invalidIDs`
 	addedInvalidIDs := make(map[flow.Identifier]struct{})
-
-	// ensure we're starting with an empty slice
-	*invalidIDs = []flow.Identifier{}
 
 	return func() (checkFunc, createFunc, handleFunc) {
 
@@ -450,7 +447,7 @@ func checkpayload(blockID flow.Identifier, candidateIDs []flow.Identifier, inval
 				// the entity is invalid and we have not already added it
 				if isInvalid && !alreadyAdded {
 					addedInvalidIDs[entityID] = struct{}{}
-					*invalidIDs = append(*invalidIDs, entityID)
+					(*invalidIDs)[entityID] = struct{}{}
 				}
 			}
 			return nil

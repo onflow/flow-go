@@ -52,10 +52,16 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
+		// get the last finalized block ID
+		var finalizedID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &finalizedID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized ID: %w", err)
+		}
+
 		// for each unfinalized ancestor of the payload we are building, we retrieve
 		// a list of all pending IDs for guarantees and seals; we can use them to
 		// exclude entities from being included in two block on the same fork.
-		// TODO we do not check that we aren't duplicating payload items from FINALIZED blocks yet
 		ancestorID := parentID
 		guaranteeLookup := make(map[flow.Identifier]struct{})
 		sealLookup := make(map[flow.Identifier]struct{})
@@ -107,11 +113,36 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// collect guarantees from memory pool, excluding those already pending
 		// on this fork
-		var guarantees []*flow.CollectionGuarantee
+		var guaranteeIDs []flow.Identifier
 		for _, guarantee := range b.guarantees.All() {
 			_, ok := guaranteeLookup[guarantee.ID()]
 			if ok {
 				continue
+			}
+			guaranteeIDs = append(guaranteeIDs, guarantee.ID())
+		}
+
+		// find any guarantees that conflict with FINALIZED blocks
+		var invalidIDs map[flow.Identifier]struct{}
+		err = operation.CheckGuaranteePayload(boundary, finalizedID, guaranteeIDs, &invalidIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not check guarantee payload: %w", err)
+		}
+
+		var guarantees []*flow.CollectionGuarantee
+		for _, guaranteeID := range guaranteeIDs {
+
+			_, isInvalid := invalidIDs[guaranteeID]
+			if isInvalid {
+				// remove from mempool, it will never be valid
+				b.guarantees.Rem(guaranteeID)
+				continue
+			}
+
+			// add non-conflicting guarantees to the final payload
+			guarantee, err := b.guarantees.ByID(guaranteeID)
+			if err != nil {
+				return fmt.Errorf("could not get guarantee from pool: %w", err)
 			}
 			guarantees = append(guarantees, guarantee)
 		}
@@ -126,7 +157,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// we then keep adding seals that follow this state commit from the pool
 		var seals []*flow.Seal
 
-		//create a copy to avoid modifying when referenced in an array
+		// create a copy to avoid modifying when referenced in an array
 		loopSeal := &seal
 		for {
 			// get a seal that extends the last known state commitment
