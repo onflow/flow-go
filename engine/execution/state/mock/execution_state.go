@@ -11,6 +11,29 @@ type ExecutionState struct {
 	mock.Mock
 }
 
+// ChunkDataPackByChunkID provides a mock function with given fields: _a0
+func (_m *ExecutionState) ChunkDataPackByChunkID(_a0 flow.Identifier) (*flow.ChunkDataPack, error) {
+	ret := _m.Called(_a0)
+
+	var r0 *flow.ChunkDataPack
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ChunkDataPack); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ChunkDataPack)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ChunkHeaderByChunkID provides a mock function with given fields: _a0
 func (_m *ExecutionState) ChunkHeaderByChunkID(_a0 flow.Identifier) (*flow.ChunkHeader, error) {
 	ret := _m.Called(_a0)
@@ -126,6 +149,38 @@ func (_m *ExecutionState) GetRegisters(_a0 []byte, _a1 [][]byte) ([][]byte, erro
 	return r0, r1
 }
 
+// GetRegistersWithProofs provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionState) GetRegistersWithProofs(_a0 []byte, _a1 [][]byte) ([][]byte, [][]byte, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 [][]byte
+	if rf, ok := ret.Get(0).(func([]byte, [][]byte) [][]byte); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([][]byte)
+		}
+	}
+
+	var r1 [][]byte
+	if rf, ok := ret.Get(1).(func([]byte, [][]byte) [][]byte); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([][]byte)
+		}
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func([]byte, [][]byte) error); ok {
+		r2 = rf(_a0, _a1)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 // NewView provides a mock function with given fields: _a0
 func (_m *ExecutionState) NewView(_a0 []byte) *state.View {
 	ret := _m.Called(_a0)
@@ -137,6 +192,20 @@ func (_m *ExecutionState) NewView(_a0 []byte) *state.View {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*state.View)
 		}
+	}
+
+	return r0
+}
+
+// PersistChunkDataPack provides a mock function with given fields: _a0
+func (_m *ExecutionState) PersistChunkDataPack(_a0 *flow.ChunkDataPack) error {
+	ret := _m.Called(_a0)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.ChunkDataPack) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
 	}
 
 	return r0
