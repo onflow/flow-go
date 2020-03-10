@@ -400,7 +400,7 @@ func verifypayload(blockID flow.Identifier, checkIDs []flow.Identifier) iteratio
 
 // checkpayload creates an iteration function similar to verifypayload. Rather
 // than returning an error when ANY duplicate IDs are found, checkpayload
-// tracks any duplicate IDs and populates a slice containing all invalid IDs
+// tracks any duplicate IDs and populates a map containing all invalid IDs
 // from the candidate set.
 //
 // This is useful when building a payload locally, where we want to know which
@@ -413,8 +413,8 @@ func checkpayload(blockID flow.Identifier, candidateIDs []flow.Identifier, inval
 		lookup[id] = struct{}{}
 	}
 
-	// to track when we find an invalid ID to avoid double-adding to `invalidIDs`
-	addedInvalidIDs := make(map[flow.Identifier]struct{})
+	// ensure the map is instantiated and empty
+	*invalidIDs = make(map[flow.Identifier]struct{})
 
 	return func() (checkFunc, createFunc, handleFunc) {
 
@@ -442,11 +442,7 @@ func checkpayload(blockID flow.Identifier, candidateIDs []flow.Identifier, inval
 		handle := func() error {
 			for _, entityID := range entityIDs {
 				_, isInvalid := lookup[entityID]
-				_, alreadyAdded := addedInvalidIDs[entityID]
-
-				// the entity is invalid and we have not already added it
-				if isInvalid && !alreadyAdded {
-					addedInvalidIDs[entityID] = struct{}{}
+				if isInvalid {
 					(*invalidIDs)[entityID] = struct{}{}
 				}
 			}

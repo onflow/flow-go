@@ -47,5 +47,5 @@ func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flo
 // CheckCollectionPayload populates `invalidIDs` with any IDs in the candidate
 // set that already exist in an ancestor block.
 func CheckCollectionPayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	return iterate(makePrefix(codeIndexSeal, height), makePrefix(codeIndexSeal, uint64(0)), checkpayload(blockID, candidateIDs, invalidIDs))
+	return iterate(makePrefix(codeIndexCollection, height), makePrefix(codeIndexCollection, uint64(0)), checkpayload(blockID, candidateIDs, invalidIDs))
 }
