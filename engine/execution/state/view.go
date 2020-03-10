@@ -75,3 +75,19 @@ func (r *View) ApplyDelta(delta Delta) {
 func (r *View) Reads() []flow.RegisterID {
 	return r.reads
 }
+
+// AllRegisters returns all the register IDs ether in read or delta
+func (r *View) AllRegisters() []flow.RegisterID {
+	set := make(map[string]bool)
+	for _, reg := range r.reads {
+		set[string(reg)] = true
+	}
+	for _, reg := range r.delta.RegisterIDs() {
+		set[string(reg)] = true
+	}
+	ret := make([]flow.RegisterID, len(set))
+	for r := range set {
+		ret = append(ret, flow.RegisterID(r))
+	}
+	return ret
+}

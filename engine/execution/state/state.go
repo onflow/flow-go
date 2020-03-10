@@ -21,6 +21,8 @@ type ExecutionState interface {
 	GetRegisters(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, error)
 	GetChunkRegisters(flow.Identifier) (flow.Ledger, error)
 
+	GetRegistersWithProofs(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, []flow.StorageProof, error)
+
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 	// PersistStateCommitment saves a state commitment by the given block ID.
@@ -31,6 +33,11 @@ type ExecutionState interface {
 	// PersistChunkHeader saves a chunk header by chunk ID.
 	PersistChunkHeader(*flow.ChunkHeader) error
 
+	// ChunkHeaderByChunkID retrieve a chunk data pack given the chunk ID.
+	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
+	// PersistChunkDataPack stores a chunk data pack by chunk ID.
+	PersistChunkDataPack(*flow.ChunkDataPack) error
+
 	GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error)
 	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
 }
@@ -39,6 +46,7 @@ type state struct {
 	ls               storage.Ledger
 	commits          storage.Commits
 	chunkHeaders     storage.ChunkHeaders
+	chunkDataPacks   storage.ChunkDataPacks
 	executionResults storage.ExecutionResults
 }
 
@@ -94,6 +102,13 @@ func (s *state) GetRegisters(
 	return s.ls.GetRegisters(registerIDs, commit)
 }
 
+func (s *state) GetRegistersWithProofs(
+	commit flow.StateCommitment,
+	registerIDs []flow.RegisterID,
+) ([]flow.RegisterValue, []flow.StorageProof, error) {
+	return s.ls.GetRegistersWithProof(registerIDs, commit)
+}
+
 func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) {
 	chunkHeader, err := s.ChunkHeaderByChunkID(chunkID)
 	if err != nil {
@@ -130,6 +145,14 @@ func (s *state) ChunkHeaderByChunkID(chunkID flow.Identifier) (*flow.ChunkHeader
 
 func (s *state) PersistChunkHeader(c *flow.ChunkHeader) error {
 	return s.chunkHeaders.Store(c)
+}
+
+func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+	return s.chunkDataPacks.ByChunkID(chunkID)
+}
+
+func (s *state) PersistChunkDataPack(c *flow.ChunkDataPack) error {
+	return s.chunkDataPacks.Store(c)
 }
 
 func (s *state) GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error) {

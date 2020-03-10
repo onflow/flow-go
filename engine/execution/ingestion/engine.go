@@ -362,6 +362,20 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		if err != nil {
 			return fmt.Errorf("failed to save chunk header: %w", err)
 		}
+
+		// chunkDataPack
+		allRegisters := view.AllRegisters()
+		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
+
+		if err != nil {
+			return fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, result.CompleteBlock.Block.ID())
+		}
+
+		chdp := generateChunkDataPack(chunk, allRegisters, values, proofs)
+		err = e.execState.PersistChunkDataPack(chdp)
+		if err != nil {
+			return fmt.Errorf("failed to save chunk data pack: %w", err)
+		}
 		//
 		chunks[i] = chunk
 		startState = endState
@@ -458,4 +472,25 @@ func (e *Engine) generateExecutionResultForBlock(
 	}
 
 	return er, nil
+}
+
+// generateChunkDataPack creates a chunk data pack
+func generateChunkDataPack(
+	chunk *flow.Chunk,
+	registers []flow.RegisterID,
+	values []flow.RegisterValue,
+	proofs []flow.StorageProof,
+) *flow.ChunkDataPack {
+	regTs := make([]flow.RegisterTouch, len(registers))
+	for i, reg := range registers {
+		regTs[i] = flow.RegisterTouch{RegisterID: reg,
+			Value: values[i],
+			Proof: proofs[i],
+		}
+	}
+	return &flow.ChunkDataPack{
+		ChunkID:         chunk.ID(),
+		StartState:      chunk.StartState,
+		RegisterTouches: regTs,
+	}
 }
