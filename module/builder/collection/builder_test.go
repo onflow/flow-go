@@ -1,4 +1,4 @@
-package collection
+package collection_test
 
 import (
 	"testing"
@@ -10,6 +10,7 @@ import (
 	cluster "github.com/dapperlabs/flow-go/cluster/badger"
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/builder/collection"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -76,7 +77,7 @@ func TestBuilder(t *testing.T) {
 			// use a non-existent parent ID
 			parentID := unittest.IdentifierFixture()
 
-			builder := NewBuilder(db, pool, chainID)
+			builder := collection.NewBuilder(db, pool, chainID)
 			_, err = builder.BuildOn(parentID, noopSetter)
 			assert.Error(t, err)
 		})
@@ -91,7 +92,7 @@ func TestBuilder(t *testing.T) {
 				h.View = expectedView
 			}
 
-			builder := NewBuilder(db, pool, chainID)
+			builder := collection.NewBuilder(db, pool, chainID)
 			header, err := builder.BuildOn(genesis.ID(), setter)
 			assert.Nil(t, err)
 
@@ -149,7 +150,7 @@ func TestBuilder(t *testing.T) {
 			insert(&block2)
 
 			// build on top of fork 1
-			builder := NewBuilder(db, pool, chainID)
+			builder := collection.NewBuilder(db, pool, chainID)
 			header, err := builder.BuildOn(block1.ID(), noopSetter)
 			require.Nil(t, err)
 
