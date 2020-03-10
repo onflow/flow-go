@@ -5,8 +5,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -28,7 +28,7 @@ func NewRandomBeaconAwareSigProvider(
 	randomBeaconPrivateKey crypto.PrivateKey,
 ) RandomBeaconAwareSigProvider {
 	return RandomBeaconAwareSigProvider{
-		StakingSigProvider: NewStakingSigProvider(viewState, messages.ConsensusVoteTag, me),
+		StakingSigProvider: NewStakingSigProvider(viewState, encoding.ConsensusVoteTag, me),
 		RandomBeaconSigner: NewRandomBeaconSigner(viewState, randomBeaconPrivateKey),
 	}
 }

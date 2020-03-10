@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/assignment"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -238,7 +239,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, opts ...VerificationOpt) mock.VerificationNode {
+func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, assigner assignment.ChunkAssigner, opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
@@ -270,12 +271,22 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.VerifierEngine == nil {
+
 		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me)
 		require.Nil(t, err)
 	}
 
 	if node.IngestEngine == nil {
-		node.IngestEngine, err = ingest.New(node.Log, node.Net, node.State, node.Me, node.VerifierEngine, node.Receipts, node.Blocks, node.Collections, node.ChunkStates)
+		node.IngestEngine, err = ingest.New(node.Log,
+			node.Net,
+			node.State,
+			node.Me,
+			node.VerifierEngine,
+			node.Receipts,
+			node.Blocks,
+			node.Collections,
+			node.ChunkStates,
+			assigner)
 		require.Nil(t, err)
 	}
 

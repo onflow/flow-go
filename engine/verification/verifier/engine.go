@@ -106,79 +106,83 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // process receives and submits an event to the verifier engine for processing.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
-	case *verification.CompleteExecutionResult:
+	case *verification.VerifiableChunk:
 		return e.verify(originID, resource)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// verify handles the core verification process. It accepts an execution
-// result and all dependent resources, verifies the result, and emits a
+// verify handles the core verification process. It accepts a verifiable chunk
+// and all dependent resources, verifies the chunk, and emits a
 // result approval if applicable.
 //
 // If any part of verification fails, an error is returned, indicating to the
 // initiating engine that the verification must be re-tried.
-// TODO assumes blocks with one chunk
-func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExecutionResult) error {
+func (e *Engine) verify(originID flow.Identifier, chunk *verification.VerifiableChunk) error {
 
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote origin for verify")
 	}
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
 	consensusNodes, err := e.state.Final().
 		Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not load consensus node IDs: %w", err)
 	}
-	// TODO add chunk select here
-	for i, chunk := range res.Receipt.ExecutionResult.Chunks {
-		computedEndState, err := e.executeChunk(res, i)
-		if err != nil {
-			return fmt.Errorf("could not verify chunk (id=%s): %w", chunk.ID(), err)
-		}
-		// TODO for now, we discard the computed end state and approve the ER
-		_ = computedEndState
 
-		// prepares and signs result approval body part
-		body := flow.ResultApprovalBody{
-			ExecutionResultID: res.Receipt.ExecutionResult.ID(),
-			ChunkIndex:        uint64(i),
-		}
-
-		// generates a signature over the attestation part of approval
-		sign, err := e.signAttestation(&body)
-		if err != nil {
-			return fmt.Errorf("could not generate attestation signature: %w", err)
-		}
-
-		approval := &flow.ResultApproval{
-			ResultApprovalBody: body,
-			VerifierSignature:  sign,
-		}
-
-		// broadcast result approval to consensus nodes
-		err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
-		if err != nil {
-			// TODO this error needs more advance handling after MVP
-			return fmt.Errorf("could not submit result approval: %w", err)
-		}
-		e.log.Info().
-			Hex("chunk_id", logging.ID(chunk.ID())).
-			Msg("submitted result approval")
+	// extracts chunk ID
+	chunkID := chunk.Receipt.ExecutionResult.Chunks.ByIndex(chunk.ChunkIndex).ID()
+	// executes assigned chunks
+	computedEndState, err := e.executeChunk(chunk)
+	if err != nil {
+		return fmt.Errorf("could not execute chunk (id=%s): %w", chunkID, err)
 	}
+	// TODO for now, we discard the computed end state and approve the ER
+	_ = computedEndState
+
+	// prepares and signs result approval body part
+	body := flow.ResultApprovalBody{
+		ExecutionResultID: chunk.Receipt.ExecutionResult.ID(),
+		ChunkIndex:        chunk.ChunkIndex,
+	}
+
+	// generates a signature over the attestation part of approval
+	sign, err := e.signAttestation(&body)
+	if err != nil {
+		return fmt.Errorf("could not generate attestation signature: %w", err)
+	}
+
+	approval := &flow.ResultApproval{
+		ResultApprovalBody: body,
+		VerifierSignature:  sign,
+	}
+
+	// broadcast result approval to consensus nodes
+	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
+	if err != nil {
+		// TODO this error needs more advance handling after MVP
+		return fmt.Errorf("could not submit result approval: %w", err)
+	}
+	e.log.Info().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("submitted result approval")
 
 	return nil
 }
 
 // executeChunk executes the transactions for a single chunk and returns the
 // resultant end state, or an error if execution failed.
-func (e *Engine) executeChunk(res *verification.CompleteExecutionResult, chunkIndex int) (flow.StateCommitment, error) {
+// TODO unit testing
+func (e *Engine) executeChunk(res *verification.VerifiableChunk) (flow.StateCommitment, error) {
 	blockCtx := e.vm.NewBlockContext(&res.Block.Header)
 
 	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
-		registers := res.ChunkStates[0].Registers
-
+		registers := res.ChunkState.Registers
 		val, ok := registers[string(key)]
 		if !ok {
 			return nil, fmt.Errorf("missing register")
@@ -188,8 +192,8 @@ func (e *Engine) executeChunk(res *verification.CompleteExecutionResult, chunkIn
 
 	chunkView := state.NewView(getRegister)
 
-	col := res.Collections[chunkIndex]
-	for _, tx := range col.Transactions {
+	// executes all transactions in this chunk
+	for _, tx := range res.Collection.Transactions {
 		txView := chunkView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)

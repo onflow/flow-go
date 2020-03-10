@@ -339,7 +339,72 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
-func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
+// chunkCount determines the number of chunks inside each receipt
+func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecutionResult {
+	chunks := make([]*flow.Chunk, 0)
+	chunkStates := make([]*flow.ChunkState, 0)
+	collections := make([]*flow.Collection, 0)
+	guarantees := make([]*flow.CollectionGuarantee, 0)
+
+	for i := 0; i < chunkCount; i++ {
+		// creates one guaranteed collection per chunk
+		coll := CollectionFixture(3)
+		guarantee := coll.Guarantee()
+		collections = append(collections, &coll)
+		guarantees = append(guarantees, &guarantee)
+
+		// creates a chunk
+		chunk := &flow.Chunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex: uint(i),
+				StartState:      StateCommitmentFixture(),
+			},
+			Index: uint64(i),
+		}
+		chunks = append(chunks, chunk)
+
+		// creates a chunk state
+		chunkState := &flow.ChunkState{
+			ChunkID:   chunk.ID(),
+			Registers: flow.Ledger{},
+		}
+		chunkStates = append(chunkStates, chunkState)
+	}
+
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: guarantees,
+	}
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
+
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+
+	result := flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID: block.ID(),
+			Chunks:  chunks,
+		},
+	}
+
+	receipt := flow.ExecutionReceipt{
+		ExecutionResult: result,
+	}
+
+	return verification.CompleteExecutionResult{
+		Receipt:     &receipt,
+		Block:       &block,
+		Collections: collections,
+		ChunkStates: chunkStates,
+	}
+}
+
+// VerifiableChunk returns a complete verifiable chunk with an
+// execution receipt referencing the block/collections.
+func VerifiableChunkFixture() *verification.VerifiableChunk {
 	coll := CollectionFixture(3)
 	guarantee := coll.Guarantee()
 
@@ -379,11 +444,12 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 		ExecutionResult: result,
 	}
 
-	return verification.CompleteExecutionResult{
-		Receipt:     &receipt,
-		Block:       &block,
-		Collections: []*flow.Collection{&coll},
-		ChunkStates: []*flow.ChunkState{&chunkState},
+	return &verification.VerifiableChunk{
+		ChunkIndex: chunk.Index,
+		Block:      &block,
+		Receipt:    &receipt,
+		Collection: &coll,
+		ChunkState: &chunkState,
 	}
 }
 
