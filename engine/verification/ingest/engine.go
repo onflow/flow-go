@@ -428,7 +428,7 @@ func (e *Engine) getCollectionsForChunk(block *flow.Block, receipt *flow.Executi
 	return coll, true
 }
 
-// checkPendingChunks checks all pending chunks of receipts in the mempool and verifies
+// checkPendingChunks checks all pending chunks of receiptsma in the mempool and verifies
 // any that are ready for verification.
 //
 // NOTE: this method is protected by mutex to prevent double-verifying ERs.
