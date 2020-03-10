@@ -1882,7 +1882,7 @@ func TestInterpretFailableCastingAuthorizedReferenceType(t *testing.T) {
 	    `)
 
 		assert.IsType(t,
-			&interpreter.SomeValue{},
+			interpreter.NilValue{},
 			inter.Globals["r2"].Value,
 		)
 	})
