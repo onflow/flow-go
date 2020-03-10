@@ -2,7 +2,6 @@ package module
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/assignment"
 )
 
 // Assignment is assignment map of the chunks to the list of the verifier nodes
@@ -17,7 +16,7 @@ func NewAssignment() *Assignment {
 }
 
 // Verifiers returns the list of verifier nodes assigned to a chunk
-func (a *Assignment) Verifiers(chunk *flow.Chunk) assignment.IdentifierList {
+func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 	v := make([]flow.Identifier, 0)
 	for id := range a.table[chunk.Index] {
 		v = append(v, id)
@@ -27,7 +26,7 @@ func (a *Assignment) Verifiers(chunk *flow.Chunk) assignment.IdentifierList {
 
 // Assign records the list of verifier nodes as the assigned verifiers of the chunk
 // it returns an error if the list of verifiers is empty or contains duplicate ids
-func (a *Assignment) Assign(chunk *flow.Chunk, verifiers assignment.IdentifierList) {
+func (a *Assignment) Assign(chunk *flow.Chunk, verifiers flow.IdentifierList) {
 	// sorts verifiers list based on their identifier
 	v := make(map[flow.Identifier]struct{})
 	for _, id := range verifiers {

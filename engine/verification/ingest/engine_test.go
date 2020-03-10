@@ -22,7 +22,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	module2 "github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/assignment"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -436,7 +435,7 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			// we have the assignment of chunk
 			a := module2.NewAssignment()
-			a.Assign(suite.receipt.ExecutionResult.Chunks.ByIndex(0), assignment.IdentifierList{verIdentity.NodeID})
+			a.Assign(suite.receipt.ExecutionResult.Chunks.ByIndex(0), flow.IdentifierList{verIdentity.NodeID})
 			suite.assigner.On("Assigner",
 				testifymock.Anything,
 				testifymock.Anything,
@@ -722,7 +721,7 @@ func (m *MockAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rn
 	}
 	a := module2.NewAssignment()
 	for _, c := range chunks {
-		a.Assign(c, assignment.IdentifierList{m.me})
+		a.Assign(c, flow.IdentifierList{m.me})
 	}
 
 	return a, nil

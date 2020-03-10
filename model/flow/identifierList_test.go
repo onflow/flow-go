@@ -1,4 +1,4 @@
-package assignment
+package flow
 
 import (
 	"bytes"
@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/test"
 )
 
@@ -17,7 +16,7 @@ import (
 // it generates and sorts a list of ids, and then evaluates sorting in ascending order
 func TestIdentifierListSort(t *testing.T) {
 	// creates an identity list of 10 ids
-	var idList flow.IdentityList = test.CreateIDs(10)
+	var idList IdentityList = test.CreateIDs(10)
 	var ids IdentifierList = idList.NodeIDs()
 
 	// shuffles array before sorting to enforce some pseudo-randomness
@@ -42,7 +41,7 @@ func TestIdentifierListSort(t *testing.T) {
 func TestJoinIdentifierLists(t *testing.T) {
 	// creates an identity list of 10 ids
 	count := 10
-	var idList flow.IdentityList = test.CreateIDs(count)
+	var idList IdentityList = test.CreateIDs(count)
 	var ids IdentifierList = idList.NodeIDs()
 
 	// breaks the IdentityList into two parts
