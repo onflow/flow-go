@@ -186,7 +186,7 @@ func (fnb *FlowNodeBuilder) initTracer() {
 }
 
 func (fnb *FlowNodeBuilder) initState() {
-	state, err := protocol.NewState(fnb.DB, protocol.WithClusters(fnb.BaseConfig.nClusters))
+	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	//check if database is initialized
