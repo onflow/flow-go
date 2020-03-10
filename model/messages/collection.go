@@ -12,6 +12,13 @@ type SubmitCollectionGuarantee struct {
 	Guarantee flow.CollectionGuarantee
 }
 
+// SubmitTransactionRequest is a request to submit the given transaction
+// request to other collection nodes in our cluster. Only valid as a node-local
+// message.
+type SubmitTransactionRequest struct {
+	Request TransactionRequest
+}
+
 // CollectionRequest request all transactions from a collection with the given
 // fingerprint.
 type CollectionRequest struct {

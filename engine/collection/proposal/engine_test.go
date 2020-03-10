@@ -133,7 +133,13 @@ func (suite *Suite) TestHandleProposalWithUnknownTransactions() {
 	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
 	// we are missing some transactions
 	suite.pool.On("Has", mock.Anything).Return(false)
-	// TODO assert that the missing transaction(s) is requested
+	// the missing transaction(s) should be requested
+	for _, txID := range block.Payload.Collection.Transactions {
+		req := &messages.SubmitTransactionRequest{
+			Request: messages.TransactionRequest{ID: txID},
+		}
+		suite.provider.On("SubmitLocal", req).Once()
+	}
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Error(err)
@@ -141,6 +147,8 @@ func (suite *Suite) TestHandleProposalWithUnknownTransactions() {
 	// should not store block
 	suite.headers.AssertNotCalled(suite.T(), "Store", mock.Anything)
 	suite.payloads.AssertNotCalled(suite.T(), "Store", mock.Anything, mock.Anything)
+	// transactions should have been requested
+	suite.provider.AssertExpectations(suite.T())
 	// proposal should not have been submitted to consensus algo
 	suite.coldstuff.AssertNotCalled(suite.T(), "SubmitProposal", mock.Anything, mock.Anything)
 }

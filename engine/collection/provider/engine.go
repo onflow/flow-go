@@ -101,10 +101,12 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // process processes events for the provider engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *messages.CollectionRequest:
-		return e.onCollectionRequest(originID, ev)
 	case *messages.SubmitCollectionGuarantee:
 		return e.onSubmitCollectionGuarantee(originID, ev)
+	case *messages.SubmitTransactionRequest:
+		return e.onSubmitTransactionRequest(originID, ev)
+	case *messages.CollectionRequest:
+		return e.onCollectionRequest(originID, ev)
 	case *messages.TransactionRequest:
 		return e.onTransactionRequest(originID, ev)
 	case *messages.TransactionResponse:
@@ -112,6 +114,25 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+// onSubmitTransactionRequest handles submitting the given transaction request
+// to other collection nodes in our cluster.
+func (e *Engine) onSubmitTransactionRequest(originID flow.Identifier, req *messages.SubmitTransactionRequest) error {
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("invalid remove request to submit transaction request (from=%x)", originID)
+	}
+	return e.SubmitTransactionRequest(&req.Request)
+}
+
+// onSubmitCollectionGuarantee handles submitting the given collection guarantee
+// to consensus nodes.
+func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *messages.SubmitCollectionGuarantee) error {
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("invalid remote request to submit collection guarantee (from=%x)", originID)
+	}
+
+	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }
 
 func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.CollectionRequest) error {
@@ -129,14 +150,6 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 	}
 
 	return nil
-}
-
-func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *messages.SubmitCollectionGuarantee) error {
-	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote request to submit collection guarantee [%x]", req.Guarantee.ID())
-	}
-
-	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }
 
 // onTransactionRequest handles requests for individual transactions.
@@ -191,15 +204,42 @@ func (e *Engine) onTransactionResponse(originID flow.Identifier, res *messages.T
 // SubmitCollectionGuarantee submits the collection guarantee to all
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+
 	defer e.tracer.FinishSpan(guarantee.ID())
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
-		return fmt.Errorf("could not get consensus consensusNodes: %w", err)
+		return fmt.Errorf("could not get consensus nodes: %w", err)
 	}
 
 	err = e.con.Submit(guarantee, consensusNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
+	}
+
+	return nil
+}
+
+// SubmitTransactionRequest submits the given request for an individual
+// transaction to all other nodes in our cluster.
+func (e *Engine) SubmitTransactionRequest(req *messages.TransactionRequest) error {
+
+	// get the clusters from protocol state
+	clusters, err := e.state.Final().Clusters()
+	if err != nil {
+		return fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	// get the nodes in my cluster
+	clusterNodes, err := clusters.ByNodeID(e.me.NodeID())
+	if err != nil {
+		return fmt.Errorf("could not get my cluster: %w", err)
+	}
+
+	// remove myself from the list
+	clusterNodes = clusterNodes.Filter(filter.Not(filter.HasNodeID(e.me.NodeID())))
+	err = e.con.Submit(req, clusterNodes.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not submit transaction request: %w", err)
 	}
 
 	return nil
