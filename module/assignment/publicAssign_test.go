@@ -67,7 +67,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	// assigns first chunk to non-duplicate list of verifiers
 	c := chunks.ByIndex(uint64(0))
 	assignment.Assign(c, ids.NodeIDs())
-	require.Len(a.T(), assignment.table[c.Index], size)
+	require.Len(a.T(), assignment.Verifiers(c), size)
 
 	// duplicates first verifier, hence size increases by 1
 	ids = append(ids, ids[0])
@@ -76,7 +76,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	c = chunks.ByIndex(uint64(1))
 	assignment.Assign(c, ids.NodeIDs())
 	// should be size not size + 1
-	require.Len(a.T(), assignment.table[c.Index], size)
+	require.Len(a.T(), assignment.Verifiers(c), size)
 }
 
 // TestPermuteEntirely tests permuting an entire IdentityList against
@@ -173,7 +173,7 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 
 	// list of nodes should get shuffled after public assignment
 	// but it should contain same elemets
-	require.Equal(a.T(), p1.table, p2.table)
+	require.Equal(a.T(), p1, p2)
 }
 
 // TestChunkAssignmentOneToOne evaluates chunk assignment against
