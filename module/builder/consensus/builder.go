@@ -139,7 +139,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 				continue
 			}
 
-			// add non-conflicting guarantees to the final payload
+			// add ONLY non-conflicting guarantees to the final payload
 			guarantee, err := b.guarantees.ByID(guaranteeID)
 			if err != nil {
 				return fmt.Errorf("could not get guarantee from pool: %w", err)
