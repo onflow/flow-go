@@ -1625,12 +1625,12 @@ func (interpreter *Interpreter) VisitFixedPointExpression(expression *ast.FixedP
 func (interpreter *Interpreter) convertToFixedPointBigInt(expression *ast.FixedPointExpression, scale uint) *big.Int {
 	ten := big.NewInt(10)
 
-	// integer = expression.Integer * 10 ^ scale
+	// integer = expression.UnsignedInteger * 10 ^ scale
 
 	targetScale := big.NewInt(0).SetUint64(uint64(scale))
 
 	integer := big.NewInt(0).Mul(
-		expression.Integer,
+		expression.UnsignedInteger,
 		big.NewInt(0).Exp(ten, targetScale, nil),
 	)
 
@@ -1654,7 +1654,8 @@ func (interpreter *Interpreter) convertToFixedPointBigInt(expression *ast.FixedP
 
 	// value = integer + fractional
 
-	if integer.Sign() < 0 {
+	if expression.Negative {
+		integer.Neg(integer)
 		fractional.Neg(fractional)
 	}
 
@@ -2520,67 +2521,72 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 
 	switch unwrappedTargetType.(type) {
 	case *sema.IntType:
-		return ConvertInt(value)
+		return ConvertInt(value, interpreter)
 
 	case *sema.UIntType:
-		return ConvertUInt(value)
+		return ConvertUInt(value, interpreter)
 
 	case *sema.AddressType:
-		return ConvertAddress(value)
+		return ConvertAddress(value, interpreter)
 
 	// Int*
 	case *sema.Int8Type:
-		return ConvertInt8(value)
+		return ConvertInt8(value, interpreter)
 
 	case *sema.Int16Type:
-		return ConvertInt16(value)
+		return ConvertInt16(value, interpreter)
 
 	case *sema.Int32Type:
-		return ConvertInt32(value)
+		return ConvertInt32(value, interpreter)
 
 	case *sema.Int64Type:
-		return ConvertInt64(value)
+		return ConvertInt64(value, interpreter)
 
 	case *sema.Int128Type:
-		return ConvertInt128(value)
+		return ConvertInt128(value, interpreter)
 
 	case *sema.Int256Type:
-		return ConvertInt256(value)
+		return ConvertInt256(value, interpreter)
 
 	// UInt*
 	case *sema.UInt8Type:
-		return ConvertUInt8(value)
+		return ConvertUInt8(value, interpreter)
 
 	case *sema.UInt16Type:
-		return ConvertUInt16(value)
+		return ConvertUInt16(value, interpreter)
 
 	case *sema.UInt32Type:
-		return ConvertUInt32(value)
+		return ConvertUInt32(value, interpreter)
 
 	case *sema.UInt64Type:
-		return ConvertUInt64(value)
+		return ConvertUInt64(value, interpreter)
 
 	case *sema.UInt128Type:
-		return ConvertUInt128(value)
+		return ConvertUInt128(value, interpreter)
 
 	case *sema.UInt256Type:
-		return ConvertUInt256(value)
+		return ConvertUInt256(value, interpreter)
 
 	// Word*
 	case *sema.Word8Type:
-		return ConvertWord8(value)
+		return ConvertWord8(value, interpreter)
 
 	case *sema.Word16Type:
-		return ConvertWord16(value)
+		return ConvertWord16(value, interpreter)
 
 	case *sema.Word32Type:
-		return ConvertWord32(value)
+		return ConvertWord32(value, interpreter)
 
 	case *sema.Word64Type:
-		return ConvertWord64(value)
+		return ConvertWord64(value, interpreter)
+
+	// Fix*
+
+	case *sema.Fix64Type:
+		return ConvertFix64(value, interpreter)
 
 	case *sema.UFix64Type:
-		return ConvertUFix64(value)
+		return ConvertUFix64(value, interpreter)
 
 	default:
 		return value
@@ -3122,17 +3128,38 @@ func (interpreter *Interpreter) writeStored(storageAddress common.Address, key s
 	interpreter.storageWriteHandler(interpreter, storageAddress, key, value)
 }
 
-var converters = map[string]func(Value) Value{
+type ValueConverter func(Value, *Interpreter) Value
+
+var converters = map[string]ValueConverter{
 	"Int":     ConvertInt,
+	"UInt":    ConvertUInt,
 	"Int8":    ConvertInt8,
 	"Int16":   ConvertInt16,
 	"Int32":   ConvertInt32,
 	"Int64":   ConvertInt64,
+	"Int128":  ConvertInt128,
+	"Int256":  ConvertInt256,
 	"UInt8":   ConvertUInt8,
 	"UInt16":  ConvertUInt16,
 	"UInt32":  ConvertUInt32,
 	"UInt64":  ConvertUInt64,
+	"UInt128": ConvertUInt128,
+	"UInt256": ConvertUInt256,
+	"Word8":   ConvertWord8,
+	"Word16":  ConvertWord16,
+	"Word32":  ConvertWord32,
+	"Word64":  ConvertWord64,
+	"Fix64":   ConvertFix64,
+	"UFix64":  ConvertUFix64,
 	"Address": ConvertAddress,
+}
+
+func init() {
+	for _, numberType := range sema.AllNumberTypes {
+		if _, ok := converters[numberType.String()]; !ok {
+			panic(fmt.Sprintf("missing converter for number type: %s", numberType))
+		}
+	}
 }
 
 func (interpreter *Interpreter) defineBaseFunctions() {
@@ -3147,12 +3174,13 @@ func (interpreter *Interpreter) defineBaseFunctions() {
 	}
 }
 
-func (interpreter *Interpreter) newConverterFunction(converter func(Value) Value) HostFunctionValue {
-	return HostFunctionValue{
-		Function: func(invocation Invocation) Trampoline {
-			return Done{Result: converter(invocation.Arguments[0])}
+func (interpreter *Interpreter) newConverterFunction(converter ValueConverter) FunctionValue {
+	return NewHostFunctionValue(
+		func(invocation Invocation) Trampoline {
+			value := invocation.Arguments[0]
+			return Done{Result: converter(value, interpreter)}
 		},
-	}
+	)
 }
 
 // TODO:

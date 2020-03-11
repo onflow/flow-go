@@ -574,7 +574,8 @@ func (checker *Checker) checkFixedPointLiteral(expression *ast.FixedPointExpress
 	}
 
 	if !checker.checkFixedPointRange(
-		expression.Integer,
+		expression.Negative,
+		expression.UnsignedInteger,
 		expression.Fractional,
 		minInt,
 		minFractional,
@@ -630,16 +631,34 @@ func (checker *Checker) checkIntegerRange(value, min, max *big.Int) bool {
 }
 
 func (checker *Checker) checkFixedPointRange(
-	integerValue, fractionalValue,
+	negative bool,
+	unsignedIntegerValue, fractionalValue,
 	minInt, minFractional,
 	maxInt, maxFractional *big.Int,
 ) bool {
+	minIntSign := minInt.Sign()
+
+	integerValue := big.NewInt(0).Set(unsignedIntegerValue)
+	if negative {
+		if minIntSign == 0 && negative {
+			return false
+		}
+
+		integerValue.Neg(integerValue)
+	}
+
 	switch integerValue.Cmp(minInt) {
 	case -1:
 		return false
 	case 0:
-		if fractionalValue.Cmp(minFractional) > 0 {
-			return false
+		if minIntSign < 0 {
+			if fractionalValue.Cmp(minFractional) > 0 {
+				return false
+			}
+		} else {
+			if fractionalValue.Cmp(minFractional) < 0 {
+				return false
+			}
 		}
 	case 1:
 		break
@@ -649,8 +668,14 @@ func (checker *Checker) checkFixedPointRange(
 	case -1:
 		break
 	case 0:
-		if fractionalValue.Cmp(maxFractional) > 0 {
-			return false
+		if maxInt.Sign() >= 0 {
+			if fractionalValue.Cmp(maxFractional) > 0 {
+				return false
+			}
+		} else {
+			if fractionalValue.Cmp(maxFractional) < 0 {
+				return false
+			}
 		}
 	case 1:
 		return false
