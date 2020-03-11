@@ -249,21 +249,13 @@ func TestInterpretTransactions(t *testing.T) {
 
 		require.IsType(t, values, &interpreter.ArrayValue{})
 
-		var unboxedValues []interpreter.Value
-
-		for _, value := range values.(*interpreter.ArrayValue).Values {
-			require.IsType(t, value, &interpreter.AnyValue{})
-			unboxedValue := value.(*interpreter.AnyValue).Value
-			unboxedValues = append(unboxedValues, unboxedValue)
-		}
-
 		assert.Equal(t,
 			[]interpreter.Value{
 				interpreter.AddressValue{},
 				interpreter.BoolValue(true),
 				interpreter.NewIntValue(1),
 			},
-			unboxedValues,
+			values.(*interpreter.ArrayValue).Values,
 		)
 	})
 

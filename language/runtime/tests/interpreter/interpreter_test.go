@@ -3024,10 +3024,7 @@ func TestInterpretNilCoalescingOptionalAnyStructNil(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.BoolValue(true),
-			&sema.BoolType{},
-		),
+		interpreter.BoolValue(true),
 		inter.Globals["y"].Value,
 	)
 }
@@ -3040,10 +3037,7 @@ func TestInterpretNilCoalescingOptionalAnyStructSome(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(2),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(2),
 		inter.Globals["y"].Value,
 	)
 }
@@ -4222,42 +4216,6 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	)
 }
 
-func TestInterpretFailableCastingAnyStructSuccess(t *testing.T) {
-
-	inter := parseCheckAndInterpret(t, `
-      let x: AnyStruct = 42
-      let y: Int? = x as? Int
-    `)
-
-	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-			&sema.IntType{},
-		),
-		inter.Globals["x"].Value,
-	)
-
-	assert.Equal(t,
-		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-		),
-		inter.Globals["y"].Value,
-	)
-}
-
-func TestInterpretFailableCastingAnyStructFailure(t *testing.T) {
-
-	inter := parseCheckAndInterpret(t, `
-      let x: AnyStruct = 42
-      let y: Bool? = x as? Bool
-    `)
-
-	assert.Equal(t,
-		interpreter.NilValue{},
-		inter.Globals["y"].Value,
-	)
-}
-
 func TestInterpretOptionalAnyStruct(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
@@ -4266,10 +4224,7 @@ func TestInterpretOptionalAnyStruct(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewAnyValueOwningNonCopying(
-				interpreter.NewIntValue(42),
-				&sema.IntType{},
-			),
+			interpreter.NewIntValue(42),
 		),
 		inter.Globals["x"].Value,
 	)
@@ -4284,10 +4239,7 @@ func TestInterpretOptionalAnyStructFailableCasting(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewAnyValueOwningNonCopying(
-				interpreter.NewIntValue(42),
-				&sema.IntType{},
-			),
+			interpreter.NewIntValue(42),
 		),
 		inter.Globals["x"].Value,
 	)
@@ -4310,19 +4262,13 @@ func TestInterpretOptionalAnyStructFailableCastingInt(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewAnyValueOwningNonCopying(
-				interpreter.NewIntValue(23),
-				&sema.IntType{},
-			),
+			interpreter.NewIntValue(23),
 		),
 		inter.Globals["x"].Value,
 	)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(23),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(23),
 		inter.Globals["y"].Value,
 	)
 
@@ -4348,10 +4294,7 @@ func TestInterpretOptionalAnyStructFailableCastingNil(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(42),
 		inter.Globals["y"].Value,
 	)
 
@@ -6202,10 +6145,7 @@ func TestInterpretCastingIntLiteralToAnyStruct(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(42),
 		inter.Globals["x"].Value,
 	)
 }
@@ -6237,10 +6177,9 @@ func TestInterpretCastingResourceToAnyResource(t *testing.T) {
 	value, err := inter.Invoke("test")
 	require.NoError(t, err)
 
-	require.IsType(t, &interpreter.AnyValue{}, value)
 	assert.IsType(t,
 		&interpreter.CompositeValue{},
-		value.(*interpreter.AnyValue).Value,
+		value,
 	)
 }
 

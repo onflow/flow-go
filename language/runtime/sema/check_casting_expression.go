@@ -46,16 +46,52 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 
 	switch expression.Operation {
 	case ast.OperationFailableCast:
-		// TODO: non-AnyStruct/AnyResource types (interfaces, wrapped (e.g AnyStruct?, [AnyStruct], etc.))
-		//   are not supported for now
 
-		switch leftHandType.(type) {
-		case *AnyStructType, *AnyResourceType:
-			break
-		default:
-			if !leftHandType.IsInvalidType() {
+		if !leftHandType.IsInvalidType() &&
+			!rightHandType.IsInvalidType() {
+
+			if leftHandType.IsResourceType() {
+				if !rightHandType.IsResourceType() {
+					checker.report(
+						&AlwaysFailingNonResourceCastingTypeError{
+							ValueType:  leftHandType,
+							TargetType: rightHandType,
+							Range:      ast.NewRangeFromPositioned(expression.TypeAnnotation),
+						},
+					)
+				}
+			} else {
+				if rightHandType.IsResourceType() {
+					checker.report(
+						&AlwaysFailingResourceCastingTypeError{
+							ValueType:  leftHandType,
+							TargetType: rightHandType,
+							Range:      ast.NewRangeFromPositioned(expression.TypeAnnotation),
+						},
+					)
+				}
+			}
+		}
+
+		// TODO: support more types
+
+		if !leftHandType.IsInvalidType() {
+			switch leftHandType.(type) {
+			case *AnyStructType, *AnyResourceType, *RestrictedResourceType,
+				*CompositeType, *InterfaceType,
+				*VoidType, *StringType, *BoolType, *AddressType,
+				*VariableSizedType, *ConstantSizedType,
+				*DictionaryType, *OptionalType:
+
+				break
+
+			default:
+				if IsSubType(leftHandType, &NumberType{}) {
+					break
+				}
+
 				checker.report(
-					&UnsupportedTypeError{
+					&UnsupportedCastedTypeError{
 						Type:  leftHandType,
 						Range: ast.NewRangeFromPositioned(leftHandExpression),
 					},
