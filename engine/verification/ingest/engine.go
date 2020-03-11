@@ -483,7 +483,7 @@ func (e *Engine) checkPendingChunks() {
 				e.log.Error().
 					Err(err).
 					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-					Uint64("chunk_id", chunk.Index).
+					Hex("chunk_id", logging.ID(chunk.ID())).
 					Msg("could not pass chunk to verifier engine")
 				continue
 			}
