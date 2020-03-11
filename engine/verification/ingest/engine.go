@@ -507,8 +507,17 @@ func (e *Engine) checkPendingReceipts() {
 			for _, chunk := range mychunks {
 				// creates a verifiable chunk for assigned chunk
 				index := chunk.Index
+				var endState flow.StateCommitment
+				// last chunk
+				if int(index) == len(receipt.ExecutionResult.Chunks)-1 {
+					endState = receipt.ExecutionResult.FinalStateCommit
+				} else {
+					endState = receipt.ExecutionResult.Chunks[index+1].StartState
+				}
+
 				vchunk := &verification.VerifiableChunk{
 					ChunkIndex: index,
+					EndState:   endState,
 					Receipt:    receipt,
 					Block:      block,
 					Collection: collections[index],
