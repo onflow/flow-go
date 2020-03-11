@@ -129,9 +129,10 @@ func (e *IntegerExpression) String() string {
 // FixedPointExpression
 
 type FixedPointExpression struct {
-	Integer    *big.Int
-	Fractional *big.Int
-	Scale      uint
+	Negative        bool
+	UnsignedInteger *big.Int
+	Fractional      *big.Int
+	Scale           uint
 	Range
 }
 
@@ -148,7 +149,14 @@ func (e *FixedPointExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 }
 
 func (e *FixedPointExpression) String() string {
-	return fmt.Sprintf("%s.%s", e.Integer, e.Fractional)
+	var builder strings.Builder
+	if e.Negative {
+		builder.WriteRune('-')
+	}
+	builder.WriteString(e.UnsignedInteger.String())
+	builder.WriteRune('.')
+	builder.WriteString(e.Fractional.String())
+	return builder.String()
 }
 
 // ArrayExpression

@@ -1600,12 +1600,12 @@ func (interpreter *Interpreter) VisitFixedPointExpression(expression *ast.FixedP
 func (interpreter *Interpreter) convertToFixedPointBigInt(expression *ast.FixedPointExpression, scale uint) *big.Int {
 	ten := big.NewInt(10)
 
-	// integer = expression.Integer * 10 ^ scale
+	// integer = expression.UnsignedInteger * 10 ^ scale
 
 	targetScale := big.NewInt(0).SetUint64(uint64(scale))
 
 	integer := big.NewInt(0).Mul(
-		expression.Integer,
+		expression.UnsignedInteger,
 		big.NewInt(0).Exp(ten, targetScale, nil),
 	)
 
@@ -1629,7 +1629,8 @@ func (interpreter *Interpreter) convertToFixedPointBigInt(expression *ast.FixedP
 
 	// value = integer + fractional
 
-	if integer.Sign() < 0 {
+	if expression.Negative {
+		integer.Neg(integer)
 		fractional.Neg(fractional)
 	}
 

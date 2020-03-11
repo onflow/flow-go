@@ -1604,19 +1604,19 @@ func (v *ProgramVisitor) VisitFixedPointLiteral(ctx *FixedPointLiteralContext) i
 	integer, _ := v.parseFixedPointPart(parts[0])
 	fractional, scale := v.parseFixedPointPart(parts[1])
 
-	expression := &ast.FixedPointExpression{
-		Integer:    integer,
-		Fractional: fractional,
-		Scale:      uint(scale),
+	// NOTE: can't just negate integer, might be 0 and fractional part > 0
+	negative := ctx.Minus() != nil
+
+	return &ast.FixedPointExpression{
+		Negative:        negative,
+		UnsignedInteger: integer,
+		Fractional:      fractional,
+		Scale:           scale,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
 		},
 	}
-	if ctx.Minus() != nil {
-		expression.Integer.Neg(expression.Integer)
-	}
-	return expression
 }
 
 func (v *ProgramVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {
