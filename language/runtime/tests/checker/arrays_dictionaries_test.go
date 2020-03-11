@@ -800,27 +800,31 @@ func TestCheckInvalidConstantSizedArrayDeclarationCountMismatchTooMany(t *testin
 
 func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 
-	for _, code := range []string{
-		`let k = 1`,
-		`let k = "a"`,
-		`let k = true`,
-		`let k: UInt8 = 2`,
-		`let k: UInt16 = 3`,
-		`let k: UInt32 = 4`,
-		`let k: UInt64 = 5`,
-		`let k: Int8 = 6`,
-		`let k: Int16 = 7`,
-		`let k: Int32 = 8`,
-		`let k: Int64 = 9`,
-	} {
-		t.Run("valid", func(t *testing.T) {
+	tests := map[string]string{
+		"String":    `"abc"`,
+		"Character": `"X"`,
+		"Address":   `0x1`,
+		"Bool":      `true`,
+	}
+
+	for _, integerType := range sema.AllIntegerTypes {
+		tests[integerType.String()] = `42`
+	}
+
+	for _, fixedPointType := range sema.AllFixedPointTypes {
+		tests[fixedPointType.String()] = `1.23`
+	}
+
+	for ty, code := range tests {
+		t.Run(fmt.Sprintf("valid: %s", ty), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %s
+                      let k: %s = %s
                       let xs = {k: "x"}
                     `,
+					ty,
 					code,
 				),
 			)
@@ -829,15 +833,15 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 		})
 	}
 
-	for _, code := range []string{
-		`
+	for name, code := range map[string]string{
+		"struct": `
            struct X {}
            let k = X()
         `,
-		`let k = [1]`,
-		`let k = {"a": 1}`,
+		"array":      `let k = [1]`,
+		"dictionary": `let k = {"a": 1}`,
 	} {
-		t.Run("invalid", func(t *testing.T) {
+		t.Run(fmt.Sprintf("invalid: %s", name), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(

@@ -1,15 +1,13 @@
-package assignment
+package flow
 
 import (
 	"bytes"
 
 	"github.com/rs/zerolog/log"
-
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // IdentifierList defines a sortable list of identifiers
-type IdentifierList []flow.Identifier
+type IdentifierList []Identifier
 
 // Len returns length of the IdentiferList in the number of stored identifiers.
 // It satisfies the sort.Interface making the IdentifierList sortable.
@@ -41,7 +39,7 @@ func (il IdentifierList) Swap(i, j int) {
 
 // JoinIdentifierLists appends and returns two IdentifierLists
 func JoinIdentifierLists(this, other IdentifierList) IdentifierList {
-	joined := make([]flow.Identifier, 0)
+	joined := make([]Identifier, 0, len(this)+len(other))
 	for _, id := range this {
 		joined = append(joined, id)
 	}

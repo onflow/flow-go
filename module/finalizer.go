@@ -6,13 +6,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Finalizer represents a wrapper around the temporary state (memory pools) and
-// the protocol state, which introduces finalized blocks and frees resources
-// for pending entities that are no longer needed.
+// Finalizer is used by the consensus' finalization logic to inform
+// other components in the node about a block being finalized.
 type Finalizer interface {
 
-	// MakeFinal will declare a block and all of its children as finalized, which
-	// makes it an immutable part of the blockchain, and cleans up pending
-	// entities that were included in the block or its ancestors.
+	// MakeFinal will declare a block and all of its ancestors as finalized, which
+	// makes it an immutable part of the blockchain. Returning an error indicates
+	// some fatal condition and will cause the finalization logic to terminate.
 	MakeFinal(blockID flow.Identifier) error
 }

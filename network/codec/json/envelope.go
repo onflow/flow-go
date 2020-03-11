@@ -22,6 +22,7 @@ const (
 
 	CodeCollectionGuarantee
 	CodeTransaction
+	CodeTransactionBody
 
 	CodeBlock
 

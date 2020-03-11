@@ -4185,6 +4185,10 @@ func (v AddressValue) Copy() Value {
 	return v
 }
 
+func (v AddressValue) KeyString() string {
+	return v.String()
+}
+
 func (v AddressValue) String() string {
 	return fmt.Sprintf("%x", [common.AddressLength]byte(v))
 }

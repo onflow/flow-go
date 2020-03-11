@@ -1143,7 +1143,7 @@ func (interpreter *Interpreter) visitAssignment(
 				if _, ok := target.(NilValue); !ok {
 					locationRange := interpreter.locationRange(position)
 
-					panic(&ForceAssignmentToNoNilResourceError{
+					panic(&ForceAssignmentToNonNilResourceError{
 						LocationRange: locationRange,
 					})
 				}
@@ -1185,7 +1185,7 @@ func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.
 						rightGetterSetter.set(NilValue{})
 					}
 
-					// Assign right value to left target
+					// Add right value to left target
 					// and left value to right target
 
 					rightValueCopy := interpreter.copyAndConvert(rightValue.(Value), rightType, leftType)
