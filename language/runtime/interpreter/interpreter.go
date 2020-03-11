@@ -3299,8 +3299,9 @@ func (interpreter *Interpreter) IsSubType(subType DynamicType, superType sema.Ty
 			if typedSubType.Authorized() {
 				return interpreter.IsSubType(typedSubType.InnerType(), typedSuperType.Type)
 			} else {
-				// TODO:
-				return false
+				// NOTE: Allowing all casts for casting unauthorized references is intentional:
+				// all invalid cases have already been rejected statically
+				return true
 			}
 
 		default:
