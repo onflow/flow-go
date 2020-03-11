@@ -48,10 +48,15 @@ func New(
 	comms Communicator,
 	builder module.Builder,
 	finalizer module.Finalizer,
-	participants flow.IdentityList,
 	interval time.Duration,
 	timeout time.Duration,
 ) (module.ColdStuff, error) {
+
+	participants, err := protocol.ClusterFor(state.Final(), me.NodeID())
+	if err != nil {
+		return nil, fmt.Errorf("could not get cluster participants: %w", err)
+	}
+
 	cold := coldStuff{
 		log:          log,
 		me:           me,

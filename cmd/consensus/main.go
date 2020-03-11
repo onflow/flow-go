@@ -15,8 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
@@ -87,20 +85,15 @@ func main() {
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
 			cache := buffer.NewPendingBlocks()
+			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
+			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
 
 			con, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
 
-			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
-			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
-			participants, err := node.State.Final().Identities(filter.HasRole(flow.RoleConsensus))
-			if err != nil {
-				return nil, fmt.Errorf("could not get consensus participants: %w", err)
-			}
-
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, con, build, final, participants, 3*time.Second, 6*time.Second)
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, con, build, final, 3*time.Second, 6*time.Second)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}

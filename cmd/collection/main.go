@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
@@ -67,28 +66,15 @@ func main() {
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			cache := buffer.NewPendingClusterBlocks()
+			build := builder.NewBuilder(node.DB, pool, "TODO")
+			final := finalizer.NewFinalizer(node.DB, pool, prov, node.Tracer, "TODO")
+
 			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, prov, pool, transactions, headers, payloads, cache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
 
-			build := builder.NewBuilder(node.DB, pool, "TODO")
-			final := finalizer.NewFinalizer(node.DB, pool, prov, node.Tracer, "TODO")
-
-			clusters, err := node.State.Final().Clusters()
-			if err != nil {
-				return nil, fmt.Errorf("could not get clusters: %w", err)
-			}
-			cluster, err := clusters.ByNodeID(node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not get my cluster: %w", err)
-			}
-			participants, err := node.State.Final().Identities(filter.In(cluster))
-			if err != nil {
-				return nil, fmt.Errorf("could not get nodes in cluster: %w", err)
-			}
-
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, participants, 3*time.Second, 6*time.Second)
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, 3*time.Second, 6*time.Second)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}
