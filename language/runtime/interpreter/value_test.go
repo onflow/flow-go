@@ -12,8 +12,6 @@ import (
 )
 
 func TestToExpression(t *testing.T) {
-	_, err := ToValue(1)
-	assert.Error(t, err)
 
 	testValue := func(expected Value) func(actual Value, err error) {
 		return func(actual Value, err error) {

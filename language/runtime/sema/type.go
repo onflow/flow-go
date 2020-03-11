@@ -4371,17 +4371,21 @@ func IsNilType(ty Type) bool {
 
 type TransactionType struct {
 	Members           map[string]*Member
-	prepareParameters []*Parameter
+	PrepareParameters []*Parameter
+	Parameters        []*Parameter
 }
 
 func (t *TransactionType) EntryPointFunctionType() *FunctionType {
-	return t.PrepareFunctionType().InvocationFunctionType()
+	return &FunctionType{
+		Parameters:           append(t.Parameters, t.PrepareParameters...),
+		ReturnTypeAnnotation: NewTypeAnnotation(&VoidType{}),
+	}
 }
 
 func (t *TransactionType) PrepareFunctionType() *SpecialFunctionType {
 	return &SpecialFunctionType{
 		FunctionType: &FunctionType{
-			Parameters:           t.prepareParameters,
+			Parameters:           t.PrepareParameters,
 			ReturnTypeAnnotation: NewTypeAnnotation(&VoidType{}),
 		},
 	}
