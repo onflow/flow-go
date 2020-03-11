@@ -174,6 +174,6 @@ func TestHappyPath(t *testing.T) {
 
 // isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
 func isAssigned(index int, chunkNum int) bool {
-	answer := index >= 0 && index < chunkNum && index%2 == 0
+	assigned := index >= 0 && index < chunkNum && index%2 == 0
 	return answer
 }
