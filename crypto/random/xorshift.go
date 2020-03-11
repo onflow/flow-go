@@ -122,3 +122,13 @@ func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
 	items, _ := x.Permutation(n)
 	return items[:m], nil
 }
+
+// Shuffle permutes the given slice in place
+// It implements Fisher-Yates Shuffle using x as a source of randoms
+// O(n) space and O(n) time
+func (x *xorshifts) Shuffle(n int, swap func(i, j int)) {
+	for i := n - 1; i > 0; i-- {
+		j, _ := x.IntN(i + 1)
+		swap(i, j)
+	}
+}

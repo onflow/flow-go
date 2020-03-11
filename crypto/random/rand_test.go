@@ -10,7 +10,7 @@ import (
 // The only purpose of this function is unit testing. It also implements a very basic tandomness test.
 // it doesn't evaluate randomness of the random function and doesn't perform advanced statistical tests
 // just making sure code works on edge cases
-func TestXorshift(t *testing.T) {
+func TestRandInt(t *testing.T) {
 	sampleSize := 64768
 	tolerance := 0.05
 	sampleSpace := 16 // this should be a power of 2 for a more uniform distribution
@@ -65,6 +65,44 @@ func TestRandomPermutationSubset(t *testing.T) {
 			has[shuffledlist[i]] = struct{}{}
 			// fill the distribution
 			distribution[shuffledlist[i]] += 1.0
+		}
+	}
+	stdev := stat.StdDev(distribution, nil)
+	mean := stat.Mean(distribution, nil)
+	if stdev > tolerance*mean {
+		t.Errorf("basic randomness test failed. stdev %v, mean %v", stdev, mean)
+	}
+}
+
+func TestRandomShuffle(t *testing.T) {
+	listSize := 100
+	seed := make([]byte, 16)
+	seed[0] = 45
+	rng, err := NewRand(seed)
+	require.NoError(t, err)
+	// statictics parameters
+	sampleSize := 64768
+	tolerance := 0.05
+	distribution := make([]float64, listSize)
+	// Slice to shuffle
+	list := make([]int, 0, listSize)
+	for i := 0; i < listSize; i++ {
+		list = append(list, i)
+	}
+
+	for i := 0; i < sampleSize; i++ {
+		rng.Shuffle(len(list), func(i, j int) {
+			list[i], list[j] = list[j], list[i]
+		})
+		has := make(map[int]struct{})
+		for _, e := range list {
+			// check for repetition
+			if _, ok := has[e]; ok {
+				t.Errorf("dupplicated item in the results returned by PermutateSubset")
+			}
+			has[e] = struct{}{}
+			// fill the distribution
+			distribution[e] += 1.0
 		}
 	}
 	stdev := stat.StdDev(distribution, nil)
