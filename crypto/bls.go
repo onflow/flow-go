@@ -60,7 +60,11 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac Hasher) (boo
 
 // GeneratePrKey generates a private key for BLS on BLS12381 curve
 func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
-	var sk PrKeyBLS_BLS12381
+	sk := &PrKeyBLS_BLS12381{
+		alg: a,
+		// public key is not computed
+		pk: nil,
+	}
 	// seed the RNG
 	seedRelic(seed)
 	// Generate private key here
@@ -68,11 +72,7 @@ func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	// public key is not computed (but this could be changed)
-	sk.pk = nil
-	// links the private key to the algo
-	sk.alg = a
-	return &sk, nil
+	return sk, nil
 }
 
 func (a *BLS_BLS12381Algo) decodePrivateKey([]byte) (PrivateKey, error) {
