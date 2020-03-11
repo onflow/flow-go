@@ -3024,10 +3024,7 @@ func TestInterpretNilCoalescingOptionalAnyStructNil(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.BoolValue(true),
-			&sema.BoolType{},
-		),
+		interpreter.BoolValue(true),
 		inter.Globals["y"].Value,
 	)
 }
@@ -3040,10 +3037,7 @@ func TestInterpretNilCoalescingOptionalAnyStructSome(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(2),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(2),
 		inter.Globals["y"].Value,
 	)
 }
@@ -3499,6 +3493,11 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 			continue
 		}
 
+		interfaceType := "Test"
+		if compositeKind == common.CompositeKindResource {
+			interfaceType = "AnyResource{Test}"
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpretWithOptions(t,
@@ -3508,10 +3507,11 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
                       pub %[1]s TestImpl: Test {}
 
-                      pub let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
+                      pub let test: %[2]s%[3]s %[4]s %[5]s TestImpl%[6]s
                     `,
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
+					interfaceType,
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind, ""),
@@ -3543,9 +3543,15 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 		if compositeKind == common.CompositeKindContract {
 			identifier = "TestImpl"
 		} else {
+			interfaceType := "Test"
+			if compositeKind == common.CompositeKindResource {
+				interfaceType = "AnyResource{Test}"
+			}
+
 			setupCode = fmt.Sprintf(
-				`pub let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+				`pub let test: %[1]s%[2]s %[3]s %[4]s TestImpl%[5]s`,
 				compositeKind.Annotation(),
+				interfaceType,
 				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
 				constructorArguments(compositeKind, "x: 1"),
@@ -3615,9 +3621,15 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 		if compositeKind == common.CompositeKindContract {
 			identifier = "TestImpl"
 		} else {
+			interfaceType := "Test"
+			if compositeKind == common.CompositeKindResource {
+				interfaceType = "AnyResource{Test}"
+			}
+
 			setupCode = fmt.Sprintf(
-				`pub let test: %[1]s Test %[2]s %[3]s TestImpl%[4]s`,
+				`pub let test: %[1]s %[2]s %[3]s %[4]s TestImpl%[5]s`,
 				compositeKind.Annotation(),
+				interfaceType,
 				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
 				constructorArguments(compositeKind, ""),
@@ -3676,9 +3688,15 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 		if compositeKind == common.CompositeKindContract {
 			identifier = "TestImpl"
 		} else {
+			interfaceType := "Test"
+			if compositeKind == common.CompositeKindResource {
+				interfaceType = "AnyResource{Test}"
+			}
+
 			setupCode = fmt.Sprintf(
-				`let test: %[1]s Test %[2]s %[3]s TestImpl%[4]s`,
+				`let test: %[1]s%[2]s %[3]s %[4]s TestImpl%[5]s`,
 				compositeKind.Annotation(),
+				interfaceType,
 				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
 				constructorArguments(compositeKind, ""),
@@ -3773,14 +3791,21 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 
 					var testFunction string
 					if compositeKind != common.CompositeKindContract {
+
+						interfaceType := "Test"
+						if compositeKind == common.CompositeKindResource {
+							interfaceType = "AnyResource{Test}"
+						}
+
 						testFunction =
 							fmt.Sprintf(
 								`
-					               pub fun test(x: Int): %[1]sTest {
-					                   return %[2]s %[3]s TestImpl%[4]s
+					               pub fun test(x: Int): %[1]s%[2]s {
+					                   return %[3]s %[4]s TestImpl%[5]s
 					               }
                                 `,
 								compositeKind.Annotation(),
+								interfaceType,
 								compositeKind.MoveOperator(),
 								compositeKind.ConstructionKeyword(),
 								constructorArguments(compositeKind, "x: x"),
@@ -4191,42 +4216,6 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	)
 }
 
-func TestInterpretFailableCastingAnyStructSuccess(t *testing.T) {
-
-	inter := parseCheckAndInterpret(t, `
-      let x: AnyStruct = 42
-      let y: Int? = x as? Int
-    `)
-
-	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-			&sema.IntType{},
-		),
-		inter.Globals["x"].Value,
-	)
-
-	assert.Equal(t,
-		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-		),
-		inter.Globals["y"].Value,
-	)
-}
-
-func TestInterpretFailableCastingAnyStructFailure(t *testing.T) {
-
-	inter := parseCheckAndInterpret(t, `
-      let x: AnyStruct = 42
-      let y: Bool? = x as? Bool
-    `)
-
-	assert.Equal(t,
-		interpreter.NilValue{},
-		inter.Globals["y"].Value,
-	)
-}
-
 func TestInterpretOptionalAnyStruct(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
@@ -4235,10 +4224,7 @@ func TestInterpretOptionalAnyStruct(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewAnyValueOwningNonCopying(
-				interpreter.NewIntValue(42),
-				&sema.IntType{},
-			),
+			interpreter.NewIntValue(42),
 		),
 		inter.Globals["x"].Value,
 	)
@@ -4253,10 +4239,7 @@ func TestInterpretOptionalAnyStructFailableCasting(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewAnyValueOwningNonCopying(
-				interpreter.NewIntValue(42),
-				&sema.IntType{},
-			),
+			interpreter.NewIntValue(42),
 		),
 		inter.Globals["x"].Value,
 	)
@@ -4279,19 +4262,13 @@ func TestInterpretOptionalAnyStructFailableCastingInt(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewAnyValueOwningNonCopying(
-				interpreter.NewIntValue(23),
-				&sema.IntType{},
-			),
+			interpreter.NewIntValue(23),
 		),
 		inter.Globals["x"].Value,
 	)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(23),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(23),
 		inter.Globals["y"].Value,
 	)
 
@@ -4317,10 +4294,7 @@ func TestInterpretOptionalAnyStructFailableCastingNil(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(42),
 		inter.Globals["y"].Value,
 	)
 
@@ -6312,10 +6286,7 @@ func TestInterpretCastingIntLiteralToAnyStruct(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(42),
 		inter.Globals["x"].Value,
 	)
 }
@@ -6347,10 +6318,9 @@ func TestInterpretCastingResourceToAnyResource(t *testing.T) {
 	value, err := inter.Invoke("test")
 	require.NoError(t, err)
 
-	require.IsType(t, &interpreter.AnyValue{}, value)
 	assert.IsType(t,
 		&interpreter.CompositeValue{},
-		value.(*interpreter.AnyValue).Value,
+		value,
 	)
 }
 
@@ -7809,4 +7779,77 @@ func TestInterpretResourceOwnerFieldUse(t *testing.T) {
 		),
 		result,
 	)
+}
+
+func TestInterpretResourceAssignmentForceTransfer(t *testing.T) {
+
+	t.Run("new to nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+          resource X {}
+
+          fun test() {
+              var x: @X? <- nil
+              x <-! create X()
+              destroy x
+          }
+        `)
+
+		_, err := inter.Invoke("test")
+		require.NoError(t, err)
+	})
+
+	t.Run("new to non-nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	     resource X {}
+
+	     fun test() {
+	         var x: @X? <- create X()
+	         x <-! create X()
+	         destroy x
+	     }
+	   `)
+
+		_, err := inter.Invoke("test")
+		require.Error(t, err)
+
+		assert.IsType(t, &interpreter.ForceAssignmentToNonNilResourceError{}, err)
+	})
+
+	t.Run("existing to nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	     resource X {}
+
+	     fun test() {
+	         let x <- create X()
+	         var x2: @X? <- nil
+	         x2 <-! x
+	         destroy x2
+	     }
+	   `)
+
+		_, err := inter.Invoke("test")
+		require.NoError(t, err)
+	})
+
+	t.Run("existing to non-nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	     resource X {}
+
+	     fun test() {
+	         let x <- create X()
+	         var x2: @X? <- create X()
+	         x2 <-! x
+	         destroy x2
+	     }
+	   `)
+
+		_, err := inter.Invoke("test")
+		require.Error(t, err)
+
+		assert.IsType(t, &interpreter.ForceAssignmentToNonNilResourceError{}, err)
+	})
 }

@@ -25,13 +25,16 @@ import (
 func main() {
 
 	var (
-		txLimit     uint
-		pool        mempool.Transactions
-		collections *storage.Collections
-		ingressConf ingress.Config
-		prov        *provider.Engine
-		ing         *ingest.Engine
-		err         error
+		txLimit      uint
+		pool         mempool.Transactions
+		collections  *storage.Collections
+		transactions *storage.Transactions
+		headers      *storage.Headers
+		payloads     *storage.ClusterPayloads
+		ingressConf  ingress.Config
+		prov         *provider.Engine
+		ing          *ingest.Engine
+		err          error
 	)
 
 	cmd.FlowNode("collection").
@@ -43,6 +46,12 @@ func main() {
 			pool, err = stdmap.NewTransactions(txLimit)
 			return err
 		}).
+		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
+			transactions = storage.NewTransactions(node.DB)
+			headers = storage.NewHeaders(node.DB)
+			payloads = storage.NewClusterPayloads(node.DB)
+			return nil
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool)
 			return ing, err
@@ -53,13 +62,10 @@ func main() {
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collections = storage.NewCollections(node.DB)
-			prov, err = provider.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, collections)
+			prov, err = provider.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool, collections, transactions)
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			transactions := storage.NewTransactions(node.DB)
-			headers := storage.NewHeaders(node.DB)
-			payloads := storage.NewClusterPayloads(node.DB)
 			cache := buffer.NewPendingClusterBlocks()
 			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, prov, pool, transactions, headers, payloads, cache)
 			if err != nil {
