@@ -31,8 +31,9 @@ type coldStuff struct {
 	unit      *engine.Unit
 
 	// round config
-	interval time.Duration
-	timeout  time.Duration
+	participants flow.IdentityList
+	interval     time.Duration
+	timeout      time.Duration
 
 	// incoming consensus entities
 	proposals chan *flow.Header
@@ -47,22 +48,24 @@ func New(
 	comms Communicator,
 	builder module.Builder,
 	finalizer module.Finalizer,
+	participants flow.IdentityList,
 	interval time.Duration,
 	timeout time.Duration,
 ) (module.ColdStuff, error) {
 	cold := coldStuff{
-		log:       log,
-		me:        me,
-		state:     state,
-		comms:     comms,
-		builder:   builder,
-		finalizer: finalizer,
-		unit:      engine.NewUnit(),
-		interval:  interval,
-		timeout:   timeout,
-		proposals: make(chan *flow.Header, 1),
-		votes:     make(chan *model.Vote, 1),
-		commits:   make(chan *model.Commit, 1),
+		log:          log,
+		me:           me,
+		state:        state,
+		comms:        comms,
+		builder:      builder,
+		finalizer:    finalizer,
+		unit:         engine.NewUnit(),
+		participants: participants,
+		interval:     interval,
+		timeout:      timeout,
+		proposals:    make(chan *flow.Header, 1),
+		votes:        make(chan *model.Vote, 1),
+		commits:      make(chan *model.Commit, 1),
 	}
 
 	return &cold, nil
@@ -114,7 +117,7 @@ ConsentLoop:
 	for {
 
 		var err error
-		e.round, err = round.New(e.state, e.me)
+		e.round, err = round.New(e.state, e.me, e.participants)
 		if err != nil {
 			return fmt.Errorf("could not initialize round: %w", err)
 		}
