@@ -258,9 +258,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	var missingTxErr *multierror.Error
 	for _, txID := range collection.Transactions {
 		if !e.pool.Has(txID) {
-			// reject the block, request the transaction
+			// note each missing transaction in the error and reject the block
 			missingTxErr = multierror.Append(missingTxErr, fmt.Errorf("cannot validate missing transaction (id=%x)", txID))
-			// TODO submit transaction request
+
+			// request the missing transaction
+			req := &messages.SubmitTransactionRequest{
+				Request: messages.TransactionRequest{ID: txID},
+			}
+			e.provider.SubmitLocal(req)
 		}
 	}
 	if err := missingTxErr.ErrorOrNil(); err != nil {
