@@ -344,6 +344,7 @@ func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID
 
 	log := e.log.With().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
+		hex("chunk_id", logging.ID(chunkID)).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Logger()
 
