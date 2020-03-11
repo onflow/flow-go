@@ -39,7 +39,7 @@ func (il IdentifierList) Swap(i, j int) {
 
 // JoinIdentifierLists appends and returns two IdentifierLists
 func JoinIdentifierLists(this, other IdentifierList) IdentifierList {
-	joined := make([]Identifier, 0, len(this) + len(other))
+	joined := make([]Identifier, 0, len(this)+len(other))
 	for _, id := range this {
 		joined = append(joined, id)
 	}
