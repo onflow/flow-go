@@ -168,6 +168,8 @@ func (e *Engine) onTransactionRequest(originID flow.Identifier, req *messages.Tr
 		if err != nil {
 			return fmt.Errorf("could not submit transaction resopnse: %w", err)
 		}
+
+		return nil
 	}
 
 	// if it isn't in the mempool, check persistent storage
