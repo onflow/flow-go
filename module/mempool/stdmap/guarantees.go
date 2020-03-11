@@ -15,9 +15,9 @@ type Guarantees struct {
 }
 
 // NewGuarantees creates a new memory pool for collection guarantees.
-func NewGuarantees() (*Guarantees, error) {
+func NewGuarantees(limit uint) (*Guarantees, error) {
 	g := &Guarantees{
-		Backend: NewBackend(),
+		Backend: NewBackend(WithLimit(limit)),
 	}
 
 	return g, nil

@@ -22,8 +22,8 @@ type ViewState struct {
 
 // DKGPublicData is the public data for DKG participants who generated their key shares
 type DKGPublicData struct {
-	GroupPubKey           crypto.PublicKey                   // the group public key
-	IdToDKGParticipantMap map[flow.Identifier]DKGParticipant // the mapping from DKG participants Identifier to its full DKGParticipant info
+	GroupPubKey           crypto.PublicKey                    // the group public key
+	IdToDKGParticipantMap map[flow.Identifier]*DKGParticipant // the mapping from DKG participants Identifier to its full DKGParticipant info
 }
 
 // DKGParticipant contains an individual participant's DKG data

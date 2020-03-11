@@ -9,7 +9,7 @@ type Assignment struct {
 	table map[uint64]map[flow.Identifier]struct{}
 }
 
-func NewAssignmet() *Assignment {
+func NewAssignment() *Assignment {
 	return &Assignment{
 		table: make(map[uint64]map[flow.Identifier]struct{}),
 	}
@@ -35,8 +35,8 @@ func (a *Assignment) Assign(chunk *flow.Chunk, verifiers IdentifierList) {
 	a.table[chunk.Index] = v
 }
 
-func (a *Assignment) Which(this flow.Identifier) []uint64 {
-	chunks := make([]uint64, 0)
+func (a *Assignment) ByNodeID(this flow.Identifier) []uint64 {
+	var chunks []uint64
 
 	// iterates over pairs of (chunk, assigned verifiers)
 	for c, vList := range a.table {
@@ -49,10 +49,4 @@ func (a *Assignment) Which(this flow.Identifier) []uint64 {
 		}
 	}
 	return chunks
-}
-
-// ChunkAssingment presents an interface for assigning chunks to the verifier nodes
-type ChunkAssignment interface {
-	// Which returns the list of chunks that are assigned to this verifier node
-	Which(flow.Identifier) flow.ChunkList
 }

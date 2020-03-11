@@ -44,12 +44,47 @@ func BlockHeaderFixture() flow.Header {
 	}
 }
 
+// BlockWithParent creates a new block that is valid
+// with respect to the given parent block.
+func BlockWithParent(parent *flow.Block) flow.Block {
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: CollectionGuaranteesFixture(16),
+	}
+
+	header := BlockHeaderFixture()
+	header.View = parent.View + 1
+	header.ChainID = parent.ChainID
+	header.Timestamp = time.Now()
+	header.ParentID = parent.ID()
+	header.PayloadHash = payload.Hash()
+
+	return flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+}
+
 func SealFixture() flow.Seal {
 	return flow.Seal{
 		BlockID:       IdentifierFixture(),
 		PreviousState: StateCommitmentFixture(),
 		FinalState:    StateCommitmentFixture(),
 		Signature:     SignatureFixture(),
+	}
+}
+
+func ClusterBlockFixture() cluster.Block {
+	payload := cluster.Payload{
+		Collection: flow.LightCollection{
+			Transactions: []flow.Identifier{IdentifierFixture()},
+		},
+	}
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
+	return cluster.Block{
+		Header:  header,
+		Payload: payload,
 	}
 }
 
@@ -62,14 +97,13 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 		},
 	}
 
-	header := flow.Header{
-		Height:      parent.Height + 1,
-		View:        parent.View + 1,
-		ChainID:     parent.ChainID,
-		Timestamp:   time.Now(),
-		ParentID:    parent.ID(),
-		PayloadHash: payload.Hash(),
-	}
+	header := BlockHeaderFixture()
+	header.Height = parent.Height + 1
+	header.View = parent.View + 1
+	header.ChainID = parent.ChainID
+	header.Timestamp = time.Now()
+	header.ParentID = parent.ID()
+	header.PayloadHash = payload.Hash()
 
 	block := cluster.Block{
 		Header:  header,
@@ -285,8 +319,8 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	return tx
 }
 
-func TransactionBodyFixture() flow.TransactionBody {
-	return flow.TransactionBody{
+func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
+	tb := flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
 		ReferenceBlockID: IdentifierFixture(),
 		Nonce:            rand.Uint64(),
@@ -295,11 +329,82 @@ func TransactionBodyFixture() flow.TransactionBody {
 		ScriptAccounts:   []flow.Address{AddressFixture()},
 		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
 	}
+
+	for _, apply := range opts {
+		apply(&tb)
+	}
+
+	return tb
 }
 
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
-func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
+// chunkCount determines the number of chunks inside each receipt
+func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecutionResult {
+	chunks := make([]*flow.Chunk, 0)
+	chunkStates := make([]*flow.ChunkState, 0)
+	collections := make([]*flow.Collection, 0)
+	guarantees := make([]*flow.CollectionGuarantee, 0)
+
+	for i := 0; i < chunkCount; i++ {
+		// creates one guaranteed collection per chunk
+		coll := CollectionFixture(3)
+		guarantee := coll.Guarantee()
+		collections = append(collections, &coll)
+		guarantees = append(guarantees, &guarantee)
+
+		// creates a chunk
+		chunk := &flow.Chunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex: uint(i),
+				StartState:      StateCommitmentFixture(),
+			},
+			Index: uint64(i),
+		}
+		chunks = append(chunks, chunk)
+
+		// creates a chunk state
+		chunkState := &flow.ChunkState{
+			ChunkID:   chunk.ID(),
+			Registers: flow.Ledger{},
+		}
+		chunkStates = append(chunkStates, chunkState)
+	}
+
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: guarantees,
+	}
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
+
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+
+	result := flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID: block.ID(),
+			Chunks:  chunks,
+		},
+	}
+
+	receipt := flow.ExecutionReceipt{
+		ExecutionResult: result,
+	}
+
+	return verification.CompleteExecutionResult{
+		Receipt:     &receipt,
+		Block:       &block,
+		Collections: collections,
+		ChunkStates: chunkStates,
+	}
+}
+
+// VerifiableChunk returns a complete verifiable chunk with an
+// execution receipt referencing the block/collections.
+func VerifiableChunkFixture() *verification.VerifiableChunk {
 	coll := CollectionFixture(3)
 	guarantee := coll.Guarantee()
 
@@ -339,11 +444,12 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 		ExecutionResult: result,
 	}
 
-	return verification.CompleteExecutionResult{
-		Receipt:     &receipt,
-		Block:       &block,
-		Collections: []*flow.Collection{&coll},
-		ChunkStates: []*flow.ChunkState{&chunkState},
+	return &verification.VerifiableChunk{
+		ChunkIndex: chunk.Index,
+		Block:      &block,
+		Receipt:    &receipt,
+		Collection: &coll,
+		ChunkState: &chunkState,
 	}
 }
 

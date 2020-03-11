@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/finalizer/collection"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	trace "github.com/dapperlabs/flow-go/module/trace/mock"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -30,8 +31,11 @@ func TestFinalizer(t *testing.T) {
 		require.NoError(t, err)
 		mutator := state.Mutate()
 
-		pool, err := stdmap.NewTransactions()
+		pool, err := stdmap.NewTransactions(1000)
 		require.NoError(t, err)
+
+		tracer := new(trace.Tracer)
+		tracer.On("FinishSpan", mock.Anything).Return()
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
@@ -66,7 +70,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, tracer, chainID)
 
 			fakeBlockID := unittest.IdentifierFixture()
 			err := finalizer.MakeFinal(fakeBlockID)
@@ -79,10 +83,10 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, tracer, chainID)
 
 			// tx1 is included in the finalized block
-			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
+			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.Nonce = 1 })
 			assert.Nil(t, pool.Add(&tx1))
 
 			// create a new block on genesis
@@ -105,7 +109,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, tracer, chainID)
 
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -123,13 +127,13 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, tracer, chainID)
 
 			// tx1 is included in the finalized block and mempool
-			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
+			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.Nonce = 1 })
 			assert.Nil(t, pool.Add(&tx1))
 			// tx2 is only in the mempool
-			tx2 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 2 })
+			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.Nonce = 2 })
 			assert.Nil(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
@@ -169,13 +173,13 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, tracer, chainID)
 
 			// tx1 is included in the first finalized block and mempool
-			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
+			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.Nonce = 1 })
 			assert.Nil(t, pool.Add(&tx1))
 			// tx2 is included in the second finalized block and mempool
-			tx2 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 2 })
+			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.Nonce = 2 })
 			assert.Nil(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
@@ -223,13 +227,13 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, tracer, chainID)
 
 			// tx1 is included in the finalized parent block and mempool
-			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
+			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.Nonce = 1 })
 			assert.Nil(t, pool.Add(&tx1))
 			// tx2 is included in the un-finalized block and mempool
-			tx2 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 2 })
+			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.Nonce = 2 })
 			assert.Nil(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
@@ -274,13 +278,13 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(networkmock.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, chainID)
+			finalizer := collection.NewFinalizer(db, pool, prov, tracer, chainID)
 
 			// tx1 is included in the finalized block and mempool
-			tx1 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 1 })
+			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.Nonce = 1 })
 			assert.Nil(t, pool.Add(&tx1))
 			// tx2 is included in the conflicting block and mempool
-			tx2 := unittest.TransactionFixture(func(tx *flow.Transaction) { tx.Nonce = 2 })
+			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.Nonce = 2 })
 			assert.Nil(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis

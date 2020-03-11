@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/assignment"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -80,21 +81,23 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 
 	node := GenericNode(t, hub, identity, identities, options...)
 
-	pool, err := stdmap.NewTransactions()
+	pool, err := stdmap.NewTransactions(1000)
 	require.NoError(t, err)
 
 	collections := storage.NewCollections(node.DB)
+	transactions := storage.NewTransactions(node.DB)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool)
 	require.Nil(t, err)
 
-	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, collections)
+	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool, collections, transactions)
 	require.Nil(t, err)
 
 	return mock.CollectionNode{
 		GenericNode:     node,
 		Pool:            pool,
 		Collections:     collections,
+		Transactions:    transactions,
 		IngestionEngine: ingestionEngine,
 		ProviderEngine:  providerEngine,
 	}
@@ -120,16 +123,16 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	results := storage.NewExecutionResults(node.DB)
 
-	guarantees, err := stdmap.NewGuarantees()
+	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
 
-	receipts, err := stdmap.NewReceipts()
+	receipts, err := stdmap.NewReceipts(1000)
 	require.NoError(t, err)
 
-	approvals, err := stdmap.NewApprovals()
+	approvals, err := stdmap.NewApprovals(1000)
 	require.NoError(t, err)
 
-	seals, err := stdmap.NewSeals()
+	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
 	propagationEngine, err := propagation.New(node.Log, node.Net, node.State, node.Me, guarantees)
@@ -236,7 +239,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, opts ...VerificationOpt) mock.VerificationNode {
+func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, assigner assignment.ChunkAssigner, opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
@@ -248,32 +251,42 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.Receipts == nil {
-		node.Receipts, err = stdmap.NewReceipts()
+		node.Receipts, err = stdmap.NewReceipts(1000)
 		require.Nil(t, err)
 	}
 
 	if node.Blocks == nil {
-		node.Blocks, err = stdmap.NewBlocks()
+		node.Blocks, err = stdmap.NewBlocks(1000)
 		require.Nil(t, err)
 	}
 
 	if node.Collections == nil {
-		node.Collections, err = stdmap.NewCollections()
+		node.Collections, err = stdmap.NewCollections(1000)
 		require.Nil(t, err)
 	}
 
 	if node.ChunkStates == nil {
-		node.ChunkStates, err = stdmap.NewChunkStates()
+		node.ChunkStates, err = stdmap.NewChunkStates(1000)
 		require.Nil(t, err)
 	}
 
 	if node.VerifierEngine == nil {
+
 		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me)
 		require.Nil(t, err)
 	}
 
 	if node.IngestEngine == nil {
-		node.IngestEngine, err = ingest.New(node.Log, node.Net, node.State, node.Me, node.VerifierEngine, node.Receipts, node.Blocks, node.Collections, node.ChunkStates)
+		node.IngestEngine, err = ingest.New(node.Log,
+			node.Net,
+			node.State,
+			node.Me,
+			node.VerifierEngine,
+			node.Receipts,
+			node.Blocks,
+			node.Collections,
+			node.ChunkStates,
+			assigner)
 		require.Nil(t, err)
 	}
 

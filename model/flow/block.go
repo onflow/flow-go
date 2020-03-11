@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
-func Genesis(ids IdentityList) *Block {
+func Genesis(identities IdentityList) *Block {
 
 	// create the first seal with zero references
 	seal := Seal{
@@ -20,7 +20,7 @@ func Genesis(ids IdentityList) *Block {
 
 	// create the raw content for the genesis block
 	payload := Payload{
-		Identities: ids,
+		Identities: identities,
 		Guarantees: nil,
 		Seals:      []*Seal{&seal},
 	}
@@ -124,4 +124,13 @@ func (p Payload) Hash() Identifier {
 	collHash := MerkleRoot(GetIDs(p.Guarantees)...)
 	sealHash := MerkleRoot(GetIDs(p.Seals)...)
 	return ConcatSum(idHash, collHash, sealHash)
+}
+
+// PendingBlock is a wrapper type representing a block that cannot yet be
+// processed. The block header, payload, and sender ID are stored together
+// while waiting for the block to become processable.
+type PendingBlock struct {
+	OriginID Identifier
+	Header   *Header
+	Payload  *Payload
 }
