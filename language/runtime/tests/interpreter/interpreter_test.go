@@ -4793,6 +4793,48 @@ func TestInterpretDictionaryValues(t *testing.T) {
 	)
 }
 
+func TestInterpretDictionaryKeyTypes(t *testing.T) {
+
+	tests := map[string]string{
+		"String":    `"abc"`,
+		"Character": `"X"`,
+		"Address":   `0x1`,
+		"Bool":      `true`,
+	}
+
+	for _, integerType := range sema.AllIntegerTypes {
+		tests[integerType.String()] = `42`
+	}
+
+	for _, fixedPointType := range sema.AllFixedPointTypes {
+		tests[fixedPointType.String()] = `1.23`
+	}
+
+	for ty, code := range tests {
+		t.Run(ty, func(t *testing.T) {
+
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      let k: %s = %s
+                      let xs = {k: "test"}
+                      let v = xs[k]
+                    `,
+					ty,
+					code,
+				),
+			)
+
+			assert.Equal(t,
+				interpreter.NewSomeValueOwningNonCopying(
+					interpreter.NewStringValue("test"),
+				),
+				inter.Globals["v"].Value,
+			)
+		})
+	}
+}
+
 func TestInterpretIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
