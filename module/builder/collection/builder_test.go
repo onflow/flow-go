@@ -249,9 +249,10 @@ func TestBuilder(t *testing.T) {
 		})
 
 		t.Run("large history", func(t *testing.T) {
-
+			t.Skip()
 		})
 
+		// TODO specify behaviour for empty mempools
 		t.Run("empty mempool", func(t *testing.T) {
 			t.Skip()
 		})
