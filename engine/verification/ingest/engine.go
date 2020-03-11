@@ -36,7 +36,7 @@ type Engine struct {
 	blocks             mempool.Blocks
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
-	checkReceiptsMu    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
+	checkChunksLock    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
 	assigner           module.ChunkAssigner // used to determine chunks this node needs to verify
 }
 
