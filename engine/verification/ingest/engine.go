@@ -363,7 +363,7 @@ func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID
 	// chunk state exists and retrieved and returned
 	chunkState, err := e.chunkStates.ByID(chunkID)
 	if err != nil {
-		// couldn't get chunk state from mempool, the receipt cannot yet be verified
+		// couldn't get chunk state from mempool, the chunk cannot yet be verified
 		log.Error().
 			Err(err).
 			Hex("chunk_id", logging.ID(chunkID)).
