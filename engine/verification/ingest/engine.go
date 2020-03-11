@@ -348,7 +348,7 @@ func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID
 		Logger()
 
 	if !e.chunkStates.Has(chunkID) {
-		// a chunk state is missing, the receipt cannot yet be verified
+		// the chunk state is missing, the chunk cannot yet be verified
 		// TODO rate limit these requests
 		err := e.requestExecutionState(chunkID)
 		if err != nil {
