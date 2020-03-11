@@ -1963,7 +1963,7 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 ) Trampoline {
 
 	if function.ParameterList != nil {
-		interpreter.bindFunctionInvocationParameters(function.ParameterList, arguments)
+		interpreter.bindParameterArguments(function.ParameterList, arguments)
 	}
 
 	functionBlockTrampoline := interpreter.visitFunctionBody(
@@ -1980,8 +1980,9 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 		})
 }
 
-// bindFunctionInvocationParameters binds the argument values to the given parameters
-func (interpreter *Interpreter) bindFunctionInvocationParameters(
+// bindParameterArguments binds the argument values to the given parameters
+//
+func (interpreter *Interpreter) bindParameterArguments(
 	parameterList *ast.ParameterList,
 	arguments []Value,
 ) {
@@ -2811,7 +2812,7 @@ func (interpreter *Interpreter) functionConditionsWrapper(
 			interpreter.activations.Push(lexicalScope)
 
 			if declaration.ParameterList != nil {
-				interpreter.bindFunctionInvocationParameters(
+				interpreter.bindParameterArguments(
 					declaration.ParameterList,
 					invocation.Arguments,
 				)
@@ -2987,6 +2988,20 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 
 			invocation.Self = self
 			interpreter.declareVariable(sema.SelfIdentifier, self)
+
+			if declaration.ParameterList != nil {
+				// If the transaction has a parameter list of N parameters,
+				// bind the first N arguments of the invocation to the transaction parameters,
+				// then leave the remaining arguments for the prepare function
+
+				transactionParameterCount := len(declaration.ParameterList.Parameters)
+
+				transactionArguments := invocation.Arguments[:transactionParameterCount]
+				prepareArguments := invocation.Arguments[transactionParameterCount:]
+
+				interpreter.bindParameterArguments(declaration.ParameterList, transactionArguments)
+				invocation.Arguments = prepareArguments
+			}
 
 			// NOTE: get current scope instead of using `lexicalScope`,
 			// because current scope has `self` declared

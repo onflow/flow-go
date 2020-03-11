@@ -206,6 +206,12 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 }
 
 func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{} {
+	var parameterList *ast.ParameterList
+	parameterListContext := ctx.ParameterList()
+	if parameterListContext != nil {
+		parameterList = parameterListContext.Accept(v).(*ast.ParameterList)
+	}
+
 	var fields []*ast.FieldDeclaration
 	fieldsCtx := ctx.Fields()
 	if fieldsCtx != nil {
@@ -242,6 +248,7 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.TransactionDeclaration{
+		ParameterList:  parameterList,
 		Fields:         fields,
 		Prepare:        prepareFunction,
 		PreConditions:  preConditions,
