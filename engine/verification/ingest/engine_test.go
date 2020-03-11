@@ -164,7 +164,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	// assigns all chunks in the receipt to this node through mocking
 	a := chunkassignment.NewAssignment()
 	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-		a.Assign(chunk, []flow.Identifier{verIdentity.NodeID})
+		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
 	}
 	suite.assigner.On("Assigner",
 		testifymock.Anything,
@@ -435,7 +435,7 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			// we have the assignment of chunk
 			a := chunkassignment.NewAssignment()
-			a.Assign(suite.receipt.ExecutionResult.Chunks.ByIndex(0), flow.IdentifierList{verIdentity.NodeID})
+			a.Add(suite.receipt.ExecutionResult.Chunks.ByIndex(0), flow.IdentifierList{verIdentity.NodeID})
 			suite.assigner.On("Assigner",
 				testifymock.Anything,
 				testifymock.Anything,
@@ -539,7 +539,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
-			a.Assign(chunk, []flow.Identifier{verID.NodeID})
+			a.Add(chunk, []flow.Identifier{verID.NodeID})
 			//if chunkCounter % 2 == 0 {
 			vc := &verification.VerifiableChunk{
 				ChunkIndex: chunk.Index,
@@ -721,7 +721,7 @@ func (m *MockAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rn
 	}
 	a := chunkassignment.NewAssignment()
 	for _, c := range chunks {
-		a.Assign(c, flow.IdentifierList{m.me})
+		a.Add(c, flow.IdentifierList{m.me})
 	}
 
 	return a, nil

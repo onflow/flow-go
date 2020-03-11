@@ -36,10 +36,10 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	for i := 0; i < size; i++ {
 
 		c := chunks.ByIndex(uint64(j))
-		assignment.Assign(c, append(assignment.Verifiers(c), ids[i].NodeID))
+		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
 		j++
 		c = chunks.ByIndex(uint64(j))
-		assignment.Assign(c, append(assignment.Verifiers(c), ids[i].NodeID))
+		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
 	}
 
 	// evaluating the chunk assignment
@@ -56,7 +56,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 
 }
 
-// TestAssignDuplicate tests assign Assign duplicate verifiers
+// TestAssignDuplicate tests assign Add duplicate verifiers
 func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	size := 5
 	// creates ids and twice chunks of the ids
@@ -66,7 +66,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 
 	// assigns first chunk to non-duplicate list of verifiers
 	c := chunks.ByIndex(uint64(0))
-	assignment.Assign(c, ids.NodeIDs())
+	assignment.Add(c, ids.NodeIDs())
 	require.Len(a.T(), assignment.Verifiers(c), size)
 
 	// duplicates first verifier, hence size increases by 1
@@ -74,7 +74,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	require.Len(a.T(), ids, size+1)
 	// assigns second chunk to a duplicate list of verifiers
 	c = chunks.ByIndex(uint64(1))
-	assignment.Assign(c, ids.NodeIDs())
+	assignment.Add(c, ids.NodeIDs())
 	// should be size not size + 1
 	require.Len(a.T(), assignment.Verifiers(c), size)
 }

@@ -24,9 +24,9 @@ func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 	return v
 }
 
-// Assign records the list of verifier nodes as the assigned verifiers of the chunk
+// Add records the list of verifier nodes as the assigned verifiers of the chunk
 // it returns an error if the list of verifiers is empty or contains duplicate ids
-func (a *Assignment) Assign(chunk *flow.Chunk, verifiers flow.IdentifierList) {
+func (a *Assignment) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {
 	// sorts verifiers list based on their identifier
 	v := make(map[flow.Identifier]struct{})
 	for _, id := range verifiers {
