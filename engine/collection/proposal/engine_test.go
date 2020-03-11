@@ -54,6 +54,8 @@ func (suite *Suite) SetupTest() {
 	tracer, err := trace.NewTracer(log)
 	require.NoError(suite.T(), err)
 
+	me := unittest.IdentityFixture(func(idty *flow.Identity) { idty.Role = flow.RoleCollection })
+
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.mutator = new(protocol.Mutator)
@@ -61,8 +63,14 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Mutate").Return(suite.mutator)
 	suite.snapshot.On("Head").Return(&flow.Header{}, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
+
+	// create a fake cluster
+	clusters := flow.NewClusterList(1)
+	clusters.Add(0, me)
+	suite.snapshot.On("Clusters").Return(clusters, nil)
+
 	suite.me = new(module.Local)
-	suite.me.On("NodeID").Return(flow.Identifier{})
+	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.net = new(module.Network)
 	suite.con = new(network.Conduit)
@@ -167,6 +175,7 @@ func (suite *Suite) TestHandlePendingProposal() {
 	// should request parent block
 	suite.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once()
 	suite.cache.On("Add", mock.Anything).Return(true).Once()
+	suite.cache.On("ByID", block.ParentID).Return(nil, false)
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Nil(err)
