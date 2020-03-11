@@ -42,22 +42,14 @@ func TestCheckFailableCastingWithResourceAnnotation(t *testing.T) {
 
 			switch compositeKind {
 			case common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 2)
+				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidFailableResourceDowncastOutsideOptionalBindingError{}, errs[0])
 
-				// TODO: add support for non-Any types in failable casting
-
-				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
-
 			case common.CompositeKindStructure, common.CompositeKindContract:
-				errs := ExpectCheckerErrors(t, err, 2)
+				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
-
-				// TODO: add support for non-Any types in failable casting
-
-				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 
 			case common.CompositeKindEvent:
 				errs := ExpectCheckerErrors(t, err, 2)
@@ -936,23 +928,15 @@ func TestCheckFailableCastingWithoutResourceAnnotation(t *testing.T) {
 
 			switch compositeKind {
 			case common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 3)
+				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
-
 				assert.IsType(t, &sema.InvalidFailableResourceDowncastOutsideOptionalBindingError{}, errs[1])
-
-				// TODO: add support for non-Any types in failable downcasting
-				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[2])
 
 			case common.CompositeKindStructure,
 				common.CompositeKindContract:
 
-				// TODO: add support for non-Any types in failable casting
-
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+				require.NoError(t, err)
 
 			case common.CompositeKindEvent:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -3351,11 +3335,7 @@ func TestCheckResourceOptionalBindingFailableCast(t *testing.T) {
          }
     `)
 
-	// TODO: remove once supported
-
-	errs := ExpectCheckerErrors(t, err, 1)
-
-	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalidationInThen(t *testing.T) {
@@ -3377,12 +3357,9 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	// TODO: remove once supported
-	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[1])
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
 }
 
 func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalidationAfterBranches(t *testing.T) {
@@ -3402,12 +3379,9 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	// TODO: remove once supported
-	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[1])
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
 }
 
 func TestCheckInvalidResourceOptionalBindingFailableCastResourceLossMissingElse(t *testing.T) {
@@ -3426,12 +3400,9 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceLossMissingElse(
          }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	// TODO: remove once supported
-	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
 }
 
 func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalidationAfterThen(t *testing.T) {
@@ -3451,12 +3422,9 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	// TODO: remove once supported
-	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
-
-	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[1])
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
 }
 
 func TestCheckInvalidResourceFailableCastOutsideOptionalBinding(t *testing.T) {
@@ -3474,12 +3442,9 @@ func TestCheckInvalidResourceFailableCastOutsideOptionalBinding(t *testing.T) {
          }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.InvalidFailableResourceDowncastOutsideOptionalBindingError{}, errs[0])
-
-	// TODO: remove once supported
-	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 }
 
 func TestCheckInvalidUnaryMoveAndCopyTransfer(t *testing.T) {

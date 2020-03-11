@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
-	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -234,69 +233,6 @@ func TestSetOwnerDictionaryInsert(t *testing.T) {
 	dictionary.Insert(keyValue, value)
 
 	assert.Equal(t, &newOwner, dictionary.GetOwner())
-	assert.Equal(t, &newOwner, value.GetOwner())
-}
-
-func TestOwnerNewAny(t *testing.T) {
-	oldOwner := common.Address{0x1}
-
-	value := newTestCompositeValue(oldOwner)
-	valueType := &sema.CompositeType{
-		Location:   value.Location,
-		Identifier: string(value.TypeID),
-		Kind:       value.Kind,
-	}
-
-	assert.Equal(t, &oldOwner, value.GetOwner())
-
-	any := NewAnyValueOwningNonCopying(value, valueType)
-
-	assert.Equal(t, &oldOwner, any.GetOwner())
-	assert.Equal(t, &oldOwner, value.GetOwner())
-}
-
-func TestSetOwnerAny(t *testing.T) {
-	oldOwner := common.Address{0x1}
-	newOwner := common.Address{0x2}
-
-	value := newTestCompositeValue(oldOwner)
-	valueType := &sema.CompositeType{
-		Location:   value.Location,
-		Identifier: string(value.TypeID),
-		Kind:       value.Kind,
-	}
-
-	assert.Equal(t, &oldOwner, value.GetOwner())
-
-	any := NewAnyValueOwningNonCopying(value, valueType)
-
-	any.SetOwner(&newOwner)
-
-	assert.Equal(t, &newOwner, any.GetOwner())
-	assert.Equal(t, &newOwner, value.GetOwner())
-}
-
-func TestSetOwnerAnyCopy(t *testing.T) {
-	oldOwner := common.Address{0x1}
-	newOwner := common.Address{0x2}
-
-	value := newTestCompositeValue(oldOwner)
-	valueType := &sema.CompositeType{
-		Location:   value.Location,
-		Identifier: string(value.TypeID),
-		Kind:       value.Kind,
-	}
-
-	assert.Equal(t, &oldOwner, value.GetOwner())
-
-	any := NewAnyValueOwningNonCopying(value, valueType)
-	any.SetOwner(&newOwner)
-
-	anyCopy := any.Copy().(*AnyValue)
-	valueCopy := anyCopy.Value
-
-	assert.Nil(t, anyCopy.GetOwner())
-	assert.Nil(t, valueCopy.GetOwner())
 	assert.Equal(t, &newOwner, value.GetOwner())
 }
 

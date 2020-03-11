@@ -389,6 +389,7 @@ func (checker *Checker) declareCompositeType(declaration *ast.CompositeDeclarati
 	)
 
 	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
+	checker.Elaboration.CompositeTypes[compositeType.QualifiedIdentifier()] = compositeType
 
 	// Activate new scope for nested declarations
 

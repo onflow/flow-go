@@ -2474,8 +2474,7 @@ func (interpreter *Interpreter) copyAndConvert(value Value, valueType, targetTyp
 // convertAndBox converts a value to a target type, and boxes in optionals and any value, if necessary
 func (interpreter *Interpreter) convertAndBox(value Value, valueType, targetType sema.Type) Value {
 	value = interpreter.convert(value, valueType, targetType)
-	value, valueType = interpreter.boxOptional(value, valueType, targetType)
-	return interpreter.boxAny(value, valueType, targetType)
+	return interpreter.boxOptional(value, valueType, targetType)
 }
 
 func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.Type) Value {
@@ -2563,7 +2562,7 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 }
 
 // boxOptional boxes a value in optionals, if necessary
-func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType sema.Type) (Value, sema.Type) {
+func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType sema.Type) Value {
 	inner := value
 	for {
 		optionalType, ok := targetType.(*sema.OptionalType)
@@ -2575,9 +2574,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 			inner = some.Value
 		} else if _, ok := inner.(NilValue); ok {
 			// NOTE: nested nil will be unboxed!
-			return inner, &sema.OptionalType{
-				Type: &sema.NeverType{},
-			}
+			return inner
 		} else {
 			value = NewSomeValueOwningNonCopying(value)
 			valueType = &sema.OptionalType{
@@ -2587,36 +2584,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 
 		targetType = optionalType.Type
 	}
-	return value, valueType
-}
-
-// boxOptional boxes a value in an Any value, if necessary
-func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.Type) Value {
-	switch targetType := targetType.(type) {
-	case *sema.AnyStructType, *sema.AnyResourceType:
-		// no need to convert already boxed value
-		if _, ok := value.(*AnyValue); ok {
-			return value
-		}
-		return NewAnyValueOwningNonCopying(value, valueType)
-
-	case *sema.OptionalType:
-		if _, ok := value.(NilValue); ok {
-			return value
-		}
-		some := value.(*SomeValue)
-		return NewSomeValueOwningNonCopying(
-			interpreter.boxAny(
-				some.Value,
-				valueType.(*sema.OptionalType).Type,
-				targetType.Type,
-			),
-		)
-
-	// TODO: support more types, e.g. arrays, dictionaries
-	default:
-		return value
-	}
+	return value
 }
 
 func (interpreter *Interpreter) unbox(value Value) Value {
@@ -3039,13 +3007,11 @@ func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingEx
 
 			switch expression.Operation {
 			case ast.OperationFailableCast:
-				anyValue := value.(*AnyValue)
-
-				if !sema.IsSubType(anyValue.Type, expectedType) {
-					return NilValue{}
+				dynamicType := value.DynamicType(interpreter)
+				if interpreter.IsSubType(dynamicType, expectedType) {
+					return NewSomeValueOwningNonCopying(value)
 				}
-
-				return NewSomeValueOwningNonCopying(anyValue.Value)
+				return NilValue{}
 
 			case ast.OperationCast:
 				staticValueType := interpreter.Checker.Elaboration.CastingStaticValueTypes[expression]
@@ -3147,4 +3113,141 @@ func (interpreter *Interpreter) newConverterFunction(converter func(Value) Value
 			return Done{Result: converter(invocation.Arguments[0])}
 		},
 	}
+}
+
+// TODO:
+// - FunctionType
+// - StorageReferenceType
+// - EphemeralReferenceType
+// - PublishedType
+//
+// - Character
+// - Account
+// - PublicAccount
+// - Block
+// - Storage
+// - References
+
+func (interpreter *Interpreter) IsSubType(subType DynamicType, superType sema.Type) bool {
+	switch typedSubType := subType.(type) {
+	case VoidType:
+		switch superType.(type) {
+		case *sema.VoidType, *sema.AnyStructType:
+			return true
+
+		default:
+			return false
+		}
+
+	case StringType:
+		switch superType.(type) {
+		case *sema.StringType, *sema.AnyStructType:
+			return true
+
+		default:
+			return false
+		}
+
+	case BoolType:
+		switch superType.(type) {
+		case *sema.BoolType, *sema.AnyStructType:
+			return true
+
+		default:
+			return false
+		}
+
+	case AddressType:
+		switch superType.(type) {
+		case *sema.AddressType, *sema.AnyStructType:
+			return true
+
+		default:
+			return false
+		}
+
+	case NumberType:
+		return sema.IsSubType(typedSubType.StaticType, superType)
+
+	case CompositeType:
+		return sema.IsSubType(typedSubType.StaticType, superType)
+
+	case ArrayType:
+		var superTypeElementType sema.Type
+
+		switch typedSuperType := superType.(type) {
+		case *sema.VariableSizedType:
+			superTypeElementType = typedSuperType.Type
+
+		case *sema.ConstantSizedType:
+			superTypeElementType = typedSuperType.Type
+
+		case *sema.AnyStructType, *sema.AnyResourceType:
+			return true
+
+		default:
+			return false
+		}
+
+		for _, elementType := range typedSubType.ElementTypes {
+			if !interpreter.IsSubType(elementType, superTypeElementType) {
+				return false
+			}
+		}
+
+		return true
+
+	case DictionaryType:
+
+		switch typedSuperType := superType.(type) {
+		case *sema.DictionaryType:
+			for _, entryTypes := range typedSubType.EntryTypes {
+				if !interpreter.IsSubType(entryTypes.KeyType, typedSuperType.KeyType) ||
+					!interpreter.IsSubType(entryTypes.ValueType, typedSuperType.ValueType) {
+
+					return false
+				}
+			}
+
+			return true
+
+		case *sema.AnyStructType, *sema.AnyResourceType:
+			return true
+
+		default:
+			return false
+		}
+
+	case NilType:
+		switch superType.(type) {
+		case *sema.OptionalType, *sema.AnyStructType, *sema.AnyResourceType:
+			return true
+
+		default:
+			return false
+		}
+
+	case SomeType:
+		switch typedSuperType := superType.(type) {
+		case *sema.OptionalType:
+			return interpreter.IsSubType(typedSubType.InnerType, typedSuperType.Type)
+
+		case *sema.AnyStructType, *sema.AnyResourceType:
+			return true
+
+		default:
+			return false
+		}
+
+	case StorageType:
+		switch superType.(type) {
+		case *sema.StorageType, *sema.AnyStructType:
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	return false
 }
