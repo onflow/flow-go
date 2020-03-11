@@ -1,6 +1,7 @@
 package trie
 
-var defaultLeafHash []byte = Hash(EmptySlice)
+var EmptySlice []byte
+var defaultLeafHash []byte = HashLeaf([]byte("default:"), EmptySlice)
 
 // we are currently supporting keys of a size up to 32 bytes. I.e. path length from the root of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
 var defaultHashes [257][]byte
@@ -9,7 +10,7 @@ func init() {
 	// Creates the Default hashes from base to level height
 	defaultHashes[0] = defaultLeafHash
 	for i := 1; i < len(defaultHashes); i++ {
-		defaultHashes[i] = Hash(defaultHashes[i-1], defaultHashes[i-1])
+		defaultHashes[i] = HashInterNode(defaultHashes[i-1], defaultHashes[i-1])
 	}
 }
 

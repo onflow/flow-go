@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
@@ -117,13 +118,15 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 			target = 0
 		}
 
-		ip, port := m.mws[target].libP2PNode.GetIPPort()
+		ip, port := m.mws[target].GetIPPort()
+		key := m.mws[target].PublicKey()
 
 		// mocks an identity
 		flowID := flow.Identity{
-			NodeID:  m.ids[target],
-			Address: fmt.Sprintf("%s:%s", ip, port),
-			Role:    flow.RoleCollection,
+			NodeID:        m.ids[target],
+			Address:       fmt.Sprintf("%s:%s", ip, port),
+			Role:          flow.RoleCollection,
+			NetworkPubKey: key,
 		}
 		idMap := idMaps[i]
 		idMap[flowID.NodeID] = flowID
@@ -255,8 +258,10 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 		codec := json.NewCodec()
 
+		key := m.generateNetworkingKey(target[:])
+
 		// creates new middleware
-		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID)
+		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)
@@ -299,4 +304,13 @@ func (m *MiddlewareTestSuit) StopMiddlewares() {
 	m.ov = nil
 	m.ids = nil
 	m.size = 0
+}
+
+// generateNetworkingKey generates a Flow ECDSA key using the given seed
+func (m *MiddlewareTestSuit) generateNetworkingKey(seed []byte) crypto.PrivateKey {
+	s := make([]byte, 100)
+	copy(s, seed)
+	prvKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, s)
+	require.NoError(m.Suite.T(), err)
+	return prvKey
 }

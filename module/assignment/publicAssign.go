@@ -12,7 +12,7 @@ import (
 // PublicAssignment implements an instance of the Public Chunk Assignment algorithm
 // for assigning chunks to verifier nodes in a deterministic but unpredictable manner.
 type PublicAssignment struct {
-	assignment *Assignment // used to keep assignment chunk assignment
+	alpha int // used to indicate the number of verifiers should be assigned to each chunk
 }
 
 // NewPublicAssignment generates and returns an instance of the Public Chunk Assignment algorithm
@@ -20,25 +20,17 @@ type PublicAssignment struct {
 // chunks is the list of chunks aimed to assign
 // rng is an instance of a random generator
 // alpha is the number of assigned verifier nodes to each chunk
-func NewPublicAssignment(ids flow.IdentityList,
-	chunks flow.ChunkList,
-	rng random.Rand,
-	alpha int) (*PublicAssignment, error) {
+func NewPublicAssignment(alpha int) *PublicAssignment {
+	return &PublicAssignment{alpha: alpha}
+}
 
-	a, err := chunkAssignment(ids.NodeIDs(), chunks, rng, alpha)
+func (p *PublicAssignment) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*Assignment, error) {
+	a, err := chunkAssignment(ids.NodeIDs(), chunks, rng, p.alpha)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not complete chunk assignment")
 	}
 
-	return &PublicAssignment{
-		assignment: a,
-	}, nil
-
-}
-
-// Which returns the list of chunks that are assigned to this verifier node
-func (p *PublicAssignment) Which(this flow.Identifier) []uint64 {
-	return p.assignment.Which(this)
+	return a, nil
 }
 
 // permute shuffles subset of ids that contains its first m elements in place
@@ -56,7 +48,7 @@ func chunkAssignment(ids IdentifierList, chunks flow.ChunkList, rng random.Rand,
 	if len(ids) < alpha {
 		return nil, fmt.Errorf("not enough verification nodes for chunk assignment: %d, minumum should be %d", len(ids), alpha)
 	}
-	assignment := NewAssignmet()
+	assignment := NewAssignment()
 	// permutes the entire slice
 	permute(ids, len(ids), rng)
 	t := ids

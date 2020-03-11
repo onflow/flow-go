@@ -21,13 +21,13 @@ func TestAssignment(t *testing.T) {
 	suite.Run(t, new(PublicAssignmentTestSuite))
 }
 
-// TestWhich evalues the correctness of Which method of PublicAssignment
-func (a *PublicAssignmentTestSuite) TestWhich() {
+// TestByNodeID evalues the correctness of ByNodeID method of PublicAssignment
+func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	size := 5
 	// creates ids and twice chunks of the ids
 	ids := test.CreateIDs(size)
 	chunks := a.CreateChunks(2 * size)
-	assignment := NewAssignmet()
+	assignment := NewAssignment()
 
 	// assigns two chunks to each verifier node
 	// j keeps track of chunks
@@ -46,7 +46,7 @@ func (a *PublicAssignmentTestSuite) TestWhich() {
 	// j keeps track of chunks
 	j = 0
 	for i := 0; i < size; i++ {
-		assignedChunks := assignment.Which(ids[i].NodeID)
+		assignedChunks := assignment.ByNodeID(ids[i].NodeID)
 		require.Len(a.T(), assignedChunks, 2)
 		require.Contains(a.T(), assignedChunks, chunks.ByIndex(uint64(j)).Index)
 		j++
@@ -61,7 +61,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	// creates ids and twice chunks of the ids
 	var ids flow.IdentityList = test.CreateIDs(size)
 	chunks := a.CreateChunks(2)
-	assignment := NewAssignmet()
+	assignment := NewAssignment()
 
 	// assigns first chunk to non-duplicate list of verifiers
 	c := chunks.ByIndex(uint64(0))
@@ -163,15 +163,16 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.Equal(a.T(), copy(nodes2, nodes1), n)
 
 	// chunk assignment of the first set
-	p1, err := NewPublicAssignment(nodes1, chunks, rng1, alpha)
+	p1, err := NewPublicAssignment(alpha).Assigner(nodes1, chunks, rng1)
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
-	p2, err := NewPublicAssignment(nodes2, chunks, rng2, alpha)
+	p2, err := NewPublicAssignment(alpha).Assigner(nodes2, chunks, rng2)
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
-	require.Equal(a.T(), p1.assignment, p2.assignment)
+	// but it should contain same elemets
+	require.Equal(a.T(), p1.table, p2.table)
 }
 
 // TestChunkAssignmentOneToOne evaluates chunk assignment against
@@ -217,7 +218,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	original := make([]*flow.Identity, verNum)
 	require.Equal(a.T(), copy(original, nodes), verNum)
 
-	p, err := NewPublicAssignment(nodes, chunks, rng, alpha)
+	p, err := NewPublicAssignment(alpha).Assigner(nodes, chunks, rng)
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
@@ -225,7 +226,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 
 	for _, chunk := range chunks {
 		// each chunk should be assigned to alpha verifiers
-		require.Equal(a.T(), p.assignment.Verifiers(chunk).Len(), alpha)
+		require.Equal(a.T(), p.Verifiers(chunk).Len(), alpha)
 	}
 }
 
