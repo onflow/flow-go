@@ -398,23 +398,29 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) e
 // processPendingProposal handles proposals where the parent is missing.
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
-	parentID := proposal.Header.ParentID
-
 	pendingBlock := &cluster.PendingBlock{
 		OriginID: originID,
 		Header:   proposal.Header,
 		Payload:  proposal.Payload,
 	}
 
-	// cache the block, exit early if it already exists in the cache
-	added := e.cache.Add(pendingBlock)
-	if !added {
-		return nil
+	// cache the block
+	e.cache.Add(pendingBlock)
+
+	// request the missing block - typically this is the pending block's direct
+	// parent, but in general we walk the block's pending ancestors until we find
+	// the oldest one that is missing its parent.
+	missingID := proposal.Header.ParentID
+	for {
+		nextBlock, ok := e.cache.ByID(missingID)
+		if !ok {
+			break
+		}
+		missingID = nextBlock.Header.ParentID
 	}
 
-	// if the block was not already in the buffer, request its parent
 	req := &messages.BlockRequest{
-		BlockID: parentID,
+		BlockID: missingID,
 		Nonce:   rand.Uint64(),
 	}
 	err := e.con.Submit(req, originID)
