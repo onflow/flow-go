@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/protocol"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -74,7 +75,12 @@ func main() {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
 
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, 3*time.Second, 6*time.Second)
+			memberFilter, err := protocol.ClusterFilterFor(node.State.Final(), node.Me.NodeID())
+			if err != nil {
+				return nil, fmt.Errorf("could not get cluster member filter: %w", err)
+			}
+
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, 3*time.Second, 6*time.Second)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}

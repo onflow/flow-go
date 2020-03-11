@@ -15,6 +15,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
@@ -93,7 +95,9 @@ func main() {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
 
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, con, build, final, 3*time.Second, 6*time.Second)
+			memberFilter := filter.HasRole(flow.RoleConsensus)
+
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, con, build, final, memberFilter, 3*time.Second, 6*time.Second)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}
