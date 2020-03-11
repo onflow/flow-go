@@ -20,7 +20,7 @@ func InsertBlock(block *flow.Block) func(*badger.Txn) error {
 			return fmt.Errorf("could not insert block header: %w", err)
 		}
 
-		// store the block contents
+		// insert the block payload
 		err = InsertPayload(&block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert block payload: %w", err)

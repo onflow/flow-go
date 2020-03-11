@@ -2361,6 +2361,13 @@ func testResourceNesting(
 
 	t.Run(testName, func(t *testing.T) {
 
+		innerTypeAnnotation := "T"
+		if innerIsInterface &&
+			innerCompositeKind == common.CompositeKindResource {
+
+			innerTypeAnnotation = "AnyResource{T}"
+		}
+
 		// Prepare the initializer, if needed.
 		// `outerCompositeKind` is the container composite kind.
 		// If it is concrete, i.e. not an interface, it needs an initializer.
@@ -2369,11 +2376,12 @@ func testResourceNesting(
 		if !outerIsInterface {
 			initializer = fmt.Sprintf(
 				`
-                  init(t: %[1]sT) {
-                      self.t %[2]s t
+                  init(t: %[1]s%[2]s) {
+                      self.t %[3]s t
                   }
                 `,
 				innerCompositeKind.Annotation(),
+				innerTypeAnnotation,
 				innerCompositeKind.TransferOperator(),
 			)
 		}
@@ -2403,9 +2411,9 @@ func testResourceNesting(
               %[1]s %[2]s T %[3]s
 
               %[4]s %[5]s U {
-                  let t: %[6]sT
-                  %[7]s
+                  let t: %[6]s%[7]s
                   %[8]s
+                  %[9]s
               }
             `,
 			innerCompositeKind.Keyword(),
@@ -2414,6 +2422,7 @@ func testResourceNesting(
 			outerCompositeKind.Keyword(),
 			outerInterfaceKeyword,
 			innerCompositeKind.Annotation(),
+			innerTypeAnnotation,
 			initializer,
 			destructor,
 		)
@@ -2526,18 +2535,36 @@ func TestCheckInvalidResourceInterfaceConformance(t *testing.T) {
 	assert.IsType(t, &sema.ConformanceError{}, errs[0])
 }
 
-// TestCheckResourceInterfaceUseAsType tests if a resource interface
-// can be used as a type, and if a resource is a subtype of the interface
-// if it conforms to it.
+// TestCheckInvalidResourceInterfaceUseAsType tests that a resource interface
+// can not be used as a type
+//
+func TestCheckInvalidResourceInterfaceUseAsType(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface I {}
+
+      resource R: I {}
+
+      let r: @I <- create R()
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.InvalidResourceInterfaceTypeError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+}
+
+// TestCheckResourceInterfaceUseAsType test if a resource
+// is a subtype of a restricted AnyResource type.
 //
 func TestCheckResourceInterfaceUseAsType(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      resource interface X {}
+      resource interface I {}
 
-      resource Y: X {}
+      resource R: I {}
 
-      let x: @X <- create Y()
+      let r: @AnyResource{I} <- create R()
     `)
 
 	require.NoError(t, err)
@@ -2634,23 +2661,23 @@ func TestCheckInvalidResourceLossThroughFunctionResultAccess(t *testing.T) {
 	assert.IsType(t, &sema.ResourceLossError{}, errs[0])
 }
 
-// TestCheckResourceInterfaceDestruction tests if resources
-// can be passed to resource interface parameters,
-// and if resource interfaces can be destroyed.
+// TestCheckAnyResourceDestruction tests if resources
+// can be passed to restricted AnyResources parameters,
+// and if the argument can be destroyed.
 //
-func TestCheckResourceInterfaceDestruction(t *testing.T) {
+func TestCheckAnyResourceDestruction(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      resource interface X {}
+      resource interface I {}
 
-      resource Y: X {}
+      resource R: I {}
 
-      fun foo(x: @X) {
-          destroy x
+      fun foo(_ i: @AnyResource{I}) {
+          destroy i
       }
 
       fun bar() {
-          foo(x: <-create Y())
+          foo(<-create R())
       }
     `)
 
@@ -3255,9 +3282,9 @@ func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
      resource interface RI {}
 
      resource R {
-         var ris: @{String: RI}
+         var ris: @{String: AnyResource{RI}}
 
-         init(_ ri: @RI) {
+         init(_ ri: @AnyResource{RI}) {
              self.ris <- {"first": <-ri}
          }
 
@@ -3271,7 +3298,7 @@ func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
          }
      }
 
-     fun absorb(_ ri: @RI?) {
+     fun absorb(_ ri: @AnyResource{RI}?) {
          destroy ri
      }
    `)
@@ -3425,7 +3452,7 @@ func TestCheckResourceOptionalBindingFailableCast(t *testing.T) {
          resource R: RI {}
 
          fun test() {
-             let ri: @RI <- create R()
+             let ri: @AnyResource{RI} <- create R()
              if let r <- ri as? @R {
                  destroy r
              } else {
@@ -3450,7 +3477,7 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          resource R: RI {}
 
          fun test() {
-             let ri: @RI <- create R()
+             let ri: @AnyResource{RI} <- create R()
              if let r <- ri as? @R {
                  destroy r
                  destroy ri
@@ -3477,7 +3504,7 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          resource R: RI {}
 
          fun test() {
-             let ri: @RI <- create R()
+             let ri: @AnyResource{RI} <- create R()
              if let r <- ri as? @R {
                  destroy r
              }
@@ -3502,7 +3529,7 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceLossMissingElse(
          resource R: RI {}
 
          fun test() {
-             let ri: @RI <- create R()
+             let ri: @AnyResource{RI} <- create R()
              if let r <- ri as? @R {
                  destroy r
              }
@@ -3526,7 +3553,7 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          resource R: RI {}
 
          fun test() {
-             let ri: @RI <- create R()
+             let ri: @AnyResource{RI} <- create R()
              if let r <- ri as? @R {
                  destroy r
              }
@@ -3551,7 +3578,7 @@ func TestCheckInvalidResourceFailableCastOutsideOptionalBinding(t *testing.T) {
          resource R: RI {}
 
          fun test() {
-             let ri: @RI <- create R()
+             let ri: @AnyResource{RI} <- create R()
              let r <- ri as? @R
              destroy r
          }
@@ -3825,4 +3852,64 @@ func TestCheckInvalidResourceOwnerFieldInitialization(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
+}
+
+func TestCheckInvalidResourceInterfaceType(t *testing.T) {
+
+	t.Run("direct", func(t *testing.T) {
+		_, err := ParseAndCheck(t, `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let ri: @RI <- create R()
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 2)
+
+		assert.IsType(t, &sema.InvalidResourceInterfaceTypeError{}, errs[0])
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+	})
+
+	t.Run("in array", func(t *testing.T) {
+		_, err := ParseAndCheck(t, `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let ri: @[RI] <- [<-create R()]
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 2)
+
+		assert.IsType(t, &sema.InvalidResourceInterfaceTypeError{}, errs[0])
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+	})
+}
+
+func TestCheckRestrictedAnyResourceType(t *testing.T) {
+
+	t.Run("direct", func(t *testing.T) {
+		_, err := ParseAndCheck(t, `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let ri: @AnyResource{RI} <- create R()
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("in array", func(t *testing.T) {
+		_, err := ParseAndCheck(t, `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let ri: @[AnyResource{RI}] <- [<-create R()]
+        `)
+
+		require.NoError(t, err)
+	})
 }

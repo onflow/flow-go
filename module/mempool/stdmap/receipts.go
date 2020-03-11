@@ -3,39 +3,51 @@
 package stdmap
 
 import (
+	"sync"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Receipts implements the execution receipts memory pool of the consensus node,
 // used to store execution receipts and to generate block seals.
 type Receipts struct {
+	sync.Mutex
 	*Backend
 	byBlock map[flow.Identifier](map[flow.Identifier]struct{})
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
-func NewReceipts() (*Receipts, error) {
+func NewReceipts(limit uint) (*Receipts, error) {
+
+	// create the receipts memory pool with the lookup maps
 	r := &Receipts{
-		Backend: NewBackend(),
 		byBlock: make(map[flow.Identifier](map[flow.Identifier]struct{})),
 	}
+
+	// create the hook to clean up lookups upon removal of items from backend
+	eject := func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+		entityID, entity := EjectTrueRandom(entities)
+		receipt := entity.(*flow.ExecutionReceipt)
+		r.cleanup(entityID, receipt)
+		return entityID, entity
+	}
+
+	// initialize the backend with the given hook
+	r.Backend = NewBackend(
+		WithLimit(limit),
+		WithEject(eject),
+	)
 
 	return r, nil
 }
 
 // Add adds an execution receipt to the mempool.
 func (r *Receipts) Add(receipt *flow.ExecutionReceipt) error {
+	r.register(receipt)
 	err := r.Backend.Add(receipt)
 	if err != nil {
 		return err
 	}
-	blockID := receipt.ExecutionResult.BlockID
-	forBlock, ok := r.byBlock[blockID]
-	if !ok {
-		forBlock = make(map[flow.Identifier]struct{})
-		r.byBlock[blockID] = forBlock
-	}
-	forBlock[receipt.ID()] = struct{}{}
 	return nil
 }
 
@@ -47,13 +59,7 @@ func (r *Receipts) Rem(receiptID flow.Identifier) bool {
 	}
 	_ = r.Backend.Rem(receiptID)
 	receipt := entity.(*flow.ExecutionReceipt)
-	blockID := receipt.ExecutionResult.BlockID
-	forBlock := r.byBlock[blockID]
-	delete(forBlock, receiptID)
-	if len(forBlock) > 0 {
-		return true
-	}
-	delete(r.byBlock, blockID)
+	r.cleanup(receiptID, receipt)
 	return true
 }
 
@@ -91,4 +97,30 @@ func (r *Receipts) All() []*flow.ExecutionReceipt {
 		receipts = append(receipts, entity.(*flow.ExecutionReceipt))
 	}
 	return receipts
+}
+
+// register will add the given receipt to the lookup maps.
+func (r *Receipts) register(receipt *flow.ExecutionReceipt) {
+	r.Lock()
+	defer r.Unlock()
+	blockID := receipt.ExecutionResult.BlockID
+	forBlock, ok := r.byBlock[blockID]
+	if !ok {
+		forBlock = make(map[flow.Identifier]struct{})
+		r.byBlock[blockID] = forBlock
+	}
+	forBlock[receipt.ID()] = struct{}{}
+}
+
+// cleanup will remove the given receipt from the lookup tables.
+func (r *Receipts) cleanup(receiptID flow.Identifier, receipt *flow.ExecutionReceipt) {
+	r.Lock()
+	defer r.Unlock()
+	blockID := receipt.ExecutionResult.BlockID
+	forBlock := r.byBlock[blockID]
+	delete(forBlock, receiptID)
+	if len(forBlock) > 0 {
+		return
+	}
+	delete(r.byBlock, blockID)
 }

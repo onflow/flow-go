@@ -39,6 +39,7 @@ type CollectionNode struct {
 	GenericNode
 	Pool            mempool.Transactions
 	Collections     storage.Collections
+	Transactions    storage.Transactions
 	IngestionEngine *collectioningest.Engine
 	ProviderEngine  *provider.Engine
 }

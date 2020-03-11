@@ -25,7 +25,7 @@ func TestInvalidTransaction(t *testing.T) {
 	t.Run("missing field", func(t *testing.T) {
 		node := testutil.CollectionNode(t, hub, identity, []*flow.Identity{identity})
 
-		tx := unittest.TransactionFixture()
+		tx := unittest.TransactionBodyFixture()
 		tx.Script = nil
 
 		err := node.IngestionEngine.Process(node.Me.NodeID(), &tx)
@@ -73,7 +73,7 @@ func TestClusterRouting(t *testing.T) {
 
 		// flush the network to make sure all messages are sent
 		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.DeliverAllRecursive()
+		net.DeliverAll(false)
 
 		// transaction should be in target cluster's pool, not in other pool
 		assert.EqualValues(t, 1, localNode.Pool.Size())
@@ -105,7 +105,7 @@ func TestClusterRouting(t *testing.T) {
 
 		// flush the network to make sure all messages are sent
 		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.DeliverAllRecursive()
+		net.DeliverAll(true)
 
 		// transaction should be in target cluster's pool, not in other pool
 		assert.EqualValues(t, 0, localNode.Pool.Size())
@@ -137,7 +137,7 @@ func TestClusterRouting(t *testing.T) {
 
 		// flush the network to make sure all messages are sent
 		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.DeliverAllRecursive()
+		net.DeliverAll(false)
 
 		// transaction should not be in any pool
 		assert.EqualValues(t, 0, localNode.Pool.Size())
@@ -170,7 +170,7 @@ func TestClusterRouting(t *testing.T) {
 
 		// flush the network to make sure all messages are sent
 		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.DeliverAllRecursive()
+		net.DeliverAll(false)
 
 		// the transaction should not be stored in the ingress, nor routed
 		assert.EqualValues(t, 0, localNode.Pool.Size())

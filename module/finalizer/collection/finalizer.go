@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -22,15 +23,17 @@ type Finalizer struct {
 	db           *badger.DB
 	transactions mempool.Transactions
 	prov         network.Engine
+	tracer       trace.Tracer
 	chainID      string // aka cluster ID
 }
 
 // NewFinalizer creates a new finalizer for collection nodes.
-func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, chainID string) *Finalizer {
+func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, tracer trace.Tracer, chainID string) *Finalizer {
 	f := &Finalizer{
 		db:           db,
 		transactions: transactions,
 		prov:         prov,
+		tracer:       tracer,
 		chainID:      chainID,
 	}
 	return f
@@ -94,7 +97,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// look up the transactions included in the payload
 			step := steps[i]
 			var payload cluster.Payload
-			err = procedure.RetrieveClusterPayload(step.PayloadHash, &payload)(tx)
+			err = procedure.RetrieveClusterPayload(step.ID(), &payload)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve cluster payload: %w", err)
 			}
@@ -105,6 +108,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				if !ok {
 					return fmt.Errorf("could not remove transaction from mempool (id=%x)", txID)
 				}
+				f.tracer.FinishSpan(txID)
 			}
 
 			// finalize the block in cluster state
@@ -114,6 +118,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// TODO add signatures here
+			// https://github.com/dapperlabs/flow-go/issues/2711
 			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: payload.Collection.ID(),

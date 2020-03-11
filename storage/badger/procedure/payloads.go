@@ -13,7 +13,6 @@ import (
 
 func InsertPayload(payload *flow.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-
 		// insert the block identities
 		for _, identity := range payload.Identities {
 			err := operation.SkipDuplicates(operation.InsertIdentity(identity))(tx)
@@ -80,7 +79,6 @@ func IndexPayload(header *flow.Header, payload *flow.Payload) func(*badger.Txn) 
 
 func RetrievePayload(blockID flow.Identifier, payload *flow.Payload) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
-
 		// make sure there is a nil value on error
 		*payload = flow.Payload{}
 

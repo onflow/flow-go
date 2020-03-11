@@ -342,12 +342,12 @@ func (r *interpreterRuntime) newInterpreter(
 		),
 		interpreter.WithStorageReadHandler(
 			func(_ *interpreter.Interpreter, address common.Address, key string) interpreter.OptionalValue {
-				return runtimeStorage.readValue(address.Hex(), key)
+				return runtimeStorage.readValue(string(address[:]), key)
 			},
 		),
 		interpreter.WithStorageWriteHandler(
 			func(_ *interpreter.Interpreter, address common.Address, key string, value interpreter.OptionalValue) {
-				runtimeStorage.writeValue(address.Hex(), key, value)
+				runtimeStorage.writeValue(string(address[:]), key, value)
 			},
 		),
 		interpreter.WithStorageKeyHandler(
@@ -724,9 +724,8 @@ func (r *interpreterRuntime) writeContract(
 	addressValue interpreter.AddressValue,
 	contractValue interpreter.OptionalValue,
 ) {
-	addressHex := addressValue.Hex()
 	runtimeStorage.writeValue(
-		addressHex,
+		string(addressValue[:]),
 		contractKey,
 		contractValue,
 	)
@@ -736,9 +735,9 @@ func (r *interpreterRuntime) loadContract(
 	compositeType *sema.CompositeType,
 	runtimeStorage *interpreterRuntimeStorage,
 ) *interpreter.CompositeValue {
-	addressHex := compositeType.Location.(AddressLocation).ToAddress().Hex()
+	address := compositeType.Location.(AddressLocation).ToAddress()
 	storedValue := runtimeStorage.readValue(
-		addressHex,
+		string(address[:]),
 		contractKey,
 	)
 	switch typedValue := storedValue.(type) {

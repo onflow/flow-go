@@ -4,17 +4,20 @@ package libp2p
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p"
+	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -36,9 +39,10 @@ const maxConnectAttempt = 3
 // NodeAddress is used to define a libp2p node
 type NodeAddress struct {
 	// Name is the friendly node Name e.g. "node1" (not to be confused with the libp2p node id)
-	Name string
-	IP   string
-	Port string
+	Name   string
+	IP     string
+	Port   string
+	PubKey lcrypto.PubKey
 }
 
 // P2PNode manages the the libp2p node.
@@ -54,7 +58,7 @@ type P2PNode struct {
 }
 
 // Start starts a libp2p node on the given address.
-func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, handler network.StreamHandler, psOption ...pubsub.Option) error {
+func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, key lcrypto.PrivKey, handler network.StreamHandler, psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
 	p.name = n.Name
@@ -62,12 +66,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	addr := multiaddressStr(n)
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
-		return err
-	}
-
-	key, err := GetPublicKey(n.Name)
-	if err != nil {
-		err = errors.Wrapf(err, "could not generate public key for %s", p.name)
 		return err
 	}
 
@@ -192,32 +190,13 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
 func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
 
 	// Get the PeerID
-	peerID, err := GetPeerID(n.Name)
+	peerID, err := peer.IDFromPublicKey(n.PubKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not get peer ID: %w", err)
 	}
 
-	stream, found := FindOutboundStream(p.libP2PHost, peerID, FlowLibP2PProtocolID)
-
-	// if existing stream found return it
-	if found {
-		var sDir, cDir string
-		if sDir, found = DirectionToString(stream.Stat().Direction); !found {
-			sDir = "not defined"
-		}
-		if cDir, found = DirectionToString(stream.Conn().Stat().Direction); !found {
-			cDir = "not defined"
-		}
-
-		p.logger.Debug().Str("protocol", string(stream.Protocol())).
-			Str("stream_direction", sDir).
-			Str("connection_direction", cDir).
-			Msg("found existing stream")
-		return stream, nil
-	}
-
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
-	stream, err = p.tryCreateNewStream(ctx, n, peerID, maxConnectAttempt)
+	stream, err := p.tryCreateNewStream(ctx, n, peerID, maxConnectAttempt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stream for %s: %w", peerID.String(), err)
 	}
@@ -240,7 +219,14 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 
 		// if this is a retry attempt, wait for some time before retrying
 		if err != nil {
-			time.Sleep(5 * time.Millisecond)
+			// choose a random interval between 0 and 5 ms to retry
+			r := rand.Intn(5)
+			time.Sleep(time.Duration(r) * time.Millisecond)
+			// cancel the dial back off, since we want to retry immediately
+			n := p.libP2PHost.Network()
+			if s, ok := n.(*swarm.Swarm); ok {
+				s.Backoff().Clear(targetID)
+			}
 		}
 
 		// Add node address as a peer
@@ -268,19 +254,14 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 	return s, nil
 }
 
-// GetPeerInfo generates the address of a Node/Peer given its address in a deterministic and consistent way.
-// Libp2p uses the hash of the public key of node as its id (https://docs.libp2p.io/reference/glossary/#multihash)
-// Since the public key of a node may not be available to other nodes, for now a simple scheme of naming nodes can be
-// used e.g. "node1, node2,... nodex" to helps nodes address each other.
-// An MD5 hash of such of the node Name is used as a seed to a deterministic crypto algorithm to generate the
-// public key from which libp2p derives the node id
+// GetPeerInfo generates the libp2p peer.AddrInfo for a Node/Peer given its node address
 func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
 	addr := multiaddressStr(p)
 	maddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return peer.AddrInfo{}, err
 	}
-	id, err := GetPeerID(p.Name)
+	id, err := peer.IDFromPublicKey(p.PubKey)
 	if err != nil {
 		return peer.AddrInfo{}, err
 	}

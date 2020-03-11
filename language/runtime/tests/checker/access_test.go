@@ -821,9 +821,15 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 				if compositeKind == common.CompositeKindContract {
 					identifier = "TestImpl"
 				} else {
+					interfaceType := "Test"
+					if compositeKind == common.CompositeKindResource {
+						interfaceType = "AnyResource{Test}"
+					}
+
 					setupCode = fmt.Sprintf(
-						`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+						`let test: %[1]s%[2]s %[3]s %[4]s TestImpl%[5]s`,
 						compositeKind.Annotation(),
+						interfaceType,
 						compositeKind.TransferOperator(),
 						compositeKind.ConstructionKeyword(),
 						constructorArguments(compositeKind),
@@ -1040,9 +1046,15 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 				if compositeKind == common.CompositeKindContract {
 					identifier = "TestImpl"
 				} else {
+					interfaceType := "Test"
+					if compositeKind == common.CompositeKindResource {
+						interfaceType = "AnyResource{Test}"
+					}
+
 					setupCode = fmt.Sprintf(
-						`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+						`let test: %[1]s%[2]s %[3]s %[4]s TestImpl%[5]s`,
 						compositeKind.Annotation(),
+						interfaceType,
 						compositeKind.TransferOperator(),
 						compositeKind.ConstructionKeyword(),
 						constructorArguments(compositeKind),
@@ -1277,9 +1289,16 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 				if compositeKind == common.CompositeKindContract {
 					identifier = "TestImpl"
 				} else {
+
+					interfaceType := "Test"
+					if compositeKind == common.CompositeKindResource {
+						interfaceType = "AnyResource{Test}"
+					}
+
 					setupCode = fmt.Sprintf(
-						`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+						`let test: %[1]s%[2]s %[3]s %[4]s TestImpl%[5]s`,
 						compositeKind.Annotation(),
+						interfaceType,
 						compositeKind.TransferOperator(),
 						compositeKind.ConstructionKeyword(),
 						constructorArguments(compositeKind),
@@ -1517,7 +1536,7 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
                           }
 
                           pub fun test() {
-                              let b: @B <- create BImpl()
+                              let b: @AnyResource{B} <- create BImpl()
                               let oldA <- b.a <- create A()
                               destroy oldA
                               destroy b

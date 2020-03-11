@@ -3499,6 +3499,11 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 			continue
 		}
 
+		interfaceType := "Test"
+		if compositeKind == common.CompositeKindResource {
+			interfaceType = "AnyResource{Test}"
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpretWithOptions(t,
@@ -3508,10 +3513,11 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
                       pub %[1]s TestImpl: Test {}
 
-                      pub let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
+                      pub let test: %[2]s%[3]s %[4]s %[5]s TestImpl%[6]s
                     `,
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
+					interfaceType,
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind, ""),
@@ -3543,9 +3549,15 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 		if compositeKind == common.CompositeKindContract {
 			identifier = "TestImpl"
 		} else {
+			interfaceType := "Test"
+			if compositeKind == common.CompositeKindResource {
+				interfaceType = "AnyResource{Test}"
+			}
+
 			setupCode = fmt.Sprintf(
-				`pub let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+				`pub let test: %[1]s%[2]s %[3]s %[4]s TestImpl%[5]s`,
 				compositeKind.Annotation(),
+				interfaceType,
 				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
 				constructorArguments(compositeKind, "x: 1"),
@@ -3615,9 +3627,15 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 		if compositeKind == common.CompositeKindContract {
 			identifier = "TestImpl"
 		} else {
+			interfaceType := "Test"
+			if compositeKind == common.CompositeKindResource {
+				interfaceType = "AnyResource{Test}"
+			}
+
 			setupCode = fmt.Sprintf(
-				`pub let test: %[1]s Test %[2]s %[3]s TestImpl%[4]s`,
+				`pub let test: %[1]s %[2]s %[3]s %[4]s TestImpl%[5]s`,
 				compositeKind.Annotation(),
+				interfaceType,
 				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
 				constructorArguments(compositeKind, ""),
@@ -3676,9 +3694,15 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 		if compositeKind == common.CompositeKindContract {
 			identifier = "TestImpl"
 		} else {
+			interfaceType := "Test"
+			if compositeKind == common.CompositeKindResource {
+				interfaceType = "AnyResource{Test}"
+			}
+
 			setupCode = fmt.Sprintf(
-				`let test: %[1]s Test %[2]s %[3]s TestImpl%[4]s`,
+				`let test: %[1]s%[2]s %[3]s %[4]s TestImpl%[5]s`,
 				compositeKind.Annotation(),
+				interfaceType,
 				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
 				constructorArguments(compositeKind, ""),
@@ -3773,14 +3797,21 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 
 					var testFunction string
 					if compositeKind != common.CompositeKindContract {
+
+						interfaceType := "Test"
+						if compositeKind == common.CompositeKindResource {
+							interfaceType = "AnyResource{Test}"
+						}
+
 						testFunction =
 							fmt.Sprintf(
 								`
-					               pub fun test(x: Int): %[1]sTest {
-					                   return %[2]s %[3]s TestImpl%[4]s
+					               pub fun test(x: Int): %[1]s%[2]s {
+					                   return %[3]s %[4]s TestImpl%[5]s
 					               }
                                 `,
 								compositeKind.Annotation(),
+								interfaceType,
 								compositeKind.MoveOperator(),
 								compositeKind.ConstructionKeyword(),
 								constructorArguments(compositeKind, "x: x"),
