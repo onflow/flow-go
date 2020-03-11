@@ -81,10 +81,25 @@ func TestCheckReferenceExpressionWithResourceResultType(t *testing.T) {
 func TestCheckReferenceExpressionWithResourceInterfaceResultType(t *testing.T) {
 
 	_, err := ParseAndCheckStorage(t, `
-          resource interface T {}
-          resource R: T {}
+          resource interface I {}
+          resource R: I {}
 
-          let ref = &storage[R] as &T
+          let ref = &storage[R] as &I
+        `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}
+
+func TestCheckReferenceExpressionWithRestrictedAnyResourceResultType(t *testing.T) {
+
+	_, err := ParseAndCheckStorage(t, `
+          resource interface I {}
+          resource R: I {}
+
+          let ref = &storage[R] as &AnyResource{I}
         `,
 	)
 
@@ -408,7 +423,7 @@ func TestCheckResourceInterfaceReferenceFunctionCall(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy r
 
-              let ref = &storage[R] as &I
+              let ref = &storage[R] as &AnyResource{I}
               ref.foo()
           }
         `,
@@ -432,7 +447,7 @@ func TestCheckInvalidResourceInterfaceReferenceFunctionCall(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy r
 
-              let ref = &storage[R] as &I
+              let ref = &storage[R] as &AnyResource{I}
               ref.foo()
           }
         `,
