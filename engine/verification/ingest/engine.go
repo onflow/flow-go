@@ -344,7 +344,7 @@ func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID
 
 	log := e.log.With().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
-		hex("chunk_id", logging.ID(chunkID)).
+		Hex("chunk_id", logging.ID(chunkID)).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Logger()
 
@@ -432,8 +432,8 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 //
 // NOTE: this method is protected by mutex to prevent double-verifying ERs.
 func (e *Engine) checkPendingChunks() {
-	e.checkReceiptsMu.Lock()
-	defer e.checkReceiptsMu.Unlock()
+	e.checkChunksLock.Lock()
+	defer e.checkChunksLock.Unlock()
 
 	receipts := e.receipts.All()
 
