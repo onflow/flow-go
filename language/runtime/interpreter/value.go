@@ -3804,6 +3804,8 @@ func ToValue(value interface{}) (Value, error) {
 	switch value := value.(type) {
 	case *big.Int:
 		return IntValue{value}, nil
+	case int:
+		return NewIntValue(int64(value)), nil
 	case int8:
 		return Int8Value(value), nil
 	case int16:

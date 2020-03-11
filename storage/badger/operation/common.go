@@ -345,11 +345,15 @@ func fromPayloadIndex(key []byte) (uint64, flow.Identifier, flow.Identifier) {
 	return height, blockID, parentID
 }
 
-// verifypayload creates an iteration function used for ensuring no entities in a new payload
-// have already been included in an ancestor payload. The input set of entity IDs represents
-// the IDs of all entities in the candidate block payload. If any of these candidate entities have
-// already been included in an ancestor block, a sentinel error is returned.
-func verifypayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterationFunc {
+// validatepayload creates an iteration function used for ensuring no entities in
+// a new payload have already been included in an ancestor payload. The input
+// set of entity IDs represents the IDs of all entities in the candidate block
+// payload. If any of these candidate entities have already been included in an
+// ancestor block, a sentinel error is returned.
+//
+// This is useful for verifying an existing payload, for example in a block
+// proposal from another node, where the desired output is accept/reject.
+func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterationFunc {
 
 	// build lookup table for payload entities
 	lookup := make(map[flow.Identifier]struct{})
@@ -385,6 +389,61 @@ func verifypayload(blockID flow.Identifier, checkIDs []flow.Identifier) iteratio
 				_, ok := lookup[entityID]
 				if ok {
 					return fmt.Errorf("duplicate payload entity (%s): %w", entityID, storage.ErrAlreadyIndexed)
+				}
+			}
+			return nil
+		}
+
+		return check, create, handle
+	}
+}
+
+// searchduplicates creates an iteration function similar to validatepayload. Rather
+// than returning an error when ANY duplicate IDs are found, searchduplicates
+// tracks any duplicate IDs and populates a map containing all invalid IDs
+// from the candidate set.
+//
+// This is useful when building a payload locally, where we want to know which
+// entities are valid for inclusion so we can produce a valid block proposal.
+func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) iterationFunc {
+
+	// build lookup table for candidate payload entities
+	lookup := make(map[flow.Identifier]struct{})
+	for _, id := range candidateIDs {
+		lookup[id] = struct{}{}
+	}
+
+	// ensure the map is instantiated and empty
+	*invalidIDs = make(map[flow.Identifier]struct{})
+
+	return func() (checkFunc, createFunc, handleFunc) {
+
+		// check will check whether we are on the next block we want to check
+		// if we are not on the block we care about, we ignore the entry
+		// otherwise, we forward to the next parent and check the entry
+		check := func(key []byte) bool {
+			_, currentID, nextID := fromPayloadIndex(key)
+			if currentID != blockID {
+				return false
+			}
+			blockID = nextID
+			return true
+		}
+
+		// create returns a slice of IDs to decode the payload index entry into
+		var entityIDs []flow.Identifier
+		create := func() interface{} {
+			return &entityIDs
+		}
+
+		// handle will check the payload index entry entity IDs against the
+		// entity IDs we are checking as a new payload; if any of them matches,
+		// the payload is not valid, as it contains a duplicate entity
+		handle := func() error {
+			for _, entityID := range entityIDs {
+				_, isInvalid := lookup[entityID]
+				if isInvalid {
+					(*invalidIDs)[entityID] = struct{}{}
 				}
 			}
 			return nil

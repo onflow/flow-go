@@ -80,3 +80,15 @@ func (m *Members) Destructor() *SpecialFunctionDeclaration {
 	}
 	return destructors[0]
 }
+
+func (m *Members) FieldPosition(name string, compositeKind common.CompositeKind) Position {
+	if compositeKind == common.CompositeKindEvent {
+		parameters := m.Initializers()[0].ParameterList.ParametersByIdentifier()
+		parameter := parameters[name]
+		return parameter.Identifier.Pos
+	} else {
+		fields := m.FieldsByIdentifier()
+		field := fields[name]
+		return field.Identifier.Pos
+	}
+}

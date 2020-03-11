@@ -107,10 +107,14 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 		panic(errors.NewUnreachableError())
 	}
 
+	fieldPositionGetter := func(name string) ast.Position {
+		return declaration.Members.FieldPosition(name, declaration.CompositeKind)
+	}
+
 	checker.checkResourceFieldNesting(
-		declaration.Members.FieldsByIdentifier(),
 		compositeType.Members,
 		compositeType.Kind,
+		fieldPositionGetter,
 	)
 
 	// Check conformances
