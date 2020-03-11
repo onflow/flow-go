@@ -2483,7 +2483,7 @@ func init() {
 
 // baseValues are the values available in programs
 
-var BaseValues map[string]ValueDeclaration
+var BaseValues = map[string]ValueDeclaration{}
 
 type baseFunction struct {
 	name           string
@@ -2509,12 +2509,6 @@ func (baseFunction) ValueDeclarationIsConstant() bool {
 
 func (f baseFunction) ValueDeclarationArgumentLabels() []string {
 	return f.argumentLabels
-}
-
-func init() {
-	BaseValues = map[string]ValueDeclaration{}
-	initIntegerFunctions()
-	initAddressFunction()
 }
 
 var AllSignedFixedPointTypes = []Type{
@@ -2566,10 +2560,10 @@ var AllNumberTypes = append(
 	AllFixedPointTypes...,
 )
 
-func initIntegerFunctions() {
+func init() {
 
-	for _, integerType := range AllIntegerTypes {
-		typeName := integerType.String()
+	for _, numberType := range AllNumberTypes {
+		typeName := numberType.String()
 
 		// check type is not accidentally redeclared
 		if _, ok := BaseValues[typeName]; ok {
@@ -2584,18 +2578,18 @@ func initIntegerFunctions() {
 						{
 							Label:          ArgumentLabelNotRequired,
 							Identifier:     "value",
-							TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+							TypeAnnotation: NewTypeAnnotation(&NumberType{}),
 						},
 					},
-					ReturnTypeAnnotation: &TypeAnnotation{Type: integerType},
+					ReturnTypeAnnotation: &TypeAnnotation{Type: numberType},
 				},
-				ArgumentExpressionsCheck: integerFunctionArgumentExpressionsChecker(integerType),
+				ArgumentExpressionsCheck: numberFunctionArgumentExpressionsChecker(numberType),
 			},
 		}
 	}
 }
 
-func initAddressFunction() {
+func init() {
 	addressType := &AddressType{}
 	typeName := addressType.String()
 
@@ -2628,13 +2622,16 @@ func initAddressFunction() {
 	}
 }
 
-func integerFunctionArgumentExpressionsChecker(integerType Type) func(*Checker, []ast.Expression) {
+func numberFunctionArgumentExpressionsChecker(numberType Type) func(*Checker, []ast.Expression) {
 	return func(checker *Checker, argumentExpressions []ast.Expression) {
-		intExpression, ok := argumentExpressions[0].(*ast.IntegerExpression)
-		if !ok {
-			return
+		switch numberExpression := argumentExpressions[0].(type) {
+		case *ast.IntegerExpression:
+			checker.checkIntegerLiteral(numberExpression, numberType)
+
+		case *ast.FixedPointExpression:
+			checker.checkFixedPointLiteral(numberExpression, numberType)
+
 		}
-		checker.checkIntegerLiteral(intExpression, integerType)
 	}
 }
 
