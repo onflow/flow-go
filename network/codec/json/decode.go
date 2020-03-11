@@ -71,8 +71,6 @@ func decode(env Envelope) (interface{}, error) {
 
 	case CodeExecutionCompleteBlock:
 		v = &execution.CompleteBlock{}
-	case CodeExecutionComputationOrder:
-		v = &execution.ComputationOrder{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)

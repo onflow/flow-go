@@ -26,3 +26,23 @@ The output of the Execution Node. It's responsible for broadcasting `ExecutionRe
 
 ### RPC Engine
 It's gRPC endpoint exposing Observation API. This is a temporary solution and Observation Node is expected to take over this responsibility.
+
+## Ingestion operation
+
+### Mempool queues
+Ingestion engine accepts incoming blocks and classifies them into two mempool map of queues:
+ - execution queue - which contains subqueues of blocks executable in order. This allow forks to be executed in parallel. 
+   Head of each queue is either being executed or waiting for collections. It's starting state commitment is present. It will
+   produce state commitment for it's children. 
+ - orphan queue - which contains subqueues of orphaned blocks. Those who cannot be executed immediately or are not known to be
+   executable soon. It's kept separately, as it will be used to determine when the node should switch into synchronisation mode
+   
+ ### Mempool cache
+ Additionally, EN keeps a simple mapping of collection IDs to block, for lookup when the collection is received.
+ 
+ ### Operation
+ Upon receiving block requests for it's collections are sent.
+ Upon receiving collection, they are put into appropriate blocks.
+ If after those operation blocks become executable (all collections present - or empty block, plus known execution state) - it is executed in separate Go routine.
+ After execution is finished, it passes newly created execution state to its children, and if they are now ready - they are, repeating the loop.
+ 

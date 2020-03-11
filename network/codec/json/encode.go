@@ -67,8 +67,6 @@ func encode(v interface{}) (*Envelope, error) {
 
 	case *execution.CompleteBlock:
 		code = CodeExecutionCompleteBlock
-	case *execution.ComputationOrder:
-		code = CodeExecutionComputationOrder
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)

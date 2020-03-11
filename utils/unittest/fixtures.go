@@ -186,8 +186,13 @@ func CompleteCollectionFixture() *execution.CompleteCollection {
 
 func CompleteBlockFixture(collections int) *execution.CompleteBlock {
 
+	return CompleteBlockFixtureWithParent(collections, IdentifierFixture())
+}
+
+func CompleteBlockFixtureWithParent(collections int, parentID flow.Identifier) *execution.CompleteBlock {
+
 	completeCollections := make(map[flow.Identifier]*execution.CompleteCollection, collections)
-	block := BlockFixture()
+	block := BlockWithParentFixture(parentID)
 	block.Guarantees = nil
 
 	for i := 0; i < collections; i++ {
@@ -201,18 +206,6 @@ func CompleteBlockFixture(collections int) *execution.CompleteBlock {
 	return &execution.CompleteBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
-	}
-}
-
-func CompleteBlockFixtureWithParent(parentID flow.Identifier) *execution.CompleteBlock {
-
-	cc1 := CompleteCollectionFixture()
-	cc2 := CompleteCollectionFixture()
-
-	block := BlockWithParentFixture(parentID)
-	return &execution.CompleteBlock{
-		Block:               &block,
-		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{cc1.Guarantee.CollectionID: cc1, cc2.Guarantee.CollectionID: cc2},
 	}
 }
 

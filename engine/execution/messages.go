@@ -22,6 +22,7 @@ type ComputationOrder struct {
 type CompleteBlock struct {
 	Block               *flow.Block
 	CompleteCollections map[flow.Identifier]*CompleteCollection
+	StartState          flow.StateCommitment
 }
 
 type ComputationResult struct {
@@ -39,7 +40,7 @@ func (b *CompleteBlock) Collections() []*CompleteCollection {
 	return collections
 }
 
-func (b *CompleteBlock) IsComplete() bool {
+func (b *CompleteBlock) HasAllTransactions() bool {
 	for _, collection := range b.Block.Guarantees {
 
 		completeCollection, ok := b.CompleteCollections[collection.ID()]
@@ -48,6 +49,9 @@ func (b *CompleteBlock) IsComplete() bool {
 		}
 		return false
 	}
-
 	return true
+}
+
+func (b *CompleteBlock) IsComplete() bool {
+	return b.HasAllTransactions() && len(b.StartState) > 0
 }

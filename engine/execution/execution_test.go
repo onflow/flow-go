@@ -133,7 +133,7 @@ func TestExecutionFlow(t *testing.T) {
 	assert.Eventually(t, func() bool {
 		hub.DeliverAll()
 		return receipt != nil
-	}, time.Second*30, time.Millisecond*500)
+	}, time.Second*10, time.Millisecond*500)
 
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
@@ -161,14 +161,14 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 		},
 	}
 	// TODO add as soon as engine can process blocks that are not finalized and out of order
-	// fork := &flow.Block{
-	// 	Header: flow.Header{
-	// 		ParentID:   genesis.ID(),
-	// 		View:       2,
-	// 		Height:     2,
-	// 		ProposerID: con2ID.ID(),
-	// 	},
-	// }
+	fork := &flow.Block{
+		Header: flow.Header{
+			ParentID:   genesis.ID(),
+			View:       2,
+			Height:     2,
+			ProposerID: con2ID.ID(),
+		},
+	}
 	block3 := &flow.Block{
 		Header: flow.Header{
 			ParentID:   block2.ID(),
@@ -195,8 +195,8 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 
 	// TODO submit blocks out of order, add forks and orphans. This is currently not possible
 	// since the block ingestion engine expects finalized, sequential blocks only.
-	// exeNode.IngestionEngine.Submit(con2ID.NodeID, block3)
-	// exeNode.IngestionEngine.Submit(con2ID.NodeID, fork)
+	exeNode.IngestionEngine.Submit(con2ID.NodeID, block3)
+	exeNode.IngestionEngine.Submit(con2ID.NodeID, fork)
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, block2)
 	hub.Eventually(t, equal(2, &actualCalls))
 	//eventuallyEqual(t, 2, &actualCalls)
