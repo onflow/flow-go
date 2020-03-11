@@ -22,7 +22,7 @@ func main() {
 
 	var (
 		stateCommitments   storage.Commits
-		levelDB          *leveldb.LevelDB
+		levelDB            *leveldb.LevelDB
 		ledgerStorage      storage.Ledger
 		providerEngine     *provider.Engine
 		computationManager *computation.Manager
@@ -44,6 +44,18 @@ func main() {
 			ledgerStorage, err = ledger.NewTrieStorage(levelDB)
 			return err
 		}).
+		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
+			rt := runtime.NewInterpreterRuntime()
+			vm := virtualmachine.New(rt)
+			computationManager = computation.New(
+				node.Logger,
+				node.Me,
+				node.State,
+				vm,
+			)
+
+			return nil
+		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkHeaders := badger.NewChunkHeaders(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
@@ -58,20 +70,6 @@ func main() {
 			)
 
 			return providerEngine, err
-		}).
-		Component("execution engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			rt := runtime.NewInterpreterRuntime()
-			vm := virtualmachine.New(rt)
-			executionEng, err = computation.New(
-				node.Logger,
-				node.Network,
-				node.Me,
-				node.State,
-				receiptsEng,
-				vm,
-			)
-
-			return executionEng, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			blocks := badger.NewBlocks(node.DB)
