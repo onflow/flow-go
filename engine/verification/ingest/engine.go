@@ -462,8 +462,8 @@ func (e *Engine) checkPendingChunks() {
 			}
 
 			// retrieves collection corresponding to the chunk
-			collection, collectionsReady := e.getCollectionForChunk(block, receipt, chunk)
-			if !collectionsReady {
+			collection, collectionReady := e.getCollectionForChunk(block, receipt, chunk)
+			if !collectionReady {
 				// can not verify a chunk without its collection, moves to the next chunk
 				continue
 			}
