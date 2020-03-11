@@ -1,6 +1,7 @@
 package collection_test
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -103,7 +104,7 @@ func TestBuilder(t *testing.T) {
 			var built model.Block
 			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 			assert.Nil(t, err)
-			builtCollection := built.Payload.Collection
+			builtCollection := built.Collection
 
 			// payload should include only items from mempool
 			mempoolTransactions := pool.All()
@@ -147,7 +148,7 @@ func TestBuilder(t *testing.T) {
 			var built model.Block
 			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 			assert.Nil(t, err)
-			builtCollection := built.Payload.Collection
+			builtCollection := built.Collection
 
 			// payload should include ONLY tx2 and tx3
 			assert.Len(t, builtCollection.Transactions, 2)
@@ -191,7 +192,7 @@ func TestBuilder(t *testing.T) {
 			var built model.Block
 			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 			assert.Nil(t, err)
-			builtCollection := built.Payload.Collection
+			builtCollection := built.Collection
 
 			// payload should only contain tx3
 			assert.Len(t, builtCollection.Transactions, 1)
@@ -237,7 +238,7 @@ func TestBuilder(t *testing.T) {
 			var built model.Block
 			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 			assert.Nil(t, err)
-			builtCollection := built.Payload.Collection
+			builtCollection := built.Collection
 
 			// tx2 and tx3 should be in the built collection
 			assert.Len(t, builtCollection.Transactions, 2)
@@ -248,8 +249,74 @@ func TestBuilder(t *testing.T) {
 			assert.False(t, pool.Has(tx1.ID()))
 		})
 
+		// should function correctly with large history
 		t.Run("large history", func(t *testing.T) {
-			t.Skip()
+			bootstrap()
+			defer cleanup()
+
+			// use a mempool with 1000 transactions, one per block
+			pool, err = stdmap.NewTransactions(2000)
+			require.Nil(t, err)
+
+			// keep track of the head of the chain
+			head := *genesis
+
+			// keep track of invalidated transaction IDs
+			var invalidatedTxIds []flow.Identifier
+
+			// create 1000 blocks containing 1000 transactions
+			for i := 0; i < 1000; i++ {
+
+				// create a transaction
+				tx := unittest.TransactionBodyFixture(func(t *flow.TransactionBody) { t.Nonce = uint64(i) })
+				err = pool.Add(&tx)
+				assert.Nil(t, err)
+
+				// 1/3 of the time create a conflicting fork that will be invalidated
+				// don't do this the first and last few times to ensure we don't
+				// try to fork genesis and the the last block is the valid fork.
+				conflicting := rand.Intn(3) == 0 && i > 5 && i < 995
+
+				// by default, build on the head - if we are building a
+				// conflicting fork, build on the parent of the head
+				parent := head
+				if conflicting {
+					err = db.View(procedure.RetrieveClusterBlock(parent.ParentID, &parent))
+					assert.Nil(t, err)
+					// add the transaction to the invalidated list
+					invalidatedTxIds = append(invalidatedTxIds, tx.ID())
+				}
+
+				// create a block containing the transaction
+				block := unittest.ClusterBlockWithParent(&head)
+				payload := model.PayloadFromTransactions([]flow.Identifier{tx.ID()})
+				block.SetPayload(payload)
+				insert(&block)
+
+				// reset the valid head if we aren't building a conflicting fork
+				if !conflicting {
+					head = block
+					err = db.Update(procedure.FinalizeClusterBlock(block.ID()))
+					assert.Nil(t, err)
+				}
+			}
+
+			t.Log("conflicting: ", len(invalidatedTxIds))
+
+			// build on the the head block
+			builder := collection.NewBuilder(db, pool, chainID)
+			header, err := builder.BuildOn(head.ID(), noopSetter)
+			require.Nil(t, err)
+
+			// retrieve the built block from storage
+			var built model.Block
+			err = db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+			require.Nil(t, err)
+			builtCollection := built.Collection
+
+			// payload should only contain transactions from invalidated blocks
+			assert.Len(t, builtCollection.Transactions, len(invalidatedTxIds))
+			assert.True(t, collectionContains(builtCollection, invalidatedTxIds...))
 		})
 
 		// TODO specify behaviour for empty mempools
