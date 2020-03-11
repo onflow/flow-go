@@ -419,7 +419,7 @@ func (checker *Checker) declareGlobalFunctionDeclaration(declaration *ast.Functi
 
 func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 	if valueType.IsResourceType() {
-		if transfer.Operation != ast.TransferOperationMove {
+		if !transfer.Operation.IsMove() {
 			checker.report(
 				&IncorrectTransferOperationError{
 					ActualOperation:   transfer.Operation,
@@ -429,7 +429,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 			)
 		}
 	} else if !valueType.IsInvalidType() {
-		if transfer.Operation == ast.TransferOperationMove {
+		if transfer.Operation.IsMove() {
 			checker.report(
 				&IncorrectTransferOperationError{
 					ActualOperation:   transfer.Operation,
