@@ -197,24 +197,24 @@ func (e *DestroyedCompositeError) EndPosition() ast.Position {
 	return e.LocationRange.EndPos
 }
 
-// ForceAssignmentToNoNilResourceError
+// ForceAssignmentToNonNilResourceError
 
-type ForceAssignmentToNoNilResourceError struct {
+type ForceAssignmentToNonNilResourceError struct {
 	LocationRange LocationRange
 }
 
-func (e *ForceAssignmentToNoNilResourceError) ImportLocation() ast.Location {
+func (e *ForceAssignmentToNonNilResourceError) ImportLocation() ast.Location {
 	return e.LocationRange.Location
 }
 
-func (e *ForceAssignmentToNoNilResourceError) Error() string {
+func (e *ForceAssignmentToNonNilResourceError) Error() string {
 	return "force assignment to non-nil resource-typed value"
 }
 
-func (e *ForceAssignmentToNoNilResourceError) StartPosition() ast.Position {
+func (e *ForceAssignmentToNonNilResourceError) StartPosition() ast.Position {
 	return e.LocationRange.StartPos
 }
 
-func (e *ForceAssignmentToNoNilResourceError) EndPosition() ast.Position {
+func (e *ForceAssignmentToNonNilResourceError) EndPosition() ast.Position {
 	return e.LocationRange.EndPos
 }

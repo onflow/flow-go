@@ -7692,7 +7692,7 @@ func TestInterpretResourceAssignmentForceTransfer(t *testing.T) {
 		_, err := inter.Invoke("test")
 		require.Error(t, err)
 
-		assert.IsType(t, &interpreter.ForceAssignmentToNoNilResourceError{}, err)
+		assert.IsType(t, &interpreter.ForceAssignmentToNonNilResourceError{}, err)
 	})
 
 	t.Run("existing to nil", func(t *testing.T) {
@@ -7728,6 +7728,6 @@ func TestInterpretResourceAssignmentForceTransfer(t *testing.T) {
 		_, err := inter.Invoke("test")
 		require.Error(t, err)
 
-		assert.IsType(t, &interpreter.ForceAssignmentToNoNilResourceError{}, err)
+		assert.IsType(t, &interpreter.ForceAssignmentToNonNilResourceError{}, err)
 	})
 }

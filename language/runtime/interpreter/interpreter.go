@@ -1143,7 +1143,7 @@ func (interpreter *Interpreter) visitAssignment(
 				if _, ok := target.(NilValue); !ok {
 					locationRange := interpreter.locationRange(position)
 
-					panic(&ForceAssignmentToNoNilResourceError{
+					panic(&ForceAssignmentToNonNilResourceError{
 						LocationRange: locationRange,
 					})
 				}
