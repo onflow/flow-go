@@ -120,7 +120,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // to other collection nodes in our cluster.
 func (e *Engine) onSubmitTransactionRequest(originID flow.Identifier, req *messages.SubmitTransactionRequest) error {
 	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remove request to submit transaction request (from=%x)", originID)
+		return fmt.Errorf("invalid remote request to submit transaction request (from=%x)", originID)
 	}
 	return e.SubmitTransactionRequest(&req.Request)
 }
