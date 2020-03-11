@@ -135,6 +135,12 @@ func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 	return nil, false
 }
 
+// RandN returns a list containing n identities randomly selected from the
+// receiver list L. If n<0 or n>len(L), returns L.
+func (il IdentityList) RandN(n int) IdentityList {
+	panic("TODO")
+}
+
 // Identities lists up and returns all the Identity objects inside the IdentityList
 func (il IdentityList) Identities() []*Identity {
 	l := make([]*Identity, 0)
