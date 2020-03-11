@@ -34,12 +34,13 @@ type Engine struct {
 	con          network.Conduit
 	me           module.Local
 	state        protocol.State
-	provider     network.Engine // provider engine to propagate guarantees
+	provider     network.Engine
 	pool         mempool.Transactions
 	transactions storage.Transactions
 	headers      storage.Headers
 	payloads     storage.ClusterPayloads
-	cache        module.PendingClusterBlockBuffer
+	cache        module.PendingClusterBlockBuffer // pending block cache
+	participants flow.IdentityList                // consensus participants in our cluster
 
 	coldstuff module.ColdStuff
 }
@@ -58,6 +59,11 @@ func New(
 	cache module.PendingClusterBlockBuffer,
 ) (*Engine, error) {
 
+	participants, err := protocol.ClusterFor(state.Final(), me.NodeID())
+	if err != nil {
+		return nil, fmt.Errorf("could not get cluster participants: %w", err)
+	}
+
 	e := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "proposal").Logger(),
@@ -70,6 +76,7 @@ func New(
 		headers:      headers,
 		payloads:     payloads,
 		cache:        cache,
+		participants: participants,
 	}
 
 	con, err := net.Register(engine.ProtocolClusterConsensus, e)
@@ -190,9 +197,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// retrieve all collection nodes in our cluster
-	// TODO filter by cluster
 	recipients, err := e.state.Final().Identities(
-		filter.HasRole(flow.RoleCollection),
+		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	)
 	if err != nil {
@@ -222,9 +228,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 func (e *Engine) BroadcastCommit(commit *model.Commit) error {
 
 	// retrieve all collection nodes in our cluster
-	// TODO filter by cluster
 	recipients, err := e.state.Final().Identities(
-		filter.HasRole(flow.RoleCollection),
+		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	)
 	if err != nil {
