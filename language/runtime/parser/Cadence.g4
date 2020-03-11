@@ -360,6 +360,7 @@ swap
 transfer
     : '='
     | Move
+    | MoveForced
     ;
 
 expression
@@ -488,6 +489,7 @@ unaryOp
 
 Negate : '!' ;
 Move : '<-' ;
+MoveForced : '<-!' ;
 
 Optional : '?' ;
 

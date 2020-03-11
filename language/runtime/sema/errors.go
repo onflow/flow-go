@@ -1606,7 +1606,7 @@ type InvalidResourceAssignmentError struct {
 }
 
 func (e *InvalidResourceAssignmentError) Error() string {
-	return "cannot assign to resource-typed target. consider swapping (<->)"
+	return "cannot assign to resource-typed target. consider force assigning (<-!) or swapping (<->)"
 }
 
 func (*InvalidResourceAssignmentError) isSemanticError() {}

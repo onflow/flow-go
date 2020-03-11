@@ -1152,8 +1152,11 @@ func (v *ProgramVisitor) targetExpression(
 
 func (v *ProgramVisitor) VisitTransfer(ctx *TransferContext) interface{} {
 	operation := ast.TransferOperationCopy
-	if ctx.Move() != nil {
+	switch {
+	case ctx.Move() != nil:
 		operation = ast.TransferOperationMove
+	case ctx.MoveForced() != nil:
+		operation = ast.TransferOperationMoveForced
 	}
 
 	position := PositionFromToken(ctx.GetStart())

@@ -1490,6 +1490,89 @@ func TestCheckInvalidNonResourceAssignmentMoveTransfer(t *testing.T) {
 	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
 }
 
+func TestCheckResourceAssignmentForceTransfer(t *testing.T) {
+
+	t.Run("new to nil", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t, `
+          resource X {}
+
+          fun test() {
+              var x: @X? <- nil
+              x <-! create X()
+              destroy x
+          }
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("new to non-nil", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t, `
+          resource X {}
+
+          fun test() {
+              var x: @X? <- create X()
+              x <-! create X()
+              destroy x
+          }
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("existing to nil", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t, `
+          resource X {}
+
+          fun test() {
+              let x <- create X()
+              var x2: @X? <- nil
+              x2 <-! x
+              destroy x2
+          }
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("existing to non-nil", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t, `
+          resource X {}
+
+          fun test() {
+              let x <- create X()
+              var x2: @X? <- create X()
+              x2 <-! x
+              destroy x2
+          }
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("to non-optional", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t, `
+          resource X {}
+
+          fun test() {
+              let x <- create X()
+              var x2 <- create X()
+              destroy x2
+              x2 <-! x
+          }
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[0])
+	})
+}
+
 func TestCheckInvalidResourceLossThroughVariableDeclaration(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `

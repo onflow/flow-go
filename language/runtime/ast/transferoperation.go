@@ -12,6 +12,7 @@ const (
 	TransferOperationUnknown TransferOperation = iota
 	TransferOperationCopy
 	TransferOperationMove
+	TransferOperationMoveForced
 )
 
 func (k TransferOperation) Operator() string {
@@ -20,7 +21,18 @@ func (k TransferOperation) Operator() string {
 		return "="
 	case TransferOperationMove:
 		return "<-"
+	case TransferOperationMoveForced:
+		return "<-!"
 	}
 
 	panic(errors.NewUnreachableError())
+}
+
+func (k TransferOperation) IsMove() bool {
+	switch k {
+	case TransferOperationMove, TransferOperationMoveForced:
+		return true
+	}
+
+	return false
 }
