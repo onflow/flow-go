@@ -2561,6 +2561,11 @@ var AllIntegerTypes = append(
 	AllSignedIntegerTypes...,
 )
 
+var AllNumberTypes = append(
+	AllIntegerTypes,
+	AllFixedPointTypes...,
+)
+
 func initIntegerFunctions() {
 
 	for _, integerType := range AllIntegerTypes {

@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
@@ -24,13 +25,14 @@ func TestCheckEventDeclaration(t *testing.T) {
 		transferType := checker.GlobalTypes["Transfer"].Type
 
 		require.IsType(t, &sema.CompositeType{}, transferType)
-		require.Len(t, transferType.(*sema.CompositeType).Members, 2)
+		transferCompositeType := transferType.(*sema.CompositeType)
 
-		assert.Equal(t, &sema.IntType{}, transferType.(*sema.CompositeType).Members["to"].TypeAnnotation.Type)
-		assert.Equal(t, &sema.IntType{}, transferType.(*sema.CompositeType).Members["from"].TypeAnnotation.Type)
+		require.Len(t, transferCompositeType.Members, 2)
+		assert.Equal(t, &sema.IntType{}, transferCompositeType.Members["to"].TypeAnnotation.Type)
+		assert.Equal(t, &sema.IntType{}, transferCompositeType.Members["from"].TypeAnnotation.Type)
 	})
 
-	t.Run("InvalidEventNonPrimitiveType", func(t *testing.T) {
+	t.Run("InvalidEventNonPrimitiveParameterType", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
             struct Token {
               let ID: String
@@ -46,6 +48,47 @@ func TestCheckEventDeclaration(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 1)
 
 		assert.IsType(t, &sema.InvalidEventParameterTypeError{}, errs[0])
+	})
+
+	t.Run("EventParameterType", func(t *testing.T) {
+
+		validTypes := append(
+			[]sema.Type{
+				&sema.StringType{},
+				&sema.CharacterType{},
+				&sema.BoolType{},
+				&sema.AddressType{},
+			},
+			sema.AllNumberTypes...,
+		)
+
+		tests := validTypes[:]
+
+		for _, validType := range validTypes {
+			tests = append(tests,
+				&sema.OptionalType{Type: validType},
+				&sema.VariableSizedType{Type: validType},
+				&sema.ConstantSizedType{Type: validType},
+				&sema.DictionaryType{KeyType: validType, ValueType: validType},
+			)
+		}
+
+		for _, ty := range tests {
+
+			t.Run(ty.String(), func(t *testing.T) {
+
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          event Transfer(_ value: %s)
+                        `,
+						ty,
+					),
+				)
+
+				require.NoError(t, err)
+			})
+		}
 	})
 
 	t.Run("RedeclaredEvent", func(t *testing.T) {
