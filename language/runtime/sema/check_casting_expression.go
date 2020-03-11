@@ -139,6 +139,12 @@ func FailableCanSucceed(subType, superType Type) bool {
 			if typedSuperType.Authorized {
 				return false
 			}
+
+			// A failable cast from an unauthorized reference type
+			// to an unauthorized reference type
+			// has the same semantics as a static/non-failable cast
+
+			return IsSubType(subType, superType)
 		}
 
 	case *RestrictedResourceType:
