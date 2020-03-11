@@ -36,26 +36,17 @@ func (checker *Checker) checkEventParameters(
 // Events currently only support simple primitive Cadence types.
 //
 func isValidEventParameterType(t Type) bool {
-	if IsSubType(t, &BoolType{}) {
+	switch t := t.(type) {
+	case *BoolType, *StringType, *AddressType:
 		return true
-	}
 
-	if IsSubType(t, &StringType{}) {
-		return true
-	}
-
-	if IsSubType(t, &IntegerType{}) {
-		return true
-	}
-
-	switch arrayType := t.(type) {
 	case *VariableSizedType:
-		return isValidEventParameterType(arrayType.ElementType(false))
+		return isValidEventParameterType(t.ElementType(false))
 
 	case *ConstantSizedType:
-		return isValidEventParameterType(arrayType.ElementType(false))
+		return isValidEventParameterType(t.ElementType(false))
 
 	default:
-		return false
+		return IsSubType(t, &NumberType{})
 	}
 }
