@@ -2,6 +2,7 @@ package libp2p
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
@@ -86,7 +88,7 @@ func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 	defer l.cancel()
 
 	// creates a single
-	nodes := l.CreateNodes(1)
+	nodes, _ := l.CreateNodes(1)
 
 	// stops the created node
 	done, err := nodes[0].Stop()
@@ -99,11 +101,16 @@ func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 // yields the same info or not.
 func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
+		name := fmt.Sprintf("node%d", i)
+		key, err := generateNetworkingKey(name)
+		require.NoError(l.Suite.T(), err)
+
 		// creates node-i address
 		address := NodeAddress{
-			Name: fmt.Sprintf("node%d", i),
-			IP:   "1.1.1.1",
-			Port: "0",
+			Name:   name,
+			IP:     "1.1.1.1",
+			Port:   "0",
+			PubKey: key.GetPublic(),
 		}
 
 		// translates node-i address into info
@@ -129,18 +136,11 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 	count := 3
 
 	// Creates nodes
-	nodes := l.CreateNodes(count)
+	nodes, addrs := l.CreateNodes(count)
 	defer l.StopNodes(nodes)
 
-	ids := make([]NodeAddress, 0)
-	// Get actual IP and Port numbers on which the nodes were started
-	for _, n := range nodes[1:] {
-		ip, p := n.GetIPPort()
-		ids = append(ids, NodeAddress{Name: n.name, IP: ip, Port: p})
-	}
-
 	// Adds the remaining nodes to the first node as its set of peers
-	require.NoError(l.Suite.T(), nodes[0].AddPeers(l.ctx, ids...))
+	require.NoError(l.Suite.T(), nodes[0].AddPeers(l.ctx, addrs[1:]...))
 	actual := nodes[0].libP2PHost.Peerstore().Peers().Len()
 
 	// Checks if all 9 nodes have been added as peers to the first node
@@ -164,13 +164,10 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 	count := 2
 
 	// Creates nodes
-	nodes := l.CreateNodes(count)
+	nodes, addrs := l.CreateNodes(count)
 	defer l.StopNodes(nodes)
 
-	// Create target NodeAddress
-	ip2, port2 := nodes[1].GetIPPort()
-	name2 := nodes[1].name
-	address2 := NodeAddress{IP: ip2, Port: port2, Name: name2}
+	address2 := addrs[1]
 
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
@@ -219,16 +216,12 @@ func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
 	}
 
 	// Creates peers
-	peers := l.CreateNodes(count, handler)
+	peers, addrs := l.CreateNodes(count, handler)
 	defer l.StopNodes(peers)
+	require.Len(l.T(), addrs, count)
 
-	// Create source NodeAddress
-	ip1, port1 := peers[0].GetIPPort()
-	addr1 := NodeAddress{IP: ip1, Port: port1, Name: peers[0].name}
-
-	// Create target NodeAddress
-	ip2, port2 := peers[1].GetIPPort()
-	addr2 := NodeAddress{IP: ip2, Port: port2, Name: peers[1].name}
+	addr1 := addrs[0]
+	addr2 := addrs[1]
 
 	// Create stream from node 1 to node 2
 	s1, err := peers[0].CreateStream(context.Background(), addr2)
@@ -308,16 +301,12 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 	}
 
 	// Creates peers
-	peers := l.CreateNodes(2, handler)
+	peers, addrs := l.CreateNodes(2, handler)
 	defer l.StopNodes(peers)
-
-	// Create target NodeAddress
-	ip2, port2 := peers[1].GetIPPort()
-	na2 := NodeAddress{IP: ip2, Port: port2, Name: peers[1].name}
 
 	for i := 0; i < count; i++ {
 		// Create stream from node 1 to node 2 (reuse if one already exists)
-		s, err := peers[0].CreateStream(context.Background(), na2)
+		s, err := peers[0].CreateStream(context.Background(), addrs[1])
 		assert.NoError(l.T(), err)
 		w := bufio.NewWriter(s)
 
@@ -353,9 +342,10 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 // CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHandler) (nodes []*P2PNode) {
+func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHandler) ([]*P2PNode, []NodeAddress) {
 	// keeps track of errors on creating a node
 	var err error
+	var nodes []*P2PNode
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	defer func() {
 		if err != nil && nodes != nil {
@@ -374,23 +364,33 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 	}
 
 	// creating nodes
+	var nodeAddrs []NodeAddress
 	for i := 1; i <= count; i++ {
+
+		name := fmt.Sprintf("node%d", i)
+		pkey, err := generateNetworkingKey(name)
+		require.NoError(l.Suite.T(), err)
+
 		n := &P2PNode{}
 		nodeID := NodeAddress{
-			Name: fmt.Sprintf("node%d", i),
-			IP:   "0.0.0.0", // localhost
-			Port: "0",       // random Port number
+			Name:   name,
+			IP:     "0.0.0.0",        // localhost
+			Port:   "0",              // random Port number
+			PubKey: pkey.GetPublic(), // the networking public key
 		}
 
-		err := n.Start(l.ctx, nodeID, logger, handlerFunc)
+		err = n.Start(l.ctx, nodeID, logger, pkey, handlerFunc)
 		require.NoError(l.Suite.T(), err)
 		require.Eventuallyf(l.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()
 			return ip != "" && p != ""
 		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %d", i))
+		// get the actual IP and port that have been assigned by the subsystem
+		nodeID.IP, nodeID.Port = n.GetIPPort()
 		nodes = append(nodes, n)
+		nodeAddrs = append(nodeAddrs, nodeID)
 	}
-	return nodes
+	return nodes, nodeAddrs
 }
 
 // StopNodes stop all nodes in the input slice
@@ -400,4 +400,13 @@ func (l *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
 		assert.NoError(l.Suite.T(), err)
 		<-done
 	}
+}
+
+// GetPublicKey generates a ECDSA key pair using the given seed
+func generateNetworkingKey(seed string) (crypto.PrivKey, error) {
+	seedB := make([]byte, 100)
+	copy(seedB, seed)
+	var r io.Reader = bytes.NewReader(seedB)
+	prvKey, _, err := crypto.GenerateKeyPairWithReader(crypto.ECDSA, 0, r)
+	return prvKey, err
 }

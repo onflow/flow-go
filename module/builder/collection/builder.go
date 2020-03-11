@@ -45,10 +45,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
+		var finalizedID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &finalizedID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized ID: %w", err)
+		}
+
 		// for each un-finalized ancestor of our new block, retrieve the list
 		// of pending transactions; we use this to exclude transactions that
 		// already exist in this fork.
-		// TODO we need to check that we aren't duplicating payload items from FINALIZED blocks
 		ancestorID := parentID
 		txLookup := make(map[flow.Identifier]struct{})
 		for {
@@ -67,14 +72,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 			// look up the cluster payload (ie. the collection)
 			var payload cluster.Payload
-			err = procedure.RetrieveClusterPayload(ancestor.PayloadHash, &payload)(tx)
+			err = procedure.RetrieveClusterPayload(ancestor.ID(), &payload)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve ancestor payload: %w", err)
 			}
 
 			// insert the transactions into the lookup
-			for _, txHash := range payload.Collection.Transactions {
-				txLookup[txHash] = struct{}{}
+			for _, txID := range payload.Collection.Transactions {
+				txLookup[txID] = struct{}{}
 			}
 
 			// continue with the next ancestor in the chain
@@ -85,13 +90,36 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// memory pool as possible without including any that already exist on
 		// our fork.
 		// TODO make empty collections / limit size based on collection min/max size constraints
-		var txIDs []flow.Identifier
+		var candidateTxIDs []flow.Identifier
 		for _, flowTx := range b.transactions.All() {
 			_, exists := txLookup[flowTx.ID()]
 			if exists {
 				continue
 			}
-			txIDs = append(txIDs, flowTx.ID())
+			candidateTxIDs = append(candidateTxIDs, flowTx.ID())
+		}
+
+		// find any guarantees that conflict with FINALIZED blocks
+		var invalidIDs map[flow.Identifier]struct{}
+		err = operation.CheckCollectionPayload(boundary, finalizedID, candidateTxIDs, &invalidIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not check collection payload: %w", err)
+		}
+
+		// populate the final list of transaction IDs for the block - these
+		// are guaranteed to be valid
+		var finalTxIDs []flow.Identifier
+		for _, txID := range candidateTxIDs {
+
+			_, isInvalid := invalidIDs[txID]
+			if isInvalid {
+				// remove from mempool, it will never be valid
+				b.transactions.Rem(txID)
+				continue
+			}
+
+			// add ONLY non-conflicting transaction IDs to the final payload
+			finalTxIDs = append(finalTxIDs, txID)
 		}
 
 		// STEP THREE: we have a set of transactions that are valid to include
@@ -99,9 +127,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// used in the payload, store and index it in storage, and insert the
 		// header.
 
+		// insert transactions included in this collection
+		for _, txID := range finalTxIDs {
+			flowTx, err := b.transactions.ByID(txID)
+			if err != nil {
+				return fmt.Errorf("could not insert missing transaction: %w", err)
+			}
+			err = operation.SkipDuplicates(operation.InsertTransaction(flowTx))(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert transaction: %w", err)
+			}
+		}
+
 		// create and insert the collection
-		// TODO when are individual transactions inserted to storage? may need to do that here
-		collection := flow.LightCollection{Transactions: txIDs}
+		collection := flow.LightCollection{Transactions: finalTxIDs}
 		err = operation.InsertCollection(&collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
@@ -110,12 +149,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// build the payload
 		payload := cluster.Payload{
 			Collection: collection,
-		}
-
-		// index the payload by hash
-		err = procedure.IndexClusterPayload(&payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index payload: %w", err)
 		}
 
 		// retrieve the parent to set the height
@@ -149,6 +182,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		err = operation.InsertHeader(header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
+		}
+
+		// index the payload by block ID
+		err = procedure.IndexClusterPayload(header, &payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index payload: %w", err)
 		}
 
 		return nil

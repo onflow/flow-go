@@ -9,8 +9,10 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
+	mock "github.com/dapperlabs/flow-go/engine/verification/ingest/mocks/assignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module/assignment"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -31,10 +33,23 @@ func TestHappyPath(t *testing.T) {
 
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
 
-	verNode := testutil.VerificationNode(t, hub, verIdentity, identities)
+	assigner := &mock.ChunkAssigner{}
+	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 
-	completeER := unittest.CompleteExecutionResultFixture()
+	completeER := unittest.CompleteExecutionResultFixture(1)
+
+	// completeER has only one chunk
+	// mocks the assignment of the only chunk
+	// of completeER to this verifier node
+	a := assignment.NewAssignment()
+	a.Assign(completeER.Receipt.ExecutionResult.Chunks.ByIndex(0), []flow.Identifier{verNode.Me.NodeID()})
+
+	assigner.On("Assigner",
+		testifymock.Anything,
+		completeER.Receipt.ExecutionResult.Chunks,
+		testifymock.Anything).
+		Return(a, nil)
 
 	// mock the execution node with a generic node and mocked engine
 	// to handle request for chunk state
@@ -122,10 +137,8 @@ func TestHappyPath(t *testing.T) {
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 
-	// the receipt should be removed from the mempool
-	assert.False(t, verNode.Receipts.Has(completeER.Receipt.ID()))
 	// associated resources should be removed from the mempool
 	assert.False(t, verNode.Collections.Has(completeER.Collections[0].ID()))
-	assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
-	assert.False(t, verNode.Blocks.Has(completeER.Block.ID()))
+	// TODO adding complementary tests for claning other resources like the execution receipt
+	// https://github.com/dapperlabs/flow-go/issues/2750
 }

@@ -1,9 +1,12 @@
 package checker
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,22 +33,77 @@ func TestCheckEventDeclaration(t *testing.T) {
 		assert.Equal(t, &sema.IntType{}, transferType.(*sema.CompositeType).Members["from"].TypeAnnotation.Type)
 	})
 
-	t.Run("InvalidEventNonPrimitiveType", func(t *testing.T) {
-		_, err := ParseAndCheck(t, `
-            struct Token {
-              let ID: String
+	t.Run("InvalidEventNonPrimitiveTypeComposite", func(t *testing.T) {
 
-              init(ID: String) {
-                self.ID = ID
-              }
-            }
+		for _, compositeKind := range common.CompositeKindsWithBody {
+			if compositeKind == common.CompositeKindContract {
+				continue
+			}
 
-            event Transfer(token: Token)
-        `)
+			t.Run(compositeKind.Name(), func(t *testing.T) {
 
-		errs := ExpectCheckerErrors(t, err, 1)
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          %[1]s Token {
+                            let id: String
 
-		assert.IsType(t, &sema.InvalidEventParameterTypeError{}, errs[0])
+                            init(id: String) {
+                              self.id = id
+                            }
+                          }
+
+                          event Transfer(token: %[2]sToken)
+                        `,
+						compositeKind.Keyword(),
+						compositeKind.Annotation(),
+					),
+				)
+
+				switch compositeKind {
+				case common.CompositeKindResource:
+					errs := ExpectCheckerErrors(t, err, 3)
+
+					assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+					assert.IsType(t, &sema.InvalidEventParameterTypeError{}, errs[1])
+					assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[2])
+
+				case common.CompositeKindStructure:
+					errs := ExpectCheckerErrors(t, err, 1)
+
+					assert.IsType(t, &sema.InvalidEventParameterTypeError{}, errs[0])
+
+				default:
+					panic(errors.NewUnreachableError())
+				}
+			})
+		}
+	})
+
+	t.Run("PrimitiveTypedFields", func(t *testing.T) {
+
+		validTypes := append(
+			sema.AllNumberTypes,
+			&sema.StringType{},
+			&sema.BoolType{},
+		)
+
+		for _, ty := range validTypes {
+
+			t.Run(ty.String(), func(t *testing.T) {
+
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          event Transfer(value: %s)
+                        `,
+						ty.String(),
+					),
+				)
+
+				require.NoError(t, err)
+			})
+		}
 	})
 
 	t.Run("RedeclaredEvent", func(t *testing.T) {
@@ -60,7 +118,6 @@ func TestCheckEventDeclaration(t *testing.T) {
 
 		assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 		assert.IsType(t, &sema.RedeclarationError{}, errs[1])
-
 	})
 }
 

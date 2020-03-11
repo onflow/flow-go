@@ -219,4 +219,52 @@ func TestInterpretTransactions(t *testing.T) {
 		err = inter.InvokeTransaction(0, signer1, signer2)
 		assert.IsType(t, &interpreter.ArgumentCountError{}, err)
 	})
+
+	t.Run("Parameters", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+          let values: [AnyStruct] = []
+
+          transaction(x: Int, y: Bool) {
+
+            prepare(account: Account) {
+              values.append(account.address)
+              values.append(y)
+              values.append(x)
+            }
+          }
+        `)
+
+		transactionArguments := []interface{}{1, true}
+		prepareArguments := []interface{}{
+			interpreter.NewAccountValue(interpreter.AddressValue{}, nil, nil, nil),
+		}
+
+		arguments := append(transactionArguments, prepareArguments...)
+
+		err := inter.InvokeTransaction(0, arguments...)
+		assert.NoError(t, err)
+
+		values := inter.Globals["values"].Value
+
+		require.IsType(t, values, &interpreter.ArrayValue{})
+
+		var unboxedValues []interpreter.Value
+
+		for _, value := range values.(*interpreter.ArrayValue).Values {
+			require.IsType(t, value, &interpreter.AnyValue{})
+			unboxedValue := value.(*interpreter.AnyValue).Value
+			unboxedValues = append(unboxedValues, unboxedValue)
+		}
+
+		assert.Equal(t,
+			[]interpreter.Value{
+				interpreter.AddressValue{},
+				interpreter.BoolValue(true),
+				interpreter.NewIntValue(1),
+			},
+			unboxedValues,
+		)
+	})
+
 }

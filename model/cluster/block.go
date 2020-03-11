@@ -62,3 +62,12 @@ func PayloadFromTransactions(txHashes []flow.Identifier) Payload {
 func (p Payload) Hash() flow.Identifier {
 	return p.Collection.ID()
 }
+
+// PendingBlock is a wrapper type representing a block that cannot yet be
+// processed. The block header, payload, and sender ID are stored together
+// while waiting for the block to become processable.
+type PendingBlock struct {
+	OriginID flow.Identifier
+	Header   *flow.Header
+	Payload  *Payload
+}

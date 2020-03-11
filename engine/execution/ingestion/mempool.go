@@ -48,7 +48,6 @@ func newMempool() (*Mempool, error) {
 	a := &Mempool{
 		Backend: stdmap.NewBackend(),
 	}
-
 	return a, nil
 }
 
@@ -57,7 +56,7 @@ func (b *Mempool) Add(block *blockByCollection) error {
 }
 
 func (b *Mempool) Get(id flow.Identifier) (*blockByCollection, error) {
-	backdata := &Backdata{b.Backdata}
+	backdata := &Backdata{&b.Backdata}
 	return backdata.ByID(id)
 }
 
@@ -65,7 +64,7 @@ func (b *Mempool) Run(f func(backdata *Backdata) error) error {
 	b.Lock()
 	defer b.Unlock()
 
-	err := f(&Backdata{b.Backdata})
+	err := f(&Backdata{&b.Backdata})
 	if err != nil {
 		return err
 	}
