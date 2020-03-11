@@ -2633,10 +2633,7 @@ func init() {
 	}
 
 	types := append(
-		append(
-			AllIntegerTypes,
-			AllFixedPointTypes...,
-		),
+		AllNumberTypes,
 		otherTypes...,
 	)
 
@@ -2730,6 +2727,11 @@ var AllUnsignedIntegerTypes = []Type{
 var AllIntegerTypes = append(
 	AllUnsignedIntegerTypes,
 	AllSignedIntegerTypes...,
+)
+
+var AllNumberTypes = append(
+	AllIntegerTypes,
+	AllFixedPointTypes...,
 )
 
 func initIntegerFunctions() {
