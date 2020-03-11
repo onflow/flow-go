@@ -419,7 +419,7 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 		missingID = nextBlock.Header.ParentID
 	}
 
-	req := &messages.BlockRequest{
+	req := &messages.ClusterBlockRequest{
 		BlockID: missingID,
 		Nonce:   rand.Uint64(),
 	}
