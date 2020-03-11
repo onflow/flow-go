@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
@@ -608,6 +609,11 @@ func TestCheckArraySubtyping(t *testing.T) {
 				body = "()"
 			}
 
+			interfaceType := "I"
+			if kind == common.CompositeKindResource {
+				interfaceType = "AnyResource{I}"
+			}
+
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
@@ -615,16 +621,19 @@ func TestCheckArraySubtyping(t *testing.T) {
                       %[1]s S: I %[2]s
 
                       let xs: %[3]s[S] %[4]s []
-                      let ys: %[3]s[I] %[4]s xs
+                      let ys: %[3]s[%[5]s] %[4]s xs
 	                `,
 					kind.Keyword(),
 					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
+					interfaceType,
 				),
 			)
 
-			require.NoError(t, err)
+			if !assert.NoError(t, err) {
+				cmd.PrettyPrintError(err, "", map[string]string{"": ""})
+			}
 		})
 	}
 }
@@ -656,6 +665,11 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 				body = "()"
 			}
 
+			interfaceType := "I"
+			if kind == common.CompositeKindResource {
+				interfaceType = "AnyResource{I}"
+			}
+
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
@@ -663,12 +677,13 @@ func TestCheckDictionarySubtyping(t *testing.T) {
                       %[1]s S: I %[2]s
 
                       let xs: %[3]s{String: S} %[4]s {}
-                      let ys: %[3]s{String: I} %[4]s xs
+                      let ys: %[3]s{String: %[5]s} %[4]s xs
 	                `,
 					kind.Keyword(),
 					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
+					interfaceType,
 				),
 			)
 
