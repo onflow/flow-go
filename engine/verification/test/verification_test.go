@@ -51,7 +51,7 @@ func TestHappyPath(t *testing.T) {
 			a.Add(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
 		}
 	}
-	assigner.On("Assigner",
+	assigner.On("Assign",
 		testifymock.Anything,
 		completeER.Receipt.ExecutionResult.Chunks,
 		testifymock.Anything).

@@ -13,8 +13,8 @@ type ChunkAssigner struct {
 	mock.Mock
 }
 
-// Assigner provides a mock function with given fields: ids, chunks, rng
-func (_m *ChunkAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*chunkassignment.Assignment, error) {
+// Assign provides a mock function with given fields: ids, chunks, rng
+func (_m *ChunkAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*chunkassignment.Assignment, error) {
 	ret := _m.Called(ids, chunks, rng)
 
 	var r0 *chunkassignment.Assignment

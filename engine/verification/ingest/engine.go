@@ -520,7 +520,7 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random generator: %w", err)
 	}
-	a, err := e.assigner.Assigner(verifierNodes, res.Chunks, rng)
+	a, err := e.assigner.Assign(verifierNodes, res.Chunks, rng)
 	if err != nil {
 		return nil, fmt.Errorf("could not create chunk assignment %w", err)
 	}

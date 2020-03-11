@@ -166,7 +166,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
 		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
 	}
-	suite.assigner.On("Assigner",
+	suite.assigner.On("Assign",
 		testifymock.Anything,
 		testifymock.Anything,
 		testifymock.Anything).Return(a, nil)
@@ -436,7 +436,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			// we have the assignment of chunk
 			a := chunkassignment.NewAssignment()
 			a.Add(suite.receipt.ExecutionResult.Chunks.ByIndex(0), flow.IdentifierList{verIdentity.NodeID})
-			suite.assigner.On("Assigner",
+			suite.assigner.On("Assign",
 				testifymock.Anything,
 				testifymock.Anything,
 				testifymock.Anything).Return(a, nil)
@@ -714,8 +714,8 @@ func NewMockAssigner(id flow.Identifier) *MockAssigner {
 	return &MockAssigner{me: id}
 }
 
-// Assigner assigns all input chunks to the verifer node
-func (m *MockAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*chunkassignment.Assignment, error) {
+// Assign assigns all input chunks to the verifer node
+func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*chunkassignment.Assignment, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("assigner called with empty chunk list")
 	}

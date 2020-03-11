@@ -25,7 +25,7 @@ func NewPublicAssignment(alpha int) *PublicAssignment {
 	return &PublicAssignment{alpha: alpha}
 }
 
-func (p *PublicAssignment) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*chunkassignment.Assignment, error) {
+func (p *PublicAssignment) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*chunkassignment.Assignment, error) {
 	a, err := chunkAssignment(ids.NodeIDs(), chunks, rng, p.alpha)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not complete chunk assignment")

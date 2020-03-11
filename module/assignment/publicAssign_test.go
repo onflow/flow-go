@@ -164,11 +164,11 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.Equal(a.T(), copy(nodes2, nodes1), n)
 
 	// chunk assignment of the first set
-	p1, err := NewPublicAssignment(alpha).Assigner(nodes1, chunks, rng1)
+	p1, err := NewPublicAssignment(alpha).Assign(nodes1, chunks, rng1)
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
-	p2, err := NewPublicAssignment(alpha).Assigner(nodes2, chunks, rng2)
+	p2, err := NewPublicAssignment(alpha).Assign(nodes2, chunks, rng2)
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
@@ -219,7 +219,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	original := make([]*flow.Identity, verNum)
 	require.Equal(a.T(), copy(original, nodes), verNum)
 
-	p, err := NewPublicAssignment(alpha).Assigner(nodes, chunks, rng)
+	p, err := NewPublicAssignment(alpha).Assign(nodes, chunks, rng)
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
