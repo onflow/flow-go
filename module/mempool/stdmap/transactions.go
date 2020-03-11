@@ -14,7 +14,7 @@ type Transactions struct {
 	*Backend
 }
 
-// NewTransactions creates a new memory pool for transctions.
+// NewTransactions creates a new memory pool for transactions.
 func NewTransactions(limit uint) (*Transactions, error) {
 	t := &Transactions{
 		Backend: NewBackend(WithLimit(limit)),
