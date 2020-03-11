@@ -55,7 +55,7 @@ func New(
 
 	participants, err := state.Final().Identities(memberFilter)
 	if err != nil {
-		return nil, fmt.Errorf("could not get cluster participants: %w", err)
+		return nil, fmt.Errorf("could not get consensus participants: %w", err)
 	}
 
 	cold := coldStuff{
