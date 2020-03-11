@@ -1,6 +1,7 @@
 package execution_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -160,15 +161,14 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 			ProposerID: con1ID.ID(),
 		},
 	}
-	// TODO add as soon as engine can process blocks that are not finalized and out of order
-	fork := &flow.Block{
-		Header: flow.Header{
-			ParentID:   genesis.ID(),
-			View:       2,
-			Height:     2,
-			ProposerID: con2ID.ID(),
-		},
-	}
+	//fork := &flow.Block{
+	//	Header: flow.Header{
+	//		ParentID:   genesis.ID(),
+	//		View:       2,
+	//		Height:     2,
+	//		ProposerID: con2ID.ID(),
+	//	},
+	//}
 	block3 := &flow.Block{
 		Header: flow.Header{
 			ParentID:   block2.ID(),
@@ -193,16 +193,14 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 		Run(func(args mock.Arguments) { actualCalls++ }).
 		Return(nil)
 
-	// TODO submit blocks out of order, add forks and orphans. This is currently not possible
-	// since the block ingestion engine expects finalized, sequential blocks only.
-	exeNode.IngestionEngine.Submit(con2ID.NodeID, block3)
-	exeNode.IngestionEngine.Submit(con2ID.NodeID, fork)
+	// TODO Execution Engine is able to work on forks, but full test cannot be enabled
+	// due to Consensus Follower not fully implemented
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, block2)
+	//exeNode.IngestionEngine.Submit(con1ID.NodeID, block3) // block 3 cannot be executed if parent (block2 is missing)
+	//exeNode.IngestionEngine.Submit(con1ID.NodeID, fork) // block 3 cannot be executed if parent (block2 is missing)
 	hub.Eventually(t, equal(2, &actualCalls))
-	//eventuallyEqual(t, 2, &actualCalls)
 
 	exeNode.IngestionEngine.Submit(con2ID.NodeID, block3)
-	//eventuallyEqual(t, 4, &actualCalls)
 	hub.Eventually(t, equal(4, &actualCalls))
 
 	var res flow.Identifier
@@ -268,6 +266,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 func equal(expected int, actual *int) func() bool {
 	return func() bool {
+		fmt.Printf("expect %d got %d\n", expected, *actual)
 		return expected == *actual
 	}
 }

@@ -33,7 +33,7 @@ func BlockWithParentFixture(parentID flow.Identifier) flow.Block {
 		Identities: IdentityListFixture(32),
 		Guarantees: CollectionGuaranteesFixture(16),
 	}
-	header :=  BlockHeaderWithParentFixture(parentID)
+	header := BlockHeaderWithParentFixture(parentID)
 	header.PayloadHash = payload.Hash()
 	return flow.Block{
 		Header:  header,

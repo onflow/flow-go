@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -37,7 +38,7 @@ type Engine struct {
 	providerEngine    provider.ProviderEngine
 	mempool           *Mempool
 	execState         state.ExecutionState
-	executionNotifier chan struct{}
+	wg                sync.WaitGroup
 }
 
 func New(
@@ -68,7 +69,6 @@ func New(
 		providerEngine:    providerEngine,
 		mempool:           mempool,
 		execState:         execState,
-		executionNotifier: make(chan struct{}, 0),
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -84,13 +84,10 @@ func New(
 	eng.conduit = con
 	eng.collectionConduit = collConduit
 
-	//go eng.executionQueueLoop()
-
 	return &eng, nil
 }
 
 // Engine boilerplate
-
 func (e *Engine) SubmitLocal(event interface{}) {
 	e.Submit(e.me.NodeID(), event)
 }
@@ -117,7 +114,9 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a channel that will close when the engine has
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		e.wg.Wait() //wait for block execution
+	})
 }
 
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
@@ -141,20 +140,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // Main handling
 
-// Main execution loop
-//func (e *Engine) executionQueueLoop() {
-//	for {
-//		<- e.executionNotifier
-//
-//		err := e.mempool.ExecutionQueue.Run(func(executionQueue *QueuesBackdata) error {
-//			for _, eq := range executionQueue.All() {
-//
-//
-//			}
-//		})
-//	}
-//}
-
 func (e *Engine) handleBlock(block *flow.Block) error {
 
 	e.log.Debug().
@@ -168,8 +153,10 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	}
 
 	// TODO: for MVP assume we're only receiving finalized blocks
-	// but in essence, Execution Node doesn't care about finalization of blocks
-	// so this might not be even needed
+	// but in essence, Execution Node doesn't care about finalization of blocks.
+	// However, for executing scripts we need latest finalized state and
+	// we need protocol state to be able to find other nodes
+	// Once the Consensus Follower is ready to be implemented, this should be replaced
 	blockID := block.Header.ID()
 	err = e.state.Mutate().Finalize(blockID)
 	if err != nil {
@@ -183,12 +170,19 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	err = e.mempool.Run(func(blockByCollection *BlockByCollectionBackdata, executionQueue *QueuesBackdata, orphanQueue *QueuesBackdata) error {
 
+		err := e.sendCollectionsRequest(completeBlock, blockByCollection)
+		if err != nil {
+			return fmt.Errorf("cannot send collction requests: %w", err)
+		}
+
 		// if block fits into execution queue, that's it
 		if queue, added := tryEnqueue(completeBlock, executionQueue); added {
-			err := e.sendCollectionsRequest(completeBlock, blockByCollection)
-			if err != nil {
-				return fmt.Errorf("cannot send collction requests: %w", err)
-			}
+			e.tryRequeueOrphans(completeBlock, queue, orphanQueue)
+			return nil
+		}
+
+		// if block fits into orphan queues
+		if queue, added := tryEnqueue(completeBlock, orphanQueue); added {
 			e.tryRequeueOrphans(completeBlock, queue, orphanQueue)
 			return nil
 		}
@@ -201,10 +195,6 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 			if err != nil {
 				return fmt.Errorf("cannot add orphaned block: %w", err)
 			}
-			err = e.sendCollectionsRequest(completeBlock, blockByCollection)
-			if err != nil {
-				return fmt.Errorf("cannot send collction requests: %w", err)
-			}
 			return nil
 		}
 		// any other error while accessing storage - panic
@@ -213,14 +203,14 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		}
 
 		completeBlock.StartState = stateCommitment
-
+		newQueue, err := enqueue(completeBlock, executionQueue)
+		if err != nil {
+			return fmt.Errorf("cannot enqueue block for execution: %w", err)
+		}
 		// If the block was empty
 		if completeBlock.IsComplete() {
-			newQueue, err := enqueue(completeBlock, executionQueue)
-			if err != nil {
-				return fmt.Errorf("cannot enqueue block for execution: %w", err)
-			}
 			e.tryRequeueOrphans(completeBlock, newQueue, orphanQueue)
+			e.wg.Add(1)
 			go e.executeBlock(completeBlock)
 		}
 
@@ -231,21 +221,23 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 }
 
 // tryRequeueOrphans tries to put orphaned queue into execution queue after a new block has been added
-func (e *Engine) tryRequeueOrphans(completeBlock *execution.CompleteBlock, executionQueue *Queue, orphanQueues *QueuesBackdata) {
-	for _, queue := range orphanQueues.All() {
+func (e *Engine) tryRequeueOrphans(completeBlock *execution.CompleteBlock, targetQueue *Queue, potentialQueues *QueuesBackdata) {
+	for _, queue := range potentialQueues.All() {
 		// only need to check for heads, as all children has parent already
 		// there might be many queues sharing a parent
 		if queue.Head.CompleteBlock.Block.ParentID == completeBlock.Block.ID() {
-			err := executionQueue.Attach(queue)
+			err := targetQueue.Attach(queue)
 			// shouldn't happen
 			if err != nil {
 				panic(fmt.Sprintf("internal error while joining queues"))
 			}
+			potentialQueues.Rem(queue.ID())
 		}
 	}
 }
 
 func (e *Engine) executeBlock(completeBlock *execution.CompleteBlock) {
+	defer e.wg.Done()
 
 	view := e.execState.NewView(completeBlock.StartState)
 	e.log.Info().
@@ -260,7 +252,7 @@ func (e *Engine) executeBlock(completeBlock *execution.CompleteBlock) {
 		return
 	}
 
-	err = e.handleComputationResult(computationResult, completeBlock.StartState)
+	finalState, err := e.handleComputationResult(computationResult, completeBlock.StartState)
 	if err != nil {
 		e.log.Err(err).
 			Hex("block_id", logging.Entity(completeBlock.Block)).
@@ -275,11 +267,13 @@ func (e *Engine) executeBlock(completeBlock *execution.CompleteBlock) {
 		}
 		_, newQueues := executionQueue.Dismount()
 		for _, queue := range newQueues {
+			queue.Head.CompleteBlock.StartState = finalState
 			err := executionQueues.Add(queue)
 			if err != nil {
 				return fmt.Errorf("fatal error cannot add children block to execution queue: %w", err)
 			}
 			if queue.Head.CompleteBlock.IsComplete() {
+				e.wg.Add(1)
 				go e.executeBlock(queue.Head.CompleteBlock)
 			}
 		}
@@ -327,6 +321,7 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		}
 
 		if completeBlock.IsComplete() {
+			e.wg.Add(1)
 			go e.executeBlock(completeBlock)
 		}
 
@@ -356,8 +351,8 @@ func (e *Engine) clearCollectionsCache(block *execution.CompleteBlock, backdata 
 }
 
 // tryEnqueue checks if a block fits somewhere into the already existing queues, and puts it there is so
-func tryEnqueue(completeBlock *execution.CompleteBlock, queue *QueuesBackdata) (*Queue, bool) {
-	for _, queue := range queue.All() {
+func tryEnqueue(completeBlock *execution.CompleteBlock, queues *QueuesBackdata) (*Queue, bool) {
+	for _, queue := range queues.All() {
 		if queue.TryAdd(completeBlock) {
 			return queue, true
 		}
@@ -379,19 +374,6 @@ func enqueue(completeBlock *execution.CompleteBlock, queues *QueuesBackdata) (*Q
 	}
 	return newQueue(completeBlock, queues)
 }
-
-//// tryAddExecutionStartState adds start state commitment if possible, returns if successful
-//func (e *Engine) tryAddExecutionStartState(completeBlock *execution.CompleteBlock) (bool, error) {
-//	stateCommitment, err := e.execState.StateCommitmentByBlockID(completeBlock.Block.ParentID)
-//	if err == nil {
-//		completeBlock.StartState = stateCommitment
-//		return true, nil
-//	}
-//	if err == storage.ErrNotFound {
-//		return false, nil
-//	}
-//	return false, fmt.Errorf("unexpeted error while asserting execution state: %w", err)
-//}
 
 func (e *Engine) sendCollectionsRequest(completeBlock *execution.CompleteBlock, backdata *BlockByCollectionBackdata) error {
 
@@ -460,7 +442,7 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 	return e.computationEngine.ExecuteScript(script, block, blockView)
 }
 
-func (e *Engine) handleComputationResult(result *execution.ComputationResult, startState flow.StateCommitment) error {
+func (e *Engine) handleComputationResult(result *execution.ComputationResult, startState flow.StateCommitment) (flow.StateCommitment, error) {
 
 	e.log.Debug().
 		Hex("block_id", logging.ID(result.CompleteBlock.Block.ID())).
@@ -476,7 +458,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		var err error
 		endState, err = e.execState.CommitDelta(view.Delta())
 		if err != nil {
-			return fmt.Errorf("failed to apply chunk delta: %w", err)
+			return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 		}
 		//
 		chunk := generateChunk(i, startState, endState)
@@ -485,7 +467,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		//
 		err = e.execState.PersistChunkHeader(chunkHeader)
 		if err != nil {
-			return fmt.Errorf("failed to save chunk header: %w", err)
+			return nil, fmt.Errorf("failed to save chunk header: %w", err)
 		}
 		//
 		chunks[i] = chunk
@@ -494,7 +476,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 
 	executionResult, err := e.generateExecutionResultForBlock(result.CompleteBlock, chunks, endState)
 	if err != nil {
-		return fmt.Errorf("could not generate computationEngine result: %w", err)
+		return nil, fmt.Errorf("could not generate computationEngine result: %w", err)
 	}
 
 	receipt := &flow.ExecutionReceipt{
@@ -508,15 +490,15 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 
 	err = e.execState.PersistStateCommitment(result.CompleteBlock.Block.ID(), endState)
 	if err != nil {
-		return fmt.Errorf("failed to store state commitment: %w", err)
+		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
 
 	err = e.providerEngine.BroadcastExecutionReceipt(receipt)
 	if err != nil {
-		return fmt.Errorf("could not send broadcast order: %w", err)
+		return nil, fmt.Errorf("could not send broadcast order: %w", err)
 	}
 
-	return nil
+	return endState, nil
 }
 
 // generateChunk creates a chunk from the provided computationEngine data.

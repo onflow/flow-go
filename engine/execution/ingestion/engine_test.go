@@ -114,22 +114,6 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 // TODO Currently those tests check if objects are stored directly
 // actually validating data is a part of further tasks and likely those
 // tests will have to change to reflect this
-func TestBlockStorage(t *testing.T) {
-
-	runWithEngine(t, func(ctx testingContext) {
-
-		block := unittest.BlockFixture()
-
-		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
-		ctx.collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(len(block.Guarantees))
-
-		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(unittest.StateCommitmentFixture(), nil)
-
-		err := ctx.engine.ProcessLocal(&block)
-		assert.NoError(t, err)
-	})
-}
-
 func TestCollectionRequests(t *testing.T) {
 
 	runWithEngine(t, func(ctx testingContext) {
@@ -142,8 +126,10 @@ func TestCollectionRequests(t *testing.T) {
 		for _, col := range block.Guarantees {
 			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
+		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(nil, realStorage.ErrNotFound)
 
 		err := ctx.engine.ProcessLocal(&block)
+
 		require.NoError(t, err)
 	})
 }
@@ -159,6 +145,7 @@ func TestValidatingCollectionResponse(t *testing.T) {
 		id := completeBlock.Collections()[0].Guarantee.ID()
 
 		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
+		ctx.executionState.On("StateCommitmentByBlockID", completeBlock.Block.ParentID).Return(unittest.StateCommitmentFixture(), realStorage.ErrNotFound)
 
 		err := ctx.engine.ProcessLocal(completeBlock.Block)
 		require.NoError(t, err)
@@ -179,34 +166,36 @@ func TestValidatingCollectionResponse(t *testing.T) {
 		// no interaction with conduit for finished completeBlock
 		// </TODO enable>
 
-		ctx.assertSuccessfulBlockComputation(completeBlock)
+		//ctx.executionState.On("StateCommitmentByBlockID", completeBlock.Block.ParentID).Return(unittest.StateCommitmentFixture(), realStorage.ErrNotFound)
+
+		//ctx.assertSuccessfulBlockComputation(completeBlock.Block)
 
 		err = ctx.engine.ProcessLocal(&rightResponse)
 		require.NoError(t, err)
 	})
 }
 
-func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *execution.CompleteBlock) {
-	startStateCommitment := unittest.StateCommitmentFixture()
+func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *execution.CompleteBlock, previousExecutionResultID flow.Identifier) {
 	computationResult := unittest.ComputationResultForBlockFixture(completeBlock)
 	newStateCommitment := unittest.StateCommitmentFixture()
 	if len(computationResult.StateViews) == 0 { //if block was empty, no new state commitment is produced
-		newStateCommitment = startStateCommitment
+		newStateCommitment = completeBlock.StartState
 	}
-	ctx.executionState.On("StateCommitmentByBlockID", completeBlock.Block.ParentID).Return(startStateCommitment, nil)
-	ctx.executionState.On("NewView", startStateCommitment).Return(nil)
+	ctx.executionState.On("NewView", completeBlock.StartState).Return(nil)
 
 	ctx.computationEngine.On("ComputeBlock", completeBlock, mock.Anything).Return(computationResult, nil).Once()
 
 	for _, view := range computationResult.StateViews {
 		ctx.executionState.On("CommitDelta", view.Delta()).Return(newStateCommitment, nil)
 		ctx.executionState.On("PersistChunkHeader", mock.MatchedBy(func(f *flow.ChunkHeader) bool {
-			return bytes.Equal(f.StartState, startStateCommitment)
+			return bytes.Equal(f.StartState, completeBlock.StartState)
 		})).Return(nil)
 	}
 
-	previousExecutionResultID := unittest.IdentifierFixture()
-	ctx.executionState.On("GetExecutionResultID", completeBlock.Block.ParentID).Return(previousExecutionResultID, nil)
+	ctx.executionState.On("GetExecutionResultID", completeBlock.Block.ParentID).Return(func(blockID flow.Identifier) flow.Identifier {
+		return previousExecutionResultID
+	}, nil)
+
 	ctx.executionState.On("PersistExecutionResult", completeBlock.Block.ID(), mock.MatchedBy(func(er flow.ExecutionResult) bool {
 		return er.BlockID == completeBlock.Block.ID() && er.PreviousResultID == previousExecutionResultID
 	})).Return(nil)
@@ -220,21 +209,22 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 
 	runWithEngine(t, func(ctx testingContext) {
 
-		block := unittest.CompleteBlockFixture(3)
+		completeBlock := unittest.CompleteBlockFixture(3)
 
-		for _, col := range block.Block.Guarantees {
+		for _, col := range completeBlock.Block.Guarantees {
 			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
-		ctx.blocks.EXPECT().Store(gomock.Eq(block.Block))
+		ctx.blocks.EXPECT().Store(gomock.Eq(completeBlock.Block))
+		ctx.executionState.On("StateCommitmentByBlockID", completeBlock.Block.ParentID).Return(unittest.StateCommitmentFixture(), realStorage.ErrNotFound)
 
-		err := ctx.engine.ProcessLocal(block.Block)
+		err := ctx.engine.ProcessLocal(completeBlock.Block)
 		require.NoError(t, err)
 
 		// Expected no calls so test should fail if any occurs
 
 		rightResponse := messages.CollectionResponse{
-			Collection: flow.Collection{Transactions: block.Collections()[1].Transactions},
+			Collection: flow.Collection{Transactions: completeBlock.Collections()[1].Transactions},
 		}
 
 		err = ctx.engine.ProcessLocal(&rightResponse)
@@ -273,6 +263,12 @@ func TestBlockOutOfOrder(t *testing.T) {
 		completeBlockB := unittest.CompleteBlockFixtureWithParent(0, completeBlockA.Block.ID())
 		completeBlockC := unittest.CompleteBlockFixtureWithParent(0, completeBlockA.Block.ID())
 		completeBlockD := unittest.CompleteBlockFixtureWithParent(0, completeBlockC.Block.ID())
+		completeBlockA.StartState = unittest.StateCommitmentFixture()
+
+		// blocks has no collections, so state is essentially the same
+		completeBlockC.StartState = completeBlockA.StartState
+		completeBlockB.StartState = completeBlockA.StartState
+		completeBlockD.StartState = completeBlockC.StartState
 
 		/* Artists recreation of the blocks structure:
 
@@ -295,14 +291,14 @@ func TestBlockOutOfOrder(t *testing.T) {
 		require.NoError(t, err)
 
 		// no execution state, no connection to other nodes
-		ctx.executionState.On("StateCommitmentByBlockID", completeBlockC.Block.ParentID).Return(nil, realStorage.ErrNotFound).Once()
+		ctx.executionState.On("StateCommitmentByBlockID", completeBlockC.Block.ParentID).Return(nil, realStorage.ErrNotFound)
 		err = ctx.engine.handleBlock(completeBlockC.Block)
 		require.NoError(t, err)
 
 		// child of c so no need to query execution state
 
 		// we account for every call, so if this call would have happen, test will fail
-		// ctx.executionState.On("StateCommitmentByBlockID", blockD.ParentID).Return(nil, realStorage.ErrNotFound)
+		// ctx.executionState.On("StateCommitmentByBlockID", completeBlockD.Block.ParentID).Return(nil, realStorage.ErrNotFound)
 		err = ctx.engine.handleBlock(completeBlockD.Block)
 		require.NoError(t, err)
 
@@ -310,30 +306,19 @@ func TestBlockOutOfOrder(t *testing.T) {
 		ctx.executionState.AssertExpectations(t)
 		ctx.computationEngine.AssertExpectations(t)
 
-		//computationResultA := unittest.ComputationResultForBlockFixture(completeBlockA)
+		// once block A is computed, it should trigger B and C being sent to compute, which in turn should trigger D
+		blockAExecutionResultID := unittest.IdentifierFixture()
+		ctx.assertSuccessfulBlockComputation(completeBlockA, unittest.IdentifierFixture())
+		ctx.assertSuccessfulBlockComputation(completeBlockB, blockAExecutionResultID)
+		ctx.assertSuccessfulBlockComputation(completeBlockC, blockAExecutionResultID)
+		ctx.assertSuccessfulBlockComputation(completeBlockD, unittest.IdentifierFixture())
 
-		// existing execution state, should trigger processing all other blocks
-		//ctx.executionState.On("StateCommitmentByBlockID", completeBlockA.Block.ParentID).Return(stateCommitmentA, nil)
-		//ctx.executionState.On("NewView", stateCommitmentA). Return(nil)
-		//ctx.computationEngine.On("ComputeBlock", completeBlockA, mock.Anything).Return(computationResultA, nil).Once()
-
-		ctx.assertSuccessfulBlockComputation(completeBlockA)
-
+		ctx.executionState.On("StateCommitmentByBlockID", completeBlockA.Block.ParentID).Return(completeBlockA.StartState, nil)
 		err = ctx.engine.handleBlock(completeBlockA.Block)
 		require.NoError(t, err)
 
-		// once block A is computed, it should trigger B and C being sent to compute
-
-		ctx.assertSuccessfulBlockComputation(completeBlockB)
-		ctx.assertSuccessfulBlockComputation(completeBlockC)
-
-		ctx.executionState.AssertExpectations(t)
-		ctx.computationEngine.AssertExpectations(t)
-
-		// and finally block D
-
-		ctx.assertSuccessfulBlockComputation(completeBlockD)
-
+		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		assert.False(t, more)
 	})
 
 }

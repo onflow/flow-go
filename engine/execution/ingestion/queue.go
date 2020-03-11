@@ -90,8 +90,8 @@ func (q *Queue) TryAdd(completeBlock *execution.CompleteBlock) bool {
 		return false
 	}
 	newNode := &Node{
-		CompleteBlock:    completeBlock,
-		Children: nil,
+		CompleteBlock: completeBlock,
+		Children:      nil,
 	}
 	n.Children = append(n.Children, newNode)
 	q.Nodes[completeBlock.Block.ID()] = newNode
