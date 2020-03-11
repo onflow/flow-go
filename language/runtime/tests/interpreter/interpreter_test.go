@@ -6223,26 +6223,129 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
 
 func TestInterpretIntegerConversions(t *testing.T) {
 
+	tests := map[string]interpreter.Value{
+		// Int*
+		"Int":    interpreter.NewIntValue(100),
+		"Int8":   interpreter.Int8Value(100),
+		"Int16":  interpreter.Int16Value(100),
+		"Int32":  interpreter.Int32Value(100),
+		"Int64":  interpreter.Int64Value(100),
+		"Int128": interpreter.Int128Value{Int: big.NewInt(100)},
+		"Int256": interpreter.Int256Value{Int: big.NewInt(100)},
+		// UInt*
+		"UInt":    interpreter.NewUIntValue(100),
+		"UInt8":   interpreter.UInt8Value(100),
+		"UInt16":  interpreter.UInt16Value(100),
+		"UInt32":  interpreter.UInt32Value(100),
+		"UInt64":  interpreter.UInt64Value(100),
+		"UInt128": interpreter.UInt128Value{Int: big.NewInt(100)},
+		"UInt256": interpreter.UInt256Value{Int: big.NewInt(100)},
+		// Word*
+		"Word8":  interpreter.Word8Value(100),
+		"Word16": interpreter.Word16Value(100),
+		"Word32": interpreter.Word32Value(100),
+		"Word64": interpreter.Word64Value(100),
+	}
+
+	for _, integerType := range sema.AllIntegerTypes {
+		if _, ok := tests[integerType.String()]; !ok {
+			panic(fmt.Sprintf("broken test: missing %s", integerType))
+		}
+	}
+
+	for integerType, value := range tests {
+
+		t.Run(integerType, func(t *testing.T) {
+
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      let x: %[1]s = 100
+                      let y = %[1]s(90) + %[1]s(10)
+                      let z = y == x
+                    `,
+					integerType,
+				),
+			)
+
+			assert.Equal(t,
+				value,
+				inter.Globals["x"].Value,
+			)
+
+			assert.Equal(t,
+				value,
+				inter.Globals["y"].Value,
+			)
+
+			assert.Equal(t,
+				interpreter.BoolValue(true),
+				inter.Globals["z"].Value,
+			)
+
+		})
+	}
+}
+
+func TestInterpretNegativeZeroFixedPoint(t *testing.T) {
+
 	inter := parseCheckAndInterpret(t, `
-      let x: Int8 = 100
-      let y = Int8(90) + Int8(10)
-      let z = y == x
+      let x = -0.42
     `)
 
 	assert.Equal(t,
-		interpreter.Int8Value(100),
+		interpreter.Fix64Value(-42000000),
 		inter.Globals["x"].Value,
 	)
+}
 
-	assert.Equal(t,
-		interpreter.Int8Value(100),
-		inter.Globals["y"].Value,
-	)
+func TestInterpretFixedPointConversions(t *testing.T) {
 
-	assert.Equal(t,
-		interpreter.BoolValue(true),
-		inter.Globals["z"].Value,
-	)
+	tests := map[string]interpreter.Value{
+		// Fix*
+		"Fix64": interpreter.Fix64Value(123000000),
+		// UFix*
+		"UFix64": interpreter.UFix64Value(123000000),
+	}
+
+	for _, fixedPointType := range sema.AllFixedPointTypes {
+		if _, ok := tests[fixedPointType.String()]; !ok {
+			panic(fmt.Sprintf("broken test: missing %s", fixedPointType))
+		}
+	}
+
+	for fixedPointType, value := range tests {
+
+		t.Run(fixedPointType, func(t *testing.T) {
+
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      let x: %[1]s = 1.23
+                      let y = %[1]s(0.42) + %[1]s(0.81)
+                      let z = y == x
+                    `,
+					fixedPointType,
+				),
+			)
+
+			assert.Equal(t,
+				value,
+				inter.Globals["x"].Value,
+			)
+
+			assert.Equal(t,
+				value,
+				inter.Globals["y"].Value,
+			)
+
+			assert.Equal(t,
+				interpreter.BoolValue(true),
+				inter.Globals["z"].Value,
+			)
+
+		})
+	}
 }
 
 func TestInterpretAddressConversion(t *testing.T) {
