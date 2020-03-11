@@ -52,7 +52,7 @@ func (f *TrieStorage) GetRegisters(
 // UpdateRegisters updates the values at the given registers
 // This is trusted so no proof is generated
 func (f *TrieStorage) UpdateRegisters(
-	ids [][]byte,
+	ids []flow.RegisterID,
 	values []flow.RegisterValue,
 ) (
 	newStateCommitment flow.StateCommitment,

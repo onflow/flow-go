@@ -1,6 +1,7 @@
 package verifier
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -19,6 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -26,13 +28,14 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit    *engine.Unit                  // used to control startup/shutdown
-	log     zerolog.Logger                // used to log relevant actions
-	conduit network.Conduit               // used to propagate result approvals
-	me      module.Local                  // used to access local node information
-	state   protocol.State                // used to access the protocol state
-	rah     crypto.Hasher                 // used as hasher to sign the result approvals
-	vm      virtualmachine.VirtualMachine // used to execute transactions
+	unit        *engine.Unit                  // used to control startup/shutdown
+	log         zerolog.Logger                // used to log relevant actions
+	conduit     network.Conduit               // used to propagate result approvals
+	me          module.Local                  // used to access local node information
+	state       protocol.State                // used to access the protocol state
+	rah         crypto.Hasher                 // used as hasher to sign the result approvals
+	vm          virtualmachine.VirtualMachine // used to execute transactions
+	ledgerDepth int
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -46,12 +49,13 @@ func New(
 	rt := runtime.NewInterpreterRuntime()
 
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log,
-		state: state,
-		me:    me,
-		vm:    virtualmachine.New(rt),
-		rah:   utils.NewResultApprovalHasher(),
+		unit:        engine.NewUnit(),
+		log:         log,
+		state:       state,
+		me:          me,
+		vm:          virtualmachine.New(rt),
+		rah:         utils.NewResultApprovalHasher(),
+		ledgerDepth: 257, // TODO (Ramtin) move this to the network config
 	}
 
 	var err error
@@ -181,9 +185,20 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 func (e *Engine) executeChunk(res *verification.VerifiableChunk) (flow.StateCommitment, error) {
 	blockCtx := e.vm.NewBlockContext(&res.Block.Header)
 
+	// TODO ramtin (clean up this) - create a PTrie storage in ledger
+	ptrie, err := trie.NewPSMT(res.ChunkDataPack.StartState,
+		e.ledgerDepth,
+		res.ChunkDataPack.Registers(),
+		res.ChunkDataPack.Values(),
+		*trie.DecodeProof(res.ChunkDataPack.Proofs()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error constructing partial trie %x", err)
+	}
+
+	regMap := res.ChunkDataPack.GetRegisterValues()
 	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
-		registers := res.ChunkState.Registers
-		val, ok := registers[string(key)]
+		val, ok := regMap[string(key)]
 		if !ok {
 			return nil, fmt.Errorf("missing register")
 		}
@@ -191,6 +206,8 @@ func (e *Engine) executeChunk(res *verification.VerifiableChunk) (flow.StateComm
 	}
 
 	chunkView := state.NewView(getRegister)
+
+	// TODO check the number of transactions and computation used
 
 	// executes all transactions in this chunk
 	for _, tx := range res.Collection.Transactions {
@@ -206,9 +223,21 @@ func (e *Engine) executeChunk(res *verification.VerifiableChunk) (flow.StateComm
 		}
 	}
 
+	// Apply delta to ptrie
+	regs, values := chunkView.Delta().RegisterUpdates()
+	expectedEndState, err := ptrie.Update(regs, values)
+	if err != nil {
+		return nil, fmt.Errorf("error updating partial trie %v", err)
+
+	}
+	// Check state commitment
+	if !bytes.Equal(expectedEndState, res.EndState) {
+		return nil, fmt.Errorf("final state commitment doesn't match: [%x] != [%x]", ptrie.GetRootHash(), res.EndState)
+	}
+
 	// TODO compute and return state commitment
 
-	return nil, nil
+	return ptrie.GetRootHash(), nil
 }
 
 // signAttestation extracts, signs and returns the attestation part of the result approval
