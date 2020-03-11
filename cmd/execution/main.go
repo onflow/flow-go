@@ -21,14 +21,14 @@ import (
 func main() {
 
 	var (
-		stateCommitments  storage.Commits
-		ledgerStorage     storage.Ledger
-		providerEngine    *provider.Engine
-		computationEngine *computation.Engine
-		ingestionEng      *ingestion.Engine
-		rpcConf           rpc.Config
-		err               error
-		executionState    state.ExecutionState
+		stateCommitments   storage.Commits
+		ledgerStorage      storage.Ledger
+		providerEngine     *provider.Engine
+		computationManager *computation.Manager
+		ingestionEng       *ingestion.Engine
+		rpcConf            rpc.Config
+		err                error
+		executionState     state.ExecutionState
 	)
 
 	cmd.
@@ -47,15 +47,15 @@ func main() {
 
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
-			computationEngine = computation.New(
+			computationManager = computation.New(
 				node.Logger,
 				node.Me,
 				node.State,
 				vm,
 			)
 		}).
-		Component("receipts engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing receipts engine")
+		Component("provider engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing provider engine")
 
 			chunkHeaders := badger.NewChunkHeaders(node.DB)
 
@@ -70,7 +70,7 @@ func main() {
 				node.Me,
 				executionState,
 			)
-			node.MustNot(err).Msg("could not initialize receipts engine")
+			node.MustNot(err).Msg("could not initialize provider engine")
 
 			return providerEngine
 		}).
@@ -89,7 +89,7 @@ func main() {
 				blocks,
 				payloads,
 				collections,
-				computationEngine,
+				computationManager,
 				providerEngine,
 				executionState,
 			)

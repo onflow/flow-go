@@ -22,7 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// An Engine receives and saves incoming blocks.
+// An Manager receives and saves incoming blocks.
 type Engine struct {
 	unit              *engine.Unit
 	log               zerolog.Logger
@@ -33,7 +33,7 @@ type Engine struct {
 	blocks            storage.Blocks
 	payloads          storage.Payloads
 	collections       storage.Collections
-	computationEngine computation.ComputationEngine
+	computationEngine computation.ComputationManager
 	providerEngine    provider.ProviderEngine
 	mempool           *Mempool
 	execState         state.ExecutionState
@@ -47,7 +47,7 @@ func New(
 	blocks storage.Blocks,
 	payloads storage.Payloads,
 	collections storage.Collections,
-	executionEngine computation.ComputationEngine,
+	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
 ) (*Engine, error) {
@@ -430,7 +430,7 @@ func generateChunkHeader(
 	}
 }
 
-// generateExecutionResultForBlock creates a new computationEngine result for a block from
+// generateExecutionResultForBlock creates new ExecutionResult for a block from
 // the provided chunk results.
 func (e *Engine) generateExecutionResultForBlock(
 	block *execution.CompleteBlock,

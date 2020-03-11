@@ -59,7 +59,7 @@ type ConsensusNode struct {
 type ExecutionNode struct {
 	GenericNode
 	IngestionEngine *ingestion.Engine
-	ExecutionEngine *computation.Engine
+	ExecutionEngine *computation.Manager
 	ReceiptsEngine  *executionprovider.Engine
 	BadgerDB        *badger.DB
 	LevelDB         *leveldb.LevelDB

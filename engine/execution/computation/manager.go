@@ -17,13 +17,13 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-type ComputationEngine interface {
+type ComputationManager interface {
 	ExecuteScript([]byte, *flow.Header, *state.View) ([]byte, error)
 	ComputeBlock(block *execution.CompleteBlock, view *state.View) (*execution.ComputationResult, error)
 }
 
-// Engine manages computation and execution
-type Engine struct {
+// Manager manages computation and execution
+type Manager struct {
 	log           zerolog.Logger
 	me            module.Local
 	protoState    protocol.State
@@ -36,10 +36,10 @@ func New(
 	me module.Local,
 	protoState protocol.State,
 	vm virtualmachine.VirtualMachine,
-) *Engine {
+) *Manager {
 	log := logger.With().Str("engine", "computation").Logger()
 
-	e := Engine{
+	e := Manager{
 		log:           log,
 		me:            me,
 		protoState:    protoState,
@@ -50,7 +50,7 @@ func New(
 	return &e
 }
 
-func (e *Engine) ExecuteScript(script []byte, blockHeader *flow.Header, view *state.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *state.View) ([]byte, error) {
 
 	result, err := e.vm.NewBlockContext(blockHeader).ExecuteScript(view, script)
 	if err != nil {
@@ -74,7 +74,7 @@ func (e *Engine) ExecuteScript(script []byte, blockHeader *flow.Header, view *st
 	return encodedValue, nil
 }
 
-func (e *Engine) ComputeBlock(block *execution.CompleteBlock, view *state.View) (*execution.ComputationResult, error) {
+func (e *Manager) ComputeBlock(block *execution.CompleteBlock, view *state.View) (*execution.ComputationResult, error) {
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
