@@ -187,6 +187,29 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 	}
 }
 
+const (
+	dkgType int = iota
+	tsType
+)
+
+var messageToSign = []byte{1, 2, 3}
+
+type message struct {
+	orig    int
+	msgType int
+	data    []byte
+}
+
+// This stucture holds the keys and is needed for the stateless test
+type statelessKeys struct {
+	// the current node private key (a DKG output)
+	currentPrivateKey PrivateKey
+	// the group public key (a DKG output)
+	groupPublicKey PublicKey
+	// the group public key shares (a DKG output)
+	publicKeyShares []PublicKey
+}
+
 // implements DKGProcessor interface
 type testDKGProcessor struct {
 	current   int
@@ -199,17 +222,6 @@ type testDKGProcessor struct {
 	ts *ThresholdSigner
 	// only used when testing the threshold signature statless api
 	keys *statelessKeys
-}
-
-const (
-	dkgType int = iota
-	tsType
-)
-
-type message struct {
-	orig    int
-	msgType int
-	data    []byte
 }
 
 // This is a testing function

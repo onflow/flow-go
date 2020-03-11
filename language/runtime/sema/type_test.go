@@ -355,18 +355,19 @@ func TestRestrictedResourceType_Equals(t *testing.T) {
 func TestRestrictedResourceType_GetMember(t *testing.T) {
 
 	t.Run("forbid undeclared members", func(t *testing.T) {
+		resourceType := &CompositeType{
+			Kind:       common.CompositeKindResource,
+			Identifier: "R",
+			Location:   ast.StringLocation("a"),
+			Members:    map[string]*Member{},
+		}
 		ty := &RestrictedResourceType{
-			Type: &CompositeType{
-				Kind:       common.CompositeKindResource,
-				Identifier: "R",
-				Location:   ast.StringLocation("a"),
-				Members:    map[string]*Member{},
-			},
+			Type:         resourceType,
 			Restrictions: []*InterfaceType{},
 		}
 
 		fieldName := "s"
-		ty.Type.Members[fieldName] = NewPublicConstantFieldMember(ty.Type, fieldName, &IntType{})
+		resourceType.Members[fieldName] = NewPublicConstantFieldMember(ty.Type, fieldName, &IntType{})
 
 		var reportedError error
 		member := ty.GetMember(fieldName, ast.Range{}, func(err error) {
@@ -384,13 +385,14 @@ func TestRestrictedResourceType_GetMember(t *testing.T) {
 			Members:       map[string]*Member{},
 		}
 
+		resourceType := &CompositeType{
+			Kind:       common.CompositeKindResource,
+			Identifier: "R",
+			Location:   ast.StringLocation("a"),
+			Members:    map[string]*Member{},
+		}
 		restrictedType := &RestrictedResourceType{
-			Type: &CompositeType{
-				Kind:       common.CompositeKindResource,
-				Identifier: "R",
-				Location:   ast.StringLocation("a"),
-				Members:    map[string]*Member{},
-			},
+			Type: resourceType,
 			Restrictions: []*InterfaceType{
 				interfaceType,
 			},
@@ -399,7 +401,7 @@ func TestRestrictedResourceType_GetMember(t *testing.T) {
 		fieldName := "s"
 
 		resourceMember := NewPublicConstantFieldMember(restrictedType.Type, fieldName, &IntType{})
-		restrictedType.Type.Members[fieldName] = resourceMember
+		resourceType.Members[fieldName] = resourceMember
 
 		interfaceMember := NewPublicConstantFieldMember(restrictedType.Type, fieldName, &IntType{})
 		interfaceType.Members[fieldName] = interfaceMember

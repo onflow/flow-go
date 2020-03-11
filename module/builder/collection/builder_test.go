@@ -22,7 +22,7 @@ func TestBuilder(t *testing.T) {
 		chainID := genesis.ChainID
 
 		// create a transaction pool, reset between test runs
-		pool, err := stdmap.NewTransactions()
+		pool, err := stdmap.NewTransactions(1000)
 		require.Nil(t, err)
 
 		state, err := cluster.NewState(db, chainID)
@@ -50,7 +50,7 @@ func TestBuilder(t *testing.T) {
 			require.Nil(t, err)
 			// add some transactions to transaction pool
 			for i := 0; i < 3; i++ {
-				transaction := unittest.TransactionFixture(func(tx *flow.Transaction) {
+				transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
 					tx.Nonce = uint64(i)
 				})
 				err = pool.Add(&transaction)
@@ -61,7 +61,7 @@ func TestBuilder(t *testing.T) {
 		// helper function for cleaning up state between tests
 		cleanup := func() {
 			// reset transaction pool
-			pool, err = stdmap.NewTransactions()
+			pool, err = stdmap.NewTransactions(1000)
 			require.Nil(t, err)
 			// wipe database
 			err = db.DropAll()
