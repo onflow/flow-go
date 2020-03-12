@@ -82,6 +82,11 @@ func New(
 		return nil, errors.Wrap(err, "could not register collection provider engine")
 	}
 
+	_, err = net.Register(engine.ChunkDataPackProvider, &eng)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not register chunk data pack provider engine")
+	}
+
 	eng.conduit = con
 	eng.collectionConduit = collConduit
 

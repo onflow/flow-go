@@ -23,6 +23,7 @@ const (
 	ExecutionReceiptProvider = 100
 	ExecutionStateProvider   = 101
 	ExecutionComputer        = 102
+	ChunkDataPackProvider    = 103
 
 	// Verification 150-199
 	ApprovalProvider = 150

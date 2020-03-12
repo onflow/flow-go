@@ -29,6 +29,7 @@ type Engine struct {
 	log                zerolog.Logger
 	collectionsConduit network.Conduit
 	stateConduit       network.Conduit
+	chunksConduit      network.Conduit
 	me                 module.Local
 	state              protocol.State
 	verifierEng        network.Engine // for submitting ERs that are ready to be verified
@@ -76,9 +77,15 @@ func New(
 		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
 	}
 
+	// for chunk states and chunk data packs.
 	e.stateConduit, err = net.Register(engine.ExecutionStateProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on execution state provider channel: %w", err)
+	}
+
+	e.chunksConduit, err = net.Register(engine.ChunkDataPackProvider, e)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not register chunk data pack provider engine")
 	}
 
 	_, err = net.Register(engine.ExecutionReceiptProvider, e)
