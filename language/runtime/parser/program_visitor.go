@@ -206,6 +206,12 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 }
 
 func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{} {
+	var parameterList *ast.ParameterList
+	parameterListContext := ctx.ParameterList()
+	if parameterListContext != nil {
+		parameterList = parameterListContext.Accept(v).(*ast.ParameterList)
+	}
+
 	var fields []*ast.FieldDeclaration
 	fieldsCtx := ctx.Fields()
 	if fieldsCtx != nil {
@@ -242,6 +248,7 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.TransactionDeclaration{
+		ParameterList:  parameterList,
 		Fields:         fields,
 		Prepare:        prepareFunction,
 		PreConditions:  preConditions,
@@ -1145,8 +1152,11 @@ func (v *ProgramVisitor) targetExpression(
 
 func (v *ProgramVisitor) VisitTransfer(ctx *TransferContext) interface{} {
 	operation := ast.TransferOperationCopy
-	if ctx.Move() != nil {
+	switch {
+	case ctx.Move() != nil:
 		operation = ast.TransferOperationMove
+	case ctx.MoveForced() != nil:
+		operation = ast.TransferOperationMoveForced
 	}
 
 	position := PositionFromToken(ctx.GetStart())
@@ -1604,19 +1614,19 @@ func (v *ProgramVisitor) VisitFixedPointLiteral(ctx *FixedPointLiteralContext) i
 	integer, _ := v.parseFixedPointPart(parts[0])
 	fractional, scale := v.parseFixedPointPart(parts[1])
 
-	expression := &ast.FixedPointExpression{
-		Integer:    integer,
-		Fractional: fractional,
-		Scale:      uint(scale),
+	// NOTE: can't just negate integer, might be 0 and fractional part > 0
+	negative := ctx.Minus() != nil
+
+	return &ast.FixedPointExpression{
+		Negative:        negative,
+		UnsignedInteger: integer,
+		Fractional:      fractional,
+		Scale:           scale,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
 		},
 	}
-	if ctx.Minus() != nil {
-		expression.Integer.Neg(expression.Integer)
-	}
-	return expression
 }
 
 func (v *ProgramVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {

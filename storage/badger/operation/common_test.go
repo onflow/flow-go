@@ -29,16 +29,16 @@ type Entity struct {
 	ID uint64
 }
 
-type UnencodeableEntitiy bool
+type UnencodeableEntity bool
 
 var errCantEncode = fmt.Errorf("MarshalJSON not supported")
 var errCantDecode = fmt.Errorf("UnmarshalJSON not supported")
 
-func (a UnencodeableEntitiy) MarshalJSON() ([]byte, error) {
+func (a UnencodeableEntity) MarshalJSON() ([]byte, error) {
 	return nil, errCantEncode
 }
 
-func (a *UnencodeableEntitiy) UnmarshalJSON(b []byte) error {
+func (a *UnencodeableEntity) UnmarshalJSON(b []byte) error {
 	return errCantDecode
 }
 
@@ -99,7 +99,7 @@ func TestInsertEncodingError(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 
-		err := db.Update(insert(key, UnencodeableEntitiy(true)))
+		err := db.Update(insert(key, UnencodeableEntity(true)))
 
 		require.True(t, errors.Is(err, errCantEncode))
 	})
@@ -190,7 +190,7 @@ func TestUpdateEncodingError(t *testing.T) {
 			return nil
 		})
 
-		err := db.Update(update(key, UnencodeableEntitiy(true)))
+		err := db.Update(update(key, UnencodeableEntity(true)))
 		require.True(t, errors.Is(err, errCantEncode))
 
 		// ensure value did not change
@@ -248,7 +248,7 @@ func TestRetrieveUnencodeable(t *testing.T) {
 			return nil
 		})
 
-		var act UnencodeableEntitiy
+		var act UnencodeableEntity
 		err := db.View(retrieve(key, &act))
 		require.True(t, errors.Is(err, errCantDecode))
 	})

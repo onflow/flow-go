@@ -1,4 +1,4 @@
-package assignment
+package chunkassignment
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -9,14 +9,14 @@ type Assignment struct {
 	table map[uint64]map[flow.Identifier]struct{}
 }
 
-func NewAssignmet() *Assignment {
+func NewAssignment() *Assignment {
 	return &Assignment{
 		table: make(map[uint64]map[flow.Identifier]struct{}),
 	}
 }
 
 // Verifiers returns the list of verifier nodes assigned to a chunk
-func (a *Assignment) Verifiers(chunk *flow.Chunk) IdentifierList {
+func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 	v := make([]flow.Identifier, 0)
 	for id := range a.table[chunk.Index] {
 		v = append(v, id)
@@ -24,9 +24,9 @@ func (a *Assignment) Verifiers(chunk *flow.Chunk) IdentifierList {
 	return v
 }
 
-// Assign records the list of verifier nodes as the assigned verifiers of the chunk
+// Add records the list of verifier nodes as the assigned verifiers of the chunk
 // it returns an error if the list of verifiers is empty or contains duplicate ids
-func (a *Assignment) Assign(chunk *flow.Chunk, verifiers IdentifierList) {
+func (a *Assignment) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {
 	// sorts verifiers list based on their identifier
 	v := make(map[flow.Identifier]struct{})
 	for _, id := range verifiers {
@@ -35,8 +35,8 @@ func (a *Assignment) Assign(chunk *flow.Chunk, verifiers IdentifierList) {
 	a.table[chunk.Index] = v
 }
 
-func (a *Assignment) Which(this flow.Identifier) []uint64 {
-	chunks := make([]uint64, 0)
+func (a *Assignment) ByNodeID(this flow.Identifier) []uint64 {
+	var chunks []uint64
 
 	// iterates over pairs of (chunk, assigned verifiers)
 	for c, vList := range a.table {
@@ -49,10 +49,4 @@ func (a *Assignment) Which(this flow.Identifier) []uint64 {
 		}
 	}
 	return chunks
-}
-
-// ChunkAssingment presents an interface for assigning chunks to the verifier nodes
-type ChunkAssignment interface {
-	// Which returns the list of chunks that are assigned to this verifier node
-	Which(flow.Identifier) flow.ChunkList
 }

@@ -21,48 +21,46 @@ import (
 func main() {
 
 	var (
-		stateCommitments  storage.Commits
-		ledgerStorage     storage.Ledger
-		providerEngine    *provider.Engine
-		computationEngine *computation.Engine
-		ingestionEng      *ingestion.Engine
-		rpcConf           rpc.Config
-		err               error
-		executionState    state.ExecutionState
+		stateCommitments   storage.Commits
+		levelDB            *leveldb.LevelDB
+		ledgerStorage      storage.Ledger
+		providerEngine     *provider.Engine
+		computationManager *computation.Manager
+		ingestionEng       *ingestion.Engine
+		rpcConf            rpc.Config
+		err                error
+		executionState     state.ExecutionState
 	)
 
-	cmd.
-		FlowNode("execution").
+	cmd.FlowNode("execution").
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 		}).
-		PostInit(func(node *cmd.FlowNodeBuilder) {
-			stateCommitments = badger.NewCommits(node.DB)
-
-			levelDB, err := leveldb.NewLevelDB("db/valuedb", "db/triedb")
-			node.MustNot(err).Msg("could not initialize LevelDB databases")
-
+		Module("leveldb key-value store", func(node *cmd.FlowNodeBuilder) error {
+			levelDB, err = leveldb.NewLevelDB("db/valuedb", "db/triedb")
+			return err
+		}).
+		Module("execution state ledger", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewTrieStorage(levelDB)
-			node.MustNot(err).Msg("could not initialize ledger trie storage")
-
+			return err
+		}).
+		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
-			computationEngine = computation.New(
+			computationManager = computation.New(
 				node.Logger,
 				node.Me,
 				node.State,
 				vm,
 			)
+
+			return nil
 		}).
-		Component("receipts engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing receipts engine")
-
+		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkHeaders := badger.NewChunkHeaders(node.DB)
-
 			executionResults := badger.NewExecutionResults(node.DB)
-
+			stateCommitments = badger.NewCommits(node.DB)
 			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders, executionResults)
-
 			providerEngine, err = provider.New(
 				node.Logger,
 				node.Network,
@@ -70,17 +68,13 @@ func main() {
 				node.Me,
 				executionState,
 			)
-			node.MustNot(err).Msg("could not initialize receipts engine")
 
-			return providerEngine
+			return providerEngine, err
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing ingestion engine")
-
+		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 			payloads := badger.NewPayloads(node.DB)
-
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
@@ -89,19 +83,15 @@ func main() {
 				blocks,
 				payloads,
 				collections,
-				computationEngine,
+				computationManager,
 				providerEngine,
 				executionState,
 			)
-			node.MustNot(err).Msg("could not initialize ingestion engine")
-
-			return ingestionEng
+			return ingestionEng, err
 		}).
-		Component("RPC engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing gRPC server")
-
+		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng)
-			return rpcEng
+			return rpcEng, nil
 		}).Run()
 
 }

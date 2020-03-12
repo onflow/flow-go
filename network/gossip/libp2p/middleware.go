@@ -18,6 +18,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
@@ -48,12 +49,13 @@ type Middleware struct {
 	me         flow.Identifier
 	host       string
 	port       string
+	key        crypto.PrivateKey
 	validators []validators.MessageValidator
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
-func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier) (*Middleware, error) {
+func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier, key crypto.PrivateKey) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -80,6 +82,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		me:         flowID,
 		host:       ip,
 		port:       port,
+		key:        key,
 		validators: validators,
 	}
 
@@ -94,6 +97,10 @@ func (m *Middleware) Me() flow.Identifier {
 // GetIPPort returns the ip address and port number associated with the middleware
 func (m *Middleware) GetIPPort() (string, string) {
 	return m.libP2PNode.GetIPPort()
+}
+
+func (m *Middleware) PublicKey() crypto.PublicKey {
+	return m.key.PublicKey()
 }
 
 // Start will start the middleware.
@@ -112,8 +119,13 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 
+	libp2pKey, err := PrivKey(m.key)
+	if err != nil {
+		return fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
+	}
+
 	// start the libp2p node
-	err := m.libP2PNode.Start(m.ctx, nodeAddress, m.log, m.handleIncomingStream, psOptions...)
+	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, psOptions...)
 
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
@@ -208,7 +220,7 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error
 		// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 		// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 		// sent out the the receiver
-		stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address)
+		stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address, flowIdentity.NetworkPubKey)
 		if err != nil {
 			return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
 		}
@@ -242,15 +254,21 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error
 }
 
 // connect creates a new stream
-func (m *Middleware) connect(flowID string, address string) (libp2pnetwork.Stream, error) {
+func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey) (libp2pnetwork.Stream, error) {
 
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse address %s:%v", address, err)
 	}
 
+	// convert the Flow key to a LibP2P key
+	lkey, err := PublicKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert flow key to libp2p key: %v", err)
+	}
+
 	// Create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port}
+	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port, PubKey: lkey}
 
 	// Create a stream for it
 	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)

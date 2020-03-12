@@ -17,306 +17,324 @@ func TestCheckTransactions(t *testing.T) {
 		errors []error
 	}
 
-	emptyTx := test{
-		"Empty",
-		`
-		  transaction {}
-		`,
-		nil,
-	}
-
-	noopTx := test{
-		"No-op",
-		`
-		  transaction {}
-		`,
-		nil,
-	}
-
-	simpleTx := test{
-		"Simple",
-		`
-		  transaction {
-
-		    execute {
- 			  let x = 1 + 2
-			}
-		  }
-		`,
-		nil,
-	}
-
-	invalidPrepareIdentifier := test{
-		"InvalidPrepareIdentifier",
-		`
-		  transaction {
-
-		    notPrepare() {}
-
-		    execute {}
-		  }
-		`,
-		[]error{
-			&sema.InvalidTransactionBlockError{},
-		},
-	}
-
-	invalidExecuteIdentifier := test{
-		"InvalidExecuteIdentifier",
-		`
-		  transaction {
-
-		    prepare() {}
-
-		    notExecute {}
-		  }
-		`,
-		[]error{
-			&sema.InvalidTransactionBlockError{},
-		},
-	}
-
-	validPrepareParameters := test{
-		"ValidPrepareParameters",
-		`
-		  transaction {
-		    prepare(x: Account, y: Account) {}
-		  }
-		`,
-		nil,
-	}
-
-	invalidPrepareParameters := test{
-		"InvalidPrepareParameters",
-		`
-		  transaction {
-		    prepare(x: Int, y: Int) {}
-		  }
-		`,
-		[]error{
-			&sema.InvalidTransactionPrepareParameterTypeError{},
-			&sema.InvalidTransactionPrepareParameterTypeError{},
-		},
-	}
-
-	fieldAccessSpecified := test{
-		"FieldAccessSpecified",
-		`
-		  transaction {
-    		
-			pub(set) var x: Int
-			
-		    prepare() {
-				self.x = 1
-			}
-
-		    execute {}
-		  }
-		`,
-		[]error{
-			&sema.InvalidTransactionFieldAccessModifierError{},
-		},
-	}
-
-	fieldUninitialized := test{
-		"FieldUninitialized",
-		`
-		  transaction {
-    		
-			var x: Int
-			
-		    execute {
- 			  let y = self.x + 1
-			}
-		  }
-		`,
-		[]error{
-			&sema.TransactionMissingPrepareError{},
-		},
-	}
-
-	fieldInitialized := test{
-		"FieldInitialized",
-		`
-		  transaction {
-    		
-			var x: Int
-
-			prepare() {
-              self.x = 5
-			}
-			
-		    execute {
- 			  let y = self.x + 1
-			}
-		  }
-		`,
-		nil,
-	}
-
-	preConditions := test{
-		"PreConditions",
-		`
-		  transaction {
-    		
-			var x: Int
-			var y: Int
-
-			prepare() {
-              self.x = 5
-			  self.y = 10
-			}
-
-			pre {
-			  self.x > 2
- 			  self.y < 20
-            }
-			
-		    execute {
- 			  let z = self.x + self.y
-			}
-		  }
-		`,
-		nil,
-	}
-
-	preConditionsWithUndeclaredFields := test{
-		"PreConditionsWithUndeclaredFields",
-		`
-		  transaction {
-			pre {
-			  self.x > 2
-            }
-			
-		    execute {
- 			  let y = 1 + 1
-			}
-		  }
-		`,
-		[]error{
-			&sema.NotDeclaredMemberError{},
-		},
-	}
-
-	postConditions := test{
-		"PostConditions",
-		`
-		  transaction {
-    		
-			var x: Int
-
-			prepare() {
-              self.x = 5
-			}
-			
-		    execute {
- 			  self.x = 10
-			}
-
-			post {
-			  self.x == 10
-			}
-		  }
-		`,
-		nil,
-	}
-
-	postConditionsAccessExecuteScope := test{
-		"PostConditionsAccessExecuteScope",
-		`
-		  transaction {
-	
-		    execute {
-			  var x = 5
-			}
-	
-			post {
-			  x == 5
-			}
-		  }
-		`,
-		[]error{
-			&sema.NotDeclaredError{},
-		},
-	}
-
-	// TODO: prevent self from being used in function
-	// illegalSelfUsage := test{
-	// 	"IllegalSelfUsage",
-	// 	`
-	//  	  fun foo(x: AnyStruct) {}
-	//
-	// 	  transaction {
-	// 	    execute {
-	// 		  foo(x: self)
-	// 		}
-	// 	  }
-	// 	`,
-	// 	[]error{
-	// 		&sema.CheckerError{},
-	// 	},
-	// }
-
-	resourceField := test{
-		"ResourceField",
-		`
-		  resource R {}
-
-		  transaction {
-
-	   		var x: @R
-
-			prepare() {
-			  self.x <- create R()
-			}
-
-		    execute {
-			  destroy self.x
-			}
-		  }
-		`,
-		nil,
-	}
-
-	resourceFieldLoss := test{
-		"ResourceFieldLoss",
-		`
-		  resource R {}
-
-		  transaction {
-
-	   		var x: @R
-
-			prepare() {
-			  self.x <- create R()
-			}
-
-		    execute {}
-		  }
-		`,
-		[]error{
-			&sema.ResourceFieldNotInvalidatedError{},
-		},
-	}
-
 	tests := []test{
-		emptyTx,
-		noopTx,
-		simpleTx,
-		invalidPrepareIdentifier,
-		invalidExecuteIdentifier,
-		validPrepareParameters,
-		invalidPrepareParameters,
-		fieldAccessSpecified,
-		fieldUninitialized,
-		fieldInitialized,
-		preConditions,
-		preConditionsWithUndeclaredFields,
-		postConditions,
-		postConditionsAccessExecuteScope,
-		// illegalSelfUsage,
-		resourceField,
-		resourceFieldLoss,
+		{
+			"Empty",
+			`
+              transaction {}
+            `,
+			nil,
+		},
+		{
+			"No-op",
+			`
+              transaction {}
+            `,
+			nil,
+		},
+		{
+			"Simple",
+			`
+              transaction {
+
+                execute {
+                   let x = 1 + 2
+                }
+              }
+            `,
+			nil,
+		},
+		{
+			"InvalidPrepareIdentifier",
+			`
+              transaction {
+
+                notPrepare() {}
+
+                execute {}
+              }
+            `,
+			[]error{
+				&sema.InvalidTransactionBlockError{},
+			},
+		},
+		{
+			"InvalidExecuteIdentifier",
+			`
+              transaction {
+
+                prepare() {}
+
+                notExecute {}
+              }
+            `,
+			[]error{
+				&sema.InvalidTransactionBlockError{},
+			},
+		},
+		{
+			"ValidPrepareParameters",
+			`
+              transaction {
+
+                  prepare(x: Account, y: Account) {}
+              }
+            `,
+			nil,
+		},
+		{
+			"InvalidPrepareParameters",
+			`
+              transaction {
+
+                prepare(x: Int, y: Int) {}
+              }
+            `,
+			[]error{
+				&sema.InvalidTransactionPrepareParameterTypeError{},
+				&sema.InvalidTransactionPrepareParameterTypeError{},
+			},
+		},
+		{
+			"InvalidFieldAccessSpecified",
+			`
+              transaction {
+
+                  pub(set) var x: Int
+
+                  prepare() {
+                      self.x = 1
+                  }
+
+                  execute {}
+              }
+            `,
+			[]error{
+				&sema.InvalidTransactionFieldAccessModifierError{},
+			},
+		},
+		{
+			"InvalidFieldUninitialized",
+			`
+              transaction {
+
+                var x: Int
+
+                execute {
+                    let y = self.x + 1
+                }
+              }
+            `,
+			[]error{
+				&sema.TransactionMissingPrepareError{},
+			},
+		},
+		{
+			"FieldInitialized",
+			`
+              transaction {
+
+                  var x: Int
+
+                  prepare() {
+                      self.x = 5
+                  }
+
+                  execute {
+                      let y = self.x + 1
+                  }
+              }
+            `,
+			nil,
+		},
+		{
+			"PreConditions",
+			`
+              transaction {
+
+                  var x: Int
+                  var y: Int
+
+                  prepare() {
+                      self.x = 5
+                      self.y = 10
+                  }
+
+                  pre {
+                      self.x > 2
+                      self.y < 20
+                  }
+
+                  execute {
+                      let z = self.x + self.y
+                  }
+              }
+            `,
+			nil,
+		},
+		{
+			"InvalidPreConditionsWithUndeclaredFields",
+			`
+              transaction {
+
+                  pre {
+                      self.x > 2
+                  }
+
+                  execute {
+                      let y = 1 + 1
+                  }
+                }
+            `,
+			[]error{
+				&sema.NotDeclaredMemberError{},
+			},
+		},
+		{
+			"PostConditions",
+			`
+              transaction {
+
+                  var x: Int
+
+                  prepare() {
+                      self.x = 5
+                  }
+
+                  execute {
+                      self.x = 10
+                  }
+
+                  post {
+                      self.x == 10
+                  }
+              }
+            `,
+			nil,
+		},
+		{
+			"InvalidPostConditionsAccessExecuteScope",
+			`
+              transaction {
+
+                  execute {
+                      var x = 5
+                  }
+
+                  post {
+                      x == 5
+                  }
+              }
+            `,
+			[]error{
+				&sema.NotDeclaredError{},
+			},
+		},
+
+		// TODO: prevent self from being used in function
+		// {
+		// 	"IllegalSelfUsage",
+		// 	`
+		//  	  fun foo(x: AnyStruct) {}
+		//
+		// 	  transaction {
+		// 	    execute {
+		// 		  foo(x: self)
+		// 		}
+		// 	  }
+		// 	`,
+		// 	[]error{
+		// 		&sema.CheckerError{},
+		// 	},
+		// },
+
+		{
+			"ResourceField",
+			`
+              resource R {}
+
+              transaction {
+
+                var x: @R
+
+                prepare() {
+                    self.x <- create R()
+                }
+
+                execute {
+                    destroy self.x
+                }
+              }
+            `,
+			nil,
+		},
+		{
+			"InvalidResourceFieldLoss",
+			`
+              resource R {}
+
+              transaction {
+
+                  var x: @R
+
+                  prepare() {
+                      self.x <- create R()
+                  }
+
+                  execute {}
+              }
+            `,
+			[]error{
+				&sema.ResourceFieldNotInvalidatedError{},
+			},
+		},
+		{
+			"ParameterUse",
+			`
+              transaction(x: Bool) {
+
+                  prepare() {
+                      x
+                  }
+
+                  pre {
+                      x
+                  }
+
+                  execute {
+                      x
+                  }
+
+                  post {
+                      x
+                  }
+              }
+            `,
+			nil,
+		},
+		{
+			"InvalidParameterUseAfterDeclaration",
+			`
+		      transaction(x: Bool) {}
+		
+		      let y = x
+		    `,
+			[]error{
+				&sema.NotDeclaredError{},
+			},
+		},
+		{
+			"InvalidResourceParameter",
+			`
+		      resource R {}
+
+		      transaction(rs: @[R]) {}	
+		    `,
+			[]error{
+				&sema.InvalidResourceTransactionParameterError{},
+				&sema.ResourceLossError{},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -337,19 +355,24 @@ func TestCheckTransactions(t *testing.T) {
 func TestCheckTransactionExecuteScope(t *testing.T) {
 	// non-global variable declarations do not require access modifiers
 	// execute block should be treated like function block
-	code := `
-	  transaction {
-		execute {
-		  let code: Int = 1
-		}
-	  }
-	`
 
-	_, err := ParseAndCheckWithOptions(t, code, ParseAndCheckOptions{
-		Options: []sema.Option{
-			sema.WithAccessCheckMode(sema.AccessCheckModeStrict),
+	_, err := ParseAndCheckWithOptions(
+		t,
+		`
+          transaction {
+
+              execute {
+                  let code: Int = 1
+              }
+          }
+        `,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithAccessCheckMode(sema.AccessCheckModeStrict),
+			},
 		},
-	})
+	)
+
 	assert.NoError(t, err)
 }
 

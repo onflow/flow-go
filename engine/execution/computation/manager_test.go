@@ -60,7 +60,7 @@ func TestExecutionEngine_ComputeBlock(t *testing.T) {
 	blockComputer := new(computer.BlockComputer)
 	blockComputer.On("ExecuteBlock", mock.Anything, mock.Anything, mock.Anything).Return(computationResult, nil)
 
-	engine := &Engine{
+	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 	}

@@ -43,5 +43,9 @@ func (p *Payloads) Store(header *flow.Header, payload *flow.Payload) error {
 func (p *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {
 	var payload flow.Payload
 	err := p.db.View(procedure.RetrievePayload(blockID, &payload))
-	return &payload, err
+	if err != nil {
+		return nil, err
+	}
+
+	return &payload, nil
 }

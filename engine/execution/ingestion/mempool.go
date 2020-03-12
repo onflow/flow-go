@@ -92,7 +92,6 @@ func (b *QueuesBackdata) All() []*Queue {
 		}
 		queues[i] = queue
 	}
-
 	return queues
 }
 
@@ -131,7 +130,7 @@ func (b *QueueMempool) Add(queue *Queue) error {
 }
 
 func (b *QueueMempool) Get(id flow.Identifier) (*Queue, error) {
-	backdata := &QueuesBackdata{b.Backdata}
+	backdata := &QueuesBackdata{&b.Backdata}
 	return backdata.ByID(id)
 }
 
@@ -139,7 +138,7 @@ func (b *QueueMempool) Run(f func(backdata *QueuesBackdata) error) error {
 	b.Lock()
 	defer b.Unlock()
 
-	err := f(&QueuesBackdata{b.Backdata})
+	err := f(&QueuesBackdata{&b.Backdata})
 	if err != nil {
 		return err
 	}
