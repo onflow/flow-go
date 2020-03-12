@@ -2,6 +2,10 @@
 
 package crypto
 
+import (
+	"fmt"
+)
+
 // BLS_BLS12381Algo, embeds SignAlgo
 type BLS_BLS12381Algo struct {
 	// points to Relic context of BLS12-381 with all the parameters
@@ -75,12 +79,22 @@ func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	return sk, nil
 }
 
-func (a *BLS_BLS12381Algo) decodePrivateKey([]byte) (PrivateKey, error) {
-	// TODO: implement DecodePrKey
-	return nil, nil
+func (a *BLS_BLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
+	if len(privateKeyBytes) != prKeyLengthBLS_BLS12381 {
+		return nil, cryptoError{fmt.Sprintf("the input length has to be equal to %d", prKeyLengthBLS_BLS12381)}
+	}
+	sk := &PrKeyBLS_BLS12381{
+		alg: a,
+		pk:  nil,
+	}
+	readScalar(&sk.scalar, privateKeyBytes)
+	return sk, nil
 }
 
 func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
+	if len(publicKeyBytes) != pubKeyLengthBLS_BLS12381 {
+		return nil, cryptoError{fmt.Sprintf("the input length has to be equal to %d", pubKeyLengthBLS_BLS12381)}
+	}
 	pk := &PubKeyBLS_BLS12381{
 		alg: a,
 	}
@@ -124,8 +138,9 @@ func (sk *PrKeyBLS_BLS12381) PublicKey() PublicKey {
 }
 
 func (a *PrKeyBLS_BLS12381) Encode() ([]byte, error) {
-	// TODO: implement EncodePrKey
-	return nil, nil
+	dest := make([]byte, prKeyLengthBLS_BLS12381)
+	writeScalar(dest, &a.scalar)
+	return dest, nil
 }
 
 // PubKeyBLS_BLS12381 is the public key of BLS using BLS12_381, it implements PublicKey
