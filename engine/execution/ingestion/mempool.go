@@ -110,7 +110,7 @@ func (b *BlockByCollectionMempool) Add(block *blockByCollection) error {
 }
 
 func (b *BlockByCollectionMempool) Get(id flow.Identifier) (*blockByCollection, error) {
-	backdata := &BlockByCollectionBackdata{b.Backdata}
+	backdata := &BlockByCollectionBackdata{&b.Backdata}
 	return backdata.ByID(id)
 }
 
@@ -118,7 +118,7 @@ func (b *BlockByCollectionMempool) Run(f func(backdata *BlockByCollectionBackdat
 	b.Lock()
 	defer b.Unlock()
 
-	err := f(&BlockByCollectionBackdata{b.Backdata})
+	err := f(&BlockByCollectionBackdata{&b.Backdata})
 	if err != nil {
 		return err
 	}

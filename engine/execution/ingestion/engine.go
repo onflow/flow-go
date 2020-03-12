@@ -23,22 +23,22 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// An Manager receives and saves incoming blocks.
+// An Engine receives and saves incoming blocks.
 type Engine struct {
-	unit              *engine.Unit
-	log               zerolog.Logger
-	me                module.Local
-	state             protocol.State
-	conduit           network.Conduit
-	collectionConduit network.Conduit
-	blocks            storage.Blocks
-	payloads          storage.Payloads
-	collections       storage.Collections
-	computationEngine computation.ComputationManager
-	providerEngine    provider.ProviderEngine
-	mempool           *Mempool
-	execState         state.ExecutionState
-	wg                sync.WaitGroup
+	unit               *engine.Unit
+	log                zerolog.Logger
+	me                 module.Local
+	state              protocol.State
+	conduit            network.Conduit
+	collectionConduit  network.Conduit
+	blocks             storage.Blocks
+	payloads           storage.Payloads
+	collections        storage.Collections
+	computationManager computation.ComputationManager
+	providerEngine     provider.ProviderEngine
+	mempool            *Mempool
+	execState          state.ExecutionState
+	wg                 sync.WaitGroup
 }
 
 func New(
@@ -58,17 +58,17 @@ func New(
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:              engine.NewUnit(),
-		log:               log,
-		me:                me,
-		state:             state,
-		blocks:            blocks,
-		payloads:          payloads,
-		collections:       collections,
-		computationEngine: executionEngine,
-		providerEngine:    providerEngine,
-		mempool:           mempool,
-		execState:         execState,
+		unit:               engine.NewUnit(),
+		log:                log,
+		me:                 me,
+		state:              state,
+		blocks:             blocks,
+		payloads:           payloads,
+		collections:        collections,
+		computationManager: executionEngine,
+		providerEngine:     providerEngine,
+		mempool:            mempool,
+		execState:          execState,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -244,7 +244,7 @@ func (e *Engine) executeBlock(completeBlock *execution.CompleteBlock) {
 		Hex("block_id", logging.Entity(completeBlock.Block)).
 		Msg("executing block")
 
-	computationResult, err := e.computationEngine.ComputeBlock(completeBlock, view)
+	computationResult, err := e.computationManager.ComputeBlock(completeBlock, view)
 	if err != nil {
 		e.log.Err(err).
 			Hex("block_id", logging.Entity(completeBlock.Block)).
@@ -439,7 +439,7 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 
 	blockView := e.execState.NewView(stateCommit)
 
-	return e.computationEngine.ExecuteScript(script, block, blockView)
+	return e.computationManager.ExecuteScript(script, block, blockView)
 }
 
 func (e *Engine) handleComputationResult(result *execution.ComputationResult, startState flow.StateCommitment) (flow.StateCommitment, error) {

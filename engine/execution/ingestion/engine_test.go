@@ -38,7 +38,7 @@ type testingContext struct {
 	state              *protocol.State
 	conduit            *network.MockConduit
 	collectionConduit  *network.MockConduit
-	ComputationManager *computation.ComputationManager
+	computationManager *computation.ComputationManager
 	providerEngine     *provider.ProviderEngine
 	executionState     *state.ExecutionState
 }
@@ -100,7 +100,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 		state:              protocolState,
 		conduit:            conduit,
 		collectionConduit:  collectionConduit,
-		ComputationManager: computationEngine,
+		computationManager: computationEngine,
 		providerEngine:     providerEngine,
 		executionState:     executionState,
 	})
@@ -183,7 +183,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *execu
 	}
 	ctx.executionState.On("NewView", completeBlock.StartState).Return(nil)
 
-	ctx.ComputationManager.On("ComputeBlock", completeBlock, mock.Anything).Return(computationResult, nil).Once()
+	ctx.computationManager.On("ComputeBlock", completeBlock, mock.Anything).Return(computationResult, nil).Once()
 
 	for _, view := range computationResult.StateViews {
 		ctx.executionState.On("CommitDelta", view.Delta()).Return(newStateCommitment, nil)
@@ -304,7 +304,7 @@ func TestBlockOutOfOrder(t *testing.T) {
 
 		// make sure there were no extra calls at this point in test
 		ctx.executionState.AssertExpectations(t)
-		ctx.computationEngine.AssertExpectations(t)
+		ctx.computationManager.AssertExpectations(t)
 
 		// once block A is computed, it should trigger B and C being sent to compute, which in turn should trigger D
 		blockAExecutionResultID := unittest.IdentifierFixture()
