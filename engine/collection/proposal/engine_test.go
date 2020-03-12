@@ -173,7 +173,7 @@ func (suite *Suite) TestHandlePendingProposal() {
 	// we do not have the parent yet
 	suite.headers.On("ByBlockID", block.ParentID).Return(nil, realstorage.ErrNotFound)
 	// should request parent block
-	suite.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once()
+	suite.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	suite.cache.On("Add", mock.Anything).Return(true).Once()
 	suite.cache.On("ByID", block.ParentID).Return(nil, false)
 
@@ -213,7 +213,7 @@ func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
 	suite.cache.On("ByID", parent.ID()).Return(pendingParent, true).Once()
 	suite.cache.On("ByID", grandparent.ID()).Return(nil, false).Once()
 	// should send a request for the grandparent
-	suite.con.On("Submit", mock.Anything, mock.Anything).
+	suite.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		// assert the right ID was requested manually as we don't know what nonce was used
 		Run(func(args mock.Arguments) {
 			req := args.Get(0).(*messages.ClusterBlockRequest)
