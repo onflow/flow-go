@@ -87,7 +87,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	seed := []uint64{62534197802164589}
 	var idList flow.IdentityList = test.CreateIDs(count)
 	ids := idList.NodeIDs()
-	original := make([]flow.Identifier, count)
+	original := make(flow.IdentifierList, count)
 	copy(original, ids)
 
 	// Randomness:
@@ -120,7 +120,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	seed := []uint64{62534197802164589}
 	var idList flow.IdentityList = test.CreateIDs(count)
 	ids := idList.NodeIDs()
-	original := make([]flow.Identifier, count)
+	original := make(flow.IdentifierList, count)
 	copy(original, ids)
 
 	// Randomness:
