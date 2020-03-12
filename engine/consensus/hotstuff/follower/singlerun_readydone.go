@@ -8,11 +8,11 @@ import (
 type SingleRunner struct {
 	stateTransition sync.Mutex // lock for preventing concurrent state transitions
 
-	startupSignaled  bool          // indicates whether Start(...) invoked
+	startupCommenced bool          // indicates whether Start(...) invoked
 	startupCompleted chan struct{} // channel is closed when startup was completed and the component is properly running
 
-	shutdownSignaled bool          // indicates whether Stop() invoked
-	shutdownSignal   chan struct{} // used to signal that shutdown signal has been given
+	shutdownCommenced bool          // indicates whether Stop() invoked
+	shutdownSignal    chan struct{} // used to signal that shutdown has commenced
 
 	shutdownCompleted chan struct{} // used to signal that shutdown was completed and the component is done
 }
@@ -20,9 +20,9 @@ type SingleRunner struct {
 func NewSingleRunner() SingleRunner {
 	return SingleRunner{
 		stateTransition:   sync.Mutex{},
-		startupSignaled:   false,
+		startupCommenced:  false,
 		startupCompleted:  make(chan struct{}),
-		shutdownSignaled:  false,
+		shutdownCommenced: false,
 		shutdownSignal:    make(chan struct{}),
 		shutdownCompleted: make(chan struct{}),
 	}
@@ -35,27 +35,44 @@ func (u *SingleRunner) ShutdownSignal() <-chan struct{} {
 
 func (s *SingleRunner) Start(f func()) <-chan struct{} {
 	s.stateTransition.Lock()
-	if s.startupSignaled || s.shutdownSignaled {
+	if s.startupCommenced || s.shutdownCommenced {
 		s.stateTransition.Unlock()
 		return s.startupCompleted
 	}
 
-	s.startupSignaled = true
+	s.startupCommenced = true
 	go func() {
 		close(s.startupCompleted)
 		s.stateTransition.Unlock()
 		f()
+		// there are two cases f() would exit:
+		// (a) f exited on its own without Abort() being called (this is generally an internal error)
+		// (b) f exited as a reaction to Abort() being called
+		// In either case, we want to abort and close shutdownCompleted
+		s.stateTransition.Lock()
+		s.unsafeCommenceShutdown()
 		close(s.shutdownCompleted)
+		s.stateTransition.Unlock()
 	}()
 
 	return s.startupCompleted
 }
 
-func (s *SingleRunner) Stop() <-chan struct{} {
+// Abort() will abort the SingleRunner. Note that the channel returned from Start() will never be
+// closed if the SingleRunner is aborted before Start() is called. This mimics the real world case:
+//    * consider a runner at a starting position of a race waiting for the start signal
+//    * if the runner to told to abort the race _before_ the start signal occurred, the runner will never start
+func (s *SingleRunner) Abort() <-chan struct{} {
 	s.stateTransition.Lock()
-	if !s.shutdownSignaled {
-		close(s.shutdownSignal)
-	}
+	s.unsafeCommenceShutdown()
 	s.stateTransition.Unlock()
 	return s.shutdownCompleted
+}
+
+// unsafeCommenceShutdown executes the shutdown logic once but is not concurrency safe
+func (s *SingleRunner) unsafeCommenceShutdown() {
+	if !s.shutdownCommenced {
+		s.shutdownCommenced = true
+		close(s.shutdownSignal)
+	}
 }

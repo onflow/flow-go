@@ -3024,10 +3024,7 @@ func TestInterpretNilCoalescingOptionalAnyStructNil(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.BoolValue(true),
-			&sema.BoolType{},
-		),
+		interpreter.BoolValue(true),
 		inter.Globals["y"].Value,
 	)
 }
@@ -3040,10 +3037,7 @@ func TestInterpretNilCoalescingOptionalAnyStructSome(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(2),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(2),
 		inter.Globals["y"].Value,
 	)
 }
@@ -4222,42 +4216,6 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	)
 }
 
-func TestInterpretFailableCastingAnyStructSuccess(t *testing.T) {
-
-	inter := parseCheckAndInterpret(t, `
-      let x: AnyStruct = 42
-      let y: Int? = x as? Int
-    `)
-
-	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-			&sema.IntType{},
-		),
-		inter.Globals["x"].Value,
-	)
-
-	assert.Equal(t,
-		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-		),
-		inter.Globals["y"].Value,
-	)
-}
-
-func TestInterpretFailableCastingAnyStructFailure(t *testing.T) {
-
-	inter := parseCheckAndInterpret(t, `
-      let x: AnyStruct = 42
-      let y: Bool? = x as? Bool
-    `)
-
-	assert.Equal(t,
-		interpreter.NilValue{},
-		inter.Globals["y"].Value,
-	)
-}
-
 func TestInterpretOptionalAnyStruct(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
@@ -4266,10 +4224,7 @@ func TestInterpretOptionalAnyStruct(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewAnyValueOwningNonCopying(
-				interpreter.NewIntValue(42),
-				&sema.IntType{},
-			),
+			interpreter.NewIntValue(42),
 		),
 		inter.Globals["x"].Value,
 	)
@@ -4284,10 +4239,7 @@ func TestInterpretOptionalAnyStructFailableCasting(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewAnyValueOwningNonCopying(
-				interpreter.NewIntValue(42),
-				&sema.IntType{},
-			),
+			interpreter.NewIntValue(42),
 		),
 		inter.Globals["x"].Value,
 	)
@@ -4310,19 +4262,13 @@ func TestInterpretOptionalAnyStructFailableCastingInt(t *testing.T) {
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewAnyValueOwningNonCopying(
-				interpreter.NewIntValue(23),
-				&sema.IntType{},
-			),
+			interpreter.NewIntValue(23),
 		),
 		inter.Globals["x"].Value,
 	)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(23),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(23),
 		inter.Globals["y"].Value,
 	)
 
@@ -4348,10 +4294,7 @@ func TestInterpretOptionalAnyStructFailableCastingNil(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(42),
 		inter.Globals["y"].Value,
 	)
 
@@ -4791,6 +4734,48 @@ func TestInterpretDictionaryValues(t *testing.T) {
 		),
 		value,
 	)
+}
+
+func TestInterpretDictionaryKeyTypes(t *testing.T) {
+
+	tests := map[string]string{
+		"String":    `"abc"`,
+		"Character": `"X"`,
+		"Address":   `0x1`,
+		"Bool":      `true`,
+	}
+
+	for _, integerType := range sema.AllIntegerTypes {
+		tests[integerType.String()] = `42`
+	}
+
+	for _, fixedPointType := range sema.AllFixedPointTypes {
+		tests[fixedPointType.String()] = `1.23`
+	}
+
+	for ty, code := range tests {
+		t.Run(ty, func(t *testing.T) {
+
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      let k: %s = %s
+                      let xs = {k: "test"}
+                      let v = xs[k]
+                    `,
+					ty,
+					code,
+				),
+			)
+
+			assert.Equal(t,
+				interpreter.NewSomeValueOwningNonCopying(
+					interpreter.NewStringValue("test"),
+				),
+				inter.Globals["v"].Value,
+			)
+		})
+	}
 }
 
 func TestInterpretIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
@@ -5625,6 +5610,147 @@ func TestInterpretEmitEvent(t *testing.T) {
 	assert.Equal(t, expectedEvents, actualEvents)
 }
 
+type testValue struct {
+	value   interpreter.Value
+	literal string
+}
+
+func (v testValue) String() string {
+	if v.literal == "" {
+		return fmt.Sprint(v.value)
+	}
+	return v.literal
+}
+
+func TestInterpretEmitEventParameterTypes(t *testing.T) {
+
+	validTypes := map[string]testValue{
+		"String":    {value: interpreter.NewStringValue("test")},
+		"Character": {value: interpreter.NewStringValue("X")},
+		"Bool":      {value: interpreter.BoolValue(true)},
+		"Address": {
+			value:   interpreter.NewAddressValueFromBytes([]byte{0x1}),
+			literal: `0x1`,
+		},
+		// Int*
+		"Int":    {value: interpreter.NewIntValue(42)},
+		"Int8":   {value: interpreter.Int8Value(42)},
+		"Int16":  {value: interpreter.Int16Value(42)},
+		"Int32":  {value: interpreter.Int32Value(42)},
+		"Int64":  {value: interpreter.Int64Value(42)},
+		"Int128": {value: interpreter.Int128Value{Int: big.NewInt(42)}},
+		"Int256": {value: interpreter.Int256Value{Int: big.NewInt(42)}},
+		// UInt*
+		"UInt":    {value: interpreter.NewUIntValue(42)},
+		"UInt8":   {value: interpreter.UInt8Value(42)},
+		"UInt16":  {value: interpreter.UInt16Value(42)},
+		"UInt32":  {value: interpreter.UInt32Value(42)},
+		"UInt64":  {value: interpreter.UInt64Value(42)},
+		"UInt128": {value: interpreter.UInt128Value{Int: big.NewInt(42)}},
+		"UInt256": {value: interpreter.UInt256Value{Int: big.NewInt(42)}},
+		// Word*
+		"Word8":  {value: interpreter.Word8Value(42)},
+		"Word16": {value: interpreter.Word16Value(42)},
+		"Word32": {value: interpreter.Word32Value(42)},
+		"Word64": {value: interpreter.Word64Value(42)},
+		// Fix*
+		"Fix64": {value: interpreter.Fix64Value(123000000)},
+		// UFix*
+		"UFix64": {value: interpreter.UFix64Value(123000000)},
+	}
+
+	for _, integerType := range sema.AllIntegerTypes {
+		if _, ok := validTypes[integerType.String()]; !ok {
+			panic(fmt.Sprintf("broken test: missing %s", integerType))
+		}
+	}
+
+	for _, fixedPointType := range sema.AllFixedPointTypes {
+		if _, ok := validTypes[fixedPointType.String()]; !ok {
+			panic(fmt.Sprintf("broken test: missing %s", fixedPointType))
+		}
+	}
+
+	tests := map[string]testValue{}
+
+	for validType, value := range validTypes {
+		tests[validType] = value
+
+		tests[fmt.Sprintf("%s?", validType)] =
+			testValue{
+				value:   interpreter.NewSomeValueOwningNonCopying(value.value),
+				literal: value.literal,
+			}
+
+		tests[fmt.Sprintf("[%s]", validType)] =
+			testValue{
+				value:   interpreter.NewArrayValueUnownedNonCopying(value.value),
+				literal: fmt.Sprintf("[%s as %s]", value, validType),
+			}
+
+		tests[fmt.Sprintf("[%s; 1]", validType)] =
+			testValue{
+				value:   interpreter.NewArrayValueUnownedNonCopying(value.value),
+				literal: fmt.Sprintf("[%s as %s]", value, validType),
+			}
+
+		tests[fmt.Sprintf("{%[1]s: %[1]s}", validType)] =
+			testValue{
+				value:   interpreter.NewDictionaryValueUnownedNonCopying(value.value, value.value),
+				literal: fmt.Sprintf("{%[1]s as %[2]s: %[1]s as %[2]s}", value, validType),
+			}
+	}
+
+	for ty, value := range tests {
+
+		t.Run(ty, func(t *testing.T) {
+
+			code := fmt.Sprintf(
+				`
+                  event Test(_ value: %[1]s)
+
+                  fun test() {
+                      emit Test(%[2]s as %[1]s)
+                  }
+                `,
+				ty,
+				value,
+			)
+
+			inter := parseCheckAndInterpret(t, code)
+
+			var actualEvents []*interpreter.CompositeValue
+
+			inter.SetOnEventEmittedHandler(
+				func(_ *interpreter.Interpreter, event *interpreter.CompositeValue, eventType *sema.CompositeType) {
+					actualEvents = append(actualEvents, event)
+				},
+			)
+
+			_, err := inter.Invoke("test")
+			require.NoError(t, err)
+
+			expectedEvents := []*interpreter.CompositeValue{
+				{
+					Kind:     common.CompositeKindEvent,
+					Location: TestLocation,
+					TypeID:   inter.Checker.GlobalTypes["Test"].Type.ID(),
+					Fields: map[string]interpreter.Value{
+						"value": value.value,
+					},
+					Functions: map[string]interpreter.FunctionValue{},
+				},
+			}
+
+			assert.Equal(t,
+				expectedEvents,
+				actualEvents,
+			)
+
+		})
+	}
+}
+
 func TestInterpretSwapResourceDictionaryElementReturnSwapped(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
@@ -6097,26 +6223,129 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
 
 func TestInterpretIntegerConversions(t *testing.T) {
 
+	tests := map[string]interpreter.Value{
+		// Int*
+		"Int":    interpreter.NewIntValue(100),
+		"Int8":   interpreter.Int8Value(100),
+		"Int16":  interpreter.Int16Value(100),
+		"Int32":  interpreter.Int32Value(100),
+		"Int64":  interpreter.Int64Value(100),
+		"Int128": interpreter.Int128Value{Int: big.NewInt(100)},
+		"Int256": interpreter.Int256Value{Int: big.NewInt(100)},
+		// UInt*
+		"UInt":    interpreter.NewUIntValue(100),
+		"UInt8":   interpreter.UInt8Value(100),
+		"UInt16":  interpreter.UInt16Value(100),
+		"UInt32":  interpreter.UInt32Value(100),
+		"UInt64":  interpreter.UInt64Value(100),
+		"UInt128": interpreter.UInt128Value{Int: big.NewInt(100)},
+		"UInt256": interpreter.UInt256Value{Int: big.NewInt(100)},
+		// Word*
+		"Word8":  interpreter.Word8Value(100),
+		"Word16": interpreter.Word16Value(100),
+		"Word32": interpreter.Word32Value(100),
+		"Word64": interpreter.Word64Value(100),
+	}
+
+	for _, integerType := range sema.AllIntegerTypes {
+		if _, ok := tests[integerType.String()]; !ok {
+			panic(fmt.Sprintf("broken test: missing %s", integerType))
+		}
+	}
+
+	for integerType, value := range tests {
+
+		t.Run(integerType, func(t *testing.T) {
+
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      let x: %[1]s = 100
+                      let y = %[1]s(90) + %[1]s(10)
+                      let z = y == x
+                    `,
+					integerType,
+				),
+			)
+
+			assert.Equal(t,
+				value,
+				inter.Globals["x"].Value,
+			)
+
+			assert.Equal(t,
+				value,
+				inter.Globals["y"].Value,
+			)
+
+			assert.Equal(t,
+				interpreter.BoolValue(true),
+				inter.Globals["z"].Value,
+			)
+
+		})
+	}
+}
+
+func TestInterpretNegativeZeroFixedPoint(t *testing.T) {
+
 	inter := parseCheckAndInterpret(t, `
-      let x: Int8 = 100
-      let y = Int8(90) + Int8(10)
-      let z = y == x
+      let x = -0.42
     `)
 
 	assert.Equal(t,
-		interpreter.Int8Value(100),
+		interpreter.Fix64Value(-42000000),
 		inter.Globals["x"].Value,
 	)
+}
 
-	assert.Equal(t,
-		interpreter.Int8Value(100),
-		inter.Globals["y"].Value,
-	)
+func TestInterpretFixedPointConversions(t *testing.T) {
 
-	assert.Equal(t,
-		interpreter.BoolValue(true),
-		inter.Globals["z"].Value,
-	)
+	tests := map[string]interpreter.Value{
+		// Fix*
+		"Fix64": interpreter.Fix64Value(123000000),
+		// UFix*
+		"UFix64": interpreter.UFix64Value(123000000),
+	}
+
+	for _, fixedPointType := range sema.AllFixedPointTypes {
+		if _, ok := tests[fixedPointType.String()]; !ok {
+			panic(fmt.Sprintf("broken test: missing %s", fixedPointType))
+		}
+	}
+
+	for fixedPointType, value := range tests {
+
+		t.Run(fixedPointType, func(t *testing.T) {
+
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      let x: %[1]s = 1.23
+                      let y = %[1]s(0.42) + %[1]s(0.81)
+                      let z = y == x
+                    `,
+					fixedPointType,
+				),
+			)
+
+			assert.Equal(t,
+				value,
+				inter.Globals["x"].Value,
+			)
+
+			assert.Equal(t,
+				value,
+				inter.Globals["y"].Value,
+			)
+
+			assert.Equal(t,
+				interpreter.BoolValue(true),
+				inter.Globals["z"].Value,
+			)
+
+		})
+	}
 }
 
 func TestInterpretAddressConversion(t *testing.T) {
@@ -6160,10 +6389,7 @@ func TestInterpretCastingIntLiteralToAnyStruct(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewAnyValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-			&sema.IntType{},
-		),
+		interpreter.NewIntValue(42),
 		inter.Globals["x"].Value,
 	)
 }
@@ -6195,10 +6421,9 @@ func TestInterpretCastingResourceToAnyResource(t *testing.T) {
 	value, err := inter.Invoke("test")
 	require.NoError(t, err)
 
-	require.IsType(t, &interpreter.AnyValue{}, value)
 	assert.IsType(t,
 		&interpreter.CompositeValue{},
-		value.(*interpreter.AnyValue).Value,
+		value,
 	)
 }
 
@@ -7657,4 +7882,77 @@ func TestInterpretResourceOwnerFieldUse(t *testing.T) {
 		),
 		result,
 	)
+}
+
+func TestInterpretResourceAssignmentForceTransfer(t *testing.T) {
+
+	t.Run("new to nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+          resource X {}
+
+          fun test() {
+              var x: @X? <- nil
+              x <-! create X()
+              destroy x
+          }
+        `)
+
+		_, err := inter.Invoke("test")
+		require.NoError(t, err)
+	})
+
+	t.Run("new to non-nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	     resource X {}
+
+	     fun test() {
+	         var x: @X? <- create X()
+	         x <-! create X()
+	         destroy x
+	     }
+	   `)
+
+		_, err := inter.Invoke("test")
+		require.Error(t, err)
+
+		assert.IsType(t, &interpreter.ForceAssignmentToNonNilResourceError{}, err)
+	})
+
+	t.Run("existing to nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	     resource X {}
+
+	     fun test() {
+	         let x <- create X()
+	         var x2: @X? <- nil
+	         x2 <-! x
+	         destroy x2
+	     }
+	   `)
+
+		_, err := inter.Invoke("test")
+		require.NoError(t, err)
+	})
+
+	t.Run("existing to non-nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+	     resource X {}
+
+	     fun test() {
+	         let x <- create X()
+	         var x2: @X? <- create X()
+	         x2 <-! x
+	         destroy x2
+	     }
+	   `)
+
+		_, err := inter.Invoke("test")
+		require.Error(t, err)
+
+		assert.IsType(t, &interpreter.ForceAssignmentToNonNilResourceError{}, err)
+	})
 }

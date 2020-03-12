@@ -345,7 +345,7 @@ void _ep2_write_bin_compact(byte *bin, const ep2_st *a, const int len) {
 void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {
-        THROW(ERR_NO_BUFFER);
+        THROW(ERR_NO_VALID);
         return;
     }
 

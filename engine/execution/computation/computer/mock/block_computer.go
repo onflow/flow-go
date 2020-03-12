@@ -11,13 +11,13 @@ type BlockComputer struct {
 	mock.Mock
 }
 
-// ExecuteBlock provides a mock function with given fields: _a0, _a1, _a2
-func (_m *BlockComputer) ExecuteBlock(_a0 *execution.CompleteBlock, _a1 *state.View, _a2 []byte) (*execution.ComputationResult, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// ExecuteBlock provides a mock function with given fields: _a0, _a1
+func (_m *BlockComputer) ExecuteBlock(_a0 *execution.CompleteBlock, _a1 *state.View) (*execution.ComputationResult, error) {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(*execution.CompleteBlock, *state.View, []byte) *execution.ComputationResult); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(*execution.CompleteBlock, *state.View) *execution.ComputationResult); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution.ComputationResult)
@@ -25,8 +25,8 @@ func (_m *BlockComputer) ExecuteBlock(_a0 *execution.CompleteBlock, _a1 *state.V
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*execution.CompleteBlock, *state.View, []byte) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func(*execution.CompleteBlock, *state.View) error); ok {
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -2651,7 +2651,7 @@ func init() {
 
 // baseValues are the values available in programs
 
-var BaseValues map[string]ValueDeclaration
+var BaseValues = map[string]ValueDeclaration{}
 
 type baseFunction struct {
 	name           string
@@ -2677,12 +2677,6 @@ func (baseFunction) ValueDeclarationIsConstant() bool {
 
 func (f baseFunction) ValueDeclarationArgumentLabels() []string {
 	return f.argumentLabels
-}
-
-func init() {
-	BaseValues = map[string]ValueDeclaration{}
-	initIntegerFunctions()
-	initAddressFunction()
 }
 
 var AllSignedFixedPointTypes = []Type{
@@ -2734,10 +2728,10 @@ var AllNumberTypes = append(
 	AllFixedPointTypes...,
 )
 
-func initIntegerFunctions() {
+func init() {
 
-	for _, integerType := range AllIntegerTypes {
-		typeName := integerType.String()
+	for _, numberType := range AllNumberTypes {
+		typeName := numberType.String()
 
 		// check type is not accidentally redeclared
 		if _, ok := BaseValues[typeName]; ok {
@@ -2752,18 +2746,18 @@ func initIntegerFunctions() {
 						{
 							Label:          ArgumentLabelNotRequired,
 							Identifier:     "value",
-							TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+							TypeAnnotation: NewTypeAnnotation(&NumberType{}),
 						},
 					},
-					ReturnTypeAnnotation: &TypeAnnotation{Type: integerType},
+					ReturnTypeAnnotation: &TypeAnnotation{Type: numberType},
 				},
-				ArgumentExpressionsCheck: integerFunctionArgumentExpressionsChecker(integerType),
+				ArgumentExpressionsCheck: numberFunctionArgumentExpressionsChecker(numberType),
 			},
 		}
 	}
 }
 
-func initAddressFunction() {
+func init() {
 	addressType := &AddressType{}
 	typeName := addressType.String()
 
@@ -2796,13 +2790,16 @@ func initAddressFunction() {
 	}
 }
 
-func integerFunctionArgumentExpressionsChecker(integerType Type) func(*Checker, []ast.Expression) {
+func numberFunctionArgumentExpressionsChecker(numberType Type) func(*Checker, []ast.Expression) {
 	return func(checker *Checker, argumentExpressions []ast.Expression) {
-		intExpression, ok := argumentExpressions[0].(*ast.IntegerExpression)
-		if !ok {
-			return
+		switch numberExpression := argumentExpressions[0].(type) {
+		case *ast.IntegerExpression:
+			checker.checkIntegerLiteral(numberExpression, numberType)
+
+		case *ast.FixedPointExpression:
+			checker.checkFixedPointLiteral(numberExpression, numberType)
+
 		}
-		checker.checkIntegerLiteral(intExpression, integerType)
 	}
 }
 
@@ -2860,6 +2857,14 @@ func (t *CompositeType) QualifiedIdentifier() string {
 
 func (t *CompositeType) ID() TypeID {
 	return TypeID(fmt.Sprintf("%s.%s", t.Location.ID(), t.QualifiedIdentifier()))
+}
+
+func SplitCompositeTypeID(compositeTypeID TypeID) (locationID ast.LocationID, qualifiedIdentifier string) {
+	parts := strings.SplitN(string(compositeTypeID), ".", 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return ast.LocationID(parts[0]), parts[1]
 }
 
 func (t *CompositeType) Equal(other Type) bool {
@@ -3617,7 +3622,6 @@ func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, e
 // ReferenceType represents the reference to a value
 type ReferenceType struct {
 	Authorized bool
-	Storable   bool
 	Type       Type
 }
 
@@ -3630,9 +3634,6 @@ func (t *ReferenceType) String() string {
 	var builder strings.Builder
 	if t.Authorized {
 		builder.WriteString("auth ")
-	}
-	if t.Storable {
-		builder.WriteString("storable ")
 	}
 	builder.WriteRune('&')
 	builder.WriteString(t.Type.String())
@@ -3647,9 +3648,6 @@ func (t *ReferenceType) QualifiedString() string {
 	if t.Authorized {
 		builder.WriteString("auth ")
 	}
-	if t.Storable {
-		builder.WriteString("storable ")
-	}
 	builder.WriteRune('&')
 	builder.WriteString(t.Type.QualifiedString())
 	return builder.String()
@@ -3659,9 +3657,6 @@ func (t *ReferenceType) ID() TypeID {
 	var builder strings.Builder
 	if t.Authorized {
 		builder.WriteString("auth ")
-	}
-	if t.Storable {
-		builder.WriteString("storable ")
 	}
 	builder.WriteRune('&')
 	if t.Type != nil {
@@ -3677,7 +3672,6 @@ func (t *ReferenceType) Equal(other Type) bool {
 	}
 
 	return t.Authorized == otherReference.Authorized &&
-		t.Storable == otherReference.Storable &&
 		t.Type.Equal(otherReference.Type)
 }
 
@@ -3804,6 +3798,10 @@ func IsSubType(subType Type, superType Type) bool {
 		return true
 	}
 
+	if _, ok := subType.(*NeverType); ok {
+		return true
+	}
+
 	switch superType.(type) {
 	case *AnyType:
 		return true
@@ -3813,10 +3811,6 @@ func IsSubType(subType Type, superType Type) bool {
 
 	case *AnyResourceType:
 		return subType.IsResourceType()
-	}
-
-	if _, ok := subType.(*NeverType); ok {
-		return true
 	}
 
 	switch typedSuperType := superType.(type) {
@@ -3936,30 +3930,8 @@ func IsSubType(subType Type, superType Type) bool {
 			return false
 		}
 
-		// A storable reference type `T` is a subtype of a reference type `U`,
-		// if the non-storable variant of `T` is a subtype of `U`
-
-		if typedSubType.Storable {
-			return IsSubType(
-				&ReferenceType{
-					Type:       typedSubType.Type,
-					Authorized: typedSubType.Authorized,
-					Storable:   false,
-				},
-				typedSuperType,
-			)
-		}
-
-		// A non-storable reference type is not a (static) subtype of a storable reference.
-		//
-		// The holder of the reference may not gain more permissions without having authorization.
-
-		if typedSuperType.Storable {
-			return false
-		}
-
-		// An authorized reference type `auth &T` (storable or non-storable)
-		// is a subtype of a reference type `&U` (authorized or non-authorized, storable or non-storable),
+		// An authorized reference type `auth &T`
+		// is a subtype of a reference type `&U` (authorized or non-authorized),
 		// if `T` is a subtype of `U`
 
 		if typedSubType.Authorized {
@@ -4004,14 +3976,9 @@ func IsSubType(subType Type, superType Type) bool {
 						return false
 					}
 
-					for _, restriction := range typedInnerSuperType.Restrictions {
-						// TODO: once interfaces can conform to interfaces, include
-						if _, ok := typedInnerSubType.ConformanceSet()[restriction]; !ok {
-							return false
-						}
-					}
-
-					return true
+					// TODO: once interfaces can conform to interfaces, include
+					return typedInnerSuperType.RestrictionSet().
+						IsSubsetOf(typedInnerSubType.ConformanceSet())
 
 				case *AnyResourceType:
 					// An unauthorized reference to an unrestricted resource type `&T`
@@ -4157,14 +4124,9 @@ func IsSubType(subType Type, superType Type) bool {
 						return false
 					}
 
-					for _, restriction := range typedSuperType.Restrictions {
-						// TODO: once interfaces can conform to interfaces, include
-						if _, ok := restrictedSubtype.ConformanceSet()[restriction]; !ok {
-							return false
-						}
-					}
-
-					return true
+					// TODO: once interfaces can conform to interfaces, include
+					return typedSuperType.RestrictionSet().
+						IsSubsetOf(restrictedSubtype.ConformanceSet())
 				}
 
 			case *AnyResourceType:
@@ -4182,14 +4144,8 @@ func IsSubType(subType Type, superType Type) bool {
 					return false
 				}
 
-				for _, restriction := range typedSuperType.Restrictions {
-					// TODO: once interfaces can conform to interfaces, include
-					if _, ok := typedSubType.ConformanceSet()[restriction]; !ok {
-						return false
-					}
-				}
-
-				return true
+				return typedSuperType.RestrictionSet().
+					IsSubsetOf(typedSubType.ConformanceSet())
 			}
 
 		} else {
@@ -4208,7 +4164,7 @@ func IsSubType(subType Type, superType Type) bool {
 				case *CompositeType:
 					// When `T != AnyResource`: if `T == V`.
 					//
-					// `Us` and `Ws` do not have to be subsets:
+					// `Us` and `Ws` do *not* have to be subsets:
 					// The owner of the resource may freely restrict and unrestrict the resource.
 
 					return restrictedSubType.Kind == common.CompositeKindResource &&

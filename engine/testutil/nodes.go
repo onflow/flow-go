@@ -24,7 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/assignment"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -180,6 +180,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	collectionsStorage := storage.NewCollections(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
+	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
 
 	levelDB := unittest.TempLevelDB(t)
@@ -187,9 +188,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	ls, err := ledger.NewTrieStorage(levelDB)
 	require.NoError(t, err)
 
-	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, executionResults)
+	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, chunkDataPackStorage, executionResults)
 
-	receiptsEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
+	providerEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
@@ -197,33 +198,32 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	require.NoError(t, err)
 
-	execEngine, err := computation.New(
+	computationEngine := computation.New(
 		node.Log,
-		node.Net,
 		node.Me,
 		node.State,
-		receiptsEngine,
 		vm,
 	)
 	require.NoError(t, err)
 
-	blocksEngine, err := ingestion.New(node.Log,
+	ingestionEngine, err := ingestion.New(node.Log,
 		node.Net,
 		node.Me,
 		node.State,
 		blocksStorage,
 		payloadsStorage,
 		collectionsStorage,
-		execEngine,
+		computationEngine,
+		providerEngine,
 		execState,
 	)
 	require.NoError(t, err)
 
 	return mock.ExecutionNode{
 		GenericNode:     node,
-		IngestionEngine: blocksEngine,
-		ExecutionEngine: execEngine,
-		ReceiptsEngine:  receiptsEngine,
+		IngestionEngine: ingestionEngine,
+		ExecutionEngine: computationEngine,
+		ReceiptsEngine:  providerEngine,
 		BadgerDB:        node.DB,
 		LevelDB:         levelDB,
 		VM:              vm,
@@ -239,7 +239,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, assigner assignment.ChunkAssigner, opts ...VerificationOpt) mock.VerificationNode {
+func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, assigner module.ChunkAssigner, opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
