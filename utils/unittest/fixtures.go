@@ -270,6 +270,14 @@ func IdentifierFixture() flow.Identifier {
 	return id
 }
 
+func IdentifierListFixture(n int) flow.IdentifierList {
+	il := make(flow.IdentifierList, 0, n)
+	for i := 0; i < n; i++ {
+		il = append(il, IdentifierFixture())
+	}
+	return il
+}
+
 // WithRole adds a role to an identity fixture.
 func WithRole(role flow.Role) func(*flow.Identity) {
 	return func(id *flow.Identity) {

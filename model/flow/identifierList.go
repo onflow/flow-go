@@ -57,7 +57,7 @@ func (il IdentifierList) With(ids ...Identifier) IdentifierList {
 	}
 
 	// add any IDs that don't already exist to the list
-	for _, id := range ids {
+	for id := range lookup {
 		if _, exists := dupes[id]; exists {
 			continue
 		}
@@ -77,30 +77,35 @@ func (il IdentifierList) Without(ids ...Identifier) IdentifierList {
 	}
 
 	// keep track of the indices to remove
-	var indices []int
-	for i, checkID := range il {
-		if _, exists := lookup[checkID]; exists {
-			indices = append(indices, i)
+	toRemove := make(map[Identifier]struct{})
+	for _, id := range il {
+		if _, exists := lookup[id]; exists {
+			toRemove[id] = struct{}{}
 		}
 	}
 
+	// create a new output list to avoid modifying the receiver
+	without := make(IdentifierList, 0, len(il)-len(toRemove))
+
 	// go through the list of indices and remove each one from the list
-	for _, index := range indices {
-		il[index] = il[len(il)-1]
-		il = il[:len(il)-1]
+	for _, id := range il {
+		if _, skip := toRemove[id]; skip {
+			continue
+		}
+		without = append(without, id)
 	}
 
-	return il
+	return without
 }
 
 // RandSubsetN returns a list containing n identifiers randomly selected from the
-// receiver list L. If n<0 or n>len(L), returns L.
+// receiver list L. If n>len(L), returns L.
 func (il IdentifierList) RandSubsetN(n int) IdentifierList {
 
-	if n == 0 {
+	if n <= 0 {
 		return IdentifierList{}
 	}
-	if n < 0 || n > len(il) {
+	if n > len(il) {
 		return il
 	}
 
@@ -123,10 +128,10 @@ func (il IdentifierList) RandSubsetN(n int) IdentifierList {
 	return out
 }
 
-// JoinIdentifierLists appends and returns two IdentifierLists
-func JoinIdentifierLists(this, other IdentifierList) IdentifierList {
-	joined := make([]Identifier, 0, len(this)+len(other))
-	for _, id := range this {
+// Join appends the input to the receiver and returns the result.
+func (il IdentifierList) Join(other IdentifierList) IdentifierList {
+	joined := make([]Identifier, 0, len(il)+len(other))
+	for _, id := range il {
 		joined = append(joined, id)
 	}
 
