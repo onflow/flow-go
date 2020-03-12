@@ -25,13 +25,14 @@ import (
 // Engine is the consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
 type Engine struct {
-	unit     *engine.Unit   // used to control startup/shutdown
-	log      zerolog.Logger // used to log relevant actions with context
-	me       module.Local
-	state    protocol.State
-	headers  storage.Headers
-	payloads storage.Payloads
-	con      network.Conduit
+	unit         *engine.Unit   // used to control startup/shutdown
+	log          zerolog.Logger // used to log relevant actions with context
+	me           module.Local
+	state        protocol.State
+	headers      storage.Headers
+	payloads     storage.Payloads
+	con          network.Conduit
+	participants flow.IdentityList
 
 	cache module.PendingBlockBuffer
 
@@ -49,15 +50,21 @@ func New(
 	cache module.PendingBlockBuffer,
 ) (*Engine, error) {
 
+	participants, err := state.Final().Identities(filter.HasRole(flow.RoleConsensus))
+	if err != nil {
+		return nil, fmt.Errorf("could not get consensus participants: %w", err)
+	}
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "consensus").Logger(),
-		me:       me,
-		state:    state,
-		headers:  headers,
-		payloads: payloads,
-		cache:    cache,
+		unit:         engine.NewUnit(),
+		log:          log.With().Str("engine", "consensus").Logger(),
+		me:           me,
+		state:        state,
+		headers:      headers,
+		payloads:     payloads,
+		cache:        cache,
+		participants: participants,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -397,12 +404,20 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 		BlockID: missingID,
 		Nonce:   rand.Uint64(),
 	}
-	err := e.con.Submit(&req, originID)
+
+	// select a set of 3 other nodes to request the missing block from
+	// always including the sender of the pending block
+	recipients := e.participants.NodeIDs().
+		Without(e.me.NodeID()).
+		Without(originID).
+		RandSubsetN(2).
+		With(originID)
+	err := e.con.Submit(&req, recipients...)
 	if err != nil {
 		return fmt.Errorf("could not send block request: %w", err)
 	}
 
-	// NOTE: at this point, if he doesn't send us the parent, we should probably think about a way
+	// NOTE: at this point, if we can't find the parent, we should probably think about a way
 	// to blacklist him, as this can be exploited by sending us lots of children without parent;
 	// a second mitigation strategy is to put a strict limit on children we cache, and possibly a
 	// limit on children we cache coming from a single other node

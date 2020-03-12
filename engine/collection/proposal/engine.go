@@ -423,12 +423,20 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 		BlockID: missingID,
 		Nonce:   rand.Uint64(),
 	}
-	err := e.con.Submit(req, originID)
+
+	// select a set of other nodes to request the missing block from
+	// always including the sender of the pending block
+	recipients := e.participants.NodeIDs().
+		Without(e.me.NodeID()).
+		Without(originID).
+		RandSubsetN(2).
+		With(originID)
+	err := e.con.Submit(req, recipients...)
 	if err != nil {
 		return fmt.Errorf("could not send block request: %w", err)
 	}
 
-	// NOTE: at this point, if he doesn't send us the parent, we should probably think about a way
+	// NOTE: at this point, if we can't find the parent, we should probably think about a way
 	// to blacklist him, as this can be exploited by sending us lots of children without parent;
 	// a second mitigation strategy is to put a strict limit on children we cache, and possibly a
 	// limit on children we cache coming from a single other node

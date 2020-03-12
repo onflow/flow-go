@@ -38,33 +38,27 @@ func (il IdentifierList) Swap(i, j int) {
 	il[j], il[i] = il[i], il[j]
 }
 
-// Add adds the given identifier to the list, if it doesn't already exist, and
-// returns the list.
-func (il *IdentifierList) Add(id Identifier) IdentifierList {
-	if il == nil {
-		*il = IdentifierList{}
-	}
+// With returns a new list that includes `id`. If the receiver list already
+// contains `id`, it is returned, unchanged.
+func (il IdentifierList) With(id Identifier) IdentifierList {
 
-	for _, checkID := range *il {
+	for _, checkID := range il {
 		if checkID == id {
-			return *il
+			return il
 		}
 	}
 
-	*il = append(*il, id)
-	return *il
+	il = append(il, id)
+	return il
 }
 
-// Rem removes all instances of the identifier from the list, without
-// changing ordering, and returns the list.
-func (il *IdentifierList) Rem(id Identifier) IdentifierList {
-	if il == nil {
-		*il = IdentifierList{}
-	}
+// Without returns a new list with all instances of `id` removed, without
+// changing ordering.
+func (il IdentifierList) Without(id Identifier) IdentifierList {
 
 	// keep track of the indices to remove
 	var indices []int
-	for i, checkID := range *il {
+	for i, checkID := range il {
 		if checkID == id {
 			indices = append(indices, i)
 		}
@@ -72,11 +66,11 @@ func (il *IdentifierList) Rem(id Identifier) IdentifierList {
 
 	// go through the list of indices and remove each one from `il`
 	for _, index := range indices {
-		(*il)[index] = (*il)[len(*il)-1]
-		*il = (*il)[:len(*il)-1]
+		il[index] = il[len(il)-1]
+		il = il[:len(il)-1]
 	}
 
-	return *il
+	return il
 }
 
 // RandSubsetN returns a list containing n identifiers randomly selected from the
