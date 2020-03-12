@@ -568,6 +568,13 @@ func (e *Engine) checkPendingChunks() {
 				continue
 			}
 
+			// TODO replace chunk state with chunk data pack
+			_, chunkDataPackReady := e.getChunkDataPackForReceipt(receipt, chunk.ID())
+			if !chunkDataPackReady {
+				// can not verify a chunk without its chunk data, moves to the next chunk
+				continue
+			}
+
 			// retrieves collection corresponding to the chunk
 			collection, collectionReady := e.getCollectionForChunk(block, receipt, chunk)
 			if !collectionReady {
