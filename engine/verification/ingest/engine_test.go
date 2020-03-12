@@ -43,6 +43,8 @@ type TestSuite struct {
 	statesConduit *network.Conduit
 	// mock conduit for receiving receipts
 	receiptsConduit *network.Conduit
+	// mock conduit for requesting/receiving chunk data packs
+	chunksConduit *network.Conduit
 	// mock verifier engine, should be called when all dependent resources
 	// for a receipt have been received by the ingest engine.
 	verifierEng *network.Engine
@@ -54,11 +56,12 @@ type TestSuite struct {
 	chunkStates    *mempool.ChunkStates
 	chunkDataPacks *mempool.ChunkDataPacks
 	// resources fixtures
-	collection *flow.Collection
-	block      *flow.Block
-	receipt    *flow.ExecutionReceipt
-	chunkState *flow.ChunkState
-	assigner   *module.ChunkAssigner // mocks chunk assigner
+	collection    *flow.Collection
+	block         *flow.Block
+	receipt       *flow.ExecutionReceipt
+	chunkState    *flow.ChunkState
+	chunkDataPack *flow.ChunkDataPack
+	assigner      *module.ChunkAssigner // mocks chunk assigner
 }
 
 // Invoking this method executes all TestSuite tests.
@@ -69,18 +72,21 @@ func TestReceiptsEngine(t *testing.T) {
 // SetupTest initiates the test setups prior to each test.
 func (suite *TestSuite) SetupTest() {
 	// initializing test suite fields
-	suite.state = &protocol.State{}
 	suite.collectionsConduit = &network.Conduit{}
 	suite.statesConduit = &network.Conduit{}
 	suite.receiptsConduit = &network.Conduit{}
+	suite.chunksConduit = &network.Conduit{}
 	suite.net = &module.Network{}
+	suite.verifierEng = &network.Engine{}
+
+	suite.state = &protocol.State{}
 	suite.me = &module.Local{}
 	suite.ss = &protocol.Snapshot{}
-	suite.verifierEng = &network.Engine{}
 	suite.blocks = &mempool.Blocks{}
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}
+	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
 	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := unittest.CompleteExecutionResultFixture(1)
@@ -88,6 +94,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.block = completeER.Block
 	suite.receipt = completeER.Receipt
 	suite.chunkState = completeER.ChunkStates[0]
+	suite.chunkDataPack = completeER.ChunkDataPacks[0]
 
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
@@ -99,6 +106,9 @@ func (suite *TestSuite) SetupTest() {
 		Once()
 	suite.net.On("Register", uint8(engine.ExecutionStateProvider), testifymock.Anything).
 		Return(suite.statesConduit, nil).
+		Once()
+	suite.net.On("Register", uint8(engine.ChunkDataPackProvider), testifymock.Anything).
+		Return(suite.chunksConduit, nil).
 		Once()
 }
 
@@ -155,6 +165,8 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.collections.On("Has", suite.collection.ID()).Return(false)
 	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
+	suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 	// expect that the receipt be added to the mempool, and return it in All
 	suite.receipts.On("Add", suite.receipt).Return(nil).Once()
@@ -430,6 +442,8 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
+			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
+			suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 			// removing the resources for a chunk
