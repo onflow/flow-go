@@ -189,7 +189,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, executionResults)
 
-	receiptsEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
+	providerEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
@@ -197,33 +197,32 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	require.NoError(t, err)
 
-	execEngine, err := computation.New(
+	computationEngine := computation.New(
 		node.Log,
-		node.Net,
 		node.Me,
 		node.State,
-		receiptsEngine,
 		vm,
 	)
 	require.NoError(t, err)
 
-	blocksEngine, err := ingestion.New(node.Log,
+	ingestionEngine, err := ingestion.New(node.Log,
 		node.Net,
 		node.Me,
 		node.State,
 		blocksStorage,
 		payloadsStorage,
 		collectionsStorage,
-		execEngine,
+		computationEngine,
+		providerEngine,
 		execState,
 	)
 	require.NoError(t, err)
 
 	return mock.ExecutionNode{
 		GenericNode:     node,
-		IngestionEngine: blocksEngine,
-		ExecutionEngine: execEngine,
-		ReceiptsEngine:  receiptsEngine,
+		IngestionEngine: ingestionEngine,
+		ExecutionEngine: computationEngine,
+		ReceiptsEngine:  providerEngine,
 		BadgerDB:        node.DB,
 		LevelDB:         levelDB,
 		VM:              vm,

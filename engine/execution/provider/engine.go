@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -17,6 +16,11 @@ import (
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
+
+type ProviderEngine interface {
+	network.Engine
+	BroadcastExecutionReceipt(*flow.ExecutionReceipt) error
+}
 
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
 // Also generates and saves execution receipts
@@ -88,10 +92,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		var err error
 		switch v := event.(type) {
-		case *execution.ComputationResult:
-			err = e.onExecutionResult(originID, v)
 		case *messages.ExecutionStateRequest:
-			return e.onExecutionStateRequest(originID, v)
+			err = e.onExecutionStateRequest(originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -100,70 +102,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		}
 		return nil
 	})
-}
-
-func (e *Engine) onExecutionResult(originID flow.Identifier, result *execution.ComputationResult) error {
-
-	e.log.Debug().
-		Hex("block_id", logging.ID(result.CompleteBlock.Block.ID())).
-		Msg("received execution result")
-
-	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote request to submit execution result for block [%x]", result.CompleteBlock.Block.ID())
-	}
-
-	chunks := make([]*flow.Chunk, len(result.StateViews))
-
-	startState := result.StartState
-	var endState flow.StateCommitment
-
-	for i, view := range result.StateViews {
-		// TODO - Should the deltas be applied to a particular state?
-		// Not important now, but might become important once we produce proofs
-
-		endState, err := e.execState.CommitDelta(view.Delta())
-		if err != nil {
-			return fmt.Errorf("failed to apply chunk delta: %w", err)
-		}
-		//
-		chunk := generateChunk(i, startState, endState)
-		//
-		chunkHeader := generateChunkHeader(chunk, view.Reads())
-		//
-		err = e.execState.PersistChunkHeader(chunkHeader)
-		if err != nil {
-			return fmt.Errorf("failed to save chunk header: %w", err)
-		}
-		//
-		chunks[i] = chunk
-		startState = endState
-	}
-
-	executionResult, err := e.generateExecutionResultForBlock(result.CompleteBlock, chunks, endState)
-	if err != nil {
-		return fmt.Errorf("could not generate execution result: %w", err)
-	}
-
-	receipt := &flow.ExecutionReceipt{
-		ExecutionResult: *executionResult,
-		// TODO: include SPoCKs
-		Spocks: nil,
-		// TODO: sign execution receipt
-		ExecutorSignature: nil,
-		ExecutorID:        e.me.NodeID(),
-	}
-
-	err = e.broadcastExecutionReceipt(receipt)
-	if err != nil {
-		return fmt.Errorf("could not broadcast receipt: %w", err)
-	}
-
-	err = e.execState.PersistStateCommitment(result.CompleteBlock.Block.ID(), endState)
-	if err != nil {
-		return fmt.Errorf("failed to store state commitment: %w", err)
-	}
-
-	return nil
 }
 
 func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages.ExecutionStateRequest) error {
@@ -201,7 +139,8 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 	return nil
 }
 
-func (e *Engine) broadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error {
+func (e *Engine) BroadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error {
+
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("receipt_id", logging.Entity(receipt)).
@@ -212,76 +151,13 @@ func (e *Engine) broadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
-	err = e.receiptCon.Submit(receipt, identities.NodeIDs()...)
+	fmt.Println("before submitting")
+	nodeIDs := identities.NodeIDs()
+	err = e.receiptCon.Submit(receipt, nodeIDs...)
+	fmt.Println("after submitting")
 	if err != nil {
 		return fmt.Errorf("could not submit execution receipts: %w", err)
 	}
 
 	return nil
-}
-
-// generateExecutionResultForBlock creates a new execution result for a block from
-// the provided chunk results.
-func (e *Engine) generateExecutionResultForBlock(
-	block *execution.CompleteBlock,
-	chunks []*flow.Chunk,
-	endState flow.StateCommitment,
-) (*flow.ExecutionResult, error) {
-
-	previousErID, err := e.execState.GetExecutionResultID(block.Block.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get previous execution result ID: %w", err)
-	}
-
-	er := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: previousErID,
-			BlockID:          block.Block.ID(),
-			FinalStateCommit: endState,
-			Chunks:           chunks,
-		},
-	}
-
-	err = e.execState.PersistExecutionResult(block.Block.ID(), *er)
-	if err != nil {
-		return nil, fmt.Errorf("could not persist execution result: %w", err)
-	}
-
-	return er, nil
-}
-
-// generateChunk creates a chunk from the provided execution data.
-func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flow.Chunk {
-	return &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(colIndex),
-			StartState:      startState,
-			// TODO: include event collection hash
-			EventCollection: flow.ZeroID,
-			// TODO: record gas used
-			TotalComputationUsed: 0,
-			// TODO: record number of txs
-			NumberOfTransactions: 0,
-		},
-		Index:    0,
-		EndState: endState,
-	}
-}
-
-// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
-func generateChunkHeader(
-	chunk *flow.Chunk,
-	registerIDs []flow.RegisterID,
-) *flow.ChunkHeader {
-	//reads := make([]flow.RegisterID, len(registerIDs))
-	//
-	//for i, registerID := range registerIDs {
-	//	reads[i] = flow.RegisterID(registerID)
-	//}
-
-	return &flow.ChunkHeader{
-		ChunkID:     chunk.ID(),
-		StartState:  chunk.StartState,
-		RegisterIDs: registerIDs,
-	}
 }
