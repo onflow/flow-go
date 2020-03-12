@@ -196,6 +196,10 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *execu
 	ctx.executionState.On("PersistChunkHeader", mock.MatchedBy(func(f *flow.ChunkHeader) bool {
 		return bytes.Equal(f.StartState, startStateCommitment)
 	})).Return(nil)
+	ctx.executionState.On("PersistChunkDataPack", mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
+		return bytes.Equal(f.StartState, startStateCommitment)
+	})).Return(nil)
+	ctx.executionState.On("GetRegistersWithProofs", mock.Anything, mock.Anything).Return([][]byte{}, [][]byte{}, nil)
 
 	previousExecutionResultID := unittest.IdentifierFixture()
 	ctx.executionState.On("GetExecutionResultID", completeBlock.Block.ParentID).Return(previousExecutionResultID, nil)

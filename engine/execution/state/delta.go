@@ -66,3 +66,12 @@ func (d Delta) MergeWith(delta Delta) {
 		d[key] = value
 	}
 }
+
+// RegisterIDs returns the list of registerIDs inside this delta
+func (d Delta) RegisterIDs() []flow.RegisterID {
+	ids := make([]flow.RegisterID, 0, len(d))
+	for id := range d {
+		ids = append(ids, flow.RegisterID(id))
+	}
+	return ids
+}
