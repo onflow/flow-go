@@ -56,15 +56,19 @@ func (il IdentifierList) With(ids ...Identifier) IdentifierList {
 		}
 	}
 
+	// create a copy to avoid modifying the receiver
+	with := make(IdentifierList, len(il), len(il)+len(lookup)-len(dupes))
+	copy(with, il)
+
 	// add any IDs that don't already exist to the list
 	for id := range lookup {
 		if _, exists := dupes[id]; exists {
 			continue
 		}
-		il = append(il, id)
+		with = append(with, id)
 	}
 
-	return il
+	return with
 }
 
 // Without returns a new list with all instances of `id` removed, without
