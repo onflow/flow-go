@@ -19,7 +19,7 @@ func TestTransactionPool(t *testing.T) {
 	tx2 := unittest.TransactionFixture()
 	item2 := &tx2
 
-	pool, err := stdmap.NewTransactions()
+	pool, err := stdmap.NewTransactions(1000)
 	require.NoError(t, err)
 
 	t.Run("should be able to add first", func(t *testing.T) {

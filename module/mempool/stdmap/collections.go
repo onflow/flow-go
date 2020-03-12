@@ -14,9 +14,9 @@ type Collections struct {
 }
 
 // NewCollections creates a new memory pool for collection.
-func NewCollections() (*Collections, error) {
+func NewCollections(limit uint) (*Collections, error) {
 	g := &Collections{
-		Backend: NewBackend(),
+		Backend: NewBackend(WithLimit(limit)),
 	}
 
 	return g, nil

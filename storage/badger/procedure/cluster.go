@@ -28,7 +28,7 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 		}
 
 		// index the block payload
-		err = IndexClusterPayload(&block.Payload)(tx)
+		err = IndexClusterPayload(&block.Header, &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
 		}
@@ -51,7 +51,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// retrieve payload
-		err = RetrieveClusterPayload(block.PayloadHash, &block.Payload)(tx)
+		err = RetrieveClusterPayload(block.ID(), &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
@@ -114,8 +114,23 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	}
 }
 
-// IndexClusterPayload indexes a cluster consensus block payload by payload hash.
-func IndexClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
+// InsertClusterPayload inserts the payload for a cluster block.
+func InsertClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// cluster payloads only contain a single collection, allow duplicates,
+		// because it is valid for two competing forks to have the same payload.
+		err := operation.SkipDuplicates(operation.InsertCollection(&payload.Collection))(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert collection: %w", err)
+		}
+
+		return nil
+	}
+}
+
+// IndexClusterPayload indexes a cluster consensus block payload.
+func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// only index a collection if it exists
@@ -129,10 +144,8 @@ func IndexClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 			return fmt.Errorf("cannot index non-existent collection")
 		}
 
-		// index the single collection
-		// we allow duplicate indexing because we anticipate blocks will often
-		// contain empty collections (which will be indexed by the same key)
-		err = operation.SkipDuplicates(operation.IndexCollection(payload.Hash(), 0, &payload.Collection))(tx)
+		// index the transaction IDs within the collection
+		err = operation.SkipDuplicates(operation.IndexCollectionPayload(header.Height, header.ID(), header.ParentID, &payload.Collection))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}
@@ -141,28 +154,24 @@ func IndexClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 	}
 }
 
-// RetrieveClusterPayload retrieves a cluster consensus block payload by hash.
-func RetrieveClusterPayload(payloadHash flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
+// RetrieveClusterPayload retrieves a cluster consensus block payload by block ID.
+func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// ensure payload is empty
 		*payload = cluster.Payload{}
 
+		// retrieve the block header
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header: %w", err)
+		}
+
 		// lookup collection ID
-		collectionIDs := make([]flow.Identifier, 0, 1)
-		err := operation.LookupCollections(payloadHash, &collectionIDs)(tx)
+		err = operation.LookupCollectionPayload(header.Height, blockID, header.ParentID, &payload.Collection)(tx)
 		if err != nil {
-			return fmt.Errorf("could not look up collection ID: %w", err)
-		}
-
-		if len(collectionIDs) == 0 {
-			return fmt.Errorf("could not find collection for payloadHash: %v", payloadHash)
-		}
-
-		// lookup collection
-		err = operation.RetrieveCollection(collectionIDs[0], &payload.Collection)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve collection (id=%x): %w", collectionIDs[0], err)
+			return fmt.Errorf("could not look up collection payload: %w", err)
 		}
 
 		return nil

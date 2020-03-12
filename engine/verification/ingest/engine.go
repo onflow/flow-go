@@ -9,10 +9,12 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/assignment"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -35,8 +37,8 @@ type Engine struct {
 	blocks             mempool.Blocks
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
-	// protects the checkPendingReceipts method to prevent double-verifying
-	checkReceiptsMu sync.Mutex
+	checkReceiptsMu    sync.Mutex               // protects the checkPendingReceipts method to prevent double-verifying
+	assigner           assignment.ChunkAssigner // used to determine chunks this node needs to verify
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -50,6 +52,7 @@ func New(
 	blocks mempool.Blocks,
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
+	assigner assignment.ChunkAssigner,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -62,6 +65,7 @@ func New(
 		blocks:      blocks,
 		collections: collections,
 		chunkStates: chunkStates,
+		assigner:    assigner,
 	}
 
 	var err error
@@ -155,17 +159,20 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Msg("execution receipt received")
 
 	// TODO: correctness check for execution receipts
-
-	id, err := e.state.Final().Identity(originID)
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
+	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
 		// TODO: potential attack on authenticity
 		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
 	}
 
 	// execution results are only valid from execution nodes
-	if id.Role != flow.RoleExecution {
+	if origin.Role != flow.RoleExecution {
 		// TODO: potential attack on integrity
-		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", id.NodeID, id.Role)
+		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", origin.NodeID, origin.Role)
 	}
 
 	// store the execution receipt in the store of the engine
@@ -208,13 +215,17 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		Hex("collection_id", logging.Entity(coll)).
 		Msg("collection received")
 
-	id, err := e.state.Final().Identity(originID)
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
+	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+		return fmt.Errorf("invalid origin id (%s): %w", origin, err)
 	}
 
-	if id.Role != flow.RoleCollection {
-		return fmt.Errorf("invalid role for receiving collection: %s", id.Role)
+	if origin.Role != flow.RoleCollection {
+		return fmt.Errorf("invalid role for receiving collection: %s", origin.Role)
 	}
 
 	err = e.collections.Add(coll)
@@ -237,6 +248,10 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 		Hex("chunk_id", logging.ID(res.State.ChunkID)).
 		Msg("execution state received")
 
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
 	id, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
@@ -259,6 +274,10 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 // requestCollection submits a request for the given collection to collection nodes.
 func (e *Engine) requestCollection(collID flow.Identifier) error {
 
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
 	collNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
 		return fmt.Errorf("could not load collection node identities: %w", err)
@@ -281,6 +300,10 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 // given chunk to execution nodes.
 func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
 	exeNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not load execution node identities: %w", err)
@@ -462,9 +485,7 @@ func (e *Engine) checkPendingReceipts() {
 
 	for _, receipt := range receipts {
 		block, blockReady := e.getBlockForReceipt(receipt)
-
 		chunkStates, chunkStatesReady := e.getChunkStatesForReceipt(receipt)
-
 		// we can't get collections without the block
 		if !blockReady {
 			continue
@@ -473,32 +494,84 @@ func (e *Engine) checkPendingReceipts() {
 		collections, collectionsReady := e.getCollectionsForReceipt(block, receipt)
 
 		if blockReady && chunkStatesReady && collectionsReady {
-			res := &verification.CompleteExecutionResult{
-				Receipt:     receipt,
-				Block:       block,
-				Collections: collections,
-				ChunkStates: chunkStates,
-			}
-
-			// verify the receipt
-			err := e.verifierEng.ProcessLocal(res)
+			// extracts list of chunks assigned to this Verification node
+			mychunks, err := e.myChunks(&receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
 					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-					Msg("could not get complete execution result")
+					Msg("could not fetch the assigned chunks")
 				continue
 			}
 
-			// if the receipt was verified, remove it and associated resources from the mempool
-			e.receipts.Rem(receipt.ID())
-			e.blocks.Rem(block.ID())
-			for _, coll := range collections {
-				e.collections.Rem(coll.ID())
-			}
-			for _, chunkState := range chunkStates {
-				e.chunkStates.Rem(chunkState.ID())
+			for _, chunk := range mychunks {
+				// creates a verifiable chunk for assigned chunk
+				index := chunk.Index
+				vchunk := &verification.VerifiableChunk{
+					ChunkIndex: index,
+					Receipt:    receipt,
+					Block:      block,
+					Collection: collections[index],
+					ChunkState: chunkStates[index],
+				}
+
+				// verify the receipt
+				err := e.verifierEng.ProcessLocal(vchunk)
+				if err != nil {
+					e.log.Error().
+						Err(err).
+						Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+						Uint64("chunk_id", chunk.Index).
+						Msg("could not pass chunk to verifier engine")
+					continue
+				}
+
+				// TODO add a tracker to clean the memory up from resources that have already been verified
+				// https://github.com/dapperlabs/flow-go/issues/2750
+				// clean up would be something like this:
+				// cleans the execution receipt from receipts mempool
+				// cleans block form blocks mempool
+				// cleans all chunk states from chunkStates mempool
+				// for now, we clean the mempool from only the collection, as otherwise
+				// ingest engine sends the chunk corresponding to this collection everytime
+				// this function gets called, since it has everything that is needed to verify this
+				e.collections.Rem(collections[index].ID())
 			}
 		}
 	}
+}
+
+// myChunks returns the list of chunks in the chunk list that this verifier node
+// is assigned to
+func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
+
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
+	verifierNodes, err := e.state.Final().
+		Identities(filter.HasRole(flow.RoleVerification))
+	if err != nil {
+		return nil, fmt.Errorf("could not load verifier node IDs: %w", err)
+	}
+
+	rng, err := utils.NewChunkAssignmentRNG(res)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
+	}
+	a, err := e.assigner.Assigner(verifierNodes, res.Chunks, rng)
+	if err != nil {
+		return nil, fmt.Errorf("could not create chunk assignment %w", err)
+	}
+
+	// indices of chunks assigned to this node
+	chunkIndices := a.ByNodeID(e.me.NodeID())
+
+	// mine keeps the list of chunks assigned to this node
+	mine := make(flow.ChunkList, 0, len(chunkIndices))
+	for _, index := range chunkIndices {
+		mine = append(mine, res.Chunks.ByIndex(index))
+	}
+
+	return mine, nil
 }
