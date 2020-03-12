@@ -923,22 +923,6 @@ func (e *ImportedProgramError) EndPosition() ast.Position {
 	return e.Pos
 }
 
-// UnsupportedCastedTypeError
-
-type UnsupportedCastedTypeError struct {
-	Type Type
-	ast.Range
-}
-
-func (e *UnsupportedCastedTypeError) Error() string {
-	return fmt.Sprintf(
-		"cannot cast value of type: `%s`",
-		e.Type.QualifiedString(),
-	)
-}
-
-func (*UnsupportedCastedTypeError) isSemanticError() {}
-
 // AlwaysFailingNonResourceCastingTypeError
 
 type AlwaysFailingNonResourceCastingTypeError struct {
@@ -1869,18 +1853,6 @@ func (e *OptionalTypeReferenceError) Error() string {
 }
 
 func (*OptionalTypeReferenceError) isSemanticError() {}
-
-// InvalidNonStorageStorableReferenceError
-
-type InvalidNonStorageStorableReferenceError struct {
-	ast.Range
-}
-
-func (e *InvalidNonStorageStorableReferenceError) Error() string {
-	return "cannot create storable reference which is not into storage"
-}
-
-func (*InvalidNonStorageStorableReferenceError) isSemanticError() {}
 
 // InvalidResourceCreationError
 
