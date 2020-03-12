@@ -131,5 +131,5 @@ func (s *HotStuffFollower) Ready() <-chan struct{} {
 
 // Done implements interface module.ReadyDoneAware
 func (s *HotStuffFollower) Done() <-chan struct{} {
-	return s.runner.Stop()
+	return s.runner.Abort()
 }
