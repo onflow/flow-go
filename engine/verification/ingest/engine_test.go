@@ -48,10 +48,11 @@ type TestSuite struct {
 	verifierEng *network.Engine
 	// mock mempools used by the ingest engine, valid resources should be added
 	// to these when they are received from an appropriate node role.
-	blocks      *mempool.Blocks
-	receipts    *mempool.Receipts
-	collections *mempool.Collections
-	chunkStates *mempool.ChunkStates
+	blocks         *mempool.Blocks
+	receipts       *mempool.Receipts
+	collections    *mempool.Collections
+	chunkStates    *mempool.ChunkStates
+	chunkDataPacks *mempool.ChunkDataPacks
 	// resources fixtures
 	collection *flow.Collection
 	block      *flow.Block
@@ -114,6 +115,7 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.blocks,
 		suite.collections,
 		suite.chunkStates,
+		suite.chunkDataPacks,
 		suite.assigner)
 	require.Nil(suite.T(), err, "could not create an engine")
 
