@@ -7443,12 +7443,50 @@ func TestParseFixedPointExpression(t *testing.T) {
 			Pos:       Position{Offset: 12, Line: 2, Column: 11},
 		},
 		Value: &FixedPointExpression{
-			Integer:    big.NewInt(-1234567890),
-			Fractional: big.NewInt(987654321),
-			Scale:      12,
+			Negative:        true,
+			UnsignedInteger: big.NewInt(1234567890),
+			Fractional:      big.NewInt(987654321),
+			Scale:           12,
 			Range: Range{
 				StartPos: Position{Offset: 15, Line: 2, Column: 14},
 				EndPos:   Position{Offset: 41, Line: 2, Column: 40},
+			},
+		},
+		StartPos: Position{Offset: 6, Line: 2, Column: 5},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{a},
+	}
+
+	utils.AssertEqualWithDiff(t, expected, actual)
+}
+
+func TestParseFixedPointExpressionZeroInteger(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+	    let a = -0.1
+	`)
+
+	require.NoError(t, err)
+
+	a := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{Identifier: "a",
+			Pos: Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
+		},
+		Value: &FixedPointExpression{
+			Negative:        true,
+			UnsignedInteger: big.NewInt(0),
+			Fractional:      big.NewInt(1),
+			Scale:           1,
+			Range: Range{
+				StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				EndPos:   Position{Offset: 17, Line: 2, Column: 16},
 			},
 		},
 		StartPos: Position{Offset: 6, Line: 2, Column: 5},

@@ -23,8 +23,9 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 func (checker *Checker) checkAssignment(
 	target, value ast.Expression,
 	transfer *ast.Transfer,
-	isResourceAssignment bool,
+	isSecondaryAssignment bool,
 ) (targetType, valueType Type) {
+
 	valueType = value.Accept(checker).(Type)
 
 	targetType = checker.visitAssignmentValueType(target, value, valueType)
@@ -35,24 +36,45 @@ func (checker *Checker) checkAssignment(
 
 	checker.checkTransfer(transfer, targetType)
 
-	// An assignment to a resource is invalid, as it would result in a loss
+	// An assignment to a resource is generally invalid, as it would result in a loss
 
 	if targetType.IsResourceType() {
 
-		// However, an assignment to a `self` field in the initializer is allowed.
-		// In that case the value that is assigned must be invalidated.
+		// However, there are two cases where it is allowed:
 		//
-		// The check for a repeated assignment of a constant field after initialization
-		// is not part of this logic here, see `visitMemberExpressionAssignment`
+		// 1. Force-assignment to an optional resource type.
+		//
+		// 2. Assignment to a `self` field in the initializer.
+		//
+		//    In this case the value that is assigned must be invalidated.
+		//
+		//    The check for a repeated assignment of a constant field after initialization
+		//    is not part of this logic here, see `visitMemberExpressionAssignment`
 
-		accessedSelfMember := checker.accessedSelfMember(target)
+		if transfer.Operation == ast.TransferOperationMoveForced {
 
-		if (accessedSelfMember == nil || checker.functionActivations.Current().InitializationInfo == nil) && !isResourceAssignment {
-			checker.report(
-				&InvalidResourceAssignmentError{
-					Range: ast.NewRangeFromPositioned(target),
-				},
-			)
+			if _, ok := targetType.(*OptionalType); !ok {
+				checker.report(
+					&InvalidResourceAssignmentError{
+						Range: ast.NewRangeFromPositioned(target),
+					},
+				)
+			}
+
+		} else {
+
+			accessedSelfMember := checker.accessedSelfMember(target)
+
+			if !isSecondaryAssignment &&
+				(accessedSelfMember == nil ||
+					checker.functionActivations.Current().InitializationInfo == nil) {
+
+				checker.report(
+					&InvalidResourceAssignmentError{
+						Range: ast.NewRangeFromPositioned(target),
+					},
+				)
+			}
 		}
 	}
 

@@ -83,6 +83,7 @@ declaration
 
 transactionDeclaration
     : Transaction
+      parameterList?
       '{'
       fields
       prepare?
@@ -359,6 +360,7 @@ swap
 transfer
     : '='
     | Move
+    | MoveForced
     ;
 
 expression
@@ -487,6 +489,7 @@ unaryOp
 
 Negate : '!' ;
 Move : '<-' ;
+MoveForced : '<-!' ;
 
 Optional : '?' ;
 

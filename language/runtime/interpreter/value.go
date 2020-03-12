@@ -23,9 +23,10 @@ import (
 
 type Value interface {
 	IsValue()
+	DynamicType(interpreter *Interpreter) DynamicType
 	Copy() Value
 	GetOwner() *common.Address
-	SetOwner(*common.Address)
+	SetOwner(address *common.Address)
 }
 
 // ValueIndexableValue
@@ -77,6 +78,10 @@ func init() {
 
 func (VoidValue) IsValue() {}
 
+func (VoidValue) DynamicType(_ *Interpreter) DynamicType {
+	return VoidType{}
+}
+
 func (v VoidValue) Copy() Value {
 	return v
 }
@@ -103,6 +108,10 @@ func init() {
 }
 
 func (BoolValue) IsValue() {}
+
+func (BoolValue) DynamicType(_ *Interpreter) DynamicType {
+	return BoolType{}
+}
 
 func (v BoolValue) Copy() Value {
 	return v
@@ -152,6 +161,10 @@ func NewStringValue(str string) *StringValue {
 }
 
 func (*StringValue) IsValue() {}
+
+func (*StringValue) DynamicType(_ *Interpreter) DynamicType {
+	return StringType{}
+}
 
 func (v *StringValue) Copy() Value {
 	return &StringValue{Str: v.Str}
@@ -324,6 +337,18 @@ func NewArrayValueUnownedNonCopying(values ...Value) *ArrayValue {
 }
 
 func (*ArrayValue) IsValue() {}
+
+func (v *ArrayValue) DynamicType(interpreter *Interpreter) DynamicType {
+	elementTypes := make([]DynamicType, len(v.Values))
+
+	for i, value := range v.Values {
+		elementTypes[i] = value.DynamicType(interpreter)
+	}
+
+	return ArrayType{
+		ElementTypes: elementTypes,
+	}
+}
 
 func (v *ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
@@ -576,7 +601,7 @@ func NewIntValue(value int64) IntValue {
 	return IntValue{Int: big.NewInt(value)}
 }
 
-func ConvertInt(value Value) Value {
+func ConvertInt(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	if intValue, ok := value.(IntValue); ok {
 		return intValue.Copy()
@@ -585,6 +610,10 @@ func ConvertInt(value Value) Value {
 }
 
 func (v IntValue) IsValue() {}
+
+func (IntValue) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.IntType{}}
+}
 
 func (v IntValue) Copy() Value {
 	return IntValue{big.NewInt(0).Set(v.Int)}
@@ -697,6 +726,10 @@ func init() {
 }
 
 func (Int8Value) IsValue() {}
+
+func (Int8Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int8Type{}}
+}
 
 func (v Int8Value) Copy() Value {
 	return v
@@ -825,7 +858,7 @@ func (v Int8Value) Equal(other Value) BoolValue {
 	return v == otherInt8
 }
 
-func ConvertInt8(value Value) Value {
+func ConvertInt8(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int8Value(value.(NumberValue).IntValue())
 }
@@ -839,6 +872,10 @@ func init() {
 }
 
 func (Int16Value) IsValue() {}
+
+func (Int16Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int16Type{}}
+}
 
 func (v Int16Value) Copy() Value {
 	return v
@@ -967,7 +1004,7 @@ func (v Int16Value) Equal(other Value) BoolValue {
 	return v == otherInt16
 }
 
-func ConvertInt16(value Value) Value {
+func ConvertInt16(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int16Value(value.(NumberValue).IntValue())
 }
@@ -981,6 +1018,10 @@ func init() {
 }
 
 func (Int32Value) IsValue() {}
+
+func (Int32Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int32Type{}}
+}
 
 func (v Int32Value) Copy() Value {
 	return v
@@ -1109,7 +1150,7 @@ func (v Int32Value) Equal(other Value) BoolValue {
 	return v == otherInt32
 }
 
-func ConvertInt32(value Value) Value {
+func ConvertInt32(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int32Value(value.(NumberValue).IntValue())
 }
@@ -1123,6 +1164,10 @@ func init() {
 }
 
 func (Int64Value) IsValue() {}
+
+func (Int64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int64Type{}}
+}
 
 func (v Int64Value) Copy() Value {
 	return v
@@ -1255,7 +1300,7 @@ func (v Int64Value) Equal(other Value) BoolValue {
 	return v == otherInt64
 }
 
-func ConvertInt64(value Value) Value {
+func ConvertInt64(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int64Value(value.(NumberValue).IntValue())
 }
@@ -1271,6 +1316,10 @@ func init() {
 }
 
 func (v Int128Value) IsValue() {}
+
+func (Int128Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int128Type{}}
+}
 
 func (v Int128Value) Copy() Value {
 	return Int128Value{big.NewInt(0).Set(v.Int)}
@@ -1429,7 +1478,7 @@ func (v Int128Value) Equal(other Value) BoolValue {
 	return cmp == 0
 }
 
-func ConvertInt128(value Value) Value {
+func ConvertInt128(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	intValue := value.(NumberValue).IntValue()
 	return Int128Value{big.NewInt(0).SetInt64(int64(intValue))}
@@ -1446,6 +1495,10 @@ func init() {
 }
 
 func (v Int256Value) IsValue() {}
+
+func (Int256Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Int256Type{}}
+}
 
 func (v Int256Value) Copy() Value {
 	return Int256Value{big.NewInt(0).Set(v.Int)}
@@ -1604,7 +1657,7 @@ func (v Int256Value) Equal(other Value) BoolValue {
 	return cmp == 0
 }
 
-func ConvertInt256(value Value) Value {
+func ConvertInt256(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	intValue := value.(NumberValue).IntValue()
 	return Int256Value{big.NewInt(0).SetInt64(int64(intValue))}
@@ -1624,7 +1677,7 @@ func NewUIntValue(value uint64) UIntValue {
 	return UIntValue{Int: big.NewInt(0).SetUint64(value)}
 }
 
-func ConvertUInt(value Value) Value {
+func ConvertUInt(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	if intValue, ok := value.(UIntValue); ok {
 		return intValue.Copy()
@@ -1633,6 +1686,10 @@ func ConvertUInt(value Value) Value {
 }
 
 func (v UIntValue) IsValue() {}
+
+func (UIntValue) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UIntType{}}
+}
 
 func (v UIntValue) Copy() Value {
 	return UIntValue{big.NewInt(0).Set(v.Int)}
@@ -1749,6 +1806,10 @@ func init() {
 
 func (UInt8Value) IsValue() {}
 
+func (UInt8Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt8Type{}}
+}
+
 func (v UInt8Value) Copy() Value {
 	return v
 }
@@ -1844,7 +1905,7 @@ func (v UInt8Value) Equal(other Value) BoolValue {
 	return v == otherUInt8
 }
 
-func ConvertUInt8(value Value) Value {
+func ConvertUInt8(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt8Value(value.(NumberValue).IntValue())
 }
@@ -1858,6 +1919,10 @@ func init() {
 }
 
 func (UInt16Value) IsValue() {}
+
+func (UInt16Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt16Type{}}
+}
 
 func (v UInt16Value) Copy() Value {
 	return v
@@ -1952,7 +2017,7 @@ func (v UInt16Value) Equal(other Value) BoolValue {
 	return v == otherUInt16
 }
 
-func ConvertUInt16(value Value) Value {
+func ConvertUInt16(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt16Value(value.(NumberValue).IntValue())
 }
@@ -1966,6 +2031,10 @@ func init() {
 }
 
 func (UInt32Value) IsValue() {}
+
+func (UInt32Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt32Type{}}
+}
 
 func (v UInt32Value) Copy() Value {
 	return v
@@ -2062,7 +2131,7 @@ func (v UInt32Value) Equal(other Value) BoolValue {
 	return v == otherUInt32
 }
 
-func ConvertUInt32(value Value) Value {
+func ConvertUInt32(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt32Value(value.(NumberValue).IntValue())
 }
@@ -2076,6 +2145,10 @@ func init() {
 }
 
 func (UInt64Value) IsValue() {}
+
+func (UInt64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt64Type{}}
+}
 
 func (v UInt64Value) Copy() Value {
 	return v
@@ -2177,7 +2250,7 @@ func (v UInt64Value) Equal(other Value) BoolValue {
 	return v == otherUInt64
 }
 
-func ConvertUInt64(value Value) Value {
+func ConvertUInt64(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt64Value(value.(NumberValue).IntValue())
 }
@@ -2193,6 +2266,10 @@ func init() {
 }
 
 func (v UInt128Value) IsValue() {}
+
+func (UInt128Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt128Type{}}
+}
 
 func (v UInt128Value) Copy() Value {
 	return UInt128Value{big.NewInt(0).Set(v.Int)}
@@ -2321,7 +2398,7 @@ func (v UInt128Value) Equal(other Value) BoolValue {
 	return cmp == 0
 }
 
-func ConvertUInt128(value Value) Value {
+func ConvertUInt128(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	intValue := value.(NumberValue).IntValue()
 	return UInt128Value{big.NewInt(0).SetInt64(int64(intValue))}
@@ -2338,6 +2415,10 @@ func init() {
 }
 
 func (v UInt256Value) IsValue() {}
+
+func (UInt256Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UInt256Type{}}
+}
 
 func (v UInt256Value) Copy() Value {
 	return UInt256Value{big.NewInt(0).Set(v.Int)}
@@ -2466,7 +2547,7 @@ func (v UInt256Value) Equal(other Value) BoolValue {
 	return cmp == 0
 }
 
-func ConvertUInt256(value Value) Value {
+func ConvertUInt256(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	intValue := value.(NumberValue).IntValue()
 	return UInt256Value{big.NewInt(0).SetInt64(int64(intValue))}
@@ -2481,6 +2562,10 @@ func init() {
 }
 
 func (Word8Value) IsValue() {}
+
+func (Word8Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Word8Type{}}
+}
 
 func (v Word8Value) Copy() Value {
 	return v
@@ -2563,7 +2648,7 @@ func (v Word8Value) Equal(other Value) BoolValue {
 	return v == otherWord8
 }
 
-func ConvertWord8(value Value) Value {
+func ConvertWord8(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Word8Value(value.(NumberValue).IntValue())
 }
@@ -2577,6 +2662,10 @@ func init() {
 }
 
 func (Word16Value) IsValue() {}
+
+func (Word16Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Word16Type{}}
+}
 
 func (v Word16Value) Copy() Value {
 	return v
@@ -2657,7 +2746,7 @@ func (v Word16Value) Equal(other Value) BoolValue {
 	return v == otherWord16
 }
 
-func ConvertWord16(value Value) Value {
+func ConvertWord16(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Word16Value(value.(NumberValue).IntValue())
 }
@@ -2671,6 +2760,10 @@ func init() {
 }
 
 func (Word32Value) IsValue() {}
+
+func (Word32Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Word32Type{}}
+}
 
 func (v Word32Value) Copy() Value {
 	return v
@@ -2753,7 +2846,7 @@ func (v Word32Value) Equal(other Value) BoolValue {
 	return v == otherWord32
 }
 
-func ConvertWord32(value Value) Value {
+func ConvertWord32(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Word32Value(value.(NumberValue).IntValue())
 }
@@ -2767,6 +2860,10 @@ func init() {
 }
 
 func (Word64Value) IsValue() {}
+
+func (Word64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Word64Type{}}
+}
 
 func (v Word64Value) Copy() Value {
 	return v
@@ -2849,7 +2946,7 @@ func (v Word64Value) Equal(other Value) BoolValue {
 	return v == otherWord64
 }
 
-func ConvertWord64(value Value) Value {
+func ConvertWord64(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Word64Value(value.(NumberValue).IntValue())
 }
@@ -2863,6 +2960,10 @@ func init() {
 }
 
 func (Fix64Value) IsValue() {}
+
+func (Fix64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.Fix64Type{}}
+}
 
 func (v Fix64Value) Copy() Value {
 	return v
@@ -2880,10 +2981,18 @@ func (Fix64Value) SetOwner(_ *common.Address) {
 func (v Fix64Value) String() string {
 	integer := int64(v) / sema.Fix64Factor
 	fraction := int64(v) % sema.Fix64Factor
-	if fraction < 0 {
+	negative := fraction < 0
+	var builder strings.Builder
+	if negative {
 		fraction = -fraction
+		if integer == 0 {
+			builder.WriteRune('-')
+		}
 	}
-	return fmt.Sprintf("%d.%d", integer, fraction)
+	builder.WriteString(fmt.Sprint(integer))
+	builder.WriteRune('.')
+	builder.WriteString(PadLeft(strconv.Itoa(int(fraction)), '0', sema.Fix64Scale))
+	return builder.String()
 }
 
 func (v Fix64Value) KeyString() string {
@@ -2998,6 +3107,29 @@ func (v Fix64Value) Equal(other Value) BoolValue {
 	return v == otherFix64
 }
 
+const Fix64MaxValue = math.MaxInt64
+
+func ConvertFix64(value Value, interpreter *Interpreter) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+
+	switch value := value.(type) {
+	case UFix64Value:
+		if int(value) > Fix64MaxValue {
+			panic("UFix64 value is larger than maximum value for Fix64")
+		}
+		return Fix64Value(value)
+
+	case Fix64Value:
+		return value
+
+	case NumberValue:
+		return Fix64Value(value.IntValue() * sema.Fix64Factor)
+
+	default:
+		panic(fmt.Sprintf("can't convert %s to Fix64", value.DynamicType(interpreter)))
+	}
+}
+
 // UFix64Value
 
 type UFix64Value uint64
@@ -3006,7 +3138,15 @@ func init() {
 	gob.Register(UFix64Value(0))
 }
 
+func NewUFix64ValueWithFraction(integer, fraction uint64) UFix64Value {
+	return UFix64Value(integer*sema.Fix64Factor + fraction)
+}
+
 func (UFix64Value) IsValue() {}
+
+func (UFix64Value) DynamicType(_ *Interpreter) DynamicType {
+	return NumberType{&sema.UFix64Type{}}
+}
 
 func (v UFix64Value) Copy() Value {
 	return v
@@ -3025,7 +3165,11 @@ func (v UFix64Value) String() string {
 	factor := uint64(sema.Fix64Factor)
 	integer := uint64(v) / factor
 	fraction := uint64(v) % factor
-	return fmt.Sprintf("%d.%d", integer, fraction)
+	return fmt.Sprintf(
+		"%d.%s",
+		integer,
+		PadLeft(strconv.Itoa(int(fraction)), '0', sema.Fix64Scale),
+	)
 }
 
 func (v UFix64Value) KeyString() string {
@@ -3136,13 +3280,25 @@ func (v UFix64Value) Equal(other Value) BoolValue {
 	return v == otherUFix64
 }
 
-func ConvertUFix64(value Value) Value {
+func ConvertUFix64(value Value, interpreter *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
-	val := value.(Fix64Value)
-	if val < 0 {
-		panic("can't convert negative Fix64 to UFix64")
+
+	switch value := value.(type) {
+	case Fix64Value:
+		if value < 0 {
+			panic("can't convert negative Fix64 to UFix64")
+		}
+		return UFix64Value(value)
+
+	case UFix64Value:
+		return value
+
+	case NumberValue:
+		return UFix64Value(value.IntValue() * sema.Fix64Factor)
+
+	default:
+		panic(fmt.Sprintf("can't convert %s to UFix64", value.DynamicType(interpreter)))
 	}
-	return UFix64Value(val)
 }
 
 // CompositeValue
@@ -3195,6 +3351,18 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 }
 
 func (*CompositeValue) IsValue() {}
+
+func (v *CompositeValue) DynamicType(interpreter *Interpreter) DynamicType {
+	locationID, qualifiedIdentifier := sema.SplitCompositeTypeID(v.TypeID)
+	if locationID == "" {
+		panic("failed to split composite type ID")
+	}
+
+	checker := interpreter.allCheckers[locationID]
+	staticType := checker.Elaboration.CompositeTypes[qualifiedIdentifier]
+
+	return CompositeType{StaticType: staticType}
+}
 
 func (v *CompositeValue) Copy() Value {
 	// Resources and contracts are not copied
@@ -3432,6 +3600,22 @@ func init() {
 }
 
 func (*DictionaryValue) IsValue() {}
+
+func (v *DictionaryValue) DynamicType(interpreter *Interpreter) DynamicType {
+	entryTypes := make([]struct{ KeyType, ValueType DynamicType }, len(v.Keys.Values))
+
+	for i, key := range v.Keys.Values {
+		entryTypes[i] =
+			struct{ KeyType, ValueType DynamicType }{
+				KeyType:   key.DynamicType(interpreter),
+				ValueType: v.Entries[dictionaryKey(key)].DynamicType(interpreter),
+			}
+	}
+
+	return DictionaryType{
+		EntryTypes: entryTypes,
+	}
+}
 
 func (v *DictionaryValue) Copy() Value {
 	newKeys := v.Keys.Copy().(*ArrayValue)
@@ -3671,6 +3855,8 @@ func ToValue(value interface{}) (Value, error) {
 	switch value := value.(type) {
 	case *big.Int:
 		return IntValue{value}, nil
+	case int:
+		return NewIntValue(int64(value)), nil
 	case int8:
 		return Int8Value(value), nil
 	case int16:
@@ -3734,6 +3920,10 @@ func init() {
 
 func (NilValue) IsValue() {}
 
+func (NilValue) DynamicType(_ *Interpreter) DynamicType {
+	return NilType{}
+}
+
 func (NilValue) isOptionalValue() {}
 
 func (v NilValue) Copy() Value {
@@ -3777,6 +3967,11 @@ func NewSomeValueOwningNonCopying(value Value) *SomeValue {
 
 func (*SomeValue) IsValue() {}
 
+func (v *SomeValue) DynamicType(interpreter *Interpreter) DynamicType {
+	innerType := v.Value.DynamicType(interpreter)
+	return SomeType{InnerType: innerType}
+}
+
 func (*SomeValue) isOptionalValue() {}
 
 func (v *SomeValue) Copy() Value {
@@ -3809,56 +4004,6 @@ func (v *SomeValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
-// AnyValue
-
-type AnyValue struct {
-	Value Value
-	// TODO: don't store
-	Type  sema.Type
-	Owner *common.Address
-}
-
-func NewAnyValueOwningNonCopying(value Value, ty sema.Type) *AnyValue {
-	return &AnyValue{
-		Value: value,
-		Type:  ty,
-		Owner: value.GetOwner(),
-	}
-}
-
-func init() {
-	gob.Register(&AnyValue{})
-}
-
-func (*AnyValue) IsValue() {}
-
-func (v *AnyValue) Copy() Value {
-	return &AnyValue{
-		Value: v.Value.Copy(),
-		Type:  v.Type,
-		// NOTE: new value has no owner
-		Owner: nil,
-	}
-}
-
-func (v *AnyValue) GetOwner() *common.Address {
-	return v.Owner
-}
-
-func (v *AnyValue) SetOwner(owner *common.Address) {
-	if v.Owner == owner {
-		return
-	}
-
-	v.Owner = owner
-
-	v.Value.SetOwner(owner)
-}
-
-func (v *AnyValue) String() string {
-	return fmt.Sprint(v.Value)
-}
-
 // StorageValue
 
 type StorageValue struct {
@@ -3866,6 +4011,10 @@ type StorageValue struct {
 }
 
 func (StorageValue) IsValue() {}
+
+func (v StorageValue) DynamicType(_ *Interpreter) DynamicType {
+	return StorageType{}
+}
 
 func (v StorageValue) Copy() Value {
 	return StorageValue{
@@ -3888,6 +4037,10 @@ type PublishedValue struct {
 }
 
 func (PublishedValue) IsValue() {}
+
+func (v PublishedValue) DynamicType(_ *Interpreter) DynamicType {
+	return PublishedType{}
+}
 
 func (v PublishedValue) Copy() Value {
 	return PublishedValue{
@@ -3916,6 +4069,10 @@ func init() {
 }
 
 func (*StorageReferenceValue) IsValue() {}
+
+func (*StorageReferenceValue) DynamicType(_ *Interpreter) DynamicType {
+	return StorageReferenceType{}
+}
 
 func (v *StorageReferenceValue) Copy() Value {
 	return &StorageReferenceValue{
@@ -3987,6 +4144,10 @@ type EphemeralReferenceValue struct {
 
 func (*EphemeralReferenceValue) IsValue() {}
 
+func (*EphemeralReferenceValue) DynamicType(_ *Interpreter) DynamicType {
+	return EphemeralReferenceType{}
+}
+
 func (v *EphemeralReferenceValue) Copy() Value {
 	return v
 }
@@ -4047,7 +4208,7 @@ func NewAddressValueFromBytes(b []byte) AddressValue {
 	return result
 }
 
-func ConvertAddress(value Value) Value {
+func ConvertAddress(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	result := AddressValue{}
 	if intValue, ok := value.(IntValue); ok {
@@ -4067,8 +4228,16 @@ func ConvertAddress(value Value) Value {
 
 func (AddressValue) IsValue() {}
 
+func (AddressValue) DynamicType(_ *Interpreter) DynamicType {
+	return AddressType{}
+}
+
 func (v AddressValue) Copy() Value {
 	return v
+}
+
+func (v AddressValue) KeyString() string {
+	return v.String()
 }
 
 func (v AddressValue) String() string {

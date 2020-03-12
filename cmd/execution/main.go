@@ -21,15 +21,15 @@ import (
 func main() {
 
 	var (
-		stateCommitments storage.Commits
-		levelDB          *leveldb.LevelDB
-		ledgerStorage    storage.Ledger
-		receiptsEng      *provider.Engine
-		executionEng     *computation.Engine
-		ingestionEng     *ingestion.Engine
-		rpcConf          rpc.Config
-		err              error
-		executionState   state.ExecutionState
+		stateCommitments   storage.Commits
+		levelDB            *leveldb.LevelDB
+		ledgerStorage      storage.Ledger
+		providerEngine     *provider.Engine
+		computationManager *computation.Manager
+		ingestionEng       *ingestion.Engine
+		rpcConf            rpc.Config
+		err                error
+		executionState     state.ExecutionState
 	)
 
 	cmd.FlowNode("execution").
@@ -44,32 +44,32 @@ func main() {
 			ledgerStorage, err = ledger.NewTrieStorage(levelDB)
 			return err
 		}).
-		Component("receipts engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
+			rt := runtime.NewInterpreterRuntime()
+			vm := virtualmachine.New(rt)
+			computationManager = computation.New(
+				node.Logger,
+				node.Me,
+				node.State,
+				vm,
+			)
+
+			return nil
+		}).
+		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkHeaders := badger.NewChunkHeaders(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
 			stateCommitments = badger.NewCommits(node.DB)
 			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders, executionResults)
-			receiptsEng, err = provider.New(
+			providerEngine, err = provider.New(
 				node.Logger,
 				node.Network,
 				node.State,
 				node.Me,
 				executionState,
 			)
-			return receiptsEng, err
-		}).
-		Component("execution engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rt := runtime.NewInterpreterRuntime()
-			vm := virtualmachine.New(rt)
-			executionEng, err = computation.New(
-				node.Logger,
-				node.Network,
-				node.Me,
-				node.State,
-				receiptsEng,
-				vm,
-			)
-			return executionEng, err
+
+			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			blocks := badger.NewBlocks(node.DB)
@@ -83,7 +83,8 @@ func main() {
 				blocks,
 				payloads,
 				collections,
-				executionEng,
+				computationManager,
+				providerEngine,
 				executionState,
 			)
 			return ingestionEng, err

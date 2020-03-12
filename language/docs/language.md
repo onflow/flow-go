@@ -1675,7 +1675,7 @@ let a: Int8 = -128
 let b = -a
 ```
 
-Arithmetic operations on the unsigned integer types `Word8`, `Word6`, `Word32`, `Word64`
+Arithmetic operations on the unsigned integer types `Word8`, `Word16`, `Word32`, `Word64`
 may cause values to overflow or underflow.
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111).
@@ -3146,7 +3146,7 @@ struct Rectangle {
 
     // Declare an initializer which accepts width and height.
     // As `area` is synthetic and there is only a getter provided for it,
-    // the `area` field it cannot be assigned a value.
+    // the `area` field cannot be assigned a value.
     //
     init(width: Int, height: Int) {
         self.width = width
@@ -3504,7 +3504,7 @@ fun use(resource: @SomeResource) {
 use(resource: <-b)
 
 // Invalid: Cannot use constant `b` anymore as the resource
-// it referred to was moved into function `foo`.
+// it referred to was moved into function `use`.
 //
 b.value
 ```
@@ -3825,7 +3825,7 @@ The same applies to dictionaries.
 
 ```cadence,file=resource-in-dictionary.cdc
 // Declare a constant for a dictionary of resources.
-// Create three resources and move them into the dictionary.
+// Create two resources and move them into the dictionary.
 //
 let resources <- {
     "r1": <-create R(),
@@ -4446,7 +4446,7 @@ struct interface AnInterface {
 }
 
 struct AnImplementation: AnInterface {
-    // Declare a publicly settable variable field named `a`that has type `Int`.
+    // Declare a publicly settable variable field named `a` that has type `Int`.
     // This implementation satisfies the requirement for interface `AnInterface`:
     // The field is at least publicly readable, but this implementation also
     // allows the field to be written to in all scopes.
