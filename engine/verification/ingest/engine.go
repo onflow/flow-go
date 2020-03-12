@@ -153,6 +153,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.handleCollection(originID, &resource.Collection)
 	case *messages.ExecutionStateResponse:
 		return e.handleExecutionStateResponse(originID, resource)
+	case *messages.ChunkDataPackResponse:
+		return e.handleChunkDataPack(originID, &resource.Data)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
@@ -187,6 +189,39 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// store the execution receipt in the store of the engine
 	// this will fail if the receipt already exists in the store
 	err = e.receipts.Add(receipt)
+	if err != nil {
+		return fmt.Errorf("could not store execution receipt: %w", err)
+	}
+
+	e.checkPendingChunks()
+
+	return nil
+}
+
+// handleChunkDataPack receives a chunk data pack and stores that in the mempool
+func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) error {
+	e.log.Info().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
+		Msg("chunk data pack received")
+
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
+	origin, err := e.state.Final().Identity(originID)
+	if err != nil {
+		// TODO: potential attack on authenticity
+		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
+	}
+
+	// chunk data pack should only be sent by an execution node
+	if origin.Role != flow.RoleExecution {
+		// TODO: potential attack on integrity
+		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", origin.NodeID, origin.Role)
+	}
+
+	// store the chunk data pack in the store of the engine
+	// this will fail if the receipt already exists in the store
+	err = e.chunkDataPacks.Add(chunkDataPack)
 	if err != nil {
 		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
@@ -325,6 +360,30 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 	err = e.stateConduit.Submit(req, exeNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit request for execution state (chunk_id=%s): %w", chunkID, err)
+	}
+
+	return nil
+}
+
+// requestChunkDataPack submits a request for the given chunk ID to the execution nodes.
+func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
+	execNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return fmt.Errorf("could not load execution nodes identities: %w", err)
+	}
+
+	req := &messages.ChunkDataPackRequest{
+		ChunkID: chunkID,
+	}
+
+	// TODO we should only submit to execution node that generated execution receipt
+	err = e.chunksConduit.Submit(req, execNodes.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)
 	}
 
 	return nil
