@@ -30,6 +30,7 @@ type Engine struct {
 	state             protocol.State
 	conduit           network.Conduit
 	collectionConduit network.Conduit
+	chunksConduit     network.Conduit
 	blocks            storage.Blocks
 	payloads          storage.Payloads
 	collections       storage.Collections
@@ -131,6 +132,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			err = e.handleBlock(v)
 		case *messages.CollectionResponse:
 			err = e.handleCollectionResponse(v)
+		case *messages.ChunkDataPackRequest:
+			err = e.handleChunkDataPackRequest(originID, v.ChunkID)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -139,6 +142,42 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		}
 		return nil
 	})
+}
+
+// handleChunkDataPackRequest receives a request for the chunk data pack associated with chunkID from the
+// requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
+// requester.
+func (e *Engine) handleChunkDataPackRequest(originID flow.Identifier, chunkID flow.Identifier) error {
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
+	origin, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return fmt.Errorf("invalid origin id (%s): %w", origin, err)
+	}
+
+	// only verifier nodes are allowed to request chunk data packs
+	if origin.Role != flow.RoleVerification {
+		return fmt.Errorf("invalid role for receiving collection: %s", origin.Role)
+	}
+
+	cdp, err := e.execState.ChunkDataPackByChunkID(chunkID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
+	}
+
+	response := &messages.ChunkDataPackResponse{
+		Data: *cdp,
+	}
+
+	// sends requested chunk data pack to the requester
+	err = e.chunksConduit.Submit(response, originID)
+	if err != nil {
+		return fmt.Errorf("could not send requested chunk data pack to (%s): %w", origin, err)
+	}
+
+	return nil
 }
 
 func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
