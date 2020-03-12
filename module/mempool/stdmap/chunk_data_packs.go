@@ -39,12 +39,12 @@ func (a *ChunkDataPacks) ByID(chunkID flow.Identifier) (*flow.ChunkDataPack, err
 	return chunkDataPack, nil
 }
 
-// All returns all chunk states from the pool.
-func (a *ChunkDataPacks) All() []*flow.ChunkState {
+// All returns all chunk data packs from the pool.
+func (a *ChunkDataPacks) All() []*flow.ChunkDataPack {
 	entities := a.Backend.All()
-	chunkStates := make([]*flow.ChunkState, 0, len(entities))
+	chunkDataPack := make([]*flow.ChunkDataPack, 0, len(entities))
 	for _, entity := range entities {
-		chunkStates = append(chunkStates, entity.(*flow.ChunkState))
+		chunkDataPack = append(chunkDataPack, entity.(*flow.ChunkDataPack))
 	}
-	return chunkStates
+	return chunkDataPack
 }
