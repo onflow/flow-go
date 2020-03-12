@@ -158,7 +158,6 @@ func (t *FunctionType) String() string {
 
 type ReferenceType struct {
 	Authorized bool
-	Storable   bool
 	Type       Type
 	StartPos   Position
 }
@@ -169,9 +168,6 @@ func (t *ReferenceType) String() string {
 	var builder strings.Builder
 	if t.Authorized {
 		builder.WriteString("auth ")
-	}
-	if t.Storable {
-		builder.WriteString("storable ")
 	}
 	builder.WriteRune('&')
 	builder.WriteString(t.Type.String())

@@ -8,6 +8,13 @@ type DynamicType interface {
 	IsDynamicType()
 }
 
+type ReferenceType interface {
+	DynamicType
+	isReferenceType()
+	Authorized() bool
+	InnerType() DynamicType
+}
+
 // VoidType
 
 type VoidType struct{}
@@ -80,15 +87,41 @@ func (StorageType) IsDynamicType() {}
 
 // StorageReferenceType
 
-type StorageReferenceType struct{}
+type StorageReferenceType struct {
+	authorized bool
+	innerType  DynamicType
+}
 
 func (StorageReferenceType) IsDynamicType() {}
 
+func (StorageReferenceType) isReferenceType() {}
+
+func (t StorageReferenceType) Authorized() bool {
+	return t.authorized
+}
+
+func (t StorageReferenceType) InnerType() DynamicType {
+	return t.innerType
+}
+
 // EphemeralReferenceType
 
-type EphemeralReferenceType struct{}
+type EphemeralReferenceType struct {
+	authorized bool
+	innerType  DynamicType
+}
 
 func (EphemeralReferenceType) IsDynamicType() {}
+
+func (EphemeralReferenceType) isReferenceType() {}
+
+func (t EphemeralReferenceType) Authorized() bool {
+	return t.authorized
+}
+
+func (t EphemeralReferenceType) InnerType() DynamicType {
+	return t.innerType
+}
 
 // AddressType
 

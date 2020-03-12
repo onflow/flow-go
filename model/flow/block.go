@@ -15,7 +15,7 @@ func Genesis(identities IdentityList) *Block {
 	seal := Seal{
 		BlockID:       ZeroID,
 		PreviousState: nil,
-		FinalState:    trie.GetDefaultHashForHeight(255),
+		FinalState:    trie.GetDefaultHashForHeight(256),
 	}
 
 	// create the raw content for the genesis block
