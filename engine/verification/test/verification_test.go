@@ -48,7 +48,7 @@ func TestHappyPath(t *testing.T) {
 	a := chunkassignment.NewAssignment()
 	for i := 0; i < chunkNum; i++ {
 		if isAssigned(i, chunkNum) {
-			a.Add(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
+			a.Add(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), flow.IdentifierList{verNode.Me.NodeID()})
 		}
 	}
 	assigner.On("Assign",

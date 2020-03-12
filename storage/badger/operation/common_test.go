@@ -255,13 +255,13 @@ func TestRetrieveUnencodeable(t *testing.T) {
 }
 
 func TestLookup(t *testing.T) {
-	expected := []flow.Identifier{
+	expected := flow.IdentifierList{
 		flow.Identifier{0x01},
 		flow.Identifier{0x02},
 		flow.Identifier{0x03},
 		flow.Identifier{0x04},
 	}
-	actual := []flow.Identifier{}
+	actual := flow.IdentifierList{}
 
 	iterationFunc := lookup(&actual)
 

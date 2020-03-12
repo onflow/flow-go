@@ -161,7 +161,7 @@ func (m *MeshNetTestSuite) TestTargetValidator() {
 
 	// choose half of the nodes as target
 	allIds := m.ids.NodeIDs()
-	var targets []flow.Identifier
+	var targets flow.IdentifierList
 	// create a target list of half of the nodes
 	for i := 0; i < len(allIds)/2; i++ {
 		targets = append(targets, allIds[i])

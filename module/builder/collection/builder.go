@@ -90,7 +90,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// memory pool as possible without including any that already exist on
 		// our fork.
 		// TODO make empty collections / limit size based on collection min/max size constraints
-		var candidateTxIDs []flow.Identifier
+		var candidateTxIDs flow.IdentifierList
 		for _, flowTx := range b.transactions.All() {
 			_, exists := txLookup[flowTx.ID()]
 			if exists {
@@ -108,7 +108,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// populate the final list of transaction IDs for the block - these
 		// are guaranteed to be valid
-		var finalTxIDs []flow.Identifier
+		var finalTxIDs flow.IdentifierList
 		for _, txID := range candidateTxIDs {
 
 			_, isInvalid := invalidIDs[txID]

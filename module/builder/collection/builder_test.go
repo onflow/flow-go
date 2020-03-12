@@ -124,7 +124,7 @@ func TestBuilder(t *testing.T) {
 			tx3 := mempoolTransactions[2] // in no block
 
 			// build first fork on top of genesis
-			payload1 := model.PayloadFromTransactions([]flow.Identifier{tx1.ID()})
+			payload1 := model.PayloadFromTransactions(flow.IdentifierList{tx1.ID()})
 			block1 := unittest.ClusterBlockWithParent(genesis)
 			block1.SetPayload(payload1)
 
@@ -132,7 +132,7 @@ func TestBuilder(t *testing.T) {
 			insert(&block1)
 
 			// build second fork on top of genesis
-			payload2 := model.PayloadFromTransactions([]flow.Identifier{tx2.ID()})
+			payload2 := model.PayloadFromTransactions(flow.IdentifierList{tx2.ID()})
 			block2 := unittest.ClusterBlockWithParent(genesis)
 			block2.SetPayload(payload2)
 
@@ -168,13 +168,13 @@ func TestBuilder(t *testing.T) {
 			tx3 := mempoolTransactions[2] // in no blocks
 
 			// build a block containing tx1 on genesis
-			finalizedPayload := model.PayloadFromTransactions([]flow.Identifier{tx1.ID()})
+			finalizedPayload := model.PayloadFromTransactions(flow.IdentifierList{tx1.ID()})
 			finalizedBlock := unittest.ClusterBlockWithParent(genesis)
 			finalizedBlock.SetPayload(finalizedPayload)
 			insert(&finalizedBlock)
 
 			// build a block containing tx2 on the first block
-			unFinalizedPayload := model.PayloadFromTransactions([]flow.Identifier{tx2.ID()})
+			unFinalizedPayload := model.PayloadFromTransactions(flow.IdentifierList{tx2.ID()})
 			unFinalizedBlock := unittest.ClusterBlockWithParent(&finalizedBlock)
 			unFinalizedBlock.SetPayload(unFinalizedPayload)
 			insert(&unFinalizedBlock)
@@ -214,13 +214,13 @@ func TestBuilder(t *testing.T) {
 			tx3 := mempoolTransactions[2] // in no blocks
 
 			// build a block containing tx1 on genesis - will be finalized
-			finalizedPayload := model.PayloadFromTransactions([]flow.Identifier{tx1.ID()})
+			finalizedPayload := model.PayloadFromTransactions(flow.IdentifierList{tx1.ID()})
 			finalizedBlock := unittest.ClusterBlockWithParent(genesis)
 			finalizedBlock.SetPayload(finalizedPayload)
 			insert(&finalizedBlock)
 
 			// build a block containing tx2 ALSO on genesis - will be invalidated
-			invalidatedPayload := model.PayloadFromTransactions([]flow.Identifier{tx2.ID()})
+			invalidatedPayload := model.PayloadFromTransactions(flow.IdentifierList{tx2.ID()})
 			invalidatedBlock := unittest.ClusterBlockWithParent(genesis)
 			invalidatedBlock.SetPayload(invalidatedPayload)
 			insert(&invalidatedBlock)
@@ -262,7 +262,7 @@ func TestBuilder(t *testing.T) {
 			head := *genesis
 
 			// keep track of invalidated transaction IDs
-			var invalidatedTxIds []flow.Identifier
+			var invalidatedTxIds flow.IdentifierList
 
 			// create 1000 blocks containing 1000 transactions
 			for i := 0; i < 1000; i++ {
@@ -289,7 +289,7 @@ func TestBuilder(t *testing.T) {
 
 				// create a block containing the transaction
 				block := unittest.ClusterBlockWithParent(&head)
-				payload := model.PayloadFromTransactions([]flow.Identifier{tx.ID()})
+				payload := model.PayloadFromTransactions(flow.IdentifierList{tx.ID()})
 				block.SetPayload(payload)
 				insert(&block)
 

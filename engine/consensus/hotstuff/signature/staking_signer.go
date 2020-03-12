@@ -67,7 +67,7 @@ func (s *StakingSigner) Aggregate(block *model.Block, sigs []*model.SingleSignat
 
 // verifyAggregatedStakingSig verifies the aggregated staking signature as a sanity check.
 // Errors on duplicated signers. Any error indicates an internal bug and results in a fatal error.
-func (s *StakingSigner) verifyAggregatedStakingSig(aggStakingSig []crypto.Signature, block *model.Block, signerIDs []flow.Identifier) error {
+func (s *StakingSigner) verifyAggregatedStakingSig(aggStakingSig []crypto.Signature, block *model.Block, signerIDs flow.IdentifierList) error {
 	// This implementation will eventually be replaced by verifying the proper aggregated BLS signature:
 	// Steps: (1) aggregate all the public keys
 	//        (2) use aggregated public key to verify aggregated signature
@@ -98,13 +98,13 @@ func (s *StakingSigner) verifyAggregatedStakingSig(aggStakingSig []crypto.Signat
 	return nil
 }
 
-func (s *StakingSigner) unsafeAggregate(sigs []*model.SingleSignature) ([]crypto.Signature, []flow.Identifier) {
+func (s *StakingSigner) unsafeAggregate(sigs []*model.SingleSignature) ([]crypto.Signature, flow.IdentifierList) {
 	// This implementation is a naive way of aggregation the signatures. It will work, with
 	// the downside of costing more bandwidth.
 	// The more optimal way, which is the real aggregation, will be implemented when the crypto
 	// API is available.
 	aggStakingSig := make([]crypto.Signature, len(sigs))
-	signerIDs := make([]flow.Identifier, len(sigs))
+	signerIDs := make(flow.IdentifierList, len(sigs))
 	for i, sig := range sigs {
 		aggStakingSig[i] = sig.StakingSignature
 		signerIDs[i] = sig.SignerID

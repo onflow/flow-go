@@ -62,12 +62,12 @@ func MakeID(body interface{}) Identifier {
 }
 
 // GetIDs gets the IDs for a slice of entities.
-func GetIDs(value interface{}) []Identifier {
+func GetIDs(value interface{}) IdentifierList {
 	v := reflect.ValueOf(value)
 	if v.Kind() != reflect.Slice {
 		panic(fmt.Sprintf("non-slice value (%T)", value))
 	}
-	slice := make([]Identifier, 0, v.Len())
+	slice := make(IdentifierList, 0, v.Len())
 	for i := 0; i < v.Len(); i++ {
 		entity, ok := v.Index(i).Interface().(Entity)
 		if !ok {

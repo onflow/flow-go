@@ -88,14 +88,14 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 			// look up the list of guarantee IDs included in the payload
 			step := steps[i]
-			var guaranteeIDs []flow.Identifier
+			var guaranteeIDs flow.IdentifierList
 			err = operation.LookupGuaranteePayload(step.Height, step.ID(), step.ParentID, &guaranteeIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up guarantees (block_id=%x): %w", step.ID(), err)
 			}
 
 			// look up list of seal IDs included in the payload
-			var sealIDs []flow.Identifier
+			var sealIDs flow.IdentifierList
 			err = operation.LookupSealPayload(step.Height, step.ID(), step.ParentID, &sealIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up seals (block_id=%x): %w", step.ID(), err)

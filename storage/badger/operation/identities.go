@@ -20,10 +20,10 @@ func RetrieveIdentity(nodeID flow.Identifier, identity *flow.Identity) func(*bad
 	return retrieve(makePrefix(codeIdentity, nodeID), identity)
 }
 
-func IndexIdentityPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, nodeIDs []flow.Identifier) func(*badger.Txn) error {
+func IndexIdentityPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, nodeIDs flow.IdentifierList) func(*badger.Txn) error {
 	return insert(toPayloadIndex(codeIndexIdentity, height, blockID, parentID), nodeIDs)
 }
 
-func LookupIdentityPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, nodeIDs *[]flow.Identifier) func(*badger.Txn) error {
+func LookupIdentityPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, nodeIDs *flow.IdentifierList) func(*badger.Txn) error {
 	return retrieve(toPayloadIndex(codeIndexIdentity, height, blockID, parentID), nodeIDs)
 }

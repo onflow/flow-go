@@ -136,7 +136,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
+func (e *Engine) findCollectionNodes() (flow.IdentifierList, error) {
 	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve identities: %w", err)
@@ -144,7 +144,7 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	if len(identities) < 1 {
 		return nil, fmt.Errorf("no Collection identity found")
 	}
-	identifiers := make([]flow.Identifier, len(identities))
+	identifiers := make(flow.IdentifierList, len(identities))
 	for i, id := range identities {
 		identifiers[i] = id.NodeID
 	}

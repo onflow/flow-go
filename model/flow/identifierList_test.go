@@ -45,8 +45,8 @@ func TestIdentifierListSort(t *testing.T) {
 	}
 }
 
-// TestJoinIdentifierLists tests correctness of joining two IdentityLists
-func TestJoinIdentifierLists(t *testing.T) {
+// TestJoin tests correctness of joining two IdentityLists
+func TestJoin(t *testing.T) {
 	// creates an identity list of 10 ids
 	count := 10
 	var identityList IdentityList
@@ -66,7 +66,7 @@ func TestJoinIdentifierLists(t *testing.T) {
 	part2 := ids[count/2:]
 
 	// joins two parts back together
-	joined := JoinIdentifierLists(part1, part2)
+	joined := part1.Join(part2)
 
 	// joined should have the same length and elements as
 	// the original one
@@ -74,7 +74,7 @@ func TestJoinIdentifierLists(t *testing.T) {
 	assert.Equal(t, ids, joined)
 
 	// reverse join swaps part 1 and 2 on joining
-	reversed := JoinIdentifierLists(part2, part1)
+	reversed := part2.Join(part1)
 	// joined should have the same length as the original
 	require.Equal(t, ids.Len(), reversed.Len())
 	// reversed join should not be the same as the original

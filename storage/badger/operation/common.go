@@ -167,8 +167,8 @@ type iterationFunc func() (checkFunc, createFunc, handleFunc)
 
 // lookup is the default iteration function allowing us to collect a list of
 // entity IDs from an index.
-func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleFunc) {
-	*entityIDs = make([]flow.Identifier, 0, len(*entityIDs))
+func lookup(entityIDs *flow.IdentifierList) func() (checkFunc, createFunc, handleFunc) {
+	*entityIDs = make(flow.IdentifierList, 0, len(*entityIDs))
 	return func() (checkFunc, createFunc, handleFunc) {
 		check := func(key []byte) bool {
 			return true
@@ -353,7 +353,7 @@ func fromPayloadIndex(key []byte) (uint64, flow.Identifier, flow.Identifier) {
 //
 // This is useful for verifying an existing payload, for example in a block
 // proposal from another node, where the desired output is accept/reject.
-func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterationFunc {
+func validatepayload(blockID flow.Identifier, checkIDs flow.IdentifierList) iterationFunc {
 
 	// build lookup table for payload entities
 	lookup := make(map[flow.Identifier]struct{})
@@ -376,7 +376,7 @@ func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterat
 		}
 
 		// create returns a slice of IDs to decode the payload index entry into
-		var entityIDs []flow.Identifier
+		var entityIDs flow.IdentifierList
 		create := func() interface{} {
 			return &entityIDs
 		}
@@ -405,7 +405,7 @@ func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterat
 //
 // This is useful when building a payload locally, where we want to know which
 // entities are valid for inclusion so we can produce a valid block proposal.
-func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) iterationFunc {
+func searchduplicates(blockID flow.Identifier, candidateIDs flow.IdentifierList, invalidIDs *map[flow.Identifier]struct{}) iterationFunc {
 
 	// build lookup table for candidate payload entities
 	lookup := make(map[flow.Identifier]struct{})
@@ -431,7 +431,7 @@ func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, i
 		}
 
 		// create returns a slice of IDs to decode the payload index entry into
-		var entityIDs []flow.Identifier
+		var entityIDs flow.IdentifierList
 		create := func() interface{} {
 			return &entityIDs
 		}

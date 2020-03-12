@@ -50,7 +50,7 @@ type Payload struct {
 }
 
 // PayloadFromTransactions creates a payload given a list of transaction hashes.
-func PayloadFromTransactions(txHashes []flow.Identifier) Payload {
+func PayloadFromTransactions(txHashes flow.IdentifierList) Payload {
 	return Payload{
 		Collection: flow.LightCollection{
 			Transactions: txHashes,

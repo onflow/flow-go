@@ -47,7 +47,7 @@ func RetrieveGuarantees(blockID flow.Identifier, guarantees *[]*flow.CollectionG
 		}
 
 		// get the collection IDs for the guarantees
-		var collIDs []flow.Identifier
+		var collIDs flow.IdentifierList
 		err = operation.LookupGuaranteePayload(header.Height, blockID, header.ParentID, &collIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup guarantees: %w", err)

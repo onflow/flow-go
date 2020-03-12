@@ -38,33 +38,53 @@ func (il IdentifierList) Swap(i, j int) {
 	il[j], il[i] = il[i], il[j]
 }
 
-// With returns a new list that includes `id`. If the receiver list already
-// contains `id`, it is returned, unchanged.
-func (il IdentifierList) With(id Identifier) IdentifierList {
+// With returns a new list that includes the given IDs. If the receiver list
+// already contains any IDs, they are not not re-added.
+func (il IdentifierList) With(ids ...Identifier) IdentifierList {
 
+	lookup := make(map[Identifier]struct{})
+	for _, id := range ids {
+		lookup[id] = struct{}{}
+	}
+
+	dupes := make(map[Identifier]struct{})
+
+	// find all IDs that already exist in the list
 	for _, checkID := range il {
-		if checkID == id {
-			return il
+		if _, exists := lookup[checkID]; exists {
+			dupes[checkID] = struct{}{}
 		}
 	}
 
-	il = append(il, id)
+	// add any IDs that don't already exist to the list
+	for _, id := range ids {
+		if _, exists := dupes[id]; exists {
+			continue
+		}
+		il = append(il, id)
+	}
+
 	return il
 }
 
 // Without returns a new list with all instances of `id` removed, without
 // changing ordering.
-func (il IdentifierList) Without(id Identifier) IdentifierList {
+func (il IdentifierList) Without(ids ...Identifier) IdentifierList {
+
+	lookup := make(map[Identifier]struct{})
+	for _, id := range ids {
+		lookup[id] = struct{}{}
+	}
 
 	// keep track of the indices to remove
 	var indices []int
 	for i, checkID := range il {
-		if checkID == id {
+		if _, exists := lookup[checkID]; exists {
 			indices = append(indices, i)
 		}
 	}
 
-	// go through the list of indices and remove each one from `il`
+	// go through the list of indices and remove each one from the list
 	for _, index := range indices {
 		il[index] = il[len(il)-1]
 		il = il[:len(il)-1]
@@ -94,6 +114,7 @@ func (il IdentifierList) RandSubsetN(n int) IdentifierList {
 		index := rand.Intn(len(src))
 		// add the identity at the index to the output
 		out = append(out, src[index])
+
 		// remove the selected identity to avoid duplicates
 		src[index] = src[len(src)-1]
 		src = src[:len(src)-1]

@@ -80,14 +80,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			}
 
 			// look up the ancestor's guarantees
-			var guaranteeIDs []flow.Identifier
+			var guaranteeIDs flow.IdentifierList
 			err = operation.LookupGuaranteePayload(ancestor.Height, ancestorID, ancestor.ParentID, &guaranteeIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up ancestor guarantees (%x): %w", ancestor.PayloadHash, err)
 			}
 
 			// look up the ancestor's seals
-			var sealIDs []flow.Identifier
+			var sealIDs flow.IdentifierList
 			err = operation.LookupSealPayload(ancestor.Height, ancestorID, ancestor.ParentID, &sealIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up ancestor seals (%x): %w", ancestor.PayloadHash, err)
@@ -113,7 +113,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// collect guarantees from memory pool, excluding those already pending
 		// on this fork
-		var guaranteeIDs []flow.Identifier
+		var guaranteeIDs flow.IdentifierList
 		for _, guarantee := range b.guarantees.All() {
 			_, ok := guaranteeLookup[guarantee.ID()]
 			if ok {

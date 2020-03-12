@@ -25,7 +25,7 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 			ProposerID:            flow.Identifier{0x33},
 			ParentStakingSigs:     []crypto.Signature{[]byte{0x88}},
 			ParentRandomBeaconSig: crypto.Signature{0x77},
-			ParentSigners:         []flow.Identifier{flow.Identifier{0x44}},
+			ParentSigners:         flow.IdentifierList{flow.Identifier{0x44}},
 		}
 		blockID := expected.ID()
 

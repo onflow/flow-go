@@ -41,7 +41,7 @@ func TestIdentitiesIndexAndLookup(t *testing.T) {
 		parentID := flow.MakeID([]byte{0x99})
 		ids := flow.GetIDs(identities)
 
-		expected := make([]flow.Identifier, len(identities))
+		expected := make(flow.IdentifierList, len(identities))
 
 		err := db.Update(func(tx *badger.Txn) error {
 			for i, id := range identities {
@@ -57,7 +57,7 @@ func TestIdentitiesIndexAndLookup(t *testing.T) {
 		})
 		require.Nil(t, err)
 
-		var actual []flow.Identifier
+		var actual flow.IdentifierList
 		err = db.View(LookupIdentityPayload(height, blockID, parentID, &actual))
 		require.Nil(t, err)
 

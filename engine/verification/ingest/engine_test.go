@@ -164,7 +164,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	// assigns all chunks in the receipt to this node through mocking
 	a := chunkassignment.NewAssignment()
 	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+		a.Add(chunk, flow.IdentifierList{verIdentity.NodeID})
 	}
 	suite.assigner.On("Assign",
 		testifymock.Anything,
@@ -539,7 +539,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
-			a.Add(chunk, []flow.Identifier{verID.NodeID})
+			a.Add(chunk, flow.IdentifierList{verID.NodeID})
 			//if chunkCounter % 2 == 0 {
 			vc := &verification.VerifiableChunk{
 				ChunkIndex: chunk.Index,

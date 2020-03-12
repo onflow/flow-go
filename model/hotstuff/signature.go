@@ -15,7 +15,7 @@ type SingleSignature struct {
 
 // AggregatedSignature is the aggregated signatures signed by all the signers on the same message.
 type AggregatedSignature struct {
-	StakingSignatures     []crypto.Signature // The raw bytes for aggregated BLS signature
-	RandomBeaconSignature crypto.Signature   // The aggregated threshold signature for generating random beacon
-	SignerIDs             []flow.Identifier  // The Identifiers of all the signers
+	StakingSignatures     []crypto.Signature  // The raw bytes for aggregated BLS signature
+	RandomBeaconSignature crypto.Signature    // The aggregated threshold signature for generating random beacon
+	SignerIDs             flow.IdentifierList // The Identifiers of all the signers
 }

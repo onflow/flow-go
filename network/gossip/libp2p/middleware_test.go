@@ -26,7 +26,7 @@ type MiddlewareTestSuit struct {
 	size int           // used to determine number of middlewares under test
 	mws  []*Middleware // used to keep track of middlewares under test
 	ov   []*mock.Overlay
-	ids  []flow.Identifier
+	ids  flow.IdentifierList
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -241,9 +241,9 @@ func (m *MiddlewareTestSuit) TestEcho() {
 }
 
 // createMiddelwares creates middlewares with mock overlay for each middleware
-func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []*Middleware) {
+func (m *MiddlewareTestSuit) createMiddleWares(count int) (flow.IdentifierList, []*Middleware) {
 	var mws []*Middleware
-	var ids []flow.Identifier
+	var ids flow.IdentifierList
 
 	// creates the middlewares
 	for i := 0; i < count; i++ {

@@ -47,7 +47,7 @@ func RetrieveSeals(blockID flow.Identifier, seals *[]*flow.Seal) func(*badger.Tx
 		}
 
 		// get the sealection IDs for the seals
-		var sealIDs []flow.Identifier
+		var sealIDs flow.IdentifierList
 		err = operation.LookupSealPayload(header.Height, blockID, header.ParentID, &sealIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup seals: %w", err)

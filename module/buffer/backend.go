@@ -18,7 +18,7 @@ type item struct {
 type backend struct {
 	mu sync.RWMutex
 	// map of pending block IDs, keyed by parent ID for ByParentID lookups
-	byParent map[flow.Identifier][]flow.Identifier
+	byParent map[flow.Identifier]flow.IdentifierList
 	// set of pending blocks, keyed by ID to avoid duplication
 	byID map[flow.Identifier]*item
 }
@@ -26,7 +26,7 @@ type backend struct {
 // newBackend returns a new pending block cache.
 func newBackend() *backend {
 	cache := &backend{
-		byParent: make(map[flow.Identifier][]flow.Identifier),
+		byParent: make(map[flow.Identifier]flow.IdentifierList),
 		byID:     make(map[flow.Identifier]*item),
 	}
 	return cache

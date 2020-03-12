@@ -11,6 +11,6 @@ type Response struct {
 	ChannelID uint8
 	EventID   []byte
 	OriginID  flow.Identifier
-	TargetIDs []flow.Identifier
+	TargetIDs flow.IdentifierList
 	Payload   []byte
 }

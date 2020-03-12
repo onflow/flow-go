@@ -77,7 +77,7 @@ func SealFixture() flow.Seal {
 func ClusterBlockFixture() cluster.Block {
 	payload := cluster.Payload{
 		Collection: flow.LightCollection{
-			Transactions: []flow.Identifier{IdentifierFixture()},
+			Transactions: flow.IdentifierList{IdentifierFixture()},
 		},
 	}
 	header := BlockHeaderFixture()
@@ -93,7 +93,7 @@ func ClusterBlockFixture() cluster.Block {
 func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	payload := cluster.Payload{
 		Collection: flow.LightCollection{
-			Transactions: []flow.Identifier{IdentifierFixture()},
+			Transactions: flow.IdentifierList{IdentifierFixture()},
 		},
 	}
 

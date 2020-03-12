@@ -65,7 +65,7 @@ type Header struct {
 	PayloadHash             Identifier // PayloadHash is a hash of the payload of this block.
 	Timestamp               time.Time  // Timestamp is the time at which this block was proposed. The proposing node can choose any time, so this should not be trusted as accurate.
 	View                    uint64     // View is the view number at which this block was proposed.
-	ParentSigners           []Identifier
+	ParentSigners           IdentifierList
 	ParentStakingSigs       []crypto.Signature // ParentStakingSigs is an aggregated staking signature for the parent block.
 	ParentRandomBeaconSig   crypto.Signature   // ParentRandomBeaconSig is a reconstructed signature for random beacon for the parent block.
 	ProposerID              Identifier
@@ -83,7 +83,7 @@ func (h Header) Body() interface{} {
 		Timestamp             time.Time
 		View                  uint64
 		ProposerID            Identifier
-		ParentSigners         []Identifier
+		ParentSigners         IdentifierList
 		ParentStakingSigs     []crypto.Signature
 		ParentRandomBeaconSig crypto.Signature
 	}{

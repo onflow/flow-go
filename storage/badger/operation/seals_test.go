@@ -59,7 +59,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 		})
 		require.Nil(t, err)
 
-		var actual []flow.Identifier
+		var actual flow.IdentifierList
 		err = db.View(LookupSealPayload(height, blockID, parentID, &actual))
 		require.Nil(t, err)
 

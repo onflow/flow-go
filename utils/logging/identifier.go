@@ -17,7 +17,7 @@ func ID(id flow.Identifier) []byte {
 	return id[:]
 }
 
-func IDs(ids []flow.Identifier) []string {
+func IDs(ids flow.IdentifierList) []string {
 	ss := make([]string, 0, len(ids))
 	for _, id := range ids {
 		ss = append(ss, hex.EncodeToString(id[:]))

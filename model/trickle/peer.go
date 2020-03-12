@@ -17,8 +17,8 @@ type Peer struct {
 type PeerList []*Peer
 
 // IDs returns the list of IDs for the peers in the list.
-func (pl PeerList) NodeIDs() []flow.Identifier {
-	nodeIDs := make([]flow.Identifier, 0, len(pl))
+func (pl PeerList) NodeIDs() flow.IdentifierList {
+	nodeIDs := make(flow.IdentifierList, 0, len(pl))
 	for _, p := range pl {
 		nodeIDs = append(nodeIDs, p.ID)
 	}

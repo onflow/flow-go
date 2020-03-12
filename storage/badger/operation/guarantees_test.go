@@ -58,11 +58,11 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		})
 		require.Nil(t, err)
 
-		var actual []flow.Identifier
+		var actual flow.IdentifierList
 		err = db.View(LookupGuaranteePayload(height, blockID, parentID, &actual))
 		require.Nil(t, err)
 
-		assert.Equal(t, []flow.Identifier{collID1, collID2}, actual)
+		assert.Equal(t, flow.IdentifierList{collID1, collID2}, actual)
 	})
 }
 
@@ -118,16 +118,16 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		require.Nil(t, err)
 
 		t.Run("should retrieve collections for block", func(t *testing.T) {
-			var actual1 []flow.Identifier
+			var actual1 flow.IdentifierList
 			err = db.View(LookupGuaranteePayload(height1, blockID1, parentID1, &actual1))
 			assert.NoError(t, err)
-			assert.ElementsMatch(t, []flow.Identifier{collID1}, actual1)
+			assert.ElementsMatch(t, flow.IdentifierList{collID1}, actual1)
 
 			// get block 2
-			var actual2 []flow.Identifier
+			var actual2 flow.IdentifierList
 			err = db.View(LookupGuaranteePayload(height2, blockID2, parentID2, &actual2))
 			assert.NoError(t, err)
-			assert.Equal(t, []flow.Identifier{collID2, collID3, collID4}, actual2)
+			assert.Equal(t, flow.IdentifierList{collID2, collID3, collID4}, actual2)
 		})
 	})
 }

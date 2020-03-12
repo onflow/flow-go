@@ -48,7 +48,7 @@ func RetrieveIdentities(blockID flow.Identifier, identities *[]*flow.Identity) f
 		}
 
 		// get the nodeIDs for the identities
-		var nodeIDs []flow.Identifier
+		var nodeIDs flow.IdentifierList
 		err = operation.LookupIdentityPayload(header.Height, blockID, header.ParentID, &nodeIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup identities: %w", err)

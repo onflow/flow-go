@@ -57,19 +57,19 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	for i := 0; i < chunks.Size(); i++ {
 		if len(t) >= alpha {
 			// More verifiers than required for this chunk
-			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(t[:alpha], nil))
+			assignment.Add(chunks.ByIndex(uint64(i)), t[:alpha])
 			t = t[alpha:]
 		} else {
 			// Less verifiers than required for this chunk
-			part1 := make([]flow.Identifier, len(t))
+			part1 := make(flow.IdentifierList, len(t))
 			copy(part1, t)
 
 			still := alpha - len(t)
 			permute(ids[:ids.Len()-len(t)], still, rng)
 
-			part2 := make([]flow.Identifier, still)
+			part2 := make(flow.IdentifierList, still)
 			copy(part2, ids[:still])
-			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(part1, part2))
+			assignment.Add(chunks.ByIndex(uint64(i)), part1.Join(part2))
 			permute(ids[still:], ids.Len()-still, rng)
 			t = ids[still:]
 		}

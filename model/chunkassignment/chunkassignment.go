@@ -17,7 +17,7 @@ func NewAssignment() *Assignment {
 
 // Verifiers returns the list of verifier nodes assigned to a chunk
 func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
-	v := make([]flow.Identifier, 0)
+	v := make(flow.IdentifierList, 0)
 	for id := range a.table[chunk.Index] {
 		v = append(v, id)
 	}
