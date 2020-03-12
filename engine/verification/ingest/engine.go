@@ -443,6 +443,44 @@ func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID
 	return chunkState, true
 }
 
+// getChunkDataPackForReceipt checks the chunk data pack associated with a chunk ID and
+// execution receipt. If the chunk data pack is available locally, returns true
+// as well as the chunk data pack itself.
+// Otherwise, returns false and requests the chunk data pack
+func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
+
+	log := e.log.With().
+		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Hex("receipt_id", logging.Entity(receipt)).
+		Logger()
+
+	if !e.chunkDataPacks.Has(chunkID) {
+		// the chunk data pack is missing, the chunk cannot yet be verified
+		// TODO rate limit these requests
+		err := e.requestChunkDataPack(chunkID)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Hex("chunk_id", logging.ID(chunkID)).
+				Msg("could not request chunk data pack")
+		}
+		return nil, false
+	}
+
+	// chunk data pack exists and retrieved and returned
+	chunkDataPack, err := e.chunkDataPacks.ByID(chunkID)
+	if err != nil {
+		// couldn't get chunk state from mempool, the chunk cannot yet be verified
+		log.Error().
+			Err(err).
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("could not get chunk data pack")
+		return nil, false
+	}
+	return chunkDataPack, true
+}
+
 // getCollectionForChunk checks the collection depended on the
 // given execution receipt and chunk. Returns true if the collections is available
 // locally. If the collections is not available locally, it is requested.
