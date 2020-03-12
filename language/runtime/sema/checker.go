@@ -947,7 +947,6 @@ func (checker *Checker) convertReferenceType(t *ast.ReferenceType) Type {
 
 	return &ReferenceType{
 		Authorized: t.Authorized,
-		Storable:   t.Storable,
 		Type:       ty,
 	}
 }

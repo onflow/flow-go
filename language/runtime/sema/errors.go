@@ -1854,18 +1854,6 @@ func (e *OptionalTypeReferenceError) Error() string {
 
 func (*OptionalTypeReferenceError) isSemanticError() {}
 
-// InvalidNonStorageStorableReferenceError
-
-type InvalidNonStorageStorableReferenceError struct {
-	ast.Range
-}
-
-func (e *InvalidNonStorageStorableReferenceError) Error() string {
-	return "cannot create storable reference which is not into storage"
-}
-
-func (*InvalidNonStorageStorableReferenceError) isSemanticError() {}
-
 // InvalidResourceCreationError
 
 type InvalidResourceCreationError struct {

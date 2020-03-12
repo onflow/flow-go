@@ -327,6 +327,50 @@ func TestCheckCastResourceType(t *testing.T) {
 		})
 	})
 
+	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+		const types = `
+          resource interface RI {}
+
+          resource R: RI {}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  let r: @AnyResource <- create R()
+                  let r2 <- r as @R{RI}
+                `,
+			)
+
+			// NOTE: static cast not allowed, only dynamic
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  fun test(): @R{RI}? {
+                      let r: @AnyResource <- create R()
+                      if let r2 <- r as? @R{RI} {
+                          return <-r2
+                      } else {
+                          destroy r
+                          return nil
+                      }
+                  }
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
 	t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
 
 		const types = `
@@ -601,6 +645,48 @@ func TestCheckCastResourceType(t *testing.T) {
 			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+	})
+
+	t.Run("AnyResource -> unrestricted resource", func(t *testing.T) {
+
+		const types = `
+           resource interface RI {}
+
+           resource R: RI {}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  let r: @AnyResource <- create R()
+                  let r2 <- r as @R
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  fun test(): @R? {
+                      let r: @AnyResource <- create R()
+                      if let r2 <- r as? @R {
+                          return <-r2
+                      } else {
+                          destroy r
+                          return nil
+                      }
+                  }
+                `,
+			)
+
+			require.NoError(t, err)
 		})
 	})
 
@@ -982,6 +1068,50 @@ func TestCheckCastResourceType(t *testing.T) {
 		})
 	})
 
+	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
+
+		const types = `
+          resource interface I {}
+
+          resource R: I {}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  let r: @AnyResource <- create R()
+                  let r2 <- r as @AnyResource{I}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				types+`
+                  fun test(): @AnyResource{I}? {
+                      let r: @AnyResource <- create R()
+                      if let r2 <- r as? @AnyResource{I} {
+                          return <-r2
+                      } else {
+                          destroy r
+                          return nil
+                      }
+                  }
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	// Supertype: AnyResource
+
 	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
 
 		const types = `
@@ -1149,44 +1279,6 @@ func TestCheckReferenceTypeSubTyping(t *testing.T) {
 
 			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 		})
-
-		t.Run(fmt.Sprintf("storable to non-storable: %s", ty), func(t *testing.T) {
-
-			_, err := ParseAndCheckStorage(t,
-				fmt.Sprintf(`
-                      resource interface I {}
-
-                      resource R: I {}
-
-                      let ref = &storage[R] as storable &%[1]s
-                      let ref2 = ref as &%[1]s
-                    `,
-					ty,
-				),
-			)
-
-			require.NoError(t, err)
-		})
-
-		t.Run(fmt.Sprintf("non-storable to storable: %s", ty), func(t *testing.T) {
-
-			_, err := ParseAndCheckStorage(t,
-				fmt.Sprintf(`
-                      resource interface I {}
-
-                      resource R: I {}
-
-                      let ref = &storage[R] as &%[1]s
-                      let ref2 = ref as storable &%[1]s
-                    `,
-					ty,
-				),
-			)
-
-			errs := ExpectCheckerErrors(t, err, 1)
-
-			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-		})
 	}
 }
 
@@ -1196,343 +1288,42 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
 
 	t.Run("restricted resource -> restricted resource: fewer restrictions", func(t *testing.T) {
 
-		_, err := ParseAndCheckStorage(t, `
-              resource interface I1 {}
-
-              resource interface I2 {}
-
-              resource R: I1, I2 {}
-
-              let r = &storage[R] as auth &R{I1, I2}
-              let r2 = r as &R{I2}
-            `,
-		)
-
-		require.NoError(t, err)
-	})
-
-	t.Run("restricted resource -> restricted resource: more restrictions", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-             resource interface I1 {}
-
-             resource interface I2 {}
-
-             resource R: I1, I2 {}
-
-             let r = &storage[R] as auth &R{I1}
-             let r2 = r as &R{I1, I2}
-           `,
-		)
-
-		require.NoError(t, err)
-	})
-
-	t.Run("restricted resource -> restricted resource: different resource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-             resource interface I {}
-
-             resource R1: I {}
-
-             resource R2: I {}
-
-             let r = &storage[R1] as auth &R1{I}
-             let r2 = r as &R2{I}
-           `,
-		)
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	t.Run("unrestricted resource -> restricted resource: same resource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface I {}
-
-            resource R: I {}
-
-            let r = &storage[R] as auth &R
-            let r2 = r as &R{I}
-          `,
-		)
-
-		require.NoError(t, err)
-	})
-
-	t.Run("unrestricted resource -> restricted resource: different resource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface I {}
-
-            resource R1: I {}
-
-            resource R2: I {}
-
-            let r = &storage[R1] as auth &R1
-            let r2 = r as &R2{I}
-          `,
-		)
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-           resource interface RI {}
-
-           resource R: RI {}
-
-           let r = &storage[R] as auth &AnyResource{RI}
-           let r2 = r as &R{RI}
-         `,
-		)
-
-		// NOTE: static cast not allowed, only dynamic
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-          resource interface RI {}
-
-          resource R: RI {}
-
-          let r = &storage[R] as auth &AnyResource
-          let r2 = r as &R{RI}
-        `,
-		)
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	// Supertype: Resource (unrestricted)
-
-	t.Run("restricted resource -> unrestricted resource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface I {}
-
-            resource R: I {}
-
-            let r = &storage[R] as auth &R{I}
-            let r2 = r as &R
-          `,
-		)
-
-		require.NoError(t, err)
-	})
-
-	t.Run("restricted AnyResource -> conforming resource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface RI {}
-
-            resource R: RI {}
-
-            let r = &storage[R] as auth &AnyResource{RI}
-            let r2 = r as &R
-          `,
-		)
-
-		// NOTE: static cast not allowed, only dynamic
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	t.Run("AnyResource -> unrestricted resource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-          resource interface RI {}
-
-          resource R: RI {}
-
-          let r = &storage[R] as auth &AnyResource
-          let r2 = r as &R
-        `,
-		)
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	// Supertype: restricted AnyResource
-
-	t.Run("resource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface RI {}
-
-            // NOTE: R does not conform to RI
-            resource R {}
-
-            let r = &storage[R] as auth &R
-            let r2 = r as &AnyResource{RI}
-          `,
-		)
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface RI {}
-
-            resource R: RI {}
-
-            let r = &storage[R] as auth &R
-            let r2 = r as &AnyResource{RI}
-          `,
-		)
-
-		require.NoError(t, err)
-	})
-
-	t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface I {}
-
-            resource R: I {}
-
-            let r = &storage[R] as auth &R{I}
-            let r2 = r as &AnyResource{I}
-          `,
-		)
-
-		require.NoError(t, err)
-	})
-
-	t.Run("restricted resource -> restricted AnyResource with conformance not in restriction", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface I1 {}
-
-            resource interface I2 {}
-
-            resource R: I1, I2 {}
-
-            let r = &storage[R] as auth &R{I1}
-            let r2 = r as &AnyResource{I2}
-          `,
-		)
-
-		require.NoError(t, err)
-	})
-
-	t.Run("restricted resource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface I1 {}
-
-            resource interface I2 {}
-
-            resource R: I1 {}
-
-            let r = &storage[R] as auth &R{I1}
-            let r2 = r as &AnyResource{I2}
-          `,
-		)
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-            resource interface I1 {}
-
-            resource interface I2 {}
-
-            resource R: I1, I2 {}
-
-            let r = &storage[R] as auth &AnyResource{I1, I2}
-            let r2 = r as &AnyResource{I2}
-          `,
-		)
-
-		require.NoError(t, err)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: more restrictions", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
+		const setup = `
           resource interface I1 {}
 
           resource interface I2 {}
 
           resource R: I1, I2 {}
 
-          let r = &storage[R] as auth &AnyResource{I1}
-          let r2 = r as &AnyResource{I1, I2}
-        `,
-		)
+          let r = &storage[R] as auth &R{I1, I2}
+        `
 
-		errs := ExpectCheckerErrors(t, err, 1)
+		t.Run("static", func(t *testing.T) {
 
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R{I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R{I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
 	})
 
-	t.Run("restricted AnyResource -> restricted AnyResource: non-conforming", func(t *testing.T) {
+	t.Run("restricted resource -> restricted resource: more restrictions", func(t *testing.T) {
 
-		_, err := ParseAndCheckStorage(t, `
-          resource interface I1 {}
-
-          resource interface I2 {}
-
-          resource R: I1 {}
-
-          let r = &storage[R] as auth &AnyResource{I1}
-          let r2 = r as &AnyResource{I1, I2}
-        `,
-		)
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-          resource interface I {}
-
-          resource R: I {}
-
-          let r = &storage[R] as auth &AnyResource
-          let r2 = r as &AnyResource{I}
-        `,
-		)
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	})
-
-	// Supertype: AnyResource
-
-	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
+		const setup = `
           resource interface I1 {}
 
           resource interface I2 {}
@@ -1540,16 +1331,657 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
           resource R: I1, I2 {}
 
           let r = &storage[R] as auth &R{I1}
-          let r2 = r as &AnyResource
-        `,
-		)
+        `
 
-		require.NoError(t, err)
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R{I1, I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R{I1, I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
 	})
 
-	t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
+	t.Run("restricted resource -> restricted resource: different resource", func(t *testing.T) {
 
-		_, err := ParseAndCheckStorage(t, `
+		const setup = `
+          resource interface I {}
+
+          resource R1: I {}
+
+          resource R2: I {}
+
+          let r = &storage[R1] as auth &R1{I}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R2{I}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R2{I}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+	})
+
+	t.Run("unrestricted resource -> restricted resource: same resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface I {}
+
+          resource R: I {}
+
+          let r = &storage[R] as auth &R
+
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R{I}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R{I}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("unrestricted resource -> restricted resource: different resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface I {}
+
+          resource R1: I {}
+
+          resource R2: I {}
+
+          let r = &storage[R1] as auth &R1
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R2{I}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R2{I}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+	})
+
+	t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let r = &storage[R] as auth &AnyResource{RI}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R{RI}
+                `,
+			)
+
+			// NOTE: static cast not allowed, only dynamic
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R{RI}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let r = &storage[R] as auth &AnyResource
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R{RI}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R{RI}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("restricted AnyResource -> non-conforming restricted resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface RI {}
+
+          resource R {}
+
+          let r = &storage[R] as auth &AnyResource{RI}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R{RI}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 3)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+			assert.IsType(t, &sema.InvalidNonConformanceRestrictionError{}, errs[1])
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R{RI}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 2)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+			assert.IsType(t, &sema.InvalidNonConformanceRestrictionError{}, errs[1])
+		})
+	})
+
+	// Supertype: Resource (unrestricted)
+
+	t.Run("restricted resource -> unrestricted resource: same resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface I {}
+
+          resource R: I {}
+
+          let r = &storage[R] as auth &R{I}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("restricted resource -> unrestricted resource: different resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface I {}
+
+          resource R: I {}
+
+          resource T: I {}
+
+          let r = &storage[R] as auth &R{I}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let t = r as &T
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let t = r as? &T
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+	})
+
+	t.Run("restricted AnyResource -> conforming resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let r = &storage[R] as auth &AnyResource{RI}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R
+                `,
+			)
+
+			// NOTE: static cast not allowed, only dynamic
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("restricted AnyResource -> non-conforming resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface RI {}
+
+          resource R {}
+
+          let r = &storage[R] as auth &AnyResource{RI}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 2)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+	})
+
+	t.Run("AnyResource -> unrestricted resource", func(t *testing.T) {
+
+		const setup = `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let r = &storage[R] as auth &AnyResource
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &R
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &R
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	// Supertype: restricted AnyResource
+
+	t.Run("resource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
+
+		const setup = `
+          resource interface RI {}
+
+          // NOTE: R does not conform to RI
+          resource R {}
+
+          let r = &storage[R] as auth &R
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource{RI}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource{RI}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+	})
+
+	t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
+
+		const setup = `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let r = &storage[R] as auth &R
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource{RI}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource{RI}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
+
+		const setup = `
+          resource interface I {}
+
+          resource R: I {}
+
+          let r = &storage[R] as auth &R{I}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource{I}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource{I}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("restricted resource -> restricted AnyResource with conformance not in restriction", func(t *testing.T) {
+
+		const setup = `
+          resource interface I1 {}
+
+          resource interface I2 {}
+
+          resource R: I1, I2 {}
+
+          let r = &storage[R] as auth &R{I1}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource{I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource{I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("restricted resource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
+
+		const setup = `
+          resource interface I1 {}
+
+          resource interface I2 {}
+
+          resource R: I1 {}
+
+          let r = &storage[R] as auth &R{I1}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource{I2}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource{I2}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
+
+		const setup = `
+          resource interface I1 {}
+
+          resource interface I2 {}
+
+          resource R: I1, I2 {}
+
+          let r = &storage[R] as auth &AnyResource{I1, I2}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource{I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource{I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource: more restrictions", func(t *testing.T) {
+
+		const setup = `
           resource interface I1 {}
 
           resource interface I2 {}
@@ -1557,16 +1989,180 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
           resource R: I1, I2 {}
 
           let r = &storage[R] as auth &AnyResource{I1}
-          let r2 = r as &AnyResource
-        `,
-		)
+        `
 
-		require.NoError(t, err)
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource{I1, I2}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource{I1, I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("restricted AnyResource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
+
+		const setup = `
+          resource interface I1 {}
+
+          resource interface I2 {}
+
+          resource R: I1 {}
+
+          let r = &storage[R] as auth &AnyResource{I1}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource{I1, I2}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource{I1, I2}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
+
+		const setup = `
+          resource interface I {}
+
+          resource R: I {}
+
+          let r = &storage[R] as auth &AnyResource
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource{I}
+                `,
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource{I}
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	// Supertype: AnyResource
+
+	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
+
+		const setup = `
+          resource interface I1 {}
+
+          resource interface I2 {}
+
+          resource R: I1, I2 {}
+
+          let r = &storage[R] as auth &R{I1}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
+
+		const setup = `
+          resource interface I1 {}
+
+          resource interface I2 {}
+
+          resource R: I1, I2 {}
+
+          let r = &storage[R] as auth &AnyResource{I1}
+        `
+
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource
+                `,
+			)
+
+			require.NoError(t, err)
+		})
 	})
 
 	t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
 
-		_, err := ParseAndCheckStorage(t, `
+		const setup = `
           resource interface I1 {}
 
           resource interface I2 {}
@@ -1574,11 +2170,29 @@ func TestCheckCastStaticAuthorizedReferenceType(t *testing.T) {
           resource R: I1, I2 {}
 
           let r = &storage[R] as auth &R
-          let r2 = r as &AnyResource
-        `,
-		)
+        `
 
-		require.NoError(t, err)
+		t.Run("static", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as &AnyResource
+                `,
+			)
+
+			require.NoError(t, err)
+		})
+
+		t.Run("dynamic", func(t *testing.T) {
+
+			_, err := ParseAndCheckStorage(t,
+				setup+`
+                  let r2 = r as? &AnyResource
+                `,
+			)
+
+			require.NoError(t, err)
+		})
 	})
 }
 

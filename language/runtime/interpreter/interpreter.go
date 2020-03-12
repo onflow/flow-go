@@ -3090,6 +3090,8 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 
 func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *ast.ReferenceExpression) ast.Repr {
 
+	authorized := referenceExpression.Type.(*ast.ReferenceType).Authorized
+
 	if interpreter.Checker.Elaboration.IsReferenceIntoStorage[referenceExpression] {
 		indexExpression := referenceExpression.Expression.(*ast.IndexExpression)
 		return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
@@ -3100,6 +3102,7 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 				key := interpreter.storageKeyHandler(interpreter, storage.Address, indexingType)
 
 				referenceValue := &StorageReferenceValue{
+					Authorized:           authorized,
 					TargetStorageAddress: storage.Address,
 					TargetKey:            key,
 					// NOTE: new value has no owner
@@ -3112,7 +3115,8 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 		return referenceExpression.Expression.Accept(interpreter).(Trampoline).
 			Map(func(result interface{}) interface{} {
 				return &EphemeralReferenceValue{
-					Value: result.(Value),
+					Authorized: authorized,
+					Value:      result.(Value),
 				}
 			})
 	}
@@ -3185,8 +3189,6 @@ func (interpreter *Interpreter) newConverterFunction(converter ValueConverter) F
 
 // TODO:
 // - FunctionType
-// - StorageReferenceType
-// - EphemeralReferenceType
 // - PublishedType
 //
 // - Character
@@ -3311,6 +3313,23 @@ func (interpreter *Interpreter) IsSubType(subType DynamicType, superType sema.Ty
 		switch superType.(type) {
 		case *sema.StorageType, *sema.AnyStructType:
 			return true
+
+		default:
+			return false
+		}
+
+	case ReferenceType:
+		switch typedSuperType := superType.(type) {
+		case *sema.AnyStructType:
+			return true
+
+		case *sema.ReferenceType:
+			if typedSubType.Authorized() {
+				return interpreter.IsSubType(typedSubType.InnerType(), typedSuperType.Type)
+			} else {
+				// TODO:
+				return false
+			}
 
 		default:
 			return false

@@ -4059,6 +4059,7 @@ func (PublishedValue) SetOwner(_ *common.Address) {
 // StorageReferenceValue
 
 type StorageReferenceValue struct {
+	Authorized           bool
 	TargetStorageAddress common.Address
 	TargetKey            string
 	Owner                *common.Address
@@ -4070,12 +4071,23 @@ func init() {
 
 func (*StorageReferenceValue) IsValue() {}
 
-func (*StorageReferenceValue) DynamicType(_ *Interpreter) DynamicType {
-	return StorageReferenceType{}
+func (v *StorageReferenceValue) DynamicType(interpreter *Interpreter) DynamicType {
+	referencedValue := v.referencedValue(interpreter)
+	if referencedValue == nil {
+		panic(&DereferenceError{})
+	}
+
+	innerType := (*referencedValue).DynamicType(interpreter)
+
+	return StorageReferenceType{
+		authorized: v.Authorized,
+		innerType:  innerType,
+	}
 }
 
 func (v *StorageReferenceValue) Copy() Value {
 	return &StorageReferenceValue{
+		Authorized:           v.Authorized,
 		TargetStorageAddress: v.TargetStorageAddress,
 		TargetKey:            v.TargetKey,
 		// NOTE: new value has no owner
@@ -4091,38 +4103,64 @@ func (v *StorageReferenceValue) SetOwner(owner *common.Address) {
 	v.Owner = owner
 }
 
-func (v *StorageReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
+func (v *StorageReferenceValue) referencedValue(interpreter *Interpreter) *Value {
 	key := PrefixedStorageKey(v.TargetKey, AccessLevelPrivate)
 
 	switch referenced := interpreter.readStored(v.TargetStorageAddress, key).(type) {
 	case *SomeValue:
-		return referenced.Value
+		return &referenced.Value
 	case NilValue:
-		panic(&DereferenceError{
-			LocationRange: locationRange,
-		})
+		return nil
 	default:
 		panic(errors.NewUnreachableError())
 	}
 }
 
 func (v *StorageReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
-	return v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
+	referencedValue := v.referencedValue(interpreter)
+	if referencedValue == nil {
+		panic(&DereferenceError{
+			LocationRange: locationRange,
+		})
+	}
+
+	return (*referencedValue).(MemberAccessibleValue).
 		GetMember(interpreter, locationRange, name)
 }
 
 func (v *StorageReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
-	v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
+	referencedValue := v.referencedValue(interpreter)
+	if referencedValue == nil {
+		panic(&DereferenceError{
+			LocationRange: locationRange,
+		})
+	}
+
+	(*referencedValue).(MemberAccessibleValue).
 		SetMember(interpreter, locationRange, name, value)
 }
 
 func (v *StorageReferenceValue) Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value {
-	return v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
+	referencedValue := v.referencedValue(interpreter)
+	if referencedValue == nil {
+		panic(&DereferenceError{
+			LocationRange: locationRange,
+		})
+	}
+
+	return (*referencedValue).(ValueIndexableValue).
 		Get(interpreter, locationRange, key)
 }
 
 func (v *StorageReferenceValue) Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value) {
-	v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
+	referencedValue := v.referencedValue(interpreter)
+	if referencedValue == nil {
+		panic(&DereferenceError{
+			LocationRange: locationRange,
+		})
+	}
+
+	(*referencedValue).(ValueIndexableValue).
 		Set(interpreter, locationRange, key, value)
 }
 
@@ -4133,19 +4171,26 @@ func (v *StorageReferenceValue) Equal(other Value) BoolValue {
 	}
 
 	return v.TargetStorageAddress == otherReference.TargetStorageAddress &&
-		v.TargetKey == otherReference.TargetKey
+		v.TargetKey == otherReference.TargetKey &&
+		v.Authorized == otherReference.Authorized
 }
 
 // EphemeralReferenceValue
 
 type EphemeralReferenceValue struct {
-	Value Value
+	Authorized bool
+	Value      Value
 }
 
 func (*EphemeralReferenceValue) IsValue() {}
 
-func (*EphemeralReferenceValue) DynamicType(_ *Interpreter) DynamicType {
-	return EphemeralReferenceType{}
+func (v *EphemeralReferenceValue) DynamicType(interpreter *Interpreter) DynamicType {
+	innerType := v.Value.DynamicType(interpreter)
+
+	return EphemeralReferenceType{
+		authorized: v.Authorized,
+		innerType:  innerType,
+	}
 }
 
 func (v *EphemeralReferenceValue) Copy() Value {
@@ -4187,7 +4232,8 @@ func (v *EphemeralReferenceValue) Equal(other Value) BoolValue {
 		return false
 	}
 
-	return otherReference.Value == v.Value
+	return v.Value == otherReference.Value &&
+		v.Authorized == otherReference.Authorized
 }
 
 // AddressValue
