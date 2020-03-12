@@ -45,6 +45,17 @@ type ChunkDataPack struct {
 	RegisterTouches []RegisterTouch
 }
 
+// ID returns the unique identifier for the concrete view, which is the ID of
+// the chunk the view is for.
+func (c *ChunkDataPack) ID() Identifier {
+	return c.ChunkID
+}
+
+// Checksum returns the checksum of the chunk data pack.
+func (c *ChunkDataPack) Checksum() Identifier {
+	return MakeID(c)
+}
+
 type ChunkHeader struct {
 	ChunkID     Identifier
 	StartState  StateCommitment

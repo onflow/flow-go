@@ -36,6 +36,7 @@ type Engine struct {
 	blocks             mempool.Blocks
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
+	chunkDataPacks     mempool.ChunkDataPacks
 	checkChunksLock    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
 	assigner           module.ChunkAssigner // used to determine chunks this node needs to verify
 }
@@ -51,20 +52,22 @@ func New(
 	blocks mempool.Blocks,
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
+	chunkDataPacks mempool.ChunkDataPacks,
 	assigner module.ChunkAssigner,
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log,
-		state:       state,
-		me:          me,
-		receipts:    receipts,
-		verifierEng: verifierEng,
-		blocks:      blocks,
-		collections: collections,
-		chunkStates: chunkStates,
-		assigner:    assigner,
+		unit:           engine.NewUnit(),
+		log:            log,
+		state:          state,
+		me:             me,
+		receipts:       receipts,
+		verifierEng:    verifierEng,
+		blocks:         blocks,
+		collections:    collections,
+		chunkStates:    chunkStates,
+		chunkDataPacks: chunkDataPacks,
+		assigner:       assigner,
 	}
 
 	var err error

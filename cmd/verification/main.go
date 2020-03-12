@@ -23,6 +23,7 @@ func main() {
 		blocks          *stdmap.Blocks
 		collections     *stdmap.Collections
 		chunkStates     *stdmap.ChunkStates
+		chunkDataPacks  *
 		verifierEng     *verifier.Engine
 	)
 
