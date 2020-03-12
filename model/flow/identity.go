@@ -2,7 +2,6 @@ package flow
 
 import (
 	"fmt"
-	"math/rand"
 	"regexp"
 	"strconv"
 
@@ -92,8 +91,8 @@ IDLoop:
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
-func (il IdentityList) NodeIDs() []Identifier {
-	ids := make([]Identifier, 0, len(il))
+func (il IdentityList) NodeIDs() IdentifierList {
+	ids := make(IdentifierList, 0, len(il))
 	for _, id := range il {
 		ids = append(ids, id.NodeID)
 	}
@@ -134,34 +133,6 @@ func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 		}
 	}
 	return nil, false
-}
-
-// RandN returns a list containing n identities randomly selected from the
-// receiver list L. If n<0 or n>len(L), returns L.
-func (il IdentityList) RandN(n int) IdentityList {
-
-	if n == 0 {
-		return IdentityList{}
-	}
-	if n < 0 || n > len(il) {
-		return il
-	}
-
-	// create a copy of the list to pick random elements from
-	src := make(IdentityList, len(il))
-	copy(src, il)
-
-	out := make(IdentityList, 0, n)
-	for i := 0; i < n; i++ {
-		// pick a random index
-		index := rand.Intn(len(src))
-		// add the identity at the index to the output
-		out = append(out, src[index])
-		// remove the selected identity to avoid duplicates
-		src = append(src[:index], src[index+1:]...)
-	}
-
-	return out
 }
 
 // Identities lists up and returns all the Identity objects inside the IdentityList
