@@ -4,6 +4,7 @@ package libp2p
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -217,7 +219,14 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 
 		// if this is a retry attempt, wait for some time before retrying
 		if err != nil {
-			time.Sleep(5 * time.Millisecond)
+			// choose a random interval between 0 and 5 ms to retry
+			r := rand.Intn(5)
+			time.Sleep(time.Duration(r) * time.Millisecond)
+			// cancel the dial back off, since we want to retry immediately
+			n := p.libP2PHost.Network()
+			if s, ok := n.(*swarm.Swarm); ok {
+				s.Backoff().Clear(targetID)
+			}
 		}
 
 		// Add node address as a peer

@@ -24,7 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/assignment"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -85,17 +85,19 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	require.NoError(t, err)
 
 	collections := storage.NewCollections(node.DB)
+	transactions := storage.NewTransactions(node.DB)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool)
 	require.Nil(t, err)
 
-	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, collections)
+	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool, collections, transactions)
 	require.Nil(t, err)
 
 	return mock.CollectionNode{
 		GenericNode:     node,
 		Pool:            pool,
 		Collections:     collections,
+		Transactions:    transactions,
 		IngestionEngine: ingestionEngine,
 		ProviderEngine:  providerEngine,
 	}
@@ -237,7 +239,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, assigner assignment.ChunkAssigner, opts ...VerificationOpt) mock.VerificationNode {
+func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, assigner module.ChunkAssigner, opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{

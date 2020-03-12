@@ -22,7 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// An Engine receives and saves incoming blocks.
+// An Manager receives and saves incoming blocks.
 type Engine struct {
 	unit              *engine.Unit
 	log               zerolog.Logger
@@ -33,7 +33,7 @@ type Engine struct {
 	blocks            storage.Blocks
 	payloads          storage.Payloads
 	collections       storage.Collections
-	computationEngine computation.ComputationEngine
+	computationEngine computation.ComputationManager
 	providerEngine    provider.ProviderEngine
 	mempool           *Mempool
 	execState         state.ExecutionState
@@ -47,7 +47,7 @@ func New(
 	blocks storage.Blocks,
 	payloads storage.Payloads,
 	collections storage.Collections,
-	executionEngine computation.ComputationEngine,
+	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
 ) (*Engine, error) {
@@ -339,7 +339,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 
 	e.log.Debug().
 		Hex("block_id", logging.ID(result.CompleteBlock.Block.ID())).
-		Msg("received computationEngine result")
+		Msg("received computation result")
 
 	chunks := make([]*flow.Chunk, len(result.StateViews))
 
@@ -383,14 +383,14 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 
 	executionResult, err := e.generateExecutionResultForBlock(result.CompleteBlock, chunks, endState)
 	if err != nil {
-		return fmt.Errorf("could not generate computationEngine result: %w", err)
+		return fmt.Errorf("could not generate execution result: %w", err)
 	}
 
 	receipt := &flow.ExecutionReceipt{
 		ExecutionResult: *executionResult,
 		// TODO: include SPoCKs
 		Spocks: nil,
-		// TODO: sign computationEngine receipt
+		// TODO: sign execution receipt
 		ExecutorSignature: nil,
 		ExecutorID:        e.me.NodeID(),
 	}
@@ -408,7 +408,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	return nil
 }
 
-// generateChunk creates a chunk from the provided computationEngine data.
+// generateChunk creates a chunk from the provided computation data.
 func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
@@ -431,12 +431,6 @@ func generateChunkHeader(
 	chunk *flow.Chunk,
 	registerIDs []flow.RegisterID,
 ) *flow.ChunkHeader {
-	//reads := make([]flow.RegisterID, len(registerIDs))
-	//
-	//for i, registerID := range registerIDs {
-	//	reads[i] = flow.RegisterID(registerID)
-	//}
-
 	return &flow.ChunkHeader{
 		ChunkID:     chunk.ID(),
 		StartState:  chunk.StartState,
@@ -444,7 +438,7 @@ func generateChunkHeader(
 	}
 }
 
-// generateExecutionResultForBlock creates a new computationEngine result for a block from
+// generateExecutionResultForBlock creates new ExecutionResult for a block from
 // the provided chunk results.
 func (e *Engine) generateExecutionResultForBlock(
 	block *execution.CompleteBlock,
@@ -454,7 +448,7 @@ func (e *Engine) generateExecutionResultForBlock(
 
 	previousErID, err := e.execState.GetExecutionResultID(block.Block.ParentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get previous computationEngine result ID: %w", err)
+		return nil, fmt.Errorf("could not get previous execution result ID: %w", err)
 	}
 
 	er := &flow.ExecutionResult{
@@ -468,7 +462,7 @@ func (e *Engine) generateExecutionResultForBlock(
 
 	err = e.execState.PersistExecutionResult(block.Block.ID(), *er)
 	if err != nil {
-		return nil, fmt.Errorf("could not persist computationEngine result: %w", err)
+		return nil, fmt.Errorf("could not persist execution result: %w", err)
 	}
 
 	return er, nil

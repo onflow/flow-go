@@ -345,8 +345,8 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	return tx
 }
 
-func TransactionBodyFixture() flow.TransactionBody {
-	return flow.TransactionBody{
+func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
+	tb := flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
 		ReferenceBlockID: IdentifierFixture(),
 		Nonce:            rand.Uint64(),
@@ -355,6 +355,12 @@ func TransactionBodyFixture() flow.TransactionBody {
 		ScriptAccounts:   []flow.Address{AddressFixture()},
 		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
 	}
+
+	for _, apply := range opts {
+		apply(&tb)
+	}
+
+	return tb
 }
 
 // CompleteExecutionResultFixture returns complete execution result with an

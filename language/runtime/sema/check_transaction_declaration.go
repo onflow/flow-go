@@ -34,6 +34,10 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 
 	checker.declareSelfValue(transactionType)
 
+	if declaration.ParameterList != nil {
+		checker.checkTransactionParameters(declaration, transactionType.Parameters)
+	}
+
 	checker.visitTransactionPrepareFunction(declaration.Prepare, transactionType, fieldMembers)
 
 	if declaration.PreConditions != nil {
@@ -53,6 +57,34 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 	checker.checkResourceFieldsInvalidated(transactionType, transactionType.Members)
 
 	return nil
+}
+
+func (checker *Checker) checkTransactionParameters(declaration *ast.TransactionDeclaration, parameters []*Parameter) {
+	checker.checkArgumentLabels(declaration.ParameterList)
+	checker.checkParameters(declaration.ParameterList, parameters)
+	checker.declareParameters(declaration.ParameterList, parameters)
+
+	// Check that none of the parameters are resources
+
+	for i, parameter := range parameters {
+		parameterType := parameter.TypeAnnotation.Type
+
+		if parameterType.IsInvalidType() ||
+			!parameterType.IsResourceType() {
+
+			continue
+		}
+
+		astParameter := declaration.ParameterList.Parameters[i]
+		typeRange := ast.NewRangeFromPositioned(astParameter.TypeAnnotation)
+
+		checker.report(
+			&InvalidResourceTransactionParameterError{
+				Type:  parameterType,
+				Range: typeRange,
+			},
+		)
+	}
 }
 
 // checkTransactionFields validates the field declarations for a transaction.
@@ -189,6 +221,10 @@ func (checker *Checker) visitTransactionExecuteFunction(
 func (checker *Checker) declareTransactionDeclaration(declaration *ast.TransactionDeclaration) {
 	transactionType := &TransactionType{}
 
+	if declaration.ParameterList != nil {
+		transactionType.Parameters = checker.parameters(declaration.ParameterList)
+	}
+
 	members, origins := checker.nonEventMembersAndOrigins(
 		transactionType,
 		declaration.Fields,
@@ -198,13 +234,11 @@ func (checker *Checker) declareTransactionDeclaration(declaration *ast.Transacti
 
 	checker.memberOrigins[transactionType] = origins
 
-	var prepareParameters []*Parameter
-	if declaration.Prepare != nil {
-		prepareParameters = checker.parameters(declaration.Prepare.ParameterList)
-	}
-
 	transactionType.Members = members
-	transactionType.prepareParameters = prepareParameters
+
+	if declaration.Prepare != nil {
+		transactionType.PrepareParameters = checker.parameters(declaration.Prepare.ParameterList)
+	}
 
 	checker.Elaboration.TransactionDeclarationTypes[declaration] = transactionType
 	checker.TransactionTypes = append(checker.TransactionTypes, transactionType)

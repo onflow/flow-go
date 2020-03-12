@@ -30,16 +30,16 @@ var (
 )
 
 type testingContext struct {
-	t                 *testing.T
-	engine            *Engine
-	blocks            *storage.MockBlocks
-	collections       *storage.MockCollections
-	state             *protocol.State
-	conduit           *network.MockConduit
-	collectionConduit *network.MockConduit
-	computationEngine *computation.ComputationEngine
-	providerEngine    *provider.ProviderEngine
-	executionState    *state.ExecutionState
+	t                  *testing.T
+	engine             *Engine
+	blocks             *storage.MockBlocks
+	collections        *storage.MockCollections
+	state              *protocol.State
+	conduit            *network.MockConduit
+	collectionConduit  *network.MockConduit
+	ComputationManager *computation.ComputationManager
+	providerEngine     *provider.ProviderEngine
+	executionState     *state.ExecutionState
 }
 
 func runWithEngine(t *testing.T, f func(ctx testingContext)) {
@@ -63,7 +63,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	computationEngine := new(computation.ComputationEngine)
+	computationEngine := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
 	protocolState := new(protocol.State)
 	executionState := new(state.ExecutionState)
@@ -92,16 +92,16 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	require.NoError(t, err)
 
 	f(testingContext{
-		t:                 t,
-		engine:            engine,
-		blocks:            blocks,
-		collections:       collections,
-		state:             protocolState,
-		conduit:           conduit,
-		collectionConduit: collectionConduit,
-		computationEngine: computationEngine,
-		providerEngine:    providerEngine,
-		executionState:    executionState,
+		t:                  t,
+		engine:             engine,
+		blocks:             blocks,
+		collections:        collections,
+		state:              protocolState,
+		conduit:            conduit,
+		collectionConduit:  collectionConduit,
+		ComputationManager: computationEngine,
+		providerEngine:     providerEngine,
+		executionState:     executionState,
 	})
 
 	computationEngine.AssertExpectations(t)
@@ -190,7 +190,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *execu
 	ctx.executionState.On("StateCommitmentByBlockID", completeBlock.Block.ParentID).Return(startStateCommitment, nil)
 	ctx.executionState.On("NewView", startStateCommitment).Return(nil)
 
-	ctx.computationEngine.On("ComputeBlock", completeBlock, mock.Anything).Return(computationResult, nil).Once()
+	ctx.ComputationManager.On("ComputeBlock", completeBlock, mock.Anything).Return(computationResult, nil).Once()
 
 	ctx.executionState.On("CommitDelta", computationResult.StateViews[0].Delta()).Return(newStateCommitment, nil)
 	ctx.executionState.On("PersistChunkHeader", mock.MatchedBy(func(f *flow.ChunkHeader) bool {

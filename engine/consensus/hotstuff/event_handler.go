@@ -106,7 +106,6 @@ func (e *EventHandler) OnReceiveProposal(proposal *hotstuff.Proposal) error {
 			Msg("invalid proposal")
 		return nil
 	}
-
 	if errors.Is(err, hotstuff.ErrUnverifiableBlock) {
 		e.log.Warn().
 			Hex("block_id", logging.ID(proposal.Block.BlockID)).
@@ -117,7 +116,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *hotstuff.Proposal) error {
 		// pruned, it still needs to be added to the forks, otherwise,
 		// a new block with a QC to this block will fail to be added
 		// to forks and crash the event loop.
-	} else {
+	} else if err != nil {
 		return fmt.Errorf("cannot validate proposal (%x): %w", proposal.Block.BlockID, err)
 	}
 

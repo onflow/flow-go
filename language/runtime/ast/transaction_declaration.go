@@ -1,8 +1,11 @@
 package ast
 
-import "github.com/dapperlabs/flow-go/language/runtime/common"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/common"
+)
 
 type TransactionDeclaration struct {
+	ParameterList  *ParameterList
 	Fields         []*FieldDeclaration
 	Prepare        *SpecialFunctionDeclaration
 	PreConditions  *Conditions
