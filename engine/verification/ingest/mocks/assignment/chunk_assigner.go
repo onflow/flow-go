@@ -16,11 +16,11 @@ type ChunkAssigner struct {
 }
 
 // Assigner provides a mock function with given fields: ids, chunks, rng
-func (_m *ChunkAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*assignment.Assignment, error) {
+func (_m *ChunkAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*assignment.Assignment, error) {
 	ret := _m.Called(ids, chunks, rng)
 
 	var r0 *assignment.Assignment
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, flow.ChunkList, random.RandomGenerator) *assignment.Assignment); ok {
+	if rf, ok := ret.Get(0).(func(flow.IdentityList, flow.ChunkList, random.Rand) *assignment.Assignment); ok {
 		r0 = rf(ids, chunks, rng)
 	} else {
 		if ret.Get(0) != nil {
@@ -29,7 +29,7 @@ func (_m *ChunkAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.IdentityList, flow.ChunkList, random.RandomGenerator) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.IdentityList, flow.ChunkList, random.Rand) error); ok {
 		r1 = rf(ids, chunks, rng)
 	} else {
 		r1 = ret.Error(1)
