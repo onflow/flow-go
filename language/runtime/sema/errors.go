@@ -923,22 +923,6 @@ func (e *ImportedProgramError) EndPosition() ast.Position {
 	return e.Pos
 }
 
-// UnsupportedCastedTypeError
-
-type UnsupportedCastedTypeError struct {
-	Type Type
-	ast.Range
-}
-
-func (e *UnsupportedCastedTypeError) Error() string {
-	return fmt.Sprintf(
-		"cannot cast value of type: `%s`",
-		e.Type.QualifiedString(),
-	)
-}
-
-func (*UnsupportedCastedTypeError) isSemanticError() {}
-
 // AlwaysFailingNonResourceCastingTypeError
 
 type AlwaysFailingNonResourceCastingTypeError struct {

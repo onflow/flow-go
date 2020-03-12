@@ -4009,14 +4009,9 @@ func IsSubType(subType Type, superType Type) bool {
 						return false
 					}
 
-					for _, restriction := range typedInnerSuperType.Restrictions {
-						// TODO: once interfaces can conform to interfaces, include
-						if _, ok := typedInnerSubType.ConformanceSet()[restriction]; !ok {
-							return false
-						}
-					}
-
-					return true
+					// TODO: once interfaces can conform to interfaces, include
+					return typedInnerSuperType.RestrictionSet().
+						IsSubsetOf(typedInnerSubType.ConformanceSet())
 
 				case *AnyResourceType:
 					// An unauthorized reference to an unrestricted resource type `&T`
@@ -4162,14 +4157,9 @@ func IsSubType(subType Type, superType Type) bool {
 						return false
 					}
 
-					for _, restriction := range typedSuperType.Restrictions {
-						// TODO: once interfaces can conform to interfaces, include
-						if _, ok := restrictedSubtype.ConformanceSet()[restriction]; !ok {
-							return false
-						}
-					}
-
-					return true
+					// TODO: once interfaces can conform to interfaces, include
+					return typedSuperType.RestrictionSet().
+						IsSubsetOf(restrictedSubtype.ConformanceSet())
 				}
 
 			case *AnyResourceType:
@@ -4187,14 +4177,8 @@ func IsSubType(subType Type, superType Type) bool {
 					return false
 				}
 
-				for _, restriction := range typedSuperType.Restrictions {
-					// TODO: once interfaces can conform to interfaces, include
-					if _, ok := typedSubType.ConformanceSet()[restriction]; !ok {
-						return false
-					}
-				}
-
-				return true
+				return typedSuperType.RestrictionSet().
+					IsSubsetOf(typedSubType.ConformanceSet())
 			}
 
 		} else {
@@ -4213,7 +4197,7 @@ func IsSubType(subType Type, superType Type) bool {
 				case *CompositeType:
 					// When `T != AnyResource`: if `T == V`.
 					//
-					// `Us` and `Ws` do not have to be subsets:
+					// `Us` and `Ws` do *not* have to be subsets:
 					// The owner of the resource may freely restrict and unrestrict the resource.
 
 					return restrictedSubType.Kind == common.CompositeKindResource &&
