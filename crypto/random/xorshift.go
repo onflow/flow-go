@@ -125,10 +125,21 @@ func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
 
 // Shuffle permutes the given slice in place
 // It implements Fisher-Yates Shuffle using x as a source of randoms
-// O(n) space and O(n) time
+// O(1) space and O(n) time
 func (x *xorshifts) Shuffle(n int, swap func(i, j int)) {
 	for i := n - 1; i > 0; i-- {
 		j, _ := x.IntN(i + 1)
 		swap(i, j)
+	}
+}
+
+// Samples picks randomly m elements out of n elemnts and places them
+// in random order at indices [0,m-1]. The swapping is done in place
+// It implements the first (m) elements of Fisher-Yates Shuffle using x as a source of randoms
+// O(1) space and O(m) time
+func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) {
+	for i := 0; i < m; i++ {
+		j, _ := x.IntN(n - i)
+		swap(i, i+j)
 	}
 }

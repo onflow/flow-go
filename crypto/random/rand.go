@@ -13,8 +13,16 @@ type Rand interface {
 	// to make sure the function output space covers a big chunk of the theortical outputs.
 	SubPermutation(n int, m int) ([]int, error)
 	// Shuffle permutes an ordered data structure of an aribtrary type in place. The main use-case is
-	// permuting slice elements. (n) is the size of the data structure.
+	// permuting slice or array elements. (n) is the size of the data structure.
 	// the theoretical output space grows very fast with the slice size (!n) so that input (n) should be chosen carefully
 	// to make sure the function output space covers a big chunk of the theortical outputs.
 	Shuffle(n int, swap func(i, j int))
+	// Samples picks (m) random ordered elements of a data structure of an aribtrary type of total size (n). The (m) elements are placed
+	// in the indices 0 to (m-1) with in place swapping. The data structure ends up being a permutation of the initial (n) elements.
+	// While the sampling of the (m) elements is pseudo-uniformly random, there is no guarantee about the uniformity of the permuatation of
+	// the (n) elements. The function Shuffle should be used in case the entire (n) elements need to be shuffled.
+	// The main use-case of the data structure is a slice or array.
+	// The theoretical output space grows very fast with the slice size (!n/!(n-m)) so that inputs should be chosen carefully
+	// to make sure the function output space covers a big chunk of the theortical outputs.
+	Samples(n int, m int, swap func(i, j int))
 }
