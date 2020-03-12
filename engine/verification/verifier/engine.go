@@ -185,7 +185,11 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 func (e *Engine) executeChunk(res *verification.VerifiableChunk) (flow.StateCommitment, error) {
 	blockCtx := e.vm.NewBlockContext(&res.Block.Header)
 
-	// TODO ramtin (clean up this) - create a PTrie storage in ledger
+	if res.ChunkDataPack == nil {
+		// TODO this is for now until we enable passing of chunkdatapacks
+		return nil, nil
+		//return nil, fmt.Errorf("chunk data pack is empty")
+	}
 	ptrie, err := trie.NewPSMT(res.ChunkDataPack.StartState,
 		e.ledgerDepth,
 		res.ChunkDataPack.Registers(),
@@ -235,9 +239,7 @@ func (e *Engine) executeChunk(res *verification.VerifiableChunk) (flow.StateComm
 		return nil, fmt.Errorf("final state commitment doesn't match: [%x] != [%x]", ptrie.GetRootHash(), res.EndState)
 	}
 
-	// TODO compute and return state commitment
-
-	return ptrie.GetRootHash(), nil
+	return expectedEndState, nil
 }
 
 // signAttestation extracts, signs and returns the attestation part of the result approval
