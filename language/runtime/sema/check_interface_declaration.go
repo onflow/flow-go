@@ -71,20 +71,8 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.DeclarationKind(),
 	)
 
-	var fieldPositionGetter func(name string) ast.Position
-
-	if declaration.CompositeKind == common.CompositeKindEvent {
-		parameters := declaration.Members.Initializers()[0].ParameterList.ParametersByIdentifier()
-		fieldPositionGetter = func(name string) ast.Position {
-			parameter := parameters[name]
-			return parameter.Identifier.Pos
-		}
-	} else {
-		fields := declaration.Members.FieldsByIdentifier()
-		fieldPositionGetter = func(name string) ast.Position {
-			field := fields[name]
-			return field.Identifier.Pos
-		}
+	fieldPositionGetter := func(name string) ast.Position {
+		return declaration.Members.FieldPosition(name, declaration.CompositeKind)
 	}
 
 	checker.checkResourceFieldNesting(

@@ -6,12 +6,11 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(*execution.CompleteBlock, *state.View, flow.StateCommitment) (*execution.ComputationResult, error)
+	ExecuteBlock(*execution.CompleteBlock, *state.View) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -29,9 +28,8 @@ func NewBlockComputer(vm virtualmachine.VirtualMachine) BlockComputer {
 func (e *blockComputer) ExecuteBlock(
 	block *execution.CompleteBlock,
 	stateView *state.View,
-	startState flow.StateCommitment,
 ) (*execution.ComputationResult, error) {
-	results, err := e.executeBlock(block, stateView, startState)
+	results, err := e.executeBlock(block, stateView)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -44,7 +42,6 @@ func (e *blockComputer) ExecuteBlock(
 func (e *blockComputer) executeBlock(
 	block *execution.CompleteBlock,
 	stateView *state.View,
-	startState flow.StateCommitment,
 ) (*execution.ComputationResult, error) {
 
 	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
@@ -70,7 +67,6 @@ func (e *blockComputer) executeBlock(
 	return &execution.ComputationResult{
 		CompleteBlock: block,
 		StateViews:    views,
-		StartState:    startState,
 	}, nil
 }
 

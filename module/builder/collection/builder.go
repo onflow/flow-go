@@ -45,10 +45,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
+		var finalizedID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &finalizedID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized ID: %w", err)
+		}
+
 		// for each un-finalized ancestor of our new block, retrieve the list
 		// of pending transactions; we use this to exclude transactions that
 		// already exist in this fork.
-		// TODO we need to check that we aren't duplicating payload items from FINALIZED blocks
 		ancestorID := parentID
 		txLookup := make(map[flow.Identifier]struct{})
 		for {
@@ -85,13 +90,36 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// memory pool as possible without including any that already exist on
 		// our fork.
 		// TODO make empty collections / limit size based on collection min/max size constraints
-		var txIDs []flow.Identifier
+		var candidateTxIDs []flow.Identifier
 		for _, flowTx := range b.transactions.All() {
 			_, exists := txLookup[flowTx.ID()]
 			if exists {
 				continue
 			}
-			txIDs = append(txIDs, flowTx.ID())
+			candidateTxIDs = append(candidateTxIDs, flowTx.ID())
+		}
+
+		// find any guarantees that conflict with FINALIZED blocks
+		var invalidIDs map[flow.Identifier]struct{}
+		err = operation.CheckCollectionPayload(boundary, finalizedID, candidateTxIDs, &invalidIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not check collection payload: %w", err)
+		}
+
+		// populate the final list of transaction IDs for the block - these
+		// are guaranteed to be valid
+		var finalTxIDs []flow.Identifier
+		for _, txID := range candidateTxIDs {
+
+			_, isInvalid := invalidIDs[txID]
+			if isInvalid {
+				// remove from mempool, it will never be valid
+				b.transactions.Rem(txID)
+				continue
+			}
+
+			// add ONLY non-conflicting transaction IDs to the final payload
+			finalTxIDs = append(finalTxIDs, txID)
 		}
 
 		// STEP THREE: we have a set of transactions that are valid to include
@@ -100,19 +128,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// header.
 
 		// insert transactions included in this collection
-		for _, txID := range txIDs {
+		for _, txID := range finalTxIDs {
 			flowTx, err := b.transactions.ByID(txID)
 			if err != nil {
 				return fmt.Errorf("could not insert missing transaction: %w", err)
 			}
-			err = operation.SkipDuplicates(operation.InsertTransaction(&flowTx.TransactionBody))(tx)
+			err = operation.SkipDuplicates(operation.InsertTransaction(flowTx))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert transaction: %w", err)
 			}
 		}
 
 		// create and insert the collection
-		collection := flow.LightCollection{Transactions: txIDs}
+		collection := flow.LightCollection{Transactions: finalTxIDs}
 		err = operation.InsertCollection(&collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)

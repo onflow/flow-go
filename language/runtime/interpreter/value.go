@@ -601,7 +601,7 @@ func NewIntValue(value int64) IntValue {
 	return IntValue{Int: big.NewInt(value)}
 }
 
-func ConvertInt(value Value) Value {
+func ConvertInt(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	if intValue, ok := value.(IntValue); ok {
 		return intValue.Copy()
@@ -858,7 +858,7 @@ func (v Int8Value) Equal(other Value) BoolValue {
 	return v == otherInt8
 }
 
-func ConvertInt8(value Value) Value {
+func ConvertInt8(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int8Value(value.(NumberValue).IntValue())
 }
@@ -1004,7 +1004,7 @@ func (v Int16Value) Equal(other Value) BoolValue {
 	return v == otherInt16
 }
 
-func ConvertInt16(value Value) Value {
+func ConvertInt16(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int16Value(value.(NumberValue).IntValue())
 }
@@ -1150,7 +1150,7 @@ func (v Int32Value) Equal(other Value) BoolValue {
 	return v == otherInt32
 }
 
-func ConvertInt32(value Value) Value {
+func ConvertInt32(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int32Value(value.(NumberValue).IntValue())
 }
@@ -1300,7 +1300,7 @@ func (v Int64Value) Equal(other Value) BoolValue {
 	return v == otherInt64
 }
 
-func ConvertInt64(value Value) Value {
+func ConvertInt64(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int64Value(value.(NumberValue).IntValue())
 }
@@ -1478,7 +1478,7 @@ func (v Int128Value) Equal(other Value) BoolValue {
 	return cmp == 0
 }
 
-func ConvertInt128(value Value) Value {
+func ConvertInt128(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	intValue := value.(NumberValue).IntValue()
 	return Int128Value{big.NewInt(0).SetInt64(int64(intValue))}
@@ -1657,7 +1657,7 @@ func (v Int256Value) Equal(other Value) BoolValue {
 	return cmp == 0
 }
 
-func ConvertInt256(value Value) Value {
+func ConvertInt256(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	intValue := value.(NumberValue).IntValue()
 	return Int256Value{big.NewInt(0).SetInt64(int64(intValue))}
@@ -1677,7 +1677,7 @@ func NewUIntValue(value uint64) UIntValue {
 	return UIntValue{Int: big.NewInt(0).SetUint64(value)}
 }
 
-func ConvertUInt(value Value) Value {
+func ConvertUInt(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	if intValue, ok := value.(UIntValue); ok {
 		return intValue.Copy()
@@ -1905,7 +1905,7 @@ func (v UInt8Value) Equal(other Value) BoolValue {
 	return v == otherUInt8
 }
 
-func ConvertUInt8(value Value) Value {
+func ConvertUInt8(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt8Value(value.(NumberValue).IntValue())
 }
@@ -2017,7 +2017,7 @@ func (v UInt16Value) Equal(other Value) BoolValue {
 	return v == otherUInt16
 }
 
-func ConvertUInt16(value Value) Value {
+func ConvertUInt16(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt16Value(value.(NumberValue).IntValue())
 }
@@ -2131,7 +2131,7 @@ func (v UInt32Value) Equal(other Value) BoolValue {
 	return v == otherUInt32
 }
 
-func ConvertUInt32(value Value) Value {
+func ConvertUInt32(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt32Value(value.(NumberValue).IntValue())
 }
@@ -2250,7 +2250,7 @@ func (v UInt64Value) Equal(other Value) BoolValue {
 	return v == otherUInt64
 }
 
-func ConvertUInt64(value Value) Value {
+func ConvertUInt64(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt64Value(value.(NumberValue).IntValue())
 }
@@ -2398,7 +2398,7 @@ func (v UInt128Value) Equal(other Value) BoolValue {
 	return cmp == 0
 }
 
-func ConvertUInt128(value Value) Value {
+func ConvertUInt128(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	intValue := value.(NumberValue).IntValue()
 	return UInt128Value{big.NewInt(0).SetInt64(int64(intValue))}
@@ -2547,7 +2547,7 @@ func (v UInt256Value) Equal(other Value) BoolValue {
 	return cmp == 0
 }
 
-func ConvertUInt256(value Value) Value {
+func ConvertUInt256(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	intValue := value.(NumberValue).IntValue()
 	return UInt256Value{big.NewInt(0).SetInt64(int64(intValue))}
@@ -2648,7 +2648,7 @@ func (v Word8Value) Equal(other Value) BoolValue {
 	return v == otherWord8
 }
 
-func ConvertWord8(value Value) Value {
+func ConvertWord8(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Word8Value(value.(NumberValue).IntValue())
 }
@@ -2746,7 +2746,7 @@ func (v Word16Value) Equal(other Value) BoolValue {
 	return v == otherWord16
 }
 
-func ConvertWord16(value Value) Value {
+func ConvertWord16(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Word16Value(value.(NumberValue).IntValue())
 }
@@ -2846,7 +2846,7 @@ func (v Word32Value) Equal(other Value) BoolValue {
 	return v == otherWord32
 }
 
-func ConvertWord32(value Value) Value {
+func ConvertWord32(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Word32Value(value.(NumberValue).IntValue())
 }
@@ -2946,7 +2946,7 @@ func (v Word64Value) Equal(other Value) BoolValue {
 	return v == otherWord64
 }
 
-func ConvertWord64(value Value) Value {
+func ConvertWord64(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Word64Value(value.(NumberValue).IntValue())
 }
@@ -2981,10 +2981,18 @@ func (Fix64Value) SetOwner(_ *common.Address) {
 func (v Fix64Value) String() string {
 	integer := int64(v) / sema.Fix64Factor
 	fraction := int64(v) % sema.Fix64Factor
-	if fraction < 0 {
+	negative := fraction < 0
+	var builder strings.Builder
+	if negative {
 		fraction = -fraction
+		if integer == 0 {
+			builder.WriteRune('-')
+		}
 	}
-	return fmt.Sprintf("%d.%d", integer, fraction)
+	builder.WriteString(fmt.Sprint(integer))
+	builder.WriteRune('.')
+	builder.WriteString(PadLeft(strconv.Itoa(int(fraction)), '0', sema.Fix64Scale))
+	return builder.String()
 }
 
 func (v Fix64Value) KeyString() string {
@@ -3099,12 +3107,39 @@ func (v Fix64Value) Equal(other Value) BoolValue {
 	return v == otherFix64
 }
 
+const Fix64MaxValue = math.MaxInt64
+
+func ConvertFix64(value Value, interpreter *Interpreter) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+
+	switch value := value.(type) {
+	case UFix64Value:
+		if int(value) > Fix64MaxValue {
+			panic("UFix64 value is larger than maximum value for Fix64")
+		}
+		return Fix64Value(value)
+
+	case Fix64Value:
+		return value
+
+	case NumberValue:
+		return Fix64Value(value.IntValue() * sema.Fix64Factor)
+
+	default:
+		panic(fmt.Sprintf("can't convert %s to Fix64", value.DynamicType(interpreter)))
+	}
+}
+
 // UFix64Value
 
 type UFix64Value uint64
 
 func init() {
 	gob.Register(UFix64Value(0))
+}
+
+func NewUFix64ValueWithFraction(integer, fraction uint64) UFix64Value {
+	return UFix64Value(integer*sema.Fix64Factor + fraction)
 }
 
 func (UFix64Value) IsValue() {}
@@ -3130,7 +3165,11 @@ func (v UFix64Value) String() string {
 	factor := uint64(sema.Fix64Factor)
 	integer := uint64(v) / factor
 	fraction := uint64(v) % factor
-	return fmt.Sprintf("%d.%d", integer, fraction)
+	return fmt.Sprintf(
+		"%d.%s",
+		integer,
+		PadLeft(strconv.Itoa(int(fraction)), '0', sema.Fix64Scale),
+	)
 }
 
 func (v UFix64Value) KeyString() string {
@@ -3241,13 +3280,25 @@ func (v UFix64Value) Equal(other Value) BoolValue {
 	return v == otherUFix64
 }
 
-func ConvertUFix64(value Value) Value {
+func ConvertUFix64(value Value, interpreter *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
-	val := value.(Fix64Value)
-	if val < 0 {
-		panic("can't convert negative Fix64 to UFix64")
+
+	switch value := value.(type) {
+	case Fix64Value:
+		if value < 0 {
+			panic("can't convert negative Fix64 to UFix64")
+		}
+		return UFix64Value(value)
+
+	case UFix64Value:
+		return value
+
+	case NumberValue:
+		return UFix64Value(value.IntValue() * sema.Fix64Factor)
+
+	default:
+		panic(fmt.Sprintf("can't convert %s to UFix64", value.DynamicType(interpreter)))
 	}
-	return UFix64Value(val)
 }
 
 // CompositeValue
@@ -4203,7 +4254,7 @@ func NewAddressValueFromBytes(b []byte) AddressValue {
 	return result
 }
 
-func ConvertAddress(value Value) Value {
+func ConvertAddress(value Value, _ *Interpreter) Value {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	result := AddressValue{}
 	if intValue, ok := value.(IntValue); ok {
@@ -4229,6 +4280,10 @@ func (AddressValue) DynamicType(_ *Interpreter) DynamicType {
 
 func (v AddressValue) Copy() Value {
 	return v
+}
+
+func (v AddressValue) KeyString() string {
+	return v.String()
 }
 
 func (v AddressValue) String() string {

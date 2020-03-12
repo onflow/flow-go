@@ -47,6 +47,8 @@ func encode(v interface{}) (*Envelope, error) {
 
 	case *flow.CollectionGuarantee:
 		code = CodeCollectionGuarantee
+	case *flow.TransactionBody:
+		code = CodeTransactionBody
 	case *flow.Transaction:
 		code = CodeTransaction
 

@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -21,7 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// An Engine receives and saves incoming blocks.
+// An Manager receives and saves incoming blocks.
 type Engine struct {
 	unit              *engine.Unit
 	log               zerolog.Logger
@@ -32,7 +33,8 @@ type Engine struct {
 	blocks            storage.Blocks
 	payloads          storage.Payloads
 	collections       storage.Collections
-	execution         computation.ComputationEngine
+	computationEngine computation.ComputationManager
+	providerEngine    provider.ProviderEngine
 	mempool           *Mempool
 	execState         state.ExecutionState
 }
@@ -45,7 +47,8 @@ func New(
 	blocks storage.Blocks,
 	payloads storage.Payloads,
 	collections storage.Collections,
-	executionEngine computation.ComputationEngine,
+	executionEngine computation.ComputationManager,
+	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
@@ -56,16 +59,17 @@ func New(
 	}
 
 	eng := Engine{
-		unit:        engine.NewUnit(),
-		log:         log,
-		me:          me,
-		state:       state,
-		blocks:      blocks,
-		payloads:    payloads,
-		collections: collections,
-		execution:   executionEngine,
-		mempool:     mempool,
-		execState:   execState,
+		unit:              engine.NewUnit(),
+		log:               log,
+		me:                me,
+		state:             state,
+		blocks:            blocks,
+		payloads:          payloads,
+		collections:       collections,
+		computationEngine: executionEngine,
+		providerEngine:    providerEngine,
+		mempool:           mempool,
+		execState:         execState,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -258,10 +262,20 @@ func (e *Engine) handleCompleteBlock(completeBlock *execution.CompleteBlock) {
 
 	view := e.execState.NewView(startState)
 
-	e.execution.SubmitLocal(&execution.ComputationOrder{
-		Block: completeBlock,
-		View:  view,
-	})
+	computationResult, err := e.computationEngine.ComputeBlock(completeBlock, view)
+	if err != nil {
+		e.log.Err(err).
+			Hex("block_id", logging.Entity(completeBlock.Block)).
+			Msg("error while computing block")
+		return
+	}
+
+	err = e.handleComputationResult(computationResult, startState)
+	if err != nil {
+		e.log.Err(err).
+			Hex("block_id", logging.Entity(completeBlock.Block)).
+			Msg("error while handing computation results")
+	}
 }
 
 func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
@@ -282,7 +296,7 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 
 	blockView := e.execState.NewView(stateCommit)
 
-	return e.execution.ExecuteScript(script, block, blockView)
+	return e.computationEngine.ExecuteScript(script, block, blockView)
 }
 
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
@@ -319,4 +333,158 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		e.handleCompleteBlock(completeBlock.Block)
 		return nil
 	})
+}
+
+func (e *Engine) handleComputationResult(result *execution.ComputationResult, startState flow.StateCommitment) error {
+
+	e.log.Debug().
+		Hex("block_id", logging.ID(result.CompleteBlock.Block.ID())).
+		Msg("received computation result")
+
+	chunks := make([]*flow.Chunk, len(result.StateViews))
+
+	var endState flow.StateCommitment = startState
+
+	for i, view := range result.StateViews {
+		// TODO - Should the deltas be applied to a particular state?
+		// Not important now, but might become important once we produce proofs
+		var err error
+		endState, err = e.execState.CommitDelta(view.Delta())
+		if err != nil {
+			return fmt.Errorf("failed to apply chunk delta: %w", err)
+		}
+		//
+		chunk := generateChunk(i, startState, endState)
+		//
+		chunkHeader := generateChunkHeader(chunk, view.Reads())
+		//
+		err = e.execState.PersistChunkHeader(chunkHeader)
+		if err != nil {
+			return fmt.Errorf("failed to save chunk header: %w", err)
+		}
+
+		// chunkDataPack
+		allRegisters := view.AllRegisters()
+		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
+
+		if err != nil {
+			return fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, result.CompleteBlock.Block.ID())
+		}
+
+		chdp := generateChunkDataPack(chunk, allRegisters, values, proofs)
+		err = e.execState.PersistChunkDataPack(chdp)
+		if err != nil {
+			return fmt.Errorf("failed to save chunk data pack: %w", err)
+		}
+		//
+		chunks[i] = chunk
+		startState = endState
+	}
+
+	executionResult, err := e.generateExecutionResultForBlock(result.CompleteBlock, chunks, endState)
+	if err != nil {
+		return fmt.Errorf("could not generate execution result: %w", err)
+	}
+
+	receipt := &flow.ExecutionReceipt{
+		ExecutionResult: *executionResult,
+		// TODO: include SPoCKs
+		Spocks: nil,
+		// TODO: sign execution receipt
+		ExecutorSignature: nil,
+		ExecutorID:        e.me.NodeID(),
+	}
+
+	err = e.execState.PersistStateCommitment(result.CompleteBlock.Block.ID(), endState)
+	if err != nil {
+		return fmt.Errorf("failed to store state commitment: %w", err)
+	}
+
+	err = e.providerEngine.BroadcastExecutionReceipt(receipt)
+	if err != nil {
+		return fmt.Errorf("could not send broadcast order: %w", err)
+	}
+
+	return nil
+}
+
+// generateChunk creates a chunk from the provided computation data.
+func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flow.Chunk {
+	return &flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: uint(colIndex),
+			StartState:      startState,
+			// TODO: include event collection hash
+			EventCollection: flow.ZeroID,
+			// TODO: record gas used
+			TotalComputationUsed: 0,
+			// TODO: record number of txs
+			NumberOfTransactions: 0,
+		},
+		Index:    0,
+		EndState: endState,
+	}
+}
+
+// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
+func generateChunkHeader(
+	chunk *flow.Chunk,
+	registerIDs []flow.RegisterID,
+) *flow.ChunkHeader {
+	return &flow.ChunkHeader{
+		ChunkID:     chunk.ID(),
+		StartState:  chunk.StartState,
+		RegisterIDs: registerIDs,
+	}
+}
+
+// generateExecutionResultForBlock creates new ExecutionResult for a block from
+// the provided chunk results.
+func (e *Engine) generateExecutionResultForBlock(
+	block *execution.CompleteBlock,
+	chunks []*flow.Chunk,
+	endState flow.StateCommitment,
+) (*flow.ExecutionResult, error) {
+
+	previousErID, err := e.execState.GetExecutionResultID(block.Block.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get previous execution result ID: %w", err)
+	}
+
+	er := &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: previousErID,
+			BlockID:          block.Block.ID(),
+			FinalStateCommit: endState,
+			Chunks:           chunks,
+		},
+	}
+
+	err = e.execState.PersistExecutionResult(block.Block.ID(), *er)
+	if err != nil {
+		return nil, fmt.Errorf("could not persist execution result: %w", err)
+	}
+
+	return er, nil
+}
+
+// generateChunkDataPack creates a chunk data pack
+func generateChunkDataPack(
+	chunk *flow.Chunk,
+	registers []flow.RegisterID,
+	values []flow.RegisterValue,
+	proofs []flow.StorageProof,
+) *flow.ChunkDataPack {
+	regTs := make([]flow.RegisterTouch, len(registers))
+	for i, reg := range registers {
+		regTs[i] = flow.RegisterTouch{RegisterID: reg,
+			Value: values[i],
+			Proof: proofs[i],
+		}
+	}
+	return &flow.ChunkDataPack{
+		ChunkID:         chunk.ID(),
+		StartState:      chunk.StartState,
+		RegisterTouches: regTs,
+	}
 }

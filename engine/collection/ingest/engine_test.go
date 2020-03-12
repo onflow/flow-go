@@ -25,7 +25,7 @@ func TestInvalidTransaction(t *testing.T) {
 	t.Run("missing field", func(t *testing.T) {
 		node := testutil.CollectionNode(t, hub, identity, []*flow.Identity{identity})
 
-		tx := unittest.TransactionFixture()
+		tx := unittest.TransactionBodyFixture()
 		tx.Script = nil
 
 		err := node.IngestionEngine.Process(node.Me.NodeID(), &tx)

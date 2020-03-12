@@ -23,6 +23,7 @@ require (
 	github.com/libp2p/go-libp2p v0.5.1
 	github.com/libp2p/go-libp2p-core v0.3.0
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
+	github.com/libp2p/go-libp2p-swarm v0.2.2
 	github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381 // indirect
@@ -46,6 +47,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
 	golang.org/x/sys v0.0.0-20200107162124-548cf772de50 // indirect
 	google.golang.org/grpc v1.26.0
+	gotest.tools v2.2.0+incompatible
 	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )
 

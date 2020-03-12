@@ -94,6 +94,8 @@ func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
 }
 
 // ByIndex returns an entity from the list by index
+// Todo return a boolean for out of bound
+// https://github.com/dapperlabs/flow-go/issues/2796
 func (cl ChunkList) ByIndex(i uint64) *Chunk {
 	return cl[i]
 }

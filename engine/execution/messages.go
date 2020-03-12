@@ -27,7 +27,6 @@ type CompleteBlock struct {
 type ComputationResult struct {
 	CompleteBlock *CompleteBlock
 	StateViews    []*state.View
-	StartState    flow.StateCommitment
 }
 
 func (b *CompleteBlock) Collections() []*CompleteCollection {
@@ -38,4 +37,17 @@ func (b *CompleteBlock) Collections() []*CompleteCollection {
 	}
 
 	return collections
+}
+
+func (b *CompleteBlock) IsComplete() bool {
+	for _, collection := range b.Block.Guarantees {
+
+		completeCollection, ok := b.CompleteCollections[collection.ID()]
+		if ok && completeCollection.Transactions != nil {
+			continue
+		}
+		return false
+	}
+
+	return true
 }
