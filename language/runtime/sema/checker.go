@@ -798,7 +798,13 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 }
 
 func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
-	restrictedType := checker.ConvertType(t.Type)
+	var restrictedType Type
+
+	if t.Type != nil {
+		restrictedType = checker.ConvertType(t.Type)
+	} else {
+		restrictedType = &AnyResourceType{}
+	}
 
 	// The restricted type must be a concrete resource type or `AnyResource`
 
@@ -820,8 +826,10 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 		} else {
 			reportInvalidRestrictedType()
 		}
+
 	case *AnyResourceType:
 		break
+
 	default:
 		reportInvalidRestrictedType()
 	}
