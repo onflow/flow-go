@@ -2,6 +2,7 @@ package flow
 
 import (
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strconv"
 
@@ -138,7 +139,29 @@ func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 // RandN returns a list containing n identities randomly selected from the
 // receiver list L. If n<0 or n>len(L), returns L.
 func (il IdentityList) RandN(n int) IdentityList {
-	panic("TODO")
+
+	if n == 0 {
+		return IdentityList{}
+	}
+	if n < 0 || n > len(il) {
+		return il
+	}
+
+	// create a copy of the list to pick random elements from
+	src := make(IdentityList, len(il))
+	copy(src, il)
+
+	out := make(IdentityList, 0, n)
+	for i := 0; i < n; i++ {
+		// pick a random index
+		index := rand.Intn(len(src))
+		// add the identity at the index to the output
+		out = append(out, src[index])
+		// remove the selected identity to avoid duplicates
+		src = append(src[:index], src[index+1:]...)
+	}
+
+	return out
 }
 
 // Identities lists up and returns all the Identity objects inside the IdentityList
