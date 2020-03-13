@@ -84,7 +84,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	// creates random ids
 	count := 10
-	seed := []uint64{62534197802164589}
+	seed := []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 	var idList flow.IdentityList = test.CreateIDs(count)
 	ids := idList.NodeIDs()
 	original := make(flow.IdentifierList, count)
@@ -117,7 +117,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	count := 10
 	subset := 4
 
-	seed := []uint64{62534197802164589}
+	seed := []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 	var idList flow.IdentityList = test.CreateIDs(count)
 	ids := idList.NodeIDs()
 	original := make(flow.IdentifierList, count)
@@ -146,7 +146,7 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	c := 10    // keeps number of chunks
 	n := 10    // keeps number of verifier nodes
 	alpha := 1 // each chunk requires alpha verifiers
-	seed := []uint64{62534197802164589}
+	seed := []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 	chunks := a.CreateChunks(c)
 
 	// making two random generator with the same seed
@@ -210,7 +210,7 @@ func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToMany() {
 // and then assign each chunk to alpha randomly chosen verifiers
 // it also evaluates that each chuck is assigned to alpha many unique verifier nodes
 func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, alpha int) {
-	rng, err := random.NewRand([]uint64{62534197802164589})
+	rng, err := random.NewRand([]byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58})
 	require.NoError(a.T(), err)
 	chunks := a.CreateChunks(chunkNum)
 

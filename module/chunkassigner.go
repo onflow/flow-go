@@ -10,5 +10,5 @@ import (
 type ChunkAssigner interface {
 	// Assign receives identity list of verifier nodes, chunk lists and a random generator
 	// it returns a chunk assignment
-	Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*chunkassignment.Assignment, error)
+	Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error)
 }
