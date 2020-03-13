@@ -715,7 +715,7 @@ func NewMockAssigner(id flow.Identifier) *MockAssigner {
 }
 
 // Assign assigns all input chunks to the verifer node
-func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.RandomGenerator) (*chunkassignment.Assignment, error) {
+func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("assigner called with empty chunk list")
 	}

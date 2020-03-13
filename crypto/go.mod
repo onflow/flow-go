@@ -3,6 +3,7 @@ module github.com/dapperlabs/flow-go/crypto
 go 1.13
 
 require (
+	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/golang/mock v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
