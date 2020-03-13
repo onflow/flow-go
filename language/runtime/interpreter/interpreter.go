@@ -3122,6 +3122,26 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 	}
 }
 
+func (interpreter *Interpreter) VisitForceExpression(expression *ast.ForceExpression) ast.Repr {
+	return expression.Expression.Accept(interpreter).(Trampoline).
+		Map(func(result interface{}) interface{} {
+			switch result := result.(type) {
+			case *SomeValue:
+				return result.Value
+
+			case NilValue:
+				panic(
+					&ForceNilError{
+						LocationRange: interpreter.locationRange(expression.Expression),
+					},
+				)
+
+			default:
+				panic(errors.NewUnreachableError())
+			}
+		})
+}
+
 func (interpreter *Interpreter) readStored(storageAddress common.Address, key string) OptionalValue {
 	return interpreter.storageReadHandler(interpreter, storageAddress, key)
 }
