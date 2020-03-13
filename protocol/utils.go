@@ -37,3 +37,8 @@ func ClusterFor(sn Snapshot, id flow.Identifier) (flow.IdentityList, error) {
 
 	return participants, nil
 }
+
+// ChainIDForCluster returns the canonical chain ID for a collection node cluster.
+func ChainIDForCluster(cluster flow.IdentityList) string {
+	return cluster.Fingerprint().String()
+}
