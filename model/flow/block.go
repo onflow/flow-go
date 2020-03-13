@@ -27,11 +27,11 @@ func Genesis(identities IdentityList) *Block {
 
 	// create the header
 	header := Header{
-		ChainID:     "flow",
+		ChainID:     DefaultChainID,
 		ParentID:    ZeroID,
 		Height:      0,
 		PayloadHash: payload.Hash(),
-		Timestamp:   time.Unix(1575244800, 0).UTC(),
+		Timestamp:   GenesisTime(),
 	}
 
 	// combine to block
