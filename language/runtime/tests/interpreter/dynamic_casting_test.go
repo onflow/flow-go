@@ -12,7 +12,9 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
 
-func TestInterpretFailableCastingNumber(t *testing.T) {
+var dynamicCastingOperators = map[string]bool{"as?": true, "as!": false}
+
+func TestInterpretDynamicCastingNumber(t *testing.T) {
 
 	type test struct {
 		ty       sema.Type
@@ -42,14 +44,115 @@ func TestInterpretFailableCastingNumber(t *testing.T) {
 		{&sema.Fix64Type{}, "1.23", interpreter.Fix64Value(123000000)},
 	}
 
-	for _, test := range tests {
+	for operator, returnsOptional := range dynamicCastingOperators {
 
-		t.Run(test.ty.String(), func(t *testing.T) {
+		t.Run(operator, func(t *testing.T) {
 
-			types := []sema.Type{
-				&sema.AnyStructType{},
-				test.ty,
+			for _, test := range tests {
+
+				t.Run(test.ty.String(), func(t *testing.T) {
+
+					types := []sema.Type{
+						&sema.AnyStructType{},
+						test.ty,
+					}
+					for _, fromType := range types {
+						for _, targetType := range types {
+
+							t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+
+								inter := parseCheckAndInterpret(t,
+									fmt.Sprintf(
+										`
+                                          let x: %[1]s = %[2]s
+                                          let y: %[3]s = x
+                                          let z: %[4]s? = y %[5]s %[4]s
+                                        `,
+										test.ty,
+										test.value,
+										fromType,
+										targetType,
+										operator,
+									),
+								)
+
+								assert.Equal(t,
+									test.expected,
+									inter.Globals["x"].Value,
+								)
+
+								assert.Equal(t,
+									test.expected,
+									inter.Globals["y"].Value,
+								)
+
+								assert.Equal(t,
+									interpreter.NewSomeValueOwningNonCopying(
+										test.expected,
+									),
+									inter.Globals["z"].Value,
+								)
+							})
+						}
+
+						for _, otherType := range []sema.Type{
+							&sema.BoolType{},
+							&sema.StringType{},
+							&sema.VoidType{},
+						} {
+
+							t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+
+								inter := parseCheckAndInterpret(t,
+									fmt.Sprintf(
+										`
+                                          fun test(): %[4]s? {
+                                              let x: %[1]s = %[2]s
+                                              let y: %[3]s = x
+                                              return y %[5]s %[4]s
+                                          }
+                                        `,
+										test.ty,
+										test.value,
+										fromType,
+										otherType,
+										operator,
+									),
+								)
+
+								result, err := inter.Invoke("test")
+
+								if returnsOptional {
+									assert.Equal(t,
+										interpreter.NilValue{},
+										result,
+									)
+								} else {
+									assert.IsType(t,
+										&interpreter.TypeMismatchError{},
+										err,
+									)
+								}
+							})
+						}
+					}
+				})
 			}
+		})
+	}
+}
+
+func TestInterpretDynamicCastingVoid(t *testing.T) {
+
+	types := []sema.Type{
+		&sema.AnyStructType{},
+		&sema.VoidType{},
+	}
+
+	for operator, returnsOptional := range dynamicCastingOperators {
+
+		t.Run(operator, func(t *testing.T) {
+
 			for _, fromType := range types {
 				for _, targetType := range types {
 
@@ -58,32 +161,27 @@ func TestInterpretFailableCastingNumber(t *testing.T) {
 						inter := parseCheckAndInterpret(t,
 							fmt.Sprintf(
 								`
-                                  let x: %[1]s = %[2]s
-                                  let y: %[3]s = x
-                                  let z: %[4]s? = y as? %[4]s
+                                  fun f() {}
+
+                                  let x: %[1]s = f()
+                                  let y: %[2]s? = x %[3]s %[2]s
                                 `,
-								test.ty,
-								test.value,
 								fromType,
 								targetType,
+								operator,
 							),
 						)
 
 						assert.Equal(t,
-							test.expected,
+							interpreter.VoidValue{},
 							inter.Globals["x"].Value,
 						)
 
 						assert.Equal(t,
-							test.expected,
-							inter.Globals["y"].Value,
-						)
-
-						assert.Equal(t,
 							interpreter.NewSomeValueOwningNonCopying(
-								test.expected,
+								interpreter.VoidValue{},
 							),
-							inter.Globals["z"].Value,
+							inter.Globals["y"].Value,
 						)
 					})
 				}
@@ -91,7 +189,7 @@ func TestInterpretFailableCastingNumber(t *testing.T) {
 				for _, otherType := range []sema.Type{
 					&sema.BoolType{},
 					&sema.StringType{},
-					&sema.VoidType{},
+					&sema.IntType{},
 				} {
 
 					t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
@@ -99,21 +197,32 @@ func TestInterpretFailableCastingNumber(t *testing.T) {
 						inter := parseCheckAndInterpret(t,
 							fmt.Sprintf(
 								`
-                                  let x: %[1]s = %[2]s
-                                  let y: %[3]s = x
-                                  let z: %[4]s? = y as? %[4]s
+                                  fun f() {}
+
+                                  fun test(): %[2]s? {
+                                      let x: %[1]s = f()
+                                      return x %[3]s %[2]s
+                                  }
                                 `,
-								test.ty,
-								test.value,
 								fromType,
 								otherType,
+								operator,
 							),
 						)
 
-						assert.Equal(t,
-							interpreter.NilValue{},
-							inter.Globals["z"].Value,
-						)
+						result, err := inter.Invoke("test")
+
+						if returnsOptional {
+							assert.Equal(t,
+								interpreter.NilValue{},
+								result,
+							)
+						} else {
+							assert.IsType(t,
+								&interpreter.TypeMismatchError{},
+								err,
+							)
+						}
 					})
 				}
 			}
@@ -121,374 +230,395 @@ func TestInterpretFailableCastingNumber(t *testing.T) {
 	}
 }
 
-func TestInterpretFailableCastingVoid(t *testing.T) {
-
-	types := []sema.Type{
-		&sema.AnyStructType{},
-		&sema.VoidType{},
-	}
-
-	for _, fromType := range types {
-		for _, targetType := range types {
-
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
-
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          fun f() {}
-
-                          let x: %[1]s = f()
-                          let y: %[2]s? = x as? %[2]s
-                        `,
-						fromType,
-						targetType,
-					),
-				)
-
-				assert.Equal(t,
-					interpreter.VoidValue{},
-					inter.Globals["x"].Value,
-				)
-
-				assert.Equal(t,
-					interpreter.NewSomeValueOwningNonCopying(
-						interpreter.VoidValue{},
-					),
-					inter.Globals["y"].Value,
-				)
-			})
-		}
-
-		for _, otherType := range []sema.Type{
-			&sema.BoolType{},
-			&sema.StringType{},
-			&sema.IntType{},
-		} {
-
-			t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
-
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          fun f() {}
-
-                          let x: %[1]s = f()
-                          let y: %[2]s? = x as? %[2]s
-                        `,
-						fromType,
-						otherType,
-					),
-				)
-
-				assert.Equal(t,
-					interpreter.NilValue{},
-					inter.Globals["y"].Value,
-				)
-			})
-		}
-	}
-}
-
-func TestInterpretFailableCastingString(t *testing.T) {
+func TestInterpretDynamicCastingString(t *testing.T) {
 
 	types := []sema.Type{
 		&sema.AnyStructType{},
 		&sema.StringType{},
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operator, returnsOptional := range dynamicCastingOperators {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operator, func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          let x: %[1]s = "test"
-                          let y: %[2]s? = x as? %[2]s
-                        `,
-						fromType,
-						targetType,
-					),
-				)
+			for _, fromType := range types {
+				for _, targetType := range types {
 
-				assert.Equal(t,
-					interpreter.NewStringValue("test"),
-					inter.Globals["x"].Value,
-				)
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
 
-				assert.Equal(t,
-					interpreter.NewSomeValueOwningNonCopying(
-						interpreter.NewStringValue("test"),
-					),
-					inter.Globals["y"].Value,
-				)
-			})
-		}
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  let x: %[1]s = "test"
+                                  let y: %[2]s? = x %[3]s %[2]s
+                                `,
+								fromType,
+								targetType,
+								operator,
+							),
+						)
 
-		for _, otherType := range []sema.Type{
-			&sema.BoolType{},
-			&sema.VoidType{},
-			&sema.IntType{},
-		} {
+						assert.Equal(t,
+							interpreter.NewStringValue("test"),
+							inter.Globals["x"].Value,
+						)
 
-			t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+						assert.Equal(t,
+							interpreter.NewSomeValueOwningNonCopying(
+								interpreter.NewStringValue("test"),
+							),
+							inter.Globals["y"].Value,
+						)
+					})
+				}
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          let x: String = "test"
-                          let y: %[1]s = x
-                          let z: %[2]s? = y as? %[2]s
-                        `,
-						fromType,
-						otherType,
-					),
-				)
+				for _, otherType := range []sema.Type{
+					&sema.BoolType{},
+					&sema.VoidType{},
+					&sema.IntType{},
+				} {
 
-				assert.Equal(t,
-					interpreter.NilValue{},
-					inter.Globals["z"].Value,
-				)
-			})
-		}
+					t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  fun test(): %[2]s? { 
+                                      let x: String = "test"
+                                      let y: %[1]s = x
+                                      return y %[3]s %[2]s
+                                  }
+                                `,
+								fromType,
+								otherType,
+								operator,
+							),
+						)
+
+						result, err := inter.Invoke("test")
+
+						if returnsOptional {
+							assert.Equal(t,
+								interpreter.NilValue{},
+								result,
+							)
+						} else {
+							assert.IsType(t,
+								&interpreter.TypeMismatchError{},
+								err,
+							)
+						}
+					})
+				}
+			}
+		})
 	}
 }
 
-func TestInterpretFailableCastingBool(t *testing.T) {
+func TestInterpretDynamicCastingBool(t *testing.T) {
 
 	types := []sema.Type{
 		&sema.AnyStructType{},
 		&sema.BoolType{},
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operator, returnsOptional := range dynamicCastingOperators {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operator, func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          let x: %[1]s = true
-                          let y: %[2]s? = x as? %[2]s
-                        `,
-						fromType,
-						targetType,
-					),
-				)
+			for _, fromType := range types {
+				for _, targetType := range types {
 
-				assert.Equal(t,
-					interpreter.BoolValue(true),
-					inter.Globals["x"].Value,
-				)
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
 
-				assert.Equal(t,
-					interpreter.NewSomeValueOwningNonCopying(
-						interpreter.BoolValue(true),
-					),
-					inter.Globals["y"].Value,
-				)
-			})
-		}
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  let x: %[1]s = true
+                                  let y: %[2]s? = x %[3]s %[2]s
+                                `,
+								fromType,
+								targetType,
+								operator,
+							),
+						)
 
-		for _, otherType := range []sema.Type{
-			&sema.StringType{},
-			&sema.VoidType{},
-			&sema.IntType{},
-		} {
+						assert.Equal(t,
+							interpreter.BoolValue(true),
+							inter.Globals["x"].Value,
+						)
 
-			t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+						assert.Equal(t,
+							interpreter.NewSomeValueOwningNonCopying(
+								interpreter.BoolValue(true),
+							),
+							inter.Globals["y"].Value,
+						)
+					})
+				}
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          let x: Bool = true
-                          let y: %[1]s = x
-                          let z: %[2]s? = y as? %[2]s
-                        `,
-						fromType,
-						otherType,
-					),
-				)
+				for _, otherType := range []sema.Type{
+					&sema.StringType{},
+					&sema.VoidType{},
+					&sema.IntType{},
+				} {
 
-				assert.Equal(t,
-					interpreter.NilValue{},
-					inter.Globals["z"].Value,
-				)
-			})
-		}
+					t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  fun test(): %[2]s? {
+                                      let x: Bool = true
+                                      let y: %[1]s = x
+                                      return y %[3]s %[2]s
+                                  }
+                                `,
+								fromType,
+								otherType,
+								operator,
+							),
+						)
+
+						result, err := inter.Invoke("test")
+
+						if returnsOptional {
+							assert.Equal(t,
+								interpreter.NilValue{},
+								result,
+							)
+						} else {
+							assert.IsType(t,
+								&interpreter.TypeMismatchError{},
+								err,
+							)
+						}
+					})
+				}
+			}
+		})
 	}
 }
 
-func TestInterpretFailableCastingAddress(t *testing.T) {
+func TestInterpretDynamicCastingAddress(t *testing.T) {
 
 	types := []sema.Type{
 		&sema.AnyStructType{},
 		&sema.AddressType{},
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operator, returnsOptional := range dynamicCastingOperators {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operator, func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          let x: Address = 0x1
-                          let y: %[1]s = x
-                          let z: %[2]s? = y as? %[2]s
-                        `,
-						fromType,
-						targetType,
-					),
-				)
+			for _, fromType := range types {
+				for _, targetType := range types {
 
-				addressValue := interpreter.AddressValue{
-					0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  let x: Address = 0x1
+                                  let y: %[1]s = x
+                                  let z: %[2]s? = y %[3]s %[2]s
+                                `,
+								fromType,
+								targetType,
+								operator,
+							),
+						)
+
+						addressValue := interpreter.AddressValue{
+							0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+						}
+						assert.Equal(t,
+							addressValue,
+							inter.Globals["y"].Value,
+						)
+
+						assert.Equal(t,
+							interpreter.NewSomeValueOwningNonCopying(
+								addressValue,
+							),
+							inter.Globals["z"].Value,
+						)
+					})
 				}
-				assert.Equal(t,
-					addressValue,
-					inter.Globals["y"].Value,
-				)
 
-				assert.Equal(t,
-					interpreter.NewSomeValueOwningNonCopying(
-						addressValue,
-					),
-					inter.Globals["z"].Value,
-				)
-			})
-		}
+				for _, otherType := range []sema.Type{
+					&sema.StringType{},
+					&sema.VoidType{},
+					&sema.IntType{},
+					&sema.BoolType{},
+				} {
 
-		for _, otherType := range []sema.Type{
-			&sema.StringType{},
-			&sema.VoidType{},
-			&sema.IntType{},
-			&sema.BoolType{},
-		} {
+					t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
 
-			t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  fun test(): %[2]s? {
+                                      let x: Address = 0x1
+                                      let y: %[1]s = x
+                                      return y %[3]s %[2]s
+                                  }
+                                `,
+								fromType,
+								otherType,
+								operator,
+							),
+						)
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(`
-                          let x: Address = 0x1
-                          let y: %[1]s = x
-                          let z: %[2]s? = y as? %[2]s
-                        `,
-						fromType,
-						otherType,
-					),
-				)
+						result, err := inter.Invoke("test")
 
-				assert.Equal(t,
-					interpreter.NilValue{},
-					inter.Globals["z"].Value,
-				)
-			})
-		}
+						if returnsOptional {
+							assert.Equal(t,
+								interpreter.NilValue{},
+								result,
+							)
+						} else {
+							assert.IsType(t,
+								&interpreter.TypeMismatchError{},
+								err,
+							)
+						}
+					})
+				}
+			}
+		})
 	}
 }
 
-func TestInterpretFailableCastingStruct(t *testing.T) {
+func TestInterpretDynamicCastingStruct(t *testing.T) {
 
 	types := []string{
 		"AnyStruct",
 		"S",
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operator, returnsOptional := range dynamicCastingOperators {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operator, func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          struct S {}
+			for _, fromType := range types {
+				for _, targetType := range types {
 
-                          let x: %[1]s = S()
-                          let y: %[2]s? = x as? %[2]s
-                        `,
-						fromType,
-						targetType,
-					),
-				)
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
 
-				assert.IsType(t,
-					&interpreter.CompositeValue{},
-					inter.Globals["x"].Value,
-				)
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  struct S {}
 
-				require.IsType(t,
-					&interpreter.SomeValue{},
-					inter.Globals["y"].Value,
-				)
+                                  let x: %[1]s = S()
+                                  let y: %[2]s? = x %[3]s %[2]s
+                                `,
+								fromType,
+								targetType,
+								operator,
+							),
+						)
 
-				require.IsType(t,
-					&interpreter.CompositeValue{},
-					inter.Globals["y"].Value.(*interpreter.SomeValue).Value,
-				)
-			})
-		}
+						assert.IsType(t,
+							&interpreter.CompositeValue{},
+							inter.Globals["x"].Value,
+						)
 
-		t.Run(fmt.Sprintf("invalid: from %s to T", fromType), func(t *testing.T) {
+						require.IsType(t,
+							&interpreter.SomeValue{},
+							inter.Globals["y"].Value,
+						)
 
-			inter := parseCheckAndInterpret(t,
-				fmt.Sprintf(
-					`
-                      struct S {}
+						require.IsType(t,
+							&interpreter.CompositeValue{},
+							inter.Globals["y"].Value.(*interpreter.SomeValue).Value,
+						)
+					})
+				}
 
-                      struct T {}
+				t.Run(fmt.Sprintf("invalid: from %s to T", fromType), func(t *testing.T) {
 
-                      let x: S = S()
-                      let y: %s = x
-                      let z: T? = y as? T
-                    `,
-					fromType,
-				),
-			)
+					inter := parseCheckAndInterpret(t,
+						fmt.Sprintf(
+							`
+                              struct S {}
 
-			assert.Equal(t,
-				interpreter.NilValue{},
-				inter.Globals["z"].Value,
-			)
+                              struct T {}
+
+                              fun test(): T? {
+                                  let x: S = S()
+                                  let y: %[1]s = x
+                                  return y %[2]s T
+                              }
+                            `,
+							fromType,
+							operator,
+						),
+					)
+
+					result, err := inter.Invoke("test")
+
+					if returnsOptional {
+						assert.Equal(t,
+							interpreter.NilValue{},
+							result,
+						)
+					} else {
+						assert.IsType(t,
+							&interpreter.TypeMismatchError{},
+							err,
+						)
+					}
+				})
+
+				for _, otherType := range []sema.Type{
+					&sema.StringType{},
+					&sema.VoidType{},
+					&sema.IntType{},
+					&sema.BoolType{},
+				} {
+
+					t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  struct S {}
+
+                                  fun test(): %[2]s? {
+                                      let x: S = S()
+                                      let y: %[1]s = x
+                                      return y %[3]s %[2]s
+                                  }
+                                `,
+								fromType,
+								otherType,
+								operator,
+							),
+						)
+
+						result, err := inter.Invoke("test")
+
+						if returnsOptional {
+							assert.Equal(t,
+								interpreter.NilValue{},
+								result,
+							)
+						} else {
+							assert.IsType(t,
+								&interpreter.TypeMismatchError{},
+								err,
+							)
+						}
+					})
+				}
+			}
 		})
-
-		for _, otherType := range []sema.Type{
-			&sema.StringType{},
-			&sema.VoidType{},
-			&sema.IntType{},
-			&sema.BoolType{},
-		} {
-
-			t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
-
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(`
-                          struct S {}
-
-                          let x: S = S()
-                          let y: %[1]s = x
-                          let z: %[2]s? = y as? %[2]s
-                        `,
-						fromType,
-						otherType,
-					),
-				)
-
-				assert.Equal(t,
-					interpreter.NilValue{},
-					inter.Globals["z"].Value,
-				)
-			})
-		}
 	}
 }
 
-func TestInterpretFailableCastingResource(t *testing.T) {
+func TestInterpretDynamicCastingResource(t *testing.T) {
 
 	types := []string{
 		"AnyResource",
@@ -506,11 +636,11 @@ func TestInterpretFailableCastingResource(t *testing.T) {
                           resource R {}
 
                           fun test(): @%[2]s? {
-                              let x: @%[1]s <- create R()
-                              if let y <- x as? @%[2]s {
-                                  return <-y
+                              let r: @%[1]s <- create R()
+                              if let r2 <- r as? @%[2]s {
+                                  return <-r2
                               } else {
-                                  destroy x
+                                  destroy r
                                   return nil
                               }
                           }
@@ -546,11 +676,11 @@ func TestInterpretFailableCastingResource(t *testing.T) {
                       resource T {}
 
                       fun test(): @T? {
-                          let x: @%s <- create R()
-                          if let y <- x as? @T {
-                              return <-y
+                          let r: @%s <- create R()
+                          if let r2 <- r as? @T {
+                              return <-r2
                           } else {
-                              destroy x
+                              destroy r
                               return nil
                           }
                       }
@@ -571,7 +701,7 @@ func TestInterpretFailableCastingResource(t *testing.T) {
 	}
 }
 
-func TestInterpretFailableCastingStructInterface(t *testing.T) {
+func TestInterpretDynamicCastingStructInterface(t *testing.T) {
 
 	types := []string{
 		"AnyStruct",
@@ -579,89 +709,120 @@ func TestInterpretFailableCastingStructInterface(t *testing.T) {
 		"I",
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operator, returnsOptional := range dynamicCastingOperators {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operator, func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          struct interface I {}
+			for _, fromType := range types {
+				for _, targetType := range types {
 
-                          struct S: I {}
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
 
-                          let i: %[1]s = S()
-                          let s: %[2]s? = i as? %[2]s
-                        `,
-						fromType,
-						targetType,
-					),
-				)
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  struct interface I {}
 
-				require.IsType(t,
-					&interpreter.SomeValue{},
-					inter.Globals["s"].Value,
-				)
+                                  struct S: I {}
 
-				require.IsType(t,
-					&interpreter.CompositeValue{},
-					inter.Globals["s"].Value.(*interpreter.SomeValue).Value,
-				)
-			})
-		}
+                                  let i: %[1]s = S()
+                                  let s: %[2]s? = i %[3]s %[2]s
+                                `,
+								fromType,
+								targetType,
+								operator,
+							),
+						)
 
-		t.Run(fmt.Sprintf("invalid: from %s to other struct", fromType), func(t *testing.T) {
+						require.IsType(t,
+							&interpreter.SomeValue{},
+							inter.Globals["s"].Value,
+						)
 
-			inter := parseCheckAndInterpret(t,
-				fmt.Sprintf(
-					`
-                      struct interface I {}
+						require.IsType(t,
+							&interpreter.CompositeValue{},
+							inter.Globals["s"].Value.(*interpreter.SomeValue).Value,
+						)
+					})
+				}
 
-                      struct S: I {}
+				t.Run(fmt.Sprintf("invalid: from %s to other struct", fromType), func(t *testing.T) {
 
-                      struct T: I {}
+					inter := parseCheckAndInterpret(t,
+						fmt.Sprintf(
+							`
+                              struct interface I {}
 
-                      let i: %s = S()
-                      let s: T? = i as? T
-                    `,
-					fromType,
-				),
-			)
+                              struct S: I {}
 
-			require.IsType(t,
-				interpreter.NilValue{},
-				inter.Globals["s"].Value,
-			)
-		})
+                              struct T: I {}
 
-		t.Run(fmt.Sprintf("invalid: from %s to other struct interface", fromType), func(t *testing.T) {
+                              fun test(): T? {
+                                  let i: %[1]s = S()
+                                  return i %[2]s T
+                              }
+                            `,
+							fromType,
+							operator,
+						),
+					)
 
-			inter := parseCheckAndInterpret(t,
-				fmt.Sprintf(
-					`
-                      struct interface I {}
+					result, err := inter.Invoke("test")
 
-                      struct S: I {}
+					if returnsOptional {
+						assert.Equal(t,
+							interpreter.NilValue{},
+							result,
+						)
+					} else {
+						assert.IsType(t,
+							&interpreter.TypeMismatchError{},
+							err,
+						)
+					}
+				})
 
-                      struct interface I2 {}
+				t.Run(fmt.Sprintf("invalid: from %s to other struct interface", fromType), func(t *testing.T) {
 
-                      let i: %s = S()
-                      let s: I2? = i as? I2
-                    `,
-					fromType,
-				),
-			)
+					inter := parseCheckAndInterpret(t,
+						fmt.Sprintf(
+							`
+                              struct interface I {}
 
-			require.IsType(t,
-				interpreter.NilValue{},
-				inter.Globals["s"].Value,
-			)
+                              struct S: I {}
+
+                              struct interface I2 {}
+
+                              fun test(): I2? {
+                                  let i: %[1]s = S()
+                                  return i %[2]s I2
+                              }
+                            `,
+							fromType,
+							operator,
+						),
+					)
+
+					result, err := inter.Invoke("test")
+
+					if returnsOptional {
+						assert.Equal(t,
+							interpreter.NilValue{},
+							result,
+						)
+					} else {
+						assert.IsType(t,
+							&interpreter.TypeMismatchError{},
+							err,
+						)
+					}
+				})
+			}
 		})
 	}
 }
 
-func TestInterpretFailableCastingResourceInterface(t *testing.T) {
+func TestInterpretDynamicCastingResourceInterface(t *testing.T) {
 
 	types := []string{
 		"AnyResource",
@@ -747,7 +908,7 @@ func TestInterpretFailableCastingResourceInterface(t *testing.T) {
 	}
 }
 
-func TestInterpretFailableCastingSome(t *testing.T) {
+func TestInterpretDynamicCastingSome(t *testing.T) {
 
 	types := []sema.Type{
 		&sema.OptionalType{Type: &sema.IntType{}},
@@ -755,68 +916,99 @@ func TestInterpretFailableCastingSome(t *testing.T) {
 		&sema.AnyStructType{},
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operator, returnsOptional := range dynamicCastingOperators {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operator, func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(`
-                          let x: Int? = 42
-                          let y: %[1]s = x
-                          let z: %[2]s? = y as? %[2]s
-                        `,
-						fromType,
-						targetType,
-					),
-				)
+			for _, fromType := range types {
+				for _, targetType := range types {
 
-				expectedValue := interpreter.NewSomeValueOwningNonCopying(
-					interpreter.NewIntValue(42),
-				)
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
 
-				assert.Equal(t,
-					expectedValue,
-					inter.Globals["y"].Value,
-				)
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  let x: Int? = 42
+                                  let y: %[1]s = x
+                                  let z: %[2]s? = y %[3]s %[2]s
+                                `,
+								fromType,
+								targetType,
+								operator,
+							),
+						)
 
-				assert.Equal(t,
-					interpreter.NewSomeValueOwningNonCopying(
-						expectedValue,
-					),
-					inter.Globals["z"].Value,
-				)
-			})
-		}
+						expectedValue := interpreter.NewSomeValueOwningNonCopying(
+							interpreter.NewIntValue(42),
+						)
 
-		for _, otherType := range []sema.Type{
-			&sema.OptionalType{Type: &sema.StringType{}},
-			&sema.OptionalType{Type: &sema.VoidType{}},
-			&sema.OptionalType{Type: &sema.BoolType{}},
-		} {
+						assert.Equal(t,
+							expectedValue,
+							inter.Globals["y"].Value,
+						)
 
-			t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+						if _, ok := targetType.(*sema.AnyStructType); ok && !returnsOptional {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(`
-	                      let x: %[1]s = 42	
-	                      let y: %[2]s? = x as? %[2]s
-	                    `,
-						fromType,
-						otherType,
-					),
-				)
+							assert.Equal(t,
+								expectedValue,
+								inter.Globals["z"].Value,
+							)
 
-				assert.Equal(t,
-					interpreter.NilValue{},
-					inter.Globals["y"].Value,
-				)
-			})
-		}
+						} else {
+							assert.Equal(t,
+								interpreter.NewSomeValueOwningNonCopying(
+									expectedValue,
+								),
+								inter.Globals["z"].Value,
+							)
+						}
+
+					})
+				}
+
+				for _, otherType := range []sema.Type{
+					&sema.OptionalType{Type: &sema.StringType{}},
+					&sema.OptionalType{Type: &sema.VoidType{}},
+					&sema.OptionalType{Type: &sema.BoolType{}},
+				} {
+
+					t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  fun test(): %[2]s? {
+	                                  let x: %[1]s = 42	
+	                                  return x %[3]s %[2]s
+	                              }
+	                            `,
+								fromType,
+								otherType,
+								operator,
+							),
+						)
+
+						result, err := inter.Invoke("test")
+
+						if returnsOptional {
+							assert.Equal(t,
+								interpreter.NilValue{},
+								result,
+							)
+						} else {
+							assert.IsType(t,
+								&interpreter.TypeMismatchError{},
+								err,
+							)
+						}
+					})
+				}
+			}
+		})
 	}
 }
 
-func TestInterpretFailableCastingArray(t *testing.T) {
+func TestInterpretDynamicCastingArray(t *testing.T) {
 
 	types := []sema.Type{
 		&sema.VariableSizedType{Type: &sema.IntType{}},
@@ -824,68 +1016,88 @@ func TestInterpretFailableCastingArray(t *testing.T) {
 		&sema.AnyStructType{},
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operator, returnsOptional := range dynamicCastingOperators {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operator, func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-                          let x: %[1]s = [42]
-                          let y: %[2]s? = x as? %[2]s
-                        `,
-						fromType,
-						targetType,
-					),
-				)
+			for _, fromType := range types {
+				for _, targetType := range types {
 
-				expectedValue := interpreter.NewArrayValueUnownedNonCopying(
-					interpreter.NewIntValue(42),
-				)
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
 
-				assert.Equal(t,
-					expectedValue,
-					inter.Globals["x"].Value,
-				)
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  let x: %[1]s = [42]
+                                  let y: %[2]s? = x %[3]s %[2]s
+                                `,
+								fromType,
+								targetType,
+								operator,
+							),
+						)
 
-				assert.Equal(t,
-					interpreter.NewSomeValueOwningNonCopying(
-						expectedValue,
-					),
-					inter.Globals["y"].Value,
-				)
-			})
-		}
+						expectedValue := interpreter.NewArrayValueUnownedNonCopying(
+							interpreter.NewIntValue(42),
+						)
 
-		for _, otherType := range []sema.Type{
-			&sema.StringType{},
-			&sema.VoidType{},
-			&sema.BoolType{},
-		} {
+						assert.Equal(t,
+							expectedValue,
+							inter.Globals["x"].Value,
+						)
 
-			t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+						assert.Equal(t,
+							interpreter.NewSomeValueOwningNonCopying(
+								expectedValue,
+							),
+							inter.Globals["y"].Value,
+						)
+					})
+				}
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(`
-		                 let x: %[1]s = [42]
-		                 let y: [%[2]s]? = x as? [%[2]s]
-		                `,
-						fromType,
-						otherType,
-					),
-				)
+				for _, otherType := range []sema.Type{
+					&sema.StringType{},
+					&sema.VoidType{},
+					&sema.BoolType{},
+				} {
 
-				assert.Equal(t,
-					interpreter.NilValue{},
-					inter.Globals["y"].Value,
-				)
-			})
-		}
+					t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+		                          fun test(): [%[2]s]? {
+		                              let x: %[1]s = [42]
+		                              return x %[3]s [%[2]s]
+		                          }
+		                        `,
+								fromType,
+								otherType,
+								operator,
+							),
+						)
+
+						result, err := inter.Invoke("test")
+
+						if returnsOptional {
+							assert.Equal(t,
+								interpreter.NilValue{},
+								result,
+							)
+						} else {
+							assert.IsType(t,
+								&interpreter.TypeMismatchError{},
+								err,
+							)
+						}
+					})
+				}
+			}
+		})
 	}
 }
 
-func TestInterpretFailableCastingDictionary(t *testing.T) {
+func TestInterpretDynamicCastingDictionary(t *testing.T) {
 
 	types := []sema.Type{
 		&sema.DictionaryType{
@@ -898,70 +1110,90 @@ func TestInterpretFailableCastingDictionary(t *testing.T) {
 		},
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operator, returnsOptional := range dynamicCastingOperators {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operator, func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(`
-                          let x: {String: Int} = {"test": 42}
-                          let y: %[1]s = x
-                          let z: %[2]s? = y as? %[2]s
-                        `,
-						fromType,
-						targetType,
-					),
-				)
+			for _, fromType := range types {
+				for _, targetType := range types {
 
-				expectedValue := interpreter.NewDictionaryValueUnownedNonCopying(
-					interpreter.NewStringValue("test"), interpreter.NewIntValue(42),
-				)
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
 
-				assert.Equal(t,
-					expectedValue,
-					inter.Globals["y"].Value,
-				)
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+                                  let x: {String: Int} = {"test": 42}
+                                  let y: %[1]s = x
+                                  let z: %[2]s? = y %[3]s %[2]s
+                                `,
+								fromType,
+								targetType,
+								operator,
+							),
+						)
 
-				assert.Equal(t,
-					interpreter.NewSomeValueOwningNonCopying(
-						expectedValue,
-					),
-					inter.Globals["z"].Value,
-				)
-			})
-		}
+						expectedValue := interpreter.NewDictionaryValueUnownedNonCopying(
+							interpreter.NewStringValue("test"), interpreter.NewIntValue(42),
+						)
 
-		for _, otherType := range []sema.Type{
-			&sema.StringType{},
-			&sema.VoidType{},
-			&sema.BoolType{},
-		} {
+						assert.Equal(t,
+							expectedValue,
+							inter.Globals["y"].Value,
+						)
 
-			t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+						assert.Equal(t,
+							interpreter.NewSomeValueOwningNonCopying(
+								expectedValue,
+							),
+							inter.Globals["z"].Value,
+						)
+					})
+				}
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
-						`
-	                      let x: {String: Int} = {"test": 42}
-	                      let y: %s = x
-	                      let z: {String: %[1]s}? = y as? {String: %[1]s}
-	                    `,
-						fromType,
-						otherType,
-					),
-				)
+				for _, otherType := range []sema.Type{
+					&sema.StringType{},
+					&sema.VoidType{},
+					&sema.BoolType{},
+				} {
 
-				assert.Equal(t,
-					interpreter.NilValue{},
-					inter.Globals["z"].Value,
-				)
-			})
-		}
+					t.Run(fmt.Sprintf("invalid: from %s to %s", fromType, otherType), func(t *testing.T) {
+
+						inter := parseCheckAndInterpret(t,
+							fmt.Sprintf(
+								`
+	                              fun test(): {String: %[2]s}? { 
+	                                  let x: {String: Int} = {"test": 42}
+	                                  let y: %[1]s = x
+	                                  return y %[3]s {String: %[2]s}
+	                              }
+	                            `,
+								fromType,
+								otherType,
+								operator,
+							),
+						)
+
+						result, err := inter.Invoke("test")
+
+						if returnsOptional {
+							assert.Equal(t,
+								interpreter.NilValue{},
+								result,
+							)
+						} else {
+							assert.IsType(t,
+								&interpreter.TypeMismatchError{},
+								err,
+							)
+						}
+					})
+				}
+			}
+		})
 	}
 }
 
-func TestInterpretFailableCastingResourceType(t *testing.T) {
+func TestInterpretDynamicCastingResourceType(t *testing.T) {
 
 	// Supertype: Restricted resource
 
@@ -1652,7 +1884,7 @@ func TestInterpretFailableCastingResourceType(t *testing.T) {
 	})
 }
 
-func TestInterpretFailableCastingAuthorizedReferenceType(t *testing.T) {
+func TestInterpretDynamicCastingAuthorizedReferenceType(t *testing.T) {
 
 	// Supertype: Restricted resource
 
@@ -2126,7 +2358,7 @@ func TestInterpretFailableCastingAuthorizedReferenceType(t *testing.T) {
 	})
 }
 
-func TestInterpretFailableCastingUnauthorizedReferenceType(t *testing.T) {
+func TestInterpretDynamicCastingUnauthorizedReferenceType(t *testing.T) {
 
 	// Supertype: Restricted resource
 
