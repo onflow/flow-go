@@ -34,15 +34,6 @@ func (p *PublicAssignment) Assign(ids flow.IdentityList, chunks flow.ChunkList, 
 	return a, nil
 }
 
-// permute shuffles subset of ids that contains its first m elements in place
-// it implements in-place version of Fisher-Yates shuffling https://doi.org/10.1145%2F364520.364540
-func permute(ids flow.IdentifierList, m int, rng random.Rand) {
-	for i := m - 1; i > 0; i-- {
-		j, _ := rng.IntN(i)
-		ids.Swap(i, j)
-	}
-}
-
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
 func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkassignment.Assignment, error) {
@@ -51,27 +42,34 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	}
 	assignment := chunkassignment.NewAssignment()
 	// permutes the entire slice
-	permute(ids, len(ids), rng)
+	rng.Shuffle(len(ids), ids.Swap)
 	t := ids
 
 	for i := 0; i < chunks.Size(); i++ {
-		if len(t) >= alpha {
-			// More verifiers than required for this chunk
-			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(t[:alpha], nil))
+		if len(t) >= alpha { // More verifiers than required for this chunk
+			assignees := make([]flow.Identifier, alpha)
+			copy(assignees, t[:alpha])
+			assignment.Add(chunks.ByIndex(uint64(i)), assignees)
 			t = t[alpha:]
-		} else {
-			// Less verifiers than required for this chunk
+		} else { // Less verifiers than required for this chunk
+			// take all remaining elements from t
 			part1 := make([]flow.Identifier, len(t))
 			copy(part1, t)
 
-			still := alpha - len(t)
-			permute(ids[:ids.Len()-len(t)], still, rng)
-
+			// now, we need `still` elements from a new shuffling round:
+			still := alpha - len(part1)
+			t = ids[:ids.Len()-len(part1)] // but we exclude the elements we already picked from the population
+			rng.Samples(len(t), still, t.Swap)
 			part2 := make([]flow.Identifier, still)
-			copy(part2, ids[:still])
+			copy(part2, t[:still])
+
+			// concatenated part1 and part2 have exactly alpha elements and constitute the assignees for the current chunk
 			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(part1, part2))
-			permute(ids[still:], ids.Len()-still, rng)
+
+			// we have already assigned the first `still` elements in `ids`
+			// note that remaining elements ids[still:] still need shuffling
 			t = ids[still:]
+			rng.Shuffle(len(t), t.Swap)
 		}
 	}
 	return assignment, nil

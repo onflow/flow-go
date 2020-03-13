@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/test"
 )
 
-// AssignmetTestSuite contains tests against methods of the PublicAssignment scheme
+// PublicAssignmentTestSuite contains tests against methods of the PublicAssignment scheme
 type PublicAssignmentTestSuite struct {
 	suite.Suite
 }
@@ -22,7 +22,7 @@ func TestAssignment(t *testing.T) {
 	suite.Run(t, new(PublicAssignmentTestSuite))
 }
 
-// TestByNodeID evalues the correctness of ByNodeID method of PublicAssignment
+// TestByNodeID evaluates the correctness of ByNodeID method of PublicAssignment
 func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	size := 5
 	// creates ids and twice chunks of the ids
