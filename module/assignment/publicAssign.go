@@ -45,11 +45,7 @@ func permute(ids flow.IdentifierList, m int, rng random.Rand) {
 
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
-<<<<<<< HEAD
-func chunkAssignment(ids IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*Assignment, error) {
-=======
-func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.RandomGenerator, alpha int) (*chunkassignment.Assignment, error) {
->>>>>>> master
+func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkassignment.Assignment, error) {
 	if len(ids) < alpha {
 		return nil, fmt.Errorf("not enough verification nodes for chunk assignment: %d, minumum should be %d", len(ids), alpha)
 	}
