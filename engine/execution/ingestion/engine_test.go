@@ -37,7 +37,6 @@ type testingContext struct {
 	state              *protocol.State
 	conduit            *network.MockConduit
 	collectionConduit  *network.MockConduit
-	chunksConduit      *network.MockConduit
 	ComputationManager *computation.ComputationManager
 	providerEngine     *provider.ProviderEngine
 	executionState     *state.ExecutionState
