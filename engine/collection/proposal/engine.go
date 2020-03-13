@@ -10,10 +10,11 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/cluster"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/cluster"
-	model "github.com/dapperlabs/flow-go/model/coldstuff"
+	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
+	coldstuffmodel "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -23,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine is the collection proposal engine, which packages pending
@@ -33,7 +35,8 @@ type Engine struct {
 	tracer       trace.Tracer
 	con          network.Conduit
 	me           module.Local
-	state        protocol.State
+	protoState   protocol.State // flow-wide protocol chain state
+	clusterState cluster.State  // cluster-specific chain state
 	provider     network.Engine
 	pool         mempool.Transactions
 	transactions storage.Transactions
@@ -49,7 +52,8 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	state protocol.State,
+	protoState protocol.State,
+	clusterState cluster.State,
 	tracer trace.Tracer,
 	provider network.Engine,
 	pool mempool.Transactions,
@@ -59,7 +63,7 @@ func New(
 	cache module.PendingClusterBlockBuffer,
 ) (*Engine, error) {
 
-	participants, err := protocol.ClusterFor(state.Final(), me.NodeID())
+	participants, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not get cluster participants: %w", err)
 	}
@@ -68,7 +72,8 @@ func New(
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "proposal").Logger(),
 		me:           me,
-		state:        state,
+		protoState:   protoState,
+		clusterState: clusterState,
 		tracer:       tracer,
 		provider:     provider,
 		pool:         pool,
@@ -156,7 +161,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onBlockRequest(originID, ev)
 	case *messages.ClusterBlockResponse:
 		return e.onBlockResponse(originID, ev)
-	case *model.Commit:
+	case *coldstuffmodel.Commit:
 		return e.onBlockCommit(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -197,7 +202,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.state.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	)
@@ -216,6 +221,12 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not broadcast proposal: %w", err)
 	}
 
+	e.log.Debug().
+		Hex("block_id", logging.ID(header.ID())).
+		Hex("parent_id", logging.ID(header.ParentID)).
+		Int("collection_size", payload.Collection.Transactions.Len()).
+		Msg("submitted proposal")
+
 	trace.StartCollectionSpan(e.tracer, &payload.Collection).
 		SetTag("node_type", "collection").
 		SetTag("node_id", e.me.NodeID().String())
@@ -225,10 +236,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
 // BroadcastCommit broadcasts a commit message to all collection nodes in our
 // cluster.
-func (e *Engine) BroadcastCommit(commit *model.Commit) error {
+func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.state.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	)
@@ -246,6 +257,11 @@ func (e *Engine) BroadcastCommit(commit *model.Commit) error {
 
 // onBlockProposal handles proposals for new blocks.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
+
+	e.log.Debug().
+		Hex("block_id", logging.ID(proposal.Header.ID())).
+		Hex("parent_id", logging.ID(proposal.Header.ParentID)).
+		Msg("received proposal")
 
 	// retrieve the parent block
 	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
@@ -302,7 +318,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	// ensure the block is a valid extension of cluster state
-	err = e.state.Mutate().Extend(blockID)
+	err = e.clusterState.Mutate().Extend(blockID)
 	if err != nil {
 		return fmt.Errorf("could not extend cluster state: %w", err)
 	}
@@ -390,7 +406,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 //
 // NOTE: This is only necessary for ColdStuff and can be removed when we switch
 // to HotStuff.
-func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
+func (e *Engine) onBlockCommit(originID flow.Identifier, commit *coldstuffmodel.Commit) error {
 	e.coldstuff.SubmitCommit(commit)
 	return nil
 }
@@ -398,7 +414,7 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) e
 // processPendingProposal handles proposals where the parent is missing.
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
-	pendingBlock := &cluster.PendingBlock{
+	pendingBlock := &clustermodel.PendingBlock{
 		OriginID: originID,
 		Header:   proposal.Header,
 		Payload:  proposal.Payload,
