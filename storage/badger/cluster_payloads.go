@@ -7,7 +7,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
@@ -31,15 +30,15 @@ func (cp *ClusterPayloads) Store(header *flow.Header, payload *cluster.Payload) 
 
 		// insert the payload, allow duplicates because it is valid for two
 		// identical payloads on competing forks to co-exist.
-		err := operation.SkipDuplicates(procedure.InsertClusterPayload(payload))
+		err := procedure.InsertClusterPayload(payload)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert cluster payload")
+			return fmt.Errorf("could not insert cluster payload: %w", err)
 		}
 
 		// index the payload by the block containing it
-		err = procedure.IndexClusterPayload(header, payload)
+		err = procedure.IndexClusterPayload(header, payload)(tx)
 		if err != nil {
-			return fmt.Errorf("could not index cluster payload")
+			return fmt.Errorf("could not index cluster payload: %w", err)
 		}
 
 		return nil
