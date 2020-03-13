@@ -482,46 +482,46 @@ func TestConcurrency(t *testing.T) {
 		senderCount, // number of (concurrent) senders for each execution receipt
 		chunksNum int // number of chunks in each execution receipt
 	}{
-		//{
-		//	erCount:     1,
-		//	senderCount: 1,
-		//	chunksNum:   1,
-		//}, {
-		//	erCount:     1,
-		//	senderCount: 10,
-		//	chunksNum:   1,
-		//},
+		{
+			erCount:     1,
+			senderCount: 1,
+			chunksNum:   1,
+		}, {
+			erCount:     1,
+			senderCount: 10,
+			chunksNum:   1,
+		},
 		{
 			erCount:     10,
 			senderCount: 1,
 			chunksNum:   1,
 		},
-		// {
-		//	erCount:     10,
-		//	senderCount: 10,
-		//	chunksNum:   1,
-		//},
-		//// multiple chunks receipts
-		//{
-		//	erCount:     1,
-		//	senderCount: 1,
-		//	chunksNum:   5, // choosing a higher number makes the test longer and longer timeout needed
-		//},
-		//{
-		//	erCount:     1,
-		//	senderCount: 10,
-		//	chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
-		//},
-		//{
-		//	erCount:     3,
-		//	senderCount: 1,
-		//	chunksNum:   5, // choosing a higher number makes the test longer and longer timeout needed
-		//},
-		//{
-		//	erCount:     3,
-		//	senderCount: 5,
-		//	chunksNum:   2, // choosing a higher number makes the test longer and longer timeout needed
-		//},
+		{
+			erCount:     10,
+			senderCount: 10,
+			chunksNum:   1,
+		},
+		// multiple chunks receipts
+		{
+			erCount:     1,
+			senderCount: 1,
+			chunksNum:   5, // choosing a higher number makes the test longer and longer timeout needed
+		},
+		{
+			erCount:     1,
+			senderCount: 10,
+			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
+		},
+		{
+			erCount:     3,
+			senderCount: 1,
+			chunksNum:   5, // choosing a higher number makes the test longer and longer timeout needed
+		},
+		{
+			erCount:     3,
+			senderCount: 5,
+			chunksNum:   2, // choosing a higher number makes the test longer and longer timeout needed
+		},
 	}
 
 	for _, tc := range testcases {
@@ -633,9 +633,9 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.AssertReturnsBefore(t, senderWG.Wait, 5*time.Second)
+	unittest.AssertReturnsBefore(t, senderWG.Wait, 3*time.Second)
 	verNet.DeliverAll(false)
-	unittest.AssertReturnsBefore(t, verifierEngWG.Wait, 5*time.Second)
+	unittest.AssertReturnsBefore(t, verifierEngWG.Wait, 3*time.Second)
 	verNet.DeliverAll(false)
 }
 
@@ -709,7 +709,6 @@ func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk)
 			assert.True(t, ok)
 
 			vID := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex).ID()
-
 			// ensure there are no dupe chunks
 			_, alreadySeen := receivedChunks[vID]
 			if alreadySeen {

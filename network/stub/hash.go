@@ -9,10 +9,14 @@ import (
 )
 
 func eventKey(channelID uint8, event interface{}) string {
-	tag := []byte(fmt.Sprintf("testthenetwork %03d %T", channelID, event))
-	payload, _ := encoding.DefaultEncoder.Encode(tag)
-	hasher, _ := crypto.NewHasher(crypto.SHA2_256)
-	hash := hasher.ComputeHash(append(tag, payload...))
+	tag, _ := encoding.DefaultEncoder.Encode([]byte(fmt.Sprintf("testthenetwork %03d %T", channelID, event)))
+	payload, _ := encoding.DefaultEncoder.Encode(event)
+	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
+
+	hasher.Write(tag)
+	hasher.Write(payload)
+	hash := hasher.SumHash()
+
 	key := hex.EncodeToString(hash)
 	return key
 }
