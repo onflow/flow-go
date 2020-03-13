@@ -61,12 +61,14 @@ func NewRand(seed []byte) (*xorshifts, error) {
 // next generates updates the state of a single xorshift128+
 func (x *xorshiftp) next() {
 	// the xorshift+ shift parameters chosen for this instance
-	shifts := []byte{23, 17, 26}
+	const shift0 = 23
+	const shift1 = 17
+	const shift2 = 26
 	var tmp uint64 = x.a
 	x.a = x.b
-	tmp ^= tmp << shifts[0]
-	tmp ^= tmp >> shifts[1]
-	tmp ^= x.b ^ (x.b >> shifts[2])
+	tmp ^= tmp << shift0
+	tmp ^= tmp >> shift1
+	tmp ^= x.b ^ (x.b >> shift2)
 	x.b = tmp
 }
 
@@ -99,7 +101,7 @@ func (x *xorshifts) IntN(n int) (int, error) {
 // O(n) space and O(n) time
 func (x *xorshifts) Permutation(n int) ([]int, error) {
 	if n <= 0 {
-		return nil, fmt.Errorf("arguments to PermutateSubset must be positive")
+		return nil, fmt.Errorf("inputs must be positive")
 	}
 	items := make([]int, n)
 	for i := 0; i < n; i++ {
@@ -117,7 +119,7 @@ func (x *xorshifts) Permutation(n int) ([]int, error) {
 // O(n) space and O(n) time
 func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
 	if m <= 0 {
-		return nil, fmt.Errorf("arguments to PermutateSubset must be positive")
+		return nil, fmt.Errorf("inputs must be positive")
 	}
 	items, _ := x.Permutation(n)
 	return items[:m], nil
@@ -126,20 +128,28 @@ func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
 // Shuffle permutes the given slice in place
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(n) time
-func (x *xorshifts) Shuffle(n int, swap func(i, j int)) {
+func (x *xorshifts) Shuffle(n int, swap func(i, j int)) error {
+	if n <= 0 {
+		return fmt.Errorf("input must be positive")
+	}
 	for i := n - 1; i > 0; i-- {
 		j, _ := x.IntN(i + 1)
 		swap(i, j)
 	}
+	return nil
 }
 
 // Samples picks randomly m elements out of n elemnts and places them
 // in random order at indices [0,m-1]. The swapping is done in place
 // It implements the first (m) elements of Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(m) time
-func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) {
+func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) error {
+	if m <= 0 || n <= 0 {
+		return fmt.Errorf("inputs must be positive")
+	}
 	for i := 0; i < m; i++ {
 		j, _ := x.IntN(n - i)
 		swap(i, i+j)
 	}
+	return nil
 }
