@@ -46,6 +46,8 @@ type Elaboration struct {
 	PostConditionsRewrite                  map[*ast.Conditions]PostConditionsRewrite
 	EmitStatementEventTypes                map[*ast.EmitStatement]*CompositeType
 	IsReferenceIntoStorage                 map[*ast.ReferenceExpression]bool
+	// Keyed by qualified identifier
+	CompositeTypes map[string]*CompositeType
 }
 
 func NewElaboration() *Elaboration {
@@ -85,5 +87,6 @@ func NewElaboration() *Elaboration {
 		PostConditionsRewrite:                  map[*ast.Conditions]PostConditionsRewrite{},
 		EmitStatementEventTypes:                map[*ast.EmitStatement]*CompositeType{},
 		IsReferenceIntoStorage:                 map[*ast.ReferenceExpression]bool{},
+		CompositeTypes:                         map[string]*CompositeType{},
 	}
 }

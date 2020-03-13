@@ -19,10 +19,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
-	mockassigner "github.com/dapperlabs/flow-go/engine/verification/ingest/mocks/assignment"
+	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/assignment"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -58,7 +57,7 @@ type TestSuite struct {
 	block      *flow.Block
 	receipt    *flow.ExecutionReceipt
 	chunkState *flow.ChunkState
-	assigner   *mockassigner.ChunkAssigner // mocks chunk assigner
+	assigner   *module.ChunkAssigner // mocks chunk assigner
 }
 
 // Invoking this method executes all TestSuite tests.
@@ -81,7 +80,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}
-	suite.assigner = &mockassigner.ChunkAssigner{}
+	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := unittest.CompleteExecutionResultFixture(1)
 	suite.collection = completeER.Collections[0]
@@ -142,11 +141,12 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// mock the receipt coming from an execution node
 	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 
 	suite.state.On("Final").Return(suite.ss, nil)
 	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
-	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Once()
+	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Twice()
 
 	// we have the corresponding block and chunk state, but not the collection
 	suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil)
@@ -160,6 +160,17 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
+
+	// assigns all chunks in the receipt to this node through mocking
+	a := chunkassignment.NewAssignment()
+	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+	}
+	suite.assigner.On("Assign",
+		testifymock.Anything,
+		testifymock.Anything,
+		testifymock.Anything).Return(a, nil)
+	suite.me.On("NodeID", testifymock.Anything).Return(verIdentity.NodeID)
 
 	err := eng.Process(execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
@@ -423,9 +434,9 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collections.On("Rem", suite.collection.ID()).Return(true).Once()
 
 			// we have the assignment of chunk
-			a := assignment.NewAssignment()
-			a.Assign(suite.receipt.ExecutionResult.Chunks.ByIndex(0), assignment.IdentifierList{verIdentity.NodeID})
-			suite.assigner.On("Assigner",
+			a := chunkassignment.NewAssignment()
+			a.Add(suite.receipt.ExecutionResult.Chunks.ByIndex(0), flow.IdentifierList{verIdentity.NodeID})
+			suite.assigner.On("Assign",
 				testifymock.Anything,
 				testifymock.Anything,
 				testifymock.Anything).Return(a, nil)
@@ -514,7 +525,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// new chunk assignment
-	a := assignment.NewAssignment()
+	a := chunkassignment.NewAssignment()
 
 	// create `erCount` ER fixtures that will be concurrently delivered
 	ers := make([]verification.CompleteExecutionResult, 0)
@@ -528,7 +539,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
-			a.Assign(chunk, []flow.Identifier{verID.NodeID})
+			a.Add(chunk, []flow.Identifier{verID.NodeID})
 			//if chunkCounter % 2 == 0 {
 			vc := &verification.VerifiableChunk{
 				ChunkIndex: chunk.Index,
@@ -703,14 +714,14 @@ func NewMockAssigner(id flow.Identifier) *MockAssigner {
 	return &MockAssigner{me: id}
 }
 
-// Assigner assigns all input chunks to the verifer node
-func (m *MockAssigner) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*assignment.Assignment, error) {
+// Assign assigns all input chunks to the verifer node
+func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("assigner called with empty chunk list")
 	}
-	a := assignment.NewAssignment()
+	a := chunkassignment.NewAssignment()
 	for _, c := range chunks {
-		a.Assign(c, assignment.IdentifierList{m.me})
+		a.Add(c, flow.IdentifierList{m.me})
 	}
 
 	return a, nil

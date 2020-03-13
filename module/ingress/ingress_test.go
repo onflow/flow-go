@@ -21,7 +21,7 @@ func TestSubmitTransaction(t *testing.T) {
 		engine: &engine,
 	}
 
-	tx := unittest.TransactionFixture()
+	tx := unittest.TransactionBodyFixture()
 
 	t.Run("should submit transaction to engine", func(t *testing.T) {
 		engine.On("ProcessLocal", &tx).Return(nil).Once()

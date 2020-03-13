@@ -83,6 +83,7 @@ declaration
 
 transactionDeclaration
     : Transaction
+      parameterList?
       '{'
       fields
       prepare?
@@ -197,18 +198,8 @@ typeAnnotation
     : ResourceAnnotation? fullType
     ;
 
-// NOTE: only allow reference or optionals – prevent ambiguous
-// and not particular useful types like `&R?`
 fullType
-    : (
-        ( Auth Storable
-        | Auth
-        | Storable Auth
-        | Storable
-        | /* no auth or storable */
-        )
-        Ampersand {p.noWhitespace()}?
-      )?
+    : (Auth? Ampersand {p.noWhitespace()}?)?
       innerType
       ({p.noWhitespace()}? optionals+=Optional)*
     ;
@@ -359,6 +350,7 @@ swap
 transfer
     : '='
     | Move
+    | MoveForced
     ;
 
 expression
@@ -476,7 +468,6 @@ Div : '/' ;
 Mod : '%' ;
 
 Auth : 'auth' ;
-Storable : 'storable' ;
 Ampersand : '&';
 
 unaryOp
@@ -487,6 +478,7 @@ unaryOp
 
 Negate : '!' ;
 Move : '<-' ;
+MoveForced : '<-!' ;
 
 Optional : '?' ;
 
@@ -677,7 +669,6 @@ identifier
     | Account
     | Self
     | Auth
-    | Storable
     ;
 
 Identifier

@@ -1771,7 +1771,7 @@ do not cause values to overflow or underflow.
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = -a</span><span>
 </span></pre></code>
 
-Arithmetic operations on the unsigned integer types `Word8`, `Word6`, `Word32`, `Word64`
+Arithmetic operations on the unsigned integer types `Word8`, `Word16`, `Word32`, `Word64`
 may cause values to overflow or underflow.
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111).
@@ -3167,7 +3167,7 @@ Synthetic fields are read-only when only a getter is provided.
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare an initializer which accepts width and height.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// As `area` is synthetic and there is only a getter provided for it,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// the `area` field it cannot be assigned a value.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the `area` field cannot be assigned a value.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: </span><span style="color: #0000FF">Int</span><span style="color: #000000">, height: </span><span style="color: #0000FF">Int</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
@@ -3518,7 +3518,7 @@ and when it is returned from a function.
 </span><span style="color: #000000">use(resource: &#x3C;-b)</span><span>
 </span><span>
 </span><span style="color: #008000">// Invalid: Cannot use constant `b` anymore as the resource</span><span>
-</span><span style="color: #008000">// it referred to was moved into function `foo`.</span><span>
+</span><span style="color: #008000">// it referred to was moved into function `use`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">b.value</span><span>
 </span></pre></code>
@@ -3823,7 +3823,7 @@ Instead, use a swap statement to replace the accessed resource with another reso
 The same applies to dictionaries.
 
 <code><pre><span style="color: #008000">// Declare a constant for a dictionary of resources.</span><span>
-</span><span style="color: #008000">// Create three resources and move them into the dictionary.</span><span>
+</span><span style="color: #008000">// Create two resources and move them into the dictionary.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
@@ -4433,7 +4433,7 @@ but also publicly settable (the `pub(set)` keyword is specified).
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #0000FF">struct</span><span style="color: #000000"> AnImplementation: AnInterface {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a publicly settable variable field named `a`that has type `Int`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a publicly settable variable field named `a` that has type `Int`.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the requirement for interface `AnInterface`:</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The field is at least publicly readable, but this implementation also</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// allows the field to be written to in all scopes.</span><span>

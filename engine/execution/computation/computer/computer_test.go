@@ -12,7 +12,6 @@ import (
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
@@ -35,9 +34,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
-		startState := unittest.StateCommitmentFixture()
 
-		result, err := exe.ExecuteBlock(block, view, startState)
+		result, err := exe.ExecuteBlock(block, view)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateViews, 1)
 
@@ -68,9 +66,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		startState := unittest.StateCommitmentFixture()
-
-		result, err := exe.ExecuteBlock(block, view, startState)
+		result, err := exe.ExecuteBlock(block, view)
 		assert.NoError(t, err)
 
 		//chunk count should match collection count

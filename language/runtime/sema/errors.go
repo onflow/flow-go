@@ -923,21 +923,41 @@ func (e *ImportedProgramError) EndPosition() ast.Position {
 	return e.Pos
 }
 
-// UnsupportedTypeError
+// AlwaysFailingNonResourceCastingTypeError
 
-type UnsupportedTypeError struct {
-	Type Type
+type AlwaysFailingNonResourceCastingTypeError struct {
+	ValueType  Type
+	TargetType Type
 	ast.Range
 }
 
-func (e *UnsupportedTypeError) Error() string {
+func (e *AlwaysFailingNonResourceCastingTypeError) Error() string {
 	return fmt.Sprintf(
-		"unsupported type: `%s`",
-		e.Type.QualifiedString(),
+		"cast of value of resource-type `%s` to non-resource type `%s` will always fail",
+		e.ValueType.QualifiedString(),
+		e.TargetType.QualifiedString(),
 	)
 }
 
-func (*UnsupportedTypeError) isSemanticError() {}
+func (*AlwaysFailingNonResourceCastingTypeError) isSemanticError() {}
+
+// AlwaysFailingResourceCastingTypeError
+
+type AlwaysFailingResourceCastingTypeError struct {
+	ValueType  Type
+	TargetType Type
+	ast.Range
+}
+
+func (e *AlwaysFailingResourceCastingTypeError) Error() string {
+	return fmt.Sprintf(
+		"cast of value of non-resource-type `%s` to resource type `%s` will always fail",
+		e.ValueType.QualifiedString(),
+		e.TargetType.QualifiedString(),
+	)
+}
+
+func (*AlwaysFailingResourceCastingTypeError) isSemanticError() {}
 
 // UnsupportedOverloadingError
 
@@ -1570,7 +1590,7 @@ type InvalidResourceAssignmentError struct {
 }
 
 func (e *InvalidResourceAssignmentError) Error() string {
-	return "cannot assign to resource-typed target. consider swapping (<->)"
+	return "cannot assign to resource-typed target. consider force assigning (<-!) or swapping (<->)"
 }
 
 func (*InvalidResourceAssignmentError) isSemanticError() {}
@@ -1834,18 +1854,6 @@ func (e *OptionalTypeReferenceError) Error() string {
 
 func (*OptionalTypeReferenceError) isSemanticError() {}
 
-// InvalidNonStorageStorableReferenceError
-
-type InvalidNonStorageStorableReferenceError struct {
-	ast.Range
-}
-
-func (e *InvalidNonStorageStorableReferenceError) Error() string {
-	return "cannot create storable reference which is not into storage"
-}
-
-func (*InvalidNonStorageStorableReferenceError) isSemanticError() {}
-
 // InvalidResourceCreationError
 
 type InvalidResourceCreationError struct {
@@ -2101,6 +2109,22 @@ func (e *TransactionMissingPrepareError) EndPosition() ast.Position {
 	length := len(e.FirstFieldName)
 	return e.FirstFieldPos.Shifted(length - 1)
 }
+
+// InvalidResourceTransactionParameterError
+
+type InvalidResourceTransactionParameterError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidResourceTransactionParameterError) Error() string {
+	return fmt.Sprintf(
+		"transaction parameter must not be resource type: `%s`",
+		e.Type.QualifiedString(),
+	)
+}
+
+func (*InvalidResourceTransactionParameterError) isSemanticError() {}
 
 // InvalidTransactionFieldAccessModifierError
 

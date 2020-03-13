@@ -589,7 +589,7 @@ func (extractor *ExpressionExtractor) VisitFunctionExpression(expression *Functi
 	return extractor.ExtractFunction(expression)
 }
 
-func (extractor *ExpressionExtractor) ExtractFunction(expression *FunctionExpression) ExpressionExtraction {
+func (extractor *ExpressionExtractor) ExtractFunction(_ *FunctionExpression) ExpressionExtraction {
 	// NOTE: not supported
 	panic(errors.NewUnreachableError())
 }

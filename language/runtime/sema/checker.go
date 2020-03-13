@@ -419,7 +419,7 @@ func (checker *Checker) declareGlobalFunctionDeclaration(declaration *ast.Functi
 
 func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 	if valueType.IsResourceType() {
-		if transfer.Operation != ast.TransferOperationMove {
+		if !transfer.Operation.IsMove() {
 			checker.report(
 				&IncorrectTransferOperationError{
 					ActualOperation:   transfer.Operation,
@@ -429,7 +429,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 			)
 		}
 	} else if !valueType.IsInvalidType() {
-		if transfer.Operation == ast.TransferOperationMove {
+		if transfer.Operation.IsMove() {
 			checker.report(
 				&IncorrectTransferOperationError{
 					ActualOperation:   transfer.Operation,
@@ -574,7 +574,8 @@ func (checker *Checker) checkFixedPointLiteral(expression *ast.FixedPointExpress
 	}
 
 	if !checker.checkFixedPointRange(
-		expression.Integer,
+		expression.Negative,
+		expression.UnsignedInteger,
 		expression.Fractional,
 		minInt,
 		minFractional,
@@ -630,16 +631,34 @@ func (checker *Checker) checkIntegerRange(value, min, max *big.Int) bool {
 }
 
 func (checker *Checker) checkFixedPointRange(
-	integerValue, fractionalValue,
+	negative bool,
+	unsignedIntegerValue, fractionalValue,
 	minInt, minFractional,
 	maxInt, maxFractional *big.Int,
 ) bool {
+	minIntSign := minInt.Sign()
+
+	integerValue := big.NewInt(0).Set(unsignedIntegerValue)
+	if negative {
+		if minIntSign == 0 && negative {
+			return false
+		}
+
+		integerValue.Neg(integerValue)
+	}
+
 	switch integerValue.Cmp(minInt) {
 	case -1:
 		return false
 	case 0:
-		if fractionalValue.Cmp(minFractional) > 0 {
-			return false
+		if minIntSign < 0 {
+			if fractionalValue.Cmp(minFractional) > 0 {
+				return false
+			}
+		} else {
+			if fractionalValue.Cmp(minFractional) < 0 {
+				return false
+			}
 		}
 	case 1:
 		break
@@ -649,8 +668,14 @@ func (checker *Checker) checkFixedPointRange(
 	case -1:
 		break
 	case 0:
-		if fractionalValue.Cmp(maxFractional) > 0 {
-			return false
+		if maxInt.Sign() >= 0 {
+			if fractionalValue.Cmp(maxFractional) > 0 {
+				return false
+			}
+		} else {
+			if fractionalValue.Cmp(maxFractional) < 0 {
+				return false
+			}
 		}
 	case 1:
 		return false
@@ -773,18 +798,40 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 }
 
 func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
-	typeResult := checker.ConvertType(t.Type)
+	var restrictedType Type
 
-	// The restricted type must be a concrete resource type
+	if t.Type != nil {
+		restrictedType = checker.ConvertType(t.Type)
+	} else {
+		restrictedType = &AnyResourceType{}
+	}
 
-	resourceType, ok := typeResult.(*CompositeType)
-	if !ok || resourceType.Kind != common.CompositeKindResource {
+	// The restricted type must be a concrete resource type or `AnyResource`
+
+	reportInvalidRestrictedType := func() {
 		checker.report(
 			&InvalidRestrictedTypeError{
-				Type:  resourceType,
+				Type:  restrictedType,
 				Range: ast.NewRangeFromPositioned(t.Type),
 			},
 		)
+	}
+
+	var resourceType *CompositeType
+
+	switch typeResult := restrictedType.(type) {
+	case *CompositeType:
+		if typeResult.Kind == common.CompositeKindResource {
+			resourceType = typeResult
+		} else {
+			reportInvalidRestrictedType()
+		}
+
+	case *AnyResourceType:
+		break
+
+	default:
+		reportInvalidRestrictedType()
 	}
 
 	// Convert the restrictions
@@ -803,7 +850,7 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 		if !ok || interfaceType.CompositeKind != common.CompositeKindResource {
 			checker.report(
 				&InvalidRestrictionTypeError{
-					Type:  interfaceType,
+					Type:  restrictionResult,
 					Range: ast.NewRangeFromPositioned(restriction),
 				},
 			)
@@ -887,7 +934,7 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 	}
 
 	return &RestrictedResourceType{
-		Type:         resourceType,
+		Type:         restrictedType,
 		Restrictions: restrictions,
 	}
 }
@@ -908,7 +955,6 @@ func (checker *Checker) convertReferenceType(t *ast.ReferenceType) Type {
 
 	return &ReferenceType{
 		Authorized: t.Authorized,
-		Storable:   t.Storable,
 		Type:       ty,
 	}
 }
@@ -1353,9 +1399,9 @@ func (checker *Checker) checkAccessResourceLoss(expressionType Type, expression 
 // in non resource composites (concrete or interface)
 //
 func (checker *Checker) checkResourceFieldNesting(
-	fields map[string]*ast.FieldDeclaration,
 	members map[string]*Member,
 	compositeKind common.CompositeKind,
+	fieldPositionGetter func(name string) ast.Position,
 ) {
 	// Resource fields are only allowed in resources and contracts
 
@@ -1378,13 +1424,13 @@ func (checker *Checker) checkResourceFieldNesting(
 			continue
 		}
 
-		field := fields[name]
+		pos := fieldPositionGetter(name)
 
 		checker.report(
 			&InvalidResourceFieldError{
 				Name:          name,
 				CompositeKind: compositeKind,
-				Pos:           field.Identifier.Pos,
+				Pos:           pos,
 			},
 		)
 	}
@@ -1751,4 +1797,15 @@ func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos 
 		)
 	}
 
+	if typeAnnotation.Type.ContainsFirstLevelResourceInterfaceType() {
+		checker.report(
+			&InvalidResourceInterfaceTypeError{
+				Type: typeAnnotation.Type,
+				Range: ast.Range{
+					StartPos: pos.StartPosition(),
+					EndPos:   pos.EndPosition(),
+				},
+			},
+		)
+	}
 }

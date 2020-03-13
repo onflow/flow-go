@@ -540,7 +540,7 @@ func addStakingPrivateKeys(ids flow.IdentityList) ([]crypto.PrivateKey, error) {
 
 // create N private keys and assign them to identities' RandomBeaconPubKey
 func addRandomBeaconPrivateKeys(t *testing.T, ids flow.IdentityList) ([]crypto.PrivateKey, *hotstuff.DKGPublicData, error) {
-	sks, groupPubKey, keyShares := unittest.GenDKGKeys(t, len(ids))
+	sks, groupPubKey, keyShares := unittest.RunDKGKeys(t, len(ids))
 	for i := 0; i < len(ids); i++ {
 		sk := sks[i]
 		ids[i].RandomBeaconPubKey = sk.PublicKey()

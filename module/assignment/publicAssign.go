@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto/random"
+	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -24,7 +25,7 @@ func NewPublicAssignment(alpha int) *PublicAssignment {
 	return &PublicAssignment{alpha: alpha}
 }
 
-func (p *PublicAssignment) Assigner(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*Assignment, error) {
+func (p *PublicAssignment) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
 	a, err := chunkAssignment(ids.NodeIDs(), chunks, rng, p.alpha)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not complete chunk assignment")
@@ -35,7 +36,7 @@ func (p *PublicAssignment) Assigner(ids flow.IdentityList, chunks flow.ChunkList
 
 // permute shuffles subset of ids that contains its first m elements in place
 // it implements in-place version of Fisher-Yates shuffling https://doi.org/10.1145%2F364520.364540
-func permute(ids IdentifierList, m int, rng random.Rand) {
+func permute(ids flow.IdentifierList, m int, rng random.Rand) {
 	for i := m - 1; i > 0; i-- {
 		j, _ := rng.IntN(i)
 		ids.Swap(i, j)
@@ -44,11 +45,15 @@ func permute(ids IdentifierList, m int, rng random.Rand) {
 
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
+<<<<<<< HEAD
 func chunkAssignment(ids IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*Assignment, error) {
+=======
+func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.RandomGenerator, alpha int) (*chunkassignment.Assignment, error) {
+>>>>>>> master
 	if len(ids) < alpha {
 		return nil, fmt.Errorf("not enough verification nodes for chunk assignment: %d, minumum should be %d", len(ids), alpha)
 	}
-	assignment := NewAssignment()
+	assignment := chunkassignment.NewAssignment()
 	// permutes the entire slice
 	permute(ids, len(ids), rng)
 	t := ids
@@ -56,7 +61,7 @@ func chunkAssignment(ids IdentifierList, chunks flow.ChunkList, rng random.Rand,
 	for i := 0; i < chunks.Size(); i++ {
 		if len(t) >= alpha {
 			// More verifiers than required for this chunk
-			assignment.Assign(chunks.ByIndex(uint64(i)), JoinIdentifierLists(t[:alpha], nil))
+			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(t[:alpha], nil))
 			t = t[alpha:]
 		} else {
 			// Less verifiers than required for this chunk
@@ -68,7 +73,7 @@ func chunkAssignment(ids IdentifierList, chunks flow.ChunkList, rng random.Rand,
 
 			part2 := make([]flow.Identifier, still)
 			copy(part2, ids[:still])
-			assignment.Assign(chunks.ByIndex(uint64(i)), JoinIdentifierLists(part1, part2))
+			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(part1, part2))
 			permute(ids[still:], ids.Len()-still, rng)
 			t = ids[still:]
 		}

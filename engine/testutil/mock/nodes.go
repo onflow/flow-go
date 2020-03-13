@@ -39,6 +39,7 @@ type CollectionNode struct {
 	GenericNode
 	Pool            mempool.Transactions
 	Collections     storage.Collections
+	Transactions    storage.Transactions
 	IngestionEngine *collectioningest.Engine
 	ProviderEngine  *provider.Engine
 }
@@ -59,7 +60,7 @@ type ConsensusNode struct {
 type ExecutionNode struct {
 	GenericNode
 	IngestionEngine *ingestion.Engine
-	ExecutionEngine *computation.Engine
+	ExecutionEngine *computation.Manager
 	ReceiptsEngine  *executionprovider.Engine
 	BadgerDB        *badger.DB
 	LevelDB         *leveldb.LevelDB
@@ -69,7 +70,6 @@ type ExecutionNode struct {
 
 func (en ExecutionNode) Done() {
 	<-en.IngestionEngine.Done()
-	<-en.ExecutionEngine.Done()
 	<-en.ReceiptsEngine.Done()
 	en.BadgerDB.Close()
 	en.LevelDB.SafeClose()

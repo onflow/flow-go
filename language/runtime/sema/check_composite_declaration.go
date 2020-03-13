@@ -107,10 +107,14 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 		panic(errors.NewUnreachableError())
 	}
 
+	fieldPositionGetter := func(name string) ast.Position {
+		return declaration.Members.FieldPosition(name, declaration.CompositeKind)
+	}
+
 	checker.checkResourceFieldNesting(
-		declaration.Members.FieldsByIdentifier(),
 		compositeType.Members,
 		compositeType.Kind,
+		fieldPositionGetter,
 	)
 
 	// Check conformances
@@ -131,12 +135,14 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 
 	checkMissingMembers := kind != ContainerKindInterface
 
-	for _, interfaceType := range compositeType.Conformances {
+	for i, interfaceType := range compositeType.Conformances {
+		interfaceNominalType := declaration.Conformances[i]
 
 		checker.checkCompositeConformance(
 			declaration,
 			compositeType,
 			interfaceType,
+			interfaceNominalType.Identifier,
 			checkMissingMembers,
 		)
 	}
@@ -389,6 +395,7 @@ func (checker *Checker) declareCompositeType(declaration *ast.CompositeDeclarati
 	)
 
 	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
+	checker.Elaboration.CompositeTypes[compositeType.QualifiedIdentifier()] = compositeType
 
 	// Activate new scope for nested declarations
 
@@ -638,6 +645,7 @@ func (checker *Checker) checkCompositeConformance(
 	compositeDeclaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
 	interfaceType *InterfaceType,
+	compositeKindMismatchIdentifier ast.Identifier,
 	checkMissingMembers bool,
 ) {
 	var missingMembers []*Member
@@ -648,12 +656,12 @@ func (checker *Checker) checkCompositeConformance(
 	// Ensure the composite kinds match, e.g. a structure shouldn't be able
 	// to conform to a resource interface
 
-	if compositeType.Kind != interfaceType.CompositeKind {
+	if interfaceType.CompositeKind != compositeType.Kind {
 		checker.report(
 			&CompositeKindMismatchError{
-				ExpectedKind: interfaceType.CompositeKind,
-				ActualKind:   compositeType.Kind,
-				Range:        ast.NewRangeFromPositioned(compositeDeclaration.Identifier),
+				ExpectedKind: compositeType.Kind,
+				ActualKind:   interfaceType.CompositeKind,
+				Range:        ast.NewRangeFromPositioned(compositeKindMismatchIdentifier),
 			},
 		)
 	}
@@ -914,6 +922,7 @@ func (checker *Checker) checkTypeRequirement(
 		compositeDeclaration,
 		declaredCompositeType,
 		interfaceType,
+		compositeDeclaration.Identifier,
 		true,
 	)
 }

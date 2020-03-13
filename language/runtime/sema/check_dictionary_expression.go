@@ -92,13 +92,9 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 func IsValidDictionaryKeyType(keyType Type) bool {
 	// TODO: implement support for more built-in types here and in interpreter
 	switch keyType.(type) {
-	case *NeverType, *StringType, *BoolType:
+	case *NeverType, *StringType, *BoolType, *CharacterType, *AddressType:
 		return true
 	default:
-		if IsSubType(keyType, &IntegerType{}) {
-			return true
-		}
-
-		return false
+		return IsSubType(keyType, &NumberType{})
 	}
 }
