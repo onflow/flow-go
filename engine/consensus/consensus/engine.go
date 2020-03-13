@@ -407,11 +407,12 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 
 	// select a set of 3 other nodes to request the missing block from
 	// always including the sender of the pending block
-	recipients := e.participants.NodeIDs().
-		Without(e.me.NodeID()).
-		Without(originID).
-		RandSubsetN(2).
-		With(originID)
+	recipients := e.participants.
+		Filter(filter.Not(filter.HasNodeID(originID, e.me.NodeID()))).
+		Sample(2).
+		NodeIDs()
+	recipients = append(recipients, originID)
+
 	err := e.con.Submit(&req, recipients...)
 	if err != nil {
 		return fmt.Errorf("could not send block request: %w", err)
