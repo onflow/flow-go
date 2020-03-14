@@ -191,7 +191,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *execu
 			return bytes.Equal(f.StartState, completeBlock.StartState)
 		})).Return(nil)
 		ctx.executionState.On("PersistChunkDataPack", mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
-			return bytes.Equal(f.StartState, startStateCommitment)
+			return bytes.Equal(f.StartState, completeBlock.StartState)
 		})).Return(nil)
 	}
 

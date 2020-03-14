@@ -475,13 +475,13 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
 
 		if err != nil {
-			return fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, result.CompleteBlock.Block.ID())
+			return nil, fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, result.CompleteBlock.Block.ID())
 		}
 
 		chdp := generateChunkDataPack(chunk, allRegisters, values, proofs)
 		err = e.execState.PersistChunkDataPack(chdp)
 		if err != nil {
-			return fmt.Errorf("failed to save chunk data pack: %w", err)
+			return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
 		}
 		//
 		chunks[i] = chunk
