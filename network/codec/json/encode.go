@@ -66,6 +66,10 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeExecutionStateRequest
 	case *messages.ExecutionStateResponse:
 		code = CodeExecutionStateResponse
+	case *messages.ChunkDataPackRequest:
+		code = CodeChunkDataPackRequest
+	case *messages.ChunkDataPackResponse:
+		code = CodeChunkDataPackResponse
 
 	case *execution.CompleteBlock:
 		code = CodeExecutionCompleteBlock

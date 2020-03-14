@@ -76,6 +76,11 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeExecutionComputationOrder:
 		v = &execution.ComputationOrder{}
 
+	case CodeChunkDataPackRequest:
+		v = &messages.ChunkDataPackRequest{}
+	case CodeChunkDataPackResponse:
+		v = &messages.ChunkDataPackResponse{}
+
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)
 	}
