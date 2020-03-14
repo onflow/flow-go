@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	model "github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
@@ -111,9 +110,7 @@ func main() {
 				return nil, fmt.Errorf("could not get cluster member filter: %w", err)
 			}
 
-			head := func() (*flow.Header, error) {
-				return clusterState.Final().Head()
-			}
+			head := clusterState.Final().Head
 
 			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, 3*time.Second, 6*time.Second, head)
 			if err != nil {
