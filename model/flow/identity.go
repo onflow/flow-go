@@ -147,9 +147,6 @@ func (il IdentityList) Identities() []*Identity {
 
 // Sample returns a random subset of the desired size.
 func (il IdentityList) Sample(size uint) IdentityList {
-	if size <= 0 {
-		return IdentityList{}
-	}
 
 	if size > uint(len(il)) {
 		size = uint(len(il))
