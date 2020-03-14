@@ -172,7 +172,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 		err := e.sendCollectionsRequest(completeBlock, blockByCollection)
 		if err != nil {
-			return fmt.Errorf("cannot send collction requests: %w", err)
+			return fmt.Errorf("cannot send collection requests: %w", err)
 		}
 
 		// if block fits into execution queue, that's it
@@ -193,7 +193,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		if err == storage.ErrNotFound {
 			_, err := enqueue(completeBlock, orphanQueue)
 			if err != nil {
-				return fmt.Errorf("cannot add orphaned block: %w", err)
+				panic(fmt.Sprintf("cannot add orphaned block: %s", err))
 			}
 			return nil
 		}
@@ -205,11 +205,13 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		completeBlock.StartState = stateCommitment
 		newQueue, err := enqueue(completeBlock, executionQueue)
 		if err != nil {
-			return fmt.Errorf("cannot enqueue block for execution: %w", err)
+			panic(fmt.Sprintf("cannot enqueue block for execution: %w", err))
 		}
+
+		e.tryRequeueOrphans(completeBlock, newQueue, orphanQueue)
+
 		// If the block was empty
 		if completeBlock.IsComplete() {
-			e.tryRequeueOrphans(completeBlock, newQueue, orphanQueue)
 			e.wg.Add(1)
 			go e.executeBlock(completeBlock)
 		}
