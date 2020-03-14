@@ -1,27 +1,63 @@
 package computation
 
 import (
+	"encoding/hex"
+	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	computer "github.com/dapperlabs/flow-go/engine/execution/computation/computer/mock"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	realComputer "github.com/dapperlabs/flow-go/engine/execution/computation/computer"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestExecutionEngine_ComputeBlock(t *testing.T) {
+func TestComputeBlockWithStorage(t *testing.T) {
+	encoded := hex.EncodeToString([]byte(`
+			access(all) contract Container {
+				access(all) resource Counter {
+					pub var count: Int
+		
+					init(_ v: Int) {
+						self.count = v
+					}
+					pub fun add(_ count: Int) {
+						self.count = self.count + count
+					}
+				}
+				pub fun createCounter(_ v: Int): @Counter {
+					return <-create Counter(v)
+				}
+			}`))
+
 	tx1 := flow.TransactionBody{
-		Script: []byte("transaction { execute {} }"),
+		Script: []byte(fmt.Sprintf(`transaction {
+              prepare(signer: Account) {
+                signer.setCode("%s".decodeHex())
+              }
+            }`, encoded)),
+		ScriptAccounts: []flow.Address{flow.RootAddress},
 	}
 
 	tx2 := flow.TransactionBody{
-		Script: []byte("transaction { execute {} }"),
+		Script: []byte(`
+
+			import 0x01
+
+			transaction {
+				prepare(acc: Account) {
+					if acc.storage[Container.Counter] == nil {
+                		let existing <- acc.storage[Container.Counter] <- Container.createCounter(3)
+                		destroy existing
+					}
+              	}
+            }`),
+		ScriptAccounts: []flow.Address{flow.RootAddress},
 	}
 
 	transactions := []*flow.TransactionBody{&tx1, &tx2}
@@ -52,24 +88,28 @@ func TestExecutionEngine_ComputeBlock(t *testing.T) {
 		},
 	}
 
-	computationResult := unittest.ComputationResultFixture(2)
-
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer := new(computer.BlockComputer)
-	blockComputer.On("ExecuteBlock", mock.Anything, mock.Anything, mock.Anything).Return(computationResult, nil)
+	rt := runtime.NewInterpreterRuntime()
+
+	vm := virtualmachine.New(rt)
+
+	blockComputer := realComputer.NewBlockComputer(vm)
 
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 	}
 
-	view := state.NewView(func(key flow.RegisterID) (bytes []byte, e error) {
-		return nil, nil
-	})
+	view := executionUnittest.EmptyView()
+
+	require.Empty(t, view.Delta())
 
 	returnedComputationResult, err := engine.ComputeBlock(completeBlock, view)
 	require.NoError(t, err)
-	assert.Equal(t, computationResult, returnedComputationResult)
+
+	require.NotEmpty(t, view.Delta())
+	require.Len(t, returnedComputationResult.StateViews, 1)
+	assert.NotEmpty(t, returnedComputationResult.StateViews[0].Delta())
 }

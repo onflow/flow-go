@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
 func Genesis(identities IdentityList) *Block {
@@ -15,7 +14,7 @@ func Genesis(identities IdentityList) *Block {
 	seal := Seal{
 		BlockID:       ZeroID,
 		PreviousState: nil,
-		FinalState:    trie.GetDefaultHashForHeight(255),
+		FinalState:    GenesisStateCommitment,
 	}
 
 	// create the raw content for the genesis block

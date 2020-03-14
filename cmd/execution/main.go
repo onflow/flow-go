@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -10,7 +13,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/language/runtime"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
@@ -55,6 +60,18 @@ func main() {
 			)
 
 			return nil
+		}).
+		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
+			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
+			if err != nil {
+				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
+			}
+			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
+				panic("error while boostrapping execution state - resulting state is different than precalculated!")
+			}
+			if !bytes.Equal(flow.GenesisStateCommitment, block.Seals[0].FinalState) {
+				panic("genesis seal state commitment different from precalculated")
+			}
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkHeaders := badger.NewChunkHeaders(node.DB)
