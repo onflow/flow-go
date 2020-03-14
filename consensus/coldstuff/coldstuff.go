@@ -48,10 +48,16 @@ func New(
 	comms Communicator,
 	builder module.Builder,
 	finalizer module.Finalizer,
-	participants flow.IdentityList,
+	memberFilter flow.IdentityFilter,
 	interval time.Duration,
 	timeout time.Duration,
 ) (module.ColdStuff, error) {
+
+	participants, err := state.Final().Identities(memberFilter)
+	if err != nil {
+		return nil, fmt.Errorf("could not get consensus participants: %w", err)
+	}
+
 	cold := coldStuff{
 		log:          log,
 		me:           me,

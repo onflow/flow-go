@@ -54,6 +54,8 @@ func (suite *Suite) SetupTest() {
 	tracer, err := trace.NewTracer(log)
 	require.NoError(suite.T(), err)
 
+	me := unittest.IdentityFixture(func(idty *flow.Identity) { idty.Role = flow.RoleCollection })
+
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.mutator = new(protocol.Mutator)
@@ -61,8 +63,14 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Mutate").Return(suite.mutator)
 	suite.snapshot.On("Head").Return(&flow.Header{}, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
+
+	// create a fake cluster
+	clusters := flow.NewClusterList(1)
+	clusters.Add(0, me)
+	suite.snapshot.On("Clusters").Return(clusters, nil)
+
 	suite.me = new(module.Local)
-	suite.me.On("NodeID").Return(flow.Identifier{})
+	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.net = new(module.Network)
 	suite.con = new(network.Conduit)
@@ -165,8 +173,54 @@ func (suite *Suite) TestHandlePendingProposal() {
 	// we do not have the parent yet
 	suite.headers.On("ByBlockID", block.ParentID).Return(nil, realstorage.ErrNotFound)
 	// should request parent block
-	suite.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once()
+	suite.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	suite.cache.On("Add", mock.Anything).Return(true).Once()
+	suite.cache.On("ByID", block.ParentID).Return(nil, false)
+
+	err := suite.eng.Process(originID, proposal)
+	suite.Assert().Nil(err)
+
+	// proposal should not have been submitted to consensus algo
+	suite.coldstuff.AssertNotCalled(suite.T(), "SubmitProposal")
+	// parent block should be requested
+	suite.con.AssertExpectations(suite.T())
+}
+
+func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
+	originID := unittest.IdentifierFixture()
+
+	grandparent := unittest.ClusterBlockFixture()           // we are missing this
+	parent := unittest.ClusterBlockWithParent(&grandparent) // we have this in the cache
+	block := unittest.ClusterBlockWithParent(&parent)       // we receive this as a proposal
+
+	suite.T().Logf("block: %x\nparent: %x\ng-parent: %x", block.ID(), parent.ID(), grandparent.ID())
+
+	proposal := &messages.ClusterBlockProposal{
+		Header:  &block.Header,
+		Payload: &block.Payload,
+	}
+
+	// we have the parent, it is in pending cache
+	pendingParent := &cluster.PendingBlock{
+		OriginID: originID,
+		Header:   &parent.Header,
+		Payload:  &parent.Payload,
+	}
+	suite.headers.On("ByBlockID", block.ParentID).Return(nil, realstorage.ErrNotFound)
+
+	// should add block to the cache
+	suite.cache.On("Add", mock.Anything).Return(true).Once()
+	suite.cache.On("ByID", parent.ID()).Return(pendingParent, true).Once()
+	suite.cache.On("ByID", grandparent.ID()).Return(nil, false).Once()
+	// should send a request for the grandparent
+	suite.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		// assert the right ID was requested manually as we don't know what nonce was used
+		Run(func(args mock.Arguments) {
+			req := args.Get(0).(*messages.ClusterBlockRequest)
+			suite.Assert().Equal(req.BlockID, grandparent.ID())
+		}).
+		Return(nil).
+		Once()
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Nil(err)
