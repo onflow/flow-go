@@ -82,6 +82,10 @@ type ReferenceExtractor interface {
 	ExtractReference(extractor *ExpressionExtractor, expression *ReferenceExpression) ExpressionExtraction
 }
 
+type ForceExtractor interface {
+	ExtractForce(extractor *ExpressionExtractor, expression *ForceExpression) ExpressionExtraction
+}
+
 type ExpressionExtractor struct {
 	nextIdentifier       int
 	BoolExtractor        BoolExtractor
@@ -103,6 +107,7 @@ type ExpressionExtractor struct {
 	CreateExtractor      CreateExtractor
 	DestroyExtractor     DestroyExtractor
 	ReferenceExtractor   ReferenceExtractor
+	ForceExtractor       ForceExtractor
 }
 
 func (extractor *ExpressionExtractor) Extract(expression Expression) ExpressionExtraction {
@@ -688,6 +693,33 @@ func (extractor *ExpressionExtractor) VisitReferenceExpression(expression *Refer
 }
 
 func (extractor *ExpressionExtractor) ExtractReference(expression *ReferenceExpression) ExpressionExtraction {
+
+	// copy the expression
+	newExpression := *expression
+
+	// rewrite the sub-expression
+
+	result := extractor.Extract(newExpression.Expression)
+
+	newExpression.Expression = result.RewrittenExpression
+
+	return ExpressionExtraction{
+		RewrittenExpression:  &newExpression,
+		ExtractedExpressions: result.ExtractedExpressions,
+	}
+}
+
+func (extractor *ExpressionExtractor) VisitForceExpression(expression *ForceExpression) Repr {
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.ForceExtractor != nil {
+		return extractor.ForceExtractor.ExtractForce(extractor, expression)
+	}
+	return extractor.ExtractForce(expression)
+}
+
+func (extractor *ExpressionExtractor) ExtractForce(expression *ForceExpression) ExpressionExtraction {
 
 	// copy the expression
 	newExpression := *expression

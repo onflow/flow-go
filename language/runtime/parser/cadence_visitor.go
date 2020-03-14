@@ -209,11 +209,26 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#primaryExpression.
 	VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{}
 
-	// Visit a parse tree produced by CadenceParser#composedExpression.
-	VisitComposedExpression(ctx *ComposedExpressionContext) interface{}
+	// Visit a parse tree produced by CadenceParser#accessExpression.
+	VisitAccessExpression(ctx *AccessExpressionContext) interface{}
 
-	// Visit a parse tree produced by CadenceParser#primaryExpressionSuffix.
-	VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{}
+	// Visit a parse tree produced by CadenceParser#invocationExpression.
+	VisitInvocationExpression(ctx *InvocationExpressionContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#nestedExpression.
+	VisitNestedExpression(ctx *NestedExpressionContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#identifierExpression.
+	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#forceExpression.
+	VisitForceExpression(ctx *ForceExpressionContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#literalExpression.
+	VisitLiteralExpression(ctx *LiteralExpressionContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#functionExpression.
+	VisitFunctionExpression(ctx *FunctionExpressionContext) interface{}
 
 	// Visit a parse tree produced by CadenceParser#equalityOp.
 	VisitEqualityOp(ctx *EqualityOpContext) interface{}
@@ -233,9 +248,6 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#castingOp.
 	VisitCastingOp(ctx *CastingOpContext) interface{}
 
-	// Visit a parse tree produced by CadenceParser#primaryExpressionStart.
-	VisitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) interface{}
-
 	// Visit a parse tree produced by CadenceParser#createExpression.
 	VisitCreateExpression(ctx *CreateExpressionContext) interface{}
 
@@ -244,18 +256,6 @@ type CadenceVisitor interface {
 
 	// Visit a parse tree produced by CadenceParser#referenceExpression.
 	VisitReferenceExpression(ctx *ReferenceExpressionContext) interface{}
-
-	// Visit a parse tree produced by CadenceParser#identifierExpression.
-	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}
-
-	// Visit a parse tree produced by CadenceParser#literalExpression.
-	VisitLiteralExpression(ctx *LiteralExpressionContext) interface{}
-
-	// Visit a parse tree produced by CadenceParser#functionExpression.
-	VisitFunctionExpression(ctx *FunctionExpressionContext) interface{}
-
-	// Visit a parse tree produced by CadenceParser#nestedExpression.
-	VisitNestedExpression(ctx *NestedExpressionContext) interface{}
 
 	// Visit a parse tree produced by CadenceParser#expressionAccess.
 	VisitExpressionAccess(ctx *ExpressionAccessContext) interface{}
