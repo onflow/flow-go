@@ -8,11 +8,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
 
-var dynamicCastingOperators = map[string]bool{"as?": true, "as!": false}
+// dynamic casting operation -> returns optional
+var dynamicCastingOperations = map[ast.Operation]bool{
+	ast.OperationFailableCast: true,
+	ast.OperationForceCast:    false,
+}
 
 func TestInterpretDynamicCastingNumber(t *testing.T) {
 
@@ -44,9 +50,9 @@ func TestInterpretDynamicCastingNumber(t *testing.T) {
 		{&sema.Fix64Type{}, "1.23", interpreter.Fix64Value(123000000)},
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, test := range tests {
 
@@ -72,7 +78,7 @@ func TestInterpretDynamicCastingNumber(t *testing.T) {
 										test.value,
 										fromType,
 										targetType,
-										operator,
+										operation.Symbol(),
 									),
 								)
 
@@ -116,7 +122,7 @@ func TestInterpretDynamicCastingNumber(t *testing.T) {
 										test.value,
 										fromType,
 										otherType,
-										operator,
+										operation.Symbol(),
 									),
 								)
 
@@ -149,9 +155,9 @@ func TestInterpretDynamicCastingVoid(t *testing.T) {
 		&sema.VoidType{},
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -168,7 +174,7 @@ func TestInterpretDynamicCastingVoid(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -206,7 +212,7 @@ func TestInterpretDynamicCastingVoid(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -237,9 +243,9 @@ func TestInterpretDynamicCastingString(t *testing.T) {
 		&sema.StringType{},
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -254,7 +260,7 @@ func TestInterpretDynamicCastingString(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -291,7 +297,7 @@ func TestInterpretDynamicCastingString(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -322,9 +328,9 @@ func TestInterpretDynamicCastingBool(t *testing.T) {
 		&sema.BoolType{},
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -339,7 +345,7 @@ func TestInterpretDynamicCastingBool(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -376,7 +382,7 @@ func TestInterpretDynamicCastingBool(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -407,9 +413,9 @@ func TestInterpretDynamicCastingAddress(t *testing.T) {
 		&sema.AddressType{},
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -425,7 +431,7 @@ func TestInterpretDynamicCastingAddress(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -466,7 +472,7 @@ func TestInterpretDynamicCastingAddress(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -497,9 +503,9 @@ func TestInterpretDynamicCastingStruct(t *testing.T) {
 		"S",
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -516,7 +522,7 @@ func TestInterpretDynamicCastingStruct(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -553,7 +559,7 @@ func TestInterpretDynamicCastingStruct(t *testing.T) {
                               }
                             `,
 							fromType,
-							operator,
+							operation.Symbol(),
 						),
 					)
 
@@ -594,7 +600,7 @@ func TestInterpretDynamicCastingStruct(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -618,6 +624,116 @@ func TestInterpretDynamicCastingStruct(t *testing.T) {
 	}
 }
 
+func returnResourceCasted(fromType, targetType string, operation ast.Operation) string {
+	switch operation {
+	case ast.OperationFailableCast:
+		return fmt.Sprintf(
+			`
+              fun test(): @%[2]s? {
+                  let r: @%[1]s <- create R()
+                  if let r2 <- r as? @%[2]s {
+                      return <-r2
+                  } else {
+                      destroy r
+                      return nil
+                  }
+              }
+            `,
+			fromType,
+			targetType,
+		)
+
+	case ast.OperationForceCast:
+		return fmt.Sprintf(
+			`
+              fun test(): @%[2]s {
+                  let r: @%[1]s <- create R()
+                  let r2 <- r as! @%[2]s
+                  return <-r2
+              }
+            `,
+			fromType,
+			targetType,
+		)
+
+	default:
+		panic(errors.NewUnreachableError())
+	}
+}
+
+func testResourceCastValid(t *testing.T, types, fromType string, targetType string, operation ast.Operation) {
+	inter := parseCheckAndInterpret(t,
+		types+
+			returnResourceCasted(
+				fromType,
+				targetType,
+				operation,
+			),
+	)
+
+	value, err := inter.Invoke("test")
+
+	require.NoError(t, err)
+
+	switch operation {
+	case ast.OperationFailableCast:
+		require.IsType(t,
+			&interpreter.SomeValue{},
+			value,
+		)
+
+		require.IsType(t,
+			&interpreter.CompositeValue{},
+			value.(*interpreter.SomeValue).Value,
+		)
+
+	case ast.OperationForceCast:
+
+		require.IsType(t,
+			&interpreter.CompositeValue{},
+			value,
+		)
+
+	default:
+		panic(errors.NewUnreachableError())
+	}
+}
+
+func testResourceCastInvalid(t *testing.T, types, fromType, targetType string, operation ast.Operation) {
+	inter := parseCheckAndInterpret(t,
+		fmt.Sprintf(
+			types+returnResourceCasted(
+				fromType,
+				targetType,
+				operation,
+			),
+		),
+	)
+
+	value, err := inter.Invoke("test")
+
+	switch operation {
+	case ast.OperationFailableCast:
+		require.NoError(t, err)
+
+		require.IsType(t,
+			interpreter.NilValue{},
+			value,
+		)
+
+	case ast.OperationForceCast:
+		require.Error(t, err)
+
+		require.IsType(t,
+			&interpreter.TypeMismatchError{},
+			err,
+		)
+
+	default:
+		panic(errors.NewUnreachableError())
+	}
+}
+
 func TestInterpretDynamicCastingResource(t *testing.T) {
 
 	types := []string{
@@ -625,78 +741,40 @@ func TestInterpretDynamicCastingResource(t *testing.T) {
 		"R",
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operation := range dynamicCastingOperations {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
+			for _, fromType := range types {
+				for _, targetType := range types {
+
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+
+						testResourceCastValid(t,
+							`
+                              resource R {}
+                            `,
+							fromType,
+							targetType,
+							operation,
+						)
+					})
+				}
+
+				t.Run(fmt.Sprintf("invalid: from %s to T", fromType), func(t *testing.T) {
+
+					testResourceCastInvalid(t,
 						`
                           resource R {}
 
-                          fun test(): @%[2]s? {
-                              let r: @%[1]s <- create R()
-                              if let r2 <- r as? @%[2]s {
-                                  return <-r2
-                              } else {
-                                  destroy r
-                                  return nil
-                              }
-                          }
+                          resource T {}
                         `,
 						fromType,
-						targetType,
-					),
-				)
-
-				value, err := inter.Invoke("test")
-
-				require.NoError(t, err)
-
-				require.IsType(t,
-					&interpreter.SomeValue{},
-					value,
-				)
-
-				require.IsType(t,
-					&interpreter.CompositeValue{},
-					value.(*interpreter.SomeValue).Value,
-				)
-			})
-		}
-
-		t.Run(fmt.Sprintf("invalid: from %s to T", fromType), func(t *testing.T) {
-
-			inter := parseCheckAndInterpret(t,
-				fmt.Sprintf(
-					`
-                      resource R {}
-
-                      resource T {}
-
-                      fun test(): @T? {
-                          let r: @%s <- create R()
-                          if let r2 <- r as? @T {
-                              return <-r2
-                          } else {
-                              destroy r
-                              return nil
-                          }
-                      }
-                    `,
-					fromType,
-				),
-			)
-
-			value, err := inter.Invoke("test")
-
-			require.NoError(t, err)
-
-			require.IsType(t,
-				interpreter.NilValue{},
-				value,
-			)
+						"T",
+						operation,
+					)
+				})
+			}
 		})
 	}
 }
@@ -709,9 +787,9 @@ func TestInterpretDynamicCastingStructInterface(t *testing.T) {
 		"I",
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -730,7 +808,7 @@ func TestInterpretDynamicCastingStructInterface(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -763,7 +841,7 @@ func TestInterpretDynamicCastingStructInterface(t *testing.T) {
                               }
                             `,
 							fromType,
-							operator,
+							operation.Symbol(),
 						),
 					)
 
@@ -799,7 +877,7 @@ func TestInterpretDynamicCastingStructInterface(t *testing.T) {
                               }
                             `,
 							fromType,
-							operator,
+							operation.Symbol(),
 						),
 					)
 
@@ -830,80 +908,44 @@ func TestInterpretDynamicCastingResourceInterface(t *testing.T) {
 		"AnyResource{I}",
 	}
 
-	for _, fromType := range types {
-		for _, targetType := range types {
+	for operation := range dynamicCastingOperations {
 
-			t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
-				inter := parseCheckAndInterpret(t,
-					fmt.Sprintf(
+			for _, fromType := range types {
+				for _, targetType := range types {
+
+					t.Run(fmt.Sprintf("valid: from %s to %s", fromType, targetType), func(t *testing.T) {
+
+						testResourceCastValid(t,
+							`
+                              resource interface I {}
+
+                              resource R: I {}
+                            `,
+							fromType,
+							targetType,
+							operation,
+						)
+					})
+				}
+
+				t.Run(fmt.Sprintf("invalid: from %s to other resource", fromType), func(t *testing.T) {
+
+					testResourceCastInvalid(t,
 						`
                           resource interface I {}
 
                           resource R: I {}
 
-                          fun test(): @%[2]s? {
-                              let i: @%[1]s <- create R()
-                              if let r <- i as? @%[2]s {
-                                  return <-r
-                              } else {
-                                  destroy i
-                                  return nil
-                              }
-                          }
+                          resource T: I {}
                         `,
 						fromType,
-						targetType,
-					),
-				)
-
-				result, err := inter.Invoke("test")
-				require.NoError(t, err)
-
-				require.IsType(t,
-					&interpreter.SomeValue{},
-					result,
-				)
-
-				require.IsType(t,
-					&interpreter.CompositeValue{},
-					result.(*interpreter.SomeValue).Value,
-				)
-			})
-		}
-
-		t.Run(fmt.Sprintf("invalid: from %s to other resource", fromType), func(t *testing.T) {
-
-			inter := parseCheckAndInterpret(t,
-				fmt.Sprintf(
-					`
-                      resource interface I {}
-
-                      resource R: I {}
-
-                      resource T: I {}
-
-                      fun test(): @T? {
-                          let i: @%s <- create R()
-                          if let r <- i as? @T {
-                              return <-r
-                          } else {
-                              destroy i
-                              return nil
-                          }
-                      }
-                    `,
-					fromType,
-				),
-			)
-
-			result, err := inter.Invoke("test")
-			require.NoError(t, err)
-
-			require.IsType(t,
-				interpreter.NilValue{},
-				result,
-			)
+						"T",
+						operation,
+					)
+				})
+			}
 		})
 	}
 }
@@ -916,9 +958,9 @@ func TestInterpretDynamicCastingSome(t *testing.T) {
 		&sema.AnyStructType{},
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -934,7 +976,7 @@ func TestInterpretDynamicCastingSome(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -984,7 +1026,7 @@ func TestInterpretDynamicCastingSome(t *testing.T) {
 	                            `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1016,9 +1058,9 @@ func TestInterpretDynamicCastingArray(t *testing.T) {
 		&sema.AnyStructType{},
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -1033,7 +1075,7 @@ func TestInterpretDynamicCastingArray(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1073,7 +1115,7 @@ func TestInterpretDynamicCastingArray(t *testing.T) {
 		                        `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1110,9 +1152,9 @@ func TestInterpretDynamicCastingDictionary(t *testing.T) {
 		},
 	}
 
-	for operator, returnsOptional := range dynamicCastingOperators {
+	for operation, returnsOptional := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -1128,7 +1170,7 @@ func TestInterpretDynamicCastingDictionary(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1169,7 +1211,7 @@ func TestInterpretDynamicCastingDictionary(t *testing.T) {
 	                            `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1195,1328 +1237,1014 @@ func TestInterpretDynamicCastingDictionary(t *testing.T) {
 
 func TestInterpretDynamicCastingResourceType(t *testing.T) {
 
-	// Supertype: Restricted resource
+	for operation := range dynamicCastingOperations {
 
-	t.Run("restricted resource -> restricted resource: fewer restrictions", func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
-		inter := parseCheckAndInterpret(t, `
-            resource interface I1 {}
+			// Supertype: Restricted resource
 
-            resource interface I2 {}
+			t.Run("restricted resource -> restricted resource: fewer restrictions", func(t *testing.T) {
 
-            resource R: I1, I2 {}
+				testResourceCastValid(t,
+					`
+                      resource interface I1 {}
 
-            fun test(): @R{I2}? {
-                let r: @R{I1, I2} <- create R()
-                if let r2 <- r as? @R{I2} {
-                    return <-r2
-                } else {
-                    destroy r
-                    return nil
-                }
-            }
-          `,
+                      resource interface I2 {}
+
+                      resource R: I1, I2 {}
+                    `,
+					"R{I1, I2}",
+					"R{I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted resource -> restricted resource: more restrictions", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+                    `,
+					"R{I1}",
+					"R{I1, I2}",
+					operation,
+				)
+			})
+
+			t.Run("unrestricted resource -> restricted resource: same resource", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I {}
+
+	                  resource R: I {}
+	                `,
+					"R",
+					"R{I}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+	                `,
+					"AnyResource{RI}",
+					"R{RI}",
+					operation,
+				)
+			})
+
+			// TODO: should statically fail?
+			t.Run("restricted AnyResource -> non-conforming restricted resource", func(t *testing.T) {
+
+				testResourceCastInvalid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+
+	                  resource T {}
+	                `,
+					"AnyResource{RI}",
+					"T{}",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+	                `,
+					"AnyResource",
+					"R{RI}",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> non-conforming restricted resource", func(t *testing.T) {
+
+				testResourceCastInvalid(t,
+					`
+                      resource R {}
+
+	                  resource interface TI {}
+
+	                  resource T: TI {}
+	                `,
+					"AnyResource",
+					"T{TI}",
+					operation,
+				)
+			})
+
+			// Supertype: Resource (unrestricted)
+
+			t.Run("restricted resource -> unrestricted resource: same resource", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+                      resource interface I {}
+
+	                  resource R: I {}
+                    `,
+					"R{I}",
+					"R",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> conforming resource", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+					  resource interface RI {}
+
+	                  resource R: RI {}
+	                `,
+					"AnyResource{RI}",
+					"R",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> non-conforming resource", func(t *testing.T) {
+
+				testResourceCastInvalid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+
+	                  resource T: RI {}
+	                `,
+					"AnyResource{RI}",
+					"T",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> unrestricted resource: same type", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+
+	                `,
+					"AnyResource",
+					"R",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> unrestricted resource: different type", func(t *testing.T) {
+
+				testResourceCastInvalid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+
+	                  resource T: RI {}
+
+	                `,
+					"AnyResource",
+					"T",
+					operation,
+				)
+			})
+
+			// Supertype: restricted AnyResource
+
+			t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+	                `,
+					"R",
+					"AnyResource{RI}",
+					operation,
+				)
+			})
+
+			t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I {}
+
+	                  resource R: I {}
+	                `,
+					"R{I}",
+					"AnyResource{I}",
+					operation,
+				)
+			})
+
+			t.Run("restricted resource -> restricted AnyResource with conformance not in restriction", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"R{I1}",
+					"AnyResource{I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"AnyResource{I1, I2}",
+					"AnyResource{I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource: more restrictions", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"AnyResource{I1}",
+					"AnyResource{I1, I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, conforming", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"AnyResource{I1}",
+					"AnyResource{I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, non-conforming", func(t *testing.T) {
+
+				testResourceCastInvalid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1 {}
+
+	                `,
+					"AnyResource{I1}",
+					"AnyResource{I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
+
+				testResourceCastInvalid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1 {}
+	                `,
+					"AnyResource{I1}",
+					"AnyResource{I1, I2}",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I {}
+
+	                  resource R: I {}
+	                `,
+					"AnyResource",
+					"AnyResource{I}",
+					operation,
+				)
+			})
+
+			// Supertype: AnyResource
+
+			t.Run("restricted resource -> AnyResource", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"R{I1}",
+					"AnyResource",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"AnyResource{I1}",
+					"AnyResource",
+					operation,
+				)
+			})
+
+			t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
+
+				testResourceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+                    `,
+					"R",
+					"AnyResource",
+					operation,
+				)
+			})
+		})
+	}
+}
+
+func returnReferenceCasted(fromType, targetType string, operation ast.Operation) string {
+	switch operation {
+	case ast.OperationFailableCast:
+		return fmt.Sprintf(
+			`
+              fun test(): %[2]s? {
+                  let x <- create R()
+                  let r = &x as %[1]s
+                  let r2 = r as? %[2]s
+                  destroy x
+                  return r2
+              }
+            `,
+			fromType,
+			targetType,
 		)
 
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
+	case ast.OperationForceCast:
+		return fmt.Sprintf(
+			`
+              fun test(): %[2]s {
+                  let x <- create R()
+                  let r = &x as %[1]s
+                  let r2 = r as! %[2]s
+                  destroy x
+                  return r2
+              }
+            `,
+			fromType,
+			targetType,
+		)
+
+	default:
+		panic(errors.NewUnreachableError())
+	}
+}
+
+func testReferenceCastValid(t *testing.T, types, fromType, targetType string, operation ast.Operation) {
+	inter := parseCheckAndInterpret(t,
+		types+
+			returnReferenceCasted(fromType, targetType, operation),
+	)
+
+	value, err := inter.Invoke("test")
+
+	require.NoError(t, err)
+
+	switch operation {
+	case ast.OperationFailableCast:
 
 		require.IsType(t,
 			&interpreter.SomeValue{},
-			result,
+			value,
 		)
-	})
-
-	t.Run("restricted resource -> restricted resource: more restrictions", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-	      fun test(): @R{I1, I2}? {
-	          let r: @R{I1} <- create R()
-	          if let r2 <- r as? @R{I1, I2} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
 
 		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
+			&interpreter.EphemeralReferenceValue{},
+			value.(*interpreter.SomeValue).Value,
 		)
-	})
 
-	t.Run("unrestricted resource -> restricted resource: same resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I {}
-
-	      resource R: I {}
-
-	      fun test(): @R{I}? {
-	          let r: @R <- create R()
-	          if let r2 <- r as? @R{I} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-        `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
+	case ast.OperationForceCast:
 
 		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
+			&interpreter.EphemeralReferenceValue{},
+			value,
 		)
-	})
 
-	t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
+	default:
+		panic(errors.NewUnreachableError())
+	}
+}
 
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
+func testReferenceCastInvalid(t *testing.T, types, fromType, targetType string, operation ast.Operation) {
+	inter := parseCheckAndInterpret(t,
+		fmt.Sprintf(
+			types+returnReferenceCasted(
+				fromType,
+				targetType,
+				operation,
+			),
+		),
+	)
 
-	      resource R: RI {}
+	value, err := inter.Invoke("test")
 
-	      fun test(): @R{RI}? {
-	          let r: @AnyResource{RI} <- create R()
-	          if let r2 <- r as? @R{RI} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	// TODO: should statically fail?
-	t.Run("restricted AnyResource -> non-conforming restricted resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-	      resource T {}
-
-	      fun test(): @T{}? {
-	          let r: @AnyResource{RI} <- create R()
-	          if let r2 <- r as? @T{} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
+	switch operation {
+	case ast.OperationFailableCast:
 		require.NoError(t, err)
 
 		require.IsType(t,
 			interpreter.NilValue{},
-			result,
+			value,
 		)
-	})
 
-	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-          fun test(): @R{RI}? {
-	          let r: @AnyResource <- create R()
-	          if let r2 <- r as? @R{RI} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
+	case ast.OperationForceCast:
+		require.Error(t, err)
 
 		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
+			&interpreter.TypeMismatchError{},
+			err,
 		)
-	})
 
-	t.Run("AnyResource -> non-conforming restricted resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-          resource T {}
-
-          fun test(): @R{RI}? {
-	          let r: @AnyResource <- create T()
-	          if let r2 <- r as? @R{RI} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			interpreter.NilValue{},
-			result,
-		)
-	})
-
-	// Supertype: Resource (unrestricted)
-
-	t.Run("restricted resource -> unrestricted resource: same resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-          resource interface I {}
-
-	      resource R: I {}
-
-	      fun test(): @R? {
-	          let r: @R{I} <- create R()
-	          if let r2 <- r as? @R {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-        `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted AnyResource -> conforming resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-	      fun test(): @R? {
-	          let r: @AnyResource{RI} <- create R()
-	          if let r2 <- r as? @R {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted AnyResource -> non-conforming resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-	      resource T: RI {}
-
-	      fun test(): @T? {
-	          let r: @AnyResource{RI} <- create R()
-	          if let r2 <- r as? @T {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			interpreter.NilValue{},
-			result,
-		)
-	})
-
-	t.Run("AnyResource -> unrestricted resource: same type", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-	      fun test(): @R? {
-	          let r: @AnyResource <- create R()
-	          if let r2 <- r as? @R {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("AnyResource -> unrestricted resource: different type", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-	      resource T: RI {}
-
-	      fun test(): @T? {
-	          let r: @AnyResource <- create R()
-	          if let r2 <- r as? @T {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			interpreter.NilValue{},
-			result,
-		)
-	})
-
-	// Supertype: restricted AnyResource
-
-	t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-	      fun test(): @AnyResource{RI}? {
-	          let r: @R <- create R()
-	          if let r2 <- r as? @AnyResource{RI} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I {}
-
-	      resource R: I {}
-
-	      fun test(): @AnyResource{I}? {
-	          let r: @R{I} <- create R()
-	          if let r2 <- r as? @AnyResource{I} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted resource -> restricted AnyResource with conformance not in restriction", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-	      fun test(): @AnyResource{I2}? {
-	          let r: @R{I1} <- create R()
-	          if let r2 <- r as? @AnyResource{I2} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-	      fun test(): @AnyResource{I2}? {
-	          let r: @AnyResource{I1, I2} <- create R()
-	          if let r2 <- r as? @AnyResource{I2} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: more restrictions", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-	      fun test(): @AnyResource{I1, I2}? {
-	          let r: @AnyResource{I1} <- create R()
-	          if let r2 <- r as? @AnyResource{I1, I2} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, conforming", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-	      fun test(): @AnyResource{I2}? {
-	          let r: @AnyResource{I1} <- create R()
-	          if let r2 <- r as? @AnyResource{I2} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, non-conforming", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1 {}
-
-	      fun test(): @AnyResource{I2}? {
-	          let r: @AnyResource{I1} <- create R()
-	          if let r2 <- r as? @AnyResource{I2} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			interpreter.NilValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1 {}
-
-	      fun test(): @AnyResource{I1, I2}? {
-	          let r: @AnyResource{I1} <- create R()
-	          if let r2 <- r as? @AnyResource{I1, I2} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			interpreter.NilValue{},
-			result,
-		)
-	})
-
-	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I {}
-
-	      resource R: I {}
-
-	      fun test(): @AnyResource{I}? {
-	          let r: @AnyResource <- create R()
-	          if let r2 <- r as? @AnyResource{I} {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	// Supertype: AnyResource
-
-	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-	        fun test(): @AnyResource? {
-	            let r: @R{I1} <- create R()
-	            if let r2 <- r as? @AnyResource {
-	                return <-r2
-	            } else {
-	                destroy r
-	                return nil
-	            }
-	        }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-	      fun test(): @AnyResource? {
-	          let r: @AnyResource{I1} <- create R()
-	          if let r2 <- r as? @AnyResource {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
-
-	t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-	      fun test(): @AnyResource? {
-	          let r <- create R()
-	          if let r2 <- r as? @AnyResource {
-	              return <-r2
-	          } else {
-	              destroy r
-	              return nil
-	          }
-	      }
-	    `)
-
-		result, err := inter.Invoke("test")
-		require.NoError(t, err)
-
-		require.IsType(t,
-			&interpreter.SomeValue{},
-			result,
-		)
-	})
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func TestInterpretDynamicCastingAuthorizedReferenceType(t *testing.T) {
 
-	// Supertype: Restricted resource
+	for operation := range dynamicCastingOperations {
+
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
-	t.Run("restricted resource -> restricted resource: fewer restrictions", func(t *testing.T) {
+			// Supertype: Restricted resource
 
-		inter := parseCheckAndInterpret(t, `
-          resource interface I1 {}
+			t.Run("restricted resource -> restricted resource: fewer restrictions", func(t *testing.T) {
 
-          resource interface I2 {}
+				testReferenceCastValid(t,
+					`
+                      resource interface I1 {}
+
+                      resource interface I2 {}
+
+                      resource R: I1, I2 {}
+                    `,
+					"auth &R{I1, I2}",
+					"&R{I2}",
+					operation,
+				)
+			})
 
-          resource R: I1, I2 {}
+			t.Run("restricted resource -> restricted resource: more restrictions", func(t *testing.T) {
 
-          let x <- create R()
-          let r = &x as auth &R{I1, I2}
-          let r2 = r as? &R{I2}
-        `)
+				testReferenceCastValid(t,
+					`
+                      resource interface I1 {}
+
+                      resource interface I2 {}
+
+                      resource R: I1, I2 {}
+                    `,
+					"auth &R{I1}",
+					"&R{I1, I2}",
+					operation,
+				)
+			})
+
+			t.Run("unrestricted resource -> restricted resource: same resource", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I {}
+
+	                  resource R: I {}
+	                `,
+					"auth &R",
+					"&R{I}",
+					operation,
+				)
+			})
 
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted resource -> restricted resource: more restrictions", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-          resource interface I1 {}
-
-          resource interface I2 {}
-
-          resource R: I1, I2 {}
-
-          let x <- create R()
-          let r = &x as auth &R{I1}
-          let r2 = r as? &R{I1, I2}
-        `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("unrestricted resource -> restricted resource: same resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I {}
-
-	      resource R: I {}
-
-          let x <- create R()
-	      let r = &x as auth &R
-	      let r2 = r as? &R{I}
-	   `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{RI}
-	      let r2 = r as? &R{RI}
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	// TODO: should statically fail?
-	t.Run("restricted AnyResource -> non-conforming restricted resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-	      resource T {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{RI}
-	      let r2 = r as? &T{}
-	    `)
-
-		assert.IsType(t,
-			interpreter.NilValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource
-	      let r2 = r as? &R{RI}
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("AnyResource -> non-conforming restricted resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-          resource T {}
-
-          let x <- create T()
-	      let r = &x as auth &AnyResource
-	      let r2 = r as? &R{RI}
-	    `)
-
-		assert.IsType(t,
-			interpreter.NilValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	// Supertype: Resource (unrestricted)
-
-	t.Run("restricted resource -> unrestricted resource: same resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I {}
-
-	      resource R: I {}
-
-          let x <- create R()
-	      let r = &x as auth &R{I}
-	      let r2 = r as? &R
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> conforming resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{RI}
-	      let r2 = r as? &R
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> non-conforming resource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-	      resource T: RI {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{RI}
-	      let r2 = r as? &T
-	    `)
-
-		assert.IsType(t,
-			interpreter.NilValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("AnyResource -> unrestricted resource: same type", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource
-	      let r2 = r as? &R
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("AnyResource -> unrestricted resource: different type", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-	      resource T: RI {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource
-	      let r2 = r as? &T
-	    `)
-
-		assert.IsType(t,
-			interpreter.NilValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	// Supertype: restricted AnyResource
-
-	t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface RI {}
-
-	      resource R: RI {}
-
-          let x <- create R()
-	      let r = &x as auth &R
-	      let r2 = r as? &AnyResource{RI}
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I {}
-
-	      resource R: I {}
-
-          let x <- create R()
-	      let r = &x as auth &R{I}
-	      let r2 = r as? &AnyResource{I}
-	   `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted resource -> restricted AnyResource with conformance not in restriction", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-          let x <- create R()
-	      let r = &x as auth &R{I1}
-	      let r2 = r as? &AnyResource{I2}
-        `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{I1, I2}
-	      let r2 = r as? &AnyResource{I2}
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: more restrictions", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{I1}
-	      let r2 = r as? &AnyResource{I1, I2}
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, conforming", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{I1}
-	      let r2 = r as? &AnyResource{I2}
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, non-conforming", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1 {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{I1}
-	      let r2 = r as? &AnyResource{I2}
-	    `)
-
-		assert.IsType(t,
-			interpreter.NilValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1 {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{I1}
-	      let r2 = r as? &AnyResource{I1, I2}
-	    `)
-
-		assert.IsType(t,
-			interpreter.NilValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I {}
-
-	      resource R: I {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource
-	      let r2 = r as? &AnyResource{I}
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	// Supertype: AnyResource
-
-	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-          let x <- create R()
-	      let r = &x as auth &R{I1}
-          let r2 = r as? &AnyResource
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-          let x <- create R()
-	      let r = &x as auth &AnyResource{I1}
-	      let r2 = r as? &AnyResource
-	    `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-	      resource interface I1 {}
-
-	      resource interface I2 {}
-
-	      resource R: I1, I2 {}
-
-          let x <- create R()
-	      let r = &x as auth &R
-	      let r2 = r as? &AnyResource
-        `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
+			t.Run("restricted AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+	                `,
+					"auth &AnyResource{RI}",
+					"&R{RI}",
+					operation,
+				)
+			})
+
+			// TODO: should statically fail?
+			t.Run("restricted AnyResource -> non-conforming restricted resource", func(t *testing.T) {
+
+				testReferenceCastInvalid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+
+	                  resource T {}
+	                `,
+					"auth &AnyResource{RI}",
+					"&T{}",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> conforming restricted resource", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+	                `,
+					"auth &AnyResource",
+					"&R{RI}",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> non-conforming restricted resource", func(t *testing.T) {
+
+				testReferenceCastInvalid(t,
+					`
+                      resource R {}
+
+	                  resource interface TI {}
+
+	                  resource T: TI {}
+	                `,
+					"auth &AnyResource",
+					"&T{TI}",
+					operation,
+				)
+			})
+
+			// Supertype: Resource (unrestricted)
+
+			t.Run("restricted resource -> unrestricted resource: same resource", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I {}
+
+	                  resource R: I {}
+	                `,
+					"auth &R{I}",
+					"&R",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> conforming resource", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+	                `,
+					"auth &AnyResource{RI}",
+					"&R",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> non-conforming resource", func(t *testing.T) {
+
+				testReferenceCastInvalid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+
+	                  resource T: RI {}
+	                `,
+					"auth &AnyResource{RI}",
+					"&T",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> unrestricted resource: same type", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+	                `,
+					"auth &AnyResource",
+					"&R",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> unrestricted resource: different type", func(t *testing.T) {
+
+				testReferenceCastInvalid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+
+	                  resource T: RI {}
+	                `,
+					"auth &AnyResource",
+					"&T",
+					operation,
+				)
+			})
+
+			// Supertype: restricted AnyResource
+
+			t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface RI {}
+
+	                  resource R: RI {}
+	                `,
+					"auth &R",
+					"&AnyResource{RI}",
+					operation,
+				)
+			})
+
+			t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                   resource interface I {}
+
+	                   resource R: I {}
+	                `,
+					"auth &R{I}",
+					"&AnyResource{I}",
+					operation,
+				)
+			})
+
+			t.Run("restricted resource -> restricted AnyResource with conformance not in restriction", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+                    `,
+					"auth &R{I1}",
+					"&AnyResource{I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"auth &AnyResource{I1, I2}",
+					"&AnyResource{I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource: more restrictions", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"auth &AnyResource{I1}",
+					"&AnyResource{I1, I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, conforming", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"auth &AnyResource{I1}",
+					"&AnyResource{I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource: different restrictions, non-conforming", func(t *testing.T) {
+
+				testReferenceCastInvalid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1 {}
+	                `,
+					"auth &AnyResource{I1}",
+					"&AnyResource{I2}",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> restricted AnyResource with non-conformance restriction", func(t *testing.T) {
+
+				testReferenceCastInvalid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1 {}
+	                `,
+					"auth &AnyResource{I1}",
+					"&AnyResource{I1, I2}",
+					operation,
+				)
+			})
+
+			t.Run("AnyResource -> restricted AnyResource", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I {}
+
+	                  resource R: I {}
+	                `,
+					"auth &AnyResource",
+					"&AnyResource{I}",
+					operation,
+				)
+			})
+
+			// Supertype: AnyResource
+
+			t.Run("restricted resource -> AnyResource", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"auth &R{I1}",
+					"&AnyResource",
+					operation,
+				)
+			})
+
+			t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+	                `,
+					"auth &AnyResource{I1}",
+					"&AnyResource",
+					operation,
+				)
+			})
+
+			t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
+
+				testReferenceCastValid(t,
+					`
+	                  resource interface I1 {}
+
+	                  resource interface I2 {}
+
+	                  resource R: I1, I2 {}
+                    `,
+					"auth &R",
+					"&AnyResource",
+					operation,
+				)
+			})
+		})
+	}
 }
 
 func TestInterpretDynamicCastingUnauthorizedReferenceType(t *testing.T) {
 
-	// Supertype: Restricted resource
+	for operation := range dynamicCastingOperations {
 
-	t.Run("restricted resource -> restricted resource: fewer restrictions", func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
+			// Supertype: Restricted resource
 
-		inter := parseCheckAndInterpret(t, `
-          resource interface I1 {}
+			t.Run("restricted resource -> restricted resource: fewer restrictions", func(t *testing.T) {
 
-          resource interface I2 {}
+				testReferenceCastValid(t,
+					`
+                      resource interface I1 {}
 
-          resource R: I1, I2 {}
+                      resource interface I2 {}
 
-          let x <- create R()
-          let r = &x as &R{I1, I2}
-          let r2 = r as? &R{I2}
-        `)
+                      resource R: I1, I2 {}
+                    `,
+					"&R{I1, I2}",
+					"&R{I2}",
+					operation,
+				)
+			})
 
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
+			t.Run("unrestricted resource -> restricted resource: same resource", func(t *testing.T) {
 
-	t.Run("unrestricted resource -> restricted resource: same resource", func(t *testing.T) {
+				testReferenceCastValid(t,
+					`
+                      resource interface I {}
 
-		inter := parseCheckAndInterpret(t, `
-          resource interface I {}
+                      resource R: I {}
+                    `,
+					"&R",
+					"&R{I}",
+					operation,
+				)
+			})
 
-          resource R: I {}
+			// Supertype: restricted AnyResource
 
-          let x <- create R()
-          let r = &x as &R
-          let r2 = r as? &R{I}
-        `)
+			t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
 
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
+				testReferenceCastValid(t,
+					`
+                      resource interface RI {}
 
-	// Supertype: restricted AnyResource
+                      resource R: RI {}
+                    `,
+					"&R",
+					"&AnyResource{RI}",
+					operation,
+				)
+			})
 
-	t.Run("resource -> restricted AnyResource with conformance restriction", func(t *testing.T) {
+			t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
 
-		inter := parseCheckAndInterpret(t, `
-          resource interface RI {}
+				testReferenceCastValid(t,
+					`
+                      resource interface I {}
 
-          resource R: RI {}
+                      resource R: I {}
+                    `,
+					"&R{I}",
+					"&AnyResource{I}",
+					operation,
+				)
+			})
 
-          let x <- create R()
-          let r = &x as &R
-          let r2 = r as? &AnyResource{RI}
-        `)
+			t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
 
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
+				testReferenceCastValid(t,
+					`
+                      resource interface I1 {}
 
-	t.Run("restricted resource -> restricted AnyResource with conformance in restriction", func(t *testing.T) {
+                      resource interface I2 {}
 
-		inter := parseCheckAndInterpret(t, `
-          resource interface I {}
+                      resource R: I1, I2 {}
+                    `,
+					"&AnyResource{I1, I2}",
+					"&AnyResource{I2}",
+					operation,
+				)
+			})
 
-          resource R: I {}
+			// Supertype: AnyResource
 
-          let x <- create R()
-          let r = &x as &R{I}
-          let r2 = r as? &AnyResource{I}
-        `)
+			t.Run("restricted resource -> AnyResource", func(t *testing.T) {
 
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
+				testReferenceCastValid(t,
+					`
+                      resource interface I1 {}
 
-	t.Run("restricted AnyResource -> restricted AnyResource: fewer restrictions", func(t *testing.T) {
+                      resource interface I2 {}
 
-		inter := parseCheckAndInterpret(t, `
-          resource interface I1 {}
+                      resource R: I1, I2 {}
+                    `,
+					"&R{I1}",
+					"&AnyResource",
+					operation,
+				)
+			})
 
-          resource interface I2 {}
+			t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
 
-          resource R: I1, I2 {}
+				testReferenceCastValid(t,
+					`
+                      resource interface I1 {}
 
-          let x <- create R()
-          let r = &x as &AnyResource{I1, I2}
-          let r2 = r as? &AnyResource{I2}
-        `)
+                      resource interface I2 {}
 
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
+                      resource R: I1, I2 {}
+                    `,
+					"&AnyResource{I1}",
+					"&AnyResource",
+					operation,
+				)
+			})
 
-	// Supertype: AnyResource
+			t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
 
-	t.Run("restricted resource -> AnyResource", func(t *testing.T) {
+				testReferenceCastValid(t,
+					`
+                      resource interface I1 {}
 
-		inter := parseCheckAndInterpret(t, `
-          resource interface I1 {}
+                      resource interface I2 {}
 
-          resource interface I2 {}
-
-          resource R: I1, I2 {}
-
-          let x <- create R()
-          let r = &x as &R{I1}
-          let r2 = r as? &AnyResource
-        `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("restricted AnyResource -> AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-          resource interface I1 {}
-
-          resource interface I2 {}
-
-          resource R: I1, I2 {}
-
-          let x <- create R()
-          let r = &x as &AnyResource{I1}
-          let r2 = r as? &AnyResource
-        `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
-
-	t.Run("unrestricted resource -> AnyResource", func(t *testing.T) {
-
-		inter := parseCheckAndInterpret(t, `
-          resource interface I1 {}
-
-          resource interface I2 {}
-
-          resource R: I1, I2 {}
-
-          let x <- create R()
-          let r = &x as &R
-          let r2 = r as? &AnyResource
-        `)
-
-		assert.IsType(t,
-			&interpreter.SomeValue{},
-			inter.Globals["r2"].Value,
-		)
-	})
+                      resource R: I1, I2 {}
+                    `,
+					"&R",
+					"&AnyResource",
+					operation,
+				)
+			})
+		})
+	}
 }
