@@ -92,8 +92,8 @@ IDLoop:
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
-func (il IdentityList) NodeIDs() IdentifierList {
-	ids := make(IdentifierList, 0, len(il))
+func (il IdentityList) NodeIDs() []Identifier {
+	ids := make([]Identifier, 0, len(il))
 	for _, id := range il {
 		ids = append(ids, id.NodeID)
 	}

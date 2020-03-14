@@ -2,7 +2,6 @@ package flow
 
 import (
 	"bytes"
-	"math/rand"
 
 	"github.com/rs/zerolog/log"
 )
@@ -36,70 +35,6 @@ func (il IdentifierList) Less(i, j int) bool {
 // It satisfies the sort.Interface making the IdentifierList sortable.
 func (il IdentifierList) Swap(i, j int) {
 	il[j], il[i] = il[i], il[j]
-}
-
-// With returns a new list that includes `id`. If the receiver list already
-// contains `id`, it is returned, unchanged.
-func (il IdentifierList) With(id Identifier) IdentifierList {
-
-	for _, checkID := range il {
-		if checkID == id {
-			return il
-		}
-	}
-
-	il = append(il, id)
-	return il
-}
-
-// Without returns a new list with all instances of `id` removed, without
-// changing ordering.
-func (il IdentifierList) Without(id Identifier) IdentifierList {
-
-	// keep track of the indices to remove
-	var indices []int
-	for i, checkID := range il {
-		if checkID == id {
-			indices = append(indices, i)
-		}
-	}
-
-	// go through the list of indices and remove each one from `il`
-	for _, index := range indices {
-		il[index] = il[len(il)-1]
-		il = il[:len(il)-1]
-	}
-
-	return il
-}
-
-// RandSubsetN returns a list containing n identifiers randomly selected from the
-// receiver list L. If n<0 or n>len(L), returns L.
-func (il IdentifierList) RandSubsetN(n int) IdentifierList {
-
-	if n == 0 {
-		return IdentifierList{}
-	}
-	if n < 0 || n > len(il) {
-		return il
-	}
-
-	// create a copy of the list to pick random elements from
-	src := make(IdentifierList, len(il))
-	copy(src, il)
-
-	out := make(IdentifierList, 0, n)
-	for i := 0; i < n; i++ {
-		// pick a random index
-		index := rand.Intn(len(src))
-		// add the identity at the index to the output
-		out = append(out, src[index])
-		// remove the selected identity to avoid duplicates
-		src[index] = src[len(src)-1]
-		src = src[:len(src)-1]
-	}
-
-	return out
 }
 
 // JoinIdentifierLists appends and returns two IdentifierLists
