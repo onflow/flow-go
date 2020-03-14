@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/test"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -65,26 +66,22 @@ func TestValidateProposal(t *testing.T) {
 }
 
 func testVoteOK(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	signer, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer)
+	vs, signers, ids, _, _ := createValidators(t, 3)
+	v, signer, id := vs[0], signers[0], ids[0]
 
+	// make block
 	block := makeBlock(3)
 
+	// make vote
 	vote, err := signer.VoteFor(block)
 	require.NoError(t, err)
 
+	// validate vote
 	signerID, err := v.ValidateVote(vote, block)
 	require.NoError(t, err)
-	assert.Equal(t, signerID, ids[0])
+
+	// validate signerID
+	require.Equal(t, signerID, id)
 }
 
 func testVoteInvalidView(t *testing.T) {
@@ -1154,4 +1151,37 @@ func (b *FakeBuilder) BuildOn(parentID flow.Identifier, setter func(*flow.Header
 	// apply the custom fields setter of the consensus algorithm
 	setter(header)
 	return header, nil
+}
+
+// create validator for `n` nodes in a cluster with the index-th node as the signer
+func createValidators(t *testing.T, n int) ([]*hotstuff.Validator, []hotstuff.Signer, flow.IdentityList, []*hotstuff.ViewState, hotstuff.ForksReader) {
+	ps, ids := test.NewProtocolState(t, n)
+
+	stakingKeys, err := test.AddStakingPrivateKeys(ids)
+	require.NoError(t, err)
+
+	randomBKeys, dkgPubData, err := test.AddRandomBeaconPrivateKeys(t, ids)
+
+	signers := make([]hotstuff.Signer, n)
+	viewstates := make([]*hotstuff.ViewState, n)
+	validators := make([]*hotstuff.Validator, n)
+
+	f := &mocks.ForksReader{}
+
+	for i := 0; i < n; i++ {
+		// create signer
+		signer, err := test.NewRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[i], stakingKeys[i], randomBKeys[i])
+		require.NoError(t, err)
+		signers[i] = signer
+
+		// create view state
+		vs, err := hotstuff.NewViewState(ps, dkgPubData, ids[i].NodeID, filter.HasRole(flow.RoleConsensus))
+		require.NoError(t, err)
+		viewstates[i] = vs
+
+		// create validator
+		v := hotstuff.NewValidator(vs, f, signer)
+		validators[i] = v
+	}
+	return validators, signers, ids, viewstates, f
 }
