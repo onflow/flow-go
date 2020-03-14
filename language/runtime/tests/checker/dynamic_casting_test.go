@@ -7,17 +7,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-var dynamicCastingOperators = []string{"as?", "as!"}
+var dynamicCastingOperations = []ast.Operation{
+	ast.OperationFailableCast,
+	ast.OperationForceCast,
+}
 
 func TestCheckDynamicCastingAnyStruct(t *testing.T) {
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			t.Run("struct", func(t *testing.T) {
 				checker, err := ParseAndCheck(t,
@@ -28,7 +32,7 @@ func TestCheckDynamicCastingAnyStruct(t *testing.T) {
                           let a: AnyStruct = S()
                           let s = a %s S
                         `,
-						operator,
+						operation.Symbol(),
 					),
 				)
 
@@ -48,7 +52,7 @@ func TestCheckDynamicCastingAnyStruct(t *testing.T) {
                           let a: AnyStruct = S()
                           let r <- a %s @R
                         `,
-						operator,
+						operation.Symbol(),
 					),
 				)
 
@@ -168,9 +172,9 @@ func TestCheckDynamicCastingNumber(t *testing.T) {
 		tests = append(tests, test{ty: fixedPointType, value: "1.23"})
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, test := range tests {
 
@@ -196,7 +200,7 @@ func TestCheckDynamicCastingNumber(t *testing.T) {
 										test.value,
 										fromType,
 										targetType,
-										operator,
+										operation.Symbol(),
 									),
 								)
 
@@ -223,7 +227,7 @@ func TestCheckDynamicCastingNumber(t *testing.T) {
 										test.value,
 										fromType,
 										otherType,
-										operator,
+										operation.Symbol(),
 									),
 								)
 
@@ -244,9 +248,9 @@ func TestCheckDynamicCastingVoid(t *testing.T) {
 		&sema.VoidType{},
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -263,7 +267,7 @@ func TestCheckDynamicCastingVoid(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -289,7 +293,7 @@ func TestCheckDynamicCastingVoid(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -308,9 +312,9 @@ func TestCheckDynamicCastingString(t *testing.T) {
 		&sema.StringType{},
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -325,7 +329,7 @@ func TestCheckDynamicCastingString(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -350,7 +354,7 @@ func TestCheckDynamicCastingString(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -369,9 +373,9 @@ func TestCheckDynamicCastingBool(t *testing.T) {
 		&sema.BoolType{},
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -386,7 +390,7 @@ func TestCheckDynamicCastingBool(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -411,7 +415,7 @@ func TestCheckDynamicCastingBool(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -430,9 +434,9 @@ func TestCheckDynamicCastingAddress(t *testing.T) {
 		&sema.AddressType{},
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -448,7 +452,7 @@ func TestCheckDynamicCastingAddress(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -473,7 +477,7 @@ func TestCheckDynamicCastingAddress(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -492,9 +496,9 @@ func TestCheckDynamicCastingStruct(t *testing.T) {
 		"S",
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -511,7 +515,7 @@ func TestCheckDynamicCastingStruct(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -533,7 +537,7 @@ func TestCheckDynamicCastingStruct(t *testing.T) {
                               let z: T? = y %[2]s T
                             `,
 							fromType,
-							operator,
+							operation.Symbol(),
 						),
 					)
 
@@ -559,7 +563,7 @@ func TestCheckDynamicCastingStruct(t *testing.T) {
                                 `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -693,9 +697,9 @@ func TestCheckDynamicCastingStructInterface(t *testing.T) {
 		"I",
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -714,7 +718,7 @@ func TestCheckDynamicCastingStructInterface(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -737,7 +741,7 @@ func TestCheckDynamicCastingStructInterface(t *testing.T) {
                               let s: T? = i %[2]s T
                             `,
 							fromType,
-							operator,
+							operation.Symbol(),
 						),
 					)
 
@@ -759,7 +763,7 @@ func TestCheckDynamicCastingStructInterface(t *testing.T) {
                               let s: I2? = i %[2]s I2
                             `,
 							fromType,
-							operator,
+							operation.Symbol(),
 						),
 					)
 
@@ -967,9 +971,9 @@ func TestCheckDynamicCastingSome(t *testing.T) {
 		&sema.AnyStructType{},
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -984,7 +988,7 @@ func TestCheckDynamicCastingSome(t *testing.T) {
                                `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1007,7 +1011,7 @@ func TestCheckDynamicCastingSome(t *testing.T) {
 	                            `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1027,9 +1031,9 @@ func TestCheckDynamicCastingArray(t *testing.T) {
 		&sema.AnyStructType{},
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -1044,7 +1048,7 @@ func TestCheckDynamicCastingArray(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1067,7 +1071,7 @@ func TestCheckDynamicCastingArray(t *testing.T) {
 		                        `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1092,9 +1096,9 @@ func TestCheckDynamicCastingDictionary(t *testing.T) {
 		},
 	}
 
-	for _, operator := range dynamicCastingOperators {
+	for _, operation := range dynamicCastingOperations {
 
-		t.Run(operator, func(t *testing.T) {
+		t.Run(operation.Symbol(), func(t *testing.T) {
 
 			for _, fromType := range types {
 				for _, targetType := range types {
@@ -1109,7 +1113,7 @@ func TestCheckDynamicCastingDictionary(t *testing.T) {
                                 `,
 								fromType,
 								targetType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
@@ -1134,7 +1138,7 @@ func TestCheckDynamicCastingDictionary(t *testing.T) {
 	                            `,
 								fromType,
 								otherType,
-								operator,
+								operation.Symbol(),
 							),
 						)
 
