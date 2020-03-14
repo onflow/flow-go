@@ -1,16 +1,12 @@
 package hotstuff_test
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
@@ -19,11 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	hs "github.com/dapperlabs/flow-go/model/hotstuff"
-	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/utils/unittest"
-
-	mockProtocol "github.com/dapperlabs/flow-go/protocol/mocks"
 )
 
 func TestValidateVote(t *testing.T) {
@@ -70,7 +61,7 @@ func testVoteOK(t *testing.T) {
 	v, signer, id := vs[0], signers[0], ids[0]
 
 	// make block
-	block := makeBlock(3)
+	block := test.MakeBlock(3)
 
 	// make vote
 	vote, err := signer.VoteFor(block)
@@ -85,185 +76,157 @@ func testVoteOK(t *testing.T) {
 }
 
 func testVoteInvalidView(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	signer, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer)
+	vs, signers, _, _, _ := createValidators(t, 3)
+	v, signer := vs[0], signers[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
+	// make vote
 	vote, err := signer.VoteFor(block)
 	require.NoError(t, err)
 
 	// signature is valid, but View is invalid
 	vote.View = 4
 
+	// validate vote
 	_, err = v.ValidateVote(vote, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testVoteInvalidBlock(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	signer, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer)
+	vs, signers, _, _, _ := createValidators(t, 3)
+	v, signer := vs[0], signers[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
+	// make vote
 	vote, err := signer.VoteFor(block)
 	require.NoError(t, err)
 
 	// signature is valid, but BlockID is invalid
 	vote.BlockID = flow.HashToID([]byte{1, 2, 3})
 
+	// validate vote
 	_, err = v.ValidateVote(vote, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testVoteUnstakedNode(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	signer, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer)
+	vs, signers, ids, _, _ := createValidators(t, 3)
+	v, signer, id := vs[0], signers[0], ids[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
-	// signer is now unstaked
-	ids[0].Stake = 0
-
+	// make vote
 	vote, err := signer.VoteFor(block)
 	require.NoError(t, err)
 
+	// signer is now unstaked
+	id.Stake = 0
+
+	// validate vote
 	_, err = v.ValidateVote(vote, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testVoteInvalidStaking(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid staking key
-	signer, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[1], randomBKeys[0])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer)
+	vs, signers, _, _, _ := createValidators(t, 3)
+	v, signer := vs[0], signers[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
+	// make vote
 	vote, err := signer.VoteFor(block)
 	require.NoError(t, err)
 
+	// make vote from others
+	voteFromOthers, err := signers[1].VoteFor(block)
+	require.NoError(t, err)
+
+	// take staking signature from others' vote
+	vote.Signature.StakingSignature = voteFromOthers.Signature.StakingSignature
+
+	// validate vote
 	_, err = v.ValidateVote(vote, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testVoteInvalidRandomB(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[1])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer)
+	vs, signers, _, _, _ := createValidators(t, 3)
+	v, signer := vs[0], signers[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
+	// make vote
 	vote, err := signer.VoteFor(block)
 	require.NoError(t, err)
 
+	// make vote from others
+	voteFromOthers, err := signers[1].VoteFor(block)
+	require.NoError(t, err)
+
+	// take random beacon signature from others' vote
+	vote.Signature.RandomBeaconSignature = voteFromOthers.Signature.RandomBeaconSignature
+
+	// validate vote
 	_, err = v.ValidateVote(vote, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testQCOK(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	vs, signers, _, _, _ := createValidators(t, 3)
+	v := vs[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// make votes
+	vote1, err := signers[0].VoteFor(block)
+	require.NoError(t, err)
+	vote2, err := signers[1].VoteFor(block)
+	require.NoError(t, err)
+	vote3, err := signers[2].VoteFor(block)
 	require.NoError(t, err)
 
-	aggsig, err := signer1.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// manually aggregate sigs
+	aggsig, err := signers[0].Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
 
+	// make QC
 	qc := &hs.QuorumCertificate{
 		View:                block.View,
 		BlockID:             block.BlockID,
 		AggregatedSignature: aggsig,
 	}
+
+	// validate QC
 	err = v.ValidateQC(qc, block)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func testQCInvalidBlock(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	vs, signers, _, _, _ := createValidators(t, 3)
+	v := vs[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// make votes
+	vote1, err := signers[0].VoteFor(block)
+	require.NoError(t, err)
+	vote2, err := signers[1].VoteFor(block)
+	require.NoError(t, err)
+	vote3, err := signers[2].VoteFor(block)
 	require.NoError(t, err)
 
-	aggsig, err := signer1.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// manually aggregate sigs
+	aggsig, err := signers[0].Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
 
+	// make QC
 	qc := &hs.QuorumCertificate{
 		View:                block.View,
 		BlockID:             block.BlockID,
@@ -273,35 +236,30 @@ func testQCInvalidBlock(t *testing.T) {
 	// replace with invalid blockID
 	block.BlockID = flow.HashToID([]byte{1, 2})
 
+	// validate QC
 	err = v.ValidateQC(qc, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testQCInvalidView(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	vs, signers, _, _, _ := createValidators(t, 3)
+	v := vs[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// make votes
+	vote1, err := signers[0].VoteFor(block)
+	require.NoError(t, err)
+	vote2, err := signers[1].VoteFor(block)
+	require.NoError(t, err)
+	vote3, err := signers[2].VoteFor(block)
 	require.NoError(t, err)
 
-	aggsig, err := signer1.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// manually aggregate sigs
+	aggsig, err := signers[0].Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
 
+	// make QC
 	qc := &hs.QuorumCertificate{
 		View:                block.View,
 		BlockID:             block.BlockID,
@@ -311,35 +269,30 @@ func testQCInvalidView(t *testing.T) {
 	// replace with invalid view
 	block.View = 5
 
+	// validate QC
 	err = v.ValidateQC(qc, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testQCHasUnstakedSigner(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	vs, signers, ids, _, _ := createValidators(t, 3)
+	v := vs[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// make votes
+	vote1, err := signers[0].VoteFor(block)
+	require.NoError(t, err)
+	vote2, err := signers[1].VoteFor(block)
+	require.NoError(t, err)
+	vote3, err := signers[2].VoteFor(block)
 	require.NoError(t, err)
 
-	aggsig, err := signer1.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// manually aggregate sigs
+	aggsig, err := signers[0].Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
 
+	// make QC
 	qc := &hs.QuorumCertificate{
 		View:                block.View,
 		BlockID:             block.BlockID,
@@ -349,34 +302,28 @@ func testQCHasUnstakedSigner(t *testing.T) {
 	// one signer is unstaked
 	ids[2].Stake = 0
 
+	// validate QC
 	err = v.ValidateQC(qc, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testQCHasInsufficentStake(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	vs, signers, _, _, _ := createValidators(t, 3)
+	v := vs[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// make votes
+	vote1, err := signers[0].VoteFor(block)
+	require.NoError(t, err)
+	vote2, err := signers[1].VoteFor(block)
+	require.NoError(t, err)
+	vote3, err := signers[2].VoteFor(block)
 	require.NoError(t, err)
 
-	aggsig, err := signer1.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// manually aggregate sigs
+	aggsig, err := signers[0].Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
 
 	// only take 2 signers
 	aggsig.SignerIDs = []flow.Identifier{
@@ -384,755 +331,419 @@ func testQCHasInsufficentStake(t *testing.T) {
 		aggsig.SignerIDs[1],
 	}
 
+	// make QC
 	qc := &hs.QuorumCertificate{
 		View:                block.View,
 		BlockID:             block.BlockID,
 		AggregatedSignature: aggsig,
 	}
 
+	// validate QC
 	err = v.ValidateQC(qc, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testQCHasInvalidRandomBSig(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	vs, signers, _, _, _ := createValidators(t, 3)
+	v := vs[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// make votes
+	vote1, err := signers[0].VoteFor(block)
+	require.NoError(t, err)
+	vote2, err := signers[1].VoteFor(block)
+	require.NoError(t, err)
+	vote3, err := signers[2].VoteFor(block)
 	require.NoError(t, err)
 
-	aggsig, err := signer1.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// manually aggregate sigs
+	aggsig, err := signers[0].Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	require.NoError(t, err)
 
 	// making bad votes
-	invalidBlock := makeBlock(4)
-	badvote1, err := signer1.VoteFor(invalidBlock)
-	badvote2, err := signer2.VoteFor(invalidBlock)
-	badvote3, err := signer3.VoteFor(invalidBlock)
+	invalidBlock := test.MakeBlock(4)
+	badvote1, err := signers[0].VoteFor(invalidBlock)
+	require.NoError(t, err)
+	badvote2, err := signers[1].VoteFor(invalidBlock)
+	require.NoError(t, err)
+	badvote3, err := signers[2].VoteFor(invalidBlock)
+	require.NoError(t, err)
 
-	// aggregate bad votes
-	badaggsig, err := signer1.Aggregate(invalidBlock, []*hs.SingleSignature{badvote1.Signature, badvote2.Signature, badvote3.Signature})
+	// aggregate bad votes to make a bad random beacon sig
+	badaggsig, err := signers[0].Aggregate(invalidBlock, []*hs.SingleSignature{badvote1.Signature, badvote2.Signature, badvote3.Signature})
 	require.NoError(t, err)
 
 	// the random beacon signatures and the signers are now mismatch
 	aggsig.RandomBeaconSignature = badaggsig.RandomBeaconSignature
 
+	// make QC
 	qc := &hs.QuorumCertificate{
 		View:                block.View,
 		BlockID:             block.BlockID,
 		AggregatedSignature: aggsig,
 	}
 
+	// validate QC
 	err = v.ValidateQC(qc, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testQCHasInvalidStakingSig(t *testing.T) {
-	ps, ids := newProtocolState(t, 4)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	signer4, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[3], stakingKeys[3], randomBKeys[3])
-	id := ids[0]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	vs, signers, _, _, _ := createValidators(t, 4)
+	v := vs[0]
 
-	block := makeBlock(3)
+	// make block
+	block := test.MakeBlock(3)
 
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
-	vote4, err := signer4.VoteFor(block)
+	// make votes
+	vote1, err := signers[0].VoteFor(block)
+	require.NoError(t, err)
+	vote2, err := signers[1].VoteFor(block)
+	require.NoError(t, err)
+	vote3, err := signers[2].VoteFor(block)
+	require.NoError(t, err)
+	vote4, err := signers[3].VoteFor(block)
 	require.NoError(t, err)
 
-	aggsig, err := signer1.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-	// aggregate with a different group of signers
-	aggsig2, err := signer1.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote4.Signature})
+	// manually aggregate sigs
+	aggsig, err := signers[0].Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	require.NoError(t, err)
+
+	// manually aggregate sigs from different votes (1,2,4)
+	badaggsig, err := signers[0].Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote4.Signature})
+	require.NoError(t, err)
 
 	// the staking signatures and the signers are now mismatch
-	aggsig.StakingSignatures = aggsig2.StakingSignatures
+	aggsig.StakingSignatures = badaggsig.StakingSignatures
 
+	// make QC
 	qc := &hs.QuorumCertificate{
 		View:                block.View,
 		BlockID:             block.BlockID,
 		AggregatedSignature: aggsig,
 	}
 
+	// validate QC
 	err = v.ValidateQC(qc, block)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func testProposalOK(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	// create validators and other dependencies
+	vs, signers, _, viewstates, f := createValidators(t, n)
+
+	// make a block producer and a qc of view 3
+	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v := vs[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// mock forks has the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
 
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	f.On("GetBlock", block.BlockID).Return(block, true)
-	// assert.NotNil(t, proposal)
-	// assert.NotNil(t, v)
 	err = v.ValidateProposal(proposal)
 	require.NoError(t, err)
 }
 
 func testProposalInvalidView(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	// create validators and other dependencies
+	vs, signers, _, viewstates, f := createValidators(t, n)
+
+	// make a block producer and a qc of view 3
+	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v := vs[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// mock forks has the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
 
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
+	// signer is still the leader of view 7, but View is invalid
+	proposal.Block.View = 7
 
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	f.On("GetBlock", block.BlockID).Return(block, true)
-	// assert.NotNil(t, proposal)
-	// assert.NotNil(t, v)
-	proposal.Block.View = 7 // signer is still the leader of view 7
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
 }
 
 func testProposalInvalidBlock(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	// create validators and other dependencies
+	vs, signers, _, viewstates, f := createValidators(t, n)
+
+	// make a block producer and a qc of view 3
+	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v := vs[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// mock forks has the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
 
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	f.On("GetBlock", block.BlockID).Return(block, true)
 	// invalid block id
 	proposal.Block.BlockID = flow.HashToID([]byte{1, 2, 3})
+
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
 }
 
 func testProposalUnstakedNode(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	// create validators and other dependencies
+	vs, signers, ids, viewstates, f := createValidators(t, n)
+
+	// make a block producer and a qc of view 3
+	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v, id := vs[index], ids[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// mock forks has the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
 
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
+	// signer is now unstaked
+	id.Stake = 0
 
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	f.On("GetBlock", block.BlockID).Return(block, true)
-	// signer2 is now unstaked
-	ids[1].Stake = 0
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
 }
 
 func testProposalInvalidStaking(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	// create validators and other dependencies
+	vs, signers, _, viewstates, f := createValidators(t, n)
+
+	// make a block producer and a qc of view 3
+	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v := vs[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	f.On("GetBlock", block.BlockID).Return(block, true)
+	// make a different proposal to take its signature
 	proposal7, err := bp.MakeBlockProposal(qc, 7)
+
 	// invalid staking sig
 	proposal.StakingSignature = proposal7.StakingSignature
+
+	// mock forks has the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
+
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
 }
 
 func testProposalInvalidRandomB(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	// create validators and other dependencies
+	vs, signers, _, viewstates, f := createValidators(t, n)
+
+	// make a block producer and a qc of view 3
+	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v := vs[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	f.On("GetBlock", block.BlockID).Return(block, true)
+	// make a different proposal to take its signature
 	proposal7, err := bp.MakeBlockProposal(qc, 7)
+
 	// invalid random beacon sig
 	proposal.RandomBeaconSignature = proposal7.RandomBeaconSignature
+
+	// mock forks has the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
+
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
 }
 
 func testProposalWrongLeader(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
-	require.NoError(t, err)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// create validators and other dependencies
+	vs, signers, _, viewstates, f := createValidators(t, n)
 
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
+	// make a block producer and a qc of view 3
+	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
 
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
+	// validator
+	v := vs[index]
 
 	// make a view where signer is not the leader of
 	wrongViewAsLeader := uint64(5)
 
 	// build proposal
 	proposal, err := bp.MakeBlockProposal(qc, wrongViewAsLeader)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	f.On("GetBlock", block.BlockID).Return(block, true)
+
+	// mock forks doesn't have the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
+
+	// validate proposal
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
 }
 
 func testProposalWrongParentEqual(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	// create validators and other dependencies
+	vs, signers, _, viewstates, f := createValidators(t, n)
+
+	// make a block producer and a qc of view 3
+	bp, qc, _ := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v := vs[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// mock forks doesn't have the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(nil, false)
 
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
+	// proposal.Block.QC.View equals to finalized view
+	f.On("FinalizedView").Return(qcview)
 
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	// block not found
-	f.On("GetBlock", block.BlockID).Return(nil, false)
-	f.On("FinalizedView").Return(uint64(3)) // finalized view equals to proposal.Block.QC.View
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
 }
 
 func testProposalWrongParentAbove(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	vs, signers, _, viewstates, f := createValidators(t, n)
+	// make a block producer and a qc of view 3
+	bp, qc, _ := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v := vs[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// mock forks doesn't have the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(nil, false)
 
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
+	// proposal.Block.QC.View is above finalized view
+	f.On("FinalizedView").Return(uint64(3))
 
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	// block not found
-	f.On("GetBlock", block.BlockID).Return(nil, false)
-	f.On("FinalizedView").Return(uint64(2)) // proposal.Block.QC.View is above finalized view
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
 }
 
 func testProposalWrongParentBelow(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	vs, signers, _, viewstates, f := createValidators(t, n)
+	// make a block producer and a qc of view 3
+	bp, qc, _ := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v := vs[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// mock forks doesn't have the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(nil, false)
 
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
+	// proposal.Block.QC.View is below finalized view
+	f.On("FinalizedView").Return(uint64(5))
 
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	// block not found
-	f.On("GetBlock", block.BlockID).Return(nil, false)
-	f.On("FinalizedView").Return(uint64(5)) // proposal.Block.QC.View is below finalized view
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
 }
 
 func testProposalInvalidQC(t *testing.T) {
-	ps, ids := newProtocolState(t, 3)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	// with invalid random beacon key
-	signer1, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[0], stakingKeys[0], randomBKeys[0])
-	signer2, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[1], stakingKeys[1], randomBKeys[1])
-	signer3, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[2], stakingKeys[2], randomBKeys[2])
-	id := ids[1]
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &mocks.ForksReader{}
-	v := hotstuff.NewValidator(vs, f, signer1)
+	n, qcview, view := 3, uint64(3), uint64(4)
 
-	block := makeBlock(3)
-	signer := signer2 // signer2 is the leader for view 4
-	vote1, err := signer1.VoteFor(block)
-	vote2, err := signer2.VoteFor(block)
-	vote3, err := signer3.VoteFor(block)
+	// index-th node as the signer
+	index := leaderOfView(n, view)
+
+	vs, signers, _, viewstates, f := createValidators(t, n)
+	// make a block producer and a qc of view 3
+	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
+
+	// validator
+	v := vs[index]
+
+	// build proposal for view 4
+	proposal, err := bp.MakeBlockProposal(qc, view)
 	require.NoError(t, err)
 
-	aggsig, err := signer.Aggregate(block, []*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	// mock forks doesn't have the parent block
+	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
 
-	// make a valid qc
-	qc := &hs.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// build a proposal on top of a valid qc
-	builder := &FakeBuilder{}
-	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
-	require.NoError(t, err)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, 4)
-	// assert.Equal(t, vote1.Signature.SignerID, ids[1].ID())
-	signerValidated, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
-	require.NoError(t, err)
-	assert.Equal(t, signerValidated.ID(), ids[1].ID())
-	// block not found
-	f.On("GetBlock", block.BlockID).Return(block, true)
 	// make QC invalid
 	proposal.Block.QC.View = 10
+
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
-}
-
-// make a random block seeded by input
-func makeBlock(seed int) *hs.Block {
-	id := flow.MakeID(struct {
-		BlockID int
-	}{
-		BlockID: seed,
-	})
-	return &hs.Block{
-		BlockID: id,
-		View:    uint64(seed),
-	}
-}
-
-// create a protocol state with N identities
-func newProtocolState(t *testing.T, n int) (protocol.State, flow.IdentityList) {
-	ctrl := gomock.NewController(t)
-	// mock identity list
-	ids := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
-
-	// mock protocol state
-	mockProtocolState := mockProtocol.NewMockState(ctrl)
-	mockSnapshot := mockProtocol.NewMockSnapshot(ctrl)
-	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(mockSnapshot).AnyTimes()
-	mockProtocolState.EXPECT().Final().Return(mockSnapshot).AnyTimes()
-	for _, id := range ids {
-		mockSnapshot.EXPECT().Identity(id.NodeID).Return(id, nil).AnyTimes()
-	}
-	mockSnapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f ...flow.IdentityFilter) (flow.IdentityList, error) {
-		return ids.Filter(f...), nil
-	}).AnyTimes()
-	return mockProtocolState, ids
-}
-
-// create a new RandomBeaconAwareSigProvider
-func newRandomBeaconSigProvider(ps protocol.State, dkgPubData *hotstuff.DKGPublicData, tag string, id *flow.Identity, stakingKey crypto.PrivateKey, randomBeaconKey crypto.PrivateKey) (*signature.RandomBeaconAwareSigProvider, error) {
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return nil, fmt.Errorf("cannot create view state: %w", err)
-	}
-	me, err := local.New(id, stakingKey)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create local: %w", err)
-	}
-
-	sigProvider := signature.NewRandomBeaconAwareSigProvider(vs, me, randomBeaconKey)
-	return &sigProvider, nil
-}
-
-// create N private keys and assign them to identities' RandomBeaconPubKey
-func addRandomBeaconPrivateKeys(t *testing.T, ids flow.IdentityList) ([]crypto.PrivateKey, *hotstuff.DKGPublicData, error) {
-	sks, groupPubKey, keyShares := unittest.RunDKGKeys(t, len(ids))
-	for i := 0; i < len(ids); i++ {
-		sk := sks[i]
-		ids[i].RandomBeaconPubKey = sk.PublicKey()
-	}
-
-	dkgMap := make(map[flow.Identifier]*hotstuff.DKGParticipant)
-	for i, id := range ids {
-		dkgMap[id.NodeID] = &hotstuff.DKGParticipant{
-			Id:             id.NodeID,
-			PublicKeyShare: keyShares[i],
-			DKGIndex:       i,
-		}
-	}
-	dkgPubData := hotstuff.DKGPublicData{
-		GroupPubKey:           groupPubKey,
-		IdToDKGParticipantMap: dkgMap,
-	}
-	return sks, &dkgPubData, nil
-}
-
-// generete a random BLS private key
-func nextBLSKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, 48)
-	_, err := rand.Read(seed)
-	if err != nil {
-		return nil, err
-	}
-	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
-	return sk, err
-}
-
-// create N private keys and assign them to identities' StakingPubKey
-func addStakingPrivateKeys(ids flow.IdentityList) ([]crypto.PrivateKey, error) {
-	sks := []crypto.PrivateKey{}
-	for i := 0; i < len(ids); i++ {
-		sk, err := nextBLSKey()
-		if err != nil {
-			return nil, fmt.Errorf("cannot create mock private key: %w", err)
-		}
-		ids[i].StakingPubKey = sk.PublicKey()
-		sks = append(sks, sk)
-	}
-	return sks, nil
 }
 
 type FakeBuilder struct{}
@@ -1154,7 +765,7 @@ func (b *FakeBuilder) BuildOn(parentID flow.Identifier, setter func(*flow.Header
 }
 
 // create validator for `n` nodes in a cluster with the index-th node as the signer
-func createValidators(t *testing.T, n int) ([]*hotstuff.Validator, []hotstuff.Signer, flow.IdentityList, []*hotstuff.ViewState, hotstuff.ForksReader) {
+func createValidators(t *testing.T, n int) ([]*hotstuff.Validator, []*signature.RandomBeaconAwareSigProvider, flow.IdentityList, []*hotstuff.ViewState, *mocks.ForksReader) {
 	ps, ids := test.NewProtocolState(t, n)
 
 	stakingKeys, err := test.AddStakingPrivateKeys(ids)
@@ -1162,7 +773,7 @@ func createValidators(t *testing.T, n int) ([]*hotstuff.Validator, []hotstuff.Si
 
 	randomBKeys, dkgPubData, err := test.AddRandomBeaconPrivateKeys(t, ids)
 
-	signers := make([]hotstuff.Signer, n)
+	signers := make([]*signature.RandomBeaconAwareSigProvider, n)
 	viewstates := make([]*hotstuff.ViewState, n)
 	validators := make([]*hotstuff.Validator, n)
 
@@ -1184,4 +795,49 @@ func createValidators(t *testing.T, n int) ([]*hotstuff.Validator, []hotstuff.Si
 		validators[i] = v
 	}
 	return validators, signers, ids, viewstates, f
+}
+
+func createBlockProducer(t *testing.T, signer hotstuff.Signer, vs *hotstuff.ViewState) *hotstuff.BlockProducer {
+	builder := &FakeBuilder{}
+	bp, err := hotstuff.NewBlockProducer(signer, vs, builder)
+	require.NoError(t, err)
+	return bp
+}
+
+// make a nodes cluster with index-th node as the block producer, and make a QC for given view
+func makeBlockProducerAndQC(t *testing.T, signers []*signature.RandomBeaconAwareSigProvider, viewstates []*hotstuff.ViewState, index int, view uint64) (*hotstuff.BlockProducer, *hs.QuorumCertificate, *hs.Block) {
+	signer, viewstate := signers[index], viewstates[index]
+	n := len(signers)
+
+	// make block
+	block := test.MakeBlock(int(view))
+
+	// make votes
+	sigs := make([]*hs.SingleSignature, n)
+	for i := 0; i < n; i++ {
+		vote, err := signers[i].VoteFor(block)
+		require.NoError(t, err)
+		sigs[i] = vote.Signature
+	}
+
+	// manually aggregate sigs
+	aggsig, err := signer.Aggregate(block, sigs)
+	require.NoError(t, err)
+
+	// make QC
+	qc := &hs.QuorumCertificate{
+		View:                block.View,
+		BlockID:             block.BlockID,
+		AggregatedSignature: aggsig,
+	}
+
+	// create bloc builder
+	bp := createBlockProducer(t, signer, viewstate)
+
+	return bp, qc, block
+}
+
+func leaderOfView(n int, view uint64) int {
+	// referred to engine/consensus/hotstuff/viewstate.go#roundRobin
+	return int(view) % n
 }
