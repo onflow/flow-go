@@ -186,8 +186,18 @@ docker-build-verification-debug:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target debug \
 		-t gcr.io/dl-flow/verification-debug:latest -t "gcr.io/dl-flow/verification-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification-debug:$(IMAGE_TAG)" .
 
+.PHONY: docker-build-observation
+docker-build-observation:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=observation --target production \
+		-t gcr.io/dl-flow/observation:latest -t "gcr.io/dl-flow/observation:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/observation:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-observation-debug
+docker-build-observation-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=observation --target debug \
+		-t gcr.io/dl-flow/observation-debug:latest -t "gcr.io/dl-flow/observation-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/observation-debug:$(IMAGE_TAG)" .
+
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-observation
 
 .PHONY: docker-push-collection
 docker-push-collection:
@@ -213,8 +223,14 @@ docker-push-verification:
 	docker push "gcr.io/dl-flow/verification:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/verification:$(IMAGE_TAG)"
 
+.PHONY: docker-push-observation
+docker-push-observation:
+	docker push gcr.io/dl-flow/observation:latest
+	docker push "gcr.io/dl-flow/observation:$(SHORT_COMMIT)"
+	docker push "gcr.io/dl-flow/observation:$(IMAGE_TAG)"
+
 .PHONY: docker-push-flow
-docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification
+docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-observation
 
 .PHONY: docker-run-collection
 docker-run-collection:
@@ -231,6 +247,10 @@ docker-run-execution:
 .PHONY: docker-run-verification
 docker-run-verification:
 	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/verification:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries verification-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+.PHONY: docker-run-observation
+docker-run-observation:
+	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/observation:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries observation-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 # Builds the VS Code extension
 .PHONY: build-vscode-extension

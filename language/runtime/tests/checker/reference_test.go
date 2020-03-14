@@ -218,7 +218,7 @@ func TestCheckReferenceToNonStorage(t *testing.T) {
 		assert.IsType(t, &sema.NonResourceReferenceTypeError{}, errs[1])
 	})
 
-	t.Run("resource variable, non-storable", func(t *testing.T) {
+	t.Run("resource variable", func(t *testing.T) {
 
 		_, err := ParseAndCheckStorage(t, `
           resource R {}
@@ -238,33 +238,6 @@ func TestCheckReferenceToNonStorage(t *testing.T) {
 
           let rs <- [<-create R()]
           let ref = &rs[0] as &R
-        `,
-		)
-
-		require.NoError(t, err)
-	})
-
-	t.Run("resource variable, storable", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-          resource R {}
-
-          let r <- create R()
-          let ref = &r as storable &R
-        `,
-		)
-
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.InvalidNonStorageStorableReferenceError{}, errs[0])
-	})
-
-	t.Run("storage, storable", func(t *testing.T) {
-
-		_, err := ParseAndCheckStorage(t, `
-          resource R {}
-
-          let ref = &storage[R] as storable &R
         `,
 		)
 
@@ -486,7 +459,6 @@ func TestCheckReferenceExpressionReferenceType(t *testing.T) {
 		)
 
 		assert.False(t, referenceType.Authorized)
-		assert.False(t, referenceType.Storable)
 	})
 
 	t.Run("auth reference", func(t *testing.T) {
@@ -515,96 +487,7 @@ func TestCheckReferenceExpressionReferenceType(t *testing.T) {
 		)
 
 		assert.True(t, referenceType.Authorized)
-		assert.False(t, referenceType.Storable)
 	})
-
-	t.Run("storable reference", func(t *testing.T) {
-
-		checker, err := ParseAndCheckStorage(t, `
-          resource R {}
-
-          let ref = &storage[R] as storable &R
-        `,
-		)
-
-		require.NoError(t, err)
-
-		refValueType := checker.GlobalValues["ref"].Type
-
-		require.IsType(t,
-			&sema.ReferenceType{},
-			refValueType,
-		)
-
-		referenceType := refValueType.(*sema.ReferenceType)
-
-		assert.IsType(t,
-			&sema.CompositeType{},
-			referenceType.Type,
-		)
-
-		assert.False(t, referenceType.Authorized)
-		assert.True(t, referenceType.Storable)
-	})
-
-	t.Run("storable auth reference", func(t *testing.T) {
-
-		checker, err := ParseAndCheckStorage(t, `
-          resource R {}
-
-          let ref = &storage[R] as storable auth &R
-        `,
-		)
-
-		require.NoError(t, err)
-
-		refValueType := checker.GlobalValues["ref"].Type
-
-		require.IsType(t,
-			&sema.ReferenceType{},
-			refValueType,
-		)
-
-		referenceType := refValueType.(*sema.ReferenceType)
-
-		assert.IsType(t,
-			&sema.CompositeType{},
-			referenceType.Type,
-		)
-
-		assert.True(t, referenceType.Authorized)
-		assert.True(t, referenceType.Storable)
-	})
-
-	t.Run("storable auth reference", func(t *testing.T) {
-
-		checker, err := ParseAndCheckStorage(t, `
-          resource R {}
-
-          let ref = &storage[R] as auth storable &R
-        `,
-		)
-
-		require.NoError(t, err)
-
-		refValueType := checker.GlobalValues["ref"].Type
-
-		require.IsType(t,
-			&sema.ReferenceType{},
-			refValueType,
-		)
-
-		referenceType := refValueType.(*sema.ReferenceType)
-
-		assert.IsType(t,
-			&sema.CompositeType{},
-			referenceType.Type,
-		)
-
-		assert.True(t, referenceType.Authorized)
-		assert.True(t, referenceType.Storable)
-	})
-
 }
 
 func TestCheckReferenceExpressionOfOptional(t *testing.T) {

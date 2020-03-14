@@ -198,18 +198,8 @@ typeAnnotation
     : ResourceAnnotation? fullType
     ;
 
-// NOTE: only allow reference or optionals – prevent ambiguous
-// and not particular useful types like `&R?`
 fullType
-    : (
-        ( Auth Storable
-        | Auth
-        | Storable Auth
-        | Storable
-        | /* no auth or storable */
-        )
-        Ampersand {p.noWhitespace()}?
-      )?
+    : (Auth? Ampersand {p.noWhitespace()}?)?
       innerType
       ({p.noWhitespace()}? optionals+=Optional)*
     ;
@@ -427,16 +417,17 @@ primaryExpression
     : createExpression
     | destroyExpression
     | referenceExpression
-    | composedExpression
+    | postfixExpression
     ;
 
-composedExpression
-    : primaryExpressionStart primaryExpressionSuffix*
-    ;
-
-primaryExpressionSuffix
-    : expressionAccess
-    | invocation
+postfixExpression
+    : identifier                                                          #identifierExpression
+    | literal                                                             #literalExpression
+    | Fun parameterList (':' returnType=typeAnnotation)? functionBlock    #functionExpression
+    | '(' expression ')'                                                  #nestedExpression
+    | postfixExpression invocation                                        #invocationExpression
+    | postfixExpression expressionAccess                                  #accessExpression
+    | postfixExpression '!'                                               #forceExpression
     ;
 
 equalityOp
@@ -478,7 +469,6 @@ Div : '/' ;
 Mod : '%' ;
 
 Auth : 'auth' ;
-Storable : 'storable' ;
 Ampersand : '&';
 
 unaryOp
@@ -505,13 +495,6 @@ castingOp
     | FailableCasting
     ;
 
-primaryExpressionStart
-    : identifierExpression
-    | literalExpression
-    | functionExpression
-    | nestedExpression
-    ;
-
 createExpression
     : Create nominalType invocation
     ;
@@ -522,22 +505,6 @@ destroyExpression
 
 referenceExpression
     : Ampersand expression Casting fullType
-    ;
-
-identifierExpression
-    : identifier
-    ;
-
-literalExpression
-    : literal
-    ;
-
-functionExpression
-    : Fun parameterList (':' returnType=typeAnnotation)? functionBlock
-    ;
-
-nestedExpression
-    : '(' expression ')'
     ;
 
 expressionAccess
@@ -680,7 +647,6 @@ identifier
     | Account
     | Self
     | Auth
-    | Storable
     ;
 
 Identifier

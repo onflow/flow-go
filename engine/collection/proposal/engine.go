@@ -34,12 +34,13 @@ type Engine struct {
 	con          network.Conduit
 	me           module.Local
 	state        protocol.State
-	provider     network.Engine // provider engine to propagate guarantees
+	provider     network.Engine
 	pool         mempool.Transactions
 	transactions storage.Transactions
 	headers      storage.Headers
 	payloads     storage.ClusterPayloads
-	cache        module.PendingClusterBlockBuffer
+	cache        module.PendingClusterBlockBuffer // pending block cache
+	participants flow.IdentityList                // consensus participants in our cluster
 
 	coldstuff module.ColdStuff
 }
@@ -58,6 +59,11 @@ func New(
 	cache module.PendingClusterBlockBuffer,
 ) (*Engine, error) {
 
+	participants, err := protocol.ClusterFor(state.Final(), me.NodeID())
+	if err != nil {
+		return nil, fmt.Errorf("could not get cluster participants: %w", err)
+	}
+
 	e := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "proposal").Logger(),
@@ -70,6 +76,7 @@ func New(
 		headers:      headers,
 		payloads:     payloads,
 		cache:        cache,
+		participants: participants,
 	}
 
 	con, err := net.Register(engine.ProtocolClusterConsensus, e)
@@ -190,9 +197,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// retrieve all collection nodes in our cluster
-	// TODO filter by cluster
 	recipients, err := e.state.Final().Identities(
-		filter.HasRole(flow.RoleCollection),
+		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	)
 	if err != nil {
@@ -222,9 +228,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 func (e *Engine) BroadcastCommit(commit *model.Commit) error {
 
 	// retrieve all collection nodes in our cluster
-	// TODO filter by cluster
 	recipients, err := e.state.Final().Identities(
-		filter.HasRole(flow.RoleCollection),
+		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	)
 	if err != nil {
@@ -393,31 +398,46 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) e
 // processPendingProposal handles proposals where the parent is missing.
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
-	parentID := proposal.Header.ParentID
-
 	pendingBlock := &cluster.PendingBlock{
 		OriginID: originID,
 		Header:   proposal.Header,
 		Payload:  proposal.Payload,
 	}
 
-	// cache the block, exit early if it already exists in the cache
-	added := e.cache.Add(pendingBlock)
-	if !added {
-		return nil
+	// cache the block
+	e.cache.Add(pendingBlock)
+
+	// request the missing block - typically this is the pending block's direct
+	// parent, but in general we walk the block's pending ancestors until we find
+	// the oldest one that is missing its parent.
+	missingID := proposal.Header.ParentID
+	for {
+		nextBlock, ok := e.cache.ByID(missingID)
+		if !ok {
+			break
+		}
+		missingID = nextBlock.Header.ParentID
 	}
 
-	// if the block was not already in the buffer, request its parent
-	req := &messages.BlockRequest{
-		BlockID: parentID,
+	req := &messages.ClusterBlockRequest{
+		BlockID: missingID,
 		Nonce:   rand.Uint64(),
 	}
-	err := e.con.Submit(req, originID)
+
+	// select a set of other nodes to request the missing block from
+	// always including the sender of the pending block
+	recipients := e.participants.
+		Filter(filter.Not(filter.HasNodeID(originID, e.me.NodeID()))).
+		Sample(2).
+		NodeIDs()
+	recipients = append(recipients, originID)
+
+	err := e.con.Submit(req, recipients...)
 	if err != nil {
 		return fmt.Errorf("could not send block request: %w", err)
 	}
 
-	// NOTE: at this point, if he doesn't send us the parent, we should probably think about a way
+	// NOTE: at this point, if we can't find the parent, we should probably think about a way
 	// to blacklist him, as this can be exploited by sending us lots of children without parent;
 	// a second mitigation strategy is to put a strict limit on children we cache, and possibly a
 	// limit on children we cache coming from a single other node
