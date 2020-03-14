@@ -57,7 +57,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
 	collectionConduit := network.NewMockConduit(ctrl)
-	chunksConduit := network.NewMockConduit(ctrl)
+
 	me := module.NewMockLocal(ctrl)
 	me.EXPECT().NodeID().Return(myself).AnyTimes()
 
@@ -88,7 +88,6 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ChunkDataPackProvider)), gomock.AssignableToTypeOf(engine)).Return(chunksConduit, nil)
 
 	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, computationEngine, providerEngine, executionState)
 	require.NoError(t, err)
