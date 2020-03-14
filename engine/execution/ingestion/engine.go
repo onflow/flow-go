@@ -205,7 +205,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		completeBlock.StartState = stateCommitment
 		newQueue, err := enqueue(completeBlock, executionQueue)
 		if err != nil {
-			panic(fmt.Sprintf("cannot enqueue block for execution: %w", err))
+			panic(fmt.Sprintf("cannot enqueue block for execution: %s", err))
 		}
 
 		e.tryRequeueOrphans(completeBlock, newQueue, orphanQueue)
