@@ -304,7 +304,8 @@ func (e *coldStuff) waitForVotes() error {
 				log.Error().Err(err).Hex("voter_id", voterID[:]).Msg("could not verify voter ID")
 				break
 			}
-			if _, isParticipant := e.participants.ByNodeID(voterID); !isParticipant {
+			_, isParticipant := e.participants.ByNodeID(voterID)
+			if !isParticipant {
 				log.Warn().Hex("voter_id", logging.ID(voterID)).Msg("vote by non-participant")
 				continue
 			}
