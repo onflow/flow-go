@@ -2,6 +2,7 @@ package flow
 
 import (
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strconv"
 
@@ -142,4 +143,18 @@ func (il IdentityList) Identities() []*Identity {
 		l = append(l, id)
 	}
 	return l
+}
+
+// Sample returns a random subset of the desired size.
+func (il IdentityList) Sample(size uint) IdentityList {
+
+	if size > uint(len(il)) {
+		size = uint(len(il))
+	}
+
+	rand.Shuffle(len(il), func(i int, j int) {
+		il[i], il[j] = il[j], il[i]
+	})
+
+	return il[:size]
 }

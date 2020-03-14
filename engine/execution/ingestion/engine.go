@@ -172,7 +172,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 		err := e.sendCollectionsRequest(completeBlock, blockByCollection)
 		if err != nil {
-			return fmt.Errorf("cannot send collction requests: %w", err)
+			return fmt.Errorf("cannot send collection requests: %w", err)
 		}
 
 		// if block fits into execution queue, that's it
@@ -193,7 +193,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		if err == storage.ErrNotFound {
 			_, err := enqueue(completeBlock, orphanQueue)
 			if err != nil {
-				return fmt.Errorf("cannot add orphaned block: %w", err)
+				panic(fmt.Sprintf("cannot add orphaned block: %s", err))
 			}
 			return nil
 		}
@@ -205,11 +205,13 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		completeBlock.StartState = stateCommitment
 		newQueue, err := enqueue(completeBlock, executionQueue)
 		if err != nil {
-			return fmt.Errorf("cannot enqueue block for execution: %w", err)
+			panic(fmt.Sprintf("cannot enqueue block for execution: %s", err))
 		}
+
+		e.tryRequeueOrphans(completeBlock, newQueue, orphanQueue)
+
 		// If the block was empty
 		if completeBlock.IsComplete() {
-			e.tryRequeueOrphans(completeBlock, newQueue, orphanQueue)
 			e.wg.Add(1)
 			go e.executeBlock(completeBlock)
 		}
@@ -469,6 +471,20 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		if err != nil {
 			return nil, fmt.Errorf("failed to save chunk header: %w", err)
 		}
+
+		// chunkDataPack
+		allRegisters := view.AllRegisters()
+		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
+
+		if err != nil {
+			return nil, fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, result.CompleteBlock.Block.ID())
+		}
+
+		chdp := generateChunkDataPack(chunk, allRegisters, values, proofs)
+		err = e.execState.PersistChunkDataPack(chdp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
+		}
 		//
 		chunks[i] = chunk
 		startState = endState
@@ -559,4 +575,25 @@ func (e *Engine) generateExecutionResultForBlock(
 	}
 
 	return er, nil
+}
+
+// generateChunkDataPack creates a chunk data pack
+func generateChunkDataPack(
+	chunk *flow.Chunk,
+	registers []flow.RegisterID,
+	values []flow.RegisterValue,
+	proofs []flow.StorageProof,
+) *flow.ChunkDataPack {
+	regTs := make([]flow.RegisterTouch, len(registers))
+	for i, reg := range registers {
+		regTs[i] = flow.RegisterTouch{RegisterID: reg,
+			Value: values[i],
+			Proof: proofs[i],
+		}
+	}
+	return &flow.ChunkDataPack{
+		ChunkID:         chunk.ID(),
+		StartState:      chunk.StartState,
+		RegisterTouches: regTs,
+	}
 }

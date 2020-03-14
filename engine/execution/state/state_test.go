@@ -34,9 +34,11 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 			chunkHeaders := new(storage.ChunkHeaders)
 
+			chunkDataPacks := new(storage.ChunkDataPacks)
+
 			executionResults := new(storage.ExecutionResults)
 
-			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders, executionResults)
+			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders, chunkDataPacks, executionResults)
 
 			f(t, es)
 		})
@@ -152,13 +154,15 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
+		cdp := new(storage.ChunkDataPacks)
+
 		er := new(storage.ExecutionResults)
 
 		chunkID := unittest.IdentifierFixture()
 
 		ch.On("ByID", chunkID).Return(nil, fmt.Errorf("storage error"))
 
-		es := state.NewExecutionState(ls, sc, ch, er)
+		es := state.NewExecutionState(ls, sc, ch, cdp, er)
 
 		ledger, err := es.GetChunkRegisters(chunkID)
 		assert.Nil(t, ledger)
@@ -174,6 +178,8 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
+		cdp := new(storage.ChunkDataPacks)
+
 		er := new(storage.ExecutionResults)
 
 		chunkHeader := unittest.ChunkHeaderFixture()
@@ -185,7 +191,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).
 			Return(nil, fmt.Errorf("storage error"))
 
-		es := state.NewExecutionState(ls, sc, ch, er)
+		es := state.NewExecutionState(ls, sc, ch, cdp, er)
 
 		registers, err := es.GetChunkRegisters(chunkID)
 		assert.Error(t, err)
@@ -201,6 +207,8 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
+		cdp := new(storage.ChunkDataPacks)
+
 		er := new(storage.ExecutionResults)
 
 		chunkHeader := unittest.ChunkHeaderFixture()
@@ -212,7 +220,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		ch.On("ByID", chunkID).Return(&chunkHeader, nil)
 		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).Return(registerValues, nil)
 
-		es := state.NewExecutionState(ls, sc, ch, er)
+		es := state.NewExecutionState(ls, sc, ch, cdp, er)
 
 		actualRegisters, err := es.GetChunkRegisters(chunkID)
 		assert.NoError(t, err)

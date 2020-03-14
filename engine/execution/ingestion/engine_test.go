@@ -190,6 +190,9 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *execu
 		ctx.executionState.On("PersistChunkHeader", mock.MatchedBy(func(f *flow.ChunkHeader) bool {
 			return bytes.Equal(f.StartState, completeBlock.StartState)
 		})).Return(nil)
+		ctx.executionState.On("PersistChunkDataPack", mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
+			return bytes.Equal(f.StartState, completeBlock.StartState)
+		})).Return(nil)
 	}
 
 	ctx.executionState.On("GetExecutionResultID", completeBlock.Block.ParentID).Return(func(blockID flow.Identifier) flow.Identifier {
