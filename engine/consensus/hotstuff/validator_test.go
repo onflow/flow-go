@@ -25,24 +25,6 @@ import (
 	mockProtocol "github.com/dapperlabs/flow-go/protocol/mocks"
 )
 
-type FakeBuilder struct{}
-
-// the fake builder takes
-func (b *FakeBuilder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
-	var payloadHash flow.Identifier
-	rand.Read(payloadHash[:])
-
-	// construct default block on top of the provided parent
-	header := &flow.Header{
-		Timestamp:   time.Now().UTC(),
-		PayloadHash: payloadHash,
-	}
-
-	// apply the custom fields setter of the consensus algorithm
-	setter(header)
-	return header, nil
-}
-
 func TestValidateVote(t *testing.T) {
 	// Happy Path
 	t.Run("A valid vote should be valid", testVoteOK)
@@ -1154,4 +1136,22 @@ func addStakingPrivateKeys(ids flow.IdentityList) ([]crypto.PrivateKey, error) {
 		sks = append(sks, sk)
 	}
 	return sks, nil
+}
+
+type FakeBuilder struct{}
+
+// the fake builder takes
+func (b *FakeBuilder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
+	var payloadHash flow.Identifier
+	rand.Read(payloadHash[:])
+
+	// construct default block on top of the provided parent
+	header := &flow.Header{
+		Timestamp:   time.Now().UTC(),
+		PayloadHash: payloadHash,
+	}
+
+	// apply the custom fields setter of the consensus algorithm
+	setter(header)
+	return header, nil
 }
