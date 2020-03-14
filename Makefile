@@ -117,6 +117,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'ForksReader' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name 'Signer' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name 'SigVerifier' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
+	GO111MODULE=on mockery -name 'SigAggregator' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy

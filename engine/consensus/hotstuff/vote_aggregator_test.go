@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	mockverifier "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/mocks"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/mocks"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -689,16 +690,23 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 		return ids.Filter(f...), nil
 	}).AnyTimes()
 	// mock sig verifier and aggregator
-	mockSigVerifier := mockverifier.NewMockSigVerifier(ctrl)
-	mockSigVerifier.EXPECT().VerifyRandomBeaconThresholdSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
-	mockSigVerifier.EXPECT().VerifyStakingAggregatedSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
-	mockSigVerifier.EXPECT().VerifyRandomBeaconSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
-	mockSigVerifier.EXPECT().VerifyStakingSig(gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
-	mockSigAggregator := mockverifier.NewMockSigAggregator(ctrl)
-	mockSigAggregator.EXPECT().Aggregate(gomock.Any(), gomock.Any()).Return(&hotmodel.AggregatedSignature{}, nil).AnyTimes()
-	mockSigAggregator.EXPECT().CanReconstruct(gomock.Any()).DoAndReturn(func(numOfSigShares int) bool {
-		return float64(numOfSigShares) > float64(VALIDATOR_SIZE)/2.0
-	}).AnyTimes()
+	mockSigVerifier := &mocks.SigVerifier{}
+	mockSigVerifier.On("VerifyRandomBeaconThresholdSig", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	mockSigVerifier.On("VerifyStakingAggregatedSig", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	mockSigVerifier.On("VerifyRandomBeaconSig", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	mockSigVerifier.On("VerifyStakingSig", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	mockSigAggregator := &mocks.SigAggregator{}
+	mockSigAggregator.On("Aggregate", mock.Anything, mock.Anything).Return(&hotmodel.AggregatedSignature{}, nil)
+	// TODO replace with the equivalent of DoAndReturn
+	mockSigAggregator.On("CanReconstruct", 0).Return(false)
+	mockSigAggregator.On("CanReconstruct", 1).Return(false)
+	mockSigAggregator.On("CanReconstruct", 2).Return(false)
+	mockSigAggregator.On("CanReconstruct", 3).Return(false)
+	mockSigAggregator.On("CanReconstruct", 4).Return(true)
+	mockSigAggregator.On("CanReconstruct", 5).Return(true)
+	mockSigAggregator.On("CanReconstruct", 6).Return(true)
+	mockSigAggregator.On("CanReconstruct", 7).Return(true)
 
 	viewState, _ := NewViewState(mockProtocolState, nil, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
 	voteValidator := NewValidator(viewState, nil, mockSigVerifier)
