@@ -224,7 +224,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	e.log.Debug().
 		Hex("block_id", logging.ID(header.ID())).
 		Hex("parent_id", logging.ID(header.ParentID)).
-		Int("collection_size", payload.Collection.Transactions.Len()).
+		Int("collection_size", len(payload.Collection.Transactions)).
 		Msg("submitted proposal")
 
 	trace.StartCollectionSpan(e.tracer, &payload.Collection).
