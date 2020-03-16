@@ -7,14 +7,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -34,26 +32,18 @@ type Engine struct {
 	collectionConduit network.Conduit
 	blockConduit      network.Conduit
 	receiptConduit    network.Conduit
-
-	// Mempools
-	blocks      mempool.Blocks
-	collections mempool.Collections
-	receipts    mempool.Receipts
 }
 
 // New creates a new observation ingestion engine
-func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local, blocks mempool.Blocks, collections mempool.Collections, receipts mempool.Receipts) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log.With().Str("engine", "ingestion").Logger(),
-		tracer:      tracer,
-		state:       state,
-		me:          me,
-		blocks:      blocks,
-		collections: collections,
-		receipts:    receipts,
+		unit:   engine.NewUnit(),
+		log:    log.With().Str("engine", "ingestion").Logger(),
+		tracer: tracer,
+		state:  state,
+		me:     me,
 	}
 
 	blockConduit, err := net.Register(engine.BlockProvider, eng)
@@ -148,11 +138,6 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 		Uint64("block_view", block.View).
 		Msg("received block")
 
-	err := e.blocks.Add(block)
-	if err != nil {
-		return fmt.Errorf("could not store block: %w", err)
-	}
-
 	// TODO: Do something with block
 
 	return nil
@@ -175,24 +160,24 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	}
 
 	// check that the origin is a collection node; this check is fine even if it
-	// excludes our own ID - in the case of local submission of collections, we
-	// should use the propagation engine, which is for exchange of collections
+	// excludes our own ID - in the case of local submission of Collections, we
+	// should use the propagation engine, which is for exchange of Collections
 	// between consensus nodes anyway; we do no processing or validation in this
 	// engine beyond validating the origin
 	if id.Role != flow.RoleCollection {
 		return errors.Errorf("invalid origin node role (%s)", id.Role)
 	}
-	collID := guarantee.ID()
-	if !e.collections.Has(collID) {
-		// TODO rate limit these requests
-		err := e.requestCollection(collID)
-		if err != nil {
-			log.Error().
-				Err(err).
-				Hex("collection_id", logging.ID(collID)).
-				Msg("could not request collection")
-		}
-	}
+	//collID := guarantee.ID()
+	//if !e.mempools.Collections.Has(collID) {
+	//	// TODO rate limit these requests
+	//	err := e.requestCollection(collID)
+	//	if err != nil {
+	//		log.Error().
+	//			Err(err).
+	//			Hex("collection_id", logging.ID(collID)).
+	//			Msg("could not request collection")
+	//	}
+	//}
 
 	return nil
 }
@@ -200,7 +185,6 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 // onCollection for handling data about a collection from a collection node
 func (e *Engine) onCollection(originID flow.Identifier, guarantee *flow.Collection) error {
 	// TODO
-
 	return nil
 }
 

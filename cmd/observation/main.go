@@ -8,9 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/observation/ingestion"
 	"github.com/dapperlabs/flow-go/engine/observation/rpc"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	"github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func main() {
@@ -19,9 +18,6 @@ func main() {
 		blockLimit      uint
 		collectionLimit uint
 		receiptLimit    uint
-		blockPool       mempool.Blocks
-		collPool        mempool.Collections
-		receiptPool     mempool.Receipts
 		ingestEng       *ingestion.Engine
 		rpcConf         rpc.Config
 		collectionRPC   observation.ObserveServiceClient
@@ -37,18 +33,6 @@ func main() {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "i", "localhost:9000", "the address (of the execution node) forward the script to")
-		}).
-		Module("blocks mempool", func(node *cmd.FlowNodeBuilder) error {
-			blockPool, err = stdmap.NewBlocks(blockLimit)
-			return err
-		}).
-		Module("collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			collPool, err = stdmap.NewCollections(collectionLimit)
-			return err
-		}).
-		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			receiptPool, err = stdmap.NewReceipts(receiptLimit)
-			return err
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			collectionRPCConn, err := grpc.Dial(rpcConf.CollectionAddr)
@@ -67,11 +51,13 @@ func main() {
 			return nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, blockPool, collPool, receiptPool)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me)
 			return ingestEng, err
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, collectionRPC, executionRPC)
+			blocks := badger.NewBlocks(node.DB)
+			headers := badger.NewHeaders(node.DB)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, collectionRPC, executionRPC, blocks, headers)
 			return rpcEng, nil
 		}).
 		Run()
