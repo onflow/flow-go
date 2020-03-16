@@ -92,6 +92,7 @@ func testVoteInvalidView(t *testing.T) {
 	// validate vote
 	_, err = v.ValidateVote(vote, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "wrong view number")
 }
 
 func testVoteInvalidBlock(t *testing.T) {
@@ -111,6 +112,7 @@ func testVoteInvalidBlock(t *testing.T) {
 	// validate vote
 	_, err = v.ValidateVote(vote, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "wrong block ID")
 }
 
 func testVoteUnstakedNode(t *testing.T) {
@@ -130,6 +132,7 @@ func testVoteUnstakedNode(t *testing.T) {
 	// validate vote
 	_, err = v.ValidateVote(vote, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "not a staked node")
 }
 
 func testVoteInvalidStaking(t *testing.T) {
@@ -153,6 +156,7 @@ func testVoteInvalidStaking(t *testing.T) {
 	// validate vote
 	_, err = v.ValidateVote(vote, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid staking signature")
 }
 
 func testVoteInvalidRandomB(t *testing.T) {
@@ -176,6 +180,7 @@ func testVoteInvalidRandomB(t *testing.T) {
 	// validate vote
 	_, err = v.ValidateVote(vote, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid random beacon signature")
 }
 
 func testQCOK(t *testing.T) {
@@ -239,6 +244,7 @@ func testQCInvalidBlock(t *testing.T) {
 	// validate QC
 	err = v.ValidateQC(qc, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "qc.BlockID")
 }
 
 func testQCInvalidView(t *testing.T) {
@@ -272,6 +278,7 @@ func testQCInvalidView(t *testing.T) {
 	// validate QC
 	err = v.ValidateQC(qc, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "qc.View")
 }
 
 func testQCHasUnstakedSigner(t *testing.T) {
@@ -305,6 +312,7 @@ func testQCHasUnstakedSigner(t *testing.T) {
 	// validate QC
 	err = v.ValidateQC(qc, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "unstaked identities")
 }
 
 func testQCHasInsufficentStake(t *testing.T) {
@@ -341,6 +349,7 @@ func testQCHasInsufficentStake(t *testing.T) {
 	// validate QC
 	err = v.ValidateQC(qc, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "insufficient stake")
 }
 
 func testQCHasInvalidRandomBSig(t *testing.T) {
@@ -388,6 +397,7 @@ func testQCHasInvalidRandomBSig(t *testing.T) {
 	// validate QC
 	err = v.ValidateQC(qc, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "reconstructed random beacon signature in QC is invalid")
 }
 
 func testQCHasInvalidStakingSig(t *testing.T) {
@@ -428,6 +438,7 @@ func testQCHasInvalidStakingSig(t *testing.T) {
 	// validate QC
 	err = v.ValidateQC(qc, block)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "aggregated staking signature in QC is invalid")
 }
 
 func testProposalOK(t *testing.T) {
@@ -483,6 +494,7 @@ func testProposalInvalidView(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid block")
 }
 
 func testProposalInvalidBlock(t *testing.T) {
@@ -512,6 +524,7 @@ func testProposalInvalidBlock(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid block")
 }
 
 func testProposalUnstakedNode(t *testing.T) {
@@ -541,6 +554,7 @@ func testProposalUnstakedNode(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "not a staked node")
 }
 
 func testProposalInvalidStaking(t *testing.T) {
@@ -573,6 +587,7 @@ func testProposalInvalidStaking(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid staking signature")
 }
 
 func testProposalInvalidRandomB(t *testing.T) {
@@ -605,6 +620,7 @@ func testProposalInvalidRandomB(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid random beacon signature")
 }
 
 func testProposalWrongLeader(t *testing.T) {
@@ -634,6 +650,7 @@ func testProposalWrongLeader(t *testing.T) {
 	// validate proposal
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "wrong leader")
 }
 
 func testProposalWrongParentEqual(t *testing.T) {
@@ -663,6 +680,7 @@ func testProposalWrongParentEqual(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Equal(t, err, &hs.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID})
 }
 
 func testProposalWrongParentAbove(t *testing.T) {
@@ -690,6 +708,7 @@ func testProposalWrongParentAbove(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Equal(t, err, &hs.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID})
 }
 
 func testProposalWrongParentBelow(t *testing.T) {
@@ -717,6 +736,7 @@ func testProposalWrongParentBelow(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "its view is above the finalized view, but its QC is below the finalized view")
 }
 
 func testProposalInvalidQC(t *testing.T) {
@@ -744,6 +764,7 @@ func testProposalInvalidQC(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "qc.View")
 }
 
 type FakeBuilder struct{}
