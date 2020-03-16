@@ -15,6 +15,11 @@ import (
 // AssignmetTestSuite contains tests against methods of the PublicAssignment scheme
 type PublicAssignmentTestSuite struct {
 	suite.Suite
+	seed []byte
+}
+
+func (a *PublicAssignmentTestSuite) SetupTest() {
+	a.seed = []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 }
 
 // TestAssignment invokes all the tests in this test suite
@@ -84,14 +89,13 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	// creates random ids
 	count := 10
-	seed := []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 	var idList flow.IdentityList = test.CreateIDs(count)
 	ids := idList.NodeIDs()
 	original := make([]flow.Identifier, count)
 	copy(original, ids)
 
 	// Randomness:
-	rng1, err := random.NewRand(seed)
+	rng1, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
 	permute(ids, len(ids), rng1)
 
@@ -103,7 +107,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 
 	// Deterministiciy:
 	// shuffling same list with the same seed should generate the same permutation
-	rng2, err := random.NewRand(seed)
+	rng2, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
 	// permutes original list with the same seed
 	permute(original, len(original), rng2)
@@ -117,14 +121,13 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	count := 10
 	subset := 4
 
-	seed := []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 	var idList flow.IdentityList = test.CreateIDs(count)
 	ids := idList.NodeIDs()
 	original := make([]flow.Identifier, count)
 	copy(original, ids)
 
 	// Randomness:
-	rng1, err := random.NewRand(seed)
+	rng1, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
 	permute(ids, subset, rng1)
 
@@ -146,16 +149,15 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	c := 10    // keeps number of chunks
 	n := 10    // keeps number of verifier nodes
 	alpha := 1 // each chunk requires alpha verifiers
-	seed := []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 	chunks := a.CreateChunks(c)
 
 	// making two random generator with the same seed
 	// random generator #1
-	rng1, err := random.NewRand(seed)
+	rng1, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
 
 	// random generator #2
-	rng2, err := random.NewRand(seed)
+	rng2, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
 
 	// creates two set of the same nodes
@@ -210,7 +212,7 @@ func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToMany() {
 // and then assign each chunk to alpha randomly chosen verifiers
 // it also evaluates that each chuck is assigned to alpha many unique verifier nodes
 func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, alpha int) {
-	rng, err := random.NewRand([]byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58})
+	rng, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
 	chunks := a.CreateChunks(chunkNum)
 
@@ -229,6 +231,36 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 		// each chunk should be assigned to alpha verifiers
 		require.Equal(a.T(), p.Verifiers(chunk).Len(), alpha)
 	}
+}
+
+func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
+	rng, err := random.NewRand(a.seed)
+	require.NoError(a.T(), err)
+	chunks := a.CreateChunks(20)
+
+	// creates nodes and keeps a copy of them
+	nodes := test.CreateIDs(5)
+	assigner := NewPublicAssignment(3)
+
+	// initially cache should be empty
+	require.Len(a.T(), assigner.cache, 0)
+
+	// new assignment should be cached
+	_, err = assigner.Assign(nodes, chunks, rng)
+	require.NoError(a.T(), err)
+	require.Len(a.T(), assigner.cache, 1)
+
+	// repetitive assignment should not be cached
+	_, err = assigner.Assign(nodes, chunks, rng)
+	require.NoError(a.T(), err)
+	require.Len(a.T(), assigner.cache, 1)
+
+	// creates a new set of nodes, hence assigner should cache new assignment
+	newNodes := test.CreateIDs(6)
+	_, err = assigner.Assign(newNodes, chunks, rng)
+	require.NoError(a.T(), err)
+	require.Len(a.T(), assigner.cache, 2)
+
 }
 
 // CreateChunk creates and returns num chunks. It only fills the Index part of

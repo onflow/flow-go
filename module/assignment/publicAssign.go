@@ -37,7 +37,7 @@ func NewPublicAssignment(alpha int) *PublicAssignment {
 func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
 	// computes a finger print for identities||chunks
 	ids := identities.NodeIDs()
-	hash, err := fingerPrint(ids, chunks)
+	hash, err := fingerPrint(ids, chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
 	}
@@ -102,7 +102,7 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 }
 
 // Fingerprint computes the SHA3-256 hash value of the sorted version of identifier list
-func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList) (crypto.Hash, error) {
+func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (crypto.Hash, error) {
 	// sorts and encodes ids
 	sort.Sort(ids)
 	encIDs, err := encoding.DefaultEncoder.Encode(ids)
@@ -117,12 +117,24 @@ func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList) (crypto.Hash, e
 		return nil, fmt.Errorf("could not encode chunk list: %w", err)
 	}
 
+	// encodes random generator
+	encRng, err := encoding.DefaultEncoder.Encode(rng)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode random generator: %w", err)
+	}
+
+	// encodes alpha parameteer
+	encAlpha, err := encoding.DefaultEncoder.Encode(alpha)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode alpha: %w", err)
+	}
+
 	hasher, err := crypto.NewHasher(crypto.SHA3_256)
 	if err != nil {
 		return nil, fmt.Errorf("could not create hasher: %w", err)
 	}
 
-	// computes and returns hash(encIDs || encChunks)
+	// computes and returns hash(encIDs || encChunks || encRng || encAlpha)
 	_, err = hasher.Write(encIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not hash ids: %w", err)
@@ -130,6 +142,16 @@ func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList) (crypto.Hash, e
 	_, err = hasher.Write(encChunks)
 	if err != nil {
 		return nil, fmt.Errorf("could not hash chunks: %w", err)
+	}
+
+	_, err = hasher.Write(encRng)
+	if err != nil {
+		return nil, fmt.Errorf("could not random generator: %w", err)
+	}
+
+	_, err = hasher.Write(encAlpha)
+	if err != nil {
+		return nil, fmt.Errorf("could not hash alpha: %w", err)
 	}
 
 	return hasher.SumHash(), nil
