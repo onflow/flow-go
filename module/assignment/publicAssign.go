@@ -46,31 +46,27 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	t := ids
 
 	for i := 0; i < chunks.Size(); i++ {
+		assignees := make([]flow.Identifier, 0, alpha)
 		if len(t) >= alpha { // More verifiers than required for this chunk
-			assignees := make([]flow.Identifier, alpha)
-			copy(assignees, t[:alpha])
-			assignment.Add(chunks.ByIndex(uint64(i)), assignees)
+			assignees = append(assignees, t[:alpha]...)
 			t = t[alpha:]
 		} else { // Less verifiers than required for this chunk
-			// take all remaining elements from t
-			part1 := make([]flow.Identifier, len(t))
-			copy(part1, t)
+			assignees = append(assignees, t...) // take all remaining elements from t
 
 			// now, we need `still` elements from a new shuffling round:
-			still := alpha - len(part1)
-			t = ids[:ids.Len()-len(part1)] // but we exclude the elements we already picked from the population
+			still := alpha - len(assignees)
+			t = ids[:ids.Len()-len(assignees)] // but we exclude the elements we already picked from the population
 			rng.Samples(len(t), still, t.Swap)
-			part2 := make([]flow.Identifier, still)
-			copy(part2, t[:still])
 
-			// concatenated part1 and part2 have exactly alpha elements and constitute the assignees for the current chunk
-			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(part1, part2))
+			// by adding `still` elements from new shuffling round: we have alpha assignees for the current chunk
+			assignees = append(assignees, t[:still]...)
 
 			// we have already assigned the first `still` elements in `ids`
 			// note that remaining elements ids[still:] still need shuffling
 			t = ids[still:]
 			rng.Shuffle(len(t), t.Swap)
 		}
+		assignment.Add(chunks.ByIndex(uint64(i)), assignees)
 	}
 	return assignment, nil
 }
