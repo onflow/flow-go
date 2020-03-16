@@ -13,7 +13,7 @@ import (
 
 func TestChunkDataPack(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.ChunkDataPackFixture()
+		expected := unittest.ChunkDataPackFixture(unittest.IdentifierFixture())
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {
 			var actual flow.ChunkDataPack
