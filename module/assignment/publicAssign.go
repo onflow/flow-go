@@ -2,11 +2,14 @@ package assignment
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/pkg/errors"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/model/chunkassignment"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -14,6 +17,7 @@ import (
 // for assigning chunks to verifier nodes in a deterministic but unpredictable manner.
 type PublicAssignment struct {
 	alpha int // used to indicate the number of verifiers should be assigned to each chunk
+	cache map[string]*chunkassignment.Assignment
 }
 
 // NewPublicAssignment generates and returns an instance of the Public Chunk Assignment algorithm
@@ -22,14 +26,34 @@ type PublicAssignment struct {
 // rng is an instance of a random generator
 // alpha is the number of assigned verifier nodes to each chunk
 func NewPublicAssignment(alpha int) *PublicAssignment {
-	return &PublicAssignment{alpha: alpha}
+	return &PublicAssignment{
+		alpha: alpha,
+		cache: make(map[string]*chunkassignment.Assignment),
+	}
 }
 
-func (p *PublicAssignment) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
-	a, err := chunkAssignment(ids.NodeIDs(), chunks, rng, p.alpha)
+// Assign receives identity list of verifier nodes, chunk lists and a random generator
+// it returns a chunk assignment
+func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
+	// computes a finger print for identities||chunks
+	ids := identities.NodeIDs()
+	hash, err := fingerPrint(ids, chunks)
+	if err != nil {
+		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
+	}
+
+	// checks cache against this assignment
+	hashStr := hash.Hex()
+	if a, ok := p.cache[hashStr]; ok {
+		return a, nil
+	}
+
+	// otherwise, it computes the assignment and caches it for future calls
+	a, err := chunkAssignment(ids, chunks, rng, p.alpha)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not complete chunk assignment")
 	}
+	p.cache[hashStr] = a
 
 	return a, nil
 }
@@ -54,7 +78,7 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	permute(ids, len(ids), rng)
 	t := ids
 
-	for i := 0; i < chunks.Size(); i++ {
+	for i := 0; i < chunks.Len(); i++ {
 		if len(t) >= alpha {
 			// More verifiers than required for this chunk
 			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(t[:alpha], nil))
@@ -75,4 +99,38 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 		}
 	}
 	return assignment, nil
+}
+
+// Fingerprint computes the SHA3-256 hash value of the sorted version of identifier list
+func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList) (crypto.Hash, error) {
+	// sorts and encodes ids
+	sort.Sort(ids)
+	encIDs, err := encoding.DefaultEncoder.Encode(ids)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode identifier list: %w", err)
+	}
+
+	// sorts and encodes chunks
+	sort.Sort(chunks)
+	encChunks, err := encoding.DefaultEncoder.Encode(chunks)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode chunk list: %w", err)
+	}
+
+	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	if err != nil {
+		return nil, fmt.Errorf("could not create hasher: %w", err)
+	}
+
+	// computes and returns hash(encIDs || encChunks)
+	_, err = hasher.Write(encIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not hash ids: %w", err)
+	}
+	_, err = hasher.Write(encChunks)
+	if err != nil {
+		return nil, fmt.Errorf("could not hash chunks: %w", err)
+	}
+
+	return hasher.SumHash(), nil
 }

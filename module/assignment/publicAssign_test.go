@@ -241,6 +241,6 @@ func (a *PublicAssignmentTestSuite) CreateChunks(num int) flow.ChunkList {
 		}
 		list.Insert(c)
 	}
-	require.Equal(a.T(), num, list.Size())
+	require.Equal(a.T(), num, list.Len())
 	return list
 }
