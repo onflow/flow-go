@@ -270,6 +270,11 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
+	if node.ChunkDataPacks == nil {
+		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
+		require.Nil(t, err)
+	}
+
 	if node.VerifierEngine == nil {
 
 		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me)
@@ -286,6 +291,7 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.Blocks,
 			node.Collections,
 			node.ChunkStates,
+			node.ChunkDataPacks,
 			assigner)
 		require.Nil(t, err)
 	}

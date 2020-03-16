@@ -417,16 +417,17 @@ primaryExpression
     : createExpression
     | destroyExpression
     | referenceExpression
-    | composedExpression
+    | postfixExpression
     ;
 
-composedExpression
-    : primaryExpressionStart primaryExpressionSuffix*
-    ;
-
-primaryExpressionSuffix
-    : expressionAccess
-    | invocation
+postfixExpression
+    : identifier                                                          #identifierExpression
+    | literal                                                             #literalExpression
+    | Fun parameterList (':' returnType=typeAnnotation)? functionBlock    #functionExpression
+    | '(' expression ')'                                                  #nestedExpression
+    | postfixExpression invocation                                        #invocationExpression
+    | postfixExpression expressionAccess                                  #accessExpression
+    | postfixExpression '!'                                               #forceExpression
     ;
 
 equalityOp
@@ -494,13 +495,6 @@ castingOp
     | FailableCasting
     ;
 
-primaryExpressionStart
-    : identifierExpression
-    | literalExpression
-    | functionExpression
-    | nestedExpression
-    ;
-
 createExpression
     : Create nominalType invocation
     ;
@@ -511,22 +505,6 @@ destroyExpression
 
 referenceExpression
     : Ampersand expression Casting fullType
-    ;
-
-identifierExpression
-    : identifier
-    ;
-
-literalExpression
-    : literal
-    ;
-
-functionExpression
-    : Fun parameterList (':' returnType=typeAnnotation)? functionBlock
-    ;
-
-nestedExpression
-    : '(' expression ')'
     ;
 
 expressionAccess

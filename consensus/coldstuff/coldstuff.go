@@ -31,9 +31,10 @@ type coldStuff struct {
 	unit      *engine.Unit
 
 	// round config
-	participants flow.IdentityList
-	interval     time.Duration
-	timeout      time.Duration
+	participants flow.IdentityList            // the participants in consensus
+	interval     time.Duration                // how often a block is proposed
+	timeout      time.Duration                // how long to wait for votes
+	head         func() (*flow.Header, error) // returns the head of chain state
 
 	// incoming consensus entities
 	proposals chan *flow.Header
@@ -48,10 +49,17 @@ func New(
 	comms Communicator,
 	builder module.Builder,
 	finalizer module.Finalizer,
-	participants flow.IdentityList,
+	memberFilter flow.IdentityFilter,
 	interval time.Duration,
 	timeout time.Duration,
+	head func() (*flow.Header, error),
 ) (module.ColdStuff, error) {
+
+	participants, err := state.Final().Identities(memberFilter)
+	if err != nil {
+		return nil, fmt.Errorf("could not get consensus participants: %w", err)
+	}
+
 	cold := coldStuff{
 		log:          log,
 		me:           me,
@@ -63,6 +71,7 @@ func New(
 		participants: participants,
 		interval:     interval,
 		timeout:      timeout,
+		head:         head,
 		proposals:    make(chan *flow.Header, 1),
 		votes:        make(chan *model.Vote, 1),
 		commits:      make(chan *model.Commit, 1),
@@ -116,8 +125,12 @@ func (e *coldStuff) loop() error {
 ConsentLoop:
 	for {
 
-		var err error
-		e.round, err = round.New(e.state, e.me, e.participants)
+		head, err := e.head()
+		if err != nil {
+			return fmt.Errorf("could not get head: %w", err)
+		}
+
+		e.round, err = round.New(head, e.me, e.participants)
 		if err != nil {
 			return fmt.Errorf("could not initialize round: %w", err)
 		}
@@ -281,8 +294,8 @@ func (e *coldStuff) waitForVotes() error {
 				continue
 			}
 
-			// discard votes that are not by staked consensus nodes
-			id, err := e.state.Final().Identity(voterID)
+			// discard votes that are not by staked consensus participants
+			voter, err := e.state.Final().Identity(voterID)
 			if errors.Is(err, badger.ErrKeyNotFound) {
 				log.Warn().Hex("voter_id", voterID[:]).Msg("vote by unknown node")
 				continue
@@ -291,8 +304,9 @@ func (e *coldStuff) waitForVotes() error {
 				log.Error().Err(err).Hex("voter_id", voterID[:]).Msg("could not verify voter ID")
 				break
 			}
-			if id.Role != flow.RoleConsensus {
-				log.Warn().Str("role", id.Role.String()).Msg("vote by non-consensus node")
+			_, isParticipant := e.participants.ByNodeID(voterID)
+			if !isParticipant {
+				log.Warn().Hex("voter_id", logging.ID(voterID)).Msg("vote by non-participant")
 				continue
 			}
 
@@ -303,7 +317,7 @@ func (e *coldStuff) waitForVotes() error {
 			}
 
 			// tally the voting stake of the voter ID
-			e.round.Tally(voterID, id.Stake)
+			e.round.Tally(voterID, voter.Stake)
 			votes := e.round.Votes()
 
 			log.Info().Uint64("vote_quorum", e.round.Quorum()).Uint64("vote_count", votes).Msg("block vote received")

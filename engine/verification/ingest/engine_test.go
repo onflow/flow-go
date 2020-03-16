@@ -43,21 +43,25 @@ type TestSuite struct {
 	statesConduit *network.Conduit
 	// mock conduit for receiving receipts
 	receiptsConduit *network.Conduit
+	// mock conduit for requesting/receiving chunk data packs
+	chunksConduit *network.Conduit
 	// mock verifier engine, should be called when all dependent resources
 	// for a receipt have been received by the ingest engine.
 	verifierEng *network.Engine
 	// mock mempools used by the ingest engine, valid resources should be added
 	// to these when they are received from an appropriate node role.
-	blocks      *mempool.Blocks
-	receipts    *mempool.Receipts
-	collections *mempool.Collections
-	chunkStates *mempool.ChunkStates
+	blocks         *mempool.Blocks
+	receipts       *mempool.Receipts
+	collections    *mempool.Collections
+	chunkStates    *mempool.ChunkStates
+	chunkDataPacks *mempool.ChunkDataPacks
 	// resources fixtures
-	collection *flow.Collection
-	block      *flow.Block
-	receipt    *flow.ExecutionReceipt
-	chunkState *flow.ChunkState
-	assigner   *module.ChunkAssigner // mocks chunk assigner
+	collection    *flow.Collection
+	block         *flow.Block
+	receipt       *flow.ExecutionReceipt
+	chunkState    *flow.ChunkState
+	chunkDataPack *flow.ChunkDataPack
+	assigner      *module.ChunkAssigner // mocks chunk assigner
 }
 
 // Invoking this method executes all TestSuite tests.
@@ -68,18 +72,21 @@ func TestReceiptsEngine(t *testing.T) {
 // SetupTest initiates the test setups prior to each test.
 func (suite *TestSuite) SetupTest() {
 	// initializing test suite fields
-	suite.state = &protocol.State{}
 	suite.collectionsConduit = &network.Conduit{}
 	suite.statesConduit = &network.Conduit{}
 	suite.receiptsConduit = &network.Conduit{}
+	suite.chunksConduit = &network.Conduit{}
 	suite.net = &module.Network{}
+	suite.verifierEng = &network.Engine{}
+
+	suite.state = &protocol.State{}
 	suite.me = &module.Local{}
 	suite.ss = &protocol.Snapshot{}
-	suite.verifierEng = &network.Engine{}
 	suite.blocks = &mempool.Blocks{}
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}
+	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
 	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := unittest.CompleteExecutionResultFixture(1)
@@ -87,6 +94,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.block = completeER.Block
 	suite.receipt = completeER.Receipt
 	suite.chunkState = completeER.ChunkStates[0]
+	suite.chunkDataPack = completeER.ChunkDataPacks[0]
 
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
@@ -98,6 +106,9 @@ func (suite *TestSuite) SetupTest() {
 		Once()
 	suite.net.On("Register", uint8(engine.ExecutionStateProvider), testifymock.Anything).
 		Return(suite.statesConduit, nil).
+		Once()
+	suite.net.On("Register", uint8(engine.ChunkDataPackProvider), testifymock.Anything).
+		Return(suite.chunksConduit, nil).
 		Once()
 }
 
@@ -114,6 +125,7 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.blocks,
 		suite.collections,
 		suite.chunkStates,
+		suite.chunkDataPacks,
 		suite.assigner)
 	require.Nil(suite.T(), err, "could not create an engine")
 
@@ -153,6 +165,8 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.collections.On("Has", suite.collection.ID()).Return(false)
 	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
+	suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 	// expect that the receipt be added to the mempool, and return it in All
 	suite.receipts.On("Add", suite.receipt).Return(nil).Once()
@@ -428,6 +442,8 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
+			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
+			suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 			// removing the resources for a chunk
@@ -474,11 +490,13 @@ func TestConcurrency(t *testing.T) {
 			erCount:     1,
 			senderCount: 10,
 			chunksNum:   1,
-		}, {
+		},
+		{
 			erCount:     10,
 			senderCount: 1,
 			chunksNum:   1,
-		}, {
+		},
+		{
 			erCount:     10,
 			senderCount: 10,
 			chunksNum:   1,
@@ -549,7 +567,6 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 				ChunkState: er.ChunkStates[chunk.Index],
 			}
 			vChunks = append(vChunks, vc)
-			//}
 		}
 	}
 
@@ -629,25 +646,39 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 	eng := new(network.Engine)
 	conduit, err := node.Net.Register(engine.ExecutionStateProvider, eng)
 	assert.Nil(t, err)
+	chunksConduit, err := node.Net.Register(engine.ChunkDataPackProvider, eng)
+	assert.Nil(t, err)
 
 	eng.On("Process", verID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			req, ok := args[1].(*messages.ExecutionStateRequest)
-			require.True(t, ok)
-
-			for _, er := range ers {
-				for _, chunk := range er.Receipt.ExecutionResult.Chunks {
-					if chunk.ID() == req.ChunkID {
-						res := &messages.ExecutionStateResponse{
-							State: *er.ChunkStates[chunk.Index],
+			if req, ok := args[1].(*messages.ExecutionStateRequest); ok {
+				for _, er := range ers {
+					for _, chunk := range er.Receipt.ExecutionResult.Chunks {
+						if chunk.ID() == req.ChunkID {
+							res := &messages.ExecutionStateResponse{
+								State: *er.ChunkStates[chunk.Index],
+							}
+							err := conduit.Submit(res, verID)
+							assert.Nil(t, err)
+							return
 						}
-						err := conduit.Submit(res, verID)
-						assert.Nil(t, err)
-						return
+					}
+				}
+			} else if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
+				for _, er := range ers {
+					for _, chunk := range er.Receipt.ExecutionResult.Chunks {
+						if chunk.ID() == req.ChunkID {
+							res := &messages.ChunkDataPackResponse{
+								Data: *er.ChunkDataPacks[chunk.Index],
+							}
+							err := chunksConduit.Submit(res, verID)
+							assert.Nil(t, err)
+							return
+						}
 					}
 				}
 			}
-			t.Log("invalid chunk state request", req.ChunkID.String())
+			t.Logf("invalid chunk request (%T): %v ", args[1], args[1])
 			t.Fail()
 		}).
 		Return(nil)
@@ -678,7 +709,6 @@ func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk)
 			assert.True(t, ok)
 
 			vID := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex).ID()
-
 			// ensure there are no dupe chunks
 			_, alreadySeen := receivedChunks[vID]
 			if alreadySeen {

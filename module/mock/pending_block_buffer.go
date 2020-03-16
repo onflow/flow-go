@@ -24,6 +24,29 @@ func (_m *PendingBlockBuffer) Add(block *flow.PendingBlock) bool {
 	return r0
 }
 
+// ByID provides a mock function with given fields: blockID
+func (_m *PendingBlockBuffer) ByID(blockID flow.Identifier) (*flow.PendingBlock, bool) {
+	ret := _m.Called(blockID)
+
+	var r0 *flow.PendingBlock
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.PendingBlock); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.PendingBlock)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(blockID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
 // ByParentID provides a mock function with given fields: parentID
 func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]*flow.PendingBlock, bool) {
 	ret := _m.Called(parentID)
