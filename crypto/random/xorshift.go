@@ -3,6 +3,8 @@ package random
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 // xorshifts is a set of xorshift128+ pseudo random number generators
@@ -152,4 +154,23 @@ func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) error {
 		swap(i, i+j)
 	}
 	return nil
+}
+
+// Encode encodes the internal state of random generator
+// NOTE: it is not possible to encode an object of random generator
+// by passing it to an encoder function like JSON, since its internal
+// state is not exported and hence encoded. Encode method compensates this.
+func (x *xorshifts) Encode() ([]byte, error) {
+	// encodes state || index
+	encState, err := encoding.DefaultEncoder.Encode(x.states)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode state, %w", err)
+	}
+
+	encStartIndex, err := encoding.DefaultEncoder.Encode(x.stateIndex)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode start index, %w", err)
+	}
+
+	return append(encState, encStartIndex...), nil
 }

@@ -38,5 +38,5 @@ type Rand interface {
 	// NOTE: it is not possible to encode an object of random generator
 	// by passing it to an encoder function like JSON, since its internal
 	// state is not exported and hence encoded. Encode method compensates this.
-	Encode() []byte
+	Encode() ([]byte, error)
 }
