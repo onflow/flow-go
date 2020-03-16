@@ -97,7 +97,9 @@ func main() {
 
 			memberFilter := filter.HasRole(flow.RoleConsensus)
 
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, con, build, final, memberFilter, 3*time.Second, 6*time.Second)
+			head := node.State.Final().Head
+
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, con, build, final, memberFilter, 3*time.Second, 6*time.Second, head)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}

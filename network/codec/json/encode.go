@@ -45,6 +45,16 @@ func encode(v interface{}) (*Envelope, error) {
 	case *coldstuff.Commit:
 		code = CodeBlockCommit
 
+	// Cluster consensus
+	case *messages.ClusterBlockProposal:
+		code = CodeClusterBlockProposal
+	case *messages.ClusterBlockVote:
+		code = CodeClusterBlockVote
+	case *messages.ClusterBlockRequest:
+		code = CodeClusterBlockRequest
+	case *messages.ClusterBlockResponse:
+		code = CodeClusterBlockResponse
+
 	case *flow.CollectionGuarantee:
 		code = CodeCollectionGuarantee
 	case *flow.TransactionBody:

@@ -15,10 +15,16 @@ const (
 	CodeResponse
 	CodeEcho
 
-	// Consensus
+	// consensus
 	CodeBlockProposal
 	CodeBlockVote
-	CodeBlockCommit // ColdStuff-only
+	CodeBlockCommit // coldstuff-only
+
+	// cluster consensus
+	CodeClusterBlockProposal
+	CodeClusterBlockVote
+	CodeClusterBlockRequest
+	CodeClusterBlockResponse
 
 	CodeCollectionGuarantee
 	CodeTransaction
