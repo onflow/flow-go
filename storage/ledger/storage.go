@@ -116,6 +116,29 @@ func (f *TrieStorage) GetRegistersWithProof(
 	return values, proofs, err
 }
 
+func (f *TrieStorage) GetRegisterTouches(
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+) (
+	[]flow.RegisterTouch,
+	error,
+) {
+	values, proofs, err := f.GetRegistersWithProof(registerIDs, stateCommitment)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]flow.RegisterTouch, 0)
+	for i, reg := range registerIDs {
+		rt := flow.RegisterTouch{
+			RegisterID: reg,
+			Value:      values[i],
+			Proof:      proofs[i],
+		}
+		res = append(res, rt)
+	}
+	return res, nil
+}
+
 // UpdateRegistersWithProof updates the values at the given registers
 // This is untrusted so a proof is generated
 func (f *TrieStorage) UpdateRegistersWithProof(

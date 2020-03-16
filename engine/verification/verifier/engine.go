@@ -1,7 +1,6 @@
 package verifier
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -9,18 +8,15 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/chunkVerifier"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -28,14 +24,13 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit        *engine.Unit                  // used to control startup/shutdown
-	log         zerolog.Logger                // used to log relevant actions
-	conduit     network.Conduit               // used to propagate result approvals
-	me          module.Local                  // used to access local node information
-	state       protocol.State                // used to access the protocol state
-	rah         crypto.Hasher                 // used as hasher to sign the result approvals
-	vm          virtualmachine.VirtualMachine // used to execute transactions
-	ledgerDepth int
+	unit     *engine.Unit                // used to control startup/shutdown
+	log      zerolog.Logger              // used to log relevant actions
+	conduit  network.Conduit             // used to propagate result approvals
+	me       module.Local                // used to access local node information
+	state    protocol.State              // used to access the protocol state
+	rah      crypto.Hasher               // used as hasher to sign the result approvals
+	verifier chunkVerifier.ChunkVerifier // used to verify chunks
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -44,18 +39,16 @@ func New(
 	net module.Network,
 	state protocol.State,
 	me module.Local,
+	verifier chunkVerifier.ChunkVerifier,
 ) (*Engine, error) {
 
-	rt := runtime.NewInterpreterRuntime()
-
 	e := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log,
-		state:       state,
-		me:          me,
-		vm:          virtualmachine.New(rt),
-		rah:         utils.NewResultApprovalHasher(),
-		ledgerDepth: 257, // TODO (Ramtin) move this to the network config
+		unit:     engine.NewUnit(),
+		log:      log,
+		state:    state,
+		me:       me,
+		verifier: verifier,
+		rah:      utils.NewResultApprovalHasher(),
 	}
 
 	var err error
@@ -182,64 +175,12 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 // executeChunk executes the transactions for a single chunk and returns the
 // resultant end state, or an error if execution failed.
 // TODO unit testing
-func (e *Engine) executeChunk(res *verification.VerifiableChunk) (flow.StateCommitment, error) {
-	blockCtx := e.vm.NewBlockContext(&res.Block.Header)
-
-	if res.ChunkDataPack == nil {
-		// TODO this is for now until we enable passing of chunkdatapacks
-		return nil, nil
-		//return nil, fmt.Errorf("chunk data pack is empty")
-	}
-	ptrie, err := trie.NewPSMT(res.ChunkDataPack.StartState,
-		e.ledgerDepth,
-		res.ChunkDataPack.Registers(),
-		res.ChunkDataPack.Values(),
-		*trie.DecodeProof(res.ChunkDataPack.Proofs()),
-	)
+func (e *Engine) executeChunk(ch *verification.VerifiableChunk) (flow.StateCommitment, error) {
+	err := e.verifier.Verify(ch)
 	if err != nil {
-		return nil, fmt.Errorf("error constructing partial trie %x", err)
+		return nil, fmt.Errorf("chunk verification failed for verifiable chunk [%d] of receipt [%x], error: %v", ch.ChunkIndex, ch.Receipt.ID(), err)
 	}
-
-	regMap := res.ChunkDataPack.GetRegisterValues()
-	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
-		val, ok := regMap[string(key)]
-		if !ok {
-			return nil, fmt.Errorf("missing register")
-		}
-		return val, nil
-	}
-
-	chunkView := state.NewView(getRegister)
-
-	// TODO check the number of transactions and computation used
-
-	// executes all transactions in this chunk
-	for _, tx := range res.Collection.Transactions {
-		txView := chunkView.NewChild()
-
-		result, err := blockCtx.ExecuteTransaction(txView, tx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to execute transaction: %w", err)
-		}
-
-		if result.Succeeded() {
-			chunkView.ApplyDelta(txView.Delta())
-		}
-	}
-
-	// Apply delta to ptrie
-	regs, values := chunkView.Delta().RegisterUpdates()
-	expectedEndState, err := ptrie.Update(regs, values)
-	if err != nil {
-		return nil, fmt.Errorf("error updating partial trie %v", err)
-
-	}
-	// Check state commitment
-	if !bytes.Equal(expectedEndState, res.EndState) {
-		return nil, fmt.Errorf("final state commitment doesn't match: [%x] != [%x]", ptrie.GetRootHash(), res.EndState)
-	}
-
-	return expectedEndState, nil
+	return ch.EndState, nil
 }
 
 // signAttestation extracts, signs and returns the attestation part of the result approval

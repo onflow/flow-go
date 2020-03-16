@@ -56,7 +56,7 @@ func (cdp *ChunkDataPack) GetRegisterValues() map[string]RegisterValue {
 
 // Registers returns a list of register Ids (ordered)
 func (cdp *ChunkDataPack) Registers() []RegisterID {
-	registers := make([]RegisterID, len(cdp.RegisterTouches))
+	registers := make([]RegisterID, 0, len(cdp.RegisterTouches))
 	for _, rt := range cdp.RegisterTouches {
 		registers = append(registers, rt.RegisterID)
 	}
@@ -65,7 +65,7 @@ func (cdp *ChunkDataPack) Registers() []RegisterID {
 
 // Values returns a list of values (ordered)
 func (cdp *ChunkDataPack) Values() []RegisterValue {
-	values := make([]RegisterValue, len(cdp.RegisterTouches))
+	values := make([]RegisterValue, 0, len(cdp.RegisterTouches))
 	for _, rt := range cdp.RegisterTouches {
 		values = append(values, rt.Value)
 	}
@@ -74,7 +74,7 @@ func (cdp *ChunkDataPack) Values() []RegisterValue {
 
 // Proofs returns a list of proofs (ordered)
 func (cdp *ChunkDataPack) Proofs() []StorageProof {
-	proofs := make([]StorageProof, len(cdp.RegisterTouches))
+	proofs := make([]StorageProof, 0, len(cdp.RegisterTouches))
 	for _, rt := range cdp.RegisterTouches {
 		proofs = append(proofs, rt.Proof)
 	}
