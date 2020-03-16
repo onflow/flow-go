@@ -3,8 +3,6 @@
 package cluster
 
 import (
-	"time"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -12,7 +10,7 @@ func Genesis() *Block {
 	header := flow.Header{
 		View:      0,
 		ChainID:   "",
-		Timestamp: time.Now(),
+		Timestamp: flow.GenesisTime(),
 		ParentID:  flow.ZeroID,
 	}
 

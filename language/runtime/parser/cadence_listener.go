@@ -205,11 +205,26 @@ type CadenceListener interface {
 	// EnterPrimaryExpression is called when entering the primaryExpression production.
 	EnterPrimaryExpression(c *PrimaryExpressionContext)
 
-	// EnterComposedExpression is called when entering the composedExpression production.
-	EnterComposedExpression(c *ComposedExpressionContext)
+	// EnterAccessExpression is called when entering the accessExpression production.
+	EnterAccessExpression(c *AccessExpressionContext)
 
-	// EnterPrimaryExpressionSuffix is called when entering the primaryExpressionSuffix production.
-	EnterPrimaryExpressionSuffix(c *PrimaryExpressionSuffixContext)
+	// EnterInvocationExpression is called when entering the invocationExpression production.
+	EnterInvocationExpression(c *InvocationExpressionContext)
+
+	// EnterNestedExpression is called when entering the nestedExpression production.
+	EnterNestedExpression(c *NestedExpressionContext)
+
+	// EnterIdentifierExpression is called when entering the identifierExpression production.
+	EnterIdentifierExpression(c *IdentifierExpressionContext)
+
+	// EnterForceExpression is called when entering the forceExpression production.
+	EnterForceExpression(c *ForceExpressionContext)
+
+	// EnterLiteralExpression is called when entering the literalExpression production.
+	EnterLiteralExpression(c *LiteralExpressionContext)
+
+	// EnterFunctionExpression is called when entering the functionExpression production.
+	EnterFunctionExpression(c *FunctionExpressionContext)
 
 	// EnterEqualityOp is called when entering the equalityOp production.
 	EnterEqualityOp(c *EqualityOpContext)
@@ -229,9 +244,6 @@ type CadenceListener interface {
 	// EnterCastingOp is called when entering the castingOp production.
 	EnterCastingOp(c *CastingOpContext)
 
-	// EnterPrimaryExpressionStart is called when entering the primaryExpressionStart production.
-	EnterPrimaryExpressionStart(c *PrimaryExpressionStartContext)
-
 	// EnterCreateExpression is called when entering the createExpression production.
 	EnterCreateExpression(c *CreateExpressionContext)
 
@@ -240,18 +252,6 @@ type CadenceListener interface {
 
 	// EnterReferenceExpression is called when entering the referenceExpression production.
 	EnterReferenceExpression(c *ReferenceExpressionContext)
-
-	// EnterIdentifierExpression is called when entering the identifierExpression production.
-	EnterIdentifierExpression(c *IdentifierExpressionContext)
-
-	// EnterLiteralExpression is called when entering the literalExpression production.
-	EnterLiteralExpression(c *LiteralExpressionContext)
-
-	// EnterFunctionExpression is called when entering the functionExpression production.
-	EnterFunctionExpression(c *FunctionExpressionContext)
-
-	// EnterNestedExpression is called when entering the nestedExpression production.
-	EnterNestedExpression(c *NestedExpressionContext)
 
 	// EnterExpressionAccess is called when entering the expressionAccess production.
 	EnterExpressionAccess(c *ExpressionAccessContext)
@@ -514,11 +514,26 @@ type CadenceListener interface {
 	// ExitPrimaryExpression is called when exiting the primaryExpression production.
 	ExitPrimaryExpression(c *PrimaryExpressionContext)
 
-	// ExitComposedExpression is called when exiting the composedExpression production.
-	ExitComposedExpression(c *ComposedExpressionContext)
+	// ExitAccessExpression is called when exiting the accessExpression production.
+	ExitAccessExpression(c *AccessExpressionContext)
 
-	// ExitPrimaryExpressionSuffix is called when exiting the primaryExpressionSuffix production.
-	ExitPrimaryExpressionSuffix(c *PrimaryExpressionSuffixContext)
+	// ExitInvocationExpression is called when exiting the invocationExpression production.
+	ExitInvocationExpression(c *InvocationExpressionContext)
+
+	// ExitNestedExpression is called when exiting the nestedExpression production.
+	ExitNestedExpression(c *NestedExpressionContext)
+
+	// ExitIdentifierExpression is called when exiting the identifierExpression production.
+	ExitIdentifierExpression(c *IdentifierExpressionContext)
+
+	// ExitForceExpression is called when exiting the forceExpression production.
+	ExitForceExpression(c *ForceExpressionContext)
+
+	// ExitLiteralExpression is called when exiting the literalExpression production.
+	ExitLiteralExpression(c *LiteralExpressionContext)
+
+	// ExitFunctionExpression is called when exiting the functionExpression production.
+	ExitFunctionExpression(c *FunctionExpressionContext)
 
 	// ExitEqualityOp is called when exiting the equalityOp production.
 	ExitEqualityOp(c *EqualityOpContext)
@@ -538,9 +553,6 @@ type CadenceListener interface {
 	// ExitCastingOp is called when exiting the castingOp production.
 	ExitCastingOp(c *CastingOpContext)
 
-	// ExitPrimaryExpressionStart is called when exiting the primaryExpressionStart production.
-	ExitPrimaryExpressionStart(c *PrimaryExpressionStartContext)
-
 	// ExitCreateExpression is called when exiting the createExpression production.
 	ExitCreateExpression(c *CreateExpressionContext)
 
@@ -549,18 +561,6 @@ type CadenceListener interface {
 
 	// ExitReferenceExpression is called when exiting the referenceExpression production.
 	ExitReferenceExpression(c *ReferenceExpressionContext)
-
-	// ExitIdentifierExpression is called when exiting the identifierExpression production.
-	ExitIdentifierExpression(c *IdentifierExpressionContext)
-
-	// ExitLiteralExpression is called when exiting the literalExpression production.
-	ExitLiteralExpression(c *LiteralExpressionContext)
-
-	// ExitFunctionExpression is called when exiting the functionExpression production.
-	ExitFunctionExpression(c *FunctionExpressionContext)
-
-	// ExitNestedExpression is called when exiting the nestedExpression production.
-	ExitNestedExpression(c *NestedExpressionContext)
 
 	// ExitExpressionAccess is called when exiting the expressionAccess production.
 	ExitExpressionAccess(c *ExpressionAccessContext)

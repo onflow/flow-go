@@ -366,11 +366,6 @@ func (fnb *FlowNodeBuilder) Run() {
 	// parse configuration parameters
 	pflag.Parse()
 
-	// initialize all components
-	for _, f := range fnb.modules {
-		fnb.handleModule(f)
-	}
-
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
@@ -392,6 +387,12 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.genesisHandler(fnb, fnb.genesis)
 	}
 
+	// set up all modules
+	for _, f := range fnb.modules {
+		fnb.handleModule(f)
+	}
+
+	// initialize all components
 	for _, f := range fnb.components {
 		fnb.handleComponent(f)
 	}

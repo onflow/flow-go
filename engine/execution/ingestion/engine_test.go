@@ -57,6 +57,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
 	collectionConduit := network.NewMockConduit(ctrl)
+
 	me := module.NewMockLocal(ctrl)
 	me.EXPECT().NodeID().Return(myself).AnyTimes()
 
