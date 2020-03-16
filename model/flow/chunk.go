@@ -116,7 +116,21 @@ func (cl ChunkList) ByIndexWithProof(i uint64) (*Chunk, Proof) {
 	return cl[i], nil
 }
 
-// Size returns the number of Chunks in the list
-func (cl ChunkList) Size() int {
+// Len returns the number of Chunks in the list. It is also part of the sort
+// interface that makes ChunkList sortable
+func (cl ChunkList) Len() int {
 	return len(cl)
+}
+
+// Less returns true if element i in the ChunkList is less than j based on its chunk ID.
+// Otherwise it returns true.
+// It satisfies the sort.Interface making the ChunkList sortable.
+func (cl ChunkList) Less(i, j int) bool {
+	return cl[i].ID().String() < cl[j].ID().String()
+}
+
+// Swap swaps the element i and j in the ChunkList.
+// It satisfies the sort.Interface making the ChunkList sortable.
+func (cl ChunkList) Swap(i, j int) {
+	cl[j], cl[i] = cl[i], cl[j]
 }
