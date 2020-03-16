@@ -33,6 +33,21 @@ func (m *MockBlocks) EXPECT() *MockBlocksMockRecorder {
 	return m.recorder
 }
 
+// ByHeight mocks base method
+func (m *MockBlocks) ByHeight(arg0 uint64) (*flow.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ByHeight", arg0)
+	ret0, _ := ret[0].(*flow.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ByHeight indicates an expected call of ByHeight
+func (mr *MockBlocksMockRecorder) ByHeight(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByHeight", reflect.TypeOf((*MockBlocks)(nil).ByHeight), arg0)
+}
+
 // ByID mocks base method
 func (m *MockBlocks) ByID(arg0 flow.Identifier) (*flow.Block, error) {
 	m.ctrl.T.Helper()
@@ -46,21 +61,6 @@ func (m *MockBlocks) ByID(arg0 flow.Identifier) (*flow.Block, error) {
 func (mr *MockBlocksMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockBlocks)(nil).ByID), arg0)
-}
-
-// ByNumber mocks base method
-func (m *MockBlocks) ByNumber(arg0 uint64) (*flow.Block, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ByNumber", arg0)
-	ret0, _ := ret[0].(*flow.Block)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ByNumber indicates an expected call of ByNumber
-func (mr *MockBlocksMockRecorder) ByNumber(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByNumber", reflect.TypeOf((*MockBlocks)(nil).ByNumber), arg0)
 }
 
 // Store mocks base method
