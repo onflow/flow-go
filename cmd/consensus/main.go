@@ -97,7 +97,9 @@ func main() {
 
 			memberFilter := filter.HasRole(flow.RoleConsensus)
 
-			head := node.State.Final().Head
+			head := func() (*flow.Header, error) {
+				return node.State.Final().Head()
+			}
 
 			cold, err := coldstuff.New(node.Logger, node.State, node.Me, con, build, final, memberFilter, 3*time.Second, 6*time.Second, head)
 			if err != nil {
