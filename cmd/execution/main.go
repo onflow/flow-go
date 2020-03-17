@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
+	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/language/runtime"
@@ -79,12 +80,15 @@ func main() {
 			executionResults := badger.NewExecutionResults(node.DB)
 			stateCommitments = badger.NewCommits(node.DB)
 			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders, chunkDataPacks, executionResults)
+			stateSync := sync.NewStateSynchronizer(node.State, registerDeltas)
+
 			providerEngine, err = provider.New(
 				node.Logger,
 				node.Network,
 				node.State,
 				node.Me,
 				executionState,
+				stateSync,
 			)
 
 			return providerEngine, err

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
+	sync "github.com/dapperlabs/flow-go/engine/execution/sync/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"

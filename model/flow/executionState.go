@@ -40,3 +40,5 @@ func init() {
 		panic("error while hex decoding hardcoded state commitment")
 	}
 }
+
+type RegisterDelta map[string][]byte

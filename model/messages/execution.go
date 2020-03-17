@@ -27,3 +27,13 @@ type ChunkDataPackRequest struct {
 type ChunkDataPackResponse struct {
 	Data flow.ChunkDataPack
 }
+
+type ExecutionStateSyncRequest struct {
+	CurrentBlockID flow.Identifier
+	TargetBlockID  flow.Identifier
+}
+
+type ExecutionStateDelta struct {
+	BlockID flow.Identifier
+	Delta   flow.RegisterDelta
+}

@@ -72,15 +72,16 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeEcho:
 		v = &message.Echo{}
 
-	case CodeExecutionRecipt:
+	case CodeExecutionReceipt:
 		v = &flow.ExecutionReceipt{}
-
 	case CodeExecutionStateRequest:
 		v = &messages.ExecutionStateRequest{}
-
 	case CodeExecutionStateResponse:
 		v = &messages.ExecutionStateResponse{}
-
+	case CodeExecutionStateSyncRequest:
+		v = &messages.ExecutionStateSyncRequest{}
+	case CodeExecutionStateDelta:
+		v = &messages.ExecutionStateDelta{}
 	case CodeExecutionCompleteBlock:
 		v = &execution.CompleteBlock{}
 
