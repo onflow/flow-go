@@ -66,10 +66,6 @@ func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.Chun
 	return a, nil
 }
 
-func (p *PublicAssignment) Size() uint {
-	return p.Size()
-}
-
 // permute shuffles subset of ids that contains its first m elements in place
 // it implements in-place version of Fisher-Yates shuffling https://doi.org/10.1145%2F364520.364540
 func permute(ids flow.IdentifierList, m int, rng random.Rand) {
