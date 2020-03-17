@@ -252,6 +252,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	// generate a new one if we want to have the same
 	// state
 	sameRng, err := random.NewRand(a.seed)
+	require.NoError(a.T(), err)
 	_, err = assigner.Assign(nodes, chunks, sameRng)
 	require.NoError(a.T(), err)
 	require.Equal(a.T(), assigner.assignments.Size(), uint(1))
