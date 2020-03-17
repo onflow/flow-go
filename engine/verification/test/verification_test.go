@@ -45,7 +45,7 @@ func TestHappyPath(t *testing.T) {
 	completeER := unittest.CompleteExecutionResultFixture(chunkNum)
 
 	// assigns half of the chunks to this verifier
-	a := chunkassignment.NewAssignment()
+	a := chunkassignment.NewAssignment(flow.Identifier{})
 	for i := 0; i < chunkNum; i++ {
 		if isAssigned(i, chunkNum) {
 			a.Add(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
