@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Collections represents a concurrency-safe memory pool for chunk data packs.
+// ChunkDataPacks represents a concurrency-safe memory pool for chunk data packs.
 type ChunkDataPacks interface {
 
 	// Has checks whether the ChunkDataPack with the given hash is currently in
@@ -21,7 +21,7 @@ type ChunkDataPacks interface {
 	// return true if the ChunkDataPack was known and removed.
 	Rem(cdpID flow.Identifier) bool
 
-	// Get will retrieve the given ChunkDataPack from the memory pool; it will
+	// ByID will retrieve the given ChunkDataPack from the memory pool; it will
 	// error if the ChunkDataPack is not in the memory pool.
 	ByID(cdpID flow.Identifier) (*flow.ChunkDataPack, error)
 

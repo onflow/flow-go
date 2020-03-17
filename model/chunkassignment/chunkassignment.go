@@ -6,13 +6,25 @@ import (
 
 // Assignment is assignment map of the chunks to the list of the verifier nodes
 type Assignment struct {
+	id    flow.Identifier // unique identifier for this assignment
 	table map[uint64]map[flow.Identifier]struct{}
 }
 
-func NewAssignment() *Assignment {
+func NewAssignment(id flow.Identifier) *Assignment {
 	return &Assignment{
+		id:    id,
 		table: make(map[uint64]map[flow.Identifier]struct{}),
 	}
+}
+
+// ID returns the unique identifier for assignment
+func (a *Assignment) ID() flow.Identifier {
+	return a.id
+}
+
+// Checksum returns the checksum of the assignment
+func (a *Assignment) Checksum() flow.Identifier {
+	return flow.MakeID(a)
 }
 
 // Verifiers returns the list of verifier nodes assigned to a chunk
