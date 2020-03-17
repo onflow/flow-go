@@ -15,21 +15,30 @@ const SelfIdentifier = "self"
 const BeforeIdentifier = "before"
 const ResultIdentifier = "result"
 
-var beforeType = &FunctionType{
-	Parameters: []*Parameter{
-		{
-			Label:          ArgumentLabelNotRequired,
-			Identifier:     "value",
-			TypeAnnotation: NewTypeAnnotation(&AnyStructType{}),
+var beforeType = func() *GenericFunctionType {
+	typeParameter := &TypeParameter{
+		Name: "T",
+		Type: &AnyStructType{},
+	}
+
+	typeAnnotation := &GenericTypeAnnotation{
+		TypeParameter: typeParameter,
+	}
+
+	return &GenericFunctionType{
+		TypeParameters: []*TypeParameter{
+			typeParameter,
 		},
-	},
-	ReturnTypeAnnotation: NewTypeAnnotation(
-		&AnyStructType{},
-	),
-	ReturnTypeGetter: func(argumentTypes []Type) Type {
-		return argumentTypes[0]
-	},
-}
+		Parameters: []*GenericParameter{
+			{
+				Label:          ArgumentLabelNotRequired,
+				Identifier:     "value",
+				TypeAnnotation: typeAnnotation,
+			},
+		},
+		ReturnTypeAnnotation: typeAnnotation,
+	}
+}()
 
 // Checker
 
@@ -234,13 +243,15 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	// TODO: add access to TypeDeclaration and use declaration's access instead here
 	const access = ast.AccessPublic
 
-	variable, err := checker.typeActivations.DeclareType(typeDeclaration{
-		identifier:               identifier,
-		ty:                       ty,
-		declarationKind:          declaration.TypeDeclarationKind(),
-		access:                   access,
-		allowOuterScopeShadowing: false,
-	})
+	variable, err := checker.typeActivations.DeclareType(
+		typeDeclaration{
+			identifier:               identifier,
+			ty:                       ty,
+			declarationKind:          declaration.TypeDeclarationKind(),
+			access:                   access,
+			allowOuterScopeShadowing: false,
+		},
+	)
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 }
