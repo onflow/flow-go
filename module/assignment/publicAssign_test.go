@@ -277,7 +277,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 
 	// performs the assignment using a different seed
 	// should results in a different new assignment
-	// which should be cacheed
+	// which should be cached
 	otherRng, err := random.NewRand(a.otherSeed)
 	require.NoError(a.T(), err)
 	_, err = assigner.Assign(newNodes, chunks, otherRng)
