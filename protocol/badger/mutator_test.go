@@ -433,7 +433,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
-		require.EqualError(t, err, "extend header not valid: block needs height equal to parent height+1 (1 != 1+1)")
+		require.EqualError(t, err, "extend header not valid: block needs height equal to ancestor height+1 (1 != 1+1)")
 
 		// verify seal not indexed
 		var seal flow.Identifier

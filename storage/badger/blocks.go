@@ -39,13 +39,13 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return &block, err
 }
 
-func (b *Blocks) ByNumber(number uint64) (*flow.Block, error) {
+func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	var block flow.Block
 	err := b.db.View(func(tx *badger.Txn) error {
 
-		// retrieve the block ID by number
+		// retrieve the block ID by height
 		var blockID flow.Identifier
-		err := operation.RetrieveNumber(number, &blockID)(tx)
+		err := operation.RetrieveNumber(height, &blockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block ID: %w", err)
 		}
