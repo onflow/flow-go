@@ -414,3 +414,165 @@ func TestCheckRestrictedResourceTypeSubtyping(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestCheckRestrictedResourceTypeNoType(t *testing.T) {
+
+	const types = `
+      resource interface I1 {}
+
+      resource interface I2 {}
+    `
+
+	t.Run("resource: empty", func(t *testing.T) {
+
+		checker, err := ParseAndCheckWithPanic(t,
+			types+`
+              let r: @{} <- panic("")
+            `,
+		)
+
+		require.NoError(t, err)
+
+		rType := checker.GlobalValues["r"].Type
+		require.IsType(t, &sema.RestrictedResourceType{}, rType)
+
+		ty := rType.(*sema.RestrictedResourceType)
+
+		assert.IsType(t, &sema.AnyResourceType{}, ty.Type)
+
+		require.Len(t, ty.Restrictions, 0)
+	})
+
+	t.Run("resource: one", func(t *testing.T) {
+
+		checker, err := ParseAndCheckWithPanic(t,
+			types+`
+              let r: @{I1} <- panic("")
+            `,
+		)
+
+		require.NoError(t, err)
+
+		rType := checker.GlobalValues["r"].Type
+		require.IsType(t, &sema.RestrictedResourceType{}, rType)
+
+		ty := rType.(*sema.RestrictedResourceType)
+
+		assert.IsType(t, &sema.AnyResourceType{}, ty.Type)
+
+		require.Len(t, ty.Restrictions, 1)
+		assert.Same(t,
+			checker.GlobalTypes["I1"].Type,
+			ty.Restrictions[0],
+		)
+	})
+
+	t.Run("resource: two", func(t *testing.T) {
+
+		checker, err := ParseAndCheckWithPanic(t,
+			types+`
+              let r: @{I1, I2} <- panic("")
+            `,
+		)
+
+		require.NoError(t, err)
+
+		rType := checker.GlobalValues["r"].Type
+		require.IsType(t, &sema.RestrictedResourceType{}, rType)
+
+		ty := rType.(*sema.RestrictedResourceType)
+
+		assert.IsType(t, &sema.AnyResourceType{}, ty.Type)
+
+		require.Len(t, ty.Restrictions, 2)
+		assert.Same(t,
+			checker.GlobalTypes["I1"].Type,
+			ty.Restrictions[0],
+		)
+		assert.Same(t,
+			checker.GlobalTypes["I2"].Type,
+			ty.Restrictions[1],
+		)
+	})
+
+	t.Run("reference: empty", func(t *testing.T) {
+
+		checker, err := ParseAndCheckWithPanic(t,
+			types+`
+              let ref: &{} = panic("")
+            `,
+		)
+
+		require.NoError(t, err)
+
+		refType := checker.GlobalValues["ref"].Type
+		require.IsType(t, &sema.ReferenceType{}, refType)
+
+		rType := refType.(*sema.ReferenceType).Type
+		require.IsType(t, &sema.RestrictedResourceType{}, rType)
+
+		ty := rType.(*sema.RestrictedResourceType)
+
+		assert.IsType(t, &sema.AnyResourceType{}, ty.Type)
+
+		require.Len(t, ty.Restrictions, 0)
+	})
+
+	t.Run("reference: one", func(t *testing.T) {
+
+		checker, err := ParseAndCheckWithPanic(t,
+			types+`
+              let ref: &{I1} = panic("")
+            `,
+		)
+
+		require.NoError(t, err)
+
+		refType := checker.GlobalValues["ref"].Type
+		require.IsType(t, &sema.ReferenceType{}, refType)
+
+		rType := refType.(*sema.ReferenceType).Type
+		require.IsType(t, &sema.RestrictedResourceType{}, rType)
+
+		ty := rType.(*sema.RestrictedResourceType)
+
+		assert.IsType(t, &sema.AnyResourceType{}, ty.Type)
+
+		require.Len(t, ty.Restrictions, 1)
+		assert.Same(t,
+			checker.GlobalTypes["I1"].Type,
+			ty.Restrictions[0],
+		)
+	})
+
+	t.Run("reference: two", func(t *testing.T) {
+
+		checker, err := ParseAndCheckWithPanic(t,
+			types+`
+              let ref: &{I1, I2} = panic("")
+            `,
+		)
+
+		require.NoError(t, err)
+
+		refType := checker.GlobalValues["ref"].Type
+		require.IsType(t, &sema.ReferenceType{}, refType)
+
+		rType := refType.(*sema.ReferenceType).Type
+		require.IsType(t, &sema.RestrictedResourceType{}, rType)
+
+		ty := rType.(*sema.RestrictedResourceType)
+
+		assert.IsType(t, &sema.AnyResourceType{}, ty.Type)
+
+		require.Len(t, ty.Restrictions, 2)
+		assert.Same(t,
+			checker.GlobalTypes["I1"].Type,
+			ty.Restrictions[0],
+		)
+		assert.Same(t,
+			checker.GlobalTypes["I2"].Type,
+			ty.Restrictions[1],
+		)
+	})
+}

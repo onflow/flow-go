@@ -1448,27 +1448,6 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func (v *ProgramVisitor) VisitComposedExpression(ctx *ComposedExpressionContext) interface{} {
-	result := ctx.PrimaryExpressionStart().Accept(v).(ast.Expression)
-
-	for _, suffix := range ctx.AllPrimaryExpressionSuffix() {
-		switch partialExpression := suffix.Accept(v).(type) {
-		case *ast.InvocationExpression:
-			result = &ast.InvocationExpression{
-				InvokedExpression: result,
-				Arguments:         partialExpression.Arguments,
-				EndPos:            partialExpression.EndPos,
-			}
-		case ast.AccessExpression:
-			result = v.wrapPartialAccessExpression(result, partialExpression)
-		default:
-			panic(errors.NewUnreachableError())
-		}
-	}
-
-	return result
-}
-
 func (v *ProgramVisitor) wrapPartialAccessExpression(
 	wrapped ast.Expression,
 	partialAccessExpression ast.AccessExpression,
@@ -1494,8 +1473,27 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 	panic(errors.NewUnreachableError())
 }
 
-func (v *ProgramVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
-	return v.VisitChildren(ctx.BaseParserRuleContext)
+func (v *ProgramVisitor) VisitInvocationExpression(ctx *InvocationExpressionContext) interface{} {
+	expression := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
+	expression.InvokedExpression = ctx.PostfixExpression().Accept(v).(ast.Expression)
+	return expression
+}
+
+func (v *ProgramVisitor) VisitAccessExpression(ctx *AccessExpressionContext) interface{} {
+	accessExpression := ctx.ExpressionAccess().Accept(v).(ast.AccessExpression)
+	accessedExpression := ctx.PostfixExpression().Accept(v).(ast.Expression)
+	return v.wrapPartialAccessExpression(accessedExpression, accessExpression)
+}
+
+func (v *ProgramVisitor) VisitForceExpression(ctx *ForceExpressionContext) interface{} {
+	expression := ctx.PostfixExpression().Accept(v).(ast.Expression)
+
+	endPosition := PositionFromToken(ctx.GetStop())
+
+	return &ast.ForceExpression{
+		Expression: expression,
+		EndPos:     endPosition,
+	}
 }
 
 func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) interface{} {
@@ -1535,11 +1533,6 @@ func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) i
 			EndPos:   endPosition,
 		},
 	}
-}
-
-// NOTE: manually go over all child rules and find a match
-func (v *ProgramVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) interface{} {
-	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
 func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {

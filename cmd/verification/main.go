@@ -23,6 +23,7 @@ func main() {
 		blocks          *stdmap.Blocks
 		collections     *stdmap.Collections
 		chunkStates     *stdmap.ChunkStates
+		chunkDataPacks  *stdmap.ChunkDataPacks
 		verifierEng     *verifier.Engine
 	)
 
@@ -49,6 +50,10 @@ func main() {
 			chunkStates, err = stdmap.NewChunkStates(chunkLimit)
 			return err
 		}).
+		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
+			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
+			return err
+		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me)
 			return verifierEng, err
@@ -61,7 +66,7 @@ func main() {
 			// Todo the hardcoded default value should be parameterized as alpha in a
 			// should be moved to a configuration class
 			// DISCLAIMER: alpha down there is not a production-level value
-			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates, assigner)
+			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates, chunkDataPacks, assigner)
 			return eng, err
 		}).
 		Run()
