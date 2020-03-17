@@ -118,7 +118,7 @@ func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand
 	}
 
 	// encodes random generator
-	encRng, err := encoding.DefaultEncoder.Encode(rng)
+	encRng, err := rng.Encode()
 	if err != nil {
 		return nil, fmt.Errorf("could not encode random generator: %w", err)
 	}

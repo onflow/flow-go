@@ -23,6 +23,21 @@ type xorshiftp struct {
 	a, b uint64
 }
 
+// Encode returns the encoded version of xorshiftp for hashing
+func (x *xorshiftp) Encode() ([]byte, error) {
+	encX, err := encoding.DefaultEncoder.Encode(x.a)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode xorshiftp, %w", err)
+	}
+
+	encY, err := encoding.DefaultEncoder.Encode(x.b)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode xorshiftp, %w", err)
+	}
+
+	return append(encX, encY...), nil
+}
+
 // NewRand returns a new set of xorshift128+ PRGs
 // the length of the seed fixes the number of xorshift128+ to initialize:
 // each 16 bytes of the seed initilize an xorshift128+ instance
@@ -161,10 +176,16 @@ func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) error {
 // by passing it to an encoder function like JSON, since its internal
 // state is not exported and hence encoded. Encode method compensates this.
 func (x *xorshifts) Encode() ([]byte, error) {
+	// keeps the encoded version of random generator
+	enc := make([]byte, 0)
+
 	// encodes state || index
-	encState, err := encoding.DefaultEncoder.Encode(x.states)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode state, %w", err)
+	for _, state := range x.states {
+		stateEncode, err := state.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("could not encode state, %w", err)
+		}
+		enc = append(enc, stateEncode...)
 	}
 
 	encStartIndex, err := encoding.DefaultEncoder.Encode(x.stateIndex)
@@ -172,5 +193,7 @@ func (x *xorshifts) Encode() ([]byte, error) {
 		return nil, fmt.Errorf("could not encode start index, %w", err)
 	}
 
-	return append(encState, encStartIndex...), nil
+	enc = append(enc, encStartIndex...)
+
+	return enc, nil
 }

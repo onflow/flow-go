@@ -15,11 +15,13 @@ import (
 // AssignmetTestSuite contains tests against methods of the PublicAssignment scheme
 type PublicAssignmentTestSuite struct {
 	suite.Suite
-	seed []byte
+	seed      []byte // main seed of random generators during test
+	otherSeed []byte // a different seed than main seed used for testing
 }
 
 func (a *PublicAssignmentTestSuite) SetupTest() {
 	a.seed = []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
+	a.otherSeed = []byte{64, 54, 44, 94, 84, 24, 64, 54, 64, 53, 41, 92, 81, 11, 55, 43}
 }
 
 // TestAssignment invokes all the tests in this test suite
@@ -246,7 +248,11 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	require.Len(a.T(), assigner.cache, 0)
 
 	// new assignment should be cached
-	_, err = assigner.Assign(nodes, chunks, rng)
+	// random generators are stateful and we need to
+	// generate a new one if we want to have the same
+	// state
+	sameRng, err := random.NewRand(a.seed)
+	_, err = assigner.Assign(nodes, chunks, sameRng)
 	require.NoError(a.T(), err)
 	require.Len(a.T(), assigner.cache, 1)
 
@@ -260,6 +266,15 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	_, err = assigner.Assign(newNodes, chunks, rng)
 	require.NoError(a.T(), err)
 	require.Len(a.T(), assigner.cache, 2)
+
+	// performs the assignment using a different seed
+	// should results in a different new assignment
+	// which should be cacheed
+	otherRng, err := random.NewRand(a.otherSeed)
+	require.NoError(a.T(), err)
+	_, err = assigner.Assign(newNodes, chunks, otherRng)
+	require.NoError(a.T(), err)
+	require.Len(a.T(), assigner.cache, 3)
 
 }
 
