@@ -11,13 +11,15 @@ import (
 	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
 // PublicAssignment implements an instance of the Public Chunk Assignment algorithm
 // for assigning chunks to verifier nodes in a deterministic but unpredictable manner.
 type PublicAssignment struct {
-	alpha int // used to indicate the number of verifiers should be assigned to each chunk
-	cache map[string]*chunkassignment.Assignment
+	alpha       int // used to indicate the number of verifiers should be assigned to each chunk
+	assignments mempool.Assignments
 }
 
 // NewPublicAssignment generates and returns an instance of the Public Chunk Assignment algorithm
@@ -26,9 +28,10 @@ type PublicAssignment struct {
 // rng is an instance of a random generator
 // alpha is the number of assigned verifier nodes to each chunk
 func NewPublicAssignment(alpha int) *PublicAssignment {
+	assignment, _ := stdmap.NewAssignments(1000)
 	return &PublicAssignment{
-		alpha: alpha,
-		cache: make(map[string]*chunkassignment.Assignment),
+		alpha:       alpha,
+		assignments: assignment,
 	}
 }
 
@@ -43,19 +46,28 @@ func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.Chun
 	}
 
 	// checks cache against this assignment
-	hashStr := hash.Hex()
-	if a, ok := p.cache[hashStr]; ok {
-		return a, nil
+	assignmentID := flow.HashToID(hash)
+	if p.assignments.Has(assignmentID) {
+		return p.assignments.ByID(assignmentID)
 	}
 
 	// otherwise, it computes the assignment and caches it for future calls
-	a, err := chunkAssignment(ids, chunks, rng, p.alpha)
+	a, err := chunkAssignment(assignmentID, ids, chunks, rng, p.alpha)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not complete chunk assignment")
 	}
-	p.cache[hashStr] = a
+
+	// adds assignment to mempool
+	err = p.assignments.Add(a)
+	if err != nil {
+		return nil, fmt.Errorf("could not add generated assignment to mempool: %w", err)
+	}
 
 	return a, nil
+}
+
+func (p *PublicAssignment) Size() uint {
+	return p.Size()
 }
 
 // permute shuffles subset of ids that contains its first m elements in place
@@ -69,11 +81,11 @@ func permute(ids flow.IdentifierList, m int, rng random.Rand) {
 
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
-func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkassignment.Assignment, error) {
+func chunkAssignment(assignmentID flow.Identifier, ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkassignment.Assignment, error) {
 	if len(ids) < alpha {
 		return nil, fmt.Errorf("not enough verification nodes for chunk assignment: %d, minumum should be %d", len(ids), alpha)
 	}
-	assignment := chunkassignment.NewAssignment()
+	assignment := chunkassignment.NewAssignment(assignmentID)
 	// permutes the entire slice
 	permute(ids, len(ids), rng)
 	t := ids

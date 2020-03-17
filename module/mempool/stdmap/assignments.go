@@ -1,7 +1,10 @@
 package stdmap
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/chunkassignment"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Assignments implements the ChunkDataPack memory pool.
@@ -17,9 +20,40 @@ func NewAssignments(limit uint) (*Assignments, error) {
 	return a, nil
 }
 
+// Has checks whether the Assignment with the given hash is currently in
+// the memory pool.
+func (a *Assignments) Has(assignmentID flow.Identifier) bool {
+	return a.Backend.Has(assignmentID)
+
+}
+
+// ByID retrieves the chunk assignment from mempool based on provided ID
+func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkassignment.Assignment, error) {
+	entity, err := a.Backend.ByID(assignmentID)
+	if err != nil {
+		return nil, err
+	}
+	assignment, ok := entity.(*chunkassignment.Assignment)
+	if !ok {
+		panic(fmt.Sprintf("invalid entity in assignments pool (%T)", entity))
+	}
+	return assignment, nil
+}
+
 // Add adds an Assignment to the mempool.
 func (a *Assignments) Add(assignment *chunkassignment.Assignment) error {
 	return a.Backend.Add(assignment)
+}
+
+// Rem will remove the given Assignment from the memory pool; it will
+// return true if the Assignment was known and removed.
+func (a *Assignments) Rem(assignmentID flow.Identifier) bool {
+	return a.Backend.Rem(assignmentID)
+}
+
+// Size will return the current size of the memory pool.
+func (a *Assignments) Size() uint {
+	return a.Backend.Size()
 }
 
 // All returns all chunk data packs from the pool.

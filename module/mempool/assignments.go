@@ -13,6 +13,9 @@ type Assignments interface {
 	// the memory pool.
 	Has(assignmentID flow.Identifier) bool
 
+	// ByID retrieves the chunk assignment from mempool based on provided ID
+	ByID(assignmentID flow.Identifier) (*chunkassignment.Assignment, error)
+
 	// Add will add the given Assignment to the memory pool; it will error if
 	// the Assignment is already in the memory pool.
 	Add(assignment *chunkassignment.Assignment) error

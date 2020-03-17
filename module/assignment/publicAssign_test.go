@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/test"
 )
 
-// AssignmetTestSuite contains tests against methods of the PublicAssignment scheme
+// PublicAssignmentTestSuite contains tests against methods of the PublicAssignment scheme
 type PublicAssignmentTestSuite struct {
 	suite.Suite
 	seed      []byte // main seed of random generators during test
@@ -35,7 +35,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	// creates ids and twice chunks of the ids
 	ids := test.CreateIDs(size)
 	chunks := a.CreateChunks(2 * size)
-	assignment := chunkassignment.NewAssignment()
+	assignment := chunkassignment.NewAssignment(flow.Identifier{})
 
 	// assigns two chunks to each verifier node
 	// j keeps track of chunks
@@ -69,7 +69,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	// creates ids and twice chunks of the ids
 	var ids flow.IdentityList = test.CreateIDs(size)
 	chunks := a.CreateChunks(2)
-	assignment := chunkassignment.NewAssignment()
+	assignment := chunkassignment.NewAssignment(flow.Identifier{})
 
 	// assigns first chunk to non-duplicate list of verifiers
 	c := chunks.ByIndex(uint64(0))
@@ -245,7 +245,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	assigner := NewPublicAssignment(3)
 
 	// initially cache should be empty
-	require.Len(a.T(), assigner.cache, 0)
+	require.Len(a.T(), assigner.assignments, 0)
 
 	// new assignment should be cached
 	// random generators are stateful and we need to
@@ -254,18 +254,18 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	sameRng, err := random.NewRand(a.seed)
 	_, err = assigner.Assign(nodes, chunks, sameRng)
 	require.NoError(a.T(), err)
-	require.Len(a.T(), assigner.cache, 1)
+	require.Len(a.T(), assigner.assignments, 1)
 
 	// repetitive assignment should not be cached
 	_, err = assigner.Assign(nodes, chunks, rng)
 	require.NoError(a.T(), err)
-	require.Len(a.T(), assigner.cache, 1)
+	require.Len(a.T(), assigner.assignments, 1)
 
 	// creates a new set of nodes, hence assigner should cache new assignment
 	newNodes := test.CreateIDs(6)
 	_, err = assigner.Assign(newNodes, chunks, rng)
 	require.NoError(a.T(), err)
-	require.Len(a.T(), assigner.cache, 2)
+	require.Len(a.T(), assigner.assignments, 2)
 
 	// performs the assignment using a different seed
 	// should results in a different new assignment
@@ -274,7 +274,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	require.NoError(a.T(), err)
 	_, err = assigner.Assign(newNodes, chunks, otherRng)
 	require.NoError(a.T(), err)
-	require.Len(a.T(), assigner.cache, 3)
+	require.Len(a.T(), assigner.assignments, 3)
 
 }
 
