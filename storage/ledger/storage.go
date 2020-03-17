@@ -6,7 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
-	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
 type TrieStorage struct {
@@ -89,30 +88,7 @@ func (f *TrieStorage) GetRegistersWithProof(
 	if err != nil {
 		return nil, nil, err
 	}
-	// The following code is the encoding logic
-	// Each slice in the proofHolder is stored as a byte array, and the whole thing is stored
-	// as a [][]byte
-	// First we have a byte, and set the first bit to 1 if it is an inclusion proof
-	// Then the size is encoded as a single byte
-	// Then the flag is encoded
-	// Finally the proofs are encoded one at a time, and is stored as a byte array
-	proofs = make([]flow.StorageProof, 0)
-	for i := 0; i < proofHldr.GetSize(); i++ {
-		flag, singleProof, inclusion, size := proofHldr.ExportProof(i)
-		byteSize := []byte{size}
-		byteInclusion := make([]byte, 1)
-		if inclusion {
-			utils.SetBit(byteInclusion, 0)
-		}
-		proof := append(byteInclusion, byteSize...)
-		proof = append(proof, flag...)
-		for _, p := range singleProof {
-			proof = append(proof, p...)
-		}
-		// ledgerStorage is a struct that holds our SM
-		proofs = append(proofs, proof)
-	}
-
+	proofs = trie.EncodeProof(proofHldr)
 	return values, proofs, err
 }
 
@@ -136,6 +112,8 @@ func (f *TrieStorage) GetRegisterTouches(
 		}
 		res = append(res, rt)
 	}
+	// TODO RAMTIN
+	fmt.Println(f.tree.GetRoot().FmtStr(""))
 	return res, nil
 }
 

@@ -56,6 +56,7 @@ func NewPSMT(
 	psmt := PSMT{newNode(nil, height-1), height, make(map[string]*node)}
 	// TODO add checks for decode proof
 	proofholder := DecodeProof(proofs)
+
 	// iterating over proofs
 	for i, proofSize := range proofholder.sizes {
 		value := values[i]
@@ -142,11 +143,11 @@ func NewPSMT(
 			psmt.keyLookUp[string(key)] = currentNode
 			currentNode.value = defaultLeafHash
 		}
-		// check if the state commitment matches
-		// useing computeValue instead of value for extensive checking
-		if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
-			return nil, fmt.Errorf("root hash doesn't match the proofs")
-		}
+	}
+	// check if the state commitment matches
+	// useing computeValue instead of value for extensive checking
+	if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
+		return nil, fmt.Errorf("root hash doesn't match the proofs")
 	}
 	return &psmt, nil
 }

@@ -909,6 +909,34 @@ func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []
 	return computedHash
 }
 
+// EncodeProof encodes a proof holder into an array of byte arrays
+// The following code is the encoding logic
+// Each slice in the proofHolder is stored as a byte array, and the whole thing is stored
+// as a [][]byte
+// First we have a byte, and set the first bit to 1 if it is an inclusion proof
+// Then the size is encoded as a single byte
+// Then the flag is encoded
+// Finally the proofs are encoded one at a time, and is stored as a byte array
+func EncodeProof(pholder *proofHolder) [][]byte {
+	proofs := make([][]byte, 0)
+	for i := 0; i < pholder.GetSize(); i++ {
+		flag, singleProof, inclusion, size := pholder.ExportProof(i)
+		byteSize := []byte{size}
+		byteInclusion := make([]byte, 1)
+		if inclusion {
+			utils.SetBit(byteInclusion, 0)
+		}
+		proof := append(byteInclusion, byteSize...)
+		proof = append(proof, flag...)
+		for _, p := range singleProof {
+			proof = append(proof, p...)
+		}
+		// ledgerStorage is a struct that holds our SM
+		proofs = append(proofs, proof)
+	}
+	return proofs
+}
+
 // DecodeProof takes in an encodes array of byte arrays an converts them into a proofHolder
 func DecodeProof(proofs [][]byte) *proofHolder {
 	flags := make([][]byte, 0)
@@ -932,7 +960,7 @@ func DecodeProof(proofs [][]byte) *proofHolder {
 			flags = append(flags, proof[2:])
 		}
 		byteProofs := make([][]byte, 0)
-		i := 33
+		i := 34
 		for i < len(proof) {
 			if i+32 <= len(proof) {
 				byteProofs = append(byteProofs, proof[i:i+32])
