@@ -118,12 +118,13 @@ func (x *xorshifts) Permutation(n int) ([]int, error) {
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(n) space and O(n) time
 func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
-	if m < 0 || n < 0 {
-		return nil, fmt.Errorf("inputs cannot be negative")
+	if m < 0 {
+		return nil, fmt.Errorf("sample size cannot be negative")
 	}
 	if n < m {
 		return nil, fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)
 	}
+	// condition n >= 0 is enforced by function Permutation(n)
 	items, _ := x.Permutation(n)
 	return items[:m], nil
 }
