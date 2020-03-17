@@ -4350,3 +4350,43 @@ func NewPublicAccountValue(addressValue AddressValue) *CompositeValue {
 		},
 	}
 }
+
+// PathValue
+
+type PathValue struct {
+	Domain     string
+	Identifier string
+}
+
+func init() {
+	gob.Register(PathValue{})
+}
+
+func (PathValue) IsValue() {}
+
+func (PathValue) DynamicType(_ *Interpreter) DynamicType {
+	return NilType{}
+}
+
+func (PathValue) isOptionalValue() {}
+
+func (v PathValue) Copy() Value {
+	return v
+}
+
+func (PathValue) GetOwner() *common.Address {
+	// value is never owned
+	return nil
+}
+
+func (PathValue) SetOwner(_ *common.Address) {
+	// NO-OP: value cannot be owned
+}
+
+func (v PathValue) Destroy(_ *Interpreter, _ LocationPosition) trampoline.Trampoline {
+	return trampoline.Done{}
+}
+
+func (v PathValue) String() string {
+	return fmt.Sprintf("/%s/%s", v.Domain, v.Identifier)
+}

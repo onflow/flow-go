@@ -3142,6 +3142,15 @@ func (interpreter *Interpreter) VisitForceExpression(expression *ast.ForceExpres
 		})
 }
 
+func (interpreter *Interpreter) VisitPathExpression(expression *ast.PathExpression) ast.Repr {
+	return Done{
+		Result: PathValue{
+			Domain:     expression.Domain.Identifier,
+			Identifier: expression.Identifier.Identifier,
+		},
+	}
+}
+
 func (interpreter *Interpreter) readStored(storageAddress common.Address, key string) OptionalValue {
 	return interpreter.storageReadHandler(interpreter, storageAddress, key)
 }
