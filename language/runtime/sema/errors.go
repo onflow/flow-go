@@ -2440,3 +2440,34 @@ func (e *NonOptionalForceError) Error() string {
 }
 
 func (*NonOptionalForceError) isSemanticError() {}
+
+// InvalidPathDomainError
+
+type InvalidPathDomainError struct {
+	ActualDomain string
+	ast.Range
+}
+
+func (e *InvalidPathDomainError) Error() string {
+	return "invalid path domain"
+}
+
+func (*InvalidPathDomainError) isSemanticError() {}
+
+var validPathDomainDescription = func() string {
+	words := make([]string, 0, len(common.AllPathDomainsByIdentifier))
+
+	for domain := range common.AllPathDomainsByIdentifier {
+		words = append(words, fmt.Sprintf("`%s`", domain))
+	}
+
+	return common.EnumerateWords(words, "or")
+}()
+
+func (e *InvalidPathDomainError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected one of %s; got `%s`",
+		validPathDomainDescription,
+		e.ActualDomain,
+	)
+}

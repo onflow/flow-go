@@ -4572,3 +4572,42 @@ func (t *RestrictedResourceType) GetMember(identifier string, targetRange ast.Ra
 
 	return nil
 }
+
+// PathType
+
+type PathType struct{}
+
+func (*PathType) IsType() {}
+
+func (*PathType) String() string {
+	return "Path"
+}
+
+func (*PathType) QualifiedString() string {
+	return "Path"
+}
+
+func (*PathType) ID() TypeID {
+	return "Path"
+}
+
+func (*PathType) Equal(other Type) bool {
+	_, ok := other.(*PathType)
+	return ok
+}
+
+func (*PathType) IsResourceType() bool {
+	return false
+}
+
+func (*PathType) IsInvalidType() bool {
+	return false
+}
+
+func (*PathType) TypeAnnotationState() TypeAnnotationState {
+	return TypeAnnotationStateValid
+}
+
+func (*PathType) ContainsFirstLevelResourceInterfaceType() bool {
+	return false
+}
