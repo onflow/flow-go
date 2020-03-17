@@ -15,18 +15,26 @@ import (
 type Handler struct {
 	executionRPC  observation.ObserveServiceClient
 	collectionRPC observation.ObserveServiceClient
-	blocks        storage.Blocks
 	headers       storage.Headers
+	collection    storage.Collections
+	transactions  storage.Transactions
 	log           zerolog.Logger
 	state         protocol.State
 }
 
-func NewHandler(log zerolog.Logger, s protocol.State, e observation.ObserveServiceClient, c observation.ObserveServiceClient, b storage.Blocks, h storage.Headers) *Handler {
+func NewHandler(log zerolog.Logger,
+	s protocol.State,
+	e observation.ObserveServiceClient,
+	c observation.ObserveServiceClient,
+	h storage.Headers,
+	coll storage.Collections,
+	t storage.Transactions) *Handler {
 	return &Handler{
 		executionRPC:  e,
 		collectionRPC: c,
-		blocks:        b,
 		headers:       h,
+		collection:    coll,
+		transactions:  t,
 		state:         s,
 		log:           log,
 	}
@@ -47,24 +55,32 @@ func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTran
 	return h.collectionRPC.SendTransaction(ctx, req)
 }
 
-func (h *Handler) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
-	header, err := h.state.Final().Head()
-	if err != nil {
-		return nil, err
+func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
+	if !req.IsSealed {
+		// For the latest finalized block, query the state
+		// The follower engine should have updated the state
+		header, err := h.state.Final().Head()
+		if err != nil {
+			return nil, err
+		}
+
+		msg, err := convert.BlockHeaderToMessage(header)
+		if err != nil {
+			return nil, err
+		}
+
+		resp := &observation.GetLatestBlockResponse{
+			Block: &msg,
+		}
+		return resp, nil
 	}
 
-	msg, err := convert.BlockHeaderToMessage(header)
-	if err != nil {
-		return nil, err
-	}
-
-	resp := &observation.GetLatestBlockResponse{
-		Block: &msg,
-	}
-	return resp, nil
+	//TODO implement fetching Sealed blocks
+	return nil, nil
 }
 
 func (h *Handler) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
+	// TODO lookup transaction in local transaction storage
 	return nil, nil
 }
 

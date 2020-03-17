@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -30,25 +31,36 @@ type Engine struct {
 
 	// Conduits
 	collectionConduit network.Conduit
-	blockConduit      network.Conduit
-	receiptConduit    network.Conduit
+
+	// blockchain state
+	headers      storage.Headers
+	payloads     storage.Payloads
+	collection   storage.Collections
+	transactions storage.Transactions
 }
 
 // New creates a new observation ingestion engine
-func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger,
+	net module.Network,
+	state protocol.State,
+	tracer trace.Tracer,
+	me module.Local,
+	headers storage.Headers,
+	payloads storage.Payloads,
+	collection storage.Collections,
+	transactions storage.Transactions) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
-		unit:   engine.NewUnit(),
-		log:    log.With().Str("engine", "ingestion").Logger(),
-		tracer: tracer,
-		state:  state,
-		me:     me,
-	}
-
-	blockConduit, err := net.Register(engine.BlockProvider, eng)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		unit:         engine.NewUnit(),
+		log:          log.With().Str("engine", "ingestion").Logger(),
+		tracer:       tracer,
+		state:        state,
+		me:           me,
+		headers:      headers,
+		payloads:     payloads,
+		collection:   collection,
+		transactions: transactions,
 	}
 
 	collConduit, err := net.Register(engine.CollectionProvider, eng)
@@ -56,14 +68,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, tracer tr
 		return nil, errors.Wrap(err, "could not register collection provider engine")
 	}
 
-	receiptConduit, err := net.Register(engine.ExecutionReceiptProvider, eng)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not register receipt provider engine")
-	}
-
-	eng.blockConduit = blockConduit
 	eng.collectionConduit = collConduit
-	eng.receiptConduit = receiptConduit
 
 	return eng, nil
 }
@@ -118,6 +123,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
 	case *flow.Block:
 		return e.onBlock(originID, entity)
+	case *messages.CollectionResponse:
+		return e.handleCollectionResponse(originID, entity)
 	case *flow.CollectionGuarantee:
 		return e.onCollectionGuarantee(originID, entity)
 	case *flow.Collection:
@@ -130,6 +137,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // onBlock handles an incoming block.
+// TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
 func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 
 	e.log.Info().
@@ -138,9 +146,42 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 		Uint64("block_view", block.View).
 		Msg("received block")
 
-	// TODO: Do something with block
+	ids, err := e.findCollectionNodes()
+	if err != nil {
+		return err
+	}
+
+	// Request all the collections for this block
+	for _, g := range block.Guarantees {
+		e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID()}, ids...)
+		if err != nil {
+			e.log.Err(err).Msg("cannot submit collection requests")
+		}
+	}
 
 	return nil
+}
+
+// handleCollectionResponse handles the response of the a collection request made earlier when a block was received
+func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
+	collection := response.Collection
+
+	e.log.Info().
+		Hex("origin_id", originID[:]).
+		Hex("collection_id", logging.Entity(collection)).
+		Msg("received collection")
+
+	err := e.collection.Store(&collection)
+	if err != nil {
+		return err
+	}
+
+	for _, t := range collection.Transactions {
+		e.transactions.Store(t)
+	}
+
+	return nil
+
 }
 
 // onCollectionGuarantee is used to process collection guarantees received
@@ -195,23 +236,17 @@ func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.Exec
 	return nil
 }
 
-// requestCollection submits a request for the given collection to collection nodes.
-func (e *Engine) requestCollection(collID flow.Identifier) error {
-
-	collNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
+func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
+	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
-		return fmt.Errorf("could not load collection node identities: %w", err)
+		return nil, fmt.Errorf("could not retrieve identities: %w", err)
 	}
-
-	req := &messages.CollectionRequest{
-		ID: collID,
+	if len(identities) < 1 {
+		return nil, fmt.Errorf("no Collection identity found")
 	}
-
-	// TODO we should only submit to cluster which owns the collection
-	err = e.collectionConduit.Submit(req, collNodes.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
+	identifiers := make([]flow.Identifier, len(identities))
+	for i, id := range identities {
+		identifiers[i] = id.NodeID
 	}
-
-	return nil
+	return identifiers, nil
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/observation/rpc"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	"github.com/dapperlabs/flow-go/storage/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func main() {
@@ -23,6 +23,10 @@ func main() {
 		collectionRPC   observation.ObserveServiceClient
 		executionRPC    observation.ObserveServiceClient
 		err             error
+		transactions    *storage.Transactions
+		collections     *storage.Collections
+		headers         *storage.Headers
+		payloads        *storage.Payloads
 	)
 
 	cmd.FlowNode("observation").
@@ -50,14 +54,28 @@ func main() {
 			executionRPC = observation.NewObserveServiceClient(executionRPCConn)
 			return nil
 		}).
+		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
+			transactions = storage.NewTransactions(node.DB)
+			collections = storage.NewCollections(node.DB)
+			headers = storage.NewHeaders(node.DB)
+			payloads = storage.NewPayloads(node.DB)
+			return nil
+		}).
+		//Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		//	cache := buffer.NewPendingBlocks()
+		//	// using Mock TODO: Create the follower engine here
+		//	hsf := new(mock.HotStuffFollower)
+		//	// Not sure right now what to put in for
+		//	// dkgPubData,  trustedRootBlock and rootBlockSigs in follower_loop follower.New()
+		//	followEng, err := follower.New(node.Logger, node.Network, node.Me, node.State, headers, payloads, cache, hsf)
+		//	return followEng, err
+		//}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, headers, payloads, collections, transactions)
 			return ingestEng, err
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			blocks := badger.NewBlocks(node.DB)
-			headers := badger.NewHeaders(node.DB)
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, collectionRPC, executionRPC, blocks, headers)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, collectionRPC, executionRPC, headers, collections, transactions)
 			return rpcEng, nil
 		}).
 		Run()

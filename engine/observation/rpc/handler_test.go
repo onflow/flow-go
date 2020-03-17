@@ -21,7 +21,7 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) TestPing() {
-	handler := NewHandler(zerolog.Logger{}, nil, nil, nil, nil, nil)
+	handler := NewHandler(zerolog.Logger{}, nil, nil, nil, nil, nil, nil)
 	ping := &observation.PingRequest{}
 	_, err := handler.Ping(context.Background(), ping)
 	suite.Require().NoError(err)
@@ -33,7 +33,7 @@ func (suite *Suite) TestGetLatestBlock() {
 	snapshot.On("Head").Return(&block, nil)
 	state := new(protocol.State)
 	state.On("Final").Return(snapshot)
-	handler := NewHandler(zerolog.Logger{}, state, nil, nil, nil, nil)
+	handler := NewHandler(zerolog.Logger{}, state, nil, nil, nil, nil, nil)
 	req := &observation.GetLatestBlockRequest{}
 	resp, err := handler.GetLatestBlock(context.Background(), req)
 	suite.Require().NoError(err)
