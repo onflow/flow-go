@@ -24,7 +24,7 @@ type ChunkVerifierTestSuite struct {
 
 // Make sure variables are set properly
 func (s *ChunkVerifierTestSuite) SetupTest() {
-	s.verifier = NewFlowChunkVerifier(NewVirtualMachineMock())
+	s.verifier = NewFlowChunkVerifier(newVirtualMachineMock())
 }
 
 // TestVerification invokes all the tests in this test suite
@@ -34,14 +34,14 @@ func TestVerification(t *testing.T) {
 
 // TestHappyPath tests verification of the baseline verifiable chunk
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
-	vch := GetBaselineVerifiableChunk()
+	vch := GetBaselineVerifiableChunk([]byte{})
 	err := s.verifier.Verify(vch)
-	assert.NotNil(s.T(), err)
+	assert.Nil(s.T(), err)
 }
 
 // TestMissingRegisterTouch tests verification of the a chunkdatapack missing a register touch
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouch() {
-	vch := GetBaselineVerifiableChunk()
+	vch := GetBaselineVerifiableChunk([]byte("MissingRegisterTouch"))
 	// remove the first register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
 	err := s.verifier.Verify(vch)
@@ -49,9 +49,20 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouch() {
 	assert.NotNil(s.T(), err)
 }
 
-func GetBaselineVerifiableChunk() *verification.VerifiableChunk {
+func (s *ChunkVerifierTestSuite) TestWrongEndState() {
+	vch := GetBaselineVerifiableChunk([]byte("wrongEndState"))
+	err := s.verifier.Verify(vch)
+	assert.NotNil(s.T(), err)
+}
+
+// wrongEndState
+
+func GetBaselineVerifiableChunk(script []byte) *verification.VerifiableChunk {
 	// Collection setup
-	coll := unittest.CollectionFixture(3)
+
+	coll := unittest.CollectionFixture(5)
+	coll.Transactions[3] = &flow.TransactionBody{Script: script}
+
 	guarantee := coll.Guarantee()
 
 	// Block setup
@@ -71,9 +82,9 @@ func GetBaselineVerifiableChunk() *verification.VerifiableChunk {
 	value1 := []byte{'a'}
 
 	id2 := make([]byte, 32)
+	id2[0] = byte(5)
 	value2 := []byte{'b'}
 	UpdatedValue2 := []byte{'B'}
-	SetBit(id2, 5)
 
 	ids := make([][]byte, 0)
 	values := make([][]byte, 0)
@@ -85,7 +96,7 @@ func GetBaselineVerifiableChunk() *verification.VerifiableChunk {
 	startState, _ := f.UpdateRegisters(ids, values)
 	regTs, _ := f.GetRegisterTouches(ids, startState)
 
-	ids = [][]byte{id1}
+	ids = [][]byte{id2}
 	values = [][]byte{UpdatedValue2}
 	endState, _ := f.UpdateRegisters(ids, values)
 
@@ -131,10 +142,6 @@ func GetBaselineVerifiableChunk() *verification.VerifiableChunk {
 // ChunkWrongEndState   *verification.VerifiableChunk
 // TooManyInputs
 
-func SetBit(b []byte, i int) {
-	b[i/8] |= 1 << int(7-i%8)
-}
-
 func TempLevelDB() (*leveldb.LevelDB, error) {
 	dir, err := ioutil.TempDir("", "flow-test-db")
 	if err != nil {
@@ -156,12 +163,34 @@ func (bc *blockContextMock) ExecuteTransaction(
 	tx *flow.TransactionBody,
 	options ...virtualmachine.TransactionContextOption,
 ) (*virtualmachine.TransactionResult, error) {
-	txRes := virtualmachine.TransactionResult{
-		TransactionID: unittest.IdentifierFixture(),
-		Events:        []runtime.Event{},
-		Logs:          []string{"log1", "log2"}, // []string
-		Error:         nil,
-		GasUsed:       0,
+	var txRes virtualmachine.TransactionResult
+	switch string(tx.Script) {
+	case "wrongEndState":
+		id2 := make([]byte, 32)
+		id2[0] = byte(5)
+		UpdatedValue2 := []byte{'F'}
+		// add updates to the ledger
+		ledger.Set(id2, UpdatedValue2)
+		txRes = virtualmachine.TransactionResult{
+			TransactionID: unittest.IdentifierFixture(),
+			Events:        []runtime.Event{},
+			Logs:          []string{"log1", "log2"}, // []string
+			Error:         nil,                      // inside the runtime (e.g. div by zero, access account)
+			GasUsed:       0,
+		}
+	default:
+		id2 := make([]byte, 32)
+		id2[0] = byte(5)
+		UpdatedValue2 := []byte{'B'}
+		// add updates to the ledger
+		ledger.Set(id2, UpdatedValue2)
+		txRes = virtualmachine.TransactionResult{
+			TransactionID: unittest.IdentifierFixture(),
+			Events:        []runtime.Event{},
+			Logs:          []string{"log1", "log2"}, // []string
+			Error:         nil,                      // inside the runtime (e.g. div by zero, access account)
+			GasUsed:       0,
+		}
 	}
 	return &txRes, nil
 }
@@ -177,7 +206,7 @@ func (bc *blockContextMock) ExecuteScript(
 type virtualMachineMock struct {
 }
 
-func NewVirtualMachineMock() *virtualMachineMock {
+func newVirtualMachineMock() *virtualMachineMock {
 	// TODO set execution outcome
 	return &virtualMachineMock{}
 }

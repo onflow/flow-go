@@ -29,9 +29,6 @@ func (p *PSMT) GetRootHash() []byte {
 
 // Update updates the register values and returns rootValue after updates
 func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, error) {
-	if len(registerIDs) != len(values) {
-		return nil, fmt.Errorf("number of elements in registerIDs and values mismatch")
-	}
 	for i, key := range registerIDs {
 		value := values[i]
 
