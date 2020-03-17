@@ -263,9 +263,9 @@ func TestBlockOutOfOrder(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
 		completeBlockA := unittest.CompleteBlockFixture(0)
-		completeBlockB := unittest.CompleteBlockFixtureWithParent(0, completeBlockA.Block.ID())
-		completeBlockC := unittest.CompleteBlockFixtureWithParent(0, completeBlockA.Block.ID())
-		completeBlockD := unittest.CompleteBlockFixtureWithParent(0, completeBlockC.Block.ID())
+		completeBlockB := unittest.CompleteBlockFixtureWithParent(0, &completeBlockA.Block.Header)
+		completeBlockC := unittest.CompleteBlockFixtureWithParent(0, &completeBlockA.Block.Header)
+		completeBlockD := unittest.CompleteBlockFixtureWithParent(0, &completeBlockC.Block.Header)
 		completeBlockA.StartState = unittest.StateCommitmentFixture()
 
 		// blocks has no collections, so state is essentially the same

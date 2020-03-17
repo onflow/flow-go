@@ -25,15 +25,16 @@ func AccountSignatureFixture() flow.AccountSignature {
 }
 
 func BlockFixture() flow.Block {
-	return BlockWithParentFixture(IdentifierFixture())
+	header := BlockHeaderFixture()
+	return BlockWithParentFixture(&header)
 }
 
-func BlockWithParentFixture(parentID flow.Identifier) flow.Block {
+func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
 		Guarantees: CollectionGuaranteesFixture(16),
 	}
-	header := BlockHeaderWithParentFixture(parentID)
+	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	return flow.Block{
 		Header:  header,
@@ -42,13 +43,17 @@ func BlockWithParentFixture(parentID flow.Identifier) flow.Block {
 }
 
 func BlockHeaderFixture() flow.Header {
-	return BlockHeaderWithParentFixture(IdentifierFixture())
+	return BlockHeaderWithParentFixture(&flow.Header{
+		ParentID:                IdentifierFixture(),
+		Height:                  0,
+	})
 }
 
-func BlockHeaderWithParentFixture(parentID flow.Identifier) flow.Header {
+func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	return flow.Header{
-		ParentID: parentID,
+		ParentID: parent.ID(),
 		View:     rand.Uint64(),
+		Height:   parent.Height + 1,
 	}
 }
 
@@ -179,13 +184,14 @@ func CompleteCollectionFixture() *execution.CompleteCollection {
 
 func CompleteBlockFixture(collections int) *execution.CompleteBlock {
 
-	return CompleteBlockFixtureWithParent(collections, IdentifierFixture())
+	header := BlockHeaderFixture()
+	return CompleteBlockFixtureWithParent(collections, &header)
 }
 
-func CompleteBlockFixtureWithParent(collections int, parentID flow.Identifier) *execution.CompleteBlock {
+func CompleteBlockFixtureWithParent(collections int, parent *flow.Header) *execution.CompleteBlock {
 
 	completeCollections := make(map[flow.Identifier]*execution.CompleteCollection, collections)
-	block := BlockWithParentFixture(parentID)
+	block := BlockWithParentFixture(parent)
 	block.Guarantees = nil
 
 	for i := 0; i < collections; i++ {

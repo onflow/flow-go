@@ -19,8 +19,9 @@ type Node struct {
 // Note that this is not a thread-safe structure and external synchronisation is required
 // to use in concurrent environment
 type Queue struct {
-	Head  *Node
-	Nodes map[flow.Identifier]*Node
+	Head    *Node
+	Highest *Node
+	Nodes   map[flow.Identifier]*Node
 }
 
 // Make queue an entity so it can be stored in mempool
@@ -33,11 +34,24 @@ func (q *Queue) Checksum() flow.Identifier {
 	return q.Head.CompleteBlock.Block.Checksum()
 }
 
+// Size returns number of elements in the queue
+func (q *Queue) Size() int {
+	return len(q.Nodes)
+}
+
+// Returns difference between lowest and highest element in the queue
+func (q *Queue) Height() uint64 {
+	return q.Highest.CompleteBlock.Block.Height - q.Head.CompleteBlock.Block.Height
+}
+
 // traverse Node children recursively and populate m
-func traverse(node *Node, m map[flow.Identifier]*Node) {
+func traverse(node *Node, m map[flow.Identifier]*Node, highest *Node) {
 	m[node.CompleteBlock.Block.ID()] = node
 	for _, node := range node.Children {
-		traverse(node, m)
+		if node.CompleteBlock.Block.Height > highest.CompleteBlock.Block.Height {
+			*highest = *node
+		}
+		traverse(node, m, highest)
 	}
 }
 
@@ -47,8 +61,9 @@ func NewQueue(completeBlock *execution.CompleteBlock) *Queue {
 		Children:      nil,
 	}
 	return &Queue{
-		Head:  n,
-		Nodes: map[flow.Identifier]*Node{n.CompleteBlock.Block.ID(): n},
+		Head:    n,
+		Highest: n,
+		Nodes:   map[flow.Identifier]*Node{n.CompleteBlock.Block.ID(): n},
 	}
 }
 
@@ -57,11 +72,13 @@ func NewQueue(completeBlock *execution.CompleteBlock) *Queue {
 func rebuildQueue(n *Node) *Queue {
 	// rebuild map-cache
 	cache := make(map[flow.Identifier]*Node)
-	traverse(n, cache)
+	highest := *n //copy n
+	traverse(n, cache, &highest)
 
 	return &Queue{
-		Head:  n,
-		Nodes: cache,
+		Head:    n,
+		Nodes:   cache,
+		Highest: &highest,
 	}
 }
 
@@ -78,8 +95,9 @@ func dequeue(queue *Queue) *Queue {
 		}
 	}
 	return &Queue{
-		Head:  onlyChild,
-		Nodes: cache,
+		Head:    onlyChild,
+		Nodes:   cache,
+		Highest: queue.Highest,
 	}
 }
 
@@ -89,12 +107,18 @@ func (q *Queue) TryAdd(completeBlock *execution.CompleteBlock) bool {
 	if !ok {
 		return false
 	}
+	if n.CompleteBlock.Block.Height != completeBlock.Block.Height-1 {
+		return false
+	}
 	newNode := &Node{
 		CompleteBlock: completeBlock,
 		Children:      nil,
 	}
 	n.Children = append(n.Children, newNode)
 	q.Nodes[completeBlock.Block.ID()] = newNode
+	if completeBlock.Block.Height > q.Highest.CompleteBlock.Block.Height {
+		q.Highest = newNode
+	}
 	return true
 }
 
@@ -107,6 +131,9 @@ func (q *Queue) Attach(other *Queue) error {
 	n.Children = append(n.Children, other.Head)
 	for identifier, node := range other.Nodes {
 		q.Nodes[identifier] = node
+	}
+	if other.Highest.CompleteBlock.Block.Height > q.Highest.CompleteBlock.Block.Height {
+		q.Highest = other.Highest
 	}
 	return nil
 }
