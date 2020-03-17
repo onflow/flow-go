@@ -168,11 +168,15 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.Equal(a.T(), copy(nodes2, nodes1), n)
 
 	// chunk assignment of the first set
-	p1, err := NewPublicAssignment(alpha).Assign(nodes1, chunks, rng1)
+	a1, err := NewPublicAssignment(alpha)
+	require.NoError(a.T(), err)
+	p1, err := a1.Assign(nodes1, chunks, rng1)
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
-	p2, err := NewPublicAssignment(alpha).Assign(nodes2, chunks, rng2)
+	a2, err := NewPublicAssignment(alpha)
+	require.NoError(a.T(), err)
+	p2, err := a2.Assign(nodes2, chunks, rng2)
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
@@ -223,7 +227,9 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	original := make([]*flow.Identity, verNum)
 	require.Equal(a.T(), copy(original, nodes), verNum)
 
-	p, err := NewPublicAssignment(alpha).Assign(nodes, chunks, rng)
+	a1, err := NewPublicAssignment(alpha)
+	require.NoError(a.T(), err)
+	p1, err := a1.Assign(nodes, chunks, rng)
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
@@ -231,7 +237,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 
 	for _, chunk := range chunks {
 		// each chunk should be assigned to alpha verifiers
-		require.Equal(a.T(), p.Verifiers(chunk).Len(), alpha)
+		require.Equal(a.T(), p1.Verifiers(chunk).Len(), alpha)
 	}
 }
 
@@ -242,7 +248,8 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 
 	// creates nodes and keeps a copy of them
 	nodes := test.CreateIDs(5)
-	assigner := NewPublicAssignment(3)
+	assigner, err := NewPublicAssignment(3)
+	require.NoError(a.T(), err)
 
 	// initially cache should be empty
 	require.Equal(a.T(), assigner.assignments.Size(), uint(0))

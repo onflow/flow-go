@@ -27,12 +27,17 @@ type PublicAssignment struct {
 // chunks is the list of chunks aimed to assign
 // rng is an instance of a random generator
 // alpha is the number of assigned verifier nodes to each chunk
-func NewPublicAssignment(alpha int) *PublicAssignment {
-	assignment, _ := stdmap.NewAssignments(1000)
+func NewPublicAssignment(alpha int) (*PublicAssignment, error) {
+	// TODO to have limit of assignment mempool as a parameter
+	// https://github.com/dapperlabs/flow-go/issues/2703
+	assignment, err := stdmap.NewAssignments(1000)
+	if err != nil {
+		return nil, fmt.Errorf("could not create an assignment mempool: %w", err)
+	}
 	return &PublicAssignment{
 		alpha:       alpha,
 		assignments: assignment,
-	}
+	}, nil
 }
 
 // Assign receives identity list of verifier nodes, chunk lists and a random generator
