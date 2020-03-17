@@ -425,7 +425,8 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.SetupTest()
 			eng := suite.TestNewEngine()
 
-			suite.state.On("Final").Return(suite.ss, nil)
+			suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
+			suite.state.On("Final", testifymock.Anything).Return(suite.ss, nil)
 			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil).Once()
 			suite.ss.On("Identities", testifymock.Anything).Return(flow.IdentityList{verIdentity}, nil).Once()
 			suite.me.On("NodeID").Return(verIdentity.NodeID)
