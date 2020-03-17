@@ -21,14 +21,25 @@ func NewChunkDataPacks(limit uint) (*ChunkDataPacks, error) {
 	return a, nil
 }
 
+// Has checks whether the ChunkDataPack with the given hash is currently in
+// the memory pool.
+func (c *ChunkDataPacks) Has(cdpID flow.Identifier) bool {
+	return c.Backend.Has(cdpID)
+}
+
 // Add adds an chunkDataPack to the mempool.
-func (a *ChunkDataPacks) Add(chunkDataPack *flow.ChunkDataPack) error {
-	return a.Backend.Add(chunkDataPack)
+func (c *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) error {
+	return c.Backend.Add(cdp)
+}
+
+// Rem will remove chunk data pack by ID
+func (c *ChunkDataPacks) Rem(cdpID flow.Identifier) bool {
+	return c.Backend.Rem(cdpID)
 }
 
 // ByID returns the chunk data pack with the given ID from the mempool.
-func (a *ChunkDataPacks) ByID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	entity, err := a.Backend.ByID(chunkID)
+func (c *ChunkDataPacks) ByID(cdpID flow.Identifier) (*flow.ChunkDataPack, error) {
+	entity, err := c.Backend.ByID(cdpID)
 	if err != nil {
 		return nil, err
 	}
@@ -39,12 +50,22 @@ func (a *ChunkDataPacks) ByID(chunkID flow.Identifier) (*flow.ChunkDataPack, err
 	return chunkDataPack, nil
 }
 
+// Size will return the current size of the memory pool.
+func (c *ChunkDataPacks) Size() uint {
+	return c.Backend.Size()
+}
+
 // All returns all chunk data packs from the pool.
-func (a *ChunkDataPacks) All() []*flow.ChunkDataPack {
-	entities := a.Backend.All()
+func (c *ChunkDataPacks) All() []*flow.ChunkDataPack {
+	entities := c.Backend.All()
 	chunkDataPack := make([]*flow.ChunkDataPack, 0, len(entities))
 	for _, entity := range entities {
 		chunkDataPack = append(chunkDataPack, entity.(*flow.ChunkDataPack))
 	}
 	return chunkDataPack
+}
+
+// Hash will return a hash of the contents of the memory pool.
+func (c *ChunkDataPacks) Hash() flow.Identifier {
+	return c.Backend.Hash()
 }
