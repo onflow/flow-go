@@ -109,7 +109,12 @@ func chunkAssignment(assignmentID flow.Identifier, ids flow.IdentifierList, chun
 	return assignment, nil
 }
 
-// Fingerprint computes the SHA3-256 hash value of the sorted version of identifier list
+// Fingerprint computes the SHA3-256 hash value of the inputs to the assignment algorithm:
+// - sorted version of identifier list
+// - sorted version of chunk list
+// - internal state of random generator
+// - alpha
+// the generated fingerprint is deterministic in the set of aforementioned parameters
 func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (crypto.Hash, error) {
 	// sorts and encodes ids
 	sort.Sort(ids)
