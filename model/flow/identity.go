@@ -136,25 +136,17 @@ func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 	return nil, false
 }
 
-// Identities lists up and returns all the Identity objects inside the IdentityList
-func (il IdentityList) Identities() []*Identity {
-	l := make([]*Identity, 0)
-	for _, id := range il {
-		l = append(l, id)
-	}
-	return l
-}
-
-// Sample returns a random subset of the desired size.
+// Sample returns simple random sample from the `IdentityList`
 func (il IdentityList) Sample(size uint) IdentityList {
-
 	if size > uint(len(il)) {
 		size = uint(len(il))
 	}
-
-	rand.Shuffle(len(il), func(i int, j int) {
-		il[i], il[j] = il[j], il[i]
+	dup := make([]*Identity, 0, len(il))
+	for _, identity := range il {
+		dup = append(dup, identity)
+	}
+	rand.Shuffle(len(dup), func(i int, j int) {
+		dup[i], dup[j] = dup[j], dup[i]
 	})
-
-	return il[:size]
+	return dup[:size]
 }

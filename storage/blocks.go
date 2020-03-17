@@ -16,7 +16,7 @@ type Blocks interface {
 	// finalized and ambiguous blocks.
 	ByID(blockID flow.Identifier) (*flow.Block, error)
 
-	// ByNumber returns the block with the given number. It is only available
+	// ByHeight returns the block at the given height. It is only available
 	// for finalized blocks.
-	ByNumber(number uint64) (*flow.Block, error)
+	ByHeight(height uint64) (*flow.Block, error)
 }
