@@ -7,7 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
@@ -15,7 +14,7 @@ import (
 // ChunkVerifier provides functionality to verify chunks
 type ChunkVerifier interface {
 	// Verify verifies the given VerifiableChunk by executing it and checking the final statecommitment
-	// TODO return challenges beside errors
+	// TODO return challenges plus errors
 	Verify(ch *verification.VerifiableChunk) error
 }
 
@@ -26,10 +25,9 @@ type FlowChunkVerifier struct {
 }
 
 // NewFlowChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewFlowChunkVerifier() *FlowChunkVerifier {
-	rt := runtime.NewInterpreterRuntime()
+func NewFlowChunkVerifier(vm virtualmachine.VirtualMachine) *FlowChunkVerifier {
 	return &FlowChunkVerifier{
-		vm:        virtualmachine.New(rt),
+		vm:        vm,
 		trieDepth: 257,
 	}
 }

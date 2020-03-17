@@ -8,7 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
@@ -22,7 +24,7 @@ type ChunkVerifierTestSuite struct {
 
 // Make sure variables are set properly
 func (s *ChunkVerifierTestSuite) SetupTest() {
-	s.verifier = NewFlowChunkVerifier()
+	s.verifier = NewFlowChunkVerifier(NewVirtualMachineMock())
 }
 
 // TestVerification invokes all the tests in this test suite
@@ -142,4 +144,63 @@ func TempLevelDB() (*leveldb.LevelDB, error) {
 	tdbPath := filepath.Join(dir, "tdb")
 	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
 	return db, err
+}
+
+type blockContextMock struct {
+	vm     *virtualMachineMock
+	header *flow.Header
+}
+
+func (bc *blockContextMock) ExecuteTransaction(
+	ledger virtualmachine.Ledger,
+	tx *flow.TransactionBody,
+	options ...virtualmachine.TransactionContextOption,
+) (*virtualmachine.TransactionResult, error) {
+	txRes := virtualmachine.TransactionResult{
+		TransactionID: unittest.IdentifierFixture(),
+		Events:        []runtime.Event{},
+		Logs:          []string{"log1", "log2"}, // []string
+		Error:         nil,
+		GasUsed:       0,
+	}
+	return &txRes, nil
+}
+
+func (bc *blockContextMock) ExecuteScript(
+	ledger virtualmachine.Ledger,
+	script []byte,
+) (*virtualmachine.ScriptResult, error) {
+	return nil, nil
+}
+
+// virtualMachineMock is a mocked virtualMachine
+type virtualMachineMock struct {
+}
+
+func NewVirtualMachineMock() *virtualMachineMock {
+	// TODO set execution outcome
+	return &virtualMachineMock{}
+}
+
+func (vm *virtualMachineMock) NewBlockContext(header *flow.Header) virtualmachine.BlockContext {
+	return &blockContextMock{
+		vm:     vm,
+		header: header,
+	}
+}
+
+func (vm *virtualMachineMock) executeTransaction(
+	script []byte,
+	runtimeInterface runtime.Interface,
+	location runtime.Location,
+) error {
+	return nil
+}
+
+func (vm *virtualMachineMock) executeScript(
+	script []byte,
+	runtimeInterface runtime.Interface,
+	location runtime.Location,
+) (runtime.Value, error) {
+	return nil, nil
 }
