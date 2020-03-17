@@ -196,3 +196,47 @@ func (e *DestroyedCompositeError) StartPosition() ast.Position {
 func (e *DestroyedCompositeError) EndPosition() ast.Position {
 	return e.LocationRange.EndPos
 }
+
+// ForceAssignmentToNonNilResourceError
+
+type ForceAssignmentToNonNilResourceError struct {
+	LocationRange LocationRange
+}
+
+func (e *ForceAssignmentToNonNilResourceError) ImportLocation() ast.Location {
+	return e.LocationRange.Location
+}
+
+func (e *ForceAssignmentToNonNilResourceError) Error() string {
+	return "force assignment to non-nil resource-typed value"
+}
+
+func (e *ForceAssignmentToNonNilResourceError) StartPosition() ast.Position {
+	return e.LocationRange.StartPos
+}
+
+func (e *ForceAssignmentToNonNilResourceError) EndPosition() ast.Position {
+	return e.LocationRange.EndPos
+}
+
+// ForceNilError
+
+type ForceNilError struct {
+	LocationRange LocationRange
+}
+
+func (e *ForceNilError) ImportLocation() ast.Location {
+	return e.LocationRange.Location
+}
+
+func (e *ForceNilError) Error() string {
+	return "unexpectedly found nil while forcing an Optional value"
+}
+
+func (e *ForceNilError) StartPosition() ast.Position {
+	return e.LocationRange.StartPos
+}
+
+func (e *ForceNilError) EndPosition() ast.Position {
+	return e.LocationRange.EndPos
+}

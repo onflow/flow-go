@@ -6,12 +6,9 @@ import (
 	"encoding/binary"
 	"math/rand"
 
-	"github.com/pkg/errors"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/protocol"
 )
 
 // Round keeps track of the current consensus state.
@@ -24,35 +21,21 @@ type Round struct {
 	votes        map[flow.Identifier]uint64
 }
 
-// New creates a new consensus cache.
-func New(state protocol.State, me module.Local) (*Round, error) {
-
-	// retrieve what is currently the last finalized block
-	head, err := state.Final().Head()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve head")
-	}
-
-	// get participants to the consensus algorithm
-	ids, err := state.Final().Identities(
-		filter.HasRole(flow.RoleConsensus),
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve identities")
-	}
+// New creates a new consensus round.
+func New(head *flow.Header, me module.Local, participants flow.IdentityList) (*Round, error) {
 
 	// take first 8 bytes of previous block hash as a seed to shuffle identities
 	headID := head.ID()
 	seed := binary.LittleEndian.Uint64(headID[:])
 	r := rand.New(rand.NewSource(int64(seed)))
-	r.Shuffle(len(ids), func(i int, j int) {
-		ids[i], ids[j] = ids[j], ids[i]
+	r.Shuffle(len(participants), func(i int, j int) {
+		participants[i], participants[j] = participants[j], participants[i]
 	})
 
 	// remove ourselves from the participants
-	leader := ids[0]
-	quorum := ids.TotalStake()
-	participants := ids.Filter(filter.Not(filter.HasNodeID(me.NodeID())))
+	leader := participants[0]
+	quorum := participants.TotalStake()
+	participants = participants.Filter(filter.Not(filter.HasNodeID(me.NodeID())))
 
 	s := &Round{
 		parent:       head,

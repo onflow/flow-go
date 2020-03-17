@@ -419,17 +419,47 @@ func (s *BaseCadenceListener) EnterPrimaryExpression(ctx *PrimaryExpressionConte
 // ExitPrimaryExpression is called when production primaryExpression is exited.
 func (s *BaseCadenceListener) ExitPrimaryExpression(ctx *PrimaryExpressionContext) {}
 
-// EnterComposedExpression is called when production composedExpression is entered.
-func (s *BaseCadenceListener) EnterComposedExpression(ctx *ComposedExpressionContext) {}
+// EnterAccessExpression is called when production accessExpression is entered.
+func (s *BaseCadenceListener) EnterAccessExpression(ctx *AccessExpressionContext) {}
 
-// ExitComposedExpression is called when production composedExpression is exited.
-func (s *BaseCadenceListener) ExitComposedExpression(ctx *ComposedExpressionContext) {}
+// ExitAccessExpression is called when production accessExpression is exited.
+func (s *BaseCadenceListener) ExitAccessExpression(ctx *AccessExpressionContext) {}
 
-// EnterPrimaryExpressionSuffix is called when production primaryExpressionSuffix is entered.
-func (s *BaseCadenceListener) EnterPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) {}
+// EnterInvocationExpression is called when production invocationExpression is entered.
+func (s *BaseCadenceListener) EnterInvocationExpression(ctx *InvocationExpressionContext) {}
 
-// ExitPrimaryExpressionSuffix is called when production primaryExpressionSuffix is exited.
-func (s *BaseCadenceListener) ExitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) {}
+// ExitInvocationExpression is called when production invocationExpression is exited.
+func (s *BaseCadenceListener) ExitInvocationExpression(ctx *InvocationExpressionContext) {}
+
+// EnterNestedExpression is called when production nestedExpression is entered.
+func (s *BaseCadenceListener) EnterNestedExpression(ctx *NestedExpressionContext) {}
+
+// ExitNestedExpression is called when production nestedExpression is exited.
+func (s *BaseCadenceListener) ExitNestedExpression(ctx *NestedExpressionContext) {}
+
+// EnterIdentifierExpression is called when production identifierExpression is entered.
+func (s *BaseCadenceListener) EnterIdentifierExpression(ctx *IdentifierExpressionContext) {}
+
+// ExitIdentifierExpression is called when production identifierExpression is exited.
+func (s *BaseCadenceListener) ExitIdentifierExpression(ctx *IdentifierExpressionContext) {}
+
+// EnterForceExpression is called when production forceExpression is entered.
+func (s *BaseCadenceListener) EnterForceExpression(ctx *ForceExpressionContext) {}
+
+// ExitForceExpression is called when production forceExpression is exited.
+func (s *BaseCadenceListener) ExitForceExpression(ctx *ForceExpressionContext) {}
+
+// EnterLiteralExpression is called when production literalExpression is entered.
+func (s *BaseCadenceListener) EnterLiteralExpression(ctx *LiteralExpressionContext) {}
+
+// ExitLiteralExpression is called when production literalExpression is exited.
+func (s *BaseCadenceListener) ExitLiteralExpression(ctx *LiteralExpressionContext) {}
+
+// EnterFunctionExpression is called when production functionExpression is entered.
+func (s *BaseCadenceListener) EnterFunctionExpression(ctx *FunctionExpressionContext) {}
+
+// ExitFunctionExpression is called when production functionExpression is exited.
+func (s *BaseCadenceListener) ExitFunctionExpression(ctx *FunctionExpressionContext) {}
 
 // EnterEqualityOp is called when production equalityOp is entered.
 func (s *BaseCadenceListener) EnterEqualityOp(ctx *EqualityOpContext) {}
@@ -467,12 +497,6 @@ func (s *BaseCadenceListener) EnterCastingOp(ctx *CastingOpContext) {}
 // ExitCastingOp is called when production castingOp is exited.
 func (s *BaseCadenceListener) ExitCastingOp(ctx *CastingOpContext) {}
 
-// EnterPrimaryExpressionStart is called when production primaryExpressionStart is entered.
-func (s *BaseCadenceListener) EnterPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) {}
-
-// ExitPrimaryExpressionStart is called when production primaryExpressionStart is exited.
-func (s *BaseCadenceListener) ExitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) {}
-
 // EnterCreateExpression is called when production createExpression is entered.
 func (s *BaseCadenceListener) EnterCreateExpression(ctx *CreateExpressionContext) {}
 
@@ -490,30 +514,6 @@ func (s *BaseCadenceListener) EnterReferenceExpression(ctx *ReferenceExpressionC
 
 // ExitReferenceExpression is called when production referenceExpression is exited.
 func (s *BaseCadenceListener) ExitReferenceExpression(ctx *ReferenceExpressionContext) {}
-
-// EnterIdentifierExpression is called when production identifierExpression is entered.
-func (s *BaseCadenceListener) EnterIdentifierExpression(ctx *IdentifierExpressionContext) {}
-
-// ExitIdentifierExpression is called when production identifierExpression is exited.
-func (s *BaseCadenceListener) ExitIdentifierExpression(ctx *IdentifierExpressionContext) {}
-
-// EnterLiteralExpression is called when production literalExpression is entered.
-func (s *BaseCadenceListener) EnterLiteralExpression(ctx *LiteralExpressionContext) {}
-
-// ExitLiteralExpression is called when production literalExpression is exited.
-func (s *BaseCadenceListener) ExitLiteralExpression(ctx *LiteralExpressionContext) {}
-
-// EnterFunctionExpression is called when production functionExpression is entered.
-func (s *BaseCadenceListener) EnterFunctionExpression(ctx *FunctionExpressionContext) {}
-
-// ExitFunctionExpression is called when production functionExpression is exited.
-func (s *BaseCadenceListener) ExitFunctionExpression(ctx *FunctionExpressionContext) {}
-
-// EnterNestedExpression is called when production nestedExpression is entered.
-func (s *BaseCadenceListener) EnterNestedExpression(ctx *NestedExpressionContext) {}
-
-// ExitNestedExpression is called when production nestedExpression is exited.
-func (s *BaseCadenceListener) ExitNestedExpression(ctx *NestedExpressionContext) {}
 
 // EnterExpressionAccess is called when production expressionAccess is entered.
 func (s *BaseCadenceListener) EnterExpressionAccess(ctx *ExpressionAccessContext) {}

@@ -10,11 +10,14 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
-	"github.com/dapperlabs/flow-go/engine/consensus/consensus"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
@@ -39,6 +42,7 @@ func main() {
 		seals          mempool.Seals
 		prop           *propagation.Engine
 		prov           *provider.Engine
+		sync           *synchronization.Engine
 	)
 
 	cmd.FlowNode("consensus").
@@ -81,22 +85,36 @@ func main() {
 			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
 			return ing, err
 		}).
-		Component("consensus engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("consensus components", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// TODO: we should probably find a way to initialize mutually dependent engines separately
+
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
 			cache := buffer.NewPendingBlocks()
-			con, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cache)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cache)
 			if err != nil {
-				return nil, fmt.Errorf("could not initialize engine: %w", err)
+				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
+
+			blocks := storage.NewBlocks(node.DB)
+			sync, err = synchronization.New(node.Logger, node.Network, node.Me, node.State, blocks, comp)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
+
+			memberFilter := filter.HasRole(flow.RoleConsensus)
+
+			head := node.State.Final().Head
 			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, con, build, final, 3*time.Second, 6*time.Second)
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, comp, build, final, memberFilter, 3*time.Second, 6*time.Second, head)
 			if err != nil {
-				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
+				return nil, fmt.Errorf("could not initialize coldstuff engine: %w", err)
 			}
-			con.WithConsensus(cold)
-			return con, nil
+
+			comp = comp.WithSynchronization(sync).WithConsensus(cold)
+			return comp, nil
 		}).
 		Run()
 }

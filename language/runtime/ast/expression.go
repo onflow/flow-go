@@ -129,9 +129,10 @@ func (e *IntegerExpression) String() string {
 // FixedPointExpression
 
 type FixedPointExpression struct {
-	Integer    *big.Int
-	Fractional *big.Int
-	Scale      uint
+	Negative        bool
+	UnsignedInteger *big.Int
+	Fractional      *big.Int
+	Scale           uint
 	Range
 }
 
@@ -148,7 +149,14 @@ func (e *FixedPointExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 }
 
 func (e *FixedPointExpression) String() string {
-	return fmt.Sprintf("%s.%s", e.Integer, e.Fractional)
+	var builder strings.Builder
+	if e.Negative {
+		builder.WriteRune('-')
+	}
+	builder.WriteString(e.UnsignedInteger.String())
+	builder.WriteRune('.')
+	builder.WriteString(e.Fractional.String())
+	return builder.String()
 }
 
 // ArrayExpression
@@ -301,6 +309,7 @@ func (e *InvocationExpression) EndPosition() Position {
 // AccessExpression
 
 type AccessExpression interface {
+	Expression
 	isAccessExpression()
 	AccessedExpression() Expression
 }
@@ -663,4 +672,35 @@ func (e *ReferenceExpression) StartPosition() Position {
 
 func (e *ReferenceExpression) EndPosition() Position {
 	return e.Type.EndPosition()
+}
+
+// ForceExpression
+
+type ForceExpression struct {
+	Expression Expression
+	EndPos     Position
+}
+
+func (*ForceExpression) isExpression() {}
+
+func (*ForceExpression) isIfStatementTest() {}
+
+func (e *ForceExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *ForceExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitForceExpression(e)
+}
+
+func (e *ForceExpression) String() string {
+	return fmt.Sprintf("%s!", e.Expression)
+}
+
+func (e *ForceExpression) StartPosition() Position {
+	return e.Expression.StartPosition()
+}
+
+func (e *ForceExpression) EndPosition() Position {
+	return e.EndPos
 }

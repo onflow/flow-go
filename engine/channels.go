@@ -15,14 +15,16 @@ const (
 	// Observation 030-049
 
 	// Consensus 050-099
-	BlockProvider     = 50 // providing blocks to non-consensus nodes
-	BlockPropagation  = 51 // propagating entities to be included in blocks between consensus nodes
-	ProtocolConsensus = 60 // consensus protocol
+	BlockProvider           = 50 // providing blocks to non-consensus nodes
+	BlockPropagation        = 51 // propagating entities to be included in blocks between consensus nodes
+	ProtocolConsensus       = 60 // consensus protocol
+	ProtocolSynchronization = 66 // synchronization protocol
 
 	// Execution 100-199
 	ExecutionReceiptProvider = 100
 	ExecutionStateProvider   = 101
 	ExecutionComputer        = 102
+	ChunkDataPackProvider    = 103
 
 	// Verification 150-199
 	ApprovalProvider = 150

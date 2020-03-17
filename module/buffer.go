@@ -12,6 +12,8 @@ import (
 type PendingBlockBuffer interface {
 	Add(block *flow.PendingBlock) bool
 
+	ByID(blockID flow.Identifier) (*flow.PendingBlock, bool)
+
 	ByParentID(parentID flow.Identifier) ([]*flow.PendingBlock, bool)
 
 	DropForParent(parentID flow.Identifier)
@@ -21,6 +23,8 @@ type PendingBlockBuffer interface {
 // collection node cluster consensus.
 type PendingClusterBlockBuffer interface {
 	Add(block *cluster.PendingBlock) bool
+
+	ByID(blockID flow.Identifier) (*cluster.PendingBlock, bool)
 
 	ByParentID(parentID flow.Identifier) ([]*cluster.PendingBlock, bool)
 

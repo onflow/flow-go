@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/crypto/random"
+	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/test"
 )
@@ -27,7 +28,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	// creates ids and twice chunks of the ids
 	ids := test.CreateIDs(size)
 	chunks := a.CreateChunks(2 * size)
-	assignment := NewAssignment()
+	assignment := chunkassignment.NewAssignment()
 
 	// assigns two chunks to each verifier node
 	// j keeps track of chunks
@@ -35,10 +36,10 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	for i := 0; i < size; i++ {
 
 		c := chunks.ByIndex(uint64(j))
-		assignment.Assign(c, append(assignment.Verifiers(c), ids[i].NodeID))
+		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
 		j++
 		c = chunks.ByIndex(uint64(j))
-		assignment.Assign(c, append(assignment.Verifiers(c), ids[i].NodeID))
+		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
 	}
 
 	// evaluating the chunk assignment
@@ -55,27 +56,27 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 
 }
 
-// TestAssignDuplicate tests assign Assign duplicate verifiers
+// TestAssignDuplicate tests assign Add duplicate verifiers
 func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	size := 5
 	// creates ids and twice chunks of the ids
 	var ids flow.IdentityList = test.CreateIDs(size)
 	chunks := a.CreateChunks(2)
-	assignment := NewAssignment()
+	assignment := chunkassignment.NewAssignment()
 
 	// assigns first chunk to non-duplicate list of verifiers
 	c := chunks.ByIndex(uint64(0))
-	assignment.Assign(c, ids.NodeIDs())
-	require.Len(a.T(), assignment.table[c.Index], size)
+	assignment.Add(c, ids.NodeIDs())
+	require.Len(a.T(), assignment.Verifiers(c), size)
 
 	// duplicates first verifier, hence size increases by 1
 	ids = append(ids, ids[0])
 	require.Len(a.T(), ids, size+1)
 	// assigns second chunk to a duplicate list of verifiers
 	c = chunks.ByIndex(uint64(1))
-	assignment.Assign(c, ids.NodeIDs())
+	assignment.Add(c, ids.NodeIDs())
 	// should be size not size + 1
-	require.Len(a.T(), assignment.table[c.Index], size)
+	require.Len(a.T(), assignment.Verifiers(c), size)
 }
 
 // TestPermuteEntirely tests permuting an entire IdentityList against
@@ -83,7 +84,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	// creates random ids
 	count := 10
-	seed := []uint64{62534197802164589}
+	seed := []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 	var idList flow.IdentityList = test.CreateIDs(count)
 	ids := idList.NodeIDs()
 	original := make([]flow.Identifier, count)
@@ -116,7 +117,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	count := 10
 	subset := 4
 
-	seed := []uint64{62534197802164589}
+	seed := []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 	var idList flow.IdentityList = test.CreateIDs(count)
 	ids := idList.NodeIDs()
 	original := make([]flow.Identifier, count)
@@ -145,7 +146,7 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	c := 10    // keeps number of chunks
 	n := 10    // keeps number of verifier nodes
 	alpha := 1 // each chunk requires alpha verifiers
-	seed := []uint64{62534197802164589}
+	seed := []byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58}
 	chunks := a.CreateChunks(c)
 
 	// making two random generator with the same seed
@@ -163,16 +164,16 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.Equal(a.T(), copy(nodes2, nodes1), n)
 
 	// chunk assignment of the first set
-	p1, err := NewPublicAssignment(alpha).Assigner(nodes1, chunks, rng1)
+	p1, err := NewPublicAssignment(alpha).Assign(nodes1, chunks, rng1)
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
-	p2, err := NewPublicAssignment(alpha).Assigner(nodes2, chunks, rng2)
+	p2, err := NewPublicAssignment(alpha).Assign(nodes2, chunks, rng2)
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
 	// but it should contain same elemets
-	require.Equal(a.T(), p1.table, p2.table)
+	require.Equal(a.T(), p1, p2)
 }
 
 // TestChunkAssignmentOneToOne evaluates chunk assignment against
@@ -209,7 +210,7 @@ func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToMany() {
 // and then assign each chunk to alpha randomly chosen verifiers
 // it also evaluates that each chuck is assigned to alpha many unique verifier nodes
 func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, alpha int) {
-	rng, err := random.NewRand([]uint64{62534197802164589})
+	rng, err := random.NewRand([]byte{62, 53, 41, 97, 80, 21, 64, 58, 62, 53, 41, 97, 80, 21, 64, 58})
 	require.NoError(a.T(), err)
 	chunks := a.CreateChunks(chunkNum)
 
@@ -218,7 +219,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	original := make([]*flow.Identity, verNum)
 	require.Equal(a.T(), copy(original, nodes), verNum)
 
-	p, err := NewPublicAssignment(alpha).Assigner(nodes, chunks, rng)
+	p, err := NewPublicAssignment(alpha).Assign(nodes, chunks, rng)
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment

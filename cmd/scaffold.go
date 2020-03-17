@@ -37,6 +37,7 @@ type BaseConfig struct {
 	datadir     string
 	level       string
 	metricsPort uint
+	nClusters   uint
 }
 
 type namedModuleFunc struct {
@@ -94,6 +95,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
+	fnb.flags.UintVar(&fnb.BaseConfig.nClusters, "nclusters", 1, "number of collection node clusters")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -184,7 +186,7 @@ func (fnb *FlowNodeBuilder) initTracer() {
 }
 
 func (fnb *FlowNodeBuilder) initState() {
-	state, err := protocol.NewState(fnb.DB)
+	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	//check if database is initialized
@@ -364,11 +366,6 @@ func (fnb *FlowNodeBuilder) Run() {
 	// parse configuration parameters
 	pflag.Parse()
 
-	// initialize all components
-	for _, f := range fnb.modules {
-		fnb.handleModule(f)
-	}
-
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
@@ -390,6 +387,12 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.genesisHandler(fnb, fnb.genesis)
 	}
 
+	// set up all modules
+	for _, f := range fnb.modules {
+		fnb.handleModule(f)
+	}
+
+	// initialize all components
 	for _, f := range fnb.components {
 		fnb.handleComponent(f)
 	}

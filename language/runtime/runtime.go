@@ -968,6 +968,10 @@ func init() {
 
 func (BlockValue) IsValue() {}
 
+func (BlockValue) DynamicType(*interpreter.Interpreter) interpreter.DynamicType {
+	return nil
+}
+
 func (v BlockValue) Copy() Value {
 	return v
 }

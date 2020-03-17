@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
@@ -608,6 +609,11 @@ func TestCheckArraySubtyping(t *testing.T) {
 				body = "()"
 			}
 
+			interfaceType := "I"
+			if kind == common.CompositeKindResource {
+				interfaceType = "AnyResource{I}"
+			}
+
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
@@ -615,16 +621,19 @@ func TestCheckArraySubtyping(t *testing.T) {
                       %[1]s S: I %[2]s
 
                       let xs: %[3]s[S] %[4]s []
-                      let ys: %[3]s[I] %[4]s xs
+                      let ys: %[3]s[%[5]s] %[4]s xs
 	                `,
 					kind.Keyword(),
 					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
+					interfaceType,
 				),
 			)
 
-			require.NoError(t, err)
+			if !assert.NoError(t, err) {
+				cmd.PrettyPrintError(err, "", map[string]string{"": ""})
+			}
 		})
 	}
 }
@@ -656,6 +665,11 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 				body = "()"
 			}
 
+			interfaceType := "I"
+			if kind == common.CompositeKindResource {
+				interfaceType = "AnyResource{I}"
+			}
+
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
@@ -663,12 +677,13 @@ func TestCheckDictionarySubtyping(t *testing.T) {
                       %[1]s S: I %[2]s
 
                       let xs: %[3]s{String: S} %[4]s {}
-                      let ys: %[3]s{String: I} %[4]s xs
+                      let ys: %[3]s{String: %[5]s} %[4]s xs
 	                `,
 					kind.Keyword(),
 					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
+					interfaceType,
 				),
 			)
 
@@ -785,27 +800,31 @@ func TestCheckInvalidConstantSizedArrayDeclarationCountMismatchTooMany(t *testin
 
 func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 
-	for _, code := range []string{
-		`let k = 1`,
-		`let k = "a"`,
-		`let k = true`,
-		`let k: UInt8 = 2`,
-		`let k: UInt16 = 3`,
-		`let k: UInt32 = 4`,
-		`let k: UInt64 = 5`,
-		`let k: Int8 = 6`,
-		`let k: Int16 = 7`,
-		`let k: Int32 = 8`,
-		`let k: Int64 = 9`,
-	} {
-		t.Run("valid", func(t *testing.T) {
+	tests := map[string]string{
+		"String":    `"abc"`,
+		"Character": `"X"`,
+		"Address":   `0x1`,
+		"Bool":      `true`,
+	}
+
+	for _, integerType := range sema.AllIntegerTypes {
+		tests[integerType.String()] = `42`
+	}
+
+	for _, fixedPointType := range sema.AllFixedPointTypes {
+		tests[fixedPointType.String()] = `1.23`
+	}
+
+	for ty, code := range tests {
+		t.Run(fmt.Sprintf("valid: %s", ty), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %s
+                      let k: %s = %s
                       let xs = {k: "x"}
                     `,
+					ty,
 					code,
 				),
 			)
@@ -814,15 +833,15 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 		})
 	}
 
-	for _, code := range []string{
-		`
+	for name, code := range map[string]string{
+		"struct": `
            struct X {}
            let k = X()
         `,
-		`let k = [1]`,
-		`let k = {"a": 1}`,
+		"array":      `let k = [1]`,
+		"dictionary": `let k = {"a": 1}`,
 	} {
-		t.Run("invalid", func(t *testing.T) {
+		t.Run(fmt.Sprintf("invalid: %s", name), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
