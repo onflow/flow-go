@@ -100,8 +100,8 @@ func (x *xorshifts) IntN(n int) (int, error) {
 // (which fixes the internal state length of xorshifts ) should be chosen carefully
 // O(n) space and O(n) time
 func (x *xorshifts) Permutation(n int) ([]int, error) {
-	if n <= 0 {
-		return nil, fmt.Errorf("inputs must be positive")
+	if n < 0 {
+		return nil, fmt.Errorf("population size cannot be negative")
 	}
 	items := make([]int, n)
 	for i := 0; i < n; i++ {
@@ -118,8 +118,11 @@ func (x *xorshifts) Permutation(n int) ([]int, error) {
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(n) space and O(n) time
 func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
-	if m <= 0 {
-		return nil, fmt.Errorf("inputs must be positive")
+	if m < 0 || n < 0 {
+		return nil, fmt.Errorf("inputs cannot be negative")
+	}
+	if n < m {
+		return nil, fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)
 	}
 	items, _ := x.Permutation(n)
 	return items[:m], nil
@@ -129,8 +132,8 @@ func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(n) time
 func (x *xorshifts) Shuffle(n int, swap func(i, j int)) error {
-	if n <= 0 {
-		return fmt.Errorf("input must be positive")
+	if n < 0 {
+		return fmt.Errorf("population size cannot be negative")
 	}
 	for i := n - 1; i > 0; i-- {
 		j, _ := x.IntN(i + 1)
@@ -144,8 +147,11 @@ func (x *xorshifts) Shuffle(n int, swap func(i, j int)) error {
 // It implements the first (m) elements of Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(m) time
 func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) error {
-	if m <= 0 || n <= 0 {
-		return fmt.Errorf("inputs must be positive")
+	if m < 0 || n < 0 {
+		return fmt.Errorf("inputs cannot be negative")
+	}
+	if n < m {
+		return fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)
 	}
 	for i := 0; i < m; i++ {
 		j, _ := x.IntN(n - i)

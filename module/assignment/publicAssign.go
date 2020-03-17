@@ -3,8 +3,6 @@ package assignment
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -28,7 +26,7 @@ func NewPublicAssignment(alpha int) *PublicAssignment {
 func (p *PublicAssignment) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
 	a, err := chunkAssignment(ids.NodeIDs(), chunks, rng, p.alpha)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not complete chunk assignment")
+		return nil, fmt.Errorf("computing assignment failed: %w", err)
 	}
 
 	return a, nil
@@ -42,7 +40,10 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	}
 	assignment := chunkassignment.NewAssignment()
 	// permutes the entire slice
-	rng.Shuffle(len(ids), ids.Swap)
+	err := rng.Shuffle(len(ids), ids.Swap)
+	if err != nil {
+		return nil, fmt.Errorf("shuffling verifiers failed: %w", err)
+	}
 	t := ids
 
 	for i := 0; i < chunks.Size(); i++ {
@@ -56,7 +57,10 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 			// now, we need `still` elements from a new shuffling round:
 			still := alpha - len(assignees)
 			t = ids[:ids.Len()-len(assignees)] // but we exclude the elements we already picked from the population
-			rng.Samples(len(t), still, t.Swap)
+			err := rng.Samples(len(t), still, t.Swap)
+			if err != nil {
+				return nil, fmt.Errorf("sampling verifiers failed: %w", err)
+			}
 
 			// by adding `still` elements from new shuffling round: we have alpha assignees for the current chunk
 			assignees = append(assignees, t[:still]...)
@@ -64,7 +68,10 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 			// we have already assigned the first `still` elements in `ids`
 			// note that remaining elements ids[still:] still need shuffling
 			t = ids[still:]
-			rng.Shuffle(len(t), t.Swap)
+			err = rng.Shuffle(len(t), t.Swap)
+			if err != nil {
+				return nil, fmt.Errorf("shuffling verifiers failed: %w", err)
+			}
 		}
 		assignment.Add(chunks.ByIndex(uint64(i)), assignees)
 	}

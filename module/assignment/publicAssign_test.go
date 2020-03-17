@@ -93,7 +93,8 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	// Randomness:
 	rng1, err := random.NewRand(seed)
 	require.NoError(a.T(), err)
-	rng1.Shuffle(len(ids), ids.Swap)
+	err = rng1.Shuffle(len(ids), ids.Swap)
+	require.NoError(a.T(), err)
 
 	// permutation should not change length of the list
 	require.Len(a.T(), ids, count)
@@ -106,7 +107,8 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	rng2, err := random.NewRand(seed)
 	require.NoError(a.T(), err)
 	// permutes original list with the same seed
-	rng2.Shuffle(len(original), original.Swap)
+	err = rng2.Shuffle(len(original), original.Swap)
+	require.NoError(a.T(), err)
 	require.Equal(a.T(), ids, original)
 }
 
@@ -126,7 +128,8 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	// Randomness:
 	rng1, err := random.NewRand(seed)
 	require.NoError(a.T(), err)
-	rng1.Samples(len(ids), subset, ids.Swap)
+	err = rng1.Samples(len(ids), subset, ids.Swap)
+	require.NoError(a.T(), err)
 
 	// permutation should not change length of the list
 	require.Len(a.T(), ids, count)

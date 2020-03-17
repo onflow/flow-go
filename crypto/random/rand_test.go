@@ -57,7 +57,8 @@ func TestRandomPermutationSubset(t *testing.T) {
 	testElement := rand.Intn(listSize)
 
 	for i := 0; i < sampleSize; i++ {
-		shuffledlist, _ := rng.SubPermutation(listSize, subsetSize)
+		shuffledlist, err := rng.SubPermutation(listSize, subsetSize)
+		require.NoError(t, err)
 		if len(shuffledlist) != subsetSize {
 			t.Errorf("PermutateSubset returned a list with a wrong size")
 		}
@@ -87,6 +88,16 @@ func TestRandomPermutationSubset(t *testing.T) {
 	}
 }
 
+func TestEmptyPermutationSubset(t *testing.T) {
+	seed := make([]byte, 16)
+	seed[0] = 45
+	rng, err := NewRand(seed)
+	require.NoError(t, err)
+	res, err := rng.SubPermutation(0, 0)
+	require.NoError(t, err)
+	require.True(t, len(res) == 0)
+}
+
 func TestRandomShuffle(t *testing.T) {
 	listSize := 100
 	seed := make([]byte, 16)
@@ -106,9 +117,10 @@ func TestRandomShuffle(t *testing.T) {
 	}
 
 	for i := 0; i < sampleSize; i++ {
-		rng.Shuffle(listSize, func(i, j int) {
+		err = rng.Shuffle(listSize, func(i, j int) {
 			list[i], list[j] = list[j], list[i]
 		})
+		require.NoError(t, err)
 		has := make(map[int]struct{})
 		for j, e := range list {
 			// check for repetition
@@ -127,6 +139,18 @@ func TestRandomShuffle(t *testing.T) {
 	if stdev > tolerance*mean {
 		t.Errorf("basic randomness test failed. stdev %v, mean %v", stdev, mean)
 	}
+}
+
+func TestEmptyShuffle(t *testing.T) {
+	seed := make([]byte, 16)
+	seed[0] = 45
+	rng, err := NewRand(seed)
+	require.NoError(t, err)
+	emptySlice := make([]float64, 0)
+	rng.Shuffle(len(emptySlice), func(i, j int) {
+		emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
+	})
+	require.True(t, len(emptySlice) == 0)
 }
 
 func TestRandomSamples(t *testing.T) {
@@ -151,9 +175,10 @@ func TestRandomSamples(t *testing.T) {
 	}
 
 	for i := 0; i < sampleSize; i++ {
-		rng.Samples(listSize, samplesSize, func(i, j int) {
+		err = rng.Samples(listSize, samplesSize, func(i, j int) {
 			list[i], list[j] = list[j], list[i]
 		})
+		require.NoError(t, err)
 		has := make(map[int]struct{})
 		for j, e := range list[:samplesSize] {
 			// check for repetition
@@ -178,4 +203,16 @@ func TestRandomSamples(t *testing.T) {
 	if stdev > tolerance*mean {
 		t.Errorf("basic ordering randomness test failed. stdev %v, mean %v", stdev, mean)
 	}
+}
+
+func TestEmptySamples(t *testing.T) {
+	seed := make([]byte, 16)
+	seed[0] = 45
+	rng, err := NewRand(seed)
+	require.NoError(t, err)
+	emptySlice := make([]float64, 0)
+	rng.Samples(len(emptySlice), len(emptySlice), func(i, j int) {
+		emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
+	})
+	require.True(t, len(emptySlice) == 0)
 }
