@@ -86,6 +86,10 @@ type ForceExtractor interface {
 	ExtractForce(extractor *ExpressionExtractor, expression *ForceExpression) ExpressionExtraction
 }
 
+type PathExtractor interface {
+	ExtractPath(extractor *ExpressionExtractor, expression *PathExpression) ExpressionExtraction
+}
+
 type ExpressionExtractor struct {
 	nextIdentifier       int
 	BoolExtractor        BoolExtractor
@@ -108,6 +112,7 @@ type ExpressionExtractor struct {
 	DestroyExtractor     DestroyExtractor
 	ReferenceExtractor   ReferenceExtractor
 	ForceExtractor       ForceExtractor
+	PathExtractor        PathExtractor
 }
 
 func (extractor *ExpressionExtractor) Extract(expression Expression) ExpressionExtraction {
@@ -733,5 +738,26 @@ func (extractor *ExpressionExtractor) ExtractForce(expression *ForceExpression) 
 	return ExpressionExtraction{
 		RewrittenExpression:  &newExpression,
 		ExtractedExpressions: result.ExtractedExpressions,
+	}
+}
+
+func (extractor *ExpressionExtractor) VisitPathExpression(expression *PathExpression) Repr {
+
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.PathExtractor != nil {
+		return extractor.PathExtractor.ExtractPath(extractor, expression)
+	}
+	return extractor.ExtractPath(expression)
+}
+
+func (extractor *ExpressionExtractor) ExtractPath(expression *PathExpression) ExpressionExtraction {
+
+	// nothing to rewrite, return as-is
+
+	return ExpressionExtraction{
+		RewrittenExpression:  expression,
+		ExtractedExpressions: nil,
 	}
 }

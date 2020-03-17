@@ -1860,6 +1860,19 @@ func parseHex(b byte) rune {
 	panic(errors.NewUnreachableError())
 }
 
+func (v *ProgramVisitor) VisitPathLiteral(ctx *PathLiteralContext) interface{} {
+	startPos := PositionFromToken(ctx.GetStart())
+
+	domain := ctx.domain.Accept(v).(ast.Identifier)
+	identifier := ctx.id.Accept(v).(ast.Identifier)
+
+	return &ast.PathExpression{
+		StartPos:   startPos,
+		Domain:     domain,
+		Identifier: identifier,
+	}
+}
+
 func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
 	var expressions []ast.Expression
 	for _, expression := range ctx.AllExpression() {

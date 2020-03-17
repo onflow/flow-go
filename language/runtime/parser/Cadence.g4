@@ -537,6 +537,7 @@ literal
     | dictionaryLiteral
     | stringLiteral
     | nilLiteral
+    | pathLiteral
     ;
 
 booleanLiteral
@@ -546,6 +547,11 @@ booleanLiteral
 
 nilLiteral
     : Nil
+    ;
+
+pathLiteral
+    : '/' {p.noWhitespace()}? domain=identifier {p.noWhitespace()}?
+      '/' {p.noWhitespace()}? id=identifier
     ;
 
 stringLiteral

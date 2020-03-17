@@ -704,3 +704,35 @@ func (e *ForceExpression) StartPosition() Position {
 func (e *ForceExpression) EndPosition() Position {
 	return e.EndPos
 }
+
+// PathExpression
+
+type PathExpression struct {
+	StartPos   Position
+	Domain     Identifier
+	Identifier Identifier
+}
+
+func (*PathExpression) isExpression() {}
+
+func (*PathExpression) isIfStatementTest() {}
+
+func (e *PathExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *PathExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitPathExpression(e)
+}
+
+func (e *PathExpression) String() string {
+	return fmt.Sprintf("/%s/%s", e.Domain, e.Identifier)
+}
+
+func (e *PathExpression) StartPosition() Position {
+	return e.StartPos
+}
+
+func (e *PathExpression) EndPosition() Position {
+	return e.Domain.EndPosition()
+}

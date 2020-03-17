@@ -563,6 +563,12 @@ func (s *BaseCadenceListener) EnterNilLiteral(ctx *NilLiteralContext) {}
 // ExitNilLiteral is called when production nilLiteral is exited.
 func (s *BaseCadenceListener) ExitNilLiteral(ctx *NilLiteralContext) {}
 
+// EnterPathLiteral is called when production pathLiteral is entered.
+func (s *BaseCadenceListener) EnterPathLiteral(ctx *PathLiteralContext) {}
+
+// ExitPathLiteral is called when production pathLiteral is exited.
+func (s *BaseCadenceListener) ExitPathLiteral(ctx *PathLiteralContext) {}
+
 // EnterStringLiteral is called when production stringLiteral is entered.
 func (s *BaseCadenceListener) EnterStringLiteral(ctx *StringLiteralContext) {}
 
