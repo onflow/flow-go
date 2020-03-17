@@ -17,7 +17,7 @@ static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint8_t*
     //#define MOD_METHOD MONTY
     #define MOD_METHOD BASIC
 
-    #if MOD_METHOD == Basic   
+    #if MOD_METHOD == MONTY   
     bn_st u;
     bn_new(&u)
     // Montgomery reduction constant
