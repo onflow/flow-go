@@ -33,7 +33,7 @@ func New(log zerolog.Logger,
 	state protocol.State,
 	config Config, collectionRPC observation.ObserveServiceClient,
 	executionRPC observation.ObserveServiceClient,
-	blkState *obs.BlockchainSate) *Engine {
+	blkState *obs.BlockchainState) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{

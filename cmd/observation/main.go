@@ -24,7 +24,7 @@ func main() {
 		collectionRPC   observation.ObserveServiceClient
 		executionRPC    observation.ObserveServiceClient
 		err             error
-		blkState        *obs.BlockchainSate
+		blkState        *obs.BlockchainState
 	)
 
 	cmd.FlowNode("observation").

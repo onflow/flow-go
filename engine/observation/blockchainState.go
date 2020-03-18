@@ -8,7 +8,7 @@ import (
 )
 
 // BlockChainState represents the entire block chain including blocks, collections and transactions
-type BlockchainSate struct {
+type BlockchainState struct {
 	headers      storage.Headers
 	payloads     storage.Payloads
 	collections  storage.Collections
@@ -18,8 +18,8 @@ type BlockchainSate struct {
 	sync.Mutex
 }
 
-func NewBlockchainState(h storage.Headers, p storage.Payloads, c storage.Collections, t storage.Transactions) *BlockchainSate {
-	return &BlockchainSate{
+func NewBlockchainState(h storage.Headers, p storage.Payloads, c storage.Collections, t storage.Transactions) *BlockchainState {
+	return &BlockchainState{
 		headers:      h,
 		payloads:     p,
 		collections:  c,
@@ -28,7 +28,7 @@ func NewBlockchainState(h storage.Headers, p storage.Payloads, c storage.Collect
 }
 
 // UpsertCollection adds ors updates a collection to the block chain state
-func (b *BlockchainSate) UpsertCollection(collection *flow.Collection) error {
+func (b *BlockchainState) UpsertCollection(collection *flow.Collection) error {
 	b.Lock()
 	defer b.Unlock()
 	_, err := b.collections.ByID(collection.ID())
@@ -48,7 +48,7 @@ func (b *BlockchainSate) UpsertCollection(collection *flow.Collection) error {
 }
 
 // AddTransaction adds the transaction body to the state if not present
-func (b *BlockchainSate) AddTransaction(transaction *flow.TransactionBody) error {
+func (b *BlockchainState) AddTransaction(transaction *flow.TransactionBody) error {
 	b.Lock()
 	defer b.Unlock()
 	_, err := b.transactions.ByID(transaction.ID())
@@ -59,4 +59,9 @@ func (b *BlockchainSate) AddTransaction(transaction *flow.TransactionBody) error
 		err = b.transactions.Store(transaction)
 	}
 	return err
+}
+
+// Block retrieves a Block by ID
+func (b *BlockchainState) Block(id flow.Identifier) (*flow.Header, error) {
+	return b.headers.ByBlockID(id)
 }

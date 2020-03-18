@@ -38,7 +38,7 @@ type Suite struct {
 	collections  *storage.Collections
 	headers      *storage.Headers
 	payloads     *storage.Payloads
-	blkState     *observation.BlockchainSate
+	blkState     *observation.BlockchainState
 	eng          *Engine
 
 	// mock conduit for requesting/receiving collections

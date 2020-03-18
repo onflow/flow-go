@@ -33,7 +33,7 @@ type Engine struct {
 	collectionConduit network.Conduit
 
 	// blockchain state
-	blkState *observation.BlockchainSate
+	blkState *observation.BlockchainState
 }
 
 // New creates a new observation ingestion engine
@@ -42,7 +42,7 @@ func New(log zerolog.Logger,
 	state protocol.State,
 	tracer trace.Tracer,
 	me module.Local,
-	blkState *observation.BlockchainSate) (*Engine, error) {
+	blkState *observation.BlockchainState) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
@@ -118,10 +118,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.handleCollectionResponse(originID, entity)
 	case *flow.CollectionGuarantee:
 		return e.onCollectionGuarantee(originID, entity)
-	case *flow.Collection:
-		return e.onCollection(originID, entity)
-	case *flow.ExecutionReceipt:
-		return e.onExecutionReceipt(originID, entity)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
@@ -137,20 +133,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 		Uint64("block_view", block.View).
 		Msg("received block")
 
-	ids, err := e.findCollectionNodes()
-	if err != nil {
-		return err
-	}
-
-	// Request all the collections for this block
-	for _, g := range block.Guarantees {
-		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID()}, ids...)
-		if err != nil {
-			e.log.Err(err).Msg("cannot submit collection requests")
-		}
-	}
-
-	return nil
+	return e.requestCollections(block.Guarantees...)
 }
 
 // handleCollectionResponse handles the response of the a collection request made earlier when a block was received
@@ -202,32 +185,26 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	if id.Role != flow.RoleCollection {
 		return errors.Errorf("invalid origin node role (%s)", id.Role)
 	}
-	//collID := guarantee.ID()
-	//if !e.mempools.Collections.Has(collID) {
-	//	// TODO rate limit these requests
-	//	err := e.requestCollection(collID)
-	//	if err != nil {
-	//		log.Error().
-	//			Err(err).
-	//			Hex("collection_id", logging.ID(collID)).
-	//			Msg("could not request collection")
-	//	}
-	//}
 
-	return nil
+	return e.requestCollections(guarantee)
 }
 
-// onCollection for handling data about a collection from a collection node
-func (e *Engine) onCollection(originID flow.Identifier, guarantee *flow.Collection) error {
-	// TODO
-	return nil
-}
+func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
+	ids, err := e.findCollectionNodes()
+	if err != nil {
+		return err
+	}
 
-// onExecutionReceipt handles an incoming execution receipts.
-func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-	// TODO
+	// Request all the collections for this block
+	for _, g := range guarantees {
+		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID()}, ids...)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
+
 }
 
 func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {

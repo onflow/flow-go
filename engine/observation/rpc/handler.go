@@ -7,6 +7,7 @@ import (
 
 	obs "github.com/dapperlabs/flow-go/engine/observation"
 	"github.com/dapperlabs/flow-go/engine/observation/rpc/convert"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/protocol"
 )
@@ -17,14 +18,14 @@ type Handler struct {
 	collectionRPC observation.ObserveServiceClient
 	log           zerolog.Logger
 	state         protocol.State
-	blkState      *obs.BlockchainSate
+	blkState      *obs.BlockchainState
 }
 
 func NewHandler(log zerolog.Logger,
 	s protocol.State,
 	e observation.ObserveServiceClient,
 	c observation.ObserveServiceClient,
-	bcst *obs.BlockchainSate) *Handler {
+	bcst *obs.BlockchainState) *Handler {
 	return &Handler{
 		executionRPC:  e,
 		collectionRPC: c,
@@ -50,27 +51,35 @@ func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTran
 }
 
 func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
-	if !req.IsSealed {
-		// For the latest finalized block, query the state
-		// The follower engine should have updated the state
-		header, err := h.state.Final().Head()
+	var header *flow.Header
+	var seal flow.Seal
+	var err error
+
+	// If request if for the latest Sealed block, lookup the latest seal to get latest blockid
+	// The follower engine should have updated the state
+	if req.IsSealed {
+		seal, err = h.state.Final().Seal()
 		if err != nil {
 			return nil, err
 		}
-
-		msg, err := convert.BlockHeaderToMessage(header)
-		if err != nil {
-			return nil, err
-		}
-
-		resp := &observation.GetLatestBlockResponse{
-			Block: &msg,
-		}
-		return resp, nil
+		header, err = h.blkState.Block(seal.BlockID)
+	} else {
+		// Otherwise, for the latest finalized block, query the state
+		header, err = h.state.Final().Head()
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	//TODO implement fetching Sealed blocks
-	return nil, nil
+	msg, err := convert.BlockHeaderToMessage(header)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &observation.GetLatestBlockResponse{
+		Block: &msg,
+	}
+	return resp, nil
 }
 
 func (h *Handler) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {

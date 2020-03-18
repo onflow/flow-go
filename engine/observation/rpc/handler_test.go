@@ -27,14 +27,14 @@ func (suite *Suite) TestPing() {
 	suite.Require().NoError(err)
 }
 
-func (suite *Suite) TestGetLatestBlock() {
+func (suite *Suite) TestGetLatestFinalizedBlock() {
 	snapshot := new(protocol.Snapshot)
 	block := unittest.BlockHeaderFixture()
 	snapshot.On("Head").Return(&block, nil)
 	state := new(protocol.State)
 	state.On("Final").Return(snapshot)
 	handler := NewHandler(zerolog.Logger{}, state, nil, nil, nil)
-	req := &observation.GetLatestBlockRequest{}
+	req := &observation.GetLatestBlockRequest{IsSealed: false}
 	resp, err := handler.GetLatestBlock(context.Background(), req)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
