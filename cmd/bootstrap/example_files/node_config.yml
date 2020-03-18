@@ -1,0 +1,12 @@
+- role: collection
+  address: 123.0.0.10
+  stake: 100
+- role: consensus
+  address: 123.0.0.20
+  stake: 200
+- role: execution
+  address: 123.0.0.30
+  stake: 300
+- role: verification
+  address: 123.0.0.40
+  stake: 400

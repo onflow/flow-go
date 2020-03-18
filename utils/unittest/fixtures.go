@@ -500,3 +500,19 @@ func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
 	}
 }
+
+// SeedFixture returns a random []byte with length n
+func SeedFixture(n int) []byte {
+	var seed = make([]byte, n, n)
+	_, _ = rand.Read(seed[0:n])
+	return seed
+}
+
+// SeedFixtures returns a list of m random []byte, each having length n
+func SeedFixtures(m int, n int) [][]byte {
+	var seeds = make([][]byte, m, m)
+	for i := range seeds {
+		seeds[i] = SeedFixture(n)
+	}
+	return seeds
+}

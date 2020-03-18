@@ -309,3 +309,7 @@ monitor-rollout:
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-consensus-node-v1; \
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-execution-node-v1; \
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-verification-node-v1
+
+.PHONY: generate-keys
+generate-keys:
+	go run -tags relic ./cmd/bootstrapping -n=2 abc defg
