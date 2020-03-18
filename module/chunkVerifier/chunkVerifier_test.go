@@ -39,23 +39,30 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	assert.Nil(s.T(), err)
 }
 
-// TestMissingRegisterTouch tests verification of the a chunkdatapack missing a register touch
-func (s *ChunkVerifierTestSuite) TestMissingRegisterTouch() {
-	vch := GetBaselineVerifiableChunk([]byte("MissingRegisterTouch"))
-	// remove the first register touch
-	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
+// TestMissingRegisterTouchForUpdate tests verification of the a chunkdatapack missing a register touch (update)
+func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
+	vch := GetBaselineVerifiableChunk([]byte(""))
+	// remove the second register touch
+	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
 	err := s.verifier.Verify(vch)
-	// TODO RAMTIN
 	assert.NotNil(s.T(), err)
 }
+
+// TODO
+// TestMissingRegisterTouchForRead tests verification of the a chunkdatapack missing a register touch (read)
+// func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
+// 	vch := GetBaselineVerifiableChunk([]byte(""))
+// 	// remove the second register touch
+// 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
+// 	err := s.verifier.Verify(vch)
+// 	assert.NotNil(s.T(), err)
+// }
 
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk([]byte("wrongEndState"))
 	err := s.verifier.Verify(vch)
 	assert.NotNil(s.T(), err)
 }
-
-// wrongEndState
 
 func GetBaselineVerifiableChunk(script []byte) *verification.VerifiableChunk {
 	// Collection setup
@@ -166,11 +173,10 @@ func (bc *blockContextMock) ExecuteTransaction(
 	var txRes virtualmachine.TransactionResult
 	switch string(tx.Script) {
 	case "wrongEndState":
-		id2 := make([]byte, 32)
-		id2[0] = byte(5)
-		UpdatedValue2 := []byte{'F'}
+		id1 := make([]byte, 32)
+		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
-		ledger.Set(id2, UpdatedValue2)
+		ledger.Set(id1, UpdatedValue1)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
 			Events:        []runtime.Event{},
@@ -179,10 +185,11 @@ func (bc *blockContextMock) ExecuteTransaction(
 			GasUsed:       0,
 		}
 	default:
+		id1 := make([]byte, 32)
 		id2 := make([]byte, 32)
 		id2[0] = byte(5)
 		UpdatedValue2 := []byte{'B'}
-		// add updates to the ledger
+		ledger.Get(id1)
 		ledger.Set(id2, UpdatedValue2)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),

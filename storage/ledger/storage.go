@@ -71,6 +71,7 @@ func (f *TrieStorage) UpdateRegisters(
 	}
 
 	err = f.tree.Update(ids, values)
+
 	return f.tree.GetRoot().GetValue(), err
 }
 
@@ -112,8 +113,6 @@ func (f *TrieStorage) GetRegisterTouches(
 		}
 		res = append(res, rt)
 	}
-	// TODO RAMTIN
-	fmt.Println(f.tree.GetRoot().FmtStr(""))
 	return res, nil
 }
 
