@@ -22,7 +22,7 @@ func NewCommits(db *badger.DB) *Commits {
 
 func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
 	return c.db.Update(func(btx *badger.Txn) error {
-		err := operation.IndexCommit(blockID, commit)(btx)
+		err := operation.IndexStateCommitment(blockID, commit)(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert state commitment: %w", err)
 		}
@@ -33,7 +33,7 @@ func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) er
 func (c *Commits) ByID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	var commitment flow.StateCommitment
 	err := c.db.View(func(btx *badger.Txn) error {
-		err := operation.LookupCommit(blockID, &commitment)(btx)
+		err := operation.LookupStateCommitment(blockID, &commitment)(btx)
 		if err != nil {
 			if err == storage.ErrNotFound {
 				return err

@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -20,27 +23,28 @@ import (
 func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T) {
 	return func(t *testing.T) {
 		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+			unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
+				ls, err := ledger.NewTrieStorage(db)
+				require.NoError(t, err)
 
-			ls, err := ledger.NewTrieStorage(db)
-			require.NoError(t, err)
+				ctrl := gomock.NewController(t)
 
-			ctrl := gomock.NewController(t)
+				stateCommitments := mocks.NewMockCommits(ctrl)
 
-			stateCommitments := mocks.NewMockCommits(ctrl)
+				stateCommitment := unittest.StateCommitmentFixture()
 
-			stateCommitment := unittest.StateCommitmentFixture()
+				stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
 
-			stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
+				chunkHeaders := new(storage.ChunkHeaders)
 
-			chunkHeaders := new(storage.ChunkHeaders)
+				chunkDataPacks := new(storage.ChunkDataPacks)
 
-			chunkDataPacks := new(storage.ChunkDataPacks)
+				executionResults := new(storage.ExecutionResults)
 
-			executionResults := new(storage.ExecutionResults)
+				es := state.NewExecutionState(ls, stateCommitments, chunkHeaders, chunkDataPacks, executionResults, badgerDB)
 
-			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders, chunkDataPacks, executionResults)
-
-			f(t, es)
+				f(t, es)
+			})
 		})
 	}
 }
@@ -151,91 +155,163 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 func TestState_GetChunkRegisters(t *testing.T) {
 	t.Run("non-existent chunk", func(t *testing.T) {
-		ls := new(storage.Ledger)
-		sc := new(storage.Commits)
-		ch := new(storage.ChunkHeaders)
-		cdp := new(storage.ChunkDataPacks)
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			ls := new(storage.Ledger)
+			sc := new(storage.Commits)
+			ch := new(storage.ChunkHeaders)
+			cdp := new(storage.ChunkDataPacks)
 
-		er := new(storage.ExecutionResults)
+			er := new(storage.ExecutionResults)
 
-		chunkID := unittest.IdentifierFixture()
+			chunkID := unittest.IdentifierFixture()
 
-		ch.On("ByID", chunkID).Return(nil, fmt.Errorf("storage error"))
+			ch.On("ByID", chunkID).Return(nil, fmt.Errorf("storage error"))
 
-		es := state.NewExecutionState(ls, sc, ch, cdp, er)
+			es := state.NewExecutionState(ls, sc, ch, cdp, er, db)
 
-		ledger, err := es.GetChunkRegisters(chunkID)
-		assert.Nil(t, ledger)
-		assert.Error(t, err)
+			ledger, err := es.GetChunkRegisters(chunkID)
+			assert.Nil(t, ledger)
+			assert.Error(t, err)
 
-		ch.AssertExpectations(t)
-		ls.AssertExpectations(t)
-		sc.AssertExpectations(t)
-		er.AssertExpectations(t)
+			ch.AssertExpectations(t)
+			ls.AssertExpectations(t)
+			sc.AssertExpectations(t)
+			er.AssertExpectations(t)
+		})
 	})
 
 	t.Run("ledger storage error", func(t *testing.T) {
-		ls := new(storage.Ledger)
-		sc := new(storage.Commits)
-		ch := new(storage.ChunkHeaders)
-		cdp := new(storage.ChunkDataPacks)
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			ls := new(storage.Ledger)
+			sc := new(storage.Commits)
+			ch := new(storage.ChunkHeaders)
+			cdp := new(storage.ChunkDataPacks)
 
-		er := new(storage.ExecutionResults)
+			er := new(storage.ExecutionResults)
 
-		chunkHeader := unittest.ChunkHeaderFixture()
-		chunkID := chunkHeader.ChunkID
+			chunkHeader := unittest.ChunkHeaderFixture()
+			chunkID := chunkHeader.ChunkID
 
-		registerIDs := chunkHeader.RegisterIDs
+			registerIDs := chunkHeader.RegisterIDs
 
-		ch.On("ByID", chunkID).Return(&chunkHeader, nil)
-		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).
-			Return(nil, fmt.Errorf("storage error"))
+			ch.On("ByID", chunkID).Return(&chunkHeader, nil)
+			ls.On("GetRegisters", registerIDs, chunkHeader.StartState).
+				Return(nil, fmt.Errorf("storage error"))
 
-		es := state.NewExecutionState(ls, sc, ch, cdp, er)
+			es := state.NewExecutionState(ls, sc, ch, cdp, er, db)
 
-		registers, err := es.GetChunkRegisters(chunkID)
-		assert.Error(t, err)
-		assert.Nil(t, registers)
+			registers, err := es.GetChunkRegisters(chunkID)
+			assert.Error(t, err)
+			assert.Nil(t, registers)
 
-		ch.AssertExpectations(t)
-		ls.AssertExpectations(t)
-		sc.AssertExpectations(t)
-		er.AssertExpectations(t)
+			ch.AssertExpectations(t)
+			ls.AssertExpectations(t)
+			sc.AssertExpectations(t)
+			er.AssertExpectations(t)
+		})
+
 	})
 
 	t.Run("existing chunk", func(t *testing.T) {
-		ls := new(storage.Ledger)
-		sc := new(storage.Commits)
-		ch := new(storage.ChunkHeaders)
-		cdp := new(storage.ChunkDataPacks)
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			ls := new(storage.Ledger)
+			sc := new(storage.Commits)
+			ch := new(storage.ChunkHeaders)
+			cdp := new(storage.ChunkDataPacks)
 
-		er := new(storage.ExecutionResults)
+			er := new(storage.ExecutionResults)
 
-		chunkHeader := unittest.ChunkHeaderFixture()
-		chunkID := chunkHeader.ChunkID
+			chunkHeader := unittest.ChunkHeaderFixture()
+			chunkID := chunkHeader.ChunkID
 
-		registerIDs := chunkHeader.RegisterIDs
-		registerValues := []flow.RegisterValue{{1}, {2}, {3}}
+			registerIDs := chunkHeader.RegisterIDs
+			registerValues := []flow.RegisterValue{{1}, {2}, {3}}
 
-		ch.On("ByID", chunkID).Return(&chunkHeader, nil)
-		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).Return(registerValues, nil)
+			ch.On("ByID", chunkID).Return(&chunkHeader, nil)
+			ls.On("GetRegisters", registerIDs, chunkHeader.StartState).Return(registerValues, nil)
 
-		es := state.NewExecutionState(ls, sc, ch, cdp, er)
+			es := state.NewExecutionState(ls, sc, ch, cdp, er, db)
 
-		actualRegisters, err := es.GetChunkRegisters(chunkID)
-		assert.NoError(t, err)
+			actualRegisters, err := es.GetChunkRegisters(chunkID)
+			assert.NoError(t, err)
 
-		expectedRegisters := flow.Ledger{
-			string(registerIDs[0]): registerValues[0],
-			string(registerIDs[1]): registerValues[1],
-			string(registerIDs[2]): registerValues[2],
-		}
+			expectedRegisters := flow.Ledger{
+				string(registerIDs[0]): registerValues[0],
+				string(registerIDs[1]): registerValues[1],
+				string(registerIDs[2]): registerValues[2],
+			}
 
-		assert.Equal(t, expectedRegisters, actualRegisters)
+			assert.Equal(t, expectedRegisters, actualRegisters)
 
-		ch.AssertExpectations(t)
-		ls.AssertExpectations(t)
-		sc.AssertExpectations(t)
-		er.AssertExpectations(t)
+			ch.AssertExpectations(t)
+			ls.AssertExpectations(t)
+			sc.AssertExpectations(t)
+			er.AssertExpectations(t)
+		})
+	})
+
+	t.Run("FindLatestFinalizedAndExecutedBlock", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			ls := new(storage.Ledger)
+			sc := new(storage.Commits)
+			ch := new(storage.ChunkHeaders)
+			cdp := new(storage.ChunkDataPacks)
+			er := new(storage.ExecutionResults)
+			es := state.NewExecutionState(ls, sc, ch, cdp, er, db)
+
+			blockA := unittest.BlockFixture()
+			blockB := unittest.BlockWithParentFixture(&blockA.Header)
+			blockC := unittest.BlockWithParentFixture(&blockB.Header)
+			blockD := unittest.BlockWithParentFixture(&blockC.Header)
+
+			err := db.Update(func(txn *badger.Txn) error {
+				err := procedure.InsertBlock(&blockA)(txn)
+				require.NoError(t, err)
+
+				err = procedure.InsertBlock(&blockB)(txn)
+				require.NoError(t, err)
+
+				err = procedure.InsertBlock(&blockC)(txn)
+				require.NoError(t, err)
+
+				err = procedure.InsertBlock(&blockD)(txn)
+				require.NoError(t, err)
+
+				err = operation.InsertNumber(blockA.View, blockA.ID())(txn)
+				require.NoError(t, err)
+
+				err = operation.InsertBoundary(blockA.View)(txn)
+				require.NoError(t, err)
+
+				//err = procedure.FinalizeBlock(blockA.ID())(txn)
+				//require.NoError(t, err)
+
+				err = procedure.FinalizeBlock(blockB.ID())(txn)
+				require.NoError(t, err)
+
+				err = procedure.FinalizeBlock(blockC.ID())(txn)
+				require.NoError(t, err)
+
+				err = operation.IndexStateCommitment(blockA.ID(), unittest.StateCommitmentFixture())(txn)
+				require.NoError(t, err)
+
+				err = operation.IndexStateCommitment(blockB.ID(), unittest.StateCommitmentFixture())(txn)
+				require.NoError(t, err)
+
+
+				return nil
+			})
+			require.NoError(t, err)
+
+			header, err := es.FindLatestFinalizedAndExecutedBlock()
+			assert.NoError(t, err)
+
+			assert.Equal(t, &blockB.Header, header)
+
+			ch.AssertExpectations(t)
+			ls.AssertExpectations(t)
+			sc.AssertExpectations(t)
+			er.AssertExpectations(t)
+		})
 	})
 }

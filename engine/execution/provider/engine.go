@@ -121,7 +121,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			err = e.onExecutionStateRequest(originID, v)
 		case *messages.ChunkDataPackRequest:
 			err = e.handleChunkDataPackRequest(originID, v.ChunkID)
-			return e.onExecutionStateRequest(originID, v)
 		case *messages.ExecutionStateSyncRequest:
 			return e.onExecutionStateSyncRequest(originID, v)
 		case *messages.ExecutionStateDelta:

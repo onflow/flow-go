@@ -39,6 +39,8 @@ type Engine struct {
 	mempool            *Mempool
 	execState          state.ExecutionState
 	wg                 sync.WaitGroup
+	syncModeThreshold  uint64 //how many consecutive orphaned blocks trigger sync
+	syncInProgress     bool
 }
 
 func New(
@@ -69,6 +71,8 @@ func New(
 		providerEngine:     providerEngine,
 		mempool:            mempool,
 		execState:          execState,
+		syncModeThreshold:  6, //TODO - config param maybe?
+		syncInProgress:     false,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -168,7 +172,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		CompleteCollections: make(map[flow.Identifier]*execution.CompleteCollection),
 	}
 
-	err = e.mempool.Run(func(blockByCollection *BlockByCollectionBackdata, executionQueue *QueuesBackdata, orphanQueue *QueuesBackdata) error {
+	err = e.mempool.Run(func(blockByCollection *BlockByCollectionBackdata, executionQueue *QueuesBackdata, orphanQueues *QueuesBackdata) error {
 
 		err := e.sendCollectionsRequest(completeBlock, blockByCollection)
 		if err != nil {
@@ -177,13 +181,19 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 		// if block fits into execution queue, that's it
 		if queue, added := tryEnqueue(completeBlock, executionQueue); added {
-			e.tryRequeueOrphans(completeBlock, queue, orphanQueue)
+			e.tryRequeueOrphans(completeBlock, queue, orphanQueues)
 			return nil
 		}
 
 		// if block fits into orphan queues
-		if queue, added := tryEnqueue(completeBlock, orphanQueue); added {
-			e.tryRequeueOrphans(completeBlock, queue, orphanQueue)
+		if queue, added := tryEnqueue(completeBlock, orphanQueues); added {
+			e.tryRequeueOrphans(completeBlock, queue, orphanQueues)
+			// this is only queue which grew and could trigger threshold
+			if !e.syncInProgress && queue.Height() > e.syncModeThreshold {
+				// Start sync mode - initializing would require DB operation and will stop processing blocks here
+				// which is exactly what we want
+				e.StartSync(queue.Head.CompleteBlock)
+			}
 			return nil
 		}
 
@@ -191,7 +201,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		// if state commitment doesn't exist and there are no known blocks which will produce
 		// it soon (execution queue) that we save it as orphaned
 		if err == storage.ErrNotFound {
-			_, err := enqueue(completeBlock, orphanQueue)
+			_, err := enqueue(completeBlock, orphanQueues)
 			if err != nil {
 				panic(fmt.Sprintf("cannot add orphaned block: %s", err))
 			}
@@ -203,12 +213,12 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		}
 
 		completeBlock.StartState = stateCommitment
-		newQueue, err := enqueue(completeBlock, executionQueue)
+		newQueue, err := enqueue(completeBlock, executionQueue) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
 		if err != nil {
 			panic(fmt.Sprintf("cannot enqueue block for execution: %s", err))
 		}
 
-		e.tryRequeueOrphans(completeBlock, newQueue, orphanQueue)
+		e.tryRequeueOrphans(completeBlock, newQueue, orphanQueues)
 
 		// If the block was empty
 		if completeBlock.IsComplete() {
@@ -222,7 +232,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	return err
 }
 
-// tryRequeueOrphans tries to put orphaned queue into execution queue after a new block has been added
+// tryRequeueOrphans tries to put orphaned queue into other queues after a new block has been added
 func (e *Engine) tryRequeueOrphans(completeBlock *execution.CompleteBlock, targetQueue *Queue, potentialQueues *QueuesBackdata) {
 	for _, queue := range potentialQueues.All() {
 		// only need to check for heads, as all children has parent already
@@ -455,8 +465,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	var endState flow.StateCommitment = startState
 
 	for i, view := range result.StateViews {
-		// TODO - Should the deltas be applied to a particular state?
-		// Not important now, but might become important once we produce proofs
+		// TODO - Deltas should be applied to a particular state
 		var err error
 		endState, err = e.execState.CommitDelta(view.Delta())
 		if err != nil {
@@ -575,6 +584,14 @@ func (e *Engine) generateExecutionResultForBlock(
 	}
 
 	return er, nil
+}
+
+func (e *Engine) StartSync(completeBlock *execution.CompleteBlock) {
+	// find latest finalized block with state commitment
+	// this way we maximise chance of path existing between it and fresh one
+	// TODO - this doesn't make sense if we treat every block as finalized (MVP)
+
+
 }
 
 // generateChunkDataPack creates a chunk data pack
