@@ -240,3 +240,29 @@ func (e *ForceNilError) StartPosition() ast.Position {
 func (e *ForceNilError) EndPosition() ast.Position {
 	return e.LocationRange.EndPos
 }
+
+// TypeMismatchError
+
+type TypeMismatchError struct {
+	ExpectedType  sema.Type
+	LocationRange LocationRange
+}
+
+func (e *TypeMismatchError) ImportLocation() ast.Location {
+	return e.LocationRange.Location
+}
+
+func (e *TypeMismatchError) Error() string {
+	return fmt.Sprintf(
+		"unexpectedly found non-`%s` while force-casting value",
+		e.ExpectedType.QualifiedString(),
+	)
+}
+
+func (e *TypeMismatchError) StartPosition() ast.Position {
+	return e.LocationRange.StartPos
+}
+
+func (e *TypeMismatchError) EndPosition() ast.Position {
+	return e.LocationRange.EndPos
+}
