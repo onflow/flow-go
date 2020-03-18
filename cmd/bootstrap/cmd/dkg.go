@@ -46,7 +46,7 @@ var dkgCmd = &cobra.Command{
 		log.Debug().Msgf("will run DKG")
 		dkgData, err := run.RunDKG(nodes, generateRandomSeeds(nodes))
 		if err != nil {
-			log.Fatal().Err(err).Msg("eror running DKG")
+			log.Fatal().Err(err).Msg("error running DKG")
 		}
 		log.Info().Msgf("finished running DKG")
 
@@ -74,7 +74,8 @@ var dkgCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(dkgCmd)
 
-	dkgCmd.Flags().StringVarP(&stakingInfosFile, "staking-infos", "s", "", "Path to a yml file containing staking information for all genesis nodes [required]")
+	dkgCmd.Flags().StringVarP(&stakingInfosFile, "staking-infos", "s", "",
+		"Path to a yml file containing staking information for all genesis nodes [required]")
 	dkgCmd.MarkFlagRequired("staking-infos")
 }
 
