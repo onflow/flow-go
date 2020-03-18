@@ -24,9 +24,6 @@
 #define SK_BITS             (Fr_BITS)
 #define SK_LEN              BITS_TO_BYTES(SK_BITS)    
 
-#define VALID   1
-#define INVALID 0
-
 // Compressed and uncompressed points
 #define COMPRESSED      1
 #define UNCOMPRESSED    0

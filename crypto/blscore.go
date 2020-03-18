@@ -22,6 +22,8 @@ type ctx struct {
 var signatureLengthBLS_BLS12381 = int(C._getSignatureLengthBLS_BLS12381())
 var pubKeyLengthBLS_BLS12381 = int(C._getPubKeyLengthBLS_BLS12381())
 var prKeyLengthBLS_BLS12381 = int(C._getPrKeyLengthBLS_BLS12381())
+var valid = C.get_valid()
+var invalid = C.get_invalid()
 
 // init sets the context of BLS12381 curve
 func (a *BLS_BLS12381Algo) init() error {
@@ -140,8 +142,7 @@ func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool
 		(*C.uchar)(&data[0]),
 		(C.int)(len(data)))
 
-	const sigValid = 1 // same value as in include.h
-	return (verif == sigValid)
+	return (verif == valid)
 }
 
 // membershipCheckG2 runs a membership check of BLS public keys on BLS12-381 curve.
@@ -152,7 +153,5 @@ func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool
 // it imports a key through the function DecodePublicKey.
 func (pk *pointG2) checkMembershipG2() bool {
 	verif := C.checkMembership_G2((*C.ep2_st)(pk))
-	// same value as in include.h
-	const pkValid = 1
-	return verif == pkValid
+	return verif == valid
 }
