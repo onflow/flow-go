@@ -283,21 +283,17 @@ func TestState_GetChunkRegisters(t *testing.T) {
 				err = operation.InsertBoundary(blockA.View)(txn)
 				require.NoError(t, err)
 
-				//err = procedure.FinalizeBlock(blockA.ID())(txn)
-				//require.NoError(t, err)
-
 				err = procedure.FinalizeBlock(blockB.ID())(txn)
 				require.NoError(t, err)
 
-				err = procedure.FinalizeBlock(blockC.ID())(txn)
+				err = procedure.FinalizeBlock(blockC.ID())(txn) //finalize up to C
 				require.NoError(t, err)
 
 				err = operation.IndexStateCommitment(blockA.ID(), unittest.StateCommitmentFixture())(txn)
 				require.NoError(t, err)
 
-				err = operation.IndexStateCommitment(blockB.ID(), unittest.StateCommitmentFixture())(txn)
+				err = operation.IndexStateCommitment(blockB.ID(), unittest.StateCommitmentFixture())(txn) // state commitment up to B
 				require.NoError(t, err)
-
 
 				return nil
 			})
