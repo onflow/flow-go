@@ -698,15 +698,9 @@ func newMockVoteAggregator(t *testing.T) (*VoteAggregator, flow.IdentityList) {
 
 	mockSigAggregator := &mocks.SigAggregator{}
 	mockSigAggregator.On("Aggregate", mock.Anything, mock.Anything).Return(&hotmodel.AggregatedSignature{}, nil)
-	// TODO replace with the equivalent of DoAndReturn
-	mockSigAggregator.On("CanReconstruct", 0).Return(false)
-	mockSigAggregator.On("CanReconstruct", 1).Return(false)
-	mockSigAggregator.On("CanReconstruct", 2).Return(false)
-	mockSigAggregator.On("CanReconstruct", 3).Return(false)
-	mockSigAggregator.On("CanReconstruct", 4).Return(true)
-	mockSigAggregator.On("CanReconstruct", 5).Return(true)
-	mockSigAggregator.On("CanReconstruct", 6).Return(true)
-	mockSigAggregator.On("CanReconstruct", 7).Return(true)
+	mockSigAggregator.On("CanReconstruct", mock.AnythingOfType("int")).Return(func(numOfSigShares int) bool {
+		return float64(numOfSigShares) > float64(VALIDATOR_SIZE)/2.0
+	})
 
 	viewState, _ := NewViewState(mockProtocolState, nil, ids[len(ids)-1].NodeID, filter.HasRole(flow.RoleConsensus))
 	voteValidator := NewValidator(viewState, nil, mockSigVerifier)

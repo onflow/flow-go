@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/test"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	hs "github.com/dapperlabs/flow-go/model/hotstuff"
@@ -348,6 +347,7 @@ func testQCHasInsufficentStake(t *testing.T) {
 
 	// validate QC
 	err = v.ValidateQC(qc, block)
+	// a valid QC require `2/3 + 1` of the stakes, this QC only has 2/3 stakes, which is insufficient
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "insufficient stake")
 }
@@ -802,7 +802,7 @@ func createValidators(t *testing.T, n int) ([]*hotstuff.Validator, []*signature.
 
 	for i := 0; i < n; i++ {
 		// create signer
-		signer, err := test.NewRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[i], stakingKeys[i], randomBKeys[i])
+		signer, err := test.NewRandomBeaconSigProvider(ps, dkgPubData, ids[i], stakingKeys[i], randomBKeys[i])
 		require.NoError(t, err)
 		signers[i] = signer
 
@@ -852,7 +852,7 @@ func makeBlockProducerAndQC(t *testing.T, signers []*signature.RandomBeaconAware
 		AggregatedSignature: aggsig,
 	}
 
-	// create bloc builder
+	// create block builder
 	bp := createBlockProducer(t, signer, viewstate)
 
 	return bp, qc, block

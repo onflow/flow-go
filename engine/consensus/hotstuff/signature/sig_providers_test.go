@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/test"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestRandomBeaconEnabledSigning(t *testing.T) {
@@ -208,9 +209,7 @@ func testWrongKMacTagRBEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// verify random beacon sig by a unstaked verifier
-	verifier := TestRandomBeaconSigVerifier{
-		randomBeaconHasher: crypto.NewBLS_KMAC("wrongtag"),
-	}
+	verifier := NewTestRandomBeaconSigVerifier("wrongtag")
 	valid, err := verifier.VerifyRandomBeaconThresholdSig(vote.Signature.RandomBeaconSignature, block, randomBKeys[0].PublicKey())
 	require.NoError(t, err)
 	assert.Equal(t, false, valid)

@@ -119,7 +119,7 @@ func NewStakingProvider(ps protocol.State, tag string, id *flow.Identity, sk cry
 }
 
 // create a new RandomBeaconAwareSigProvider
-func NewRandomBeaconSigProvider(ps protocol.State, dkgPubData *hotstuff.DKGPublicData, tag string, id *flow.Identity, stakingKey crypto.PrivateKey, randomBeaconKey crypto.PrivateKey) (*signature.RandomBeaconAwareSigProvider, error) {
+func NewRandomBeaconSigProvider(ps protocol.State, dkgPubData *hotstuff.DKGPublicData, id *flow.Identity, stakingKey crypto.PrivateKey, randomBeaconKey crypto.PrivateKey) (*signature.RandomBeaconAwareSigProvider, error) {
 	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create view state: %w", err)
@@ -170,7 +170,7 @@ func MakeSignerAndVerifier(t *testing.T, n int, enableRandomBeacon bool) (
 
 	randomBKeys, dkgPubData, err := AddRandomBeaconPrivateKeys(t, ids)
 	for i := 0; i < n; i++ {
-		signer, err := NewRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[i], stakingKeys[i], randomBKeys[i])
+		signer, err := NewRandomBeaconSigProvider(ps, dkgPubData, ids[i], stakingKeys[i], randomBKeys[i])
 		require.NoError(t, err)
 		signers[i] = signer
 		if i == 0 {
