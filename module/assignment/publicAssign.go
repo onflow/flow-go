@@ -88,7 +88,7 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	}
 	t := ids
 
-	for i := 0; i < chunks.Size(); i++ {
+	for i := 0; i < chunks.Len(); i++ {
 		assignees := make([]flow.Identifier, 0, alpha)
 		if len(t) >= alpha { // More verifiers than required for this chunk
 			assignees = append(assignees, t[:alpha]...)
