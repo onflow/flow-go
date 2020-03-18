@@ -148,7 +148,7 @@ func (x *xorshifts) Shuffle(n int, swap func(i, j int)) error {
 // It implements the first (m) elements of Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(m) time
 func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) error {
-	if m < 0 || n < 0 {
+	if m < 0  {
 		return fmt.Errorf("inputs cannot be negative")
 	}
 	if n < m {
