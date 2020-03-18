@@ -88,12 +88,22 @@ func TestRandomPermutationSubset(t *testing.T) {
 	}
 }
 
+// Test_SubPermutationOnEmptySet evaluates that
+//  * permuting an empty set returns an empty list
+//  * drawing a sample of size zero from a non-empty set returns an empty list
 func TestEmptyPermutationSubset(t *testing.T) {
 	seed := make([]byte, 16)
 	seed[0] = 45
 	rng, err := NewRand(seed)
 	require.NoError(t, err)
+
+	// verify that permuting an empty set returns an empty list
 	res, err := rng.SubPermutation(0, 0)
+	require.NoError(t, err)
+	require.True(t, len(res) == 0)
+
+	// verify that drawing a sample of size zero from a non-empty set returns an empty list
+	res, err = rng.SubPermutation(10, 0)
 	require.NoError(t, err)
 	require.True(t, len(res) == 0)
 }
@@ -147,9 +157,10 @@ func TestEmptyShuffle(t *testing.T) {
 	rng, err := NewRand(seed)
 	require.NoError(t, err)
 	emptySlice := make([]float64, 0)
-	rng.Shuffle(len(emptySlice), func(i, j int) {
+	err = rng.Shuffle(len(emptySlice), func(i, j int) {
 		emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
 	})
+	require.NoError(t, err)
 	require.True(t, len(emptySlice) == 0)
 }
 
@@ -205,14 +216,26 @@ func TestRandomSamples(t *testing.T) {
 	}
 }
 
+// TestEmptySamples verifies that drawing a sample of size zero leaves the original list unchanged
 func TestEmptySamples(t *testing.T) {
 	seed := make([]byte, 16)
 	seed[0] = 45
 	rng, err := NewRand(seed)
 	require.NoError(t, err)
+
+	// Sampling from an empty set
 	emptySlice := make([]float64, 0)
-	rng.Samples(len(emptySlice), len(emptySlice), func(i, j int) {
+	err = rng.Samples(len(emptySlice), len(emptySlice), func(i, j int) {
 		emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
 	})
+	require.NoError(t, err)
 	require.True(t, len(emptySlice) == 0)
+
+	// drawing a sample of size zero from an non-empty list should leave the original list unmodified
+	fullSlice := []float64{0, 1, 2, 3, 4, 5}
+	err = rng.Samples(len(fullSlice), 0, func(i, j int) { // modifies fullSlice IN-PLACE
+		emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
+	})
+	require.NoError(t, err)
+	require.Equal(t, []float64{0, 1, 2, 3, 4, 5}, fullSlice)
 }
