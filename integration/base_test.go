@@ -19,23 +19,11 @@ import (
 
 func TestContainer_Start(t *testing.T) {
 
-	net := []*network.FlowNode{
-		{
-			Role:  flow.RoleCollection,
-			Stake: 1000,
-		},
-		{
-			Role:  flow.RoleConsensus,
-			Stake: 1000,
-		},
-		{
-			Role:  flow.RoleExecution,
-			Stake: 1234,
-		},
-		{
-			Role:  flow.RoleVerification,
-			Stake: 4582,
-		},
+	net := []*network.NodeConfig{
+		network.NewNodeConfig(flow.RoleCollection),
+		network.NewNodeConfig(flow.RoleConsensus),
+		network.NewNodeConfig(flow.RoleExecution),
+		network.NewNodeConfig(flow.RoleVerification),
 	}
 
 	// Enable verbose logging
@@ -46,13 +34,13 @@ func TestContainer_Start(t *testing.T) {
 	flowNetwork, err := network.PrepareFlowNetwork(ctx, t, "mvp", net)
 	require.NoError(t, err)
 
-	flowNetwork.Suite.Start(ctx)
-	defer flowNetwork.Suite.Close()
+	flowNetwork.Start(ctx)
+	defer flowNetwork.Stop()
 
 	var collectionNodeApiPort = ""
 	for _, container := range flowNetwork.Containers {
 		if container.Identity.Role == flow.RoleCollection {
-			collectionNodeApiPort = container.Ports["api"]
+			collectionNodeApiPort = container.Ports[network.IngressApiPort]
 		}
 	}
 	require.NotEqual(t, collectionNodeApiPort, "")

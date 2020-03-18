@@ -3,46 +3,119 @@ package network
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
+	"github.com/hashicorp/go-multierror"
 	"github.com/m4ksio/testingdock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/utils/unittest"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+const (
+	// DefaultDataDir is the default directory for the node database.
+	DefaultDataDir = "/flow"
+
+	// IngressApiPort is the name used for the collection node ingress API.
+	IngressApiPort = "ingress-api"
+)
+
+// FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	Suite      *testingdock.Suite
+	suite      *testingdock.Suite
 	Network    *testingdock.Network
 	Containers []*FlowContainer
 }
 
+// Start spins up the network.
+func (n *FlowNetwork) Start(ctx context.Context) {
+	n.suite.Start(ctx)
+}
+
+// Stop spins down the network and cleans up temporary directories.
+func (n *FlowNetwork) Stop() error {
+	var merr *multierror.Error
+
+	// stop the containers
+	err := n.suite.Close()
+	if err != nil {
+		merr = multierror.Append(merr, err)
+	}
+
+	// remove data directories
+	for _, c := range n.Containers {
+		err := os.RemoveAll(c.DataDir)
+		if err != nil {
+			merr = multierror.Append(merr, err)
+		}
+	}
+
+	return merr.ErrorOrNil()
+}
+
+// ContainerByID returns the container with the given node ID. If such a
+// container exists, returns true. Otherwise returns false.
+func (n *FlowNetwork) ContainerByID(id flow.Identifier) (*FlowContainer, bool) {
+	for _, c := range n.Containers {
+		if c.Identity.NodeID == id {
+			return c, true
+		}
+	}
+	return nil, false
+}
+
+// FlowContainer represents a test Docker container for a generic Flow node.
 type FlowContainer struct {
 	*testingdock.Container
-	Identity flow.Identity
-	Ports    map[string]string
+	Identity flow.Identity     // the node identity
+	Ports    map[string]string // port mapping
+	DataDir  string            // host directory bound to container's database
 }
 
-type CollectionContainer struct {
-	FlowContainer
-	APIPort string
-}
-
-type FlowNode struct {
+// NodeConfig defines the config for a single node. This is used to start a
+// container for the node.
+type NodeConfig struct {
 	Role       flow.Role
 	Stake      uint64
 	Identifier flow.Identifier
+	CLIOpts    map[string]string // map from CLI flag name to value
+}
+
+func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) *NodeConfig {
+	c := &NodeConfig{
+		Role:       role,
+		Stake:      1000,                         // default stake
+		Identifier: unittest.IdentifierFixture(), // default random ID
+		CLIOpts:    make(map[string]string),
+	}
+
+	for _, apply := range opts {
+		apply(c)
+	}
+
+	return c
+}
+
+func WithClusters(clusters int) func(*NodeConfig) {
+	return func(conf *NodeConfig) {
+		conf.CLIOpts["nclusters"] = strconv.Itoa(clusters)
+	}
 }
 
 type rolesCounts map[flow.Role]uint
 
 // countRoles counts how many times each role occurs
-func countRoles(identities []*FlowNode) rolesCounts {
+func countRoles(identities []*NodeConfig) rolesCounts {
 	ret := make(rolesCounts)
 
 	for _, identity := range identities {
@@ -69,7 +142,12 @@ func healthcheckGRPC(context context.Context, apiPort string) error {
 	return c.Ping(context)
 }
 
-func PrepareFlowNetwork(context context.Context, t *testing.T, name string, nodes []*FlowNode) (*FlowNetwork, error) {
+// imageName returns the canonical image name for the given role.
+func imageName(role flow.Role) string {
+	return fmt.Sprintf("gcr.io/dl-flow/%s:latest", role.String())
+}
+
+func PrepareFlowNetwork(context context.Context, t *testing.T, name string, nodes []*NodeConfig) (*FlowNetwork, error) {
 
 	// count each role occurence
 	identitiesCounts := countRoles(nodes)
@@ -106,11 +184,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		return fmt.Sprintf("%s_%d", role.String(), counter)
 	}
 
-	imageName := func(role flow.Role) string {
-		return fmt.Sprintf("gcr.io/dl-flow/%s:latest", role.String())
-	}
-
-	assign := func(node *FlowNode) (*testingdock.ContainerOpts, *flow.Identity) {
+	assign := func(node *NodeConfig) (*testingdock.ContainerOpts, *flow.Identity) {
 
 		name := containerName(node.Role)
 		imageName := imageName(node.Role)
@@ -121,6 +195,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			Config: &container.Config{
 				Image: imageName,
 			},
+			HostConfig: &container.HostConfig{},
 		}
 
 		identity := flow.Identity{
@@ -143,35 +218,56 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		opts.Config.Cmd = []string{
 			fmt.Sprintf("--entries=%s", networkIdentities),
 			fmt.Sprintf("--nodeid=%s", identity.NodeID.String()),
+			fmt.Sprintf("--datadir=%s", DefaultDataDir),
 			"--loglevel=debug",
+			"--nclusters=1",
 		}
 
-		switch identity.Role {
+		// get a temporary directory in the host
+		tmpdir, err := ioutil.TempDir("", "flow-integration")
+		require.Nil(t, err)
+		flowContainer.DataDir = tmpdir
 
+		// mount the temp directory to the datadir in the container
+		opts.HostConfig.Mounts = append(
+			opts.HostConfig.Mounts,
+			mount.Mount{
+				Type:     "bind",
+				Source:   tmpdir,
+				Target:   DefaultDataDir,
+				ReadOnly: false,
+				BindOptions: &mount.BindOptions{
+					Propagation: "rprivate",
+				},
+			})
+
+		switch identity.Role {
 		// enhance with extras for collection node
 		case flow.RoleCollection:
 
-			collectionNodeAPIPort := testingdock.RandomPort(t)
+			// get a free host port for the collection node ingress grpc service
+			ingressPort := testingdock.RandomPort(t)
 
 			opts.Config.ExposedPorts = nat.PortSet{
-				"9000/tcp": struct{}{},
+				"9000/tcp": {},
 			}
 			opts.Config.Cmd = append(opts.Config.Cmd, fmt.Sprintf("--ingress-addr=%s:9000", opts.Name))
 			opts.HostConfig = &container.HostConfig{
 				PortBindings: nat.PortMap{
-					nat.Port("9000/tcp"): []nat.PortBinding{
+					"9000/tcp": []nat.PortBinding{
 						{
 							HostIP:   "0.0.0.0",
-							HostPort: collectionNodeAPIPort,
+							HostPort: ingressPort,
 						},
 					},
 				},
 			}
+
 			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
-				return healthcheckGRPC(context, collectionNodeAPIPort)
+				return healthcheckGRPC(context, ingressPort)
 			})
 
-			flowContainer.Ports["api"] = collectionNodeAPIPort
+			flowContainer.Ports[IngressApiPort] = ingressPort
 		}
 
 		c := suite.Container(*opts)
@@ -184,9 +280,9 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 
 	// assigns names and addresses, those depends on numbers of each service
 	for i, node := range nodes {
-		ops, identity := assign(node)
+		containerOpts, identity := assign(node)
 
-		opts[i] = ops
+		opts[i] = containerOpts
 		identities[i] = identity
 		identitiesStr[i] = identity.String()
 	}
@@ -201,7 +297,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 	}
 
 	return &FlowNetwork{
-		Suite:      suite,
+		suite:      suite,
 		Network:    network,
 		Containers: containers,
 	}, nil

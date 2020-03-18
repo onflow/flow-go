@@ -21,23 +21,11 @@ type nodeInfo struct {
 
 func TestNetworkSetupBasic(t *testing.T) {
 
-	net := []*network.FlowNode{
-		{
-			Role:  flow.RoleCollection,
-			Stake: 1000,
-		},
-		{
-			Role:  flow.RoleConsensus,
-			Stake: 1000,
-		},
-		{
-			Role:  flow.RoleExecution,
-			Stake: 1234,
-		},
-		{
-			Role:  flow.RoleVerification,
-			Stake: 4582,
-		},
+	net := []*network.NodeConfig{
+		network.NewNodeConfig(flow.RoleCollection),
+		network.NewNodeConfig(flow.RoleConsensus),
+		network.NewNodeConfig(flow.RoleExecution),
+		network.NewNodeConfig(flow.RoleVerification),
 	}
 
 	flowNetwork, err := network.PrepareFlowNetwork(context.Background(), t, "testing", net)
@@ -59,35 +47,14 @@ func TestNetworkSetupBasic(t *testing.T) {
 
 func TestNetworkSetupMultipleNodes(t *testing.T) {
 
-	net := []*network.FlowNode{
-		{
-			Role:  flow.RoleCollection,
-			Stake: 1000,
-		},
-		{
-			Role:  flow.RoleCollection,
-			Stake: 1000,
-		},
-		{
-			Role:  flow.RoleCollection,
-			Stake: 1234,
-		},
-		{
-			Role:  flow.RoleExecution,
-			Stake: 7668,
-		},
-		{
-			Role:  flow.RoleVerification,
-			Stake: 4582,
-		},
-		{
-			Role:  flow.RoleVerification,
-			Stake: 4582,
-		},
-		{
-			Role:  flow.RoleVerification,
-			Stake: 4582,
-		},
+	net := []*network.NodeConfig{
+		network.NewNodeConfig(flow.RoleCollection),
+		network.NewNodeConfig(flow.RoleCollection),
+		network.NewNodeConfig(flow.RoleCollection),
+		network.NewNodeConfig(flow.RoleVerification),
+		network.NewNodeConfig(flow.RoleVerification),
+		network.NewNodeConfig(flow.RoleVerification),
+		network.NewNodeConfig(flow.RoleExecution),
 	}
 
 	flowNetwork, err := network.PrepareFlowNetwork(context.Background(), t, "testing", net)
