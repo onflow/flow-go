@@ -19,7 +19,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/ipfs/go-log v0.0.1
 	github.com/jrick/bitset v1.0.0
-	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
+	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8 // indirect
 	github.com/libp2p/go-libp2p v0.5.1
 	github.com/libp2p/go-libp2p-core v0.3.0
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
