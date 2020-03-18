@@ -14,16 +14,23 @@ type BlockchainState struct {
 	collections  storage.Collections
 	transactions storage.Transactions //stores TransactionBody (not the complete transaction)
 
+	// reverse lookup storage
+	transactionInfo storage.TransactionInfos
+
 	//lock since storage interface doesn't has an atomic upsert
 	sync.Mutex
 }
 
-func NewBlockchainState(h storage.Headers, p storage.Payloads, c storage.Collections, t storage.Transactions) *BlockchainState {
+func NewBlockchainState(h storage.Headers,
+	p storage.Payloads, c storage.Collections,
+	t storage.Transactions,
+	ti storage.TransactionInfos) *BlockchainState {
 	return &BlockchainState{
-		headers:      h,
-		payloads:     p,
-		collections:  c,
-		transactions: t,
+		headers:         h,
+		payloads:        p,
+		collections:     c,
+		transactions:    t,
+		transactionInfo: ti,
 	}
 }
 
@@ -47,8 +54,8 @@ func (b *BlockchainState) UpsertCollection(collection *flow.Collection) error {
 	return err
 }
 
-// AddTransaction adds the transaction body to the state if not present
-func (b *BlockchainState) AddTransaction(transaction *flow.TransactionBody) error {
+// AddTransaction adds the transaction body to the state if not present and adds the transactionInfo
+func (b *BlockchainState) AddTransaction(transaction *flow.TransactionBody, collID flow.Identifier) error {
 	b.Lock()
 	defer b.Unlock()
 	_, err := b.transactions.ByID(transaction.ID())
@@ -57,6 +64,13 @@ func (b *BlockchainState) AddTransaction(transaction *flow.TransactionBody) erro
 	}
 	if err == storage.ErrNotFound {
 		err = b.transactions.Store(transaction)
+		if err != nil {
+			tInfo := &flow.TransactionInfo{
+				TransactionID: transaction.ID(),
+				CollectionID:  collID,
+			}
+			err = b.transactionInfo.Store(tInfo)
+		}
 	}
 	return err
 }

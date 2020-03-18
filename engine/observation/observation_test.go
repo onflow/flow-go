@@ -1,4 +1,4 @@
-package ingestion
+package observation
 
 import (
 	"os"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/observation"
+	"github.com/dapperlabs/flow-go/engine/observation/ingestion"
 	"github.com/dapperlabs/flow-go/model/flow"
 
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -39,8 +39,8 @@ type Suite struct {
 	headers      *storage.Headers
 	payloads     *storage.Payloads
 	txInfos      *storage.TransactionInfos
-	blkState     *observation.BlockchainState
-	eng          *Engine
+	blkState     *BlockchainState
+	eng          *ingestion.Engine
 
 	// mock conduit for requesting/receiving collections
 	collectionsConduit *network.Conduit
@@ -83,22 +83,4 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 	suite.eng = eng
 
-}
-
-// TestHandleBlock checks that when a block is received a request for each individual collection is made
-func (suite *Suite) TestHandleBlock() {
-	originID := unittest.IdentifierFixture()
-	block := unittest.BlockFixture()
-
-	suite.collections.On("Store", mock.Anything).Return(nil).Times(len(block.Guarantees))
-
-	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-	suite.proto.snapshot.On("Identities", mock.Anything).Return(collIdentities, nil).Once()
-
-	// expect that the collection is requested
-	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
-
-	err := suite.eng.Process(originID, &block)
-	require.NoError(suite.T(), err)
-	suite.net.AssertExpectations(suite.T())
 }
