@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/observation"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -16,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -33,10 +33,7 @@ type Engine struct {
 	collectionConduit network.Conduit
 
 	// blockchain state
-	headers      storage.Headers
-	payloads     storage.Payloads
-	collection   storage.Collections
-	transactions storage.Transactions
+	blkState *observation.BlockchainSate
 }
 
 // New creates a new observation ingestion engine
@@ -45,22 +42,16 @@ func New(log zerolog.Logger,
 	state protocol.State,
 	tracer trace.Tracer,
 	me module.Local,
-	headers storage.Headers,
-	payloads storage.Payloads,
-	collection storage.Collections,
-	transactions storage.Transactions) (*Engine, error) {
+	blkState *observation.BlockchainSate) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
-		unit:         engine.NewUnit(),
-		log:          log.With().Str("engine", "ingestion").Logger(),
-		tracer:       tracer,
-		state:        state,
-		me:           me,
-		headers:      headers,
-		payloads:     payloads,
-		collection:   collection,
-		transactions: transactions,
+		unit:     engine.NewUnit(),
+		log:      log.With().Str("engine", "ingestion").Logger(),
+		tracer:   tracer,
+		state:    state,
+		me:       me,
+		blkState: blkState,
 	}
 
 	collConduit, err := net.Register(engine.CollectionProvider, eng)
@@ -153,7 +144,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 
 	// Request all the collections for this block
 	for _, g := range block.Guarantees {
-		e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID()}, ids...)
+		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID()}, ids...)
 		if err != nil {
 			e.log.Err(err).Msg("cannot submit collection requests")
 		}
@@ -171,13 +162,16 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 		Hex("collection_id", logging.Entity(collection)).
 		Msg("received collection")
 
-	err := e.collection.Store(&collection)
+	err := e.blkState.UpsertCollection(&collection)
 	if err != nil {
 		return err
 	}
 
 	for _, t := range collection.Transactions {
-		e.transactions.Store(t)
+		err = e.blkState.AddTransaction(t)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -7,9 +7,9 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/engine"
+	obs "github.com/dapperlabs/flow-go/engine/observation"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -33,15 +33,13 @@ func New(log zerolog.Logger,
 	state protocol.State,
 	config Config, collectionRPC observation.ObserveServiceClient,
 	executionRPC observation.ObserveServiceClient,
-	headers storage.Headers,
-	coll storage.Collections,
-	tx storage.Transactions) *Engine {
+	blkState *obs.BlockchainSate) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
 		log:     log,
 		unit:    engine.NewUnit(),
-		handler: NewHandler(log, state, collectionRPC, executionRPC, headers, coll, tx),
+		handler: NewHandler(log, state, collectionRPC, executionRPC, blkState),
 		server:  grpc.NewServer(),
 		config:  config,
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/observation"
 	"github.com/dapperlabs/flow-go/model/flow"
 
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -37,7 +38,7 @@ type Suite struct {
 	collections  *storage.Collections
 	headers      *storage.Headers
 	payloads     *storage.Payloads
-	builder      *module.Builder
+	blkState     *observation.BlockchainSate
 	eng          *Engine
 
 	// mock conduit for requesting/receiving collections
@@ -75,8 +76,9 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storage.Collections)
 	suite.headers = new(storage.Headers)
 	suite.payloads = new(storage.Payloads)
+	suite.blkState = observation.NewBlockchainState(suite.headers, suite.payloads, suite.collections, suite.transactions)
 
-	eng, err := New(log, suite.net, suite.proto.state, tracer, suite.me, suite.headers, suite.payloads, suite.collections, suite.transactions)
+	eng, err := New(log, suite.net, suite.proto.state, tracer, suite.me, suite.blkState)
 	require.NoError(suite.T(), err)
 	suite.eng = eng
 

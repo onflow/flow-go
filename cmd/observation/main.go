@@ -5,6 +5,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	obs "github.com/dapperlabs/flow-go/engine/observation"
 	"github.com/dapperlabs/flow-go/engine/observation/ingestion"
 	"github.com/dapperlabs/flow-go/engine/observation/rpc"
 	"github.com/dapperlabs/flow-go/module"
@@ -23,10 +24,7 @@ func main() {
 		collectionRPC   observation.ObserveServiceClient
 		executionRPC    observation.ObserveServiceClient
 		err             error
-		transactions    *storage.Transactions
-		collections     *storage.Collections
-		headers         *storage.Headers
-		payloads        *storage.Payloads
+		blkState        *obs.BlockchainSate
 	)
 
 	cmd.FlowNode("observation").
@@ -55,10 +53,11 @@ func main() {
 			return nil
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			transactions = storage.NewTransactions(node.DB)
-			collections = storage.NewCollections(node.DB)
-			headers = storage.NewHeaders(node.DB)
-			payloads = storage.NewPayloads(node.DB)
+			headers := storage.NewHeaders(node.DB)
+			payloads := storage.NewPayloads(node.DB)
+			collections := storage.NewCollections(node.DB)
+			transactions := storage.NewTransactions(node.DB)
+			blkState = obs.NewBlockchainState(headers, payloads, collections, transactions)
 			return nil
 		}).
 		//Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -71,11 +70,11 @@ func main() {
 		//	return followEng, err
 		//}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, headers, payloads, collections, transactions)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, blkState)
 			return ingestEng, err
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, collectionRPC, executionRPC, headers, collections, transactions)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, collectionRPC, executionRPC, blkState)
 			return rpcEng, nil
 		}).
 		Run()
