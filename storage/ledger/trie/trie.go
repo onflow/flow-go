@@ -915,7 +915,7 @@ func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []
 // as a [][]byte
 // First we have a byte, and set the first bit to 1 if it is an inclusion proof
 // Then the size is encoded as a single byte
-// Then the flag is encoded
+// Then the flag is encoded (size is defined by size)
 // Finally the proofs are encoded one at a time, and is stored as a byte array
 func EncodeProof(pholder *proofHolder) [][]byte {
 	proofs := make([][]byte, 0)
@@ -953,21 +953,17 @@ func DecodeProof(proofs [][]byte) *proofHolder {
 		byteInclusion := proof[0:1]
 		inclusion := utils.IsBitSet(byteInclusion, 0)
 		inclusions = append(inclusions, inclusion)
-		sizes = append(sizes, proof[1:2]...)
-		if len(proof) > 34 {
-			flags = append(flags, proof[2:33])
-		} else {
-			flags = append(flags, proof[2:])
-		}
+		size := proof[1:2]
+		sizes = append(sizes, size...)
+		flagByteCount := int(size[0]) / 8
+		flags = append(flags, proof[2:2+flagByteCount])
 		byteProofs := make([][]byte, 0)
-		i := 34
-		for i < len(proof) {
+		for i := flagByteCount + 2; i < len(proof); i += 32 {
 			if i+32 <= len(proof) {
 				byteProofs = append(byteProofs, proof[i:i+32])
 			} else {
 				byteProofs = append(byteProofs, proof[i:])
 			}
-			i = i + 32
 		}
 		newProofs = append(newProofs, byteProofs)
 	}
