@@ -704,7 +704,7 @@ func testProposalWrongParentAbove(t *testing.T) {
 	f.On("GetBlock", proposal.Block.QC.BlockID).Return(nil, false)
 
 	// proposal.Block.QC.View is above finalized view
-	f.On("FinalizedView").Return(uint64(3))
+	f.On("FinalizedView").Return(uint64(qcview - 1))
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
