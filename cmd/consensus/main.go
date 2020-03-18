@@ -105,7 +105,9 @@ func main() {
 
 			memberFilter := filter.HasRole(flow.RoleConsensus)
 
-			head := node.State.Final().Head
+			head := func() (*flow.Header, error) {
+				return node.State.Final().Head()
+			}
 			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
 			cold, err := coldstuff.New(node.Logger, node.State, node.Me, comp, build, final, memberFilter, 3*time.Second, 6*time.Second, head)

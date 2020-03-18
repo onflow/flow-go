@@ -28,11 +28,12 @@ func _() {
 	_ = x[OperationMove-17]
 	_ = x[OperationCast-18]
 	_ = x[OperationFailableCast-19]
+	_ = x[OperationForceCast-20]
 }
 
-const _Operation_name = "OperationUnknownOperationOrOperationAndOperationEqualOperationUnequalOperationLessOperationGreaterOperationLessEqualOperationGreaterEqualOperationPlusOperationMinusOperationMulOperationDivOperationModOperationConcatOperationNegateOperationNilCoalesceOperationMoveOperationCastOperationFailableCast"
+const _Operation_name = "OperationUnknownOperationOrOperationAndOperationEqualOperationUnequalOperationLessOperationGreaterOperationLessEqualOperationGreaterEqualOperationPlusOperationMinusOperationMulOperationDivOperationModOperationConcatOperationNegateOperationNilCoalesceOperationMoveOperationCastOperationFailableCastOperationForceCast"
 
-var _Operation_index = [...]uint16{0, 16, 27, 39, 53, 69, 82, 98, 116, 137, 150, 164, 176, 188, 200, 215, 230, 250, 263, 276, 297}
+var _Operation_index = [...]uint16{0, 16, 27, 39, 53, 69, 82, 98, 116, 137, 150, 164, 176, 188, 200, 215, 230, 250, 263, 276, 297, 315}
 
 func (i Operation) String() string {
 	if i < 0 || i >= Operation(len(_Operation_index)-1) {

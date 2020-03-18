@@ -184,7 +184,9 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 	for i, parameter := range parameterList.Parameters {
 		parameterType := parameters[i].TypeAnnotation.Type
 
-		if !IsSubType(parameterType, &AccountType{}) {
+		if !parameterType.IsInvalidType() &&
+			!IsSubType(parameterType, &AccountType{}) {
+
 			checker.report(
 				&InvalidTransactionPrepareParameterTypeError{
 					Type:  parameterType,

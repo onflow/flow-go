@@ -3,8 +3,6 @@ package assignment
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -28,19 +26,10 @@ func NewPublicAssignment(alpha int) *PublicAssignment {
 func (p *PublicAssignment) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
 	a, err := chunkAssignment(ids.NodeIDs(), chunks, rng, p.alpha)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not complete chunk assignment")
+		return nil, fmt.Errorf("computing assignment failed: %w", err)
 	}
 
 	return a, nil
-}
-
-// permute shuffles subset of ids that contains its first m elements in place
-// it implements in-place version of Fisher-Yates shuffling https://doi.org/10.1145%2F364520.364540
-func permute(ids flow.IdentifierList, m int, rng random.Rand) {
-	for i := m - 1; i > 0; i-- {
-		j, _ := rng.IntN(i)
-		ids.Swap(i, j)
-	}
 }
 
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
@@ -51,28 +40,40 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 	}
 	assignment := chunkassignment.NewAssignment()
 	// permutes the entire slice
-	permute(ids, len(ids), rng)
+	err := rng.Shuffle(len(ids), ids.Swap)
+	if err != nil {
+		return nil, fmt.Errorf("shuffling verifiers failed: %w", err)
+	}
 	t := ids
 
 	for i := 0; i < chunks.Size(); i++ {
-		if len(t) >= alpha {
-			// More verifiers than required for this chunk
-			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(t[:alpha], nil))
+		assignees := make([]flow.Identifier, 0, alpha)
+		if len(t) >= alpha { // More verifiers than required for this chunk
+			assignees = append(assignees, t[:alpha]...)
 			t = t[alpha:]
-		} else {
-			// Less verifiers than required for this chunk
-			part1 := make([]flow.Identifier, len(t))
-			copy(part1, t)
+		} else { // Less verifiers than required for this chunk
+			assignees = append(assignees, t...) // take all remaining elements from t
 
-			still := alpha - len(t)
-			permute(ids[:ids.Len()-len(t)], still, rng)
+			// now, we need `still` elements from a new shuffling round:
+			still := alpha - len(assignees)
+			t = ids[:ids.Len()-len(assignees)] // but we exclude the elements we already picked from the population
+			err := rng.Samples(len(t), still, t.Swap)
+			if err != nil {
+				return nil, fmt.Errorf("sampling verifiers failed: %w", err)
+			}
 
-			part2 := make([]flow.Identifier, still)
-			copy(part2, ids[:still])
-			assignment.Add(chunks.ByIndex(uint64(i)), flow.JoinIdentifierLists(part1, part2))
-			permute(ids[still:], ids.Len()-still, rng)
+			// by adding `still` elements from new shuffling round: we have alpha assignees for the current chunk
+			assignees = append(assignees, t[:still]...)
+
+			// we have already assigned the first `still` elements in `ids`
+			// note that remaining elements ids[still:] still need shuffling
 			t = ids[still:]
+			err = rng.Shuffle(len(t), t.Swap)
+			if err != nil {
+				return nil, fmt.Errorf("shuffling verifiers failed: %w", err)
+			}
 		}
+		assignment.Add(chunks.ByIndex(uint64(i)), assignees)
 	}
 	return assignment, nil
 }
