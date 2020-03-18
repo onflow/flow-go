@@ -3495,10 +3495,31 @@ func TestProofEncoderDecoder(t *testing.T) {
 	values = append(values, value1, value2)
 
 	trie := newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
-	defer trie.SafeClose()
 
 	_ = trie.Update(keys, values)
 	_, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
+
+	trie.SafeClose()
+	require.Equal(t, DecodeProof(EncodeProof(proofHldr)), proofHldr, "Proof Encoder has an issue")
+
+	trieHeight = 257
+	// add key1 and value1 to the empty trie
+	key1 = make([]byte, 32) // 00000000 (0)
+	value1 = []byte{'a'}
+
+	key2 = make([]byte, 32) // 00000001 (1)
+	utils.SetBit(key2, 7)
+	value2 = []byte{'b'}
+
+	keys = make([][]byte, 0)
+	values = make([][]byte, 0)
+	keys = append(keys, key1, key2)
+	values = append(values, value1, value2)
+	trie = newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
+	defer trie.SafeClose()
+
+	_ = trie.Update(keys, values)
+	_, proofHldr, _ = trie.Read(keys, false, trie.GetRoot().value)
 
 	require.Equal(t, DecodeProof(EncodeProof(proofHldr)), proofHldr, "Proof Encoder has an issue")
 }

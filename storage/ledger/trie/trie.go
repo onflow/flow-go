@@ -927,7 +927,11 @@ func EncodeProof(pholder *proofHolder) [][]byte {
 			utils.SetBit(byteInclusion, 0)
 		}
 		proof := append(byteInclusion, byteSize...)
+
+		flagSize := []byte{uint8(len(flag))}
+		proof = append(proof, flagSize...)
 		proof = append(proof, flag...)
+
 		for _, p := range singleProof {
 			proof = append(proof, p...)
 		}
@@ -955,10 +959,10 @@ func DecodeProof(proofs [][]byte) *proofHolder {
 		inclusions = append(inclusions, inclusion)
 		size := proof[1:2]
 		sizes = append(sizes, size...)
-		flagByteCount := int(size[0]) / 8
-		flags = append(flags, proof[2:2+flagByteCount])
+		flagSize := int(proof[2])
+		flags = append(flags, proof[3:flagSize+3])
 		byteProofs := make([][]byte, 0)
-		for i := flagByteCount + 2; i < len(proof); i += 32 {
+		for i := flagSize + 3; i < len(proof); i += 32 {
 			if i+32 <= len(proof) {
 				byteProofs = append(byteProofs, proof[i:i+32])
 			} else {
