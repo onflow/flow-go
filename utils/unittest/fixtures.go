@@ -345,6 +345,17 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	return tx
 }
 
+func TransactionInfoFixture(n ...func(t *flow.TransactionInfo)) flow.TransactionInfo {
+	tx := flow.TransactionInfo{
+		TransactionID: IdentifierFixture(),
+		CollectionID:  IdentifierFixture(),
+		Status:        flow.TransactionPending}
+	if len(n) > 0 {
+		n[0](&tx)
+	}
+	return tx
+}
+
 func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	tb := flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
