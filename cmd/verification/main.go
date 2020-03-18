@@ -60,7 +60,7 @@ func main() {
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
-			chunkVerifier := chunkVerifier.FlowChunkVerifier(vm)
+			chunkVerifier := chunkVerifier.NewFlowChunkVerifier(vm)
 			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).
