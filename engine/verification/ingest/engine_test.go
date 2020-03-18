@@ -206,6 +206,7 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
 	suite.state.On("Final").Return(suite.ss)
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
 
 	// process should fail
@@ -231,6 +232,7 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 			// mock the receipt coming from the invalid role
 			invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
 			suite.state.On("Final").Return(suite.ss)
+			suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 			suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 
 			receipt := unittest.ExecutionReceiptFixture()
@@ -258,6 +260,7 @@ func (suite *TestSuite) TestHandleCollection() {
 
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", collIdentity.NodeID).Return(collIdentity, nil).Once()
 
 	// expect that the collection be added to the mempool
@@ -278,6 +281,7 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
 	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
 
 	err := eng.Process(unstakedIdentity, suite.collection)
@@ -302,6 +306,7 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 		// mock the collection coming from the invalid role
 		invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
 		suite.state.On("Final").Return(suite.ss).Once()
+		suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 
 		err := eng.Process(invalidIdentity.NodeID, suite.collection)
@@ -320,6 +325,7 @@ func (suite *TestSuite) TestHandleExecutionState() {
 
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", exeIdentity.NodeID).Return(exeIdentity, nil).Once()
 
 	// expect that the state be added to the mempool
@@ -344,6 +350,7 @@ func (suite *TestSuite) TestHandleExecutionState_UnstakedSender() {
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
 	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
 
 	res := &messages.ExecutionStateResponse{
@@ -372,6 +379,7 @@ func (suite *TestSuite) TestHandleExecutionState_SenderWithWrongRole() {
 		// mock the state coming from the invalid role
 		invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
 		suite.state.On("Final").Return(suite.ss).Once()
+		suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 
 		err := eng.Process(invalidIdentity.NodeID, suite.chunkState)
@@ -426,8 +434,8 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.SetupTest()
 			eng := suite.TestNewEngine()
 
-			suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 			suite.state.On("Final", testifymock.Anything).Return(suite.ss, nil)
+			suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil).Once()
 			suite.ss.On("Identities", testifymock.Anything).Return(flow.IdentityList{verIdentity}, nil).Once()
 			suite.me.On("NodeID").Return(verIdentity.NodeID)
@@ -611,7 +619,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					_ = verNode.IngestEngine.Process(exeID.NodeID, receipt)
 				}
 
-				switch j % 2 {
+				switch 0 {
 				case 0:
 					// block then receipt
 					sendBlock()
