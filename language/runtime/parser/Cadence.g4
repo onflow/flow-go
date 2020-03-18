@@ -487,12 +487,14 @@ NilCoalescing : WS '??';
 
 Casting : 'as' ;
 FailableCasting : 'as?' ;
+ForceCasting : 'as!' ;
 
 ResourceAnnotation : '@' ;
 
 castingOp
     : Casting
     | FailableCasting
+    | ForceCasting
     ;
 
 createExpression
