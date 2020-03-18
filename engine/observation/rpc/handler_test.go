@@ -38,7 +38,8 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	resp, err := handler.GetLatestBlock(context.Background(), req)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
-	suite.Require().Equal(block.PayloadHash[:], resp.Block.Hash)
+	id := block.ID()
+	suite.Require().Equal(id[:], resp.Block.Hash)
 	suite.Require().Equal(block.Height, resp.Block.Number)
 	suite.Require().Equal(block.ParentID[:], resp.Block.PreviousBlockHash)
 }

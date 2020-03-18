@@ -6,8 +6,9 @@ import (
 )
 
 func BlockHeaderToMessage(h *flow.Header) (entities.BlockHeader, error) {
+	id := h.ID()
 	bh := entities.BlockHeader{
-		Hash:              h.PayloadHash[:],
+		Hash:              id[:],
 		PreviousBlockHash: h.ParentID[:],
 		Number:            h.Height,
 	}

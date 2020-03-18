@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -12,11 +13,13 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/observation"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 
 	module "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	realstore "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -31,15 +34,13 @@ type Suite struct {
 		mutator  *protocol.Mutator
 	}
 
-	me           *module.Local
-	net          *module.Network
-	provider     *network.Engine
-	transactions *storage.Transactions
-	collections  *storage.Collections
-	headers      *storage.Headers
-	payloads     *storage.Payloads
-	blkState     *observation.BlockchainState
-	eng          *Engine
+	me          *module.Local
+	net         *module.Network
+	provider    *network.Engine
+	collections *storage.Collections
+	headers     *storage.Headers
+	blkState    *observation.BlockchainState
+	eng         *Engine
 
 	// mock conduit for requesting/receiving collections
 	collectionsConduit *network.Conduit
@@ -72,11 +73,9 @@ func (suite *Suite) SetupTest() {
 		Once()
 
 	suite.provider = new(network.Engine)
-	suite.transactions = new(storage.Transactions)
 	suite.collections = new(storage.Collections)
 	suite.headers = new(storage.Headers)
-	suite.payloads = new(storage.Payloads)
-	suite.blkState = observation.NewBlockchainState(suite.headers, suite.payloads, suite.collections, suite.transactions)
+	suite.blkState = observation.NewBlockchainState(suite.headers, suite.collections)
 
 	eng, err := New(log, suite.net, suite.proto.state, tracer, suite.me, suite.blkState)
 	require.NoError(suite.T(), err)
@@ -84,12 +83,10 @@ func (suite *Suite) SetupTest() {
 
 }
 
-// TestHandleBlock checks that when a block is received a request for each individual collection is made
+// TestHandleBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestHandleBlock() {
 	originID := unittest.IdentifierFixture()
 	block := unittest.BlockFixture()
-
-	suite.collections.On("Store", mock.Anything).Return(nil).Times(len(block.Guarantees))
 
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(collIdentities, nil).Once()
@@ -98,6 +95,33 @@ func (suite *Suite) TestHandleBlock() {
 	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
 
 	err := suite.eng.Process(originID, &block)
+	require.NoError(suite.T(), err)
+	suite.net.AssertExpectations(suite.T())
+}
+
+// TestHandleCollection checks that when a Collection is received, it is persisted
+func (suite *Suite) TestHandleCollection() {
+	originID := unittest.IdentifierFixture()
+	collection := unittest.CollectionFixture(5)
+
+	suite.collections.On("Store", mock.Anything).Return(nil).Once()
+
+	cr := messages.CollectionResponse{Collection: collection}
+	err := suite.eng.Process(originID, &cr)
+	require.NoError(suite.T(), err)
+	suite.net.AssertExpectations(suite.T())
+}
+
+// TestHandleDuplicateCollection checks that when a duplicate Collection is received, it is ignored
+func (suite *Suite) TestHandleDuplicateCollection() {
+	originID := unittest.IdentifierFixture()
+	collection := unittest.CollectionFixture(5)
+
+	error := fmt.Errorf("extra text: %w", realstore.ErrAlreadyExists)
+	suite.collections.On("Store", mock.Anything).Return(error).Once()
+
+	cr := messages.CollectionResponse{Collection: collection}
+	err := suite.eng.Process(originID, &cr)
 	require.NoError(suite.T(), err)
 	suite.net.AssertExpectations(suite.T())
 }

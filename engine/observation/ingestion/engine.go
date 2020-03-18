@@ -145,20 +145,8 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 		Hex("collection_id", logging.Entity(collection)).
 		Msg("received collection")
 
-	err := e.blkState.UpsertCollection(&collection)
-	if err != nil {
-		return err
-	}
-
-	for _, t := range collection.Transactions {
-		err = e.blkState.AddTransaction(t)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-
+	err := e.blkState.StoreCollection(&collection)
+	return err
 }
 
 // onCollectionGuarantee is used to process collection guarantees received
@@ -178,8 +166,8 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	}
 
 	// check that the origin is a collection node; this check is fine even if it
-	// excludes our own ID - in the case of local submission of Collections, we
-	// should use the propagation engine, which is for exchange of Collections
+	// excludes our own ID - in the case of local submission of collections, we
+	// should use the propagation engine, which is for exchange of collections
 	// between consensus nodes anyway; we do no processing or validation in this
 	// engine beyond validating the origin
 	if id.Role != flow.RoleCollection {
@@ -215,9 +203,6 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	if len(identities) < 1 {
 		return nil, fmt.Errorf("no Collection identity found")
 	}
-	identifiers := make([]flow.Identifier, len(identities))
-	for i, id := range identities {
-		identifiers[i] = id.NodeID
-	}
+	identifiers := flow.GetIDs(identities)
 	return identifiers, nil
 }

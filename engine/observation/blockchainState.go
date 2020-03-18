@@ -1,7 +1,7 @@
 package observation
 
 import (
-	"sync"
+	"strings"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -9,54 +9,25 @@ import (
 
 // BlockChainState represents the entire block chain including blocks, collections and transactions
 type BlockchainState struct {
-	headers      storage.Headers
-	payloads     storage.Payloads
-	collections  storage.Collections
-	transactions storage.Transactions //stores TransactionBody (not the complete transaction)
-
-	//lock since storage interface doesn't has an atomic upsert
-	sync.Mutex
+	headers     storage.Headers
+	collections storage.Collections
 }
 
-func NewBlockchainState(h storage.Headers, p storage.Payloads, c storage.Collections, t storage.Transactions) *BlockchainState {
+func NewBlockchainState(h storage.Headers, c storage.Collections) *BlockchainState {
 	return &BlockchainState{
-		headers:      h,
-		payloads:     p,
-		collections:  c,
-		transactions: t,
+		headers:     h,
+		collections: c,
 	}
 }
 
-// UpsertCollection adds ors updates a collection to the block chain state
-func (b *BlockchainState) UpsertCollection(collection *flow.Collection) error {
-	b.Lock()
-	defer b.Unlock()
-	_, err := b.collections.ByID(collection.ID())
-	if err != nil {
-		if err == storage.ErrNotFound {
-			err = b.collections.Store(collection)
-			return err
-		}
-		return err
-	}
-	err = b.collections.Remove(collection.ID())
-	if err != nil {
-		return err
-	}
-	err = b.collections.Store(collection)
-	return err
-}
+// StoreCollection adds a collection to the block chain state if not already present
+func (b *BlockchainState) StoreCollection(collection *flow.Collection) error {
 
-// AddTransaction adds the transaction body to the state if not present
-func (b *BlockchainState) AddTransaction(transaction *flow.TransactionBody) error {
-	b.Lock()
-	defer b.Unlock()
-	_, err := b.transactions.ByID(transaction.ID())
-	if err == nil {
+	err := b.collections.Store(collection)
+
+	// since the transactions in a collection remain same collection, it just needs to be added once
+	if err != nil && strings.Contains(err.Error(), storage.ErrAlreadyExists.Error()) {
 		return nil
-	}
-	if err == storage.ErrNotFound {
-		err = b.transactions.Store(transaction)
 	}
 	return err
 }
