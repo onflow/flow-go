@@ -48,15 +48,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	assert.NotNil(s.T(), err)
 }
 
-// TODO
-// TestMissingRegisterTouchForRead tests verification of the a chunkdatapack missing a register touch (read)
-// func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
-// 	vch := GetBaselineVerifiableChunk([]byte(""))
-// 	// remove the second register touch
-// 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
-// 	err := s.verifier.Verify(vch)
-// 	assert.NotNil(s.T(), err)
-// }
+// TODO TestMissingRegisterTouchForRead
 
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk([]byte("wrongEndState"))
@@ -145,10 +137,6 @@ func GetBaselineVerifiableChunk(script []byte) *verification.VerifiableChunk {
 
 }
 
-// ChunkMissingRegTouch *verification.VerifiableChunk
-// ChunkWrongEndState   *verification.VerifiableChunk
-// TooManyInputs
-
 func TempLevelDB() (*leveldb.LevelDB, error) {
 	dir, err := ioutil.TempDir("", "flow-test-db")
 	if err != nil {
@@ -224,19 +212,3 @@ func (vm *virtualMachineMock) NewBlockContext(header *flow.Header) virtualmachin
 		header: header,
 	}
 }
-
-// func (vm *virtualMachineMock) executeTransaction(
-// 	script []byte,
-// 	runtimeInterface runtime.Interface,
-// 	location runtime.Location,
-// ) error {
-// 	return nil
-// }
-
-// func (vm *virtualMachineMock) executeScript(
-// 	script []byte,
-// 	runtimeInterface runtime.Interface,
-// 	location runtime.Location,
-// ) (runtime.Value, error) {
-// 	return nil, nil
-// }
