@@ -25,7 +25,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 			ScriptAccounts: []flow.Address{unittest.AddressFixture()},
 			Script: []byte(`
                 transaction {
-                  prepare(signer: Account) {}
+                  prepare(signer: AuthAccount) {}
                 }
             `),
 		}
@@ -45,7 +45,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 transaction {
                   var x: Int
 
-                  prepare(signer: Account) {
+                  prepare(signer: AuthAccount) {
                     self.x = 0
                   }
 
@@ -96,7 +96,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 			Script: []byte(`
                 transaction {
                   execute {
-				    Account([], [])
+				    AuthAccount(publicKeys: [], code: [])
 				  }
                 }
             `),
