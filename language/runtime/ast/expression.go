@@ -309,6 +309,7 @@ func (e *InvocationExpression) EndPosition() Position {
 // AccessExpression
 
 type AccessExpression interface {
+	Expression
 	isAccessExpression()
 	AccessedExpression() Expression
 }
@@ -671,4 +672,35 @@ func (e *ReferenceExpression) StartPosition() Position {
 
 func (e *ReferenceExpression) EndPosition() Position {
 	return e.Type.EndPosition()
+}
+
+// ForceExpression
+
+type ForceExpression struct {
+	Expression Expression
+	EndPos     Position
+}
+
+func (*ForceExpression) isExpression() {}
+
+func (*ForceExpression) isIfStatementTest() {}
+
+func (e *ForceExpression) Accept(visitor Visitor) Repr {
+	return e.AcceptExp(visitor)
+}
+
+func (e *ForceExpression) AcceptExp(visitor ExpressionVisitor) Repr {
+	return visitor.VisitForceExpression(e)
+}
+
+func (e *ForceExpression) String() string {
+	return fmt.Sprintf("%s!", e.Expression)
+}
+
+func (e *ForceExpression) StartPosition() Position {
+	return e.Expression.StartPosition()
+}
+
+func (e *ForceExpression) EndPosition() Position {
+	return e.EndPos
 }

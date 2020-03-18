@@ -7956,3 +7956,42 @@ func TestInterpretResourceAssignmentForceTransfer(t *testing.T) {
 		assert.IsType(t, &interpreter.ForceAssignmentToNonNilResourceError{}, err)
 	})
 }
+
+func TestInterpretForce(t *testing.T) {
+
+	t.Run("non-nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+          let x: Int? = 1
+          let y = x!
+        `)
+
+		assert.Equal(t,
+			interpreter.NewSomeValueOwningNonCopying(
+				interpreter.NewIntValue(1),
+			),
+			inter.Globals["x"].Value,
+		)
+
+		assert.Equal(t,
+			interpreter.NewIntValue(1),
+			inter.Globals["y"].Value,
+		)
+	})
+
+	t.Run("nil", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+          let x: Int? = nil
+
+          fun test(): Int {
+              return x!
+          }
+        `)
+
+		_, err := inter.Invoke("test")
+		require.Error(t, err)
+
+		assert.IsType(t, &interpreter.ForceNilError{}, err)
+	})
+}

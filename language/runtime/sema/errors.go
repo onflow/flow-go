@@ -2424,3 +2424,19 @@ func (e *RestrictionMemberClashError) Error() string {
 }
 
 func (*RestrictionMemberClashError) isSemanticError() {}
+
+// NonOptionalForceError
+
+type NonOptionalForceError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *NonOptionalForceError) Error() string {
+	return fmt.Sprintf(
+		"cannot force non-optional type: `%s`",
+		e.Type.QualifiedString(),
+	)
+}
+
+func (*NonOptionalForceError) isSemanticError() {}

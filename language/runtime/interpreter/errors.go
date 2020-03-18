@@ -218,3 +218,51 @@ func (e *ForceAssignmentToNonNilResourceError) StartPosition() ast.Position {
 func (e *ForceAssignmentToNonNilResourceError) EndPosition() ast.Position {
 	return e.LocationRange.EndPos
 }
+
+// ForceNilError
+
+type ForceNilError struct {
+	LocationRange LocationRange
+}
+
+func (e *ForceNilError) ImportLocation() ast.Location {
+	return e.LocationRange.Location
+}
+
+func (e *ForceNilError) Error() string {
+	return "unexpectedly found nil while forcing an Optional value"
+}
+
+func (e *ForceNilError) StartPosition() ast.Position {
+	return e.LocationRange.StartPos
+}
+
+func (e *ForceNilError) EndPosition() ast.Position {
+	return e.LocationRange.EndPos
+}
+
+// TypeMismatchError
+
+type TypeMismatchError struct {
+	ExpectedType  sema.Type
+	LocationRange LocationRange
+}
+
+func (e *TypeMismatchError) ImportLocation() ast.Location {
+	return e.LocationRange.Location
+}
+
+func (e *TypeMismatchError) Error() string {
+	return fmt.Sprintf(
+		"unexpectedly found non-`%s` while force-casting value",
+		e.ExpectedType.QualifiedString(),
+	)
+}
+
+func (e *TypeMismatchError) StartPosition() ast.Position {
+	return e.LocationRange.StartPos
+}
+
+func (e *TypeMismatchError) EndPosition() ast.Position {
+	return e.LocationRange.EndPos
+}

@@ -3052,12 +3052,33 @@ func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingEx
 			expectedType := interpreter.Checker.Elaboration.CastingTargetTypes[expression]
 
 			switch expression.Operation {
-			case ast.OperationFailableCast:
+			case ast.OperationFailableCast, ast.OperationForceCast:
 				dynamicType := value.DynamicType(interpreter)
-				if interpreter.IsSubType(dynamicType, expectedType) {
+				isSubType := interpreter.IsSubType(dynamicType, expectedType)
+
+				switch expression.Operation {
+				case ast.OperationFailableCast:
+					if !isSubType {
+						return NilValue{}
+					}
+
 					return NewSomeValueOwningNonCopying(value)
+
+				case ast.OperationForceCast:
+					if !isSubType {
+						panic(
+							&TypeMismatchError{
+								ExpectedType:  expectedType,
+								LocationRange: interpreter.locationRange(expression.Expression),
+							},
+						)
+					}
+
+					return value
+
+				default:
+					panic(errors.NewUnreachableError())
 				}
-				return NilValue{}
 
 			case ast.OperationCast:
 				staticValueType := interpreter.Checker.Elaboration.CastingStaticValueTypes[expression]
@@ -3120,6 +3141,26 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 				}
 			})
 	}
+}
+
+func (interpreter *Interpreter) VisitForceExpression(expression *ast.ForceExpression) ast.Repr {
+	return expression.Expression.Accept(interpreter).(Trampoline).
+		Map(func(result interface{}) interface{} {
+			switch result := result.(type) {
+			case *SomeValue:
+				return result.Value
+
+			case NilValue:
+				panic(
+					&ForceNilError{
+						LocationRange: interpreter.locationRange(expression.Expression),
+					},
+				)
+
+			default:
+				panic(errors.NewUnreachableError())
+			}
+		})
 }
 
 func (interpreter *Interpreter) readStored(storageAddress common.Address, key string) OptionalValue {

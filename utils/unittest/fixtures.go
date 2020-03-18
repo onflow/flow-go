@@ -368,9 +368,10 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 // chunkCount determines the number of chunks inside each receipt
 func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecutionResult {
 	chunks := make([]*flow.Chunk, 0)
-	chunkStates := make([]*flow.ChunkState, 0)
-	collections := make([]*flow.Collection, 0)
-	guarantees := make([]*flow.CollectionGuarantee, 0)
+	chunkStates := make([]*flow.ChunkState, 0, chunkCount)
+	collections := make([]*flow.Collection, 0, chunkCount)
+	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
+	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
 
 	for i := 0; i < chunkCount; i++ {
 		// creates one guaranteed collection per chunk
@@ -395,6 +396,10 @@ func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecuti
 			Registers: flow.Ledger{},
 		}
 		chunkStates = append(chunkStates, chunkState)
+
+		// creates a chunk data pack for the chunk
+		chunkDataPack := ChunkDataPackFixture(chunk.ID())
+		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
 	}
 
 	payload := flow.Payload{
@@ -421,10 +426,11 @@ func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecuti
 	}
 
 	return verification.CompleteExecutionResult{
-		Receipt:     &receipt,
-		Block:       &block,
-		Collections: collections,
-		ChunkStates: chunkStates,
+		Receipt:        &receipt,
+		Block:          &block,
+		Collections:    collections,
+		ChunkStates:    chunkStates,
+		ChunkDataPacks: chunkDataPacks,
 	}
 }
 
@@ -487,9 +493,9 @@ func ChunkHeaderFixture() flow.ChunkHeader {
 	}
 }
 
-func ChunkDataPackFixture() flow.ChunkDataPack {
+func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 	return flow.ChunkDataPack{
-		ChunkID:         IdentifierFixture(),
+		ChunkID:         identifier,
 		StartState:      StateCommitmentFixture(),
 		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
 	}

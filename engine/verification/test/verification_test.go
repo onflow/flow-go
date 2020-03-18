@@ -61,33 +61,66 @@ func TestHappyPath(t *testing.T) {
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
 	exeEngine := new(network.Engine)
-	exeConduit, err := exeNode.Net.Register(engine.ExecutionStateProvider, exeEngine)
-	exeChunkSeen := make(map[flow.Identifier]struct{})
+	exeChunkStateConduit, err := exeNode.Net.Register(engine.ExecutionStateProvider, exeEngine)
 	assert.Nil(t, err)
+	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
+	assert.Nil(t, err)
+	exeChunkStateSeen := make(map[flow.Identifier]struct{})
+	exeChunkDataSeen := make(map[flow.Identifier]struct{})
+
 	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			req, ok := args[1].(*messages.ExecutionStateRequest)
-			require.True(t, ok)
-			for i := 0; i < chunkNum; i++ {
-				chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
-				if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
-					// each assigned chunk should be requested only once
-					_, ok := exeChunkSeen[chunkID]
-					require.False(t, ok)
-					exeChunkSeen[chunkID] = struct{}{}
+			if req, ok := args[1].(*messages.ExecutionStateRequest); ok {
+				require.True(t, ok)
+				for i := 0; i < chunkNum; i++ {
+					chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
+					if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
+						// each assigned chunk state should be requested only once
+						_, ok := exeChunkStateSeen[chunkID]
+						require.False(t, ok)
+						exeChunkStateSeen[chunkID] = struct{}{}
 
-					// publishes the execution state response to the network
-					res := &messages.ExecutionStateResponse{
-						State: *completeER.ChunkStates[i],
+						// publishes the execution state response to the network
+						res := &messages.ExecutionStateResponse{
+							State: *completeER.ChunkStates[i],
+						}
+						err := exeChunkStateConduit.Submit(res, verIdentity.NodeID)
+						assert.Nil(t, err)
+						return
 					}
-					err := exeConduit.Submit(res, verIdentity.NodeID)
-					assert.Nil(t, err)
-					return
 				}
+				require.Error(t, fmt.Errorf(" requested an unidentifed chunk state %v", req))
+			} else if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
+				require.True(t, ok)
+				for i := 0; i < chunkNum; i++ {
+					chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
+					if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
+						// each assigned chunk data pack should be requested only once
+						_, ok := exeChunkDataSeen[chunkID]
+						require.False(t, ok)
+						exeChunkDataSeen[chunkID] = struct{}{}
+
+						// publishes the chunk data pack response to the network
+						res := &messages.ChunkDataPackResponse{
+							Data: *completeER.ChunkDataPacks[i],
+						}
+						err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
+						assert.Nil(t, err)
+						return
+					}
+				}
+				require.Error(t, fmt.Errorf(" requested an unidentifed chunk data pack %v", req))
 			}
-			require.Error(t, fmt.Errorf(" requested an unidentifed chunk %v", req))
+
+			require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
+
 		}).
 		Return(nil).
+		// half of the chunks assigned to the verification node
+		// for each chunk the verification node contacts execution node
+		// once for chunk data pack
+		// once for chunk state
+		// total number of calls is then chunkNum/2 * 2 = chunkNum
 		Times(chunkNum)
 
 	// mock the consensus node with a generic node and mocked engine to assert
@@ -101,6 +134,9 @@ func TestHappyPath(t *testing.T) {
 			assert.True(t, ok)
 			// assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
 		}).
+		// half of the chunks are assigned to the verification node
+		// for each chunk there is one result approval emitted from verification node
+		// to consensus node, hence total number of calls is chunkNum/2
 		Return(nil).Times(chunkNum / 2)
 
 	_, err = conNode.Net.Register(engine.ApprovalProvider, conEngine)
@@ -163,6 +199,9 @@ func TestHappyPath(t *testing.T) {
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
+
+	// assert proper number of calls made
+	exeEngine.AssertExpectations(t)
 
 	// associated resources should be removed from the mempool
 	for i := 0; i < chunkNum; i++ {
