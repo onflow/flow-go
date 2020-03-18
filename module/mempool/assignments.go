@@ -18,7 +18,7 @@ type Assignments interface {
 
 	// Add will add the given Assignment to the memory pool; it will error if
 	// the Assignment is already in the memory pool.
-	Add(assignment *chunkassignment.Assignment) error
+	Add(assignmentFingerprint flow.Identifier, assignment *chunkassignment.Assignment) error
 
 	// Rem will remove the given Assignment from the memory pool; it will
 	// return true if the Assignment was known and removed.

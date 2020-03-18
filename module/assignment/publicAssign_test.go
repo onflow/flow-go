@@ -35,7 +35,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	// creates ids and twice chunks of the ids
 	ids := test.CreateIDs(size)
 	chunks := a.CreateChunks(2 * size)
-	assignment := chunkassignment.NewAssignment(flow.Identifier{})
+	assignment := chunkassignment.NewAssignment()
 
 	// assigns two chunks to each verifier node
 	// j keeps track of chunks
@@ -69,7 +69,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	// creates ids and twice chunks of the ids
 	var ids flow.IdentityList = test.CreateIDs(size)
 	chunks := a.CreateChunks(2)
-	assignment := chunkassignment.NewAssignment(flow.Identifier{})
+	assignment := chunkassignment.NewAssignment()
 
 	// assigns first chunk to non-duplicate list of verifiers
 	c := chunks.ByIndex(uint64(0))

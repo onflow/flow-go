@@ -51,19 +51,19 @@ func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.Chun
 	}
 
 	// checks cache against this assignment
-	assignmentID := flow.HashToID(hash)
-	if p.assignments.Has(assignmentID) {
-		return p.assignments.ByID(assignmentID)
+	assignmentFingerprint := flow.HashToID(hash)
+	if p.assignments.Has(assignmentFingerprint) {
+		return p.assignments.ByID(assignmentFingerprint)
 	}
 
 	// otherwise, it computes the assignment and caches it for future calls
-	a, err := chunkAssignment(assignmentID, ids, chunks, rng, p.alpha)
+	a, err := chunkAssignment(ids, chunks, rng, p.alpha)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not complete chunk assignment")
 	}
 
 	// adds assignment to mempool
-	err = p.assignments.Add(a)
+	err = p.assignments.Add(assignmentFingerprint, a)
 	if err != nil {
 		return nil, fmt.Errorf("could not add generated assignment to mempool: %w", err)
 	}
@@ -82,11 +82,14 @@ func permute(ids flow.IdentifierList, m int, rng random.Rand) {
 
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
-func chunkAssignment(assignmentID flow.Identifier, ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkassignment.Assignment, error) {
+func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkassignment.Assignment, error) {
 	if len(ids) < alpha {
 		return nil, fmt.Errorf("not enough verification nodes for chunk assignment: %d, minumum should be %d", len(ids), alpha)
 	}
-	assignment := chunkassignment.NewAssignment(assignmentID)
+
+	// creates an assignment
+	assignment := chunkassignment.NewAssignment()
+
 	// permutes the entire slice
 	permute(ids, len(ids), rng)
 	t := ids
