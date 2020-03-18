@@ -29,7 +29,7 @@ func TestAssignment(t *testing.T) {
 	suite.Run(t, new(PublicAssignmentTestSuite))
 }
 
-// TestByNodeID evalues the correctness of ByNodeID method of PublicAssignment
+// TestByNodeID evaluates the correctness of ByNodeID method of PublicAssignment
 func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	size := 5
 	// creates ids and twice chunks of the ids
@@ -92,19 +92,20 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	// creates random ids
 	count := 10
 	var idList flow.IdentityList = test.CreateIDs(count)
-	ids := idList.NodeIDs()
-	original := make([]flow.Identifier, count)
+	var ids flow.IdentifierList = idList.NodeIDs()
+	original := make(flow.IdentifierList, count)
 	copy(original, ids)
 
 	// Randomness:
 	rng1, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
-	permute(ids, len(ids), rng1)
+	err = rng1.Shuffle(len(ids), ids.Swap)
+	require.NoError(a.T(), err)
 
 	// permutation should not change length of the list
 	require.Len(a.T(), ids, count)
 
-	// list should be premuted
+	// list should be permuted
 	require.NotEqual(a.T(), ids, original)
 
 	// Deterministiciy:
@@ -112,7 +113,8 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	rng2, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
 	// permutes original list with the same seed
-	permute(original, len(original), rng2)
+	err = rng2.Shuffle(len(original), original.Swap)
+	require.NoError(a.T(), err)
 	require.Equal(a.T(), ids, original)
 }
 
@@ -124,14 +126,15 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	subset := 4
 
 	var idList flow.IdentityList = test.CreateIDs(count)
-	ids := idList.NodeIDs()
+	var ids flow.IdentifierList = idList.NodeIDs()
 	original := make([]flow.Identifier, count)
 	copy(original, ids)
 
 	// Randomness:
 	rng1, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
-	permute(ids, subset, rng1)
+	err = rng1.Samples(len(ids), subset, ids.Swap)
+	require.NoError(a.T(), err)
 
 	// permutation should not change length of the list
 	require.Len(a.T(), ids, count)
@@ -139,10 +142,6 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	// the initial subset of the list that is permuted should
 	// be different than the original
 	require.NotEqual(a.T(), ids[:subset], original[:subset])
-
-	// the rest of the list that is not permuted should be the same
-	// as the original
-	require.Equal(a.T(), ids[subset:], original[subset:])
 }
 
 // TestDeterministicy evaluates deterministic behavior of chunk assignment when
@@ -180,7 +179,7 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
-	// but it should contain same elemets
+	// but it should contain same elements
 	require.Equal(a.T(), p1, p2)
 }
 

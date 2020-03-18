@@ -1976,6 +1976,9 @@ func (v *ProgramVisitor) VisitCastingOp(ctx *CastingOpContext) interface{} {
 	case ctx.FailableCasting() != nil:
 		return ast.OperationFailableCast
 
+	case ctx.ForceCasting() != nil:
+		return ast.OperationForceCast
+
 	default:
 		panic(errors.NewUnreachableError())
 	}
