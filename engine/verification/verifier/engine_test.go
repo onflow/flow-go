@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/chunkVerifier"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -36,14 +35,13 @@ func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) error {
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
-	net      *mockmodule.Network
-	state    *protocol.State
-	ss       *protocol.Snapshot
-	me       *MockLocal
-	verifier chunkVerifier.ChunkVerifier
-	sk       crypto.PrivateKey
-	hasher   crypto.Hasher
-	conduit  *network.Conduit // mocks conduit for submitting result approvals
+	net     *mockmodule.Network
+	state   *protocol.State
+	ss      *protocol.Snapshot
+	me      *MockLocal
+	sk      crypto.PrivateKey
+	hasher  crypto.Hasher
+	conduit *network.Conduit // mocks conduit for submitting result approvals
 }
 
 func TestVerifierEngine(t *testing.T) {

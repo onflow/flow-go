@@ -189,7 +189,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		id2 := make([]byte, 32)
 		id2[0] = byte(5)
 		UpdatedValue2 := []byte{'B'}
-		ledger.Get(id1)
+		_, _ = ledger.Get(id1)
 		ledger.Set(id2, UpdatedValue2)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
@@ -225,18 +225,18 @@ func (vm *virtualMachineMock) NewBlockContext(header *flow.Header) virtualmachin
 	}
 }
 
-func (vm *virtualMachineMock) executeTransaction(
-	script []byte,
-	runtimeInterface runtime.Interface,
-	location runtime.Location,
-) error {
-	return nil
-}
+// func (vm *virtualMachineMock) executeTransaction(
+// 	script []byte,
+// 	runtimeInterface runtime.Interface,
+// 	location runtime.Location,
+// ) error {
+// 	return nil
+// }
 
-func (vm *virtualMachineMock) executeScript(
-	script []byte,
-	runtimeInterface runtime.Interface,
-	location runtime.Location,
-) (runtime.Value, error) {
-	return nil, nil
-}
+// func (vm *virtualMachineMock) executeScript(
+// 	script []byte,
+// 	runtimeInterface runtime.Interface,
+// 	location runtime.Location,
+// ) (runtime.Value, error) {
+// 	return nil, nil
+// }
