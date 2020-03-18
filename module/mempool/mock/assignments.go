@@ -12,13 +12,13 @@ type Assignments struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: assignment
-func (_m *Assignments) Add(assignment *chunkassignment.Assignment) error {
-	ret := _m.Called(assignment)
+// Add provides a mock function with given fields: assignmentFingerprint, assignment
+func (_m *Assignments) Add(assignmentFingerprint flow.Identifier, assignment *chunkassignment.Assignment) error {
+	ret := _m.Called(assignmentFingerprint, assignment)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*chunkassignment.Assignment) error); ok {
-		r0 = rf(assignment)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *chunkassignment.Assignment) error); ok {
+		r0 = rf(assignmentFingerprint, assignment)
 	} else {
 		r0 = ret.Error(0)
 	}

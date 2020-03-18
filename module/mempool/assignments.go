@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Assignments represents a concurrency-safe memory pool for chunk data packs.
+// Assignments represents a concurrency-safe memory pool for chunk assignments
 type Assignments interface {
 
 	// Has checks whether the Assignment with the given hash is currently in

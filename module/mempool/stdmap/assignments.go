@@ -7,7 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Assignments implements the ChunkDataPack memory pool.
+// Assignments implements the chunk assignment memory pool.
 type Assignments struct {
 	*Backend
 }
