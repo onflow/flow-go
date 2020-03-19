@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -34,10 +35,11 @@ type Engine struct {
 	state              protocol.State
 	verifierEng        network.Engine // for submitting ERs that are ready to be verified
 	receipts           mempool.Receipts
-	blocks             mempool.Blocks
+	blockPool          mempool.Blocks
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
 	chunkDataPacks     mempool.ChunkDataPacks
+	blockStorage       storage.Blocks
 	checkChunksLock    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
 	assigner           module.ChunkAssigner // used to determine chunks this node needs to verify
 }
@@ -54,6 +56,7 @@ func New(
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
 	chunkDataPacks mempool.ChunkDataPacks,
+	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
 ) (*Engine, error) {
 
@@ -64,10 +67,11 @@ func New(
 		me:             me,
 		receipts:       receipts,
 		verifierEng:    verifierEng,
-		blocks:         blocks,
+		blockPool:      blocks,
 		collections:    collections,
 		chunkStates:    chunkStates,
 		chunkDataPacks: chunkDataPacks,
+		blockStorage:   blockStorage,
 		assigner:       assigner,
 	}
 
@@ -237,7 +241,12 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		Uint64("block_view", block.View).
 		Msg("received block")
 
-	err := e.blocks.Add(block)
+	err := e.blockStorage.Store(block)
+	if err != nil {
+		return fmt.Errorf("could not store block: %w", err)
+	}
+
+	err = e.blockPool.Add(block)
 	if err != nil {
 		return fmt.Errorf("could not store block: %w", err)
 	}
@@ -393,7 +402,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
 // TODO does not yet request block
 func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this execution
-	block, err := e.blocks.ByID(receipt.ExecutionResult.BlockID)
+	block, err := e.blockPool.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		// TODO should request the block here. For now, we require that we
 		// have received the block at this point as there is no way to request it

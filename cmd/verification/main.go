@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/assignment"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func main() {
@@ -69,7 +70,10 @@ func main() {
 			// Todo the hardcoded default value should be parameterized as alpha in a
 			// should be moved to a configuration class
 			// DISCLAIMER: alpha down there is not a production-level value
-			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates, chunkDataPacks, assigner)
+
+			blocks := storage.NewBlocks(node.DB)
+
+			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates, chunkDataPacks, blocks, assigner)
 			return eng, err
 		}).
 		Run()
