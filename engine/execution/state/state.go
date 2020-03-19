@@ -219,5 +219,3 @@ func (s *state) FindLatestFinalizedAndExecutedBlock() (*flow.Header, error) {
 	}
 	return &header, nil
 }
-
-

@@ -589,11 +589,10 @@ func (e *Engine) generateExecutionResultForBlock(
 	return er, nil
 }
 
-func (e *Engine) StartSync(completeBlock *execution.CompleteBlock) {
+func (e *Engine) StartSync(completeBlock *entity.ExecutableBlock) {
 	// find latest finalized block with state commitment
 	// this way we maximise chance of path existing between it and fresh one
 	// TODO - this doesn't make sense if we treat every block as finalized (MVP)
-
 
 }
 

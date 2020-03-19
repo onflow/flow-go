@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -45,8 +43,8 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 
 func BlockHeaderFixture() flow.Header {
 	return BlockHeaderWithParentFixture(&flow.Header{
-		ParentID:                IdentifierFixture(),
-		Height:                  0,
+		ParentID: IdentifierFixture(),
+		Height:   0,
 	})
 }
 
@@ -166,12 +164,6 @@ func ExecutionReceiptFixture() *flow.ExecutionReceipt {
 	}
 }
 
-func StateViewFixture() *state.View {
-	return state.NewView(func(key flow.RegisterID) (bytes []byte, err error) {
-		return nil, nil
-	})
-}
-
 func CompleteCollectionFixture() *entity.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &entity.CompleteCollection{
@@ -206,29 +198,6 @@ func CompleteBlockFixtureWithParent(collections int, parent *flow.Header) *entit
 	return &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
-	}
-}
-
-func ComputationResultFixture(n int) *execution.ComputationResult {
-	stateViews := make([]*state.View, n)
-	for i := 0; i < n; i++ {
-		stateViews[i] = StateViewFixture()
-	}
-	return &execution.ComputationResult{
-		CompleteBlock: CompleteBlockFixture(n),
-		StateViews:    stateViews,
-	}
-}
-
-func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *execution.ComputationResult {
-	n := len(completeBlock.CompleteCollections)
-	stateViews := make([]*state.View, n)
-	for i := 0; i < n; i++ {
-		stateViews[i] = StateViewFixture()
-	}
-	return &execution.ComputationResult{
-		CompleteBlock: completeBlock,
-		StateViews:    stateViews,
 	}
 }
 

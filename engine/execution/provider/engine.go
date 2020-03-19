@@ -34,8 +34,8 @@ type Engine struct {
 	me            module.Local
 	execStateCon  network.Conduit
 	chunksConduit network.Conduit
-	stateSync    sync.StateSynchronizer
-	execSyncCon  network.Conduit
+	stateSync     sync.StateSynchronizer
+	execSyncCon   network.Conduit
 }
 
 func New(

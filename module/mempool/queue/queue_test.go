@@ -57,8 +57,6 @@ func TestQueue(t *testing.T) {
 		assert.Equal(t, uint64(2), height)
 
 		added = queue.TryAdd(f) //parent not added yet
-		size = queue.Size()
-		height = queue.Height()
 		assert.False(t, added)
 
 		added = queue.TryAdd(d)
@@ -69,8 +67,6 @@ func TestQueue(t *testing.T) {
 		assert.Equal(t, uint64(2), height)
 
 		added = queue.TryAdd(dBroken) // wrong height
-		size = queue.Size()
-		height = queue.Height()
 		assert.False(t, added)
 
 		added = queue.TryAdd(e)

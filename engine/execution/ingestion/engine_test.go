@@ -14,6 +14,7 @@ import (
 	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
 	provider "github.com/dapperlabs/flow-go/engine/execution/provider/mock"
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
+	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -177,7 +178,7 @@ func TestValidatingCollectionResponse(t *testing.T) {
 }
 
 func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *entity.ExecutableBlock, previousExecutionResultID flow.Identifier) {
-	computationResult := unittest.ComputationResultForBlockFixture(completeBlock)
+	computationResult := executionUnittest.ComputationResultForBlockFixture(completeBlock)
 	newStateCommitment := unittest.StateCommitmentFixture()
 	if len(computationResult.StateViews) == 0 { //if block was empty, no new state commitment is produced
 		newStateCommitment = completeBlock.StartState

@@ -194,7 +194,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	_, err = bootstrap.BootstrapLedger(ls)
 	require.NoError(t, err)
 
-	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, chunkDataPackStorage, executionResults)
+	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, chunkDataPackStorage, executionResults, node.DB)
 
 	stateSync := sync.NewStateSynchronizer(node.State, registerDeltasStorage)
 
