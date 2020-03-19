@@ -3,10 +3,10 @@ package virtualmachine_test
 import (
 	"testing"
 
+	"github.com/dapperlabs/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/cadence/runtime"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"

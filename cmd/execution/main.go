@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/dapperlabs/cadence/runtime"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/cadence/runtime"
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"

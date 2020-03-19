@@ -5,10 +5,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dapperlabs/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/cadence/runtime"
 	"github.com/dapperlabs/flow-go/crypto"
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"

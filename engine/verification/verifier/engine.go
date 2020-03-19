@@ -3,10 +3,10 @@ package verifier
 import (
 	"fmt"
 
+	"github.com/dapperlabs/cadence/runtime"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/cadence/runtime"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
