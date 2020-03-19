@@ -37,7 +37,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx1 := flow.TransactionBody{
 		Script: []byte(fmt.Sprintf(`transaction {
-              prepare(signer: Account) {
+              prepare(signer: AuthAccount) {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
@@ -50,7 +50,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 			import 0x01
 
 			transaction {
-				prepare(acc: Account) {
+				prepare(acc: AuthAccount) {
 					if acc.storage[Container.Counter] == nil {
                 		let existing <- acc.storage[Container.Counter] <- Container.createCounter(3)
                 		destroy existing
