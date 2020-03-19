@@ -23,12 +23,6 @@ var blockCmd = &cobra.Command{
 		var dkgDataPub DKGDataPub
 		readYaml(dkgDataPubFile, &dkgDataPub)
 
-		if len(nodeInfos) != len(dkgDataPub.Participants) {
-			log.Fatal().Int("len(nodeInfos)", len(nodeInfos)).
-				Int("len(dkgDataPub.Participants", len(dkgDataPub.Participants)).
-				Msg("node info and public DKG data participants do not have equal lenght")
-		}
-
 		seal := run.GenerateRootSeal(sc.StateCommitment)
 		identityList := generateIdentityList(nodeInfos, dkgDataPub)
 		block := run.GenerateRootBlock(identityList, seal)
@@ -52,6 +46,12 @@ func init() {
 }
 
 func generateIdentityList(infos []NodeInfoPub, dkgDataPub DKGDataPub) flow.IdentityList {
+	if len(infos) != len(dkgDataPub.Participants) {
+		log.Fatal().Int("len(infos)", len(infos)).
+			Int("len(dkgDataPub.Participants", len(dkgDataPub.Participants)).
+			Msg("node info and public DKG data participants do not have equal length")
+	}
+
 	var list flow.IdentityList
 	list = make([]*flow.Identity, 0, len(infos))
 

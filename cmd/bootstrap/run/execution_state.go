@@ -28,8 +28,12 @@ func GenerateExecutionState(priv string) (flow.StateCommitment, error) {
 	return bootstrapLedger(ledgerStorage, priv)
 }
 
+func tempDBDir() (string, error) {
+	return ioutil.TempDir("", "flow-bootstrap-db")
+}
+
 func tempLevelDB() *leveldb.LevelDB {
-	dir, err := ioutil.TempDir("", "flow-bootstrap-db")
+	dir, err := tempDBDir()
 	if err != nil {
 		log.Fatal().Err(err).Msg("error creating temp dir")
 	}

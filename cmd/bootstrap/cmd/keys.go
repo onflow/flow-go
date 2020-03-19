@@ -61,14 +61,17 @@ var keysCmd = &cobra.Command{
 		log.Info().Msgf("generated %v staking keys", nodes)
 
 		nodeInfosPub := make([]NodeInfoPub, 0, nodes)
+		nodeInfosPriv := make([]NodeInfoPriv, 0, nodes)
 		for i, nodeConfig := range nodeConfigs {
 			log.Debug().Int("i", i).Str("address", nodeConfig.Address).Msg("assembling node information")
 			nodeInfoPriv, nodeInfoPub := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
 			nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
+			nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
 			writeYaml(fmt.Sprintf("%v.node-info.priv.yml", nodeInfoPriv.NodeID), nodeInfoPriv)
 		}
 
 		writeYaml("node-infos.pub.yml", nodeInfosPub)
+		writeYaml("node-infos.priv.yml", nodeInfosPriv)
 	},
 }
 
