@@ -27,6 +27,7 @@ import (
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	storage "github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -55,6 +56,7 @@ type TestSuite struct {
 	collections    *mempool.Collections
 	chunkStates    *mempool.ChunkStates
 	chunkDataPacks *mempool.ChunkDataPacks
+	blockStorage   *storage.MockBlocks
 	// resources fixtures
 	collection    *flow.Collection
 	block         *flow.Block
@@ -83,6 +85,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.me = &module.Local{}
 	suite.ss = &protocol.Snapshot{}
 	suite.blocks = &mempool.Blocks{}
+	suite.blockStorage = &storage.MockBlocks{}
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}
@@ -126,6 +129,7 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.collections,
 		suite.chunkStates,
 		suite.chunkDataPacks,
+		suite.blockStorage,
 		suite.assigner)
 	require.Nil(suite.T(), err, "could not create an engine")
 
