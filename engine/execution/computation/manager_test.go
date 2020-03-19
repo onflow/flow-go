@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dapperlabs/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/unittest"
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mock"

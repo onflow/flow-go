@@ -6,6 +6,7 @@ require (
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dapperlabs/cadence v0.0.0-20200319034220-e57278d2b982
 	github.com/dapperlabs/flow-go/crypto v0.3.1
+	github.com/dapperlabs/flow-go/language v0.3.1
 	github.com/dapperlabs/flow-go/protobuf v0.3.1
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
