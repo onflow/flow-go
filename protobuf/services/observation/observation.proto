@@ -8,20 +8,51 @@ import "sdk/entities/entities.proto";
 
 // ObserveService is the user-facing API provided by access nodes.
 service ObserveService {
-  rpc Ping(PingRequest) returns (PingResponse);
 
-  // SendTransaction submits a transaction to the network.
-  rpc SendTransaction(SendTransactionRequest) returns (SendTransactionResponse);
+  // Ping is used to check if the observation node is up
+  rpc Ping (PingRequest) returns (PingResponse);
+
+  // Block (block header)
   // GetLatestBlock gets the latest sealed or unsealed block.
-  rpc GetLatestBlock(GetLatestBlockRequest) returns (GetLatestBlockResponse);
+  rpc GetLatestBlock (GetLatestBlockRequest) returns (BlockResponse);
+  // GetBlockByHash gets a block by its hash
+  rpc GetBlockByHash (GetBlockByHashRequest) returns (BlockResponse);
+  // GetBlockByHeight gets a block by its height
+  rpc GetBlockByHeight (GetBlockByHeightRequest) returns (BlockResponse);
+
+  // Block details (block payload)
+  // GetLatestBlockDetails gets the block details of the latest sealed or unsealed block.
+  rpc GetLatestBlockDetails (GetLatestBlockDetailsRequest) returns (BlockDetailsResponse);
+  // GetBlockDetailsByHash gets the block details by the block hash
+  rpc GetBlockDetailsByHash (GetBlockDetailsByHashRequest) returns (BlockDetailsResponse);
+  // GetBlockDetailsByHeight gets the block details by the block height
+  rpc GetBlockDetailsByHeight (GetBlockDetailsByHeightRequest) returns (BlockDetailsResponse);
+
+  // Collection
+  // GetCollectionByHash gets a collection by its hash
+  rpc GetCollectionByHash (GetCollectionByHashRequest) returns (CollectionResponse);
+  // GetCollectionByHeight gets a collection by its height
+  rpc GetCollectionByHeight (GetCollectionByHeightRequest) returns (CollectionResponse);
+
+  // Transaction
+  // SendTransaction submits a transaction to the network.
+  rpc SendTransaction (SendTransactionRequest) returns (SendTransactionResponse);
   // GetTransactions gets a transaction by hash.
-  rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse);
+  rpc GetTransaction (GetTransactionRequest) returns (GetTransactionResponse);
+  // GetTransactionStatus gets the statue of a transaction
+  rpc GetTransactionStatus (GetTransactionRequest) returns (GetTransactionStatusResponse);
+
+  // Account
   // GetAccount gets an account by address.
-  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+  rpc GetAccount (GetAccountRequest) returns (GetAccountResponse);
+
+  // Script
   // ExecuteScript executes a script against the latest sealed world state.
-  rpc ExecuteScript(ExecuteScriptRequest) returns (ExecuteScriptResponse);
+  rpc ExecuteScript (ExecuteScriptRequest) returns (ExecuteScriptResponse);
+
+  // Events
   // GetEvents retrieves events matching a given query.
-  rpc GetEvents(GetEventsRequest) returns (GetEventsResponse);
+  rpc GetEvents (GetEventsRequest) returns (GetEventsResponse);
 }
 
 message PingRequest {}
@@ -39,11 +70,47 @@ message SendTransactionResponse {
 }
 
 message GetLatestBlockRequest {
-  bool is_sealed = 1;
+  bool isSealed = 1;
 }
 
-message GetLatestBlockResponse {
+message GetBlockByHashRequest {
+  bool hash = 1;
+}
+
+message GetBlockByHeightRequest {
+  bool height = 1;
+}
+
+message BlockResponse {
   flow.sdk.entities.BlockHeader block = 1;
+}
+
+message GetLatestBlockDetailsRequest {
+  bool isSealed = 1;
+}
+
+message GetBlockDetailsByHashRequest {
+  bool hash = 1;
+}
+
+message GetBlockDetailsByHeightRequest {
+  bool height = 1;
+}
+
+message BlockDetailsResponse {
+  flow.sdk.entities.Block block = 1;
+}
+
+message GetCollectionByHashRequest {
+  bool hash = 1;
+}
+
+message GetCollectionByHeightRequest {
+  bool height = 1;
+}
+
+message CollectionResponse {
+  flow.sdk.entities.Collection collection = 1;
 }
 
 message GetAccountRequest {
@@ -64,8 +131,8 @@ message ExecuteScriptResponse {
 
 message GetEventsRequest {
     string type = 1;
-    uint64 start_block = 2;
-    uint64 end_block = 3;
+    uint64 startBlock = 2;
+    uint64 endBlock = 3;
 }
 
 message GetEventsResponse {
@@ -80,5 +147,8 @@ message GetTransactionRequest {
 message GetTransactionResponse {
   flow.sdk.entities.Transaction transaction = 1;
   repeated flow.sdk.entities.Event events = 2;
+}
 
+message GetTransactionStatusResponse {
+  flow.sdk.entities.TransactionStatus status = 1;
 }

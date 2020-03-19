@@ -7,14 +7,14 @@ option go_package = "entities";
 import "google/protobuf/timestamp.proto";
 
 message BlockHeader {
-  bytes hash = 1;
+  bytes ID = 1;
   bytes previousBlockHash = 2;
-  uint64 number = 3;
+  uint64 height = 3;
 }
 
 message Block {
   string chainID = 1;
-  uint64 number = 2;
+  uint64 height = 2;
   bytes previousBlockHash = 3;
   google.protobuf.Timestamp timestamp = 4;
   repeated SignedCollectionHash signedCollectionHashes = 5;
@@ -84,9 +84,9 @@ enum TransactionStatus {
 
 message Transaction {
   bytes script = 1;
-  bytes reference_block_hash = 2;
+  bytes referenceBlockHash = 2;
   uint64 nonce = 3;
-  uint64 compute_limit = 4;
+  uint64 computeLimit = 4;
   bytes PayerAccount = 5;
   repeated bytes ScriptAccounts = 6;
   repeated AccountSignature signatures = 7;
@@ -111,15 +111,15 @@ message Account {
 }
 
 message AccountPublicKey {
-  bytes public_key = 1;
-  uint32 sign_algo = 2;
-  uint32 hash_algo = 3;
+  bytes publicKey = 1;
+  uint32 signAlgo = 2;
+  uint32 hashAlgo = 3;
   uint32 weight = 4;
 }
 
 message Event {
   string type = 1;
-  bytes transaction_hash = 2;
+  bytes transactionHash = 2;
   uint32 index = 3;
   bytes payload = 4;
 }

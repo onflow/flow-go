@@ -82,6 +82,8 @@ type handler struct {
 	engine *ingestion.Engine
 }
 
+var _ observation.ObserveServiceServer = &handler{}
+
 // Ping responds to requests when the server is up.
 func (h *handler) Ping(ctx context.Context, req *observation.PingRequest) (*observation.PingResponse, error) {
 	return &observation.PingResponse{}, nil
@@ -109,7 +111,7 @@ func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTran
 	return nil, nil
 }
 
-func (h *handler) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
+func (h *handler) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.BlockResponse, error) {
 	return nil, nil
 }
 
@@ -122,5 +124,37 @@ func (h *handler) GetAccount(context.Context, *observation.GetAccountRequest) (*
 }
 
 func (h *handler) GetEvents(context.Context, *observation.GetEventsRequest) (*observation.GetEventsResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetBlockByHash(context.Context, *observation.GetBlockByHashRequest) (*observation.BlockResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetBlockByHeight(context.Context, *observation.GetBlockByHeightRequest) (*observation.BlockResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetLatestBlockDetails(context.Context, *observation.GetLatestBlockDetailsRequest) (*observation.BlockDetailsResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetBlockDetailsByHash(context.Context, *observation.GetBlockDetailsByHashRequest) (*observation.BlockDetailsResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetBlockDetailsByHeight(context.Context, *observation.GetBlockDetailsByHeightRequest) (*observation.BlockDetailsResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetCollectionByHash(context.Context, *observation.GetCollectionByHashRequest) (*observation.CollectionResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetCollectionByHeight(context.Context, *observation.GetCollectionByHeightRequest) (*observation.CollectionResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetTransactionStatus(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionStatusResponse, error) {
 	return nil, nil
 }
