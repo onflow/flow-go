@@ -40,8 +40,6 @@ const (
 	CodeExecutionStateResponse
 	CodeExecutionStateSyncRequest
 	CodeExecutionStateDelta
-	CodeExecutionCompleteBlock
-	CodeExecutionComputationOrder
 	CodeChunkDataPackRequest
 	CodeChunkDataPackResponse
 )

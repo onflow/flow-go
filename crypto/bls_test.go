@@ -56,3 +56,30 @@ func TestEncDecPrivateKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, skBytes, skCopyBytes)
 }
+
+// TestEncDecPublicKey checks:
+// - the consistency of encode/decode of BLS public keys
+// - the validity of membership checks of BLS public keys on BLS12-381
+//    when decoding a public key
+func TestEncDecPublicKey(t *testing.T) {
+	// generate a key pair
+	seed := []byte{1, 2, 3, 4}
+	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	require.NoError(t, err)
+	pk := sk.PublicKey()
+	// encode the publick key
+	pkBytes, err := pk.Encode()
+	require.NoError(t, err)
+	// decode the public key including a membership check
+	pkCopy, err := DecodePublicKey(BLS_BLS12381, pkBytes)
+	// membership check should be valid
+	assert.Nil(t, err)
+	// check the encode and decode are consistent
+	pkCopyBytes, err := pkCopy.Encode()
+	require.NoError(t, err)
+	assert.Equal(t, pkBytes, pkCopyBytes)
+	// check an invalid membership check
+	pkBytes[5] ^= 1 // alter one bit
+	pkCopy, err = DecodePublicKey(BLS_BLS12381, pkBytes)
+	assert.NotNil(t, err)
+}

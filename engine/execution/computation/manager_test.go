@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dapperlabs/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/unittest"
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -78,7 +78,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		},
 	}
 
-	completeBlock := &entity.ExecutableBlock{
+	executableBlock := &entity.ExecutableBlock{
 		Block: &block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.ID(): {
@@ -106,7 +106,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	require.Empty(t, view.Delta())
 
-	returnedComputationResult, err := engine.ComputeBlock(completeBlock, view)
+	returnedComputationResult, err := engine.ComputeBlock(executableBlock, view)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, view.Delta())

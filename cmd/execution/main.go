@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/dapperlabs/cadence/runtime"
+
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"

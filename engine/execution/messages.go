@@ -16,6 +16,6 @@ type ComputationOrder struct {
 }
 
 type ComputationResult struct {
-	CompleteBlock *entity.ExecutableBlock
-	StateViews    []*state.View
+	ExecutableBlock *entity.ExecutableBlock
+	StateViews      []*state.View
 }

@@ -7,68 +7,25 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type MissingSignerError struct {
-	Vote *Vote
+type NoVoteError struct {
+	Msg string
 }
 
-type DoubleVoteError struct {
-	OriginalVote *Vote
-	DoubleVote   *Vote
-}
+func (e NoVoteError) Error() string { return e.Msg }
 
-type InvalidVoteError struct {
-	VoteID flow.Identifier
-	View   uint64
-}
-
-type StaleVoteError struct {
-	Vote              *Vote
-	HighestPrunedView uint64
-}
-
-type StaleBlockError struct {
-	Block             *Block
-	HighestPrunedView uint64
-}
-
-type ExistingQCError struct {
-	Vote *Vote
-	QC   *QuorumCertificate
+func (e NoVoteError) Is(other error) bool {
+	_, ok := other.(NoVoteError)
+	return ok
 }
 
 var ErrInsufficientVotes = errors.New("received insufficient votes")
 var ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
-
-func (e MissingSignerError) Error() string {
-	return fmt.Sprintf("missing signer of vote %v", e.Vote)
-}
-
-func (e StaleVoteError) Error() string {
-	return fmt.Sprintf("stale vote (highest pruned view %d): %v", e.HighestPrunedView, e.Vote)
-}
-
-func (e StaleBlockError) Error() string {
-	return fmt.Sprintf("stale block (highest pruned view %d): %v", e.HighestPrunedView, e.Block)
-}
-
-func (e ExistingQCError) Error() string {
-	return fmt.Sprintf("QC already existed (vote: %v, qc: %v)", e.Vote, e.QC)
-}
 
 type ErrorConfiguration struct {
 	Msg string
 }
 
 func (e *ErrorConfiguration) Error() string { return e.Msg }
-
-type ErrorConflictingQCs struct {
-	View uint64
-	QCs  []*QuorumCertificate
-}
-
-func (e *ErrorConflictingQCs) Error() string {
-	return fmt.Sprintf("%d conflicting QCs at view %d", len(e.QCs), e.View)
-}
 
 type ErrorMissingBlock struct {
 	View    uint64

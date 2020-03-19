@@ -1,1 +1,0 @@
-let a = "this is a test \t\\new line and race car:\n\u{1F3CE}\u{FE0F}"

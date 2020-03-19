@@ -18,15 +18,6 @@ import (
 type Forks interface {
 	ForksReader
 
-	// IsSafeBlock returns true if block is safe to vote for
-	// (according to the definition in https://arxiv.org/abs/1803.05069v6).
-	//
-	// In the current architecture, the block is stored _before_ evaluating its safety.
-	// Consequently, IsSafeBlock accepts only known, valid blocks. Should a block be
-	// unknown (not previously added to Forks) or violate some consistency requirements,
-	// IsSafeBlock errors. All errors are fatal.
-	IsSafeBlock(block *hotstuff.Block) bool
-
 	// AddBlock adds the block to Forks. This might cause an update of the finalized block
 	// and pruning of older blocks.
 	// Handles duplicated addition of blocks (at the potential cost of additional computation time).
@@ -62,6 +53,15 @@ type Forks interface {
 }
 
 type ForksReader interface {
+	// IsSafeBlock returns true if block is safe to vote for
+	// (according to the definition in https://arxiv.org/abs/1803.05069v6).
+	//
+	// In the current architecture, the block is stored _before_ evaluating its safety.
+	// Consequently, IsSafeBlock accepts only known, valid blocks. Should a block be
+	// unknown (not previously added to Forks) or violate some consistency requirements,
+	// IsSafeBlock errors. All errors are fatal.
+	IsSafeBlock(block *hotstuff.Block) bool
+
 	// GetBlocksForView returns all BlockProposals at the given view number.
 	GetBlocksForView(view uint64) []*hotstuff.Block
 

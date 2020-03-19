@@ -175,13 +175,13 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 	}
 }
 
-func CompleteBlockFixture(collections int) *entity.ExecutableBlock {
+func ExecutableBlockFixture(collections int) *entity.ExecutableBlock {
 
 	header := BlockHeaderFixture()
-	return CompleteBlockFixtureWithParent(collections, &header)
+	return ExecutableBlockFixtureWithParent(collections, &header)
 }
 
-func CompleteBlockFixtureWithParent(collections int, parent *flow.Header) *entity.ExecutableBlock {
+func ExecutableBlockFixtureWithParent(collections int, parent *flow.Header) *entity.ExecutableBlock {
 
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, collections)
 	block := BlockWithParentFixture(parent)

@@ -10,7 +10,7 @@
 ### Ingestion engine
 Central component - input of the node - execution state owner, only component allowed to mutate it. 
 It receives blocks, assembles them (gather collections) and forms execution queue (fork-aware ordering).
-Once a block is assembled and ready to be computed (full content of transaction is known and valid, previous execution state is available) it sends `CompleteBlock` for computation (to Computation engine)
+Once a block is assembled and ready to be computed (full content of transaction is known and valid, previous execution state is available) it sends `ExecutableBlock` for computation (to Computation engine)
 After receiving computation results ingestion engine generates Flow-compliant entities (`ExecutionReceipt`) and saves them along with other internal execution state data (block's `StateCommitment`).
 
 ### Computation engine

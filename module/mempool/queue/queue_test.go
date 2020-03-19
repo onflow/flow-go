@@ -21,13 +21,13 @@ func TestQueue(t *testing.T) {
 
 	*/
 
-	a := unittest.CompleteBlockFixture(0)
-	c := unittest.CompleteBlockFixtureWithParent(0, &a.Block.Header)
-	b := unittest.CompleteBlockFixtureWithParent(0, &c.Block.Header)
-	d := unittest.CompleteBlockFixtureWithParent(0, &c.Block.Header)
-	e := unittest.CompleteBlockFixtureWithParent(0, &d.Block.Header)
-	f := unittest.CompleteBlockFixtureWithParent(0, &d.Block.Header)
-	g := unittest.CompleteBlockFixtureWithParent(0, &b.Block.Header)
+	a := unittest.ExecutableBlockFixture(0)
+	c := unittest.ExecutableBlockFixtureWithParent(0, &a.Block.Header)
+	b := unittest.ExecutableBlockFixtureWithParent(0, &c.Block.Header)
+	d := unittest.ExecutableBlockFixtureWithParent(0, &c.Block.Header)
+	e := unittest.ExecutableBlockFixtureWithParent(0, &d.Block.Header)
+	f := unittest.ExecutableBlockFixtureWithParent(0, &d.Block.Header)
+	g := unittest.ExecutableBlockFixtureWithParent(0, &b.Block.Header)
 
 	dBroken := unittest.CompleteBlockFixtureWithParent(0, &c.Block.Header)
 	dBroken.Block.Height += 2 //change height
@@ -106,14 +106,14 @@ func TestQueue(t *testing.T) {
 		// order of children is not guaranteed
 		var queueD *Queue
 		var queueB *Queue
-		if queuesC[0].Head.CompleteBlock == d {
+		if queuesC[0].Head.ExecutableBlock == d {
 			queueD = queuesC[0]
 			queueB = queuesC[1]
 		} else {
 			queueD = queuesC[1]
 			queueB = queuesC[0]
 		}
-		assert.Equal(t, d, queueD.Head.CompleteBlock)
+		assert.Equal(t, d, queueD.Head.ExecutableBlock)
 		sizeD := queueD.Size()
 		heightD := queueD.Height()
 		sizeB := queueB.Size()

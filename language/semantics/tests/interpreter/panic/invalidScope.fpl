@@ -1,9 +1,0 @@
-fun f(): Int {
-  return g()
-};
-
-let x = f();
-
-fun g(): Int {
-  return 0
-}
