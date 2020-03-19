@@ -3,6 +3,7 @@ package signature_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,6 +54,10 @@ func TestRandomBeaconDisabledAggregation(t *testing.T) {
 	// Unhappy Path
 	t.Run("aggregated signatures for different blocks should be rejected", testAggregateWithWrongBlockIDRBDisabled)
 	t.Run("aggregated signatures claimed from a wrong signer should be rejected", testAggregateWithWrongSignerRBDisabled)
+}
+
+func TestAggregationPerformance(t *testing.T) {
+	t.Run("check how long it takes to reconstruct 254 votes", testAggregationPerformance)
 }
 
 func testOKSigningRBEnabled(t *testing.T) {
@@ -501,4 +506,42 @@ func testAggregateWithWrongSignerRBDisabled(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, false, valid)
+}
+
+func testAggregationPerformance(t *testing.T) {
+	_, signers, _, aggregator, stakingKeys, _, dkg := test.MakeSignerAndVerifierWithFakeDKG(t, 254)
+	require.NotNil(t, dkg)
+
+	threshold := len(signers)*2/3 + 1
+
+	// create block
+	block := test.MakeBlock(1)
+
+	// create votes and signatures
+	sigs := make([]*model.SingleSignature, 0, threshold)
+	pubkeys := make([]crypto.PublicKey, 0, threshold)
+
+	for i := 0; i < threshold; i++ {
+		vote, err := signers[i].VoteFor(block)
+		require.NoError(t, err)
+		sigs = append(sigs, vote.Signature)
+		pubkeys = append(pubkeys, stakingKeys[i].PublicKey())
+	}
+
+	// aggregate
+	timer := time.Now()
+	// The aggregation will fail, because we used fake random beacon private keys.
+	// However it's OK for the aggregation to fail, because the failure comes from verifying the aggregated
+	// signature. Since we only care about the timing, by the time the verification has failed, the aggregation
+	// has been done. The timing result should be the same as using the real random beacon private keys.
+
+	// Why using fake random beacon private keys here?
+	// because generating 254 DKG keys is very slow on one machine.
+	// TODO: we could generate 254 DKG keys on power machines, and store the generated keys in files,
+	// and load them to tests
+	aggregator.Aggregate(block, sigs)
+	// log performance
+	duration := time.Now().Sub(timer)
+
+	t.Logf("Aggregating %v signatures for %v nodes took: %s\n", threshold, len(signers), duration)
 }
