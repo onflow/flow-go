@@ -33,8 +33,9 @@ type Engine struct {
 	chunksConduit      network.Conduit
 	me                 module.Local
 	state              protocol.State
-	verifierEng        network.Engine // for submitting ERs that are ready to be verified
-	receipts           mempool.Receipts
+	verifierEng        network.Engine   // for submitting ERs that are ready to be verified
+	authReceipts       mempool.Receipts // keeps receipts with authenticated origin IDs
+	pendingReceipts    mempool.Receipts // keeps receipts pending for their originID to be authenticated
 	blockPool          mempool.Blocks
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
@@ -51,7 +52,8 @@ func New(
 	state protocol.State,
 	me module.Local,
 	verifierEng network.Engine,
-	receipts mempool.Receipts,
+	authReceipts mempool.Receipts,
+	pendingReceipts mempool.Receipts,
 	blocks mempool.Blocks,
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
@@ -61,18 +63,19 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:           engine.NewUnit(),
-		log:            log,
-		state:          state,
-		me:             me,
-		receipts:       receipts,
-		verifierEng:    verifierEng,
-		blockPool:      blocks,
-		collections:    collections,
-		chunkStates:    chunkStates,
-		chunkDataPacks: chunkDataPacks,
-		blockStorage:   blockStorage,
-		assigner:       assigner,
+		unit:            engine.NewUnit(),
+		log:             log,
+		state:           state,
+		me:              me,
+		authReceipts:    authReceipts,
+		pendingReceipts: pendingReceipts,
+		verifierEng:     verifierEng,
+		blockPool:       blocks,
+		collections:     collections,
+		chunkStates:     chunkStates,
+		chunkDataPacks:  chunkDataPacks,
+		blockStorage:    blockStorage,
+		assigner:        assigner,
 	}
 
 	var err error
@@ -167,7 +170,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // handleExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
 // a result approval upon successful verification
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.Entity(receipt)).
@@ -175,12 +177,15 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 
 	// TODO: correctness check for execution receipts
 	// extracts list of verifier nodes id
-	//
-	// origin, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
-	origin, err := e.state.Final().Identity(originID)
+	origin, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
 	if err != nil {
 		// TODO: potential attack on authenticity
-		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
+		// stores ER in pending receipts till a block arrives authenticating this
+		err = e.pendingReceipts.Add(receipt)
+		if err != nil {
+			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
+		}
+		return nil
 	}
 
 	// execution results are only valid from execution nodes
@@ -191,7 +196,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 
 	// store the execution receipt in the store of the engine
 	// this will fail if the receipt already exists in the store
-	err = e.receipts.Add(receipt)
+	err = e.authReceipts.Add(receipt)
 	if err != nil {
 		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
@@ -250,6 +255,20 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	err = e.blockPool.Add(block)
 	if err != nil {
 		return fmt.Errorf("could not store block: %w", err)
+	}
+
+	blockID := block.ID()
+	for _, receipt := range e.pendingReceipts.All() {
+		if receipt.ExecutionResult.BlockID == blockID {
+			// adds receipt to authenticated receipts pool
+			err := e.authReceipts.Add(receipt)
+			if err != nil {
+				return fmt.Errorf("could not move receipt to authenticated receipts pool: %w", err)
+			}
+
+			// removes receipt from pending receipts pool
+			e.pendingReceipts.Rem(receipt.ID())
+		}
 	}
 
 	e.checkPendingChunks()
@@ -550,7 +569,7 @@ func (e *Engine) checkPendingChunks() {
 	e.checkChunksLock.Lock()
 	defer e.checkChunksLock.Unlock()
 
-	receipts := e.receipts.All()
+	receipts := e.authReceipts.All()
 
 	for _, receipt := range receipts {
 		block, blockReady := e.getBlockForReceipt(receipt)
@@ -642,6 +661,7 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random generator: %w", err)
 	}
+	// TODO pull up caching of chunk assignments to here
 	a, err := e.assigner.Assign(verifierNodes, res.Chunks, rng)
 	if err != nil {
 		return nil, fmt.Errorf("could not create chunk assignment %w", err)

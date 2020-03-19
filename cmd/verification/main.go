@@ -20,7 +20,8 @@ func main() {
 		blockLimit      uint
 		chunkLimit      uint
 		err             error
-		receipts        *stdmap.Receipts
+		authReceipts    *stdmap.Receipts
+		pendingReceipts *stdmap.Receipts
 		blocks          *stdmap.Blocks
 		collections     *stdmap.Collections
 		chunkStates     *stdmap.ChunkStates
@@ -35,8 +36,12 @@ func main() {
 			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 100000, "maximum number of chunk states in the memory pool")
 		}).
-		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			receipts, err = stdmap.NewReceipts(receiptLimit)
+		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			authReceipts, err = stdmap.NewReceipts(receiptLimit)
+			return err
+		}).
+		Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingReceipts, err = stdmap.NewReceipts(receiptLimit)
 			return err
 		}).
 		Module("collections mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -75,7 +80,19 @@ func main() {
 			// to reflect incoming blocks on state
 			blockStorage := storage.NewBlocks(node.DB)
 
-			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates, chunkDataPacks, blockStorage, assigner)
+			eng, err := ingest.New(node.Logger,
+				node.Network,
+				node.State,
+				node.Me,
+				verifierEng,
+				authReceipts,
+				pendingReceipts,
+				blocks,
+				collections,
+				chunkStates,
+				chunkDataPacks,
+				blockStorage,
+				assigner)
 			return eng, err
 		}).
 		Run()

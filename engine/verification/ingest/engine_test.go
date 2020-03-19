@@ -51,12 +51,13 @@ type TestSuite struct {
 	verifierEng *network.Engine
 	// mock mempools used by the ingest engine, valid resources should be added
 	// to these when they are received from an appropriate node role.
-	blocks         *mempool.Blocks
-	receipts       *mempool.Receipts
-	collections    *mempool.Collections
-	chunkStates    *mempool.ChunkStates
-	chunkDataPacks *mempool.ChunkDataPacks
-	blockStorage   *storage.Blocks
+	blocks          *mempool.Blocks
+	authReceipts    *mempool.Receipts
+	pendingReceipts *mempool.Receipts
+	collections     *mempool.Collections
+	chunkStates     *mempool.ChunkStates
+	chunkDataPacks  *mempool.ChunkDataPacks
+	blockStorage    *storage.Blocks
 	// resources fixtures
 	collection    *flow.Collection
 	block         *flow.Block
@@ -86,7 +87,8 @@ func (suite *TestSuite) SetupTest() {
 	suite.ss = &protocol.Snapshot{}
 	suite.blocks = &mempool.Blocks{}
 	suite.blockStorage = &storage.Blocks{}
-	suite.receipts = &mempool.Receipts{}
+	suite.authReceipts = &mempool.Receipts{}
+	suite.pendingReceipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
@@ -124,7 +126,8 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.state,
 		suite.me,
 		suite.verifierEng,
-		suite.receipts,
+		suite.authReceipts,
+		suite.pendingReceipts,
 		suite.blocks,
 		suite.collections,
 		suite.chunkStates,
@@ -141,7 +144,7 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 func (suite *TestSuite) TestHandleBlock() {
 	eng := suite.TestNewEngine()
 
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 
 	// expect that that the block be added to the mempool
 	suite.blocks.On("Add", suite.block).Return(nil).Once()
@@ -174,8 +177,8 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 	// expect that the receipt be added to the mempool, and return it in All
-	suite.receipts.On("Add", suite.receipt).Return(nil).Once()
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
@@ -194,7 +197,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	err := eng.Process(execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
 
-	suite.receipts.AssertExpectations(suite.T())
+	suite.authReceipts.AssertExpectations(suite.T())
 	suite.collectionsConduit.AssertExpectations(suite.T())
 
 	// verifier should not be called
@@ -218,7 +221,7 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.Assert().Error(err)
 
 	// receipt should not be added
-	suite.receipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
+	suite.authReceipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -246,7 +249,7 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 			suite.Assert().Error(err)
 
 			// receipt should not be added
-			suite.receipts.AssertNotCalled(suite.T(), "Add", &receipt)
+			suite.authReceipts.AssertNotCalled(suite.T(), "Add", &receipt)
 
 			// verifier should not be called
 			suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -262,7 +265,7 @@ func (suite *TestSuite) TestHandleCollection() {
 	// mock the collection coming from an collection node
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", collIdentity.NodeID).Return(collIdentity, nil).Once()
@@ -327,7 +330,7 @@ func (suite *TestSuite) TestHandleExecutionState() {
 	// mock the state coming from an execution node
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", exeIdentity.NodeID).Return(exeIdentity, nil).Once()
@@ -445,7 +448,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.me.On("NodeID").Return(verIdentity.NodeID)
 
 			// allow adding the received resource to mempool
-			suite.receipts.On("Add", suite.receipt).Return(nil)
+			suite.authReceipts.On("Add", suite.receipt).Return(nil)
 			suite.collections.On("Add", suite.collection).Return(nil)
 			suite.blocks.On("Add", suite.block).Return(nil)
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
@@ -458,7 +461,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
 			suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
-			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 			// removing the resources for a chunk
 			suite.collections.On("Rem", suite.collection.ID()).Return(true).Once()
@@ -623,7 +626,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					_ = verNode.IngestEngine.Process(exeID.NodeID, receipt)
 				}
 
-				switch 0 {
+				switch 1 {
 				case 0:
 					// block then receipt
 					sendBlock()
