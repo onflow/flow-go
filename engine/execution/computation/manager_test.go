@@ -8,12 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	computer "github.com/dapperlabs/flow-go/engine/execution/computation/computer/mock"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution"
-	realComputer "github.com/dapperlabs/flow-go/engine/execution/computation/computer"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
+	"github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -98,14 +95,14 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	vm := virtualmachine.New(rt)
 
-	blockComputer := realComputer.NewBlockComputer(vm)
+	blockComputer := computer.NewBlockComputer(vm)
 
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 	}
 
-	view := executionUnittest.EmptyView()
+	view := unittest.EmptyView()
 
 	require.Empty(t, view.Delta())
 
