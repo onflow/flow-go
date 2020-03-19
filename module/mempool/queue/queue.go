@@ -1,14 +1,14 @@
-package ingestion
+package queue
 
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
 type Node struct {
-	CompleteBlock *execution.CompleteBlock
+	CompleteBlock *entity.ExecutableBlock
 	Children      []*Node
 }
 
@@ -41,7 +41,7 @@ func traverse(node *Node, m map[flow.Identifier]*Node) {
 	}
 }
 
-func NewQueue(completeBlock *execution.CompleteBlock) *Queue {
+func NewQueue(completeBlock *entity.ExecutableBlock) *Queue {
 	n := &Node{
 		CompleteBlock: completeBlock,
 		Children:      nil,
@@ -84,7 +84,7 @@ func dequeue(queue *Queue) *Queue {
 }
 
 // TryAdd tries to add a new Node to the queue and returns if the operation has been successful
-func (q *Queue) TryAdd(completeBlock *execution.CompleteBlock) bool {
+func (q *Queue) TryAdd(completeBlock *entity.ExecutableBlock) bool {
 	n, ok := q.Nodes[completeBlock.Block.ParentID]
 	if !ok {
 		return false
@@ -112,7 +112,7 @@ func (q *Queue) Attach(other *Queue) error {
 }
 
 // Dismount removes the head element, returns it and it's children as new queues
-func (q *Queue) Dismount() (*execution.CompleteBlock, []*Queue) {
+func (q *Queue) Dismount() (*entity.ExecutableBlock, []*Queue) {
 
 	queues := make([]*Queue, len(q.Head.Children))
 	if len(q.Head.Children) == 1 { //optimize for most common single-child case

@@ -1,4 +1,4 @@
-package ingestion
+package queue
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -86,7 +86,7 @@ func TestQueue(t *testing.T) {
 	t.Run("Process all", func(t *testing.T) {
 		// Dismounting iteratively all queues should yield all nodes/blocks only once
 		// and in the proper order (parents are always evaluated first)
-		blocksInOrder := make([]*execution.CompleteBlock, 0)
+		blocksInOrder := make([]*entity.ExecutableBlock, 0)
 
 		executionHeads := make(chan *Queue, 10)
 		executionHeads <- queue
@@ -102,7 +102,7 @@ func TestQueue(t *testing.T) {
 
 		// Couldn't find ready assertion for subset in order, so lets
 		// map nodes by their index and check if order is as expected
-		indices := make(map[*execution.CompleteBlock]int)
+		indices := make(map[*entity.ExecutableBlock]int)
 
 		for i, block := range blocksInOrder {
 			indices[block] = i

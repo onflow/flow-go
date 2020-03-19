@@ -2,6 +2,7 @@
 
 package mock
 
+import entity "github.com/dapperlabs/flow-go/module/mempool/entity"
 import execution "github.com/dapperlabs/flow-go/engine/execution"
 import mock "github.com/stretchr/testify/mock"
 import state "github.com/dapperlabs/flow-go/engine/execution/state"
@@ -12,11 +13,11 @@ type BlockComputer struct {
 }
 
 // ExecuteBlock provides a mock function with given fields: _a0, _a1
-func (_m *BlockComputer) ExecuteBlock(_a0 *execution.CompleteBlock, _a1 *state.View) (*execution.ComputationResult, error) {
+func (_m *BlockComputer) ExecuteBlock(_a0 *entity.ExecutableBlock, _a1 *state.View) (*execution.ComputationResult, error) {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(*execution.CompleteBlock, *state.View) *execution.ComputationResult); ok {
+	if rf, ok := ret.Get(0).(func(*entity.ExecutableBlock, *state.View) *execution.ComputationResult); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
@@ -25,7 +26,7 @@ func (_m *BlockComputer) ExecuteBlock(_a0 *execution.CompleteBlock, _a1 *state.V
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*execution.CompleteBlock, *state.View) error); ok {
+	if rf, ok := ret.Get(1).(func(*entity.ExecutableBlock, *state.View) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)

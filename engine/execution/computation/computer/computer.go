@@ -6,11 +6,12 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(*execution.CompleteBlock, *state.View) (*execution.ComputationResult, error)
+	ExecuteBlock(*entity.ExecutableBlock, *state.View) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -26,7 +27,7 @@ func NewBlockComputer(vm virtualmachine.VirtualMachine) BlockComputer {
 
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockComputer) ExecuteBlock(
-	block *execution.CompleteBlock,
+	block *entity.ExecutableBlock,
 	stateView *state.View,
 ) (*execution.ComputationResult, error) {
 	results, err := e.executeBlock(block, stateView)
@@ -40,7 +41,7 @@ func (e *blockComputer) ExecuteBlock(
 }
 
 func (e *blockComputer) executeBlock(
-	block *execution.CompleteBlock,
+	block *entity.ExecutableBlock,
 	stateView *state.View,
 ) (*execution.ComputationResult, error) {
 
@@ -74,7 +75,7 @@ func (e *blockComputer) executeCollection(
 	index int,
 	blockCtx virtualmachine.BlockContext,
 	collectionView *state.View,
-	collection *execution.CompleteCollection,
+	collection *entity.CompleteCollection,
 ) error {
 
 	for _, tx := range collection.Transactions {

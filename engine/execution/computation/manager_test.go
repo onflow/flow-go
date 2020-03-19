@@ -8,12 +8,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	computer "github.com/dapperlabs/flow-go/engine/execution/computation/computer/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	realComputer "github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mock"
 )
 
@@ -78,9 +81,9 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		},
 	}
 
-	completeBlock := &execution.CompleteBlock{
+	completeBlock := &entity.ExecutableBlock{
 		Block: &block,
-		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{
+		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.ID(): {
 				Guarantee:    &guarantee,
 				Transactions: transactions,
