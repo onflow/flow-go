@@ -46,7 +46,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		var finalizedID flow.Identifier
-		err = operation.RetrieveNumber(boundary, &finalizedID)(tx)
+		err = operation.RetrieveNumberForCluster(b.chainID, boundary, &finalizedID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized ID: %w", err)
 		}
@@ -141,7 +141,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// create and insert the collection
 		collection := flow.LightCollection{Transactions: finalTxIDs}
-		err = operation.InsertCollection(&collection)(tx)
+		err = operation.SkipDuplicates(operation.InsertCollection(&collection))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}

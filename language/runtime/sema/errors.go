@@ -2163,7 +2163,7 @@ type InvalidTransactionPrepareParameterTypeError struct {
 func (e *InvalidTransactionPrepareParameterTypeError) Error() string {
 	return fmt.Sprintf(
 		"prepare parameter must be of type `%s`, not `%s`",
-		&AccountType{},
+		&AuthAccountType{},
 		e.Type.QualifiedString(),
 	)
 }

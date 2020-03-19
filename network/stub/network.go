@@ -132,7 +132,10 @@ func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 	mn.Lock()
 	defer mn.Unlock()
 
-	key := eventKey(m.ChannelID, m.Event)
+	key, err := eventKey(m.ChannelID, m.Event)
+	if err != nil {
+		return err
+	}
 	for _, nodeID := range m.TargetIDs {
 		// Find the network of the targeted node
 		receiverNetwork, exist := mn.hub.GetNetwork(nodeID)

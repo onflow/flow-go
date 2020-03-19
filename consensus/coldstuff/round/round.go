@@ -6,12 +6,9 @@ import (
 	"encoding/binary"
 	"math/rand"
 
-	"github.com/pkg/errors"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/protocol"
 )
 
 // Round keeps track of the current consensus state.
@@ -24,14 +21,8 @@ type Round struct {
 	votes        map[flow.Identifier]uint64
 }
 
-// New creates a new consensus cache.
-func New(state protocol.State, me module.Local, participants flow.IdentityList) (*Round, error) {
-
-	// retrieve what is currently the last finalized block
-	head, err := state.Final().Head()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve head")
-	}
+// New creates a new consensus round.
+func New(head *flow.Header, me module.Local, participants flow.IdentityList) (*Round, error) {
 
 	// take first 8 bytes of previous block hash as a seed to shuffle identities
 	headID := head.ID()

@@ -173,7 +173,7 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("TooFewArguments", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            prepare(signer: Account) {}
+            prepare(signer: AuthAccount) {}
           }
         `)
 
@@ -188,7 +188,7 @@ func TestInterpretTransactions(t *testing.T) {
           }
 
           transaction {
-            prepare(signer: Account) {}
+            prepare(signer: AuthAccount) {}
 
             execute {}
           }
@@ -198,13 +198,13 @@ func TestInterpretTransactions(t *testing.T) {
 			panic(errors.NewUnreachableError())
 		})
 
-		signer1 := interpreter.NewAccountValue(
+		signer1 := interpreter.NewAuthAccountValue(
 			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			panicFunction,
 			panicFunction,
 			panicFunction,
 		)
-		signer2 := interpreter.NewAccountValue(
+		signer2 := interpreter.NewAuthAccountValue(
 			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
 			panicFunction,
 			panicFunction,
@@ -227,8 +227,8 @@ func TestInterpretTransactions(t *testing.T) {
 
           transaction(x: Int, y: Bool) {
 
-            prepare(account: Account) {
-              values.append(account.address)
+            prepare(signer: AuthAccount) {
+              values.append(signer.address)
               values.append(y)
               values.append(x)
             }
@@ -237,7 +237,7 @@ func TestInterpretTransactions(t *testing.T) {
 
 		transactionArguments := []interface{}{1, true}
 		prepareArguments := []interface{}{
-			interpreter.NewAccountValue(interpreter.AddressValue{}, nil, nil, nil),
+			interpreter.NewAuthAccountValue(interpreter.AddressValue{}, nil, nil, nil),
 		}
 
 		arguments := append(transactionArguments, prepareArguments...)
