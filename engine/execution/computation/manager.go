@@ -5,12 +5,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/cadence"
+	"github.com/dapperlabs/cadence/encoding"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/language"
-	"github.com/dapperlabs/flow-go/language/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -61,7 +61,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *s
 		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
 	}
 
-	value, err := language.ConvertValue(result.Value)
+	value, err := cadence.ConvertValue(result.Value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to export runtime value: %w", err)
 	}
