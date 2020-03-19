@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestPRGSeeding(t *testing.T) {
@@ -118,31 +117,4 @@ func TestOpSwuHashToG1(t *testing.T) {
 		assert.Equal(t, hex.EncodeToString(output), expected[i], "hash to G1 is not equal to the expected value")
 	}
 	return
-}
-
-// TestDecode checks:
-// - the consistency of encode/decode of BLS public keys
-// - the validity of membership checks of BLS public keys on BLS12-381
-//    when decoding a public key
-func TestDecode(t *testing.T) {
-	// generate a key pair
-	seed := []byte{1, 2, 3, 4}
-	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
-	require.NoError(t, err)
-	pk := sk.PublicKey()
-	// encode the publick key
-	pkBytes, err := pk.Encode()
-	require.NoError(t, err)
-	// decode the public key including a membership check
-	pkCopy, err := DecodePublicKey(BLS_BLS12381, pkBytes)
-	// membership check should be valid
-	assert.Nil(t, err)
-	// check the encode and decode are consistent
-	pkCopyBytes, err := pkCopy.Encode()
-	require.NoError(t, err)
-	assert.Equal(t, pkBytes, pkCopyBytes)
-	// check an invalid membership check
-	pkBytes[5] ^= 1 // alter a bit
-	pkCopy, err = DecodePublicKey(BLS_BLS12381, pkBytes)
-	assert.NotNil(t, err)
 }
