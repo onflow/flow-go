@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -11,24 +12,24 @@ import (
 var stakingInfosFile string
 
 type DKGParticipantPriv struct {
-	NodeID              string `yaml:"nodeId"`
-	RandomBeaconPrivKey string `yaml:"randomBeaconPrivKey"`
-	GroupIndex          int    `yaml:"groupIndex"`
+	NodeID              flow.Identifier     `yaml:"nodeId"`
+	RandomBeaconPrivKey RandomBeaconPrivKey `yaml:"randomBeaconPrivKey"`
+	GroupIndex          int                 `yaml:"groupIndex"`
 }
 
 type DKGParticipantPub struct {
-	NodeID             string `yaml:"nodeId"`
-	RandomBeaconPubKey string `yaml:"randomBeaconPubKey"`
-	GroupIndex         int    `yaml:"groupIndex"`
+	NodeID             flow.Identifier    `yaml:"nodeId"`
+	RandomBeaconPubKey RandomBeaconPubKey `yaml:"randomBeaconPubKey"`
+	GroupIndex         int                `yaml:"groupIndex"`
 }
 
 type DKGDataPriv struct {
-	PubGroupKey  string               `yaml:"pubGroupKey"`
+	PubGroupKey  RandomBeaconPubKey   `yaml:"pubGroupKey"`
 	Participants []DKGParticipantPriv `yaml:"participants"`
 }
 
 type DKGDataPub struct {
-	PubGroupKey  string              `yaml:"pubGroupKey"`
+	PubGroupKey  RandomBeaconPubKey  `yaml:"pubGroupKey"`
 	Participants []DKGParticipantPub `yaml:"participants"`
 }
 
@@ -52,14 +53,14 @@ var dkgCmd = &cobra.Command{
 
 		dkgDataPriv := DKGDataPriv{
 			Participants: make([]DKGParticipantPriv, 0, nodes),
-			PubGroupKey:  pubKeyToString(dkgData.PubGroupKey),
+			PubGroupKey:  RandomBeaconPubKey{dkgData.PubGroupKey},
 		}
 		dkgDataPub := DKGDataPub{
 			Participants: make([]DKGParticipantPub, 0, nodes),
-			PubGroupKey:  pubKeyToString(dkgData.PubGroupKey),
+			PubGroupKey:  RandomBeaconPubKey{dkgData.PubGroupKey},
 		}
 		for i, nodeInfo := range nodeInfos {
-			log.Debug().Int("i", i).Str("nodeId", nodeInfo.NodeID).Msg("assembling dkg data")
+			log.Debug().Int("i", i).Str("nodeId", nodeInfo.NodeID.String()).Msg("assembling dkg data")
 			partPriv, partPub := assembleDKGParticipant(nodeInfo, dkgData.Participants[i])
 			dkgDataPriv.Participants = append(dkgDataPriv.Participants, partPriv)
 			dkgDataPub.Participants = append(dkgDataPub.Participants, partPub)
@@ -81,7 +82,6 @@ func init() {
 
 func assembleDKGParticipant(info NodeInfoPub, part run.DKGParticipant) (DKGParticipantPriv, DKGParticipantPub) {
 	pub := pubKeyToString(part.Pub)
-	priv := privKeyToString(part.Priv)
 
 	log.Debug().
 		Str("pub", pub).
@@ -89,13 +89,13 @@ func assembleDKGParticipant(info NodeInfoPub, part run.DKGParticipant) (DKGParti
 
 	partPriv := DKGParticipantPriv{
 		NodeID:              info.NodeID,
-		RandomBeaconPrivKey: priv,
+		RandomBeaconPrivKey: RandomBeaconPrivKey{part.Priv},
 		GroupIndex:          part.GroupIndex,
 	}
 
 	partPub := DKGParticipantPub{
 		NodeID:             info.NodeID,
-		RandomBeaconPubKey: pub,
+		RandomBeaconPubKey: RandomBeaconPubKey{part.Pub},
 		GroupIndex:         part.GroupIndex,
 	}
 

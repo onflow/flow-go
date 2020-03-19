@@ -13,26 +13,26 @@ import (
 var configFile string
 
 type NodeConfig struct {
-	Role    string `yaml:"role"`
-	Address string `yaml:"address"`
-	Stake   uint64 `yaml:"stake"`
+	Role    flow.Role `yaml:"role"`
+	Address string    `yaml:"address"`
+	Stake   uint64    `yaml:"stake"`
 }
 
 type NodeInfoPriv struct {
-	Role           string `yaml:"role"`
-	Address        string `yaml:"address"`
-	NodeID         string `yaml:"nodeId"`
-	NetworkPrivKey string `yaml:"networkPrivKey"`
-	StakingPrivKey string `yaml:"stakingPrivKey"`
+	Role           flow.Role       `yaml:"role"`
+	Address        string          `yaml:"address"`
+	NodeID         flow.Identifier `yaml:"nodeId"`
+	NetworkPrivKey NetworkPrivKey  `yaml:"networkPrivKey"`
+	StakingPrivKey StakingPrivKey  `yaml:"stakingPrivKey"`
 }
 
 type NodeInfoPub struct {
-	Role          string `yaml:"role"`
-	Address       string `yaml:"address"`
-	NodeID        string `yaml:"nodeId"`
-	NetworkPubKey string `yaml:"networkPubKey"`
-	StakingPubKey string `yaml:"stakingPubKey"`
-	Stake         uint64 `yaml:"stake"`
+	Role          flow.Role       `yaml:"role"`
+	Address       string          `yaml:"address"`
+	NodeID        flow.Identifier `yaml:"nodeId"`
+	NetworkPubKey NetworkPubKey   `yaml:"networkPubKey"`
+	StakingPubKey StakingPubKey   `yaml:"stakingPubKey"`
+	Stake         uint64          `yaml:"stake"`
 }
 
 var keysCmd = &cobra.Command{
@@ -56,7 +56,7 @@ var keysCmd = &cobra.Command{
 		// TODO replace with user provided seeds (through flag or file)
 		stakingKeys, err := run.GenerateStakingKeys(nodes, generateRandomSeeds(nodes))
 		if err != nil {
-			log.Fatal().Err(err).Msg("cannot generate networking keys")
+			log.Fatal().Err(err).Msg("cannot generate staking keys")
 		}
 		log.Info().Msgf("generated %v staking keys", nodes)
 
@@ -80,30 +80,27 @@ func init() {
 }
 
 func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.PrivateKey) (NodeInfoPriv, NodeInfoPub) {
-	networkPubKey := pubKeyToString(networkKey.PublicKey())
-	networkPrivKey := privKeyToString(networkKey)
-	stakingPubKey := pubKeyToString(stakingKey.PublicKey())
-	stakingPrivKey := privKeyToString(stakingKey)
+	nodeID := flow.MakeID(pubKeyToBytes(stakingKey.PublicKey()))
 
 	log.Debug().
-		Str("networkPubKey", networkPubKey).
-		Str("stakingPubKey", stakingPubKey).
+		Str("networkPubKey", pubKeyToString(networkKey.PublicKey())).
+		Str("stakingPubKey", pubKeyToString(stakingKey.PublicKey())).
 		Msg("encoded public staking and network keys")
 
 	nodeInfoPriv := NodeInfoPriv{
 		Role:           nodeConfig.Role,
 		Address:        nodeConfig.Address,
-		NodeID:         flow.MakeID(stakingPubKey).String(),
-		NetworkPrivKey: networkPrivKey,
-		StakingPrivKey: stakingPrivKey,
+		NodeID:         nodeID,
+		NetworkPrivKey: NetworkPrivKey{networkKey},
+		StakingPrivKey: StakingPrivKey{stakingKey},
 	}
 
 	nodeInfoPub := NodeInfoPub{
 		Role:          nodeConfig.Role,
 		Address:       nodeConfig.Address,
-		NodeID:        flow.MakeID(stakingPubKey).String(),
-		NetworkPubKey: networkPubKey,
-		StakingPubKey: stakingPubKey,
+		NodeID:        nodeID,
+		NetworkPubKey: NetworkPubKey{networkKey.PublicKey()},
+		StakingPubKey: StakingPubKey{stakingKey.PublicKey()},
 		Stake:         nodeConfig.Stake,
 	}
 

@@ -55,3 +55,22 @@ func ParseRole(role string) (Role, error) {
 		return 0, errors.Errorf("invalid role string (%s)", role)
 	}
 }
+
+func (r Role) MarshalYAML() (interface{}, error) {
+	return r.String(), nil
+}
+
+func (r *Role) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var s string
+	err := unmarshal(&s)
+	if err != nil {
+		return err
+	}
+
+	*r, err = ParseRole(s)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

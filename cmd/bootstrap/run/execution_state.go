@@ -23,6 +23,8 @@ func GenerateExecutionState(priv string) (flow.StateCommitment, error) {
 		return nil, err
 	}
 
+	// TODO return levelDb so it can be dumped/serialized
+
 	return bootstrapLedger(ledgerStorage, priv)
 }
 

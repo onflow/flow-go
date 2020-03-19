@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v2"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -36,4 +38,15 @@ func TestIdentifierFormat(t *testing.T) {
 		expected := fmt.Sprintf("%%!d(flow.Identifier=%s)", id)
 		assert.Equal(t, expected, formatted)
 	})
+}
+
+func TestIdentifierYAML(t *testing.T) {
+	id := unittest.IdentifierFixture()
+	bz, err := yaml.Marshal(id)
+	assert.NoError(t, err)
+	assert.Equal(t, fmt.Sprintf("%v\n", id), string(bz))
+	var actual flow.Identifier
+	err = yaml.Unmarshal(bz, &actual)
+	assert.NoError(t, err)
+	assert.Equal(t, id, actual)
 }

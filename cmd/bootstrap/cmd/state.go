@@ -1,14 +1,33 @@
 package cmd
 
 import (
-	"fmt"
+	"encoding/hex"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
 var privKey string
+
+type StateCommitment struct {
+	flow.StateCommitment
+}
+
+func (sc StateCommitment) MarshalYAML() (interface{}, error) {
+	return hex.EncodeToString(sc.StateCommitment), nil
+}
+
+func (sc *StateCommitment) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var s string
+	err := unmarshal(&s)
+	if err != nil {
+		return err
+	}
+	sc.StateCommitment, err = hex.DecodeString(s)
+	return err
+}
 
 // stateCmd represents the state command
 var stateCmd = &cobra.Command{
@@ -22,7 +41,7 @@ var stateCmd = &cobra.Command{
 			log.Fatal().Err(err).Msg("error generating execution state")
 		}
 
-		writeYaml("state.yml", fmt.Sprintf("%#x", stateCommitment))
+		writeYaml("state.yml", StateCommitment{stateCommitment})
 	},
 }
 

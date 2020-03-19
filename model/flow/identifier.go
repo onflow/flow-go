@@ -47,6 +47,25 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 	}
 }
 
+func (id Identifier) MarshalYAML() (interface{}, error) {
+	return id.String(), nil
+}
+
+func (id *Identifier) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var s string
+	err := unmarshal(&s)
+	if err != nil {
+		return err
+	}
+
+	*id, err = HexStringToIdentifier(s)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func HashToID(hash []byte) Identifier {
 	var id Identifier
 	copy(id[:], hash)
