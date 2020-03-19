@@ -277,6 +277,9 @@ type CadenceListener interface {
 	// EnterNilLiteral is called when entering the nilLiteral production.
 	EnterNilLiteral(c *NilLiteralContext)
 
+	// EnterPathLiteral is called when entering the pathLiteral production.
+	EnterPathLiteral(c *PathLiteralContext)
+
 	// EnterStringLiteral is called when entering the stringLiteral production.
 	EnterStringLiteral(c *StringLiteralContext)
 
@@ -585,6 +588,9 @@ type CadenceListener interface {
 
 	// ExitNilLiteral is called when exiting the nilLiteral production.
 	ExitNilLiteral(c *NilLiteralContext)
+
+	// ExitPathLiteral is called when exiting the pathLiteral production.
+	ExitPathLiteral(c *PathLiteralContext)
 
 	// ExitStringLiteral is called when exiting the stringLiteral production.
 	ExitStringLiteral(c *StringLiteralContext)

@@ -281,6 +281,9 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#nilLiteral.
 	VisitNilLiteral(ctx *NilLiteralContext) interface{}
 
+	// Visit a parse tree produced by CadenceParser#pathLiteral.
+	VisitPathLiteral(ctx *PathLiteralContext) interface{}
+
 	// Visit a parse tree produced by CadenceParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}
 

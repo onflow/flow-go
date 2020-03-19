@@ -56,6 +56,7 @@ type ExpressionVisitor interface {
 	VisitDestroyExpression(*DestroyExpression) Repr
 	VisitReferenceExpression(*ReferenceExpression) Repr
 	VisitForceExpression(*ForceExpression) Repr
+	VisitPathExpression(*PathExpression) Repr
 }
 
 type Visitor interface {

@@ -7666,3 +7666,41 @@ func BenchmarkParseFungibleToken(b *testing.B) {
 		}
 	}
 }
+
+func TestParsePathLiteral(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+	    let a = /foo/bar
+	`)
+
+	require.NoError(t, err)
+
+	a := &VariableDeclaration{
+		IsConstant: true,
+		Identifier: Identifier{Identifier: "a",
+			Pos: Position{Offset: 10, Line: 2, Column: 9},
+		},
+		Transfer: &Transfer{
+			Operation: TransferOperationCopy,
+			Pos:       Position{Offset: 12, Line: 2, Column: 11},
+		},
+		Value: &PathExpression{
+			StartPos: Position{Offset: 14, Line: 2, Column: 13},
+			Domain: Identifier{
+				Identifier: "foo",
+				Pos:        Position{Offset: 15, Line: 2, Column: 14},
+			},
+			Identifier: Identifier{
+				Identifier: "bar",
+				Pos:        Position{Offset: 19, Line: 2, Column: 18},
+			},
+		},
+		StartPos: Position{Offset: 6, Line: 2, Column: 5},
+	}
+
+	expected := &Program{
+		Declarations: []Declaration{a},
+	}
+
+	utils.AssertEqualWithDiff(t, expected, actual)
+}
