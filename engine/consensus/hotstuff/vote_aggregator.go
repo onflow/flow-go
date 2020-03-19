@@ -29,7 +29,6 @@ type VoteAggregator struct {
 // NewVoteAggregator creates an instance of vote aggregator
 func NewVoteAggregator(notifier notifications.Consumer, highestPrunedView uint64, viewState *ViewState, voteValidator *Validator, sigAggregator SigAggregator) *VoteAggregator {
 	return &VoteAggregator{
-		// TODO: implement logger in the future
 		logger:                zerolog.Logger{},
 		notifier:              notifier,
 		highestPrunedView:     highestPrunedView,
@@ -52,6 +51,8 @@ func (va *VoteAggregator) StorePendingVote(vote *hotstuff.Vote) bool {
 	// check if the vote is for a view that has already been pruned (and is thus stale)
 	// cannot store vote for already pruned view
 	if va.isStale(vote) {
+		va.logger.Info().Msgf("received staled pending vote for view :%v, ignored since highestPrunedView is: %v",
+			vote.View, va.highestPrunedView)
 		return false
 	}
 	// add vote, return false if the vote is not successfully added (already existed)
@@ -76,7 +77,9 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *hotstuff.Vote, block *hotstu
 	}
 	// ignore stale votes
 	if va.isStale(vote) {
-		return nil, false, hotstuff.StaleVoteError{Vote: vote, HighestPrunedView: va.highestPrunedView}
+		va.logger.Info().Msgf("received staled vote for view :%v, ignored since highestPrunedView is: %v",
+			vote.View, va.highestPrunedView)
+		return nil, false, nil
 	}
 	// validate the vote and adding it to the accumulated voting status
 	valid, err := va.validateAndStoreIncorporatedVote(vote, block)

@@ -66,8 +66,8 @@ func (e *blockComputer) executeBlock(
 	}
 
 	return &execution.ComputationResult{
-		CompleteBlock: block,
-		StateViews:    views,
+		ExecutableBlock: block,
+		StateViews:      views,
 	}, nil
 }
 

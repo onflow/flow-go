@@ -1,5 +1,0 @@
-fun test(_ x: Int8): Int8 {
-    return x
-};
-let x = test(1);
-assert x == 1

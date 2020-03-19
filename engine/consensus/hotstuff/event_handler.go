@@ -317,7 +317,18 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *hotstuff.
 	// cause the `curView` here to be stale
 	isNextLeader := true
 	curView := block.View
-	ownVote, shouldVote := e.voter.ProduceVoteIfVotable(block, curView)
+	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
+	shouldVote := true
+	if err != nil {
+		if errors.Is(err, hotstuff.NoVoteError{}) {
+			// if this block should not be voted, then change shouldVote to false
+			e.log.Debug().Msgf("should not vote for this block: %w", err)
+			shouldVote = false
+		} else {
+			// unknown error, exit the event loop
+			return fmt.Errorf("could not produce vote: %w", err)
+		}
+	}
 
 	// if i'm the next leader, then stay at the current view to collect votes for the block of the current view.
 	nv, viewChanged := e.paceMaker.UpdateCurViewWithBlock(block, isNextLeader)
@@ -343,7 +354,21 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *hotstu
 	// voter performs all the checks to decide whether to vote for this block or not.
 	isNextLeader := false
 	curView := block.View
-	ownVote, shouldVote := e.voter.ProduceVoteIfVotable(block, curView)
+
+	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
+	shouldVote := true
+
+	if err != nil {
+		switch err.(type) {
+		// if this block should not be voted, then change shouldVote to false
+		case *hotstuff.NoVoteError:
+			e.log.Debug().Msgf("should not vote for this block: %w", err)
+			shouldVote = false
+		default:
+			// unknown error, exit the event loop
+			return fmt.Errorf("could not produce vote: %w", err)
+		}
+	}
 
 	// send my vote if I should vote and I'm not the leader
 	if shouldVote {

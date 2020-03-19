@@ -78,7 +78,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		},
 	}
 
-	completeBlock := &entity.ExecutableBlock{
+	executableBlock := &entity.ExecutableBlock{
 		Block: &block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.ID(): {
@@ -106,7 +106,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	require.Empty(t, view.Delta())
 
-	returnedComputationResult, err := engine.ComputeBlock(completeBlock, view)
+	returnedComputationResult, err := engine.ComputeBlock(executableBlock, view)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, view.Delta())

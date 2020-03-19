@@ -1,3 +1,4 @@
+
 # The short Git commit hash
 SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
@@ -19,7 +20,6 @@ UNAME := $(shell uname)
 # The location of the k8s YAML files
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
-export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
 export DOCKER_BUILDKIT := 1
 
 crypto/relic:
@@ -55,7 +55,6 @@ unittest:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
-	$(MAKE) -C language test
 	$(MAKE) -C integration test
 
 .PHONY: test
@@ -256,18 +255,6 @@ docker-run-verification:
 .PHONY: docker-run-observation
 docker-run-observation:
 	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/observation:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries observation-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
-
-# Builds the VS Code extension
-.PHONY: build-vscode-extension
-build-vscode-extension:
-	cd language/tools/vscode-extension && npm run package;
-
-# Builds and promotes the VS Code extension. Promoting here means re-generating
-# the embedded extension binary used in the CLI for installation.
-.PHONY: promote-vscode-extension
-promote-vscode-extension: build-vscode-extension
-	cp language/tools/vscode-extension/cadence-*.vsix ./cli/flow/cadence/vscode/cadence.vsix;
-	go generate ./cli/flow/cadence/vscode;
 
 # Check if the go version is 1.13. flow-go only supports go 1.13
 .PHONY: check-go-version

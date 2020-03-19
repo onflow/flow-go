@@ -166,27 +166,27 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		return fmt.Errorf("could not finalize block: %w", err)
 	}
 
-	completeBlock := &entity.ExecutableBlock{
+	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
 	}
 
 	err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueue *stdmap.QueuesBackdata, orphanQueue *stdmap.QueuesBackdata) error {
 
-		err := e.sendCollectionsRequest(completeBlock, blockByCollection)
+		err := e.sendCollectionsRequest(executableBlock, blockByCollection)
 		if err != nil {
 			return fmt.Errorf("cannot send collection requests: %w", err)
 		}
 
 		// if block fits into execution queue, that's it
-		if queue, added := tryEnqueue(completeBlock, executionQueue); added {
-			e.tryRequeueOrphans(completeBlock, queue, orphanQueue)
+		if queue, added := tryEnqueue(executableBlock, executionQueue); added {
+			e.tryRequeueOrphans(executableBlock, queue, orphanQueue)
 			return nil
 		}
 
 		// if block fits into orphan queues
-		if queue, added := tryEnqueue(completeBlock, orphanQueue); added {
-			e.tryRequeueOrphans(completeBlock, queue, orphanQueue)
+		if queue, added := tryEnqueue(executableBlock, orphanQueue); added {
+			e.tryRequeueOrphans(executableBlock, queue, orphanQueue)
 			return nil
 		}
 
@@ -194,7 +194,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		// if state commitment doesn't exist and there are no known blocks which will produce
 		// it soon (execution queue) that we save it as orphaned
 		if err == storage.ErrNotFound {
-			_, err := enqueue(completeBlock, orphanQueue)
+			_, err := enqueue(executableBlock, orphanQueue)
 			if err != nil {
 				panic(fmt.Sprintf("cannot add orphaned block: %s", err))
 			}
@@ -205,18 +205,18 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 			panic(fmt.Sprintf("unexpected error while accessing storage, shutting down: %v", err))
 		}
 
-		completeBlock.StartState = stateCommitment
-		newQueue, err := enqueue(completeBlock, executionQueue)
+		executableBlock.StartState = stateCommitment
+		newQueue, err := enqueue(executableBlock, executionQueue)
 		if err != nil {
 			panic(fmt.Sprintf("cannot enqueue block for execution: %s", err))
 		}
 
-		e.tryRequeueOrphans(completeBlock, newQueue, orphanQueue)
+		e.tryRequeueOrphans(executableBlock, newQueue, orphanQueue)
 
 		// If the block was empty
-		if completeBlock.IsComplete() {
+		if executableBlock.IsComplete() {
 			e.wg.Add(1)
-			go e.executeBlock(completeBlock)
+			go e.executeBlock(executableBlock)
 		}
 
 		return nil
@@ -226,11 +226,11 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 }
 
 // tryRequeueOrphans tries to put orphaned queue into execution queue after a new block has been added
-func (e *Engine) tryRequeueOrphans(completeBlock *entity.ExecutableBlock, targetQueue *queue.Queue, potentialQueues *stdmap.QueuesBackdata) {
+func (e *Engine) tryRequeueOrphans(executableBlock *entity.ExecutableBlock, targetQueue *queue.Queue, potentialQueues *stdmap.QueuesBackdata) {
 	for _, queue := range potentialQueues.All() {
 		// only need to check for heads, as all children has parent already
 		// there might be many queues sharing a parent
-		if queue.Head.CompleteBlock.Block.ParentID == completeBlock.Block.ID() {
+		if queue.Head.ExecutableBlock.Block.ParentID == executableBlock.Block.ID() {
 			err := targetQueue.Attach(queue)
 			// shouldn't happen
 			if err != nil {
@@ -241,54 +241,54 @@ func (e *Engine) tryRequeueOrphans(completeBlock *entity.ExecutableBlock, target
 	}
 }
 
-func (e *Engine) executeBlock(completeBlock *entity.ExecutableBlock) {
+func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 	defer e.wg.Done()
 
-	view := e.execState.NewView(completeBlock.StartState)
+	view := e.execState.NewView(executableBlock.StartState)
 	e.log.Info().
-		Hex("block_id", logging.Entity(completeBlock.Block)).
+		Hex("block_id", logging.Entity(executableBlock.Block)).
 		Msg("executing block")
 
-	computationResult, err := e.computationManager.ComputeBlock(completeBlock, view)
+	computationResult, err := e.computationManager.ComputeBlock(executableBlock, view)
 	if err != nil {
 		e.log.Err(err).
-			Hex("block_id", logging.Entity(completeBlock.Block)).
+			Hex("block_id", logging.Entity(executableBlock.Block)).
 			Msg("error while computing block")
 		return
 	}
 
-	finalState, err := e.handleComputationResult(computationResult, completeBlock.StartState)
+	finalState, err := e.handleComputationResult(computationResult, executableBlock.StartState)
 	if err != nil {
 		e.log.Err(err).
-			Hex("block_id", logging.Entity(completeBlock.Block)).
+			Hex("block_id", logging.Entity(executableBlock.Block)).
 			Msg("error while handing computation results")
 		return
 	}
 
 	err = e.mempool.ExecutionQueue.Run(func(executionQueues *stdmap.QueuesBackdata) error {
-		executionQueue, err := executionQueues.ByID(completeBlock.Block.ID())
+		executionQueue, err := executionQueues.ByID(executableBlock.Block.ID())
 		if err != nil {
 			return fmt.Errorf("fatal error - executed block not present in execution queue: %w", err)
 		}
 		_, newQueues := executionQueue.Dismount()
 		for _, queue := range newQueues {
-			queue.Head.CompleteBlock.StartState = finalState
+			queue.Head.ExecutableBlock.StartState = finalState
 			err := executionQueues.Add(queue)
 			if err != nil {
 				return fmt.Errorf("fatal error cannot add children block to execution queue: %w", err)
 			}
-			if queue.Head.CompleteBlock.IsComplete() {
+			if queue.Head.ExecutableBlock.IsComplete() {
 				e.wg.Add(1)
-				go e.executeBlock(queue.Head.CompleteBlock)
+				go e.executeBlock(queue.Head.ExecutableBlock)
 			}
 		}
-		executionQueues.Rem(completeBlock.Block.ID())
+		executionQueues.Rem(executableBlock.Block.ID())
 		return nil
 	})
 
 	if err != nil {
 		e.log.Err(err).
-			Hex("block_id", logging.Entity(completeBlock.Block)).
+			Hex("block_id", logging.Entity(executableBlock.Block)).
 			Msg("error while requeueing blocks after execution")
 	}
 }
@@ -308,9 +308,9 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		if err != nil {
 			return err
 		}
-		completeBlock := blockByCollectionId.ExecutableBlock
+		executableBlock := blockByCollectionId.ExecutableBlock
 
-		completeCollection, ok := completeBlock.CompleteCollections[collID]
+		completeCollection, ok := executableBlock.CompleteCollections[collID]
 		if !ok {
 			return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
 		}
@@ -321,13 +321,13 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		}
 
 		completeCollection.Transactions = collection.Transactions
-		if completeBlock.HasAllTransactions() {
-			e.clearCollectionsCache(completeBlock, backdata)
+		if executableBlock.HasAllTransactions() {
+			e.clearCollectionsCache(executableBlock, backdata)
 		}
 
-		if completeBlock.IsComplete() {
+		if executableBlock.IsComplete() {
 			e.wg.Add(1)
-			go e.executeBlock(completeBlock)
+			go e.executeBlock(executableBlock)
 		}
 
 		return nil
@@ -356,54 +356,54 @@ func (e *Engine) clearCollectionsCache(block *entity.ExecutableBlock, backdata *
 }
 
 // tryEnqueue checks if a block fits somewhere into the already existing queues, and puts it there is so
-func tryEnqueue(completeBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
+func tryEnqueue(executableBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	for _, queue := range queues.All() {
-		if queue.TryAdd(completeBlock) {
+		if queue.TryAdd(executableBlock) {
 			return queue, true
 		}
 	}
 	return nil, false
 }
 
-func newQueue(completeBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
-	q := queue.NewQueue(completeBlock)
+func newQueue(executableBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
+	q := queue.NewQueue(executableBlock)
 	return q, queues.Add(q)
 }
 
 // enqueue inserts block into matching queue or creates a new one
-func enqueue(completeBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
+func enqueue(executableBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
 	for _, queue := range queues.All() {
-		if queue.TryAdd(completeBlock) {
+		if queue.TryAdd(executableBlock) {
 			return queue, nil
 		}
 	}
-	return newQueue(completeBlock, queues)
+	return newQueue(executableBlock, queues)
 }
 
-func (e *Engine) sendCollectionsRequest(completeBlock *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) error {
+func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) error {
 
 	collectionIdentifiers, err := e.findCollectionNodes()
 	if err != nil {
 		return err
 	}
 
-	for _, guarantee := range completeBlock.Block.Guarantees {
+	for _, guarantee := range executableBlock.Block.Guarantees {
 		maybeBlockByCollection, err := backdata.ByID(guarantee.ID())
 		if err == mempool.ErrEntityNotFound {
-			completeBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
+			executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
 				Guarantee:    guarantee,
 				Transactions: nil,
 			}
 			err := backdata.Add(&entity.BlockByCollection{
 				CollectionID:    guarantee.ID(),
-				ExecutableBlock: completeBlock,
+				ExecutableBlock: executableBlock,
 			})
 			if err != nil {
 				return fmt.Errorf("cannot save collection-block mapping: %w", err)
 			}
 
 			e.log.Debug().
-				Hex("block_id", logging.Entity(completeBlock.Block)).
+				Hex("block_id", logging.Entity(executableBlock.Block)).
 				Hex("collection_id", logging.ID(guarantee.ID())).
 				Msg("requesting collection")
 
@@ -417,7 +417,7 @@ func (e *Engine) sendCollectionsRequest(completeBlock *entity.ExecutableBlock, b
 		if err != nil {
 			return fmt.Errorf("cannot get an item from mempool: %w", err)
 		}
-		if maybeBlockByCollection.ID() != completeBlock.Block.ID() {
+		if maybeBlockByCollection.ID() != executableBlock.Block.ID() {
 			// Should not happen in MVP
 			return fmt.Errorf("received block with same collection alredy pointing to different block ")
 		}
@@ -450,7 +450,7 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 func (e *Engine) handleComputationResult(result *execution.ComputationResult, startState flow.StateCommitment) (flow.StateCommitment, error) {
 
 	e.log.Debug().
-		Hex("block_id", logging.ID(result.CompleteBlock.Block.ID())).
+		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
 	chunks := make([]*flow.Chunk, len(result.StateViews))
@@ -480,7 +480,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
 
 		if err != nil {
-			return nil, fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, result.CompleteBlock.Block.ID())
+			return nil, fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, result.ExecutableBlock.Block.ID())
 		}
 
 		chdp := generateChunkDataPack(chunk, allRegisters, values, proofs)
@@ -493,7 +493,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		startState = endState
 	}
 
-	executionResult, err := e.generateExecutionResultForBlock(result.CompleteBlock, chunks, endState)
+	executionResult, err := e.generateExecutionResultForBlock(result.ExecutableBlock, chunks, endState)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -507,7 +507,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		ExecutorID:        e.me.NodeID(),
 	}
 
-	err = e.execState.PersistStateCommitment(result.CompleteBlock.Block.ID(), endState)
+	err = e.execState.PersistStateCommitment(result.ExecutableBlock.Block.ID(), endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
