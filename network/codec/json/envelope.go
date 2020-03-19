@@ -39,8 +39,6 @@ const (
 
 	CodeExecutionStateRequest
 	CodeExecutionStateResponse
-	CodeExecutionCompleteBlock
-	CodeExecutionComputationOrder
 	CodeChunkDataPackRequest
 	CodeChunkDataPackResponse
 )
