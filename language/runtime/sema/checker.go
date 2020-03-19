@@ -1667,12 +1667,12 @@ func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 
 		switch compositeKindedType.GetCompositeKind() {
 		case common.CompositeKindContract:
-			// Contracts have a predeclared private field `priv let account: Account`
+			// Contracts have a predeclared private field `priv let account: AuthAccount`
 
 			member := NewPublicConstantFieldMember(
 				containerType,
 				"account",
-				&AccountType{},
+				&AuthAccountType{},
 			)
 			member.Access = ast.AccessPrivate
 			addPredeclaredMember(member)

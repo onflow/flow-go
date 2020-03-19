@@ -31,7 +31,7 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 		// must occur in an optional binding, i.e. inside a variable declaration
 		// as the if-statement test element
 
-		if expression.Operation != ast.OperationCast {
+		if expression.Operation == ast.OperationFailableCast {
 
 			if expression.ParentVariableDeclaration == nil ||
 				expression.ParentVariableDeclaration.ParentIfStatement == nil {
@@ -46,7 +46,7 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 	}
 
 	switch expression.Operation {
-	case ast.OperationFailableCast:
+	case ast.OperationFailableCast, ast.OperationForceCast:
 
 		if !leftHandType.IsInvalidType() &&
 			!rightHandType.IsInvalidType() {
@@ -85,7 +85,11 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 			}
 		}
 
-		return &OptionalType{Type: rightHandType}
+		if expression.Operation == ast.OperationFailableCast {
+			return &OptionalType{Type: rightHandType}
+		}
+
+		return rightHandType
 
 	case ast.OperationCast:
 		if !leftHandType.IsInvalidType() &&

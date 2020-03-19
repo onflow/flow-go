@@ -17,9 +17,9 @@ func TestCheckInvalidContractAccountField(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       contract Test {
-          let account: Account
+          let account: AuthAccount
 
-          init(account: Account) {
+          init(account: AuthAccount) {
               self.account = account
           }
       }
@@ -34,7 +34,7 @@ func TestCheckInvalidContractInterfaceAccountField(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       contract interface Test {
-          let account: Account
+          let account: AuthAccount
       }
     `)
 
@@ -102,7 +102,7 @@ func TestCheckInvalidContractAccountFieldInitialization(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       contract Test {
 
-          init(account: Account) {
+          init(account: AuthAccount) {
               self.account = account
           }
       }

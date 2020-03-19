@@ -173,12 +173,12 @@ func (r *interpreterRuntime) interpret(
 	return nil, nil
 }
 
-func (r *interpreterRuntime) newAccountValue(
+func (r *interpreterRuntime) newAuthAccountValue(
 	addressValue interpreter.AddressValue,
 	runtimeInterface Interface,
 	runtimeStorage *interpreterRuntimeStorage,
 ) *interpreter.CompositeValue {
-	return interpreter.NewAccountValue(
+	return interpreter.NewAuthAccountValue(
 		addressValue,
 		r.newSetCodeFunction(addressValue, runtimeInterface, runtimeStorage),
 		r.newAddPublicKeyFunction(addressValue, runtimeInterface),
@@ -227,7 +227,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	for _, parameter := range transactionFunctionType.Parameters {
 		parameterType := parameter.TypeAnnotation.Type
 
-		if !parameterType.Equal(&sema.AccountType{}) {
+		if !parameterType.Equal(&sema.AuthAccountType{}) {
 			return newError(InvalidTransactionParameterTypeError{
 				Actual: parameterType,
 			})
@@ -237,7 +237,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	signingAccounts := make([]interface{}, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
-		signingAccounts[i] = r.newAccountValue(
+		signingAccounts[i] = r.newAuthAccountValue(
 			interpreter.NewAddressValue(address),
 			runtimeInterface, runtimeStorage,
 		)
@@ -377,7 +377,7 @@ func (r *interpreterRuntime) newInterpreter(
 					addressValue := interpreter.NewAddressValueFromBytes(address)
 
 					return map[string]interpreter.Value{
-						"account": r.newAccountValue(addressValue, runtimeInterface, runtimeStorage),
+						"account": r.newAuthAccountValue(addressValue, runtimeInterface, runtimeStorage),
 					}
 				}
 
@@ -536,7 +536,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 			[]Value{accountAddressValue, codeValue, contractTypeIDs},
 		)
 
-		account := r.newAccountValue(accountAddressValue, runtimeInterface, runtimeStorage)
+		account := r.newAuthAccountValue(accountAddressValue, runtimeInterface, runtimeStorage)
 
 		return trampoline.Done{Result: account}
 	}

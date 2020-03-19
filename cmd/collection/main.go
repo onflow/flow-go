@@ -6,11 +6,15 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/cluster"
+	badgercluster "github.com/dapperlabs/flow-go/cluster/badger"
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	model "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
@@ -26,12 +30,14 @@ func main() {
 
 	var (
 		txLimit      uint
+		ingressConf  ingress.Config
 		pool         mempool.Transactions
 		collections  *storage.Collections
 		transactions *storage.Transactions
 		headers      *storage.Headers
 		payloads     *storage.ClusterPayloads
-		ingressConf  ingress.Config
+		clusterID    string        // chain ID for the cluster
+		clusterState cluster.State // chain state for the cluster
 		prov         *provider.Engine
 		ing          *ingest.Engine
 		err          error
@@ -52,6 +58,31 @@ func main() {
 			payloads = storage.NewClusterPayloads(node.DB)
 			return nil
 		}).
+		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
+			myCluster, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
+			if err != nil {
+				return fmt.Errorf("could not get my cluster: %w", err)
+			}
+
+			// determine the chain ID for my cluster and create cluster state
+			clusterID = protocol.ChainIDForCluster(myCluster)
+			clusterState, err = badgercluster.NewState(node.DB, clusterID)
+			if err != nil {
+				return fmt.Errorf("could not create cluster state: %w", err)
+			}
+
+			// create genesis block for cluster consensus
+			genesis := model.Genesis()
+			genesis.ChainID = clusterID
+
+			// bootstrap cluster consensus state
+			err = clusterState.Mutate().Bootstrap(genesis)
+			if err != nil {
+				return fmt.Errorf("could not bootstrap cluster state: %w", err)
+			}
+
+			return nil
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool)
 			return ing, err
@@ -67,10 +98,10 @@ func main() {
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			cache := buffer.NewPendingClusterBlocks()
-			build := builder.NewBuilder(node.DB, pool, "TODO")
-			final := finalizer.NewFinalizer(node.DB, pool, prov, node.Tracer, "TODO")
+			build := builder.NewBuilder(node.DB, pool, clusterID)
+			final := finalizer.NewFinalizer(node.DB, pool, prov, node.Tracer, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, node.Tracer, prov, pool, transactions, headers, payloads, cache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Tracer, prov, pool, transactions, headers, payloads, cache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
@@ -80,7 +111,11 @@ func main() {
 				return nil, fmt.Errorf("could not get cluster member filter: %w", err)
 			}
 
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, 3*time.Second, 6*time.Second)
+			head := func() (*flow.Header, error) {
+				return clusterState.Final().Head()
+			}
+
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, 3*time.Second, 6*time.Second, head)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}
