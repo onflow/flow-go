@@ -29,7 +29,7 @@ func (b *BlockchainState) StoreCollection(collection *flow.Collection) error {
 	light := collection.Light()
 	err := b.collections.StoreLight(&light)
 
-	// since the transactions in a collection remain same collection, it just needs to be added once
+	// since the transactions in a collection remain same, it just needs to be added once
 	if err != nil && strings.Contains(err.Error(), storage.ErrAlreadyExists.Error()) {
 		return nil
 	}
@@ -59,4 +59,10 @@ func (b *BlockchainState) AddTransactionCollectionMapping(transaction *flow.Tran
 // Block retrieves a Block by ID
 func (b *BlockchainState) Block(id flow.Identifier) (*flow.Header, error) {
 	return b.headers.ByBlockID(id)
+}
+
+// GetTransaction retrieves a transaction
+func (b *BlockchainState) GetTransaction(id flow.Identifier) (*flow.TransactionBody, error) {
+	return b.transactions.ByID(id)
+	// TODO: send a transaction request to the collection node and wait for a response
 }

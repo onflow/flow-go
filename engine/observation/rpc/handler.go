@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -14,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Handler implements a subset of the Observation API
@@ -50,17 +52,19 @@ func (h *Handler) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 
 // SendTransaction forwards the transaction to the collection node
 func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
+	// send the transaction to the collection node
 	resp, err := h.collectionRPC.SendTransaction(ctx, req)
 	if err != nil {
 		return resp, err
 	}
 
+	// convert the request message to a transaction
 	tx, err := ingress.MessageToTransaction(req.Transaction)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
 
-	// cache the transaction locally
+	// store the transaction locally
 	err = h.blkState.AddTransaction(&tx)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
@@ -91,10 +95,7 @@ func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatest
 		return nil, err
 	}
 
-	msg, err := convert.BlockHeaderToMessage(header)
-	if err != nil {
-		return nil, err
-	}
+	msg := convert.BlockHeaderToMessage(header)
 
 	resp := &observation.GetLatestBlockResponse{
 		Block: &msg,
@@ -102,9 +103,26 @@ func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatest
 	return resp, nil
 }
 
-func (h *Handler) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
-	// TODO lookup transaction in local transaction storage
-	return nil, nil
+func (h *Handler) GetTransaction(_ context.Context, req *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
+
+	id := flow.HashToID(req.Hash)
+	tx, err := h.blkState.GetTransaction(id)
+	if err != nil {
+		if strings.Contains(err.Error(), storage.ErrNotFound.Error()) {
+			return nil, status.Error(codes.NotFound, fmt.Sprintf("transaction not found: %v", err))
+		}
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to find transaction: %v", err))
+	}
+
+	transaction := convert.TransactionToMessage(tx)
+
+	// TODO: derive and set appropriate status of the transaction
+
+	resp := &observation.GetTransactionResponse{
+		Transaction: transaction,
+		// TODO: add events
+	}
+	return resp, nil
 }
 
 func (h *Handler) GetAccount(context.Context, *observation.GetAccountRequest) (*observation.GetAccountResponse, error) {
