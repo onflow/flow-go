@@ -46,7 +46,6 @@ require (
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
 	golang.org/x/sys v0.0.0-20200107162124-548cf772de50 // indirect
 	google.golang.org/grpc v1.26.0
-	gotest.tools v2.2.0+incompatible
 	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )
 

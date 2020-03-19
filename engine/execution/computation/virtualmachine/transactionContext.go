@@ -62,14 +62,8 @@ func (r *TransactionContext) SetValue(owner, controller, key, value []byte) erro
 	return nil
 }
 
-// CreateAccount creates a new account and inserts it into the world state.
-//
-// This function returns an error if the input is invalid.
-//
-// After creating the account, this function calls the onAccountCreated callback registered
-// with this context.
-func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address, error) {
-	latestAccountID, _ := r.ledger.Get(fullKeyHash("", "", keyLatestAccount))
+func CreateAccountInLedger(ledger Ledger, publicKeys [][]byte) (runtime.Address, error) {
+	latestAccountID, _ := ledger.Get(fullKeyHash("", "", keyLatestAccount))
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
 	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
@@ -78,19 +72,30 @@ func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 
 	accountID := accountAddress[:]
 
-	r.ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
+	ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 
-	err := r.setAccountPublicKeys(accountID, publicKeys)
+	err := setAccountPublicKeys(ledger, accountID, publicKeys)
 	if err != nil {
 		return runtime.Address{}, err
 	}
 
-	r.ledger.Set(fullKeyHash("", "", keyLatestAccount), accountID)
+	ledger.Set(fullKeyHash("", "", keyLatestAccount), accountID)
 
+	return runtime.Address(accountAddress), nil
+}
+
+// CreateAccount creates a new account and inserts it into the world state.
+//
+// This function returns an error if the input is invalid.
+//
+// After creating the account, this function calls the onAccountCreated callback registered
+// with this context.
+func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address, error) {
+	accountAddress, err := CreateAccountInLedger(r.ledger, publicKeys)
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %x", accountAddress))
 
-	return runtime.Address(accountAddress), nil
+	return accountAddress, err
 }
 
 // AddAccountKey adds a public key to an existing account.
@@ -115,7 +120,7 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 
 	publicKeys = append(publicKeys, publicKey)
 
-	return r.setAccountPublicKeys(accountID, publicKeys)
+	return setAccountPublicKeys(r.ledger, accountID, publicKeys)
 }
 
 // RemoveAccountKey removes a public key by index from an existing account.
@@ -146,7 +151,7 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
 
-	err = r.setAccountPublicKeys(accountID, publicKeys)
+	err = setAccountPublicKeys(r.ledger, accountID, publicKeys)
 	if err != nil {
 		return publicKey, err
 	}
@@ -188,10 +193,10 @@ func (r *TransactionContext) getAccountPublicKeys(accountID []byte) (publicKeys 
 	return publicKeys, nil
 }
 
-func (r *TransactionContext) setAccountPublicKeys(accountID []byte, publicKeys [][]byte) error {
+func setAccountPublicKeys(ledger Ledger, accountID []byte, publicKeys [][]byte) error {
 	var existingCount int
 
-	countBytes, err := r.ledger.Get(
+	countBytes, err := ledger.Get(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if err != nil {
@@ -206,13 +211,13 @@ func (r *TransactionContext) setAccountPublicKeys(accountID []byte, publicKeys [
 
 	newCount := len(publicKeys)
 
-	r.ledger.Set(
+	ledger.Set(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 		big.NewInt(int64(newCount)).Bytes(),
 	)
 
 	for i, publicKey := range publicKeys {
-		r.ledger.Set(
+		ledger.Set(
 			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
 			publicKey,
 		)
@@ -220,7 +225,7 @@ func (r *TransactionContext) setAccountPublicKeys(accountID []byte, publicKeys [
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		r.ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
+		ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
 	}
 
 	return nil
