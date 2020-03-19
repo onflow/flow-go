@@ -46,7 +46,6 @@ func (b *QueuesBackdata) All() []*queue.Queue {
 	return queues
 }
 
-
 func (b *Queues) Add(queue *queue.Queue) error {
 	return b.Backend.Add(queue)
 }

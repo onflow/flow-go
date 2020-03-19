@@ -22,7 +22,6 @@ func (m *Mempool) Run(f func(blockByCollection *stdmap.BlockByCollectionBackdata
 	})
 }
 
-
 func newMempool() *Mempool {
 	m := &Mempool{
 		BlockByCollection: stdmap.NewBlockByCollections(),

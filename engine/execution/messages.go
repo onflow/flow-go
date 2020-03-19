@@ -6,7 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
-
 // TODO If the executor will be a separate process/machine we would need to rework
 // sending view as local data, but that would be much greater refactor of storage anyway
 
