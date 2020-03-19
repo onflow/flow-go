@@ -195,7 +195,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 			if !e.syncInProgress && queue.Height() > e.syncModeThreshold {
 				// Start sync mode - initializing would require DB operation and will stop processing blocks here
 				// which is exactly what we want
-				e.StartSync(queue.Head.CompleteBlock)
+				e.StartSync(queue.Head.ExecutableBlock)
 			}
 			return nil
 		}

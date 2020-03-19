@@ -29,7 +29,7 @@ func TestQueue(t *testing.T) {
 	f := unittest.ExecutableBlockFixtureWithParent(0, &d.Block.Header)
 	g := unittest.ExecutableBlockFixtureWithParent(0, &b.Block.Header)
 
-	dBroken := unittest.CompleteBlockFixtureWithParent(0, &c.Block.Header)
+	dBroken := unittest.ExecutableBlockFixtureWithParent(0, &c.Block.Header)
 	dBroken.Block.Height += 2 //change height
 
 	queue := NewQueue(a)

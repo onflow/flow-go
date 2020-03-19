@@ -30,7 +30,7 @@ func ComputationResultFixture(n int) *execution.ComputationResult {
 		stateViews[i] = StateViewFixture()
 	}
 	return &execution.ComputationResult{
-		CompleteBlock: unittest.CompleteBlockFixture(n),
+		ExecutableBlock: unittest.ExecutableBlockFixture(n),
 		StateViews:    stateViews,
 	}
 }
@@ -42,7 +42,7 @@ func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *ex
 		stateViews[i] = StateViewFixture()
 	}
 	return &execution.ComputationResult{
-		CompleteBlock: completeBlock,
+		ExecutableBlock: completeBlock,
 		StateViews:    stateViews,
 	}
 }
