@@ -5,11 +5,10 @@ package json
 import (
 	"encoding/json"
 
-	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/pkg/errors"
+
 	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/messages"
-
-	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
@@ -84,8 +83,6 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeExecutionStateSyncRequest
 	case *messages.ExecutionStateDelta:
 		code = CodeExecutionStateDelta
-	case *execution.CompleteBlock:
-		code = CodeExecutionCompleteBlock
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)

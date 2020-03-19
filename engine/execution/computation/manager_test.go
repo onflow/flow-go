@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution"
-	realComputer "github.com/dapperlabs/flow-go/engine/execution/computation/computer"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
+	"github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mock"
 )
 
@@ -37,7 +37,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx1 := flow.TransactionBody{
 		Script: []byte(fmt.Sprintf(`transaction {
-              prepare(signer: Account) {
+              prepare(signer: AuthAccount) {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
@@ -50,7 +50,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 			import 0x01
 
 			transaction {
-				prepare(acc: Account) {
+				prepare(acc: AuthAccount) {
 					if acc.storage[Container.Counter] == nil {
                 		let existing <- acc.storage[Container.Counter] <- Container.createCounter(3)
                 		destroy existing
@@ -78,9 +78,9 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		},
 	}
 
-	completeBlock := &execution.CompleteBlock{
+	completeBlock := &entity.ExecutableBlock{
 		Block: &block,
-		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{
+		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.ID(): {
 				Guarantee:    &guarantee,
 				Transactions: transactions,
@@ -95,14 +95,14 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	vm := virtualmachine.New(rt)
 
-	blockComputer := realComputer.NewBlockComputer(vm)
+	blockComputer := computer.NewBlockComputer(vm)
 
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 	}
 
-	view := executionUnittest.EmptyView()
+	view := unittest.EmptyView()
 
 	require.Empty(t, view.Delta())
 

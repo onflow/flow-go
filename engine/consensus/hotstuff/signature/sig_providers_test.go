@@ -1,23 +1,19 @@
-package signature
+package signature_test
 
 import (
-	"crypto/rand"
 	"fmt"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/test"
 	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	model "github.com/dapperlabs/flow-go/model/hotstuff"
-	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/protocol"
-	mockProtocol "github.com/dapperlabs/flow-go/protocol/mocks"
-	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestRandomBeaconEnabledSigning(t *testing.T) {
@@ -60,11 +56,15 @@ func TestRandomBeaconDisabledAggregation(t *testing.T) {
 	t.Run("aggregated signatures claimed from a wrong signer should be rejected", testAggregateWithWrongSignerRBDisabled)
 }
 
+func TestAggregationPerformance(t *testing.T) {
+	t.Run("check how long it takes to reconstruct 254 votes", testAggregationPerformance)
+}
+
 func testOKSigningRBEnabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, randomBeaconKeys, _ := makeSignerAndVerifier(t, 4, true)
+	_, signers, verifier, _, stakingKeys, randomBeaconKeys, _ := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create proposal
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 	proposal, err := signers[0].Propose(block)
 	require.NoError(t, err)
 
@@ -79,16 +79,16 @@ func testOKSigningRBEnabled(t *testing.T) {
 	assert.True(t, valid)
 
 	// verify random beacon sig by a unstaked verifier
-	valid, err = NewRandomBeaconAwareSigVerifier().VerifyRandomBeaconThresholdSig(proposal.RandomBeaconSignature, block, randomBeaconKeys[0].PublicKey())
+	valid, err = signature.NewRandomBeaconAwareSigVerifier().VerifyRandomBeaconThresholdSig(proposal.RandomBeaconSignature, block, randomBeaconKeys[0].PublicKey())
 	require.NoError(t, err)
 	assert.True(t, valid)
 }
 
 func testOKSigningVoteRBEnabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, randomBKeys, _ := makeSignerAndVerifier(t, 4, true)
+	_, signers, verifier, _, stakingKeys, randomBKeys, _ := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create vote
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 	vote, err := signers[0].VoteFor(block)
 	require.NoError(t, err)
 
@@ -103,17 +103,17 @@ func testOKSigningVoteRBEnabled(t *testing.T) {
 	assert.True(t, valid)
 
 	// verify random beacon sig by a unstaked verifier
-	valid, err = NewRandomBeaconAwareSigVerifier().VerifyRandomBeaconThresholdSig(vote.Signature.RandomBeaconSignature, block, randomBKeys[0].PublicKey())
+	valid, err = signature.NewRandomBeaconAwareSigVerifier().VerifyRandomBeaconThresholdSig(vote.Signature.RandomBeaconSignature, block, randomBKeys[0].PublicKey())
 	require.NoError(t, err)
 	assert.True(t, valid)
 }
 
 func testProposalIsVote(t *testing.T) {
-	_, signers, _, _, _, _, _ := makeSignerAndVerifier(t, 4, false)
+	_, signers, _, _, _, _, _ := test.MakeSignerAndVerifier(t, 4, false)
 	signer := signers[0]
 
 	// make a vote from proposal
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 	proposal, err := signer.Propose(block)
 	require.NoError(t, err)
 
@@ -126,10 +126,10 @@ func testProposalIsVote(t *testing.T) {
 }
 
 func testWrongBlockIDRBEnabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, randomBKeys, _ := makeSignerAndVerifier(t, 4, true)
+	_, signers, verifier, _, stakingKeys, randomBKeys, _ := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create vote
-	block, withWrongBlockID := makeBlock(1), makeBlock(2)
+	block, withWrongBlockID := test.MakeBlock(1), test.MakeBlock(2)
 	withWrongBlockID.View = block.View // withWrongBlockID has the different BlockID
 	vote, err := signers[0].VoteFor(block)
 	require.NoError(t, err)
@@ -145,16 +145,16 @@ func testWrongBlockIDRBEnabled(t *testing.T) {
 	assert.Equal(t, false, valid)
 
 	// verify random beacon sig by a unstaked verifier
-	valid, err = NewRandomBeaconAwareSigVerifier().VerifyRandomBeaconThresholdSig(vote.Signature.RandomBeaconSignature, withWrongBlockID, randomBKeys[0].PublicKey())
+	valid, err = signature.NewRandomBeaconAwareSigVerifier().VerifyRandomBeaconThresholdSig(vote.Signature.RandomBeaconSignature, withWrongBlockID, randomBKeys[0].PublicKey())
 	require.NoError(t, err)
 	assert.Equal(t, false, valid)
 }
 
 func testWrongViewRBEnabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, randomBKeys, _ := makeSignerAndVerifier(t, 4, true)
+	_, signers, verifier, _, stakingKeys, randomBKeys, _ := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create vote
-	block, withWrongView := makeBlock(1), makeBlock(2)
+	block, withWrongView := test.MakeBlock(1), test.MakeBlock(2)
 	withWrongView.BlockID = block.BlockID // withWrongView has the different View
 	vote, err := signers[0].VoteFor(block)
 	require.NoError(t, err)
@@ -170,33 +170,61 @@ func testWrongViewRBEnabled(t *testing.T) {
 	assert.Equal(t, false, valid)
 
 	// verify random beacon sig by a unstaked verifier
-	valid, err = NewRandomBeaconAwareSigVerifier().VerifyRandomBeaconThresholdSig(vote.Signature.RandomBeaconSignature, withWrongView, randomBKeys[0].PublicKey())
+	valid, err = signature.NewRandomBeaconAwareSigVerifier().VerifyRandomBeaconThresholdSig(vote.Signature.RandomBeaconSignature, withWrongView, randomBKeys[0].PublicKey())
 	require.NoError(t, err)
 	assert.Equal(t, false, valid)
 }
 
+type TestRandomBeaconSigVerifier struct {
+	// the hasher for signer random beacon signature
+	randomBeaconHasher crypto.Hasher
+}
+
+func NewTestRandomBeaconSigVerifier(tag string) TestRandomBeaconSigVerifier {
+	return TestRandomBeaconSigVerifier{
+		randomBeaconHasher: crypto.NewBLS_KMAC(tag),
+	}
+}
+
+func (v *TestRandomBeaconSigVerifier) VerifyRandomBeaconSig(sigShare crypto.Signature, block *model.Block, signerPubKey crypto.PublicKey) (bool, error) {
+	msg := signature.BlockToBytesForSign(block)
+	valid, err := signerPubKey.Verify(sigShare, msg, v.randomBeaconHasher)
+	if err != nil {
+		return false, fmt.Errorf("cannot verify random beacon signature: %w", err)
+	}
+	return valid, nil
+}
+
+func (v *TestRandomBeaconSigVerifier) VerifyRandomBeaconThresholdSig(sig crypto.Signature, block *model.Block, groupPubKey crypto.PublicKey) (bool, error) {
+	msg := signature.BlockToBytesForSign(block)
+	// the reconstructed signature is also a BLS signature which can be verified by the group public key
+	valid, err := groupPubKey.Verify(sig, msg, v.randomBeaconHasher)
+	if err != nil {
+		return false, fmt.Errorf("cannot verify reconstructed random beacon sig: %w", err)
+	}
+	return valid, nil
+}
+
 func testWrongKMacTagRBEnabled(t *testing.T) {
-	_, signers, _, _, _, randomBKeys, _ := makeSignerAndVerifier(t, 4, true)
+	_, signers, _, _, _, randomBKeys, _ := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create vote
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 	vote, err := signers[0].VoteFor(block)
 	require.NoError(t, err)
 
 	// verify random beacon sig by a unstaked verifier
-	verifier := RandomBeaconSigVerifier{
-		randomBeaconHasher: crypto.NewBLS_KMAC("wrongtag"),
-	}
+	verifier := NewTestRandomBeaconSigVerifier("wrongtag")
 	valid, err := verifier.VerifyRandomBeaconThresholdSig(vote.Signature.RandomBeaconSignature, block, randomBKeys[0].PublicKey())
 	require.NoError(t, err)
 	assert.Equal(t, false, valid)
 }
 
 func testWrongSignerRBEnabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, randomBKeys, _ := makeSignerAndVerifier(t, 4, true)
+	_, signers, verifier, _, stakingKeys, randomBKeys, _ := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create vote
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 	vote, err := signers[0].VoteFor(block)
 	require.NoError(t, err)
 
@@ -214,10 +242,10 @@ func testWrongSignerRBEnabled(t *testing.T) {
 }
 
 func testOKSigningRBDisabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, _, _ := makeSignerAndVerifier(t, 4, false)
+	_, signers, verifier, _, stakingKeys, _, _ := test.MakeSignerAndVerifier(t, 4, false)
 
 	// create proposal
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 	proposal, err := signers[0].Propose(block)
 	require.NoError(t, err)
 
@@ -227,10 +255,10 @@ func testOKSigningRBDisabled(t *testing.T) {
 	assert.True(t, valid)
 }
 func testOKSigningVoteRBDisabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, _, _ := makeSignerAndVerifier(t, 4, false)
+	_, signers, verifier, _, stakingKeys, _, _ := test.MakeSignerAndVerifier(t, 4, false)
 
 	// create vote
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 	vote, err := signers[0].VoteFor(block)
 	require.NoError(t, err)
 
@@ -241,10 +269,10 @@ func testOKSigningVoteRBDisabled(t *testing.T) {
 }
 
 func testWrongBlockIDRBDisabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, _, _ := makeSignerAndVerifier(t, 4, false)
+	_, signers, verifier, _, stakingKeys, _, _ := test.MakeSignerAndVerifier(t, 4, false)
 
 	// create vote
-	block, withWrongBlockID := makeBlock(1), makeBlock(2)
+	block, withWrongBlockID := test.MakeBlock(1), test.MakeBlock(2)
 	withWrongBlockID.View = block.View // withWrongBlockID has the different BlockID
 	vote, err := signers[0].VoteFor(block)
 	require.NoError(t, err)
@@ -256,10 +284,10 @@ func testWrongBlockIDRBDisabled(t *testing.T) {
 }
 
 func testWrongViewRBDisabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, _, _ := makeSignerAndVerifier(t, 4, false)
+	_, signers, verifier, _, stakingKeys, _, _ := test.MakeSignerAndVerifier(t, 4, false)
 
 	// create vote
-	block, withWrongView := makeBlock(1), makeBlock(2)
+	block, withWrongView := test.MakeBlock(1), test.MakeBlock(2)
 	withWrongView.BlockID = block.BlockID // withWrongView has the different View
 	vote, err := signers[0].VoteFor(block)
 	require.NoError(t, err)
@@ -271,21 +299,21 @@ func testWrongViewRBDisabled(t *testing.T) {
 }
 
 func testWrongKMacTagRBDisabled(t *testing.T) {
-	ps, ids := newProtocolState(t, 4)
-	stakingKeys, err := addStakingPrivateKeys(ids)
+	ps, ids := test.NewProtocolState(t, 4)
+	stakingKeys, err := test.AddStakingPrivateKeys(ids)
 	require.NoError(t, err)
 
 	var signer hotstuff.Signer
 	var verifier hotstuff.SigVerifier
 
 	// creating signer
-	signer, err = newStakingSigProvider(ps, "wrongtag", ids[0], stakingKeys[0]) // bad signer init with a wrong tag
+	signer, err = test.NewStakingProvider(ps, "wrongtag", ids[0], stakingKeys[0]) // bad signer init with a wrong tag
 	require.NoError(t, err)
-	verifier, err = newStakingSigProvider(ps, encoding.CollectorVoteTag, ids[1], stakingKeys[1])
+	verifier, err = test.NewStakingProvider(ps, encoding.CollectorVoteTag, ids[1], stakingKeys[1])
 	require.NoError(t, err)
 
 	// create vote
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 	vote, err := signer.VoteFor(block)
 	require.NoError(t, err)
 
@@ -296,10 +324,10 @@ func testWrongKMacTagRBDisabled(t *testing.T) {
 }
 
 func testWrongSignerRBDisabled(t *testing.T) {
-	_, signers, verifier, _, stakingKeys, _, _ := makeSignerAndVerifier(t, 4, false)
+	_, signers, verifier, _, stakingKeys, _, _ := test.MakeSignerAndVerifier(t, 4, false)
 
 	// create vote
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 	vote, err := signers[0].VoteFor(block)
 	require.NoError(t, err)
 
@@ -312,10 +340,10 @@ func testWrongSignerRBDisabled(t *testing.T) {
 }
 
 func testAggregateRBEnabled(t *testing.T) {
-	_, signers, verifier, aggregator, stakingKeys, _, dkg := makeSignerAndVerifier(t, 4, true)
+	_, signers, verifier, aggregator, stakingKeys, _, dkg := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create block
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 
 	// create votes
 	vote1, err := signers[0].VoteFor(block)
@@ -343,10 +371,10 @@ func testAggregateRBEnabled(t *testing.T) {
 }
 
 func testAggregateDifferentBlockRBEnabled(t *testing.T) {
-	_, signers, _, aggregator, _, _, _ := makeSignerAndVerifier(t, 4, true)
+	_, signers, _, aggregator, _, _, _ := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create block
-	block1, block2 := makeBlock(1), makeBlock(2)
+	block1, block2 := test.MakeBlock(1), test.MakeBlock(2)
 
 	// create votes
 	vote1, err := signers[0].VoteFor(block1)
@@ -361,10 +389,10 @@ func testAggregateDifferentBlockRBEnabled(t *testing.T) {
 }
 
 func testAggregateWithWrongSignerRBEnabled(t *testing.T) {
-	_, signers, verifier, aggregator, stakingKeys, _, _ := makeSignerAndVerifier(t, 4, true)
+	_, signers, verifier, aggregator, stakingKeys, _, _ := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create block
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 
 	// create votes
 	vote1, err := signers[0].VoteFor(block)
@@ -386,7 +414,7 @@ func testAggregateWithWrongSignerRBEnabled(t *testing.T) {
 	assert.Equal(t, false, valid)
 
 	// create a different dkg group with 5 nodes
-	_, _, _, _, _, _, dkg2 := makeSignerAndVerifier(t, 5, true)
+	_, _, _, _, _, _, dkg2 := test.MakeSignerAndVerifier(t, 5, true)
 	// verify aggregated random beacon sig
 	valid, err = verifier.VerifyRandomBeaconThresholdSig(aggsig.RandomBeaconSignature, block, dkg2.GroupPubKey)
 	// fail because the group public key was wrong
@@ -395,10 +423,10 @@ func testAggregateWithWrongSignerRBEnabled(t *testing.T) {
 }
 
 func testAggregateWithInsufficientSharesRBEnabled(t *testing.T) {
-	_, signers, _, aggregator, _, _, _ := makeSignerAndVerifier(t, 4, true)
+	_, signers, _, aggregator, _, _, _ := test.MakeSignerAndVerifier(t, 4, true)
 
 	// create block
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 
 	// create votes
 	vote1, err := signers[0].VoteFor(block)
@@ -411,10 +439,10 @@ func testAggregateWithInsufficientSharesRBEnabled(t *testing.T) {
 }
 
 func testAggregateRBDisabled(t *testing.T) {
-	_, signers, verifier, aggregator, stakingKeys, _, _ := makeSignerAndVerifier(t, 4, false)
+	_, signers, verifier, aggregator, stakingKeys, _, _ := test.MakeSignerAndVerifier(t, 4, false)
 
 	// create block
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 
 	// create votes
 	vote1, err := signers[0].VoteFor(block)
@@ -437,10 +465,10 @@ func testAggregateRBDisabled(t *testing.T) {
 }
 
 func testAggregateWithWrongBlockIDRBDisabled(t *testing.T) {
-	_, signers, _, aggregator, _, _, _ := makeSignerAndVerifier(t, 4, false)
+	_, signers, _, aggregator, _, _, _ := test.MakeSignerAndVerifier(t, 4, false)
 
 	// create block
-	block1, block2 := makeBlock(1), makeBlock(2)
+	block1, block2 := test.MakeBlock(1), test.MakeBlock(2)
 
 	// create votes
 	vote1, err := signers[0].VoteFor(block1)
@@ -455,10 +483,10 @@ func testAggregateWithWrongBlockIDRBDisabled(t *testing.T) {
 }
 
 func testAggregateWithWrongSignerRBDisabled(t *testing.T) {
-	_, signers, verifier, aggregator, stakingKeys, _, _ := makeSignerAndVerifier(t, 4, false)
+	_, signers, verifier, aggregator, stakingKeys, _, _ := test.MakeSignerAndVerifier(t, 4, false)
 
 	// create block
-	block := makeBlock(1)
+	block := test.MakeBlock(1)
 
 	// create votes
 	vote1, err := signers[0].VoteFor(block)
@@ -480,161 +508,40 @@ func testAggregateWithWrongSignerRBDisabled(t *testing.T) {
 	assert.Equal(t, false, valid)
 }
 
-// generete a random BLS private key
-func nextBLSKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, 48)
-	_, err := rand.Read(seed)
-	if err != nil {
-		return nil, err
-	}
-	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
-	return sk, err
-}
+func testAggregationPerformance(t *testing.T) {
+	_, signers, _, aggregator, stakingKeys, _, dkg := test.MakeSignerAndVerifierWithFakeDKG(t, 254)
+	require.NotNil(t, dkg)
 
-// make a random block seeded by input
-func makeBlock(seed int) *model.Block {
-	id := flow.MakeID(struct {
-		BlockID int
-	}{
-		BlockID: seed,
-	})
-	return &model.Block{
-		BlockID: id,
-		View:    uint64(seed),
-	}
-}
+	threshold := len(signers)*2/3 + 1
 
-// create a protocol state with N identities
-func newProtocolState(t *testing.T, n int) (protocol.State, flow.IdentityList) {
-	ctrl := gomock.NewController(t)
-	// mock identity list
-	ids := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
+	// create block
+	block := test.MakeBlock(1)
 
-	// mock protocol state
-	mockProtocolState := mockProtocol.NewMockState(ctrl)
-	mockSnapshot := mockProtocol.NewMockSnapshot(ctrl)
-	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(mockSnapshot).AnyTimes()
-	mockProtocolState.EXPECT().Final().Return(mockSnapshot).AnyTimes()
-	for _, id := range ids {
-		mockSnapshot.EXPECT().Identity(id.NodeID).Return(id, nil).AnyTimes()
-	}
-	mockSnapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f ...flow.IdentityFilter) (flow.IdentityList, error) {
-		return ids.Filter(f...), nil
-	}).AnyTimes()
-	return mockProtocolState, ids
-}
+	// create votes and signatures
+	sigs := make([]*model.SingleSignature, 0, threshold)
+	pubkeys := make([]crypto.PublicKey, 0, threshold)
 
-// create N private keys and assign them to identities' StakingPubKey
-func addStakingPrivateKeys(ids flow.IdentityList) ([]crypto.PrivateKey, error) {
-	sks := []crypto.PrivateKey{}
-	for i := 0; i < len(ids); i++ {
-		sk, err := nextBLSKey()
-		if err != nil {
-			return nil, fmt.Errorf("cannot create mock private key: %w", err)
-		}
-		ids[i].StakingPubKey = sk.PublicKey()
-		sks = append(sks, sk)
-	}
-	return sks, nil
-}
-
-// create N private keys and assign them to identities' RandomBeaconPubKey
-func addRandomBeaconPrivateKeys(t *testing.T, ids flow.IdentityList) ([]crypto.PrivateKey, *hotstuff.DKGPublicData, error) {
-	sks, groupPubKey, keyShares := unittest.RunDKGKeys(t, len(ids))
-	for i := 0; i < len(ids); i++ {
-		sk := sks[i]
-		ids[i].RandomBeaconPubKey = sk.PublicKey()
-	}
-
-	dkgMap := make(map[flow.Identifier]*hotstuff.DKGParticipant)
-	for i, id := range ids {
-		dkgMap[id.NodeID] = &hotstuff.DKGParticipant{
-			Id:             id.NodeID,
-			PublicKeyShare: keyShares[i],
-			DKGIndex:       i,
-		}
-	}
-	dkgPubData := hotstuff.DKGPublicData{
-		GroupPubKey:           groupPubKey,
-		IdToDKGParticipantMap: dkgMap,
-	}
-	return sks, &dkgPubData, nil
-}
-
-// create a new StakingSigProvider
-func newStakingSigProvider(ps protocol.State, tag string, id *flow.Identity, sk crypto.PrivateKey) (*StakingSigProvider, error) {
-	vs, err := hotstuff.NewViewState(ps, nil, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return nil, fmt.Errorf("cannot create view state: %w", err)
-	}
-	me, err := local.New(id, sk)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create local: %w", err)
-	}
-
-	sigProvider := NewStakingSigProvider(vs, tag, me)
-	return &sigProvider, nil
-}
-
-// create a new RandomBeaconAwareSigProvider
-func newRandomBeaconSigProvider(ps protocol.State, dkgPubData *hotstuff.DKGPublicData, tag string, id *flow.Identity, stakingKey crypto.PrivateKey, randomBeaconKey crypto.PrivateKey) (*RandomBeaconAwareSigProvider, error) {
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return nil, fmt.Errorf("cannot create view state: %w", err)
-	}
-	me, err := local.New(id, stakingKey)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create local: %w", err)
-	}
-
-	sigProvider := NewRandomBeaconAwareSigProvider(vs, me, randomBeaconKey)
-	return &sigProvider, nil
-}
-
-// setup necessary signer, verifier, and aggregator for a cluster of N nodes
-func makeSignerAndVerifier(t *testing.T, n int, enableRandomBeacon bool) (
-	flow.IdentityList,
-	[]hotstuff.Signer,
-	hotstuff.SigVerifier,
-	hotstuff.SigAggregator,
-	[]crypto.PrivateKey, // stakingKeys
-	[]crypto.PrivateKey, // randomBKeys
-	*hotstuff.DKGPublicData,
-) {
-
-	assert.NotEqual(t, n, 0)
-
-	ps, ids := newProtocolState(t, n)
-	stakingKeys, err := addStakingPrivateKeys(ids)
-	require.NoError(t, err)
-
-	signers := make([]hotstuff.Signer, n)
-	var verifier hotstuff.SigVerifier
-	var aggregator hotstuff.SigAggregator
-
-	if !enableRandomBeacon {
-		// if random beacon is disabled, create staking sig provider
-		for i := 0; i < n; i++ {
-			signer, err := newStakingSigProvider(ps, encoding.ConsensusVoteTag, ids[i], stakingKeys[i])
-			require.NoError(t, err)
-			signers[i] = signer
-			if i == 0 {
-				verifier = signer
-				aggregator = signer
-			}
-		}
-		return ids, signers, verifier, aggregator, stakingKeys, nil, nil
-	}
-
-	randomBKeys, dkgPubData, err := addRandomBeaconPrivateKeys(t, ids)
-	for i := 0; i < n; i++ {
-		signer, err := newRandomBeaconSigProvider(ps, dkgPubData, encoding.ConsensusVoteTag, ids[i], stakingKeys[i], randomBKeys[i])
+	for i := 0; i < threshold; i++ {
+		vote, err := signers[i].VoteFor(block)
 		require.NoError(t, err)
-		signers[i] = signer
-		if i == 0 {
-			verifier = signer
-			aggregator = signer
-		}
+		sigs = append(sigs, vote.Signature)
+		pubkeys = append(pubkeys, stakingKeys[i].PublicKey())
 	}
-	return ids, signers, verifier, aggregator, stakingKeys, randomBKeys, dkgPubData
+
+	// aggregate
+	timer := time.Now()
+	// The aggregation will fail, because we used fake random beacon private keys.
+	// However it's OK for the aggregation to fail, because the failure comes from verifying the aggregated
+	// signature. Since we only care about the timing, by the time the verification has failed, the aggregation
+	// has been done. The timing result should be the same as using the real random beacon private keys.
+
+	// Why using fake random beacon private keys here?
+	// because generating 254 DKG keys is very slow on one machine.
+	// TODO: we could generate 254 DKG keys on power machines, and store the generated keys in files,
+	// and load them to tests
+	aggregator.Aggregate(block, sigs)
+	// log performance
+	duration := time.Now().Sub(timer)
+
+	t.Logf("Aggregating %v signatures for %v nodes took: %s\n", threshold, len(signers), duration)
 }

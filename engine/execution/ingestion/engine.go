@@ -17,6 +17,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/module/mempool/queue"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -167,12 +170,12 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		return fmt.Errorf("could not finalize block: %w", err)
 	}
 
-	completeBlock := &execution.CompleteBlock{
+	completeBlock := &entity.ExecutableBlock{
 		Block:               block,
-		CompleteCollections: make(map[flow.Identifier]*execution.CompleteCollection),
+		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
 	}
 
-	err = e.mempool.Run(func(blockByCollection *BlockByCollectionBackdata, executionQueue *QueuesBackdata, orphanQueues *QueuesBackdata) error {
+	err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueue *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
 
 		err := e.sendCollectionsRequest(completeBlock, blockByCollection)
 		if err != nil {
@@ -233,7 +236,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 }
 
 // tryRequeueOrphans tries to put orphaned queue into other queues after a new block has been added
-func (e *Engine) tryRequeueOrphans(completeBlock *execution.CompleteBlock, targetQueue *Queue, potentialQueues *QueuesBackdata) {
+func (e *Engine) tryRequeueOrphans(completeBlock *entity.ExecutableBlock, targetQueue *queue.Queue, potentialQueues *stdmap.QueuesBackdata) {
 	for _, queue := range potentialQueues.All() {
 		// only need to check for heads, as all children has parent already
 		// there might be many queues sharing a parent
@@ -248,7 +251,7 @@ func (e *Engine) tryRequeueOrphans(completeBlock *execution.CompleteBlock, targe
 	}
 }
 
-func (e *Engine) executeBlock(completeBlock *execution.CompleteBlock) {
+func (e *Engine) executeBlock(completeBlock *entity.ExecutableBlock) {
 	defer e.wg.Done()
 
 	view := e.execState.NewView(completeBlock.StartState)
@@ -272,7 +275,7 @@ func (e *Engine) executeBlock(completeBlock *execution.CompleteBlock) {
 		return
 	}
 
-	err = e.mempool.ExecutionQueue.Run(func(executionQueues *QueuesBackdata) error {
+	err = e.mempool.ExecutionQueue.Run(func(executionQueues *stdmap.QueuesBackdata) error {
 		executionQueue, err := executionQueues.ByID(completeBlock.Block.ID())
 		if err != nil {
 			return fmt.Errorf("fatal error - executed block not present in execution queue: %w", err)
@@ -310,12 +313,12 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 
 	collID := collection.ID()
 
-	return e.mempool.BlockByCollection.Run(func(backdata *BlockByCollectionBackdata) error {
+	return e.mempool.BlockByCollection.Run(func(backdata *stdmap.BlockByCollectionBackdata) error {
 		blockByCollectionId, err := backdata.ByID(collID)
 		if err != nil {
 			return err
 		}
-		completeBlock := blockByCollectionId.CompleteBlock
+		completeBlock := blockByCollectionId.ExecutableBlock
 
 		completeCollection, ok := completeBlock.CompleteCollections[collID]
 		if !ok {
@@ -356,14 +359,14 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	return identifiers, nil
 }
 
-func (e *Engine) clearCollectionsCache(block *execution.CompleteBlock, backdata *BlockByCollectionBackdata) {
+func (e *Engine) clearCollectionsCache(block *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) {
 	for _, collection := range block.Block.Guarantees {
 		backdata.Rem(collection.ID())
 	}
 }
 
 // tryEnqueue checks if a block fits somewhere into the already existing queues, and puts it there is so
-func tryEnqueue(completeBlock *execution.CompleteBlock, queues *QueuesBackdata) (*Queue, bool) {
+func tryEnqueue(completeBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	for _, queue := range queues.All() {
 		if queue.TryAdd(completeBlock) {
 			return queue, true
@@ -372,13 +375,13 @@ func tryEnqueue(completeBlock *execution.CompleteBlock, queues *QueuesBackdata) 
 	return nil, false
 }
 
-func newQueue(completeBlock *execution.CompleteBlock, queue *QueuesBackdata) (*Queue, error) {
-	q := NewQueue(completeBlock)
-	return q, queue.Add(q)
+func newQueue(completeBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
+	q := queue.NewQueue(completeBlock)
+	return q, queues.Add(q)
 }
 
 // enqueue inserts block into matching queue or creates a new one
-func enqueue(completeBlock *execution.CompleteBlock, queues *QueuesBackdata) (*Queue, error) {
+func enqueue(completeBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
 	for _, queue := range queues.All() {
 		if queue.TryAdd(completeBlock) {
 			return queue, nil
@@ -387,7 +390,7 @@ func enqueue(completeBlock *execution.CompleteBlock, queues *QueuesBackdata) (*Q
 	return newQueue(completeBlock, queues)
 }
 
-func (e *Engine) sendCollectionsRequest(completeBlock *execution.CompleteBlock, backdata *BlockByCollectionBackdata) error {
+func (e *Engine) sendCollectionsRequest(completeBlock *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) error {
 
 	collectionIdentifiers, err := e.findCollectionNodes()
 	if err != nil {
@@ -397,13 +400,13 @@ func (e *Engine) sendCollectionsRequest(completeBlock *execution.CompleteBlock, 
 	for _, guarantee := range completeBlock.Block.Guarantees {
 		maybeBlockByCollection, err := backdata.ByID(guarantee.ID())
 		if err == mempool.ErrEntityNotFound {
-			completeBlock.CompleteCollections[guarantee.ID()] = &execution.CompleteCollection{
+			completeBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
 				Guarantee:    guarantee,
 				Transactions: nil,
 			}
-			err := backdata.Add(&blockByCollection{
-				CollectionID:  guarantee.ID(),
-				CompleteBlock: completeBlock,
+			err := backdata.Add(&entity.BlockByCollection{
+				CollectionID:    guarantee.ID(),
+				ExecutableBlock: completeBlock,
 			})
 			if err != nil {
 				return fmt.Errorf("cannot save collection-block mapping: %w", err)
@@ -559,7 +562,7 @@ func generateChunkHeader(
 // generateExecutionResultForBlock creates new ExecutionResult for a block from
 // the provided chunk results.
 func (e *Engine) generateExecutionResultForBlock(
-	block *execution.CompleteBlock,
+	block *entity.ExecutableBlock,
 	chunks []*flow.Chunk,
 	endState flow.StateCommitment,
 ) (*flow.ExecutionResult, error) {

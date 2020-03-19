@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
@@ -82,8 +81,6 @@ func decode(env Envelope) (interface{}, error) {
 		v = &messages.ExecutionStateSyncRequest{}
 	case CodeExecutionStateDelta:
 		v = &messages.ExecutionStateDelta{}
-	case CodeExecutionCompleteBlock:
-		v = &execution.CompleteBlock{}
 
 	case CodeChunkDataPackRequest:
 		v = &messages.ChunkDataPackRequest{}
