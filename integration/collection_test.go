@@ -8,16 +8,18 @@ import (
 
 	sdk "github.com/dapperlabs/flow-go-sdk"
 	"github.com/dapperlabs/flow-go-sdk/client"
-	"github.com/dapperlabs/flow-go-sdk/convert"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/m4ksio/testingdock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	clusterstate "github.com/dapperlabs/flow-go/cluster/badger"
 	"github.com/dapperlabs/flow-go/integration/network"
+	cluster "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/ingress"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 func TestCollection(t *testing.T) {
@@ -61,8 +63,8 @@ func TestCollection(t *testing.T) {
 	}
 	err = client.SendTransaction(ctx, sdkTx)
 	assert.Nil(t, err)
-	tx, err := ingress.MessageToTransaction(convert.TransactionToMessage(sdkTx))
-	assert.Nil(t, err)
+
+	identities := net.Identities()
 
 	// create a database
 	db, err := badger.Open(badger.DefaultOptions(colContainer.DataDir).WithLogger(nil))
@@ -70,9 +72,22 @@ func TestCollection(t *testing.T) {
 
 	// eventually the transaction should be included in the storage
 	assert.Eventually(t, func() bool {
-		transactions := storage.NewTransactions(db)
-		_, err := transactions.ByID(tx.ID())
-		return err == nil
-	}, 10*time.Second, 500*time.Millisecond)
+		chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
+
+		state, err := clusterstate.NewState(db, chainID)
+		assert.Nil(t, err)
+		head, err := state.Final().Head()
+		assert.Nil(t, err)
+
+		fmt.Println(">>>> cluster id: ", chainID)
+		fmt.Println(">>>> height: ", head.Height)
+		fmt.Println(">>>> id: ", head.ID())
+		var payload cluster.Payload
+		err = db.View(procedure.RetrieveClusterPayload(head.ID(), &payload))
+		assert.Nil(t, err)
+		fmt.Println(">>>> payload size: ", len(payload.Collection.Transactions))
+
+		return len(payload.Collection.Transactions) > 0
+	}, 10*time.Second, time.Second)
 
 }

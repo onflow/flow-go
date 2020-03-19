@@ -37,6 +37,14 @@ type FlowNetwork struct {
 	Containers []*FlowContainer
 }
 
+func (n *FlowNetwork) Identities() flow.IdentityList {
+	il := make(flow.IdentityList, 0, len(n.Containers))
+	for _, c := range n.Containers {
+		il = append(il, &c.Identity)
+	}
+	return il
+}
+
 // Start spins up the network.
 func (n *FlowNetwork) Start(ctx context.Context) {
 	n.suite.Start(ctx)
@@ -224,7 +232,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		}
 
 		// get a temporary directory in the host
-		tmpdir, err := ioutil.TempDir("", "flow-integration")
+		tmpdir, err := ioutil.TempDir("/tmp", "flow-integration")
 		require.Nil(t, err)
 		flowContainer.DataDir = tmpdir
 
