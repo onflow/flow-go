@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/dapperlabs/flow-go-sdk/utils/unittest"
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -18,8 +19,9 @@ var qcCmd = &cobra.Command{
 	Use:   "qc",
 	Short: "Construct genesis QC (quorum certificate)",
 	Run: func(cmd *cobra.Command, args []string) {
-		var block flow.Block
-		readYaml(genesisBlockFile, &block)
+		// var block flow.Block
+		// readYaml(genesisBlockFile, &block)
+		block := unittest.BlockFixture() // TODO replace once block decoding works
 		var nodeInfosPub []NodeInfoPub
 		readYaml(nodeInfosPubFile, &nodeInfosPub)
 		var nodeInfosPriv []NodeInfoPriv
