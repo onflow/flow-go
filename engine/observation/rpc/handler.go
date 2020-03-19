@@ -44,7 +44,7 @@ func (h *Handler) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 	return h.executionRPC.ExecuteScript(ctx, req)
 }
 
-// Remaining Handler functions are no-ops to implement the Observation API protobuf service.
+// SendTransaction forwards the transaction to the collection node
 func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
 
 	return h.collectionRPC.SendTransaction(ctx, req)

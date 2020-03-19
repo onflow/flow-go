@@ -31,7 +31,8 @@ type Engine struct {
 // New returns a new RPC engine.
 func New(log zerolog.Logger,
 	state protocol.State,
-	config Config, collectionRPC observation.ObserveServiceClient,
+	config Config,
+	collectionRPC observation.ObserveServiceClient,
 	executionRPC observation.ObserveServiceClient,
 	blkState *obs.BlockchainState) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
