@@ -2,12 +2,16 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	obs "github.com/dapperlabs/flow-go/engine/observation"
 	"github.com/dapperlabs/flow-go/engine/observation/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/protocol"
 )
@@ -46,8 +50,24 @@ func (h *Handler) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 
 // SendTransaction forwards the transaction to the collection node
 func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
+	resp, err := h.collectionRPC.SendTransaction(ctx, req)
+	if err != nil {
+		return resp, err
+	}
 
-	return h.collectionRPC.SendTransaction(ctx, req)
+	tx, err := ingress.MessageToTransaction(req.Transaction)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
+	}
+
+	// cache the transaction locally
+	err = h.blkState.AddTransaction(&tx)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
+	}
+
+	return resp, nil
+
 }
 
 func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {

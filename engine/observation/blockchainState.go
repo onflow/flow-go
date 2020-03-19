@@ -38,7 +38,7 @@ func (b *BlockchainState) StoreCollection(collection *flow.Collection) error {
 }
 
 // AddTransaction adds the transaction body to the state if not present
-func (b *BlockchainState) AddTransaction(transaction *flow.TransactionBody, collID flow.Identifier) error {
+func (b *BlockchainState) AddTransaction(transaction *flow.TransactionBody) error {
 
 	err := b.transactions.Store(transaction)
 
@@ -48,10 +48,12 @@ func (b *BlockchainState) AddTransaction(transaction *flow.TransactionBody, coll
 			return err
 		}
 	}
+	return nil
+}
 
-	// update the transaction to collection lookup
-	err = b.transactions.StoreCollectionID(transaction.ID(), collID)
-	return err
+// AddTransactionCollectionMapping adds the transaction id to collection id record
+func (b *BlockchainState) AddTransactionCollectionMapping(transaction *flow.TransactionBody, collID flow.Identifier) error {
+	return b.transactions.StoreCollectionID(transaction.ID(), collID)
 }
 
 // Block retrieves a Block by ID

@@ -151,7 +151,11 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 	}
 
 	for _, t := range collection.Transactions {
-		err = e.blkState.AddTransaction(t, collection.ID())
+		err = e.blkState.AddTransaction(t)
+		if err != nil {
+			return err
+		}
+		err = e.blkState.AddTransactionCollectionMapping(t, collection.ID())
 		if err != nil {
 			return err
 		}
