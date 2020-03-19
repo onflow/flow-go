@@ -51,6 +51,7 @@ func TempBadgerDB(t *testing.T) *badger.DB {
 	dir, err := tempDBDir()
 	require.Nil(t, err)
 
+	// Ref: https://github.com/dgraph-io/badger#memory-usage
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
 	require.Nil(t, err)
 
