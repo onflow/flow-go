@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -94,15 +95,22 @@ func TestCheckFixedPointLiteralRanges(t *testing.T) {
 			minFractional := ranged.MinFractional()
 			minFractionalPlusOne := big.NewInt(0).Add(minFractional, big.NewInt(1))
 
+			formatLiteral := func(integer, fractional *big.Int) string {
+				var builder strings.Builder
+				builder.WriteString(integer.String())
+				builder.WriteRune('.')
+				builder.WriteString(interpreter.PadLeft(fractional.String(), '0', ranged.Scale()))
+				return builder.String()
+			}
+
 			t.Run("min int + 1, min fractional", func(t *testing.T) {
 				_, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
-                          let x: %s = %s.%s
+                          let x: %s = %s
                         `,
 						ty,
-						minIntPlusOne,
-						minFractional,
+						formatLiteral(minIntPlusOne, minFractional),
 					),
 				)
 
@@ -113,43 +121,43 @@ func TestCheckFixedPointLiteralRanges(t *testing.T) {
 				_, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
-                          let x: %s = %s.%s
+                          let x: %s = %s
                         `,
 						ty,
-						minInt,
-						minFractional,
+						formatLiteral(minInt, minFractional),
 					),
 				)
 
 				assert.NoError(t, err)
 			})
 
-			t.Run("min int, min fractional - 1", func(t *testing.T) {
-				_, err := ParseAndCheck(t,
-					fmt.Sprintf(
-						`
-			             let x: %s = %s.%s
-			           `,
-						ty,
-						minInt,
-						minFractionalPlusOne,
-					),
-				)
+			if minInt.Sign() < 0 {
 
-				errs := ExpectCheckerErrors(t, err, 1)
+				t.Run("min int, min fractional - 1", func(t *testing.T) {
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+			                  let x: %s = %s
+			                `,
+							ty,
+							formatLiteral(minInt, minFractionalPlusOne),
+						),
+					)
 
-				assert.IsType(t, &sema.InvalidFixedPointLiteralRangeError{}, errs[0])
-			})
+					errs := ExpectCheckerErrors(t, err, 1)
+
+					assert.IsType(t, &sema.InvalidFixedPointLiteralRangeError{}, errs[0])
+				})
+			}
 
 			t.Run("min int - 1, min fractional", func(t *testing.T) {
 				_, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
-                         let x: %s = %s.%s
+                         let x: %s = %s
                        `,
 						ty,
-						minIntMinusOne,
-						minFractional,
+						formatLiteral(minIntMinusOne, minFractional),
 					),
 				)
 
@@ -170,11 +178,10 @@ func TestCheckFixedPointLiteralRanges(t *testing.T) {
 				_, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
-			             let x: %s = %s.%s
+			             let x: %s = %s
 			           `,
 						ty,
-						maxIntMinusOne,
-						maxFractional,
+						formatLiteral(maxIntMinusOne, maxFractional),
 					),
 				)
 
@@ -185,11 +192,10 @@ func TestCheckFixedPointLiteralRanges(t *testing.T) {
 				_, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
-			             let x: %s = %s.%s
+			             let x: %s = %s
 			           `,
 						ty,
-						maxInt,
-						maxFractional,
+						formatLiteral(maxInt, maxFractional),
 					),
 				)
 
@@ -200,11 +206,10 @@ func TestCheckFixedPointLiteralRanges(t *testing.T) {
 				_, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
-			             let x: %[1]s = %s.%s
+			             let x: %[1]s = %s
 			           `,
 						ty,
-						maxInt,
-						maxFractionalPlusOne,
+						formatLiteral(maxInt, maxFractionalPlusOne),
 					),
 				)
 
@@ -217,11 +222,10 @@ func TestCheckFixedPointLiteralRanges(t *testing.T) {
 				_, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
-			             let x: %s = %s.%s
+			             let x: %s = %s
 			           `,
 						ty,
-						maxIntPlusOne,
-						maxFractional,
+						formatLiteral(maxIntPlusOne, maxFractional),
 					),
 				)
 
@@ -326,21 +330,42 @@ func TestCheckSignedFixedPointNegate(t *testing.T) {
 func TestCheckInvalidUnsignedFixedPointNegate(t *testing.T) {
 
 	for _, ty := range sema.AllUnsignedFixedPointTypes {
-		name := ty.String()
-		t.Run(name, func(t *testing.T) {
+
+		t.Run(ty.String(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(`
                       let x: %s = 1.2
                       let y = -x
                     `,
-					name,
+					ty,
 				),
 			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.InvalidUnaryOperandError{}, errs[0])
+		})
+	}
+}
+
+func TestCheckInvalidNegativeZeroUnsignedFixedPoint(t *testing.T) {
+
+	for _, ty := range sema.AllUnsignedFixedPointTypes {
+
+		t.Run(ty.String(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+                      let x: %s = -0.42
+                    `,
+					ty,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidFixedPointLiteralRangeError{}, errs[0])
 		})
 	}
 }

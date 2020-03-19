@@ -18,6 +18,21 @@ func (b *PendingBlocks) Add(block *flow.PendingBlock) bool {
 	return b.backend.add(block.OriginID, block.Header, block.Payload)
 }
 
+func (b *PendingBlocks) ByID(blockID flow.Identifier) (*flow.PendingBlock, bool) {
+	item, ok := b.backend.ByID(blockID)
+	if !ok {
+		return nil, false
+	}
+
+	block := &flow.PendingBlock{
+		OriginID: item.originID,
+		Header:   item.header,
+		Payload:  item.payload.(*flow.Payload),
+	}
+
+	return block, true
+}
+
 func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]*flow.PendingBlock, bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {

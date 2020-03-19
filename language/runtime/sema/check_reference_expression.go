@@ -88,15 +88,6 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 					Range:      ast.NewRangeFromPositioned(referenceExpression.Type),
 				},
 			)
-		} else if !targetIsStorage && referenceType.Storable {
-
-			// References which are not into storage cannot be storable
-
-			checker.report(
-				&InvalidNonStorageStorableReferenceError{
-					Range: ast.NewRangeFromPositioned(referenceExpression.Type),
-				},
-			)
 		}
 	}
 

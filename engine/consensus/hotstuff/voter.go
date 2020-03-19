@@ -1,9 +1,6 @@
 package hotstuff
 
 import (
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-
 	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
@@ -13,17 +10,15 @@ type Voter struct {
 	viewState     *ViewState
 	forks         Forks
 	lastVotedView uint64 // need to keep track of the last view we voted for so we don't double vote accidentally
-	log           zerolog.Logger
 }
 
 // NewVoter creates a new Voter instance
-func (v *Voter) NewVoter(signer Signer, viewState *ViewState, forks Forks, log zerolog.Logger) *Voter {
+func (v *Voter) NewVoter(signer Signer, viewState *ViewState, forks Forks) *Voter {
 	return &Voter{
 		signer:        signer,
 		viewState:     viewState,
 		forks:         forks,
 		lastVotedView: 0,
-		log:           log,
 	}
 }
 
@@ -36,19 +31,14 @@ func (v *Voter) NewVoter(signer Signer, viewState *ViewState, forks Forks, log z
 // (including repeated calls with the initial block we voted for also return `nil, false`).
 func (v *Voter) ProduceVoteIfVotable(block *hotstuff.Block, curView uint64) (*hotstuff.Vote, bool) {
 	if v.forks.IsSafeBlock(block) {
-		log.Info().Msg("received block is not a safe node, don't vote")
 		return nil, false
 	}
 
 	if curView != block.View {
-		log.Info().Uint64("view", block.View).Uint64("curView", curView).
-			Msg("received block's view is not our current view, don't vote")
 		return nil, false
 	}
 
 	if curView <= v.lastVotedView {
-		log.Info().Uint64("lastVotedView", v.lastVotedView).Uint64("curView", curView).
-			Msg("received block's view is <= lastVotedView, don't vote")
 		return nil, false
 	}
 

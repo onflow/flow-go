@@ -206,6 +206,12 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 }
 
 func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclarationContext) interface{} {
+	var parameterList *ast.ParameterList
+	parameterListContext := ctx.ParameterList()
+	if parameterListContext != nil {
+		parameterList = parameterListContext.Accept(v).(*ast.ParameterList)
+	}
+
 	var fields []*ast.FieldDeclaration
 	fieldsCtx := ctx.Fields()
 	if fieldsCtx != nil {
@@ -242,6 +248,7 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.TransactionDeclaration{
+		ParameterList:  parameterList,
 		Fields:         fields,
 		Prepare:        prepareFunction,
 		PreConditions:  preConditions,
@@ -740,11 +747,9 @@ func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 
 	if ctx.Ampersand() != nil {
 		authorized := ctx.Auth() != nil
-		storable := ctx.Storable() != nil
 
 		result = &ast.ReferenceType{
 			Authorized: authorized,
-			Storable:   storable,
 			Type:       result,
 			StartPos:   startPos,
 		}
@@ -1145,8 +1150,11 @@ func (v *ProgramVisitor) targetExpression(
 
 func (v *ProgramVisitor) VisitTransfer(ctx *TransferContext) interface{} {
 	operation := ast.TransferOperationCopy
-	if ctx.Move() != nil {
+	switch {
+	case ctx.Move() != nil:
 		operation = ast.TransferOperationMove
+	case ctx.MoveForced() != nil:
+		operation = ast.TransferOperationMoveForced
 	}
 
 	position := PositionFromToken(ctx.GetStart())
@@ -1440,27 +1448,6 @@ func (v *ProgramVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContext) i
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func (v *ProgramVisitor) VisitComposedExpression(ctx *ComposedExpressionContext) interface{} {
-	result := ctx.PrimaryExpressionStart().Accept(v).(ast.Expression)
-
-	for _, suffix := range ctx.AllPrimaryExpressionSuffix() {
-		switch partialExpression := suffix.Accept(v).(type) {
-		case *ast.InvocationExpression:
-			result = &ast.InvocationExpression{
-				InvokedExpression: result,
-				Arguments:         partialExpression.Arguments,
-				EndPos:            partialExpression.EndPos,
-			}
-		case ast.AccessExpression:
-			result = v.wrapPartialAccessExpression(result, partialExpression)
-		default:
-			panic(errors.NewUnreachableError())
-		}
-	}
-
-	return result
-}
-
 func (v *ProgramVisitor) wrapPartialAccessExpression(
 	wrapped ast.Expression,
 	partialAccessExpression ast.AccessExpression,
@@ -1486,8 +1473,27 @@ func (v *ProgramVisitor) wrapPartialAccessExpression(
 	panic(errors.NewUnreachableError())
 }
 
-func (v *ProgramVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
-	return v.VisitChildren(ctx.BaseParserRuleContext)
+func (v *ProgramVisitor) VisitInvocationExpression(ctx *InvocationExpressionContext) interface{} {
+	expression := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
+	expression.InvokedExpression = ctx.PostfixExpression().Accept(v).(ast.Expression)
+	return expression
+}
+
+func (v *ProgramVisitor) VisitAccessExpression(ctx *AccessExpressionContext) interface{} {
+	accessExpression := ctx.ExpressionAccess().Accept(v).(ast.AccessExpression)
+	accessedExpression := ctx.PostfixExpression().Accept(v).(ast.Expression)
+	return v.wrapPartialAccessExpression(accessedExpression, accessExpression)
+}
+
+func (v *ProgramVisitor) VisitForceExpression(ctx *ForceExpressionContext) interface{} {
+	expression := ctx.PostfixExpression().Accept(v).(ast.Expression)
+
+	endPosition := PositionFromToken(ctx.GetStop())
+
+	return &ast.ForceExpression{
+		Expression: expression,
+		EndPos:     endPosition,
+	}
 }
 
 func (v *ProgramVisitor) VisitExpressionAccess(ctx *ExpressionAccessContext) interface{} {
@@ -1527,11 +1533,6 @@ func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) i
 			EndPos:   endPosition,
 		},
 	}
-}
-
-// NOTE: manually go over all child rules and find a match
-func (v *ProgramVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) interface{} {
-	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
 func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
@@ -1604,19 +1605,19 @@ func (v *ProgramVisitor) VisitFixedPointLiteral(ctx *FixedPointLiteralContext) i
 	integer, _ := v.parseFixedPointPart(parts[0])
 	fractional, scale := v.parseFixedPointPart(parts[1])
 
-	expression := &ast.FixedPointExpression{
-		Integer:    integer,
-		Fractional: fractional,
-		Scale:      uint(scale),
+	// NOTE: can't just negate integer, might be 0 and fractional part > 0
+	negative := ctx.Minus() != nil
+
+	return &ast.FixedPointExpression{
+		Negative:        negative,
+		UnsignedInteger: integer,
+		Fractional:      fractional,
+		Scale:           scale,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
 		},
 	}
-	if ctx.Minus() != nil {
-		expression.Integer.Neg(expression.Integer)
-	}
-	return expression
 }
 
 func (v *ProgramVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {
@@ -1974,6 +1975,9 @@ func (v *ProgramVisitor) VisitCastingOp(ctx *CastingOpContext) interface{} {
 
 	case ctx.FailableCasting() != nil:
 		return ast.OperationFailableCast
+
+	case ctx.ForceCasting() != nil:
+		return ast.OperationForceCast
 
 	default:
 		panic(errors.NewUnreachableError())

@@ -40,7 +40,7 @@ endif
 ifeq ($(UNAME), Darwin)
 	brew install capnp
 endif
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.1; \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -94,13 +94,14 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
 	GO111MODULE=on mockgen -destination=network/mocks/engine.go -package=mocks github.com/dapperlabs/flow-go/network Engine
 	GO111MODULE=on mockgen -destination=protocol/mocks/state.go -package=mocks github.com/dapperlabs/flow-go/protocol State
-	GO111MODULE=on mockgen -destination=engine/consensus/hotstuff/mocks/sig_verifier.go -package=mocks github.com/dapperlabs/flow-go/engine/consensus/hotstuff SigVerifier
 	GO111MODULE=on mockgen -destination=engine/consensus/hotstuff/mocks/sig_aggregator.go -package=mocks github.com/dapperlabs/flow-go/engine/consensus/hotstuff SigAggregator
 	GO111MODULE=on mockgen -destination=protocol/mocks/snapshot.go -package=mocks github.com/dapperlabs/flow-go/protocol Snapshot
 	GO111MODULE=on mockgen -destination=protocol/mocks/mutator.go -package=mocks github.com/dapperlabs/flow-go/protocol Mutator
 	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'BlockComputer' -dir=engine/execution/computation/computer -case=underscore -output="engine/execution/computation/computer/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'ComputationEngine' -dir=engine/execution/computation -case=underscore -output="engine/execution/computation/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ComputationManager' -dir=engine/execution/computation -case=underscore -output="engine/execution/computation/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ProviderEngine' -dir=engine/execution/provider -case=underscore -output="engine/execution/provider/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=cluster -case=underscore -output="cluster/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	GO111MODULE=on mockery -name '.*' -dir=module/trace -case=underscore -output="./module/trace/mock" -outpkg="mock"
@@ -111,8 +112,13 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/virtualmachine -case=underscore -output="./engine/execution/computation/virtualmachine/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
+	# hotstuff mocks
 	GO111MODULE=on mockery -name 'Consumer' -dir="./engine/consensus/hotstuff/notifications/" -case=underscore -output="./engine/consensus/hotstuff/notifications/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Vertex' -dir="./engine/consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./engine/consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ForksReader' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
+	GO111MODULE=on mockery -name 'Signer' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
+	GO111MODULE=on mockery -name 'SigVerifier' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
+	GO111MODULE=on mockery -name 'SigAggregator' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -185,8 +191,18 @@ docker-build-verification-debug:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target debug \
 		-t gcr.io/dl-flow/verification-debug:latest -t "gcr.io/dl-flow/verification-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification-debug:$(IMAGE_TAG)" .
 
+.PHONY: docker-build-observation
+docker-build-observation:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=observation --target production \
+		-t gcr.io/dl-flow/observation:latest -t "gcr.io/dl-flow/observation:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/observation:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-observation-debug
+docker-build-observation-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=observation --target debug \
+		-t gcr.io/dl-flow/observation-debug:latest -t "gcr.io/dl-flow/observation-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/observation-debug:$(IMAGE_TAG)" .
+
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-observation
 
 .PHONY: docker-push-collection
 docker-push-collection:
@@ -212,8 +228,14 @@ docker-push-verification:
 	docker push "gcr.io/dl-flow/verification:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/verification:$(IMAGE_TAG)"
 
+.PHONY: docker-push-observation
+docker-push-observation:
+	docker push gcr.io/dl-flow/observation:latest
+	docker push "gcr.io/dl-flow/observation:$(SHORT_COMMIT)"
+	docker push "gcr.io/dl-flow/observation:$(IMAGE_TAG)"
+
 .PHONY: docker-push-flow
-docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification
+docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-observation
 
 .PHONY: docker-run-collection
 docker-run-collection:
@@ -230,6 +252,10 @@ docker-run-execution:
 .PHONY: docker-run-verification
 docker-run-verification:
 	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/verification:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries verification-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+.PHONY: docker-run-observation
+docker-run-observation:
+	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/observation:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries observation-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 # Builds the VS Code extension
 .PHONY: build-vscode-extension

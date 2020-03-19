@@ -76,7 +76,7 @@ func seedRelic(seed []byte) {
 	C._seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
-// returns a random number on Z/Z.r
+// returns a random number in Z/Z.r
 func randZr(x *scalar) error {
 	C._bn_randZr((*C.bn_st)(x))
 	if x == nil {
@@ -108,6 +108,22 @@ func (x *scalar) setInt(a int) {
 	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
 }
 
+// writeScalar writes a G2 point in a slice of bytes
+func writeScalar(dest []byte, x *scalar) {
+	C.bn_write_bin((*C.uchar)(&dest[0]),
+		(C.int)(prKeyLengthBLS_BLS12381),
+		(*C.bn_st)(x),
+	)
+}
+
+// readScalar reads a scalar from a slice of bytes
+func readScalar(x *scalar, src []byte) {
+	C.bn_read_bin((*C.bn_st)(x),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src)),
+	)
+}
+
 // writePointG2 writes a G2 point in a slice of bytes
 func writePointG2(dest []byte, a *pointG2) {
 	C._ep2_write_bin_compact((*C.uchar)(&dest[0]),
@@ -117,10 +133,10 @@ func writePointG2(dest []byte, a *pointG2) {
 }
 
 // readVerifVector reads a G2 point from a slice of bytes
-func readPointG2(a *pointG2, data []byte) {
+func readPointG2(a *pointG2, src []byte) {
 	C._ep2_read_bin_compact((*C.ep2_st)(a),
-		(*C.uchar)(&data[0]),
-		(C.int)(len(data)),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src)),
 	)
 }
 

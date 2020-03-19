@@ -261,47 +261,42 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	}
 
 	// get the hash of the latest finalized block
-	var headID flow.Identifier
-	err = operation.RetrieveNumber(boundary, &headID)(tx)
+	var finalID flow.Identifier
+	err = operation.RetrieveNumber(boundary, &finalID)(tx)
 	if err != nil {
 		return fmt.Errorf("could not retrieve hash: %w", err)
 	}
 
-	// get the first parent of the introduced block to check the number
-	var parent flow.Header
-	err = operation.RetrieveHeader(header.ParentID, &parent)(tx)
-	if err != nil {
-		return fmt.Errorf("could not retrieve header: %w", err)
-	}
-
-	// if new block number has a lower number, we can't add it
-	if header.Height != parent.Height+1 {
-		return fmt.Errorf("block needs height equal to parent height+1 (%d != %d+1)", header.Height, parent.Height)
-	}
-
-	// NOTE: in the default case, the first parent is the boundary, so we don't
-	// load the first parent twice almost ever; even in cases where we do, we
-	// badger has efficient caching, so no reason to complicate the algorithm
-	// here to try avoiding one extra header loading
-
-	var currentHeader = *header
-
 	// trace back from new block until we find a block that has the latest
 	// finalized block as its parent
-	for currentHeader.ParentID != headID {
+	height := header.Height
+	ancestorID := header.ParentID
+	for ancestorID != finalID {
 
-		// get the parent of current block
-		err = operation.RetrieveHeader(currentHeader.ParentID, &currentHeader)(tx)
+		// get the parent of the block we current look at
+		var ancestor flow.Header
+		err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
 		if err != nil {
-			return fmt.Errorf("could not get parent (%x): %w", header.ParentID, err)
+			return fmt.Errorf("could not get block's ancestor from state (%x): %w", ancestorID, err)
+		}
+		if err != nil {
+			return fmt.Errorf("could not retrieve parent header: %w", err)
 		}
 
-		// if its number is below current boundary, the block does not connect
-		// to the finalized protocol state and would break database consistency
-		if currentHeader.Height < boundary {
+		// check that the parent is one less in height than previous block; this
+		// is redundant for all but the first check, but cheap, and makes the
+		// code a lot simpler
+		if height != ancestor.Height+1 {
+			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", header.Height, ancestor.Height)
+		}
+
+		// check if the ancestor is unfinalized, but already behind the last finalized height (orphaned fork)
+		if ancestor.Height < boundary {
 			return fmt.Errorf("block doesn't connect to finalized state")
 		}
 
+		// forward to next parent
+		ancestorID = ancestor.ParentID
 	}
 
 	return nil

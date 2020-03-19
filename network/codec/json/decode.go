@@ -44,8 +44,20 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeBlockCommit:
 		v = &coldstuff.Commit{}
 
+	// Cluster consensus
+	case CodeClusterBlockProposal:
+		v = &messages.ClusterBlockProposal{}
+	case CodeClusterBlockVote:
+		v = &messages.ClusterBlockVote{}
+	case CodeClusterBlockRequest:
+		v = &messages.ClusterBlockRequest{}
+	case CodeClusterBlockResponse:
+		v = &messages.ClusterBlockResponse{}
+
 	case CodeCollectionGuarantee:
 		v = &flow.CollectionGuarantee{}
+	case CodeTransactionBody:
+		v = &flow.TransactionBody{}
 	case CodeTransaction:
 		v = &flow.Transaction{}
 
@@ -73,6 +85,11 @@ func decode(env Envelope) (interface{}, error) {
 		v = &execution.CompleteBlock{}
 	case CodeExecutionComputationOrder:
 		v = &execution.ComputationOrder{}
+
+	case CodeChunkDataPackRequest:
+		v = &messages.ChunkDataPackRequest{}
+	case CodeChunkDataPackResponse:
+		v = &messages.ChunkDataPackResponse{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)

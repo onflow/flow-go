@@ -299,6 +299,7 @@ func TestExtend(t *testing.T) {
 
 			// should be unable to extend block 2, as it contains a dupe transaction
 			err = mutator.Extend(block2.ID())
+			t.Log(err)
 			assert.True(t, errors.Is(err, storage.ErrAlreadyIndexed))
 		})
 
@@ -334,6 +335,7 @@ func TestExtend(t *testing.T) {
 
 			// should be unable to extend block 2, as it contains a dupe transaction
 			err = mutator.Extend(block2.ID())
+			t.Log(err)
 			assert.True(t, errors.Is(err, storage.ErrAlreadyIndexed))
 		})
 

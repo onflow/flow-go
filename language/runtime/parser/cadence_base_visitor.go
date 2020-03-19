@@ -271,11 +271,31 @@ func (v *BaseCadenceVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContex
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseCadenceVisitor) VisitComposedExpression(ctx *ComposedExpressionContext) interface{} {
+func (v *BaseCadenceVisitor) VisitAccessExpression(ctx *AccessExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseCadenceVisitor) VisitPrimaryExpressionSuffix(ctx *PrimaryExpressionSuffixContext) interface{} {
+func (v *BaseCadenceVisitor) VisitInvocationExpression(ctx *InvocationExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitNestedExpression(ctx *NestedExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitForceExpression(ctx *ForceExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -303,10 +323,6 @@ func (v *BaseCadenceVisitor) VisitCastingOp(ctx *CastingOpContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseCadenceVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStartContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseCadenceVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -316,22 +332,6 @@ func (v *BaseCadenceVisitor) VisitDestroyExpression(ctx *DestroyExpressionContex
 }
 
 func (v *BaseCadenceVisitor) VisitReferenceExpression(ctx *ReferenceExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseCadenceVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseCadenceVisitor) VisitLiteralExpression(ctx *LiteralExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseCadenceVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseCadenceVisitor) VisitNestedExpression(ctx *NestedExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

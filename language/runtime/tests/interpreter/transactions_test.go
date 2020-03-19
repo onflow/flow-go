@@ -173,7 +173,7 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("TooFewArguments", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            prepare(signer: Account) {}
+            prepare(signer: AuthAccount) {}
           }
         `)
 
@@ -188,7 +188,7 @@ func TestInterpretTransactions(t *testing.T) {
           }
 
           transaction {
-            prepare(signer: Account) {}
+            prepare(signer: AuthAccount) {}
 
             execute {}
           }
@@ -198,13 +198,13 @@ func TestInterpretTransactions(t *testing.T) {
 			panic(errors.NewUnreachableError())
 		})
 
-		signer1 := interpreter.NewAccountValue(
+		signer1 := interpreter.NewAuthAccountValue(
 			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			panicFunction,
 			panicFunction,
 			panicFunction,
 		)
-		signer2 := interpreter.NewAccountValue(
+		signer2 := interpreter.NewAuthAccountValue(
 			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
 			panicFunction,
 			panicFunction,
@@ -219,4 +219,44 @@ func TestInterpretTransactions(t *testing.T) {
 		err = inter.InvokeTransaction(0, signer1, signer2)
 		assert.IsType(t, &interpreter.ArgumentCountError{}, err)
 	})
+
+	t.Run("Parameters", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t, `
+          let values: [AnyStruct] = []
+
+          transaction(x: Int, y: Bool) {
+
+            prepare(signer: AuthAccount) {
+              values.append(signer.address)
+              values.append(y)
+              values.append(x)
+            }
+          }
+        `)
+
+		transactionArguments := []interface{}{1, true}
+		prepareArguments := []interface{}{
+			interpreter.NewAuthAccountValue(interpreter.AddressValue{}, nil, nil, nil),
+		}
+
+		arguments := append(transactionArguments, prepareArguments...)
+
+		err := inter.InvokeTransaction(0, arguments...)
+		assert.NoError(t, err)
+
+		values := inter.Globals["values"].Value
+
+		require.IsType(t, values, &interpreter.ArrayValue{})
+
+		assert.Equal(t,
+			[]interpreter.Value{
+				interpreter.AddressValue{},
+				interpreter.BoolValue(true),
+				interpreter.NewIntValue(1),
+			},
+			values.(*interpreter.ArrayValue).Values,
+		)
+	})
+
 }

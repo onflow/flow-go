@@ -14,9 +14,9 @@ type ChunkStates struct {
 }
 
 // NewChunkStates creates a new memory pool for chunk states.
-func NewChunkStates() (*ChunkStates, error) {
+func NewChunkStates(limit uint) (*ChunkStates, error) {
 	a := &ChunkStates{
-		Backend: NewBackend(),
+		Backend: NewBackend(WithLimit(limit)),
 	}
 
 	return a, nil

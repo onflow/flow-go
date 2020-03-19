@@ -37,7 +37,7 @@ var accountFunctionType = &sema.FunctionType{
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.AccountType{},
+		&sema.AuthAccountType{},
 	),
 	// additional arguments are passed to the contract initializer
 	RequiredArgumentCount: (func() *int {
@@ -94,7 +94,7 @@ type FlowBuiltinImpls struct {
 func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 	return StandardLibraryFunctions{
 		NewStandardLibraryFunction(
-			"Account",
+			"AuthAccount",
 			accountFunctionType,
 			impls.CreateAccount,
 			nil,
@@ -269,6 +269,10 @@ func (*BlockType) TypeAnnotationState() sema.TypeAnnotationState {
 }
 
 func (*BlockType) IsInvalidType() bool {
+	return false
+}
+
+func (*BlockType) ContainsFirstLevelResourceInterfaceType() bool {
 	return false
 }
 

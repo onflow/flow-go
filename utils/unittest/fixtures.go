@@ -161,28 +161,54 @@ func StateViewFixture() *state.View {
 func CompleteCollectionFixture() *execution.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &execution.CompleteCollection{
-		Guarantee:    CollectionGuaranteeFixture(),
+		Guarantee: &flow.CollectionGuarantee{
+			CollectionID: flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
+			Signatures:   SignaturesFixture(16),
+		},
 		Transactions: []*flow.TransactionBody{&txBody},
 	}
 }
 
-func CompleteBlockFixture() *execution.CompleteBlock {
+func CompleteBlockFixture(collections int) *execution.CompleteBlock {
 
-	cc1 := CompleteCollectionFixture()
-	cc2 := CompleteCollectionFixture()
-
+	completeCollections := make(map[flow.Identifier]*execution.CompleteCollection, collections)
 	block := BlockFixture()
+	block.Guarantees = nil
+
+	for i := 0; i < collections; i++ {
+		completeCollection := CompleteCollectionFixture()
+		block.Guarantees = append(block.Guarantees, completeCollection.Guarantee)
+		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
+	}
+
+	block.PayloadHash = block.Payload.Hash()
+
 	return &execution.CompleteBlock{
 		Block:               &block,
-		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{cc1.Guarantee.CollectionID: cc1, cc2.Guarantee.CollectionID: cc2},
+		CompleteCollections: completeCollections,
 	}
 }
 
-func ComputationResultFixture() *execution.ComputationResult {
+func ComputationResultFixture(n int) *execution.ComputationResult {
+	stateViews := make([]*state.View, n)
+	for i := 0; i < n; i++ {
+		stateViews[i] = StateViewFixture()
+	}
 	return &execution.ComputationResult{
-		CompleteBlock: CompleteBlockFixture(),
-		StateViews:    []*state.View{StateViewFixture(), StateViewFixture()},
-		StartState:    StateCommitmentFixture(),
+		CompleteBlock: CompleteBlockFixture(n),
+		StateViews:    stateViews,
+	}
+}
+
+func ComputationResultForBlockFixture(completeBlock *execution.CompleteBlock) *execution.ComputationResult {
+	n := len(completeBlock.CompleteCollections)
+	stateViews := make([]*state.View, n)
+	for i := 0; i < n; i++ {
+		stateViews[i] = StateViewFixture()
+	}
+	return &execution.ComputationResult{
+		CompleteBlock: completeBlock,
+		StateViews:    stateViews,
 	}
 }
 
@@ -319,8 +345,8 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	return tx
 }
 
-func TransactionBodyFixture() flow.TransactionBody {
-	return flow.TransactionBody{
+func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
+	tb := flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
 		ReferenceBlockID: IdentifierFixture(),
 		Nonce:            rand.Uint64(),
@@ -329,11 +355,88 @@ func TransactionBodyFixture() flow.TransactionBody {
 		ScriptAccounts:   []flow.Address{AddressFixture()},
 		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
 	}
+
+	for _, apply := range opts {
+		apply(&tb)
+	}
+
+	return tb
 }
 
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
-func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
+// chunkCount determines the number of chunks inside each receipt
+func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecutionResult {
+	chunks := make([]*flow.Chunk, 0)
+	chunkStates := make([]*flow.ChunkState, 0, chunkCount)
+	collections := make([]*flow.Collection, 0, chunkCount)
+	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
+	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
+
+	for i := 0; i < chunkCount; i++ {
+		// creates one guaranteed collection per chunk
+		coll := CollectionFixture(3)
+		guarantee := coll.Guarantee()
+		collections = append(collections, &coll)
+		guarantees = append(guarantees, &guarantee)
+
+		// creates a chunk
+		chunk := &flow.Chunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex: uint(i),
+				StartState:      StateCommitmentFixture(),
+			},
+			Index: uint64(i),
+		}
+		chunks = append(chunks, chunk)
+
+		// creates a chunk state
+		chunkState := &flow.ChunkState{
+			ChunkID:   chunk.ID(),
+			Registers: flow.Ledger{},
+		}
+		chunkStates = append(chunkStates, chunkState)
+
+		// creates a chunk data pack for the chunk
+		chunkDataPack := ChunkDataPackFixture(chunk.ID())
+		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
+	}
+
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: guarantees,
+	}
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
+
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+
+	result := flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID: block.ID(),
+			Chunks:  chunks,
+		},
+	}
+
+	receipt := flow.ExecutionReceipt{
+		ExecutionResult: result,
+	}
+
+	return verification.CompleteExecutionResult{
+		Receipt:        &receipt,
+		Block:          &block,
+		Collections:    collections,
+		ChunkStates:    chunkStates,
+		ChunkDataPacks: chunkDataPacks,
+	}
+}
+
+// VerifiableChunk returns a complete verifiable chunk with an
+// execution receipt referencing the block/collections.
+func VerifiableChunkFixture() *verification.VerifiableChunk {
 	coll := CollectionFixture(3)
 	guarantee := coll.Guarantee()
 
@@ -373,11 +476,12 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 		ExecutionResult: result,
 	}
 
-	return verification.CompleteExecutionResult{
-		Receipt:     &receipt,
-		Block:       &block,
-		Collections: []*flow.Collection{&coll},
-		ChunkStates: []*flow.ChunkState{&chunkState},
+	return &verification.VerifiableChunk{
+		ChunkIndex: chunk.Index,
+		Block:      &block,
+		Receipt:    &receipt,
+		Collection: &coll,
+		ChunkState: &chunkState,
 	}
 }
 
@@ -389,9 +493,9 @@ func ChunkHeaderFixture() flow.ChunkHeader {
 	}
 }
 
-func ChunkDataPackFixture() flow.ChunkDataPack {
+func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 	return flow.ChunkDataPack{
-		ChunkID:         IdentifierFixture(),
+		ChunkID:         identifier,
 		StartState:      StateCommitmentFixture(),
 		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
 	}
