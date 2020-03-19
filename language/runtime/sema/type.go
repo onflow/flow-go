@@ -2355,10 +2355,100 @@ func (t *ConstantSizedType) IndexingType() Type {
 type InvokableType interface {
 	Type
 	InvocationFunctionType() *FunctionType
+	InvocationGenericFunctionType() *GenericFunctionType
 	CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression)
 }
 
+// GenericTypeAnnotation is a type annotation which is generic,
+// i.e., it is either a type instance (`TypeAnnotation` is set),
+// or it is a type variable (`TypeParameter` is set).
+//
+type GenericTypeAnnotation struct {
+	TypeAnnotation *TypeAnnotation
+	TypeParameter  *TypeParameter
+}
+
+func (a *GenericTypeAnnotation) String() string {
+	if a.TypeParameter != nil {
+		return a.TypeParameter.Name
+	}
+
+	return a.TypeAnnotation.String()
+}
+
+func (a *GenericTypeAnnotation) QualifiedString() string {
+	if a.TypeParameter != nil {
+		return a.TypeParameter.Name
+	}
+
+	return a.TypeAnnotation.QualifiedString()
+}
+
+func (a *GenericTypeAnnotation) Equal(other *GenericTypeAnnotation) bool {
+	if a.TypeParameter != nil {
+		return other.TypeParameter != nil &&
+			a.TypeParameter.Equal(other.TypeParameter)
+	}
+
+	return other.TypeAnnotation != nil &&
+		a.TypeAnnotation.Equal(other.TypeAnnotation)
+}
+
+func (a *GenericTypeAnnotation) TypeID() TypeID {
+	if a.TypeParameter != nil {
+		return a.TypeParameter.Type.ID()
+	}
+	return a.TypeAnnotation.Type.ID()
+}
+
+func (a *GenericTypeAnnotation) IsInvalidType() bool {
+	return (a.TypeParameter != nil && a.TypeParameter.Type.IsInvalidType()) ||
+		(a.TypeAnnotation != nil && a.TypeAnnotation.Type.IsInvalidType())
+}
+
+func (a *GenericTypeAnnotation) TypeAnnotationState() TypeAnnotationState {
+	if a.TypeParameter != nil {
+		typeParameterTypeAnnotationState := a.TypeParameter.Type.TypeAnnotationState()
+		if typeParameterTypeAnnotationState != TypeAnnotationStateValid {
+			return typeParameterTypeAnnotationState
+		}
+	}
+
+	return a.TypeAnnotation.Type.TypeAnnotationState()
+}
+
+func (a *GenericTypeAnnotation) ContainsFirstLevelResourceInterfaceType() bool {
+	if a.TypeParameter != nil && a.TypeParameter.Type.ContainsFirstLevelResourceInterfaceType() {
+		return true
+	}
+
+	return a.TypeAnnotation.Type.ContainsFirstLevelResourceInterfaceType()
+}
+
 // Parameter
+
+func formatParameter(spaces bool, label, identifier, typeAnnotation string) string {
+	var builder strings.Builder
+
+	if label != "" {
+		builder.WriteString(label)
+		if spaces {
+			builder.WriteRune(' ')
+		}
+	}
+
+	if identifier != "" {
+		builder.WriteString(identifier)
+		builder.WriteRune(':')
+		if spaces {
+			builder.WriteRune(' ')
+		}
+	}
+
+	builder.WriteString(typeAnnotation)
+
+	return builder.String()
+}
 
 type Parameter struct {
 	Label          string
@@ -2367,45 +2457,21 @@ type Parameter struct {
 }
 
 func (p *Parameter) String() string {
-	if p.Label != "" {
-		return fmt.Sprintf(
-			"%s %s: %s",
-			p.Label,
-			p.Identifier,
-			p.TypeAnnotation.String(),
-		)
-	}
-
-	if p.Identifier != "" {
-		return fmt.Sprintf(
-			"%s: %s",
-			p.Identifier,
-			p.TypeAnnotation.String(),
-		)
-	}
-
-	return p.TypeAnnotation.String()
+	return formatParameter(
+		true,
+		p.Label,
+		p.Identifier,
+		p.TypeAnnotation.String(),
+	)
 }
 
 func (p *Parameter) QualifiedString() string {
-	if p.Label != "" {
-		return fmt.Sprintf(
-			"%s %s: %s",
-			p.Label,
-			p.Identifier,
-			p.TypeAnnotation.QualifiedString(),
-		)
-	}
-
-	if p.Identifier != "" {
-		return fmt.Sprintf(
-			"%s: %s",
-			p.Identifier,
-			p.TypeAnnotation.QualifiedString(),
-		)
-	}
-
-	return p.TypeAnnotation.QualifiedString()
+	return formatParameter(
+		true,
+		p.Label,
+		p.Identifier,
+		p.TypeAnnotation.QualifiedString(),
+	)
 }
 
 // EffectiveArgumentLabel returns the effective argument label that
@@ -2420,23 +2486,317 @@ func (p *Parameter) EffectiveArgumentLabel() string {
 	return p.Identifier
 }
 
-// FunctionType
+// TypeParameter
 
-type FunctionType struct {
-	Parameters            []*Parameter
-	ReturnTypeAnnotation  *TypeAnnotation
-	ReturnTypeGetter      func(argumentTypes []Type) Type
+type TypeParameter struct {
+	Name string
+	Type Type
+}
+
+func (p TypeParameter) string(typeFormatter func(Type) string) string {
+	var builder strings.Builder
+	builder.WriteString(p.Name)
+	if p.Type != nil {
+		builder.WriteString(": ")
+		builder.WriteString(typeFormatter(p.Type))
+	}
+	return builder.String()
+}
+
+func (p TypeParameter) String() string {
+	return p.string(func(t Type) string {
+		return t.String()
+	})
+}
+
+func (p TypeParameter) QualifiedString() string {
+	return p.string(func(t Type) string {
+		return t.QualifiedString()
+	})
+}
+
+func (p TypeParameter) Equal(other *TypeParameter) bool {
+	return p.Name == other.Name &&
+		(p.Type == nil || !p.Type.Equal(other.Type))
+}
+
+// GenericParameter
+
+type GenericParameter struct {
+	Label          string
+	Identifier     string
+	TypeAnnotation *GenericTypeAnnotation
+}
+
+func (p *GenericParameter) String() string {
+	return formatParameter(
+		true,
+		p.Label,
+		p.Identifier,
+		p.TypeAnnotation.String(),
+	)
+}
+
+func (p *GenericParameter) QualifiedString() string {
+	return formatParameter(
+		true,
+		p.Label,
+		p.Identifier,
+		p.TypeAnnotation.QualifiedString(),
+	)
+}
+
+// Function types
+
+func formatFunctionType(
+	spaces bool,
+	typeParameters []string,
+	parameters []string,
+	returnTypeAnnotation string,
+) string {
+
+	var builder strings.Builder
+	builder.WriteRune('(')
+	if len(typeParameters) > 0 {
+		builder.WriteRune('<')
+		for i, typeParameter := range typeParameters {
+			if i > 0 {
+				builder.WriteRune(',')
+				if spaces {
+					builder.WriteRune(' ')
+				}
+			}
+			builder.WriteString(typeParameter)
+		}
+		builder.WriteRune('>')
+	}
+	builder.WriteRune('(')
+	for i, parameter := range parameters {
+		if i > 0 {
+			builder.WriteRune(',')
+			if spaces {
+				builder.WriteRune(' ')
+			}
+		}
+		builder.WriteString(parameter)
+	}
+	builder.WriteString("):")
+	if spaces {
+		builder.WriteRune(' ')
+	}
+	builder.WriteString(returnTypeAnnotation)
+	builder.WriteRune(')')
+	return builder.String()
+}
+
+// GenericFunctionType is a polymoprhic function type
+// (a "type scheme").
+//
+type GenericFunctionType struct {
+	TypeParameters        []*TypeParameter
+	Parameters            []*GenericParameter
+	ReturnTypeAnnotation  *GenericTypeAnnotation
 	RequiredArgumentCount *int
 }
 
-func (t *FunctionType) ReturnType(argumentTypes []Type) Type {
-	if len(argumentTypes) == len(t.Parameters) &&
-		t.ReturnTypeGetter != nil {
+func (*GenericFunctionType) IsType() {}
 
-		return t.ReturnTypeGetter(argumentTypes)
+func (t *GenericFunctionType) String() string {
+	typeParameters := make([]string, len(t.TypeParameters))
+
+	for i, typeParameter := range t.TypeParameters {
+		typeParameters[i] = typeParameter.String()
 	}
 
-	return t.ReturnTypeAnnotation.Type
+	parameters := make([]string, len(t.Parameters))
+
+	for i, parameter := range t.Parameters {
+		parameters[i] = parameter.String()
+	}
+
+	returnTypeAnnotation := t.ReturnTypeAnnotation.String()
+
+	return formatFunctionType(
+		true,
+		typeParameters,
+		parameters,
+		returnTypeAnnotation,
+	)
+}
+
+func (t *GenericFunctionType) QualifiedString() string {
+	typeParameters := make([]string, len(t.TypeParameters))
+
+	for i, typeParameter := range t.TypeParameters {
+		typeParameters[i] = typeParameter.QualifiedString()
+	}
+
+	parameters := make([]string, len(t.Parameters))
+
+	for i, parameter := range t.Parameters {
+		parameters[i] = parameter.QualifiedString()
+	}
+
+	returnTypeAnnotation := t.ReturnTypeAnnotation.QualifiedString()
+
+	return formatFunctionType(
+		true,
+		typeParameters,
+		parameters,
+		returnTypeAnnotation,
+	)
+}
+
+// NOTE: parameter names and argument labels are *not* part of the ID!
+func (t *GenericFunctionType) ID() TypeID {
+	typeParameters := make([]string, len(t.TypeParameters))
+
+	for i, typeParameter := range t.TypeParameters {
+		typeParameters[i] = string(typeParameter.Type.ID())
+	}
+
+	parameters := make([]string, len(t.Parameters))
+
+	for i, parameter := range t.Parameters {
+		parameters[i] = string(parameter.TypeAnnotation.TypeID())
+	}
+
+	returnTypeAnnotation := string(t.ReturnTypeAnnotation.TypeID())
+
+	return TypeID(
+		formatFunctionType(
+			false,
+			typeParameters,
+			parameters,
+			returnTypeAnnotation,
+		),
+	)
+}
+
+func (t *GenericFunctionType) Equal(other Type) bool {
+	otherFunction, ok := other.(*GenericFunctionType)
+	if !ok {
+		return false
+	}
+
+	// type parameters
+
+	if len(t.TypeParameters) != len(otherFunction.TypeParameters) {
+		return false
+	}
+
+	for i, typeParameter := range t.TypeParameters {
+		otherTypeParameter := otherFunction.TypeParameters[i]
+		if !typeParameter.Equal(otherTypeParameter) {
+			return false
+		}
+	}
+
+	// parameters
+
+	if len(t.Parameters) != len(otherFunction.Parameters) {
+		return false
+	}
+
+	for i, parameter := range t.Parameters {
+		otherParameter := otherFunction.Parameters[i]
+		if !parameter.TypeAnnotation.Equal(otherParameter.TypeAnnotation) {
+			return false
+		}
+	}
+
+	// return type
+
+	return t.ReturnTypeAnnotation.Equal(otherFunction.ReturnTypeAnnotation)
+}
+
+func (t *GenericFunctionType) IsResourceType() bool {
+	return false
+}
+
+func (t *GenericFunctionType) IsInvalidType() bool {
+
+	for _, typeParameter := range t.TypeParameters {
+		if typeParameter.Type.IsInvalidType() {
+			return true
+		}
+	}
+
+	for _, parameter := range t.Parameters {
+		if parameter.TypeAnnotation.IsInvalidType() {
+			return true
+		}
+	}
+
+	if t.ReturnTypeAnnotation.IsInvalidType() {
+		return true
+	}
+
+	return false
+}
+
+func (t *GenericFunctionType) TypeAnnotationState() TypeAnnotationState {
+	for _, typeParameter := range t.TypeParameters {
+		typeParameterTypeAnnotationState := typeParameter.Type.TypeAnnotationState()
+		if typeParameterTypeAnnotationState != TypeAnnotationStateValid {
+			return typeParameterTypeAnnotationState
+		}
+	}
+
+	for _, parameter := range t.Parameters {
+		parameterTypeAnnotationState := parameter.TypeAnnotation.TypeAnnotationState()
+		if parameterTypeAnnotationState != TypeAnnotationStateValid {
+			return parameterTypeAnnotationState
+		}
+	}
+
+	returnTypeAnnotationState := t.ReturnTypeAnnotation.TypeAnnotationState()
+	if returnTypeAnnotationState != TypeAnnotationStateValid {
+		return returnTypeAnnotationState
+	}
+
+	return TypeAnnotationStateValid
+}
+
+func (t *GenericFunctionType) ContainsFirstLevelResourceInterfaceType() bool {
+
+	for _, typeParameter := range t.TypeParameters {
+		if typeParameter.Type.ContainsFirstLevelResourceInterfaceType() {
+			return true
+		}
+	}
+
+	for _, parameter := range t.Parameters {
+		if parameter.TypeAnnotation.ContainsFirstLevelResourceInterfaceType() {
+			return true
+		}
+	}
+
+	if t.ReturnTypeAnnotation.ContainsFirstLevelResourceInterfaceType() {
+		return true
+	}
+
+	return false
+}
+
+func (t *GenericFunctionType) InvocationFunctionType() *FunctionType {
+	return nil
+}
+
+func (t *GenericFunctionType) InvocationGenericFunctionType() *GenericFunctionType {
+	return t
+}
+
+func (*GenericFunctionType) CheckArgumentExpressions(_ *Checker, _ []ast.Expression) {
+	// NO-OP: no checks for normal functions
+}
+
+// FunctionType is a monomorphic function type.
+//
+type FunctionType struct {
+	Parameters            []*Parameter
+	ReturnTypeAnnotation  *TypeAnnotation
+	RequiredArgumentCount *int
 }
 
 func (*FunctionType) IsType() {}
@@ -2445,53 +2805,67 @@ func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
 }
 
+func (t *FunctionType) InvocationGenericFunctionType() *GenericFunctionType {
+	return nil
+}
+
 func (*FunctionType) CheckArgumentExpressions(_ *Checker, _ []ast.Expression) {
 	// NO-OP: no checks for normal functions
 }
 
 func (t *FunctionType) String() string {
-	var parameters strings.Builder
+	parameters := make([]string, len(t.Parameters))
+
 	for i, parameter := range t.Parameters {
-		if i > 0 {
-			parameters.WriteString(", ")
-		}
-		parameters.WriteString(parameter.String())
+		parameters[i] = parameter.String()
 	}
 
-	return fmt.Sprintf(
-		"((%s): %s)",
-		parameters.String(),
-		t.ReturnTypeAnnotation,
+	returnTypeAnnotation := t.ReturnTypeAnnotation.String()
+
+	return formatFunctionType(
+		true,
+		nil,
+		parameters,
+		returnTypeAnnotation,
 	)
 }
 
 func (t *FunctionType) QualifiedString() string {
-	var parameters strings.Builder
+	parameters := make([]string, len(t.Parameters))
+
 	for i, parameter := range t.Parameters {
-		if i > 0 {
-			parameters.WriteString(", ")
-		}
-		parameters.WriteString(parameter.QualifiedString())
+		parameters[i] = parameter.QualifiedString()
 	}
 
-	return fmt.Sprintf(
-		"((%s): %s)",
-		parameters.String(),
-		t.ReturnTypeAnnotation.QualifiedString(),
+	returnTypeAnnotation := t.ReturnTypeAnnotation.QualifiedString()
+
+	return formatFunctionType(
+		true,
+		nil,
+		parameters,
+		returnTypeAnnotation,
 	)
 }
 
 // NOTE: parameter names and argument labels are *not* part of the ID!
 func (t *FunctionType) ID() TypeID {
-	var parameters strings.Builder
+
+	parameters := make([]string, len(t.Parameters))
+
 	for i, parameter := range t.Parameters {
-		if i > 0 {
-			parameters.WriteString(",")
-		}
-		parameters.WriteString(string(parameter.TypeAnnotation.Type.ID()))
+		parameters[i] = string(parameter.TypeAnnotation.Type.ID())
 	}
 
-	return TypeID(fmt.Sprintf("((%s):%s)", parameters.String(), t.ReturnTypeAnnotation))
+	returnTypeAnnotation := string(t.ReturnTypeAnnotation.Type.ID())
+
+	return TypeID(
+		formatFunctionType(
+			false,
+			nil,
+			parameters,
+			returnTypeAnnotation,
+		),
+	)
 }
 
 // NOTE: parameter names and argument labels are intentionally *not* considered!
@@ -2538,9 +2912,6 @@ func (*FunctionType) IsResourceType() bool {
 }
 
 func (t *FunctionType) IsInvalidType() bool {
-	if t.ReturnTypeAnnotation.Type.IsInvalidType() {
-		return true
-	}
 
 	for _, parameter := range t.Parameters {
 		if parameter.TypeAnnotation.Type.IsInvalidType() {
@@ -2548,14 +2919,14 @@ func (t *FunctionType) IsInvalidType() bool {
 		}
 	}
 
+	if t.ReturnTypeAnnotation.Type.IsInvalidType() {
+		return true
+	}
+
 	return false
 }
 
 func (t *FunctionType) TypeAnnotationState() TypeAnnotationState {
-	returnTypeAnnotationState := t.ReturnTypeAnnotation.TypeAnnotationState()
-	if returnTypeAnnotationState != TypeAnnotationStateValid {
-		return returnTypeAnnotationState
-	}
 
 	for _, parameter := range t.Parameters {
 		parameterTypeAnnotationState := parameter.TypeAnnotation.TypeAnnotationState()
@@ -2564,18 +2935,24 @@ func (t *FunctionType) TypeAnnotationState() TypeAnnotationState {
 		}
 	}
 
+	returnTypeAnnotationState := t.ReturnTypeAnnotation.TypeAnnotationState()
+	if returnTypeAnnotationState != TypeAnnotationStateValid {
+		return returnTypeAnnotationState
+	}
+
 	return TypeAnnotationStateValid
 }
 
 func (t *FunctionType) ContainsFirstLevelResourceInterfaceType() bool {
-	if t.ReturnTypeAnnotation.Type.ContainsFirstLevelResourceInterfaceType() {
-		return true
-	}
 
 	for _, parameter := range t.Parameters {
 		if parameter.TypeAnnotation.Type.ContainsFirstLevelResourceInterfaceType() {
 			return true
 		}
+	}
+
+	if t.ReturnTypeAnnotation.Type.ContainsFirstLevelResourceInterfaceType() {
+		return true
 	}
 
 	return false
@@ -2628,7 +3005,7 @@ func init() {
 		&CharacterType{},
 		&StringType{},
 		&AddressType{},
-		&AccountType{},
+		&AuthAccountType{},
 		&PublicAccountType{},
 	}
 
@@ -2938,50 +3315,50 @@ func (t *CompositeType) AllConformances() []*InterfaceType {
 	return t.Conformances
 }
 
-// AccountType
+// AuthAccountType
 
-type AccountType struct{}
+type AuthAccountType struct{}
 
-func (*AccountType) IsType() {}
+func (*AuthAccountType) IsType() {}
 
-func (*AccountType) String() string {
-	return "Account"
+func (*AuthAccountType) String() string {
+	return "AuthAccount"
 }
 
-func (*AccountType) QualifiedString() string {
-	return "Account"
+func (*AuthAccountType) QualifiedString() string {
+	return "AuthAccount"
 }
 
-func (*AccountType) ID() TypeID {
-	return "Account"
+func (*AuthAccountType) ID() TypeID {
+	return "AuthAccount"
 }
 
-func (*AccountType) Equal(other Type) bool {
-	_, ok := other.(*AccountType)
+func (*AuthAccountType) Equal(other Type) bool {
+	_, ok := other.(*AuthAccountType)
 	return ok
 }
 
-func (*AccountType) IsResourceType() bool {
+func (*AuthAccountType) IsResourceType() bool {
 	return false
 }
 
-func (*AccountType) IsInvalidType() bool {
+func (*AuthAccountType) IsInvalidType() bool {
 	return false
 }
 
-func (*AccountType) TypeAnnotationState() TypeAnnotationState {
+func (*AuthAccountType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
-func (*AccountType) ContainsFirstLevelResourceInterfaceType() bool {
+func (*AuthAccountType) ContainsFirstLevelResourceInterfaceType() bool {
 	return false
 }
 
-func (*AccountType) CanHaveMembers() bool {
+func (*AuthAccountType) CanHaveMembers() bool {
 	return true
 }
 
-func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+func (t *AuthAccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	newField := func(fieldType Type) *Member {
 		return NewPublicConstantFieldMember(t, identifier, fieldType)
 	}
@@ -3144,50 +3521,6 @@ type Member struct {
 	ArgumentLabels  []string
 	// Predeclared fields can be considered initialized
 	Predeclared bool
-}
-
-// NewCheckedMember panics if the member declaration is invalid.
-func NewCheckedMember(member *Member) *Member {
-
-	if member.DeclarationKind == common.DeclarationKindUnknown {
-		panic(fmt.Sprintf(
-			"member `%s.%s` has unknown declaration kind",
-			member.ContainerType,
-			member.Identifier.Identifier,
-		))
-	}
-
-	if member.Access == ast.AccessNotSpecified {
-		panic(fmt.Sprintf(
-			"member `%s.%s` has unspecified access",
-			member.ContainerType,
-			member.Identifier.Identifier,
-		))
-	}
-
-	if invokableType, ok := member.TypeAnnotation.Type.(InvokableType); ok {
-		functionType := invokableType.InvocationFunctionType()
-
-		if member.ArgumentLabels != nil &&
-			len(member.ArgumentLabels) != len(functionType.Parameters) {
-
-			panic(fmt.Sprintf(
-				"member `%s.%s` has incorrect argument label count",
-				member.ContainerType,
-				member.Identifier.Identifier,
-			))
-		}
-	} else {
-		if member.ArgumentLabels != nil {
-			panic(fmt.Sprintf(
-				"non-function member `%s.%s` should not declare argument labels",
-				member.ContainerType,
-				member.Identifier.Identifier,
-			))
-		}
-	}
-
-	return member
 }
 
 func NewPublicFunctionMember(containerType Type, identifier string, functionType *FunctionType) *Member {

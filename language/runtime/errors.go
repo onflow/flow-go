@@ -70,7 +70,7 @@ type InvalidTransactionParameterTypeError struct {
 func (e InvalidTransactionParameterTypeError) Error() string {
 	return fmt.Sprintf(
 		"parameter type mismatch for transaction: expected `%s`, got `%s`",
-		&sema.AccountType{},
+		&sema.AuthAccountType{},
 		e.Actual,
 	)
 }

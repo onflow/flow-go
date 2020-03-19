@@ -1943,6 +1943,19 @@ func (v *ProgramVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
+
+	// type arguments
+
+	var typeArguments []ast.Type
+	for _, typeArgument := range ctx.AllFullType() {
+		typeArguments = append(
+			typeArguments,
+			typeArgument.Accept(v).(ast.Type),
+		)
+	}
+
+	// arguments
+
 	var arguments []*ast.Argument
 	for _, argument := range ctx.AllArgument() {
 		arguments = append(
@@ -1955,8 +1968,9 @@ func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
 
 	// NOTE: partial, argument is filled later
 	return &ast.InvocationExpression{
-		Arguments: arguments,
-		EndPos:    endPosition,
+		TypeArguments: typeArguments,
+		Arguments:     arguments,
+		EndPos:        endPosition,
 	}
 }
 

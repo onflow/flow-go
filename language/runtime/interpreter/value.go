@@ -4315,14 +4315,14 @@ func (v AddressValue) ToAddress() common.Address {
 	return common.Address(v)
 }
 
-// AccountValue
+// AuthAccountValue
 
-func NewAccountValue(addressValue AddressValue, setCode, addPublicKey, removePublicKey FunctionValue) *CompositeValue {
+func NewAuthAccountValue(addressValue AddressValue, setCode, addPublicKey, removePublicKey FunctionValue) *CompositeValue {
 	address := addressValue.ToAddress()
 
 	return &CompositeValue{
 		Kind:   common.CompositeKindStructure,
-		TypeID: (&sema.AccountType{}).ID(),
+		TypeID: (&sema.AuthAccountType{}).ID(),
 		InjectedFields: map[string]Value{
 			"address":         addressValue,
 			"storage":         StorageValue{Address: address},

@@ -117,7 +117,7 @@ func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) 
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ArgumentCountError{}, errs[0])
-	assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[1])
+	assert.IsType(t, &sema.TypeParameterTypeInferenceError{}, errs[1])
 }
 
 func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {

@@ -6718,7 +6718,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 	
 		    var x: Int
 	
-		    prepare(signer: Account) {
+		    prepare(signer: AuthAccount) {
 	          x = 0
 			}
 	
@@ -6777,7 +6777,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
-													Identifier: "Account",
+													Identifier: "AuthAccount",
 													Pos:        Position{Offset: 62, Line: 6, Column: 22},
 												},
 											},
@@ -6791,7 +6791,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								},
 								Range: Range{
 									StartPos: Position{Offset: 53, Line: 6, Column: 13},
-									EndPos:   Position{Offset: 69, Line: 6, Column: 29},
+									EndPos:   Position{Offset: 73, Line: 6, Column: 33},
 								},
 							},
 							ReturnTypeAnnotation: nil,
@@ -6802,26 +6802,26 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Target: &IdentifierExpression{
 												Identifier: Identifier{
 													Identifier: "x",
-													Pos:        Position{Offset: 84, Line: 7, Column: 11},
+													Pos:        Position{Offset: 88, Line: 7, Column: 11},
 												},
 											},
 											Transfer: &Transfer{
 												Operation: TransferOperationCopy,
-												Pos:       Position{Offset: 86, Line: 7, Column: 13},
+												Pos:       Position{Offset: 90, Line: 7, Column: 13},
 											},
 											Value: &IntegerExpression{
 												Value: big.NewInt(0),
 												Base:  10,
 												Range: Range{
-													StartPos: Position{Offset: 88, Line: 7, Column: 15},
-													EndPos:   Position{Offset: 88, Line: 7, Column: 15},
+													StartPos: Position{Offset: 92, Line: 7, Column: 15},
+													EndPos:   Position{Offset: 92, Line: 7, Column: 15},
 												},
 											},
 										},
 									},
 									Range: Range{
-										StartPos: Position{Offset: 71, Line: 6, Column: 31},
-										EndPos:   Position{Offset: 93, Line: 8, Column: 3},
+										StartPos: Position{Offset: 75, Line: 6, Column: 35},
+										EndPos:   Position{Offset: 97, Line: 8, Column: 3},
 									},
 								},
 								PreConditions:  nil,
@@ -6838,7 +6838,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							Access: AccessNotSpecified,
 							Identifier: Identifier{
 								Identifier: "execute",
-								Pos:        Position{Offset: 103, Line: 10, Column: 6},
+								Pos:        Position{Offset: 107, Line: 10, Column: 6},
 							},
 							ParameterList:        &ParameterList{},
 							ReturnTypeAnnotation: nil,
@@ -6849,12 +6849,12 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Target: &IdentifierExpression{
 												Identifier: Identifier{
 													Identifier: "x",
-													Pos:        Position{Offset: 124, Line: 11, Column: 11},
+													Pos:        Position{Offset: 128, Line: 11, Column: 11},
 												},
 											},
 											Transfer: &Transfer{
 												Operation: TransferOperationCopy,
-												Pos:       Position{Offset: 126, Line: 11, Column: 13},
+												Pos:       Position{Offset: 130, Line: 11, Column: 13},
 											},
 											Value: &BinaryExpression{
 												Operation: OperationPlus,
@@ -6862,35 +6862,35 @@ func TestParseTransactionDeclaration(t *testing.T) {
 													Value: big.NewInt(1),
 													Base:  10,
 													Range: Range{
-														StartPos: Position{Offset: 128, Line: 11, Column: 15},
-														EndPos:   Position{Offset: 128, Line: 11, Column: 15},
+														StartPos: Position{Offset: 132, Line: 11, Column: 15},
+														EndPos:   Position{Offset: 132, Line: 11, Column: 15},
 													},
 												},
 												Right: &IntegerExpression{
 													Value: big.NewInt(1),
 													Base:  10,
 													Range: Range{
-														StartPos: Position{Offset: 132, Line: 11, Column: 19},
-														EndPos:   Position{Offset: 132, Line: 11, Column: 19},
+														StartPos: Position{Offset: 136, Line: 11, Column: 19},
+														EndPos:   Position{Offset: 136, Line: 11, Column: 19},
 													},
 												},
 											},
 										},
 									},
 									Range: Range{
-										StartPos: Position{Offset: 111, Line: 10, Column: 14},
-										EndPos:   Position{Offset: 137, Line: 12, Column: 3},
+										StartPos: Position{Offset: 115, Line: 10, Column: 14},
+										EndPos:   Position{Offset: 141, Line: 12, Column: 3},
 									},
 								},
 								PreConditions:  nil,
 								PostConditions: nil,
 							},
-							StartPos: Position{Offset: 103, Line: 10, Column: 6},
+							StartPos: Position{Offset: 107, Line: 10, Column: 6},
 						},
 					},
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
-						EndPos:   Position{Offset: 143, Line: 13, Column: 4},
+						EndPos:   Position{Offset: 147, Line: 13, Column: 4},
 					},
 				},
 			},
@@ -6905,7 +6905,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 	
 		    var x: Int
 	
-		    prepare(signer: Account) {
+		    prepare(signer: AuthAccount) {
 	          x = 0
 			}
 	
@@ -6972,7 +6972,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
-													Identifier: "Account",
+													Identifier: "AuthAccount",
 													Pos:        Position{Offset: 62, Line: 6, Column: 22},
 												},
 											},
@@ -6986,7 +6986,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								},
 								Range: Range{
 									StartPos: Position{Offset: 53, Line: 6, Column: 13},
-									EndPos:   Position{Offset: 69, Line: 6, Column: 29},
+									EndPos:   Position{Offset: 73, Line: 6, Column: 33},
 								},
 							},
 							ReturnTypeAnnotation: nil,
@@ -6997,26 +6997,26 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Target: &IdentifierExpression{
 												Identifier: Identifier{
 													Identifier: "x",
-													Pos:        Position{Offset: 84, Line: 7, Column: 11},
+													Pos:        Position{Offset: 88, Line: 7, Column: 11},
 												},
 											},
 											Transfer: &Transfer{
 												Operation: TransferOperationCopy,
-												Pos:       Position{Offset: 86, Line: 7, Column: 13},
+												Pos:       Position{Offset: 90, Line: 7, Column: 13},
 											},
 											Value: &IntegerExpression{
 												Value: big.NewInt(0),
 												Base:  10,
 												Range: Range{
-													StartPos: Position{Offset: 88, Line: 7, Column: 15},
-													EndPos:   Position{Offset: 88, Line: 7, Column: 15},
+													StartPos: Position{Offset: 92, Line: 7, Column: 15},
+													EndPos:   Position{Offset: 92, Line: 7, Column: 15},
 												},
 											},
 										},
 									},
 									Range: Range{
-										StartPos: Position{Offset: 71, Line: 6, Column: 31},
-										EndPos:   Position{Offset: 93, Line: 8, Column: 3},
+										StartPos: Position{Offset: 75, Line: 6, Column: 35},
+										EndPos:   Position{Offset: 97, Line: 8, Column: 3},
 									},
 								},
 								PreConditions:  nil,
@@ -7033,15 +7033,15 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								Left: &IdentifierExpression{
 									Identifier: Identifier{
 										Identifier: "x",
-										Pos:        Position{Offset: 116, Line: 11, Column: 10},
+										Pos:        Position{Offset: 120, Line: 11, Column: 10},
 									},
 								},
 								Right: &IntegerExpression{
 									Value: big.NewInt(0),
 									Base:  10,
 									Range: Range{
-										StartPos: Position{Offset: 121, Line: 11, Column: 15},
-										EndPos:   Position{Offset: 121, Line: 11, Column: 15},
+										StartPos: Position{Offset: 125, Line: 11, Column: 15},
+										EndPos:   Position{Offset: 125, Line: 11, Column: 15},
 									},
 								},
 							},
@@ -7055,15 +7055,15 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								Left: &IdentifierExpression{
 									Identifier: Identifier{
 										Identifier: "x",
-										Pos:        Position{Offset: 198, Line: 19, Column: 11},
+										Pos:        Position{Offset: 202, Line: 19, Column: 11},
 									},
 								},
 								Right: &IntegerExpression{
 									Value: big.NewInt(2),
 									Base:  10,
 									Range: Range{
-										StartPos: Position{Offset: 203, Line: 19, Column: 16},
-										EndPos:   Position{Offset: 203, Line: 19, Column: 16},
+										StartPos: Position{Offset: 207, Line: 19, Column: 16},
+										EndPos:   Position{Offset: 207, Line: 19, Column: 16},
 									},
 								},
 							},
@@ -7075,7 +7075,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							Access: AccessNotSpecified,
 							Identifier: Identifier{
 								Identifier: "execute",
-								Pos:        Position{Offset: 136, Line: 14, Column: 6},
+								Pos:        Position{Offset: 140, Line: 14, Column: 6},
 							},
 							ParameterList:        &ParameterList{},
 							ReturnTypeAnnotation: nil,
@@ -7086,12 +7086,12 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Target: &IdentifierExpression{
 												Identifier: Identifier{
 													Identifier: "x",
-													Pos:        Position{Offset: 157, Line: 15, Column: 11},
+													Pos:        Position{Offset: 161, Line: 15, Column: 11},
 												},
 											},
 											Transfer: &Transfer{
 												Operation: TransferOperationCopy,
-												Pos:       Position{Offset: 159, Line: 15, Column: 13},
+												Pos:       Position{Offset: 163, Line: 15, Column: 13},
 											},
 											Value: &BinaryExpression{
 												Operation: OperationPlus,
@@ -7099,35 +7099,35 @@ func TestParseTransactionDeclaration(t *testing.T) {
 													Value: big.NewInt(1),
 													Base:  10,
 													Range: Range{
-														StartPos: Position{Offset: 161, Line: 15, Column: 15},
-														EndPos:   Position{Offset: 161, Line: 15, Column: 15},
+														StartPos: Position{Offset: 165, Line: 15, Column: 15},
+														EndPos:   Position{Offset: 165, Line: 15, Column: 15},
 													},
 												},
 												Right: &IntegerExpression{
 													Value: big.NewInt(1),
 													Base:  10,
 													Range: Range{
-														StartPos: Position{Offset: 165, Line: 15, Column: 19},
-														EndPos:   Position{Offset: 165, Line: 15, Column: 19},
+														StartPos: Position{Offset: 169, Line: 15, Column: 19},
+														EndPos:   Position{Offset: 169, Line: 15, Column: 19},
 													},
 												},
 											},
 										},
 									},
 									Range: Range{
-										StartPos: Position{Offset: 144, Line: 14, Column: 14},
-										EndPos:   Position{Offset: 170, Line: 16, Column: 3},
+										StartPos: Position{Offset: 148, Line: 14, Column: 14},
+										EndPos:   Position{Offset: 174, Line: 16, Column: 3},
 									},
 								},
 								PreConditions:  nil,
 								PostConditions: nil,
 							},
-							StartPos: Position{Offset: 136, Line: 14, Column: 6},
+							StartPos: Position{Offset: 140, Line: 14, Column: 6},
 						},
 					},
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
-						EndPos:   Position{Offset: 220, Line: 21, Column: 4},
+						EndPos:   Position{Offset: 224, Line: 21, Column: 4},
 					},
 				},
 			},
@@ -7142,7 +7142,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 	
 		    var x: Int
 	
-		    prepare(signer: Account) {
+		    prepare(signer: AuthAccount) {
 	          x = 0
 			}
 	
@@ -7209,7 +7209,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
-													Identifier: "Account",
+													Identifier: "AuthAccount",
 													Pos:        Position{Offset: 62, Line: 6, Column: 22},
 												},
 											},
@@ -7223,7 +7223,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								},
 								Range: Range{
 									StartPos: Position{Offset: 53, Line: 6, Column: 13},
-									EndPos:   Position{Offset: 69, Line: 6, Column: 29},
+									EndPos:   Position{Offset: 73, Line: 6, Column: 33},
 								},
 							},
 							ReturnTypeAnnotation: nil,
@@ -7234,26 +7234,26 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Target: &IdentifierExpression{
 												Identifier: Identifier{
 													Identifier: "x",
-													Pos:        Position{Offset: 84, Line: 7, Column: 11},
+													Pos:        Position{Offset: 88, Line: 7, Column: 11},
 												},
 											},
 											Transfer: &Transfer{
 												Operation: TransferOperationCopy,
-												Pos:       Position{Offset: 86, Line: 7, Column: 13},
+												Pos:       Position{Offset: 90, Line: 7, Column: 13},
 											},
 											Value: &IntegerExpression{
 												Value: big.NewInt(0),
 												Base:  10,
 												Range: Range{
-													StartPos: Position{Offset: 88, Line: 7, Column: 15},
-													EndPos:   Position{Offset: 88, Line: 7, Column: 15},
+													StartPos: Position{Offset: 92, Line: 7, Column: 15},
+													EndPos:   Position{Offset: 92, Line: 7, Column: 15},
 												},
 											},
 										},
 									},
 									Range: Range{
-										StartPos: Position{Offset: 71, Line: 6, Column: 31},
-										EndPos:   Position{Offset: 93, Line: 8, Column: 3},
+										StartPos: Position{Offset: 75, Line: 6, Column: 35},
+										EndPos:   Position{Offset: 97, Line: 8, Column: 3},
 									},
 								},
 								PreConditions:  nil,
@@ -7270,15 +7270,15 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								Left: &IdentifierExpression{
 									Identifier: Identifier{
 										Identifier: "x",
-										Pos:        Position{Offset: 116, Line: 11, Column: 10},
+										Pos:        Position{Offset: 120, Line: 11, Column: 10},
 									},
 								},
 								Right: &IntegerExpression{
 									Value: big.NewInt(0),
 									Base:  10,
 									Range: Range{
-										StartPos: Position{Offset: 121, Line: 11, Column: 15},
-										EndPos:   Position{Offset: 121, Line: 11, Column: 15},
+										StartPos: Position{Offset: 125, Line: 11, Column: 15},
+										EndPos:   Position{Offset: 125, Line: 11, Column: 15},
 									},
 								},
 							},
@@ -7292,15 +7292,15 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								Left: &IdentifierExpression{
 									Identifier: Identifier{
 										Identifier: "x",
-										Pos:        Position{Offset: 153, Line: 15, Column: 11},
+										Pos:        Position{Offset: 157, Line: 15, Column: 11},
 									},
 								},
 								Right: &IntegerExpression{
 									Value: big.NewInt(2),
 									Base:  10,
 									Range: Range{
-										StartPos: Position{Offset: 158, Line: 15, Column: 16},
-										EndPos:   Position{Offset: 158, Line: 15, Column: 16},
+										StartPos: Position{Offset: 162, Line: 15, Column: 16},
+										EndPos:   Position{Offset: 162, Line: 15, Column: 16},
 									},
 								},
 							},
@@ -7312,7 +7312,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							Access: AccessNotSpecified,
 							Identifier: Identifier{
 								Identifier: "execute",
-								Pos:        Position{Offset: 179, Line: 18, Column: 6},
+								Pos:        Position{Offset: 183, Line: 18, Column: 6},
 							},
 							ParameterList:        &ParameterList{},
 							ReturnTypeAnnotation: nil,
@@ -7323,12 +7323,12 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Target: &IdentifierExpression{
 												Identifier: Identifier{
 													Identifier: "x",
-													Pos:        Position{Offset: 200, Line: 19, Column: 11},
+													Pos:        Position{Offset: 204, Line: 19, Column: 11},
 												},
 											},
 											Transfer: &Transfer{
 												Operation: TransferOperationCopy,
-												Pos:       Position{Offset: 202, Line: 19, Column: 13},
+												Pos:       Position{Offset: 206, Line: 19, Column: 13},
 											},
 											Value: &BinaryExpression{
 												Operation: OperationPlus,
@@ -7336,35 +7336,35 @@ func TestParseTransactionDeclaration(t *testing.T) {
 													Value: big.NewInt(1),
 													Base:  10,
 													Range: Range{
-														StartPos: Position{Offset: 204, Line: 19, Column: 15},
-														EndPos:   Position{Offset: 204, Line: 19, Column: 15},
+														StartPos: Position{Offset: 208, Line: 19, Column: 15},
+														EndPos:   Position{Offset: 208, Line: 19, Column: 15},
 													},
 												},
 												Right: &IntegerExpression{
 													Value: big.NewInt(1),
 													Base:  10,
 													Range: Range{
-														StartPos: Position{Offset: 208, Line: 19, Column: 19},
-														EndPos:   Position{Offset: 208, Line: 19, Column: 19},
+														StartPos: Position{Offset: 212, Line: 19, Column: 19},
+														EndPos:   Position{Offset: 212, Line: 19, Column: 19},
 													},
 												},
 											},
 										},
 									},
 									Range: Range{
-										StartPos: Position{Offset: 187, Line: 18, Column: 14},
-										EndPos:   Position{Offset: 213, Line: 20, Column: 3},
+										StartPos: Position{Offset: 191, Line: 18, Column: 14},
+										EndPos:   Position{Offset: 217, Line: 20, Column: 3},
 									},
 								},
 								PreConditions:  nil,
 								PostConditions: nil,
 							},
-							StartPos: Position{Offset: 179, Line: 18, Column: 6},
+							StartPos: Position{Offset: 183, Line: 18, Column: 6},
 						},
 					},
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
-						EndPos:   Position{Offset: 219, Line: 21, Column: 4},
+						EndPos:   Position{Offset: 223, Line: 21, Column: 4},
 					},
 				},
 			},
@@ -7514,7 +7514,7 @@ func BenchmarkParseDeploy(b *testing.B) {
 		transaction := fmt.Sprintf(`
               transaction {
                 execute {
-                  Account(publicKeys: [], code: [%s])
+                  AuthAccount(publicKeys: [], code: [%s])
                 }
               }
             `,
@@ -7541,7 +7541,7 @@ func BenchmarkParseDeploy(b *testing.B) {
 		transaction := fmt.Sprintf(`
               transaction {
                 execute {
-                  Account(publicKeys: [], code: "%s".decodeHex())
+                  AuthAccount(publicKeys: [], code: "%s".decodeHex())
                 }
               }
             `,

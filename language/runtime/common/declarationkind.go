@@ -33,6 +33,7 @@ const (
 	DeclarationKindTransaction
 	DeclarationKindPrepare
 	DeclarationKindExecute
+	DeclarationKindTypeParameter
 )
 
 func (k DeclarationKind) IsTypeDeclaration() bool {
@@ -43,7 +44,8 @@ func (k DeclarationKind) IsTypeDeclaration() bool {
 		DeclarationKindEvent,
 		DeclarationKindStructureInterface,
 		DeclarationKindResourceInterface,
-		DeclarationKindContractInterface:
+		DeclarationKindContractInterface,
+		DeclarationKindTypeParameter:
 
 		return true
 
@@ -100,6 +102,8 @@ func (k DeclarationKind) Name() string {
 		return "prepare"
 	case DeclarationKindExecute:
 		return "execute"
+	case DeclarationKindTypeParameter:
+		return "type parameter"
 	}
 
 	panic(errors.NewUnreachableError())
@@ -143,6 +147,8 @@ func (k DeclarationKind) Keywords() string {
 		return "prepare"
 	case DeclarationKindExecute:
 		return "execute"
+	case DeclarationKindTypeParameter:
+		return ""
 	}
 
 	panic(errors.NewUnreachableError())

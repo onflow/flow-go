@@ -13,7 +13,7 @@ import (
 
 var accountValueDeclaration = stdlib.StandardLibraryValue{
 	Name:       "account",
-	Type:       &sema.AccountType{},
+	Type:       &sema.AuthAccountType{},
 	Kind:       common.DeclarationKindConstant,
 	IsConstant: true,
 }

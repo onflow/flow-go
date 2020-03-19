@@ -524,7 +524,8 @@ bracketExpression
     ;
 
 invocation
-    : '(' (argument (',' argument)*)? ')'
+    : ('<' ( fullType (',' fullType )* )? '>')?
+      '(' ( argument (',' argument)* )? ')'
     ;
 
 argument
