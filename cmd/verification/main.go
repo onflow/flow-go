@@ -71,9 +71,11 @@ func main() {
 			// should be moved to a configuration class
 			// DISCLAIMER: alpha down there is not a production-level value
 
-			blocks := storage.NewBlocks(node.DB)
+			// creates a block storage for the node
+			// to reflect incoming blocks on state
+			blockStorage := storage.NewBlocks(node.DB)
 
-			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates, chunkDataPacks, blocks, assigner)
+			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates, chunkDataPacks, blockStorage, assigner)
 			return eng, err
 		}).
 		Run()

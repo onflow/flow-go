@@ -276,7 +276,6 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.VerifierEngine == nil {
-
 		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me)
 		require.Nil(t, err)
 	}
@@ -292,6 +291,7 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.Collections,
 			node.ChunkStates,
 			node.ChunkDataPacks,
+			node.BlockStorage,
 			assigner)
 		require.Nil(t, err)
 	}
