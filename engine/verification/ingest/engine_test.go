@@ -27,7 +27,7 @@ import (
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
-	storage "github.com/dapperlabs/flow-go/storage/mocks"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -56,7 +56,7 @@ type TestSuite struct {
 	collections    *mempool.Collections
 	chunkStates    *mempool.ChunkStates
 	chunkDataPacks *mempool.ChunkDataPacks
-	blockStorage   *storage.MockBlocks
+	blockStorage   *storage.Blocks
 	// resources fixtures
 	collection    *flow.Collection
 	block         *flow.Block
@@ -85,7 +85,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.me = &module.Local{}
 	suite.ss = &protocol.Snapshot{}
 	suite.blocks = &mempool.Blocks{}
-	suite.blockStorage = &storage.MockBlocks{}
+	suite.blockStorage = &storage.Blocks{}
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}

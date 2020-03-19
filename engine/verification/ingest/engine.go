@@ -176,7 +176,8 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// TODO: correctness check for execution receipts
 	// extracts list of verifier nodes id
 	//
-	origin, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
+	// origin, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
+	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
 		// TODO: potential attack on authenticity
 		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)

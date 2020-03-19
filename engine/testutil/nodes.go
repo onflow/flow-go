@@ -275,6 +275,10 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
+	if node.BlockStorage == nil {
+		node.BlockStorage = storage.NewBlocks(node.DB)
+	}
+
 	if node.VerifierEngine == nil {
 		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me)
 		require.Nil(t, err)
