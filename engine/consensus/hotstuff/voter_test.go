@@ -7,14 +7,13 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/voter"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestProduceVote(t *testing.T) {
-	voter := voter.Voter{}
+	voter := Voter{}
 
 	eventHandler := &EventHandler{}
 	fmt.Printf("%v", eventHandler)

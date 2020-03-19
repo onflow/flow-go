@@ -141,13 +141,13 @@ func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, 
 		return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
 	}
 
-	// create a lookup for consensus identities by ID
+	// create a lookup for staked consensus identities by ID
 	lookup := make(map[flow.Identifier]*flow.Identity)
 	for _, identity := range consensusIdentities {
 		lookup[identity.ID()] = identity
 	}
 	if len(lookup) != len(consensusNodeIDs) { // fail fast if there are missing or duplicated identities
-		return nil, fmt.Errorf("duplicates in consensusNodeIDs")
+		return nil, fmt.Errorf("consensusNodeIDs might contain duplicated or unstaked identities")
 	}
 
 	// create a list of identities to populate based on ordering of consensusNodeIDs

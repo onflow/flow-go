@@ -7108,7 +7108,7 @@ func TestInterpretContractAccountFieldUse(t *testing.T) {
 							panic(errors.NewUnreachableError())
 						})
 						return map[string]interpreter.Value{
-							"account": interpreter.NewAccountValue(
+							"account": interpreter.NewAuthAccountValue(
 								addressValue,
 								panicFunction,
 								panicFunction,

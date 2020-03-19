@@ -1489,7 +1489,7 @@ func (checker *Checker) checkNoDestructorNoResourceFields(
 			&MissingDestructorError{
 				ContainerType:  containerType,
 				FirstFieldName: memberName,
-				FirstFieldPos:  fields[memberName].StartPos,
+				FirstFieldPos:  fields[memberName].Identifier.Pos,
 			},
 		)
 

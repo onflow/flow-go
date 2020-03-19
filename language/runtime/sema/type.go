@@ -3005,7 +3005,7 @@ func init() {
 		&CharacterType{},
 		&StringType{},
 		&AddressType{},
-		&AccountType{},
+		&AuthAccountType{},
 		&PublicAccountType{},
 	}
 
@@ -3315,50 +3315,50 @@ func (t *CompositeType) AllConformances() []*InterfaceType {
 	return t.Conformances
 }
 
-// AccountType
+// AuthAccountType
 
-type AccountType struct{}
+type AuthAccountType struct{}
 
-func (*AccountType) IsType() {}
+func (*AuthAccountType) IsType() {}
 
-func (*AccountType) String() string {
-	return "Account"
+func (*AuthAccountType) String() string {
+	return "AuthAccount"
 }
 
-func (*AccountType) QualifiedString() string {
-	return "Account"
+func (*AuthAccountType) QualifiedString() string {
+	return "AuthAccount"
 }
 
-func (*AccountType) ID() TypeID {
-	return "Account"
+func (*AuthAccountType) ID() TypeID {
+	return "AuthAccount"
 }
 
-func (*AccountType) Equal(other Type) bool {
-	_, ok := other.(*AccountType)
+func (*AuthAccountType) Equal(other Type) bool {
+	_, ok := other.(*AuthAccountType)
 	return ok
 }
 
-func (*AccountType) IsResourceType() bool {
+func (*AuthAccountType) IsResourceType() bool {
 	return false
 }
 
-func (*AccountType) IsInvalidType() bool {
+func (*AuthAccountType) IsInvalidType() bool {
 	return false
 }
 
-func (*AccountType) TypeAnnotationState() TypeAnnotationState {
+func (*AuthAccountType) TypeAnnotationState() TypeAnnotationState {
 	return TypeAnnotationStateValid
 }
 
-func (*AccountType) ContainsFirstLevelResourceInterfaceType() bool {
+func (*AuthAccountType) ContainsFirstLevelResourceInterfaceType() bool {
 	return false
 }
 
-func (*AccountType) CanHaveMembers() bool {
+func (*AuthAccountType) CanHaveMembers() bool {
 	return true
 }
 
-func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+func (t *AuthAccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	newField := func(fieldType Type) *Member {
 		return NewPublicConstantFieldMember(t, identifier, fieldType)
 	}

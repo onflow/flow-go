@@ -52,7 +52,7 @@ func (s *StakingSigner) Aggregate(block *model.Block, sigs []*model.SingleSignat
 		return nil, fmt.Errorf("cannot aggregate an empty slice of signatures")
 	}
 
-	aggStakingSig, signerIDs := s.unsafeAggregate(sigs)                  // unsafe aggregate staking sigs: crypto math only; will not catch error
+	aggStakingSig, signerIDs := unsafeAggregate(sigs)                    // unsafe aggregate staking sigs: crypto math only; will not catch error
 	err := s.verifyAggregatedStakingSig(aggStakingSig, block, signerIDs) // safety: verify aggregated signature:
 	if err != nil {
 		return nil, fmt.Errorf("error aggregating staking signatures for block %s: %w", block.BlockID, err)
@@ -98,7 +98,7 @@ func (s *StakingSigner) verifyAggregatedStakingSig(aggStakingSig []crypto.Signat
 	return nil
 }
 
-func (s *StakingSigner) unsafeAggregate(sigs []*model.SingleSignature) ([]crypto.Signature, []flow.Identifier) {
+func unsafeAggregate(sigs []*model.SingleSignature) ([]crypto.Signature, []flow.Identifier) {
 	// This implementation is a naive way of aggregation the signatures. It will work, with
 	// the downside of costing more bandwidth.
 	// The more optimal way, which is the real aggregation, will be implemented when the crypto
