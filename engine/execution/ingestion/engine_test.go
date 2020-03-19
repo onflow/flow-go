@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	engineCommon "github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution"
 	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
 	provider "github.com/dapperlabs/flow-go/engine/execution/provider/mock"
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -175,7 +175,7 @@ func TestValidatingCollectionResponse(t *testing.T) {
 	})
 }
 
-func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *execution.CompleteBlock, previousExecutionResultID flow.Identifier) {
+func (ctx *testingContext) assertSuccessfulBlockComputation(completeBlock *entity.ExecutableBlock, previousExecutionResultID flow.Identifier) {
 	computationResult := unittest.ComputationResultForBlockFixture(completeBlock)
 	newStateCommitment := unittest.StateCommitmentFixture()
 	if len(computationResult.StateViews) == 0 { //if block was empty, no new state commitment is produced

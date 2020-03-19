@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
 func AddressFixture() flow.Address {
@@ -166,9 +167,9 @@ func StateViewFixture() *state.View {
 	})
 }
 
-func CompleteCollectionFixture() *execution.CompleteCollection {
+func CompleteCollectionFixture() *entity.CompleteCollection {
 	txBody := TransactionBodyFixture()
-	return &execution.CompleteCollection{
+	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
 			CollectionID: flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
 			Signatures:   SignaturesFixture(16),
@@ -177,14 +178,14 @@ func CompleteCollectionFixture() *execution.CompleteCollection {
 	}
 }
 
-func CompleteBlockFixture(collections int) *execution.CompleteBlock {
+func CompleteBlockFixture(collections int) *entity.ExecutableBlock {
 
 	return CompleteBlockFixtureWithParent(collections, IdentifierFixture())
 }
 
-func CompleteBlockFixtureWithParent(collections int, parentID flow.Identifier) *execution.CompleteBlock {
+func CompleteBlockFixtureWithParent(collections int, parentID flow.Identifier) *entity.ExecutableBlock {
 
-	completeCollections := make(map[flow.Identifier]*execution.CompleteCollection, collections)
+	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, collections)
 	block := BlockWithParentFixture(parentID)
 	block.Guarantees = nil
 
@@ -196,7 +197,7 @@ func CompleteBlockFixtureWithParent(collections int, parentID flow.Identifier) *
 
 	block.PayloadHash = block.Payload.Hash()
 
-	return &execution.CompleteBlock{
+	return &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
 	}
@@ -213,7 +214,7 @@ func ComputationResultFixture(n int) *execution.ComputationResult {
 	}
 }
 
-func ComputationResultForBlockFixture(completeBlock *execution.CompleteBlock) *execution.ComputationResult {
+func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *execution.ComputationResult {
 	n := len(completeBlock.CompleteCollections)
 	stateViews := make([]*state.View, n)
 	for i := 0; i < n; i++ {
