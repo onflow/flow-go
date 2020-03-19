@@ -21,13 +21,13 @@ func TestQueue(t *testing.T) {
 
 	*/
 
-	a := unittest.CompleteBlockFixture(0)
-	c := unittest.CompleteBlockFixtureWithParent(0, a.Block.ID())
-	b := unittest.CompleteBlockFixtureWithParent(0, c.Block.ID())
-	d := unittest.CompleteBlockFixtureWithParent(0, c.Block.ID())
-	e := unittest.CompleteBlockFixtureWithParent(0, d.Block.ID())
-	f := unittest.CompleteBlockFixtureWithParent(0, d.Block.ID())
-	g := unittest.CompleteBlockFixtureWithParent(0, b.Block.ID())
+	a := unittest.ExecutableBlockFixture(0)
+	c := unittest.ExecutableBlockFixtureWithParent(0, a.Block.ID())
+	b := unittest.ExecutableBlockFixtureWithParent(0, c.Block.ID())
+	d := unittest.ExecutableBlockFixtureWithParent(0, c.Block.ID())
+	e := unittest.ExecutableBlockFixtureWithParent(0, d.Block.ID())
+	f := unittest.ExecutableBlockFixtureWithParent(0, d.Block.ID())
+	g := unittest.ExecutableBlockFixtureWithParent(0, b.Block.ID())
 
 	queue := NewQueue(a)
 
@@ -71,12 +71,12 @@ func TestQueue(t *testing.T) {
 
 		// order of children is not guaranteed
 		var queueD *Queue
-		if queuesC[0].Head.CompleteBlock == d {
+		if queuesC[0].Head.ExecutableBlock == d {
 			queueD = queuesC[0]
 		} else {
 			queueD = queuesC[1]
 		}
-		assert.Equal(t, d, queueD.Head.CompleteBlock)
+		assert.Equal(t, d, queueD.Head.ExecutableBlock)
 
 		blockD, queuesD := queueD.Dismount()
 		assert.Equal(t, d, blockD)

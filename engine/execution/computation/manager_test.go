@@ -42,7 +42,7 @@ func TestExecutionEngine_ComputeBlock(t *testing.T) {
 		},
 	}
 
-	completeBlock := &entity.ExecutableBlock{
+	executableBlock := &entity.ExecutableBlock{
 		Block: &block,
 		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
 			guarantee.ID(): {
@@ -69,7 +69,7 @@ func TestExecutionEngine_ComputeBlock(t *testing.T) {
 		return nil, nil
 	})
 
-	returnedComputationResult, err := engine.ComputeBlock(completeBlock, view)
+	returnedComputationResult, err := engine.ComputeBlock(executableBlock, view)
 	require.NoError(t, err)
 	assert.Equal(t, computationResult, returnedComputationResult)
 }

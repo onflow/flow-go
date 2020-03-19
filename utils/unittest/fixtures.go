@@ -178,12 +178,12 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 	}
 }
 
-func CompleteBlockFixture(collections int) *entity.ExecutableBlock {
+func ExecutableBlockFixture(collections int) *entity.ExecutableBlock {
 
-	return CompleteBlockFixtureWithParent(collections, IdentifierFixture())
+	return ExecutableBlockFixtureWithParent(collections, IdentifierFixture())
 }
 
-func CompleteBlockFixtureWithParent(collections int, parentID flow.Identifier) *entity.ExecutableBlock {
+func ExecutableBlockFixtureWithParent(collections int, parentID flow.Identifier) *entity.ExecutableBlock {
 
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, collections)
 	block := BlockWithParentFixture(parentID)
@@ -209,20 +209,20 @@ func ComputationResultFixture(n int) *execution.ComputationResult {
 		stateViews[i] = StateViewFixture()
 	}
 	return &execution.ComputationResult{
-		CompleteBlock: CompleteBlockFixture(n),
-		StateViews:    stateViews,
+		ExecutableBlock: ExecutableBlockFixture(n),
+		StateViews:      stateViews,
 	}
 }
 
-func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *execution.ComputationResult {
-	n := len(completeBlock.CompleteCollections)
+func ComputationResultForBlockFixture(executableBlock *entity.ExecutableBlock) *execution.ComputationResult {
+	n := len(executableBlock.CompleteCollections)
 	stateViews := make([]*state.View, n)
 	for i := 0; i < n; i++ {
 		stateViews[i] = StateViewFixture()
 	}
 	return &execution.ComputationResult{
-		CompleteBlock: completeBlock,
-		StateViews:    stateViews,
+		ExecutableBlock: executableBlock,
+		StateViews:      stateViews,
 	}
 }
 

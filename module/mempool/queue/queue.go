@@ -8,8 +8,8 @@ import (
 )
 
 type Node struct {
-	CompleteBlock *entity.ExecutableBlock
-	Children      []*Node
+	ExecutableBlock *entity.ExecutableBlock
+	Children        []*Node
 }
 
 // Queue is a fork-aware queue/tree of blocks for use in execution Node, where parallel forks
@@ -26,29 +26,29 @@ type Queue struct {
 // Make queue an entity so it can be stored in mempool
 
 func (q *Queue) ID() flow.Identifier {
-	return q.Head.CompleteBlock.Block.ID()
+	return q.Head.ExecutableBlock.Block.ID()
 }
 
 func (q *Queue) Checksum() flow.Identifier {
-	return q.Head.CompleteBlock.Block.Checksum()
+	return q.Head.ExecutableBlock.Block.Checksum()
 }
 
 // traverse Node children recursively and populate m
 func traverse(node *Node, m map[flow.Identifier]*Node) {
-	m[node.CompleteBlock.Block.ID()] = node
+	m[node.ExecutableBlock.Block.ID()] = node
 	for _, node := range node.Children {
 		traverse(node, m)
 	}
 }
 
-func NewQueue(completeBlock *entity.ExecutableBlock) *Queue {
+func NewQueue(executableBlock *entity.ExecutableBlock) *Queue {
 	n := &Node{
-		CompleteBlock: completeBlock,
-		Children:      nil,
+		ExecutableBlock: executableBlock,
+		Children:        nil,
 	}
 	return &Queue{
 		Head:  n,
-		Nodes: map[flow.Identifier]*Node{n.CompleteBlock.Block.ID(): n},
+		Nodes: map[flow.Identifier]*Node{n.ExecutableBlock.Block.ID(): n},
 	}
 }
 
@@ -73,7 +73,7 @@ func dequeue(queue *Queue) *Queue {
 
 	//copy all but head caches
 	for key, val := range queue.Nodes {
-		if key != queue.Head.CompleteBlock.Block.ID() {
+		if key != queue.Head.ExecutableBlock.Block.ID() {
 			cache[key] = val
 		}
 	}
@@ -84,23 +84,23 @@ func dequeue(queue *Queue) *Queue {
 }
 
 // TryAdd tries to add a new Node to the queue and returns if the operation has been successful
-func (q *Queue) TryAdd(completeBlock *entity.ExecutableBlock) bool {
-	n, ok := q.Nodes[completeBlock.Block.ParentID]
+func (q *Queue) TryAdd(executableBlock *entity.ExecutableBlock) bool {
+	n, ok := q.Nodes[executableBlock.Block.ParentID]
 	if !ok {
 		return false
 	}
 	newNode := &Node{
-		CompleteBlock: completeBlock,
-		Children:      nil,
+		ExecutableBlock: executableBlock,
+		Children:        nil,
 	}
 	n.Children = append(n.Children, newNode)
-	q.Nodes[completeBlock.Block.ID()] = newNode
+	q.Nodes[executableBlock.Block.ID()] = newNode
 	return true
 }
 
 // Attach joins two queues together, fails if new queue head cannot be attached
 func (q *Queue) Attach(other *Queue) error {
-	n, ok := q.Nodes[other.Head.CompleteBlock.Block.ParentID]
+	n, ok := q.Nodes[other.Head.ExecutableBlock.Block.ParentID]
 	if !ok {
 		return fmt.Errorf("cannot join queues, other queue head does not reference known parent")
 	}
@@ -122,5 +122,5 @@ func (q *Queue) Dismount() (*entity.ExecutableBlock, []*Queue) {
 			queues[i] = rebuildQueue(child)
 		}
 	}
-	return q.Head.CompleteBlock, queues
+	return q.Head.ExecutableBlock, queues
 }

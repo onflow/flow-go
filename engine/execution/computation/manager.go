@@ -90,7 +90,7 @@ func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *state.View) 
 	}
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(result.CompleteBlock.Block)).
+		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
 
 	return result, nil
