@@ -43,3 +43,28 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 
 	return &tx, err
 }
+
+// CollectionID returns the collection for the given transaction ID
+func (t *Transactions) CollectionID(txID flow.Identifier) (flow.Identifier, error) {
+	collectionID := &flow.Identifier{}
+	err := t.db.View(func(btx *badger.Txn) error {
+		err := operation.LookupCollectionID(txID, collectionID)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve collection id: %w", err)
+		}
+		return nil
+	})
+
+	return *collectionID, err
+}
+
+// StoreCollectionID stores the collection ID for the given transaction ID
+func (t *Transactions) StoreCollectionID(txID, collectionID flow.Identifier) error {
+	return t.db.Update(func(btx *badger.Txn) error {
+		err := operation.IndexCollectionByTransaction(txID, collectionID)(btx)
+		if err != nil {
+			return fmt.Errorf("could not insert collection ID: %w", err)
+		}
+		return nil
+	})
+}

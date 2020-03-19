@@ -15,3 +15,13 @@ func InsertTransaction(tx *flow.TransactionBody) func(*badger.Txn) error {
 func RetrieveTransaction(txID flow.Identifier, tx *flow.TransactionBody) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeTransaction, txID), tx)
 }
+
+// IndexCollectionByTransaction inserts a collection id keyed by a transaction id
+func IndexCollectionByTransaction(txID, collectionID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexCollectionByTransaction, txID), collectionID)
+}
+
+// LookupCollectionID retrieves a collection id by transaction id
+func LookupCollectionID(txID flow.Identifier, collectionID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexCollectionByTransaction, txID), collectionID)
+}

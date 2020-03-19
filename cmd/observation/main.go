@@ -55,7 +55,8 @@ func main() {
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
 			headers := storage.NewHeaders(node.DB)
 			collections := storage.NewCollections(node.DB)
-			blkState = obs.NewBlockchainState(headers, collections)
+			transactions := storage.NewTransactions(node.DB)
+			blkState = obs.NewBlockchainState(headers, collections, transactions)
 			return nil
 		}).
 		//Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

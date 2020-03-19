@@ -34,13 +34,14 @@ type Suite struct {
 		mutator  *protocol.Mutator
 	}
 
-	me          *module.Local
-	net         *module.Network
-	provider    *network.Engine
-	collections *storage.Collections
-	headers     *storage.Headers
-	blkState    *observation.BlockchainState
-	eng         *Engine
+	me           *module.Local
+	net          *module.Network
+	provider     *network.Engine
+	collections  *storage.Collections
+	headers      *storage.Headers
+	transactions *storage.Transactions
+	blkState     *observation.BlockchainState
+	eng          *Engine
 
 	// mock conduit for requesting/receiving collections
 	collectionsConduit *network.Conduit
@@ -75,7 +76,8 @@ func (suite *Suite) SetupTest() {
 	suite.provider = new(network.Engine)
 	suite.collections = new(storage.Collections)
 	suite.headers = new(storage.Headers)
-	suite.blkState = observation.NewBlockchainState(suite.headers, suite.collections)
+	suite.transactions = new(storage.Transactions)
+	suite.blkState = observation.NewBlockchainState(suite.headers, suite.collections, suite.transactions)
 
 	eng, err := New(log, suite.net, suite.proto.state, tracer, suite.me, suite.blkState)
 	require.NoError(suite.T(), err)
@@ -104,7 +106,9 @@ func (suite *Suite) TestHandleCollection() {
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 
-	suite.collections.On("Store", mock.Anything).Return(nil).Once()
+	suite.collections.On("StoreLight", mock.Anything).Return(nil).Once()
+	suite.transactions.On("Store", mock.Anything).Return(nil).Times(len(collection.Transactions))
+	suite.transactions.On("StoreCollectionID", mock.Anything, mock.Anything).Return(nil).Times(len(collection.Transactions))
 
 	cr := messages.CollectionResponse{Collection: collection}
 	err := suite.eng.Process(originID, &cr)
@@ -118,7 +122,9 @@ func (suite *Suite) TestHandleDuplicateCollection() {
 	collection := unittest.CollectionFixture(5)
 
 	error := fmt.Errorf("extra text: %w", realstore.ErrAlreadyExists)
-	suite.collections.On("Store", mock.Anything).Return(error).Once()
+	suite.collections.On("StoreLight", mock.Anything).Return(error).Once()
+	suite.transactions.On("Store", mock.Anything).Return(nil).Times(len(collection.Transactions))
+	suite.transactions.On("StoreCollectionID", mock.Anything, mock.Anything).Return(nil).Times(len(collection.Transactions))
 
 	cr := messages.CollectionResponse{Collection: collection}
 	err := suite.eng.Process(originID, &cr)

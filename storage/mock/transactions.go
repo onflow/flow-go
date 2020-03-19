@@ -33,6 +33,29 @@ func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error
 	return r0, r1
 }
 
+// CollectionID provides a mock function with given fields: txID
+func (_m *Transactions) CollectionID(txID flow.Identifier) (flow.Identifier, error) {
+	ret := _m.Called(txID)
+
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
+		r0 = rf(txID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(txID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Store provides a mock function with given fields: tx
 func (_m *Transactions) Store(tx *flow.TransactionBody) error {
 	ret := _m.Called(tx)
@@ -40,6 +63,20 @@ func (_m *Transactions) Store(tx *flow.TransactionBody) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.TransactionBody) error); ok {
 		r0 = rf(tx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// StoreCollectionID provides a mock function with given fields: txID, collectionID
+func (_m *Transactions) StoreCollectionID(txID flow.Identifier, collectionID flow.Identifier) error {
+	ret := _m.Called(txID, collectionID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) error); ok {
+		r0 = rf(txID, collectionID)
 	} else {
 		r0 = ret.Error(0)
 	}

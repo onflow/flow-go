@@ -146,7 +146,17 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 		Msg("received collection")
 
 	err := e.blkState.StoreCollection(&collection)
-	return err
+	if err != nil {
+		return err
+	}
+
+	for _, t := range collection.Transactions {
+		err = e.blkState.AddTransaction(t, collection.ID())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // onCollectionGuarantee is used to process collection guarantees received
