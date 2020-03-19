@@ -10,7 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -858,39 +857,4 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 			assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
 		})
 	}
-}
-
-func TestCheckArrayGeneration(t *testing.T) {
-
-	code := `
-      struct Person {
-          let id: Int
-
-          init(id: Int) {
-              self.id = id
-          }
-      }
-
-      let persons = Array(
-          size: 3,
-          generate: fun(index: Int): Person {
-              return Person(id: index + 1)
-          }
-      )
-    `
-
-	_, err := ParseAndCheckWithOptions(t,
-		code,
-		ParseAndCheckOptions{
-			Options: []sema.Option{
-				sema.WithPredeclaredValues(
-					stdlib.StandardLibraryFunctions{
-						stdlib.ArrayFunction,
-					}.ToValueDeclarations(),
-				),
-			},
-		},
-	)
-
-	assert.NoError(t, err)
 }

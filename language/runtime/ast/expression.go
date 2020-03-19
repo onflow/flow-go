@@ -260,14 +260,14 @@ type Arguments []*Argument
 
 func (args Arguments) String() string {
 	var builder strings.Builder
-	builder.WriteString("(")
+	builder.WriteRune('(')
 	for i, argument := range args {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
 		builder.WriteString(argument.String())
 	}
-	builder.WriteString(")")
+	builder.WriteRune(')')
 	return builder.String()
 }
 
@@ -275,6 +275,7 @@ func (args Arguments) String() string {
 
 type InvocationExpression struct {
 	InvokedExpression Expression
+	TypeArguments     []Type
 	Arguments         Arguments
 	EndPos            Position
 }
@@ -294,6 +295,16 @@ func (e *InvocationExpression) AcceptExp(visitor ExpressionVisitor) Repr {
 func (e *InvocationExpression) String() string {
 	var builder strings.Builder
 	builder.WriteString(e.InvokedExpression.String())
+	if len(e.TypeArguments) > 0 {
+		builder.WriteRune('<')
+		for i, ty := range e.TypeArguments {
+			if i > 0 {
+				builder.WriteString(", ")
+			}
+			builder.WriteString(ty.String())
+		}
+		builder.WriteRune('>')
+	}
 	builder.WriteString(e.Arguments.String())
 	return builder.String()
 }

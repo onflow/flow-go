@@ -109,16 +109,18 @@ type typeDeclaration struct {
 }
 
 func (a *VariableActivations) DeclareType(declaration typeDeclaration) (*Variable, error) {
-	return a.Declare(variableDeclaration{
-		identifier:               declaration.identifier.Identifier,
-		ty:                       declaration.ty,
-		access:                   declaration.access,
-		kind:                     declaration.declarationKind,
-		pos:                      declaration.identifier.Pos,
-		isConstant:               true,
-		argumentLabels:           nil,
-		allowOuterScopeShadowing: declaration.allowOuterScopeShadowing,
-	})
+	return a.Declare(
+		variableDeclaration{
+			identifier:               declaration.identifier.Identifier,
+			ty:                       declaration.ty,
+			access:                   declaration.access,
+			kind:                     declaration.declarationKind,
+			pos:                      declaration.identifier.Pos,
+			isConstant:               true,
+			argumentLabels:           nil,
+			allowOuterScopeShadowing: declaration.allowOuterScopeShadowing,
+		},
+	)
 }
 
 func (a *VariableActivations) DeclareImplicitConstant(
@@ -126,14 +128,16 @@ func (a *VariableActivations) DeclareImplicitConstant(
 	ty Type,
 	kind common.DeclarationKind,
 ) (*Variable, error) {
-	return a.Declare(variableDeclaration{
-		identifier:               identifier,
-		ty:                       ty,
-		access:                   ast.AccessPublic,
-		kind:                     kind,
-		isConstant:               true,
-		allowOuterScopeShadowing: false,
-	})
+	return a.Declare(
+		variableDeclaration{
+			identifier:               identifier,
+			ty:                       ty,
+			access:                   ast.AccessPublic,
+			kind:                     kind,
+			isConstant:               true,
+			allowOuterScopeShadowing: false,
+		},
+	)
 }
 
 func (a *VariableActivations) VariablesDeclaredInAndBelow(depth int) map[string]*Variable {

@@ -16,7 +16,10 @@ func TestConstantSizedType_String(t *testing.T) {
 		Size: 2,
 	}
 
-	assert.Equal(t, ty.String(), "[[Int]; 2]")
+	assert.Equal(t,
+		"[[Int]; 2]",
+		ty.String(),
+	)
 }
 
 func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
@@ -35,7 +38,10 @@ func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
 		Size: 2,
 	}
 
-	assert.Equal(t, ty.String(), "[((Int8): Int16); 2]")
+	assert.Equal(t,
+		"[((Int8): Int16); 2]",
+		ty.String(),
+	)
 }
 
 func TestVariableSizedType_String(t *testing.T) {
@@ -47,7 +53,10 @@ func TestVariableSizedType_String(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, ty.String(), "[[Int; 2]]")
+	assert.Equal(t,
+		"[[Int; 2]]",
+		ty.String(),
+	)
 }
 
 func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
@@ -65,7 +74,10 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, ty.String(), "[((Int8): Int16)]")
+	assert.Equal(t,
+		"[((Int8): Int16)]",
+		ty.String(),
+	)
 }
 
 func TestIsResourceType_AnyStructNestedInArray(t *testing.T) {
@@ -143,8 +155,15 @@ func TestRestrictedResourceType_StringAndID(t *testing.T) {
 			Restrictions: []*InterfaceType{interfaceType},
 		}
 
-		assert.Equal(t, ty.String(), "R{I}")
-		assert.Equal(t, ty.ID(), TypeID("a.R{b.I}"))
+		assert.Equal(t,
+			"R{I}",
+			ty.String(),
+		)
+
+		assert.Equal(t,
+			TypeID("a.R{b.I}"),
+			ty.ID(),
+		)
 	})
 
 	t.Run("base type and restrictions", func(t *testing.T) {
@@ -169,8 +188,15 @@ func TestRestrictedResourceType_StringAndID(t *testing.T) {
 			Restrictions: []*InterfaceType{i1, i2},
 		}
 
-		assert.Equal(t, ty.String(), "R{I1, I2}")
-		assert.Equal(t, ty.ID(), TypeID("a.R{b.I1,c.I2}"))
+		assert.Equal(t,
+			ty.String(),
+			"R{I1, I2}",
+		)
+
+		assert.Equal(t,
+			TypeID("a.R{b.I1,c.I2}"),
+			ty.ID(),
+		)
 	})
 
 	t.Run("no restrictions", func(t *testing.T) {
@@ -182,8 +208,15 @@ func TestRestrictedResourceType_StringAndID(t *testing.T) {
 			},
 		}
 
-		assert.Equal(t, ty.String(), "R{}")
-		assert.Equal(t, ty.ID(), TypeID("a.R{}"))
+		assert.Equal(t,
+			"R{}",
+			ty.String(),
+		)
+
+		assert.Equal(t,
+			TypeID("a.R{}"),
+			ty.ID(),
+		)
 	})
 
 	t.Run("no base type", func(t *testing.T) {
@@ -198,15 +231,29 @@ func TestRestrictedResourceType_StringAndID(t *testing.T) {
 			Restrictions: []*InterfaceType{interfaceType},
 		}
 
-		assert.Equal(t, ty.String(), "{I}")
-		assert.Equal(t, ty.ID(), TypeID("{b.I}"))
+		assert.Equal(t,
+			"{I}",
+			ty.String(),
+		)
+
+		assert.Equal(t,
+			TypeID("{b.I}"),
+			ty.ID(),
+		)
 	})
 
 	t.Run("no restrictions, no base type", func(t *testing.T) {
 		ty := &RestrictedResourceType{}
 
-		assert.Equal(t, ty.String(), "{}")
-		assert.Equal(t, ty.ID(), TypeID("{}"))
+		assert.Equal(t,
+			"{}",
+			ty.String(),
+		)
+
+		assert.Equal(t,
+			TypeID("{}"),
+			ty.ID(),
+		)
 	})
 }
 
@@ -407,7 +454,22 @@ func TestRestrictedResourceType_GetMember(t *testing.T) {
 		interfaceType.Members[fieldName] = interfaceMember
 
 		actualMember := restrictedType.GetMember(fieldName, ast.Range{}, nil)
+
 		assert.Same(t, interfaceMember, actualMember)
 	})
+}
 
+func TestBeforeType_Strings(t *testing.T) {
+
+	expected := "(<T: AnyStruct>(_ value: T): T)"
+
+	assert.Equal(t,
+		expected,
+		beforeType.String(),
+	)
+
+	assert.Equal(t,
+		expected,
+		beforeType.QualifiedString(),
+	)
 }
