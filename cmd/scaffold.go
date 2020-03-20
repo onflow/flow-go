@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -175,23 +174,10 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
 
-	fmt.Println("&&&&&syncwrites$$$$$ lets goooo")
-	fmt.Println("using datadir: ", fnb.BaseConfig.datadir)
-	err = os.Mkdir(path.Join(fnb.BaseConfig.datadir, "fromdocker"), 0700)
-	fmt.Println("making dir ", err)
-
-	opts := badger.DefaultOptions(fnb.BaseConfig.datadir).
-		WithLogger(nil)
+	opts := badger.DefaultOptions(fnb.BaseConfig.datadir).WithLogger(nil)
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 	fnb.DB = db
-
-	err = db.Update(func(tx *badger.Txn) error {
-		return tx.Set([]byte{1, 2, 3, 4}, []byte{1, 2, 3, 4})
-	})
-	if err != nil {
-		fmt.Println("^^^^^^error inserting to badger", err)
-	}
 }
 
 func (fnb *FlowNodeBuilder) initTracer() {
@@ -424,7 +410,7 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handleDoneObject(doneObject)
 	}
 
-	// closing database
+	fnb.closeDatabase()
 
 	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.name)
 

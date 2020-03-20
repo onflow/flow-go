@@ -71,10 +71,6 @@ func main() {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}
 
-			node.Logger.Debug().
-				Str("cluster_id", clusterID).
-				Msg("participating in cluster")
-
 			// create genesis block for cluster consensus
 			genesis := model.Genesis()
 			genesis.ChainID = clusterID
