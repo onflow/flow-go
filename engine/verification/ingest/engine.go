@@ -185,23 +185,19 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		if err != nil {
 			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
 		}
+	} else {
+		// execution results are only valid from execution nodes
+		if origin.Role != flow.RoleExecution {
+			// TODO: potential attack on integrity
+			return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", origin.NodeID, origin.Role)
+		}
 
-		// TODO: re-iterate over this error (a nil may just be enough)
-		// https://github.com/dapperlabs/flow-go/issues/2966
-		return fmt.Errorf("could not identify the origin of receipt, added to pending pool %w", err)
-	}
-
-	// execution results are only valid from execution nodes
-	if origin.Role != flow.RoleExecution {
-		// TODO: potential attack on integrity
-		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", origin.NodeID, origin.Role)
-	}
-
-	// store the execution receipt in the store of the engine
-	// this will fail if the receipt already exists in the store
-	err = e.authReceipts.Add(receipt)
-	if err != nil {
-		return fmt.Errorf("could not store execution receipt: %w", err)
+		// store the execution receipt in the store of the engine
+		// this will fail if the receipt already exists in the store
+		err = e.authReceipts.Add(receipt)
+		if err != nil {
+			return fmt.Errorf("could not store execution receipt: %w", err)
+		}
 	}
 
 	e.checkPendingChunks()
@@ -216,8 +212,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
 		Msg("chunk data pack received")
 
-	// TODO state extraction should be done based on block references
-	// https://github.com/dapperlabs/flow-go/issues/2787
+	// TODO tracking request feature
+	// https://github.com/dapperlabs/flow-go/issues/2970
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
 		// TODO: potential attack on authenticity
@@ -291,8 +287,8 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 
 	// extracts list of verifier nodes id
 	//
-	// TODO state extraction should be done based on block references
-	// https://github.com/dapperlabs/flow-go/issues/2787
+	// TODO tracking request feature
+	// https://github.com/dapperlabs/flow-go/issues/2970
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("invalid origin id (%s): %w", origin, err)
@@ -324,8 +320,8 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 
 	// extracts list of verifier nodes id
 	//
-	// TODO state extraction should be done based on block references
-	// https://github.com/dapperlabs/flow-go/issues/2787
+	// TODO tracking request feature
+	// https://github.com/dapperlabs/flow-go/issues/2970
 	id, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
@@ -350,8 +346,6 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 
 	// extracts list of verifier nodes id
 	//
-	// TODO state extraction should be done based on block references
-	// https://github.com/dapperlabs/flow-go/issues/2787
 	collNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
 		return fmt.Errorf("could not load collection node identities: %w", err)
@@ -376,8 +370,6 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 
 	// extracts list of verifier nodes id
 	//
-	// TODO state extraction should be done based on block references
-	// https://github.com/dapperlabs/flow-go/issues/2787
 	exeNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not load execution node identities: %w", err)
@@ -399,8 +391,6 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
 	// extracts list of verifier nodes id
 	//
-	// TODO state extraction should be done based on block references
-	// https://github.com/dapperlabs/flow-go/issues/2787
 	execNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not load execution nodes identities: %w", err)
@@ -571,6 +561,17 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 func (e *Engine) checkPendingChunks() {
 	e.checkChunksLock.Lock()
 	defer e.checkChunksLock.Unlock()
+
+	// asks for missing blocks
+	pending := e.pendingReceipts.All()
+	for _, receipt := range pending {
+		_, blockReady := e.getBlockForReceipt(receipt)
+		if !blockReady {
+			continue
+		}
+		e.authReceipts.Add(receipt)
+		e.pendingReceipts.Rem(receipt.ID())
+	}
 
 	receipts := e.authReceipts.All()
 

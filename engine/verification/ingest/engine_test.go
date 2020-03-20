@@ -148,10 +148,11 @@ func (suite *TestSuite) TestHandleBlock() {
 
 	// expect that that the block be added to the mempool
 	suite.blocks.On("Add", suite.block).Return(nil).Once()
+	suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
 	suite.blockStorage.On("Store", suite.block).Return(nil).Once()
-	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
-	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
-	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+	suite.authReceipts.On("Add", suite.receipt).Return(nil)
+	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true)
 
 	err := eng.Process(unittest.IdentifierFixture(), suite.block)
 	suite.Assert().Nil(err)
@@ -183,6 +184,9 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	// expect that the receipt be added to the mempool, and return it in All
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+	suite.authReceipts.On("Add", suite.receipt).Return(nil)
+	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true)
 
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
@@ -219,11 +223,16 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.state.On("Final").Return(suite.ss)
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
+	suite.authReceipts.On("Add", suite.receipt).Return(nil)
 	suite.pendingReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}).Once()
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
+	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
+	suite.blocks.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("")).Once()
 
 	// process should fail
 	err := eng.Process(unstakedIdentity, suite.receipt)
-	suite.Assert().Error(err)
+	require.NoError(suite.T(), err)
 
 	// receipt should not be added
 	suite.authReceipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
@@ -271,6 +280,7 @@ func (suite *TestSuite) TestHandleCollection() {
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", collIdentity.NodeID).Return(collIdentity, nil).Once()
@@ -336,6 +346,7 @@ func (suite *TestSuite) TestHandleExecutionState() {
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", exeIdentity.NodeID).Return(exeIdentity, nil).Once()
@@ -466,9 +477,9 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
-			suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
-			suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
+			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+			suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+			suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true)
 			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 			// removing the resources for a chunk
