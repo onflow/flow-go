@@ -185,6 +185,9 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		if err != nil {
 			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
 		}
+
+		// TODO: re-iterate over this error (a nil may just be enough)
+		// https://github.com/dapperlabs/flow-go/issues/2966
 		return fmt.Errorf("could not identify the origin of receipt, added to pending pool %w", err)
 	}
 
