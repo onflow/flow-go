@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	sdk "github.com/dapperlabs/flow-go-sdk"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
@@ -361,6 +363,22 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	}
 
 	return tb
+}
+
+func SDKTransactionFixture(opts ...func(*sdk.Transaction)) sdk.Transaction {
+	tx := sdk.Transaction{
+		Script:             []byte("fun main() {}"),
+		ReferenceBlockHash: []byte{1, 2, 3, 4},
+		Nonce:              rand.Uint64(),
+		ComputeLimit:       10,
+		PayerAccount:       sdk.RootAddress,
+	}
+
+	for _, apply := range opts {
+		apply(&tx)
+	}
+
+	return tx
 }
 
 // CompleteExecutionResultFixture returns complete execution result with an
