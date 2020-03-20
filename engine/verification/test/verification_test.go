@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
@@ -157,7 +158,10 @@ func TestHappyPath(t *testing.T) {
 	assert.Nil(t, err)
 
 	// the receipt should be added to the mempool
-	// assert.True(t, verNode.PendingReceipts.Has(completeER.Receipt.ID()))
+	// sleep for 1 second to make sure that receipt finds its way to
+	// authReceipts pool
+	time.Sleep(1 * time.Second)
+	assert.True(t, verNode.AuthReceipts.Has(completeER.Receipt.ID()))
 
 	// flush the chunk state request
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
@@ -178,7 +182,7 @@ func TestHappyPath(t *testing.T) {
 		if isAssigned(i, chunkNum) {
 			assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
 		} else {
-			assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ChunkID))
+			assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
 		}
 	}
 
