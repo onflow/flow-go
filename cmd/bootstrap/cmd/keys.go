@@ -7,7 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 )
 
 var configFile string
@@ -35,51 +34,39 @@ type NodeInfoPub struct {
 	Stake         uint64          `yaml:"stake"`
 }
 
-var keysCmd = &cobra.Command{
-	Use:   "keys",
-	Short: "Generate staking and networking keys for multiple nodes",
-	Run: func(cmd *cobra.Command, args []string) {
-		var nodeConfigs []NodeConfig
-		readYaml(configFile, &nodeConfigs)
-		nodes := len(nodeConfigs)
-		log.Info().Msgf("read %v node configurations", nodes)
+func genNetworkAndStakingKeys() ([]NodeInfoPub, []NodeInfoPriv) {
+	var nodeConfigs []NodeConfig
+	readYaml(configFile, &nodeConfigs)
+	nodes := len(nodeConfigs)
+	log.Info().Msgf("read %v node configurations", nodes)
 
-		log.Debug().Msgf("will generate %v networking keys", nodes)
-		// TODO replace with user provided seeds (through flag or file)
-		networkKeys, err := run.GenerateNetworkingKeys(nodes, generateRandomSeeds(nodes))
-		if err != nil {
-			log.Fatal().Err(err).Msg("cannot generate networking keys")
-		}
-		log.Info().Msgf("generated %v networking keys", nodes)
+	log.Debug().Msgf("will generate %v networking keys", nodes)
+	networkKeys, err := run.GenerateNetworkingKeys(nodes, generateRandomSeeds(nodes))
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot generate networking keys")
+	}
+	log.Info().Msgf("generated %v networking keys", nodes)
 
-		log.Debug().Msgf("will generate %v staking keys", nodes)
-		// TODO replace with user provided seeds (through flag or file)
-		stakingKeys, err := run.GenerateStakingKeys(nodes, generateRandomSeeds(nodes))
-		if err != nil {
-			log.Fatal().Err(err).Msg("cannot generate staking keys")
-		}
-		log.Info().Msgf("generated %v staking keys", nodes)
+	log.Debug().Msgf("will generate %v staking keys", nodes)
+	stakingKeys, err := run.GenerateStakingKeys(nodes, generateRandomSeeds(nodes))
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot generate staking keys")
+	}
+	log.Info().Msgf("generated %v staking keys", nodes)
 
-		nodeInfosPub := make([]NodeInfoPub, 0, nodes)
-		nodeInfosPriv := make([]NodeInfoPriv, 0, nodes)
-		for i, nodeConfig := range nodeConfigs {
-			log.Debug().Int("i", i).Str("address", nodeConfig.Address).Msg("assembling node information")
-			nodeInfoPriv, nodeInfoPub := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
-			nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
-			nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
-			writeYaml(fmt.Sprintf("%v.node-info.priv.yml", nodeInfoPriv.NodeID), nodeInfoPriv)
-		}
+	nodeInfosPub := make([]NodeInfoPub, 0, nodes)
+	nodeInfosPriv := make([]NodeInfoPriv, 0, nodes)
+	for i, nodeConfig := range nodeConfigs {
+		log.Debug().Int("i", i).Str("address", nodeConfig.Address).Msg("assembling node information")
+		nodeInfoPriv, nodeInfoPub := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
+		nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
+		nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
+		writeYaml(fmt.Sprintf("%v.node-info.priv.yml", nodeInfoPriv.NodeID), nodeInfoPriv)
+	}
 
-		writeYaml("node-infos.pub.yml", nodeInfosPub)
-		writeYaml("node-infos.priv.yml", nodeInfosPriv)
-	},
-}
+	writeYaml("node-infos.pub.yml", nodeInfosPub)
 
-func init() {
-	rootCmd.AddCommand(keysCmd)
-
-	keysCmd.Flags().StringVarP(&configFile, "config", "c", "", "Path to a yml file containing multiple node configurations (node_role, network_address, stake) [required]")
-	keysCmd.MarkFlagRequired("config")
+	return nodeInfosPub, nodeInfosPriv
 }
 
 func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.PrivateKey) (NodeInfoPriv, NodeInfoPub) {

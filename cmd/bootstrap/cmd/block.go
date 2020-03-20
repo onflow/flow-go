@@ -4,75 +4,52 @@ import (
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 )
 
 var stateCommitmentFile string
 var nodeInfosFile string
 var dkgDataPubFile string
 
-// blockCmd represents the block command
-var blockCmd = &cobra.Command{
-	Use:   "block",
-	Short: "Construct genesis block",
-	Run: func(cmd *cobra.Command, args []string) {
-		var sc StateCommitment
-		readYaml(stateCommitmentFile, &sc)
-		var nodeInfos []NodeInfoPub
-		readYaml(nodeInfosFile, &nodeInfos)
-		var dkgDataPub DKGDataPub
-		readYaml(dkgDataPubFile, &dkgDataPub)
+func constructGenesisBlock(stateComm flow.StateCommitment, nodes []NodeInfoPub, dkg DKGDataPub) flow.Block {
+	seal := run.GenerateRootSeal(stateComm)
+	identityList := generateIdentityList(nodes, dkg)
+	block := run.GenerateRootBlock(identityList, seal)
 
-		seal := run.GenerateRootSeal(sc.StateCommitment)
-		identityList := generateIdentityList(nodeInfos, dkgDataPub)
-		block := run.GenerateRootBlock(identityList, seal)
+	writeYaml("genesis-block.yml", block)
 
-		writeYaml("genesis-block.yml", block)
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(blockCmd)
-
-	blockCmd.Flags().StringVarP(&stateCommitmentFile, "state-commitment", "s", "",
-		"Path to a yml file containing a state-commitment [required]")
-	blockCmd.MarkFlagRequired("state-commitment")
-	blockCmd.Flags().StringVarP(&nodeInfosFile, "node-infos", "n", "",
-		"Path to a yml file containing staking information for all genesis nodes [required]")
-	blockCmd.MarkFlagRequired("node-infos")
-	blockCmd.Flags().StringVarP(&dkgDataPubFile, "dkg-data-pub", "d", "",
-		"Path to a yml file containing public dkg data for all genesis nodes [required]")
-	blockCmd.MarkFlagRequired("dkg-data-pub")
+	return block
 }
 
 func generateIdentityList(infos []NodeInfoPub, dkgDataPub DKGDataPub) flow.IdentityList {
-	if len(infos) != len(dkgDataPub.Participants) {
-		log.Fatal().Int("len(infos)", len(infos)).
-			Int("len(dkgDataPub.Participants", len(dkgDataPub.Participants)).
-			Msg("node info and public DKG data participants do not have equal length")
-	}
-
 	var list flow.IdentityList
 	list = make([]*flow.Identity, 0, len(infos))
 
-	for i, info := range infos {
-		part := dkgDataPub.Participants[i]
-		if info.NodeID != part.NodeID {
-			log.Fatal().Int("i", i).Str("node info NodeID", info.NodeID.String()).
-				Str("DKG data participant NodeID", part.NodeID.String()).
-				Msg("NodeID in node info and public DKG data participants does not match")
+	for _, info := range infos {
+		ident := flow.Identity{
+			NodeID:        info.NodeID,
+			Address:       info.Address,
+			Role:          info.Role,
+			Stake:         info.Stake,
+			StakingPubKey: info.StakingPubKey,
+			NetworkPubKey: info.NetworkPubKey,
 		}
 
-		list = append(list, &flow.Identity{
-			NodeID:             info.NodeID,
-			Address:            info.Address,
-			Role:               info.Role,
-			Stake:              info.Stake,
-			StakingPubKey:      info.StakingPubKey,
-			RandomBeaconPubKey: part.RandomBeaconPubKey,
-			NetworkPubKey:      info.NetworkPubKey,
-		})
+		if info.Role == flow.RoleConsensus {
+			ident.RandomBeaconPubKey = findDKGParticipantPub(dkgDataPub, info.NodeID).RandomBeaconPubKey
+		}
+
+		list = append(list, &ident)
 	}
 
 	return list
+}
+
+func findDKGParticipantPub(dkg DKGDataPub, nodeID flow.Identifier) DKGParticipantPub {
+	for _, part := range dkg.Participants {
+		if part.NodeID == nodeID {
+			return part
+		}
+	}
+	log.Fatal().Str("nodeID", nodeID.String()).Msg("could not find nodeID in public DKG data")
+	return DKGParticipantPub{}
 }

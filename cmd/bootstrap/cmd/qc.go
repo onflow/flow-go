@@ -4,60 +4,18 @@ import (
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 )
 
-var genesisBlockFile string
-var nodeInfosPubFile string
-var nodeInfosPrivFile string
-var dkgDataPrivFile string
+func constructGenesisQC(block flow.Block, nodeInfosPub []NodeInfoPub, nodeInfosPriv []NodeInfoPriv, dkgDataPriv DKGDataPriv) {
+	signerData := generateQCSignerData(nodeInfosPub, nodeInfosPriv, dkgDataPriv)
 
-// qcCmd represents the qc command
-var qcCmd = &cobra.Command{
-	Use:   "qc",
-	Short: "Construct genesis QC (quorum certificate)",
-	Run: func(cmd *cobra.Command, args []string) {
-		// var block flow.Block
-		// readYaml(genesisBlockFile, &block)
-		block := unittest.BlockFixture() // TODO replace once block decoding works
-		var nodeInfosPub []NodeInfoPub
-		readYaml(nodeInfosPubFile, &nodeInfosPub)
-		var nodeInfosPriv []NodeInfoPriv
-		readYaml(nodeInfosPrivFile, &nodeInfosPriv)
-		var dkgDataPriv DKGDataPriv
-		readYaml(dkgDataPrivFile, &dkgDataPriv)
+	qc, err := run.GenerateGenesisQC(signerData, block)
+	if err != nil {
+		log.Fatal().Err(err).Msg("generating genesis QC failed")
+	}
 
-		signerData := generateQCSignerData(nodeInfosPub, nodeInfosPriv, dkgDataPriv)
-
-		qc, err := run.GenerateGenesisQC(signerData, block)
-		if err != nil {
-			log.Fatal().Err(err).Msg("generating genesis QC failed")
-		}
-
-		writeYaml("genesis-qc.yml", qc)
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(qcCmd)
-
-	qcCmd.Flags().StringVarP(&genesisBlockFile, "genesis-block", "g", "",
-		"Path to a yml file containing the genesis block [required]")
-	qcCmd.MarkFlagRequired("genesis-block")
-
-	qcCmd.Flags().StringVarP(&nodeInfosPubFile, "node-infos-pub", "n", "",
-		"Path to a yml file containing public staking information for all genesis nodes [required]")
-	qcCmd.MarkFlagRequired("node-infos-pub")
-
-	qcCmd.Flags().StringVarP(&nodeInfosPrivFile, "node-infos-priv", "o", "",
-		"Path to a yml file containing private staking information for all genesis nodes [required]")
-	qcCmd.MarkFlagRequired("node-infos-priv")
-
-	qcCmd.Flags().StringVarP(&dkgDataPrivFile, "dkg-data-priv", "e", "",
-		"Path to a yml file containing private dkg data for all genesis nodes [required]")
-	qcCmd.MarkFlagRequired("dkg-data-priv")
+	writeYaml("genesis-qc.yml", qc)
 }
 
 func generateQCSignerData(nsPub []NodeInfoPub, nsPriv []NodeInfoPriv, dkg DKGDataPriv) run.SignerData {

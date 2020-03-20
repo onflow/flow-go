@@ -7,21 +7,27 @@ import (
 	"io/ioutil"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v2"
 )
 
+const randomSeedBytes = 64
+
 func generateRandomSeeds(n int) [][]byte {
 	seeds := make([][]byte, 0, n)
-
 	for i := 0; i < n; i++ {
-		seeds = append(seeds, make([]byte, 64))
-		if _, err := rand.Read(seeds[i]); err != nil {
-			log.Fatal().Err(err).Msg("cannot generate random seeds")
-		}
+		seeds = append(seeds, generateRandomSeed())
 	}
-
 	return seeds
+}
+
+func generateRandomSeed() []byte {
+	seed := make([]byte, 64)
+	if _, err := rand.Read(seed); err != nil {
+		log.Fatal().Err(err).Msg("cannot generate random seeds")
+	}
+	return seed
 }
 
 func readYaml(filename string, target interface{}) {
@@ -77,4 +83,24 @@ func unmarshalToBytes(unmarshal func(interface{}) error) ([]byte, error) {
 		return nil, err
 	}
 	return hex.DecodeString(s)
+}
+
+func filterConsensusNodes(nodes []NodeInfoPub) []NodeInfoPub {
+	c := make([]NodeInfoPub, 0)
+	for _, node := range nodes {
+		if node.Role == flow.RoleConsensus {
+			c = append(c, node)
+		}
+	}
+	return c
+}
+
+func filterConsensusNodesPriv(nodes []NodeInfoPriv) []NodeInfoPriv {
+	c := make([]NodeInfoPriv, 0)
+	for _, node := range nodes {
+		if node.Role == flow.RoleConsensus {
+			c = append(c, node)
+		}
+	}
+	return c
 }

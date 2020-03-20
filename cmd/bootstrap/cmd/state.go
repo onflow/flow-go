@@ -1,53 +1,29 @@
 package cmd
 
 import (
-	"encoding/hex"
-
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 )
 
-var privKey string
-
-type StateCommitment struct {
-	flow.StateCommitment
-}
-
-func (sc StateCommitment) MarshalYAML() (interface{}, error) {
-	return hex.EncodeToString(sc.StateCommitment), nil
-}
-
-func (sc *StateCommitment) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var s string
-	err := unmarshal(&s)
+func genGenesisExecutionState() flow.StateCommitment {
+	account0Priv, err := run.GenerateAccount0PrivateKey(generateRandomSeed())
 	if err != nil {
-		return err
+		log.Fatal().Err(err).Msg("error generating account 0 private key")
 	}
-	sc.StateCommitment, err = hex.DecodeString(s)
-	return err
-}
 
-// stateCmd represents the state command
-var stateCmd = &cobra.Command{
-	Use:   "state",
-	Short: "Generate genesis execution state",
-	Run: func(cmd *cobra.Command, args []string) {
-		// TODO validation of privKey
+	enc, err := account0Priv.PrivateKey.Encode()
+	if err != nil {
+		log.Fatal().Err(err).Msg("error encoding account 0 private key")
+	}
+	writeYaml("account-0.priv.yml", enc)
 
-		stateCommitment, err := run.GenerateExecutionState(privKey)
-		if err != nil {
-			log.Fatal().Err(err).Msg("error generating execution state")
-		}
+	stateCommitment, err := run.GenerateExecutionState(account0Priv)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error generating execution state")
+	}
 
-		writeYaml("state.yml", StateCommitment{stateCommitment})
-	},
-}
+	// TODO write genesis execution state to file
 
-func init() {
-	rootCmd.AddCommand(stateCmd)
-
-	stateCmd.Flags().StringVarP(&privKey, "account-0-priv", "a", "", "Hex encoded private key of account 0 [required]")
-	stateCmd.MarkFlagRequired("account-0-priv")
+	return stateCommitment
 }
