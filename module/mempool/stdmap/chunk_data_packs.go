@@ -45,7 +45,7 @@ func (c *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack
 	}
 	chunkDataPack, ok := entity.(*flow.ChunkDataPack)
 	if !ok {
-		return nil, fmt.Errorf("invalid entity in chunk data pack pool (%T)", entity))
+		return nil, fmt.Errorf("invalid entity in chunk data pack pool (%T)", entity)
 	}
 	return chunkDataPack, nil
 }
