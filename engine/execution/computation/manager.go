@@ -3,23 +3,24 @@ package computation
 import (
 	"fmt"
 
+	"github.com/dapperlabs/cadence"
+	"github.com/dapperlabs/cadence/encoding"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/language"
-	"github.com/dapperlabs/flow-go/language/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 type ComputationManager interface {
 	ExecuteScript([]byte, *flow.Header, *state.View) ([]byte, error)
-	ComputeBlock(block *execution.CompleteBlock, view *state.View) (*execution.ComputationResult, error)
+	ComputeBlock(block *entity.ExecutableBlock, view *state.View) (*execution.ComputationResult, error)
 }
 
 // Manager manages computation and execution
@@ -61,7 +62,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *s
 		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
 	}
 
-	value, err := language.ConvertValue(result.Value)
+	value, err := cadence.ConvertValue(result.Value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to export runtime value: %w", err)
 	}
@@ -74,7 +75,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *s
 	return encodedValue, nil
 }
 
-func (e *Manager) ComputeBlock(block *execution.CompleteBlock, view *state.View) (*execution.ComputationResult, error) {
+func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *state.View) (*execution.ComputationResult, error) {
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
@@ -89,7 +90,7 @@ func (e *Manager) ComputeBlock(block *execution.CompleteBlock, view *state.View)
 	}
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(result.CompleteBlock.Block)).
+		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
 
 	return result, nil

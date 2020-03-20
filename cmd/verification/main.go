@@ -60,7 +60,10 @@ func main() {
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			alpha := 10
-			assigner := assignment.NewPublicAssignment(alpha)
+			assigner, err := assignment.NewPublicAssignment(alpha)
+			if err != nil {
+				return nil, err
+			}
 			// https://github.com/dapperlabs/flow-go/issues/2703
 			// proper place and only referenced here
 			// Todo the hardcoded default value should be parameterized as alpha in a

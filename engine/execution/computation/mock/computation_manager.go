@@ -2,6 +2,7 @@
 
 package mock
 
+import entity "github.com/dapperlabs/flow-go/module/mempool/entity"
 import execution "github.com/dapperlabs/flow-go/engine/execution"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
@@ -13,11 +14,11 @@ type ComputationManager struct {
 }
 
 // ComputeBlock provides a mock function with given fields: block, view
-func (_m *ComputationManager) ComputeBlock(block *execution.CompleteBlock, view *state.View) (*execution.ComputationResult, error) {
+func (_m *ComputationManager) ComputeBlock(block *entity.ExecutableBlock, view *state.View) (*execution.ComputationResult, error) {
 	ret := _m.Called(block, view)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(*execution.CompleteBlock, *state.View) *execution.ComputationResult); ok {
+	if rf, ok := ret.Get(0).(func(*entity.ExecutableBlock, *state.View) *execution.ComputationResult); ok {
 		r0 = rf(block, view)
 	} else {
 		if ret.Get(0) != nil {
@@ -26,7 +27,7 @@ func (_m *ComputationManager) ComputeBlock(block *execution.CompleteBlock, view 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*execution.CompleteBlock, *state.View) error); ok {
+	if rf, ok := ret.Get(1).(func(*entity.ExecutableBlock, *state.View) error); ok {
 		r1 = rf(block, view)
 	} else {
 		r1 = ret.Error(1)

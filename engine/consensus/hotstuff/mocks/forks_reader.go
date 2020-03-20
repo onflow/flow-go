@@ -79,3 +79,17 @@ func (_m *ForksReader) GetBlocksForView(view uint64) []*hotstuff.Block {
 
 	return r0
 }
+
+// IsSafeBlock provides a mock function with given fields: block
+func (_m *ForksReader) IsSafeBlock(block *hotstuff.Block) bool {
+	ret := _m.Called(block)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*hotstuff.Block) bool); ok {
+		r0 = rf(block)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}

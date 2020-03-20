@@ -736,7 +736,7 @@ func testProposalWrongParentBelow(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "its view is above the finalized view, but its QC is below the finalized view")
+	require.Equal(t, err, hs.ErrUnverifiableBlock)
 }
 
 func testProposalInvalidQC(t *testing.T) {
@@ -825,7 +825,7 @@ func createBlockProducer(t *testing.T, signer hotstuff.Signer, vs *hotstuff.View
 	return bp
 }
 
-// makeBlockProducerAndQC  initialized a BlockProducer, block and qc pointing to this block. The qc is constructed from the votes of the provided signers 
+// makeBlockProducerAndQC  initialized a BlockProducer, block and qc pointing to this block. The qc is constructed from the votes of the provided signers
 func makeBlockProducerAndQC(t *testing.T, signers []*signature.RandomBeaconAwareSigProvider, viewstates []*hotstuff.ViewState, index int, view uint64) (*hotstuff.BlockProducer, *hs.QuorumCertificate, *hs.Block) {
 	signer, viewstate := signers[index], viewstates[index]
 	n := len(signers)

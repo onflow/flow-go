@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"github.com/dapperlabs/flow-go-sdk/utils/unittest"
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )

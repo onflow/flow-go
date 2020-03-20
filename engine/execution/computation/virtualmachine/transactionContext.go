@@ -6,7 +6,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/language/runtime"
+	"github.com/dapperlabs/cadence/runtime"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
