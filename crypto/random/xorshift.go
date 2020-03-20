@@ -3,8 +3,6 @@ package random
 import (
 	"encoding/binary"
 	"fmt"
-
-	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 // xorshifts is a set of xorshift128+ pseudo random number generators
@@ -23,22 +21,8 @@ type xorshiftp struct {
 	a, b uint64
 }
 
-// Encode returns the encoded version of xorshiftp for hashing
-func (x *xorshiftp) Encode() ([]byte, error) {
-	encX, err := encoding.DefaultEncoder.Encode(x.a)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode xorshiftp, %w", err)
-	}
-
-	encY, err := encoding.DefaultEncoder.Encode(x.b)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode xorshiftp, %w", err)
-	}
-
-	return append(encX, encY...), nil
-}
-
-// NewRand returns a new set of xorshift128+ PRGs
+// NewRand returns a new PRG that is a set of xorshift128+ PRGs, seeded with the input seed
+// the input seed is the initial state of the PRG.
 // the length of the seed fixes the number of xorshift128+ to initialize:
 // each 16 bytes of the seed initilize an xorshift128+ instance
 // To make sure the seed entropy is optimal, the function checks that len(seed)
@@ -62,10 +46,6 @@ func NewRand(seed []byte) (*xorshifts, error) {
 		if x.a|x.b == 0 {
 			return nil, fmt.Errorf("the seed of xorshift+ cannot be zero")
 		}
-	}
-	// initial next
-	for _, x := range states {
-		x.next()
 	}
 	// init the xorshifts
 	rand := &xorshifts{
@@ -178,29 +158,22 @@ func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) error {
 	return nil
 }
 
-// Encode encodes the internal state of random generator
-// NOTE: it is not possible to encode an object of random generator
-// by passing it to an encoder function like JSON, since its internal
-// state is not exported and hence encoded. Encode method compensates this.
-func (x *xorshifts) Encode() ([]byte, error) {
-	// keeps the encoded version of random generator
-	enc := make([]byte, 0)
+// state returns the internal state of an xorshift128+
+func (x *xorshiftp) state() []byte {
+	state := make([]byte, 16)
+	binary.BigEndian.PutUint64(state, x.a)
+	binary.BigEndian.PutUint64(state[8:], x.b)
+	return state
+}
 
-	// encodes state || index
-	for _, state := range x.states {
-		stateEncode, err := state.Encode()
-		if err != nil {
-			return nil, fmt.Errorf("could not encode state, %w", err)
-		}
-		enc = append(enc, stateEncode...)
+// State returns the internal state of the concatenated xorshifts
+func (x *xorshifts) State() []byte {
+	state := make([]byte, 0, 16*len(x.states))
+	j := x.stateIndex
+	for i := 0; i < len(x.states); i++ {
+		xorshift := x.states[j%len(x.states)]
+		state = append(state, xorshift.state()...)
+		j++
 	}
-
-	encStartIndex, err := encoding.DefaultEncoder.Encode(x.stateIndex)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode start index, %w", err)
-	}
-
-	enc = append(enc, encStartIndex...)
-
-	return enc, nil
+	return state
 }

@@ -34,9 +34,8 @@ type Rand interface {
 	// The returned error is non-nil if any of the parameters is a negative integer.
 	Samples(n int, m int, swap func(i, j int)) error
 
-	// Encode encodes the internal state of random generator
-	// NOTE: it is not possible to encode an object of random generator
-	// by passing it to an encoder function like JSON, since its internal
-	// state is not exported and hence encoded. Encode method compensates this.
-	Encode() ([]byte, error)
+	// State returns the internal state of the random generator.
+	// The internal state can be used as a seed input for the function
+	// NewRand to restore an identical PRG (with the same internal state)
+	State() []byte
 }
