@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"context"
 	"net"
 
 	"github.com/rs/zerolog"
@@ -9,6 +8,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -28,18 +29,20 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, collectionRPC observation.ObserveServiceClient, executionRPC observation.ObserveServiceClient) *Engine {
+func New(log zerolog.Logger,
+	state protocol.State,
+	config Config,
+	collectionRPC observation.ObserveServiceClient,
+	executionRPC observation.ObserveServiceClient,
+	headers storage.Headers) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
-		log:  log,
-		unit: engine.NewUnit(),
-		handler: &Handler{
-			collectionRPC: collectionRPC,
-			executionRPC:  executionRPC,
-		},
-		server: grpc.NewServer(),
-		config: config,
+		log:     log,
+		unit:    engine.NewUnit(),
+		handler: NewHandler(log, state, collectionRPC, executionRPC, headers),
+		server:  grpc.NewServer(),
+		config:  config,
 	}
 
 	observation.RegisterObserveServiceServer(eng.server, eng.handler)
@@ -77,40 +80,4 @@ func (e *Engine) serve() {
 	if err != nil {
 		e.log.Err(err).Msg("fatal error in server")
 	}
-}
-
-// Handler implements a subset of the Observation API
-type Handler struct {
-	executionRPC  observation.ObserveServiceClient
-	collectionRPC observation.ObserveServiceClient
-}
-
-// Ping responds to requests when the server is up.
-func (h *Handler) Ping(ctx context.Context, req *observation.PingRequest) (*observation.PingResponse, error) {
-	return &observation.PingResponse{}, nil
-}
-
-func (h *Handler) ExecuteScript(ctx context.Context, req *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
-	return h.executionRPC.ExecuteScript(ctx, req)
-}
-
-// Remaining Handler functions are no-ops to implement the Observation API protobuf service.
-func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
-	return h.collectionRPC.SendTransaction(ctx, req)
-}
-
-func (h *Handler) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
-	return nil, nil
-}
-
-func (h *Handler) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
-	return nil, nil
-}
-
-func (h *Handler) GetAccount(context.Context, *observation.GetAccountRequest) (*observation.GetAccountResponse, error) {
-	return nil, nil
-}
-
-func (h *Handler) GetEvents(context.Context, *observation.GetEventsRequest) (*observation.GetEventsResponse, error) {
-	return nil, nil
 }
