@@ -43,6 +43,8 @@ func CheckGuaranteePayload(height uint64, blockID flow.Identifier, candidateIDs 
 // FindDescendants uses guarantee payload index to find all the incorporated descendants for a given block.
 // Useful for finding all the unfinalized and incorporated blocks
 // "Incorporated" means a block connects to a given block through a certain number of intermediate blocks
+// Note: the descendants doesn't include the blockID itself
 func FindDescendants(height uint64, blockID flow.Identifier, descendants *[]flow.Identifier) func(*badger.Txn) error {
-	return iterateKey(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(math.MaxUint64)), finddescendant(blockID, descendants))
+	// height + 1 to exclude the blockID, and all blocks at the same height
+	return iterateKey(makePrefix(codeIndexGuarantee, height+1), makePrefix(codeIndexGuarantee, uint64(math.MaxUint64)), finddescendant(blockID, descendants))
 }
