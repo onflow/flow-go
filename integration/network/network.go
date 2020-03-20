@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/go-multierror"
 	"github.com/m4ksio/testingdock"
@@ -61,12 +59,12 @@ func (n *FlowNetwork) Stop() error {
 	}
 
 	// remove data directories
-	for _, c := range n.Containers {
-		err := os.RemoveAll(c.DataDir)
-		if err != nil {
-			merr = multierror.Append(merr, err)
-		}
-	}
+	//for _, c := range n.Containers {
+	//	err := os.RemoveAll(c.DataDir)
+	//	if err != nil {
+	//		merr = multierror.Append(merr, err)
+	//	}
+	//}
 
 	return merr.ErrorOrNil()
 }
@@ -236,18 +234,25 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		require.Nil(t, err)
 		flowContainer.DataDir = tmpdir
 
+		// add the volume to host config
+		//opts.Config.Volumes = map[string]struct{}{volume.Name: {}}
+
+		// try using binds rather than mount
+		//https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
+		opts.HostConfig.Binds = append(
+			opts.HostConfig.Binds,
+			fmt.Sprintf("%s:%s:rw", tmpdir, DefaultDataDir),
+		)
+
 		// mount the temp directory to the datadir in the container
-		opts.HostConfig.Mounts = append(
-			opts.HostConfig.Mounts,
-			mount.Mount{
-				Type:     "bind",
-				Source:   tmpdir,
-				Target:   DefaultDataDir,
-				ReadOnly: false,
-				BindOptions: &mount.BindOptions{
-					Propagation: "rprivate",
-				},
-			})
+		//opts.HostConfig.Mounts = append(
+		//	opts.HostConfig.Mounts,
+		//	mount.Mount{
+		//		Type:   mount.TypeBind,
+		//		Source: tmpdir,
+		//		Target: DefaultDataDir,
+		//	},
+		//)
 
 		switch identity.Role {
 		// enhance with extras for collection node
@@ -260,13 +265,11 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 				"9000/tcp": {},
 			}
 			opts.Config.Cmd = append(opts.Config.Cmd, fmt.Sprintf("--ingress-addr=%s:9000", opts.Name))
-			opts.HostConfig = &container.HostConfig{
-				PortBindings: nat.PortMap{
-					"9000/tcp": []nat.PortBinding{
-						{
-							HostIP:   "0.0.0.0",
-							HostPort: ingressPort,
-						},
+			opts.HostConfig.PortBindings = nat.PortMap{
+				"9000/tcp": []nat.PortBinding{
+					{
+						HostIP:   "0.0.0.0",
+						HostPort: ingressPort,
 					},
 				},
 			}
@@ -300,6 +303,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 	for i := range nodes {
 
 		c := add(opts[i], identities[i])
+		fmt.Println("mounts: ", opts[i].HostConfig.Mounts, identities[i].NodeID, identities[i].Role)
 
 		containers[i] = c
 	}

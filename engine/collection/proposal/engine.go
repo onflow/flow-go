@@ -221,9 +221,14 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not broadcast proposal: %w", err)
 	}
 
+	final, _ := e.clusterState.Final().Head()
+
 	e.log.Debug().
 		Hex("block_id", logging.ID(header.ID())).
+		Uint64("block_height", header.Height).
 		Hex("parent_id", logging.ID(header.ParentID)).
+		Hex("final_id", logging.ID(final.ID())).
+		Uint64("final_height", final.Height).
 		Int("collection_size", len(payload.Collection.Transactions)).
 		Msg("submitted proposal")
 
@@ -258,9 +263,14 @@ func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
 // onBlockProposal handles proposals for new blocks.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
+	final, _ := e.clusterState.Final().Head()
+
 	e.log.Debug().
 		Hex("block_id", logging.ID(proposal.Header.ID())).
+		Uint64("block_height", proposal.Header.Height).
 		Hex("parent_id", logging.ID(proposal.Header.ParentID)).
+		Hex("final_id", logging.ID(final.ID())).
+		Uint64("final_height", final.Height).
 		Msg("received proposal")
 
 	// retrieve the parent block

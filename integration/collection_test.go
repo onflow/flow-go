@@ -25,11 +25,15 @@ import (
 func TestCollection(t *testing.T) {
 
 	var (
-		colNode1 = network.NewNodeConfig(flow.RoleCollection)
-		colNode2 = network.NewNodeConfig(flow.RoleCollection)
-		conNode  = network.NewNodeConfig(flow.RoleConsensus)
-		exeNode  = network.NewNodeConfig(flow.RoleExecution)
-		verNode  = network.NewNodeConfig(flow.RoleVerification)
+		colNode1 = network.NewNodeConfig(flow.RoleCollection, func(c *network.NodeConfig) {
+			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")
+		})
+		colNode2 = network.NewNodeConfig(flow.RoleCollection, func(c *network.NodeConfig) {
+			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
+		})
+		conNode = network.NewNodeConfig(flow.RoleConsensus)
+		exeNode = network.NewNodeConfig(flow.RoleExecution)
+		verNode = network.NewNodeConfig(flow.RoleVerification)
 	)
 
 	nodes := []*network.NodeConfig{colNode1, colNode2, conNode, exeNode, verNode}
@@ -42,10 +46,13 @@ func TestCollection(t *testing.T) {
 	require.Nil(t, err)
 
 	net.Start(ctx)
-	defer net.Stop()
+	//defer net.Stop()
 
 	// get the collection node container
 	colContainer, ok := net.ContainerByID(colNode1.Identifier)
+	assert.True(t, ok)
+
+	colContainer2, ok := net.ContainerByID(colNode2.Identifier)
 	assert.True(t, ok)
 
 	// get the node's ingress port and create an RPC client
@@ -66,18 +73,24 @@ func TestCollection(t *testing.T) {
 
 	identities := net.Identities()
 
-	// create a database
-	db, err := badger.Open(badger.DefaultOptions(colContainer.DataDir).WithLogger(nil))
-	require.Nil(t, err)
+	fmt.Println(">>>> col0 datadir: ", colContainer.DataDir)
+	fmt.Println(">>>> col1 datadir: ", colContainer2.DataDir)
 
 	// eventually the transaction should be included in the storage
 	assert.Eventually(t, func() bool {
 		chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
 
+		// create a database
+		db, err := badger.Open(badger.DefaultOptions(colContainer.DataDir).WithLogger(nil))
+		require.Nil(t, err)
+
 		state, err := clusterstate.NewState(db, chainID)
 		assert.Nil(t, err)
 		head, err := state.Final().Head()
 		assert.Nil(t, err)
+
+		fmt.Println(">>>> col0 datadir: ", colContainer.DataDir)
+		fmt.Println(">>>> col1 datadir: ", colContainer2.DataDir)
 
 		fmt.Println(">>>> cluster id: ", chainID)
 		fmt.Println(">>>> height: ", head.Height)
