@@ -87,7 +87,7 @@ func (f *TrieStorage) GetRegistersWithProof(
 ) {
 	values, proofHldr, err := f.tree.Read(registerIDs, false, stateCommitment)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Could not get registers with proofs: %w", err)
 	}
 	proofs = trie.EncodeProof(proofHldr)
 	return values, proofs, err
@@ -104,16 +104,16 @@ func (f *TrieStorage) GetRegisterTouches(
 	if err != nil {
 		return nil, err
 	}
-	res := make([]flow.RegisterTouch, 0)
+	rets := make([]flow.RegisterTouch, 0, len(registerIDs))
 	for i, reg := range registerIDs {
 		rt := flow.RegisterTouch{
 			RegisterID: reg,
 			Value:      values[i],
 			Proof:      proofs[i],
 		}
-		res = append(res, rt)
+		rets = append(rets, rt)
 	}
-	return res, nil
+	return rets, nil
 }
 
 // UpdateRegistersWithProof updates the values at the given registers

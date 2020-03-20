@@ -35,6 +35,7 @@ func TestVerification(t *testing.T) {
 // TestHappyPath tests verification of the baseline verifiable chunk
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	vch := GetBaselineVerifiableChunk([]byte{})
+	assert.NotNil(s.T(), vch)
 	err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 }
@@ -42,6 +43,7 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 // TestMissingRegisterTouchForUpdate tests verification of the a chunkdatapack missing a register touch (update)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	vch := GetBaselineVerifiableChunk([]byte(""))
+	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
 	err := s.verifier.Verify(vch)
@@ -52,6 +54,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk([]byte("wrongEndState"))
+	assert.NotNil(s.T(), vch)
 	err := s.verifier.Verify(vch)
 	assert.NotNil(s.T(), err)
 }
@@ -90,7 +93,11 @@ func GetBaselineVerifiableChunk(script []byte) *verification.VerifiableChunk {
 	ids = append(ids, id1, id2)
 	values = append(values, value1, value2)
 
-	db, _ := TempLevelDB()
+	db, err := TempLevelDB()
+	if err != nil {
+		return nil
+	}
+
 	f, _ := ledger.NewTrieStorage(db)
 	startState, _ := f.UpdateRegisters(ids, values)
 	regTs, _ := f.GetRegisterTouches(ids, startState)

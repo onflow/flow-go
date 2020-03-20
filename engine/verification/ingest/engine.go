@@ -584,10 +584,11 @@ func (e *Engine) checkPendingChunks() {
 
 			index := chunk.Index
 			var endState flow.StateCommitment
-			// last chunk
 			if int(index) == len(receipt.ExecutionResult.Chunks)-1 {
+				// last chunk in receipt takes final state commitment
 				endState = receipt.ExecutionResult.FinalStateCommit
 			} else {
+				// any chunk except last takes the subsequent chunk's start state
 				endState = receipt.ExecutionResult.Chunks[index+1].StartState
 			}
 
