@@ -119,7 +119,7 @@ message AccountPublicKey {
 
 message Event {
   string type = 1;
-  bytes transactionHash = 2;
+  bytes transactionID = 2;
   uint32 index = 3;
   bytes payload = 4;
 }
