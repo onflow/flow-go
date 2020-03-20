@@ -148,6 +148,10 @@ func (suite *TestSuite) TestHandleBlock() {
 
 	// expect that that the block be added to the mempool
 	suite.blocks.On("Add", suite.block).Return(nil).Once()
+	suite.blockStorage.On("Store", suite.block).Return(nil).Once()
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
 
 	err := eng.Process(unittest.IdentifierFixture(), suite.block)
 	suite.Assert().Nil(err)
