@@ -41,13 +41,13 @@ func (_m *ChunkDataPacks) All() []*flow.ChunkDataPack {
 	return r0
 }
 
-// ByID provides a mock function with given fields: cdpID
-func (_m *ChunkDataPacks) ByID(cdpID flow.Identifier) (*flow.ChunkDataPack, error) {
-	ret := _m.Called(cdpID)
+// ByChunkID provides a mock function with given fields: chunkID
+func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+	ret := _m.Called(chunkID)
 
 	var r0 *flow.ChunkDataPack
 	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ChunkDataPack); ok {
-		r0 = rf(cdpID)
+		r0 = rf(chunkID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.ChunkDataPack)
@@ -56,7 +56,7 @@ func (_m *ChunkDataPacks) ByID(cdpID flow.Identifier) (*flow.ChunkDataPack, erro
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(cdpID)
+		r1 = rf(chunkID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -64,13 +64,13 @@ func (_m *ChunkDataPacks) ByID(cdpID flow.Identifier) (*flow.ChunkDataPack, erro
 	return r0, r1
 }
 
-// Has provides a mock function with given fields: cdpID
-func (_m *ChunkDataPacks) Has(cdpID flow.Identifier) bool {
-	ret := _m.Called(cdpID)
+// Has provides a mock function with given fields: chunkID
+func (_m *ChunkDataPacks) Has(chunkID flow.Identifier) bool {
+	ret := _m.Called(chunkID)
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(cdpID)
+		r0 = rf(chunkID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -94,13 +94,13 @@ func (_m *ChunkDataPacks) Hash() flow.Identifier {
 	return r0
 }
 
-// Rem provides a mock function with given fields: cdpID
-func (_m *ChunkDataPacks) Rem(cdpID flow.Identifier) bool {
-	ret := _m.Called(cdpID)
+// Rem provides a mock function with given fields: chunkID
+func (_m *ChunkDataPacks) Rem(chunkID flow.Identifier) bool {
+	ret := _m.Called(chunkID)
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(cdpID)
+		r0 = rf(chunkID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
