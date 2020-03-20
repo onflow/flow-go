@@ -19,8 +19,10 @@ import (
 
 func TestContainer_Start(t *testing.T) {
 
+	colNode := network.NewNodeConfig(flow.RoleCollection)
+
 	net := []*network.NodeConfig{
-		network.NewNodeConfig(flow.RoleCollection),
+		colNode,
 		network.NewNodeConfig(flow.RoleConsensus),
 		network.NewNodeConfig(flow.RoleExecution),
 		network.NewNodeConfig(flow.RoleVerification),
@@ -37,15 +39,12 @@ func TestContainer_Start(t *testing.T) {
 	flowNetwork.Start(ctx)
 	defer flowNetwork.Stop()
 
-	var collectionNodeApiPort = ""
-	for _, container := range flowNetwork.Containers {
-		if container.Identity.Role == flow.RoleCollection {
-			collectionNodeApiPort = container.Ports[network.IngressApiPort]
-		}
-	}
-	require.NotEqual(t, collectionNodeApiPort, "")
+	colContainer, ok := flowNetwork.ContainerByID(colNode.Identifier)
+	require.True(t, ok)
+	colNodeApiPort := colContainer.Ports[network.IngressApiPort]
+	require.NotEqual(t, "", colNodeApiPort)
 
-	sendTransaction(t, collectionNodeApiPort)
+	sendTransaction(t, colNodeApiPort)
 
 	// TODO Once we have observation API in place, query this API as the actual method of test assertion
 	time.Sleep(15 * time.Second)
