@@ -23,6 +23,7 @@ type ChunkVerifierTestSuite struct {
 }
 
 // Make sure variables are set properly
+// SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupTest() {
 	s.verifier = NewFlowChunkVerifier(newVirtualMachineMock())
 }
