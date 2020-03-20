@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/dapperlabs/flow-go-sdk"
 	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/m4ksio/testingdock"
@@ -15,11 +14,10 @@ import (
 
 	clusterstate "github.com/dapperlabs/flow-go/cluster/badger"
 	"github.com/dapperlabs/flow-go/integration/network"
-	cluster "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestCollection(t *testing.T) {
@@ -46,13 +44,11 @@ func TestCollection(t *testing.T) {
 	require.Nil(t, err)
 
 	net.Start(ctx)
-	//defer net.Stop()
+	// TODO uncomment this - for debugging leave the containers up
+	//defer net.Cleanup()
 
 	// get the collection node container
 	colContainer, ok := net.ContainerByID(colNode1.Identifier)
-	assert.True(t, ok)
-
-	colContainer2, ok := net.ContainerByID(colNode2.Identifier)
 	assert.True(t, ok)
 
 	// get the node's ingress port and create an RPC client
@@ -61,46 +57,27 @@ func TestCollection(t *testing.T) {
 	client, err := client.New(fmt.Sprintf(":%s", ingressPort))
 	assert.Nil(t, err)
 
-	sdkTx := sdk.Transaction{
-		Script:             []byte("fun main() {}"),
-		ReferenceBlockHash: []byte{1, 2, 3, 4},
-		Nonce:              1,
-		ComputeLimit:       10,
-		PayerAccount:       sdk.RootAddress,
-	}
+	sdkTx := unittest.SDKTransactionFixture()
 	err = client.SendTransaction(ctx, sdkTx)
+	assert.Nil(t, err)
+
+	// give the cluster a chance to do some consensus
+	time.Sleep(10 * time.Second)
+	err = net.StopContainers()
 	assert.Nil(t, err)
 
 	identities := net.Identities()
 
-	fmt.Println(">>>> col0 datadir: ", colContainer.DataDir)
-	fmt.Println(">>>> col1 datadir: ", colContainer2.DataDir)
+	// create a database
+	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
+	db, err := badger.Open(badger.DefaultOptions(colContainer.DataDir).WithLogger(nil))
+	require.Nil(t, err)
 
-	// eventually the transaction should be included in the storage
-	assert.Eventually(t, func() bool {
-		chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
+	state, err := clusterstate.NewState(db, chainID)
+	assert.Nil(t, err)
+	head, err := state.Final().Head()
+	assert.Nil(t, err)
 
-		// create a database
-		db, err := badger.Open(badger.DefaultOptions(colContainer.DataDir).WithLogger(nil))
-		require.Nil(t, err)
-
-		state, err := clusterstate.NewState(db, chainID)
-		assert.Nil(t, err)
-		head, err := state.Final().Head()
-		assert.Nil(t, err)
-
-		fmt.Println(">>>> col0 datadir: ", colContainer.DataDir)
-		fmt.Println(">>>> col1 datadir: ", colContainer2.DataDir)
-
-		fmt.Println(">>>> cluster id: ", chainID)
-		fmt.Println(">>>> height: ", head.Height)
-		fmt.Println(">>>> id: ", head.ID())
-		var payload cluster.Payload
-		err = db.View(procedure.RetrieveClusterPayload(head.ID(), &payload))
-		assert.Nil(t, err)
-		fmt.Println(">>>> payload size: ", len(payload.Collection.Transactions))
-
-		return len(payload.Collection.Transactions) > 0
-	}, 10*time.Second, time.Second)
-
+	// should be able to read a valid latest block
+	assert.Equal(t, chainID, head.ChainID)
 }
