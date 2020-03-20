@@ -8,3 +8,8 @@ WARNING: These scripts use Go's crypto/rand package to generate seeds for privat
 
 Step 1: TODO
 Step 2: Finalize the bootstrap process `go run -tags relic ./cmd/bootstrap finalize -c ./cmd/bootstrap/example_files/node_config.yml`
+
+## Structure
+
+`cmd/bootstrap/cmd` contains CLI logic that can exit the program and read/write files. It also uses structures and data types that are purely relevant for CLI purposes, such as encoding, decoding etc...
+`cmd/bootstrap/run` contains reusable logic that does not know about a CLI. Instead of exiting a program, functions here will return errors.

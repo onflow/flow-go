@@ -64,7 +64,7 @@ func runDKG(nodes []NodeInfoPub) (DKGDataPub, DKGDataPriv) {
 }
 
 func assembleDKGParticipant(info NodeInfoPub, part run.DKGParticipant) (DKGParticipantPriv, DKGParticipantPub) {
-	pub := pubKeyToString(part.Pub)
+	pub := pubKeyToString(part.Priv.PublicKey())
 
 	log.Debug().
 		Str("pub", pub).
@@ -78,7 +78,7 @@ func assembleDKGParticipant(info NodeInfoPub, part run.DKGParticipant) (DKGParti
 
 	partPub := DKGParticipantPub{
 		NodeID:             info.NodeID,
-		RandomBeaconPubKey: RandomBeaconPubKey{part.Pub},
+		RandomBeaconPubKey: RandomBeaconPubKey{part.Priv.PublicKey()},
 		GroupIndex:         part.GroupIndex,
 	}
 

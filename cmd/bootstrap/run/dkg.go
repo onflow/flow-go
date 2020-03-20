@@ -11,12 +11,12 @@ import (
 
 type DKGParticipant struct {
 	Priv       crypto.PrivateKey
-	Pub        crypto.PublicKey
 	GroupIndex int
 }
 
 type DKGData struct {
 	PubGroupKey  crypto.PublicKey
+	PubKeys      []crypto.PublicKey
 	Participants []DKGParticipant
 }
 
@@ -81,14 +81,16 @@ func RunDKG(n int, seeds [][]byte) (DKGData, error) {
 	// synchronize the main thread to end all DKGs
 	sync.Wait()
 
-	dkgData := DKGData{Participants: make([]DKGParticipant, 0, n)}
+	dkgData := DKGData{Participants: make([]DKGParticipant, 0, n), PubKeys: make([]crypto.PublicKey, 0, n)}
 	for _, processor := range processors {
 		dkgData.Participants = append(dkgData.Participants, DKGParticipant{
 			Priv:       processor.privkey,
-			Pub:        processor.pubkey,
 			GroupIndex: processor.current,
 		})
 		dkgData.PubGroupKey = processor.pubgroupkey
+	}
+	for _, processor := range processors {
+		dkgData.PubKeys = append(dkgData.PubKeys, processor.privkey.PublicKey())
 	}
 
 	return dkgData, nil
@@ -96,18 +98,11 @@ func RunDKG(n int, seeds [][]byte) (DKGData, error) {
 
 // LocalDKGProcessor implements DKGProcessor interface
 type LocalDKGProcessor struct {
-	current int
-	dkg     crypto.DKGstate
-	chans   []chan *message
-	// msgType   int
+	current     int
+	dkg         crypto.DKGstate
+	chans       []chan *message
 	privkey     crypto.PrivateKey
-	pubkey      crypto.PublicKey
 	pubgroupkey crypto.PublicKey
-	// malicious bool
-	// only used when testing the threshold signature stateful api
-	// ts *crypto.ThresholdSigner
-	// only used when testing the threshold signature statless api
-	// keys *crypto.statelessKeys
 }
 
 const (
@@ -160,7 +155,7 @@ func dkgRunChan(proc *LocalDKGProcessor, sync *sync.WaitGroup, phase int) {
 			log.Debugf("%d Receiving from %d:", proc.current, newMsg.orig)
 			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.data)
 			if err != nil {
-				panic(err) // TODO error handling?
+				panic(fmt.Errorf("failed to receive DKG msg: %w", err))
 			}
 		// if timeout, stop and finalize
 		case <-time.After(200 * time.Millisecond):
@@ -169,27 +164,26 @@ func dkgRunChan(proc *LocalDKGProcessor, sync *sync.WaitGroup, phase int) {
 				log.Infof("%d shares phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
 				if err != nil {
-					panic(err) // TODO error handling?
+					panic(fmt.Errorf("failed to wait for next timeout: %w", err))
 				}
 			case 1:
 				log.Infof("%d complaints phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
 				if err != nil {
-					panic(err) // TODO error handling?
+					panic(fmt.Errorf("failed to wait for next timeout: %w", err))
 				}
 			case 2:
 				log.Infof("%d dkg ended \n", proc.current)
-				privkey, pubgroupkey, pubkeys, err := proc.dkg.EndDKG()
+				privkey, pubgroupkey, _, err := proc.dkg.EndDKG()
 				if err != nil {
-					panic(fmt.Errorf("end dkg error should be nil: %w", err)) // TODO error handling?
+					panic(fmt.Errorf("end dkg error should be nil: %w", err))
 				}
 				if privkey == nil {
-					panic("pubkey was nil") // TODO error handling?
+					panic("privkey was nil")
 				}
 
 				proc.privkey = privkey
 				proc.pubgroupkey = pubgroupkey
-				proc.pubkey = pubkeys[proc.current]
 			}
 			sync.Done()
 			return

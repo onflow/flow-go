@@ -24,7 +24,7 @@ var finalizeCmd = &cobra.Command{
 
 		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgDataPub)
 
-		constructGenesisQC(block, filterConsensusNodes(stakingNodes), filterConsensusNodesPriv(internalNodesPriv), dkgDataPriv)
+		constructGenesisQC(&block, filterConsensusNodes(stakingNodes), filterConsensusNodesPriv(internalNodesPriv), dkgDataPriv)
 	},
 }
 

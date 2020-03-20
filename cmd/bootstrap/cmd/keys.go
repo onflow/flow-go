@@ -70,7 +70,10 @@ func genNetworkAndStakingKeys() ([]NodeInfoPub, []NodeInfoPriv) {
 }
 
 func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.PrivateKey) (NodeInfoPriv, NodeInfoPub) {
-	nodeID := flow.MakeID(pubKeyToBytes(stakingKey.PublicKey()))
+	nodeID, err := flow.PublicKeyToID(stakingKey.PublicKey())
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot generate NodeID from PublicKey")
+	}
 
 	log.Debug().
 		Str("networkPubKey", pubKeyToString(networkKey.PublicKey())).

@@ -80,6 +80,17 @@ func MakeID(body interface{}) Identifier {
 	return HashToID(hash)
 }
 
+// PublicKeyToID creates an ID from a public key.
+func PublicKeyToID(pub crypto.PublicKey) (Identifier, error) {
+	b, err := pub.Encode()
+	if err != nil {
+		return Identifier{}, err
+	}
+	hasher := crypto.NewSHA3_256()
+	hash := hasher.ComputeHash(b)
+	return HashToID(hash), nil
+}
+
 // GetIDs gets the IDs for a slice of entities.
 func GetIDs(value interface{}) []Identifier {
 	v := reflect.ValueOf(value)

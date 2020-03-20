@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func constructGenesisQC(block flow.Block, nodeInfosPub []NodeInfoPub, nodeInfosPriv []NodeInfoPriv, dkgDataPriv DKGDataPriv) {
+func constructGenesisQC(block *flow.Block, nodeInfosPub []NodeInfoPub, nodeInfosPriv []NodeInfoPriv, dkgDataPriv DKGDataPriv) {
 	signerData := generateQCSignerData(nodeInfosPub, nodeInfosPriv, dkgDataPriv)
 
 	qc, err := run.GenerateGenesisQC(signerData, block)
@@ -40,6 +40,14 @@ func generateQCSignerData(nsPub []NodeInfoPub, nsPriv []NodeInfoPriv, dkg DKGDat
 		// find the corresponding entry in dkg
 		part := findDKGParticipantPriv(dkg, nPriv.NodeID)
 
+		if nPub.NodeID == flow.ZeroID {
+			log.Fatal().Str("Address", nPub.Address).Msg("NodeID must not be zero")
+		}
+
+		if nPub.Stake == 0 {
+			log.Fatal().Str("NodeID", nPub.NodeID.String()).Msg("Stake must not be 0")
+		}
+
 		sd.Signers = append(sd.Signers, run.Signer{
 			Identity: flow.Identity{
 				NodeID:             nPub.NodeID,
@@ -50,8 +58,8 @@ func generateQCSignerData(nsPub []NodeInfoPub, nsPriv []NodeInfoPriv, dkg DKGDat
 				RandomBeaconPubKey: part.RandomBeaconPrivKey.PublicKey(),
 				NetworkPubKey:      nPub.NetworkPubKey,
 			},
-			StakingPrivKey:       nPriv.StakingPrivKey,
-			RandomBeaconPrivKeys: part.RandomBeaconPrivKey,
+			StakingPrivKey:      nPriv.StakingPrivKey,
+			RandomBeaconPrivKey: part.RandomBeaconPrivKey,
 		})
 	}
 
@@ -87,7 +95,6 @@ func generateDKGPublicData(dkg DKGDataPriv) *hotstuff.DKGPublicData {
 	}
 
 	for _, part := range dkg.Participants {
-		// dkgPart :=
 		dat.IdToDKGParticipantMap[part.NodeID] = &hotstuff.DKGParticipant{
 			Id:             part.NodeID,
 			PublicKeyShare: part.RandomBeaconPrivKey.PublicKey(),
