@@ -6,25 +6,13 @@ import (
 
 // Assignment is assignment map of the chunks to the list of the verifier nodes
 type Assignment struct {
-	id    flow.Identifier // unique identifier for this assignment
 	table map[uint64]map[flow.Identifier]struct{}
 }
 
-func NewAssignment(id flow.Identifier) *Assignment {
+func NewAssignment() *Assignment {
 	return &Assignment{
-		id:    id,
 		table: make(map[uint64]map[flow.Identifier]struct{}),
 	}
-}
-
-// ID returns the unique identifier for assignment
-func (a *Assignment) ID() flow.Identifier {
-	return a.id
-}
-
-// Checksum returns the checksum of the assignment
-func (a *Assignment) Checksum() flow.Identifier {
-	return flow.MakeID(a)
 }
 
 // Verifiers returns the list of verifier nodes assigned to a chunk
@@ -61,4 +49,36 @@ func (a *Assignment) ByNodeID(this flow.Identifier) []uint64 {
 		}
 	}
 	return chunks
+}
+
+// AssignmentDataPack
+//
+// AssignmentDataPack provides a storable representation of chunk assignments on
+// mempool
+type AssignmentDataPack struct {
+	assignment  *Assignment
+	fingerprint flow.Identifier
+}
+
+// NewAssignmentDataPack casts an assignment and its fingerprint into an assignment data pack
+func NewAssignmentDataPack(fingerprint flow.Identifier, assignment *Assignment) *AssignmentDataPack {
+	return &AssignmentDataPack{
+		assignment:  assignment,
+		fingerprint: fingerprint,
+	}
+}
+
+// ID returns the unique identifier for assignment data pack
+func (a *AssignmentDataPack) ID() flow.Identifier {
+	return a.fingerprint
+}
+
+// Checksum returns the checksum of the assignment data pack
+func (a *AssignmentDataPack) Checksum() flow.Identifier {
+	return flow.MakeID(a)
+}
+
+// Assignment returns the assignment part of the assignment data pack
+func (a *AssignmentDataPack) Assignment() *Assignment {
+	return a.assignment
 }

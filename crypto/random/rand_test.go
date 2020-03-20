@@ -1,9 +1,11 @@
 package random
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gonum.org/v1/gonum/stat"
 )
@@ -28,9 +30,7 @@ func TestRandInt(t *testing.T) {
 	}
 	stdev := stat.StdDev(distribution, nil)
 	mean := stat.Mean(distribution, nil)
-	if stdev > tolerance*mean {
-		t.Errorf("basic randomness test failed. stdev %v, mean %v", stdev, mean)
-	}
+	assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
 }
 
 // The only purpose of this function is unit testing. It also implements a very basic tandomness test.
@@ -57,7 +57,8 @@ func TestRandomPermutationSubset(t *testing.T) {
 	testElement := rand.Intn(listSize)
 
 	for i := 0; i < sampleSize; i++ {
-		shuffledlist, _ := rng.SubPermutation(listSize, subsetSize)
+		shuffledlist, err := rng.SubPermutation(listSize, subsetSize)
+		require.NoError(t, err)
 		if len(shuffledlist) != subsetSize {
 			t.Errorf("PermutateSubset returned a list with a wrong size")
 		}
@@ -77,14 +78,30 @@ func TestRandomPermutationSubset(t *testing.T) {
 	}
 	stdev := stat.StdDev(samplingDistribution, nil)
 	mean := stat.Mean(samplingDistribution, nil)
-	if stdev > tolerance*mean {
-		t.Errorf("basic subset randomness test failed. stdev %v, mean %v", stdev, mean)
-	}
+	assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic subset randomness test failed. stdev %v, mean %v", stdev, mean))
 	stdev = stat.StdDev(orderingDistribution, nil)
 	mean = stat.Mean(orderingDistribution, nil)
-	if stdev > tolerance*mean {
-		t.Errorf("basic ordering randomness test failed. stdev %v, mean %v", stdev, mean)
-	}
+	assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic ordering randomness test failed. stdev %v, mean %v", stdev, mean))
+}
+
+// TestEmptyPermutationSubset evaluates that
+//  * permuting an empty set returns an empty list
+//  * drawing a sample of size zero from a non-empty set returns an empty list
+func TestEmptyPermutationSubset(t *testing.T) {
+	seed := make([]byte, 16)
+	seed[0] = 45
+	rng, err := NewRand(seed)
+	require.NoError(t, err)
+
+	// verify that permuting an empty set returns an empty list
+	res, err := rng.SubPermutation(0, 0)
+	require.NoError(t, err)
+	assert.True(t, len(res) == 0)
+
+	// verify that drawing a sample of size zero from a non-empty set returns an empty list
+	res, err = rng.SubPermutation(10, 0)
+	require.NoError(t, err)
+	assert.True(t, len(res) == 0)
 }
 
 func TestRandomShuffle(t *testing.T) {
@@ -106,9 +123,10 @@ func TestRandomShuffle(t *testing.T) {
 	}
 
 	for i := 0; i < sampleSize; i++ {
-		rng.Shuffle(listSize, func(i, j int) {
+		err = rng.Shuffle(listSize, func(i, j int) {
 			list[i], list[j] = list[j], list[i]
 		})
+		require.NoError(t, err)
 		has := make(map[int]struct{})
 		for j, e := range list {
 			// check for repetition
@@ -124,9 +142,20 @@ func TestRandomShuffle(t *testing.T) {
 	}
 	stdev := stat.StdDev(distribution, nil)
 	mean := stat.Mean(distribution, nil)
-	if stdev > tolerance*mean {
-		t.Errorf("basic randomness test failed. stdev %v, mean %v", stdev, mean)
-	}
+	assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+}
+
+func TestEmptyShuffle(t *testing.T) {
+	seed := make([]byte, 16)
+	seed[0] = 45
+	rng, err := NewRand(seed)
+	require.NoError(t, err)
+	emptySlice := make([]float64, 0)
+	err = rng.Shuffle(len(emptySlice), func(i, j int) {
+		emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
+	})
+	require.NoError(t, err)
+	assert.True(t, len(emptySlice) == 0)
 }
 
 func TestRandomSamples(t *testing.T) {
@@ -151,9 +180,10 @@ func TestRandomSamples(t *testing.T) {
 	}
 
 	for i := 0; i < sampleSize; i++ {
-		rng.Samples(listSize, samplesSize, func(i, j int) {
+		err = rng.Samples(listSize, samplesSize, func(i, j int) {
 			list[i], list[j] = list[j], list[i]
 		})
+		require.NoError(t, err)
 		has := make(map[int]struct{})
 		for j, e := range list[:samplesSize] {
 			// check for repetition
@@ -170,12 +200,62 @@ func TestRandomSamples(t *testing.T) {
 	}
 	stdev := stat.StdDev(samplingDistribution, nil)
 	mean := stat.Mean(samplingDistribution, nil)
-	if stdev > tolerance*mean {
-		t.Errorf("basic subset randomness test failed. stdev %v, mean %v", stdev, mean)
-	}
+	assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic subset randomness test failed. stdev %v, mean %v", stdev, mean))
 	stdev = stat.StdDev(orderingDistribution, nil)
 	mean = stat.Mean(orderingDistribution, nil)
-	if stdev > tolerance*mean {
-		t.Errorf("basic ordering randomness test failed. stdev %v, mean %v", stdev, mean)
+	assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic ordering randomness test failed. stdev %v, mean %v", stdev, mean))
+}
+
+// TestEmptySamples verifies that drawing a sample of size zero leaves the original list unchanged
+func TestEmptySamples(t *testing.T) {
+	seed := make([]byte, 16)
+	seed[0] = 45
+	rng, err := NewRand(seed)
+	require.NoError(t, err)
+
+	// Sampling from an empty set
+	emptySlice := make([]float64, 0)
+	err = rng.Samples(len(emptySlice), len(emptySlice), func(i, j int) {
+		emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
+	})
+	require.NoError(t, err)
+	assert.True(t, len(emptySlice) == 0)
+
+	// drawing a sample of size zero from an non-empty list should leave the original list unmodified
+	fullSlice := []float64{0, 1, 2, 3, 4, 5}
+	err = rng.Samples(len(fullSlice), 0, func(i, j int) { // modifies fullSlice IN-PLACE
+		emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []float64{0, 1, 2, 3, 4, 5}, fullSlice)
+}
+
+// TestState tests the function State()
+func TestState(t *testing.T) {
+	// create a seed
+	len := 16 * 3 // 3 internal xorshifts
+	seed := make([]byte, len)
+	for i := 0; i < len; i++ {
+		seed[i] = byte(rand.Intn(256))
+	}
+	// create an rng
+	rng, err := NewRand(seed)
+	require.NoError(t, err)
+	// evolve the internal state of the rng
+	iterations := rand.Intn(100)
+	for i := 0; i < iterations; i++ {
+		_, err = rng.IntN(1024)
+	}
+	// get the internal state of the rng
+	state := rng.State()
+	// seed a new rng with the internal state
+	secondRng, err := NewRand(state)
+	require.NoError(t, err)
+	// test the 2 rngs are giving identical outputs
+	iterations = rand.Intn(100)
+	for i := 0; i < iterations; i++ {
+		rand1, _ := rng.IntN(1024)
+		rand2, _ := secondRng.IntN(1024)
+		require.Equal(t, rand1, rand2, "the 2 rngs are not identical")
 	}
 }

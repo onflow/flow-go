@@ -3,8 +3,8 @@ module github.com/dapperlabs/flow-go
 go 1.13
 
 require (
+	github.com/dapperlabs/cadence v0.0.0-20200319034220-e57278d2b982
 	github.com/dapperlabs/flow-go/crypto v0.3.1
-	github.com/dapperlabs/flow-go/language v0.3.1
 	github.com/dapperlabs/flow-go/protobuf v0.3.1
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
@@ -17,7 +17,6 @@ require (
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/ipfs/go-log v0.0.1
 	github.com/jrick/bitset v1.0.0
-	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/libp2p/go-libp2p v0.5.1
 	github.com/libp2p/go-libp2p-core v0.3.0
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
@@ -39,13 +38,10 @@ require (
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
 	google.golang.org/grpc v1.26.0
-	gotest.tools v2.2.0+incompatible
 	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
-
-replace github.com/dapperlabs/flow-go/language => ./language
 
 replace github.com/dapperlabs/flow-go/crypto => ./crypto
 

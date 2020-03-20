@@ -178,7 +178,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-	suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 	// expect that the receipt be added to the mempool, and return it in All
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
@@ -188,7 +188,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
 
 	// assigns all chunks in the receipt to this node through mocking
-	a := chunkassignment.NewAssignment(flow.Identifier{})
+	a := chunkassignment.NewAssignment()
 	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
 		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
 	}
@@ -466,16 +466,16 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-			suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 			suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 			suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
+			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 			// removing the resources for a chunk
 			suite.collections.On("Rem", suite.collection.ID()).Return(true).Once()
 
 			// we have the assignment of chunk
-			a := chunkassignment.NewAssignment(flow.Identifier{})
+			a := chunkassignment.NewAssignment()
 			a.Add(suite.receipt.ExecutionResult.Chunks.ByIndex(0), flow.IdentifierList{verIdentity.NodeID})
 			suite.assigner.On("Assign",
 				testifymock.Anything,
@@ -568,7 +568,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// new chunk assignment
-	a := chunkassignment.NewAssignment(flow.Identifier{})
+	a := chunkassignment.NewAssignment()
 
 	// create `erCount` ER fixtures that will be concurrently delivered
 	ers := make([]verification.CompleteExecutionResult, 0)
@@ -774,7 +774,7 @@ func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng 
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("assigner called with empty chunk list")
 	}
-	a := chunkassignment.NewAssignment(flow.Identifier{})
+	a := chunkassignment.NewAssignment()
 	for _, c := range chunks {
 		a.Add(c, flow.IdentifierList{m.me})
 	}

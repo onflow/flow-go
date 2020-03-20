@@ -67,9 +67,9 @@ func NewExecutionState(
 	}
 }
 
-func (s *state) NewView(commitment flow.StateCommitment) *View {
-	return NewView(func(key flow.RegisterID) ([]byte, error) {
-		values, err := s.ls.GetRegisters(
+func LedgerGetRegister(ledger storage.Ledger, commitment flow.StateCommitment) GetRegisterFunc {
+	return func(key flow.RegisterID) ([]byte, error) {
+		values, err := ledger.GetRegisters(
 			[]flow.RegisterID{key},
 			commitment,
 		)
@@ -82,19 +82,27 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 		}
 
 		return values[0], nil
-	})
+	}
 }
 
-func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
+func (s *state) NewView(commitment flow.StateCommitment) *View {
+	return NewView(LedgerGetRegister(s.ls, commitment))
+}
+
+func CommitDelta(ledger storage.Ledger, delta Delta) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
 
 	// TODO: update CommitDelta to also return proofs
-	commit, _, err := s.ls.UpdateRegistersWithProof(ids, values)
+	commit, _, err := ledger.UpdateRegistersWithProof(ids, values)
 	if err != nil {
 		return nil, err
 	}
 
 	return commit, nil
+}
+
+func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
+	return CommitDelta(s.ls, delta)
 }
 
 func (s *state) GetRegisters(

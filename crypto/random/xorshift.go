@@ -3,8 +3,6 @@ package random
 import (
 	"encoding/binary"
 	"fmt"
-
-	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 // xorshifts is a set of xorshift128+ pseudo random number generators
@@ -23,22 +21,8 @@ type xorshiftp struct {
 	a, b uint64
 }
 
-// Encode returns the encoded version of xorshiftp for hashing
-func (x *xorshiftp) Encode() ([]byte, error) {
-	encX, err := encoding.DefaultEncoder.Encode(x.a)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode xorshiftp, %w", err)
-	}
-
-	encY, err := encoding.DefaultEncoder.Encode(x.b)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode xorshiftp, %w", err)
-	}
-
-	return append(encX, encY...), nil
-}
-
-// NewRand returns a new set of xorshift128+ PRGs
+// NewRand returns a new PRG that is a set of xorshift128+ PRGs, seeded with the input seed
+// the input seed is the initial state of the PRG.
 // the length of the seed fixes the number of xorshift128+ to initialize:
 // each 16 bytes of the seed initilize an xorshift128+ instance
 // To make sure the seed entropy is optimal, the function checks that len(seed)
@@ -62,10 +46,6 @@ func NewRand(seed []byte) (*xorshifts, error) {
 		if x.a|x.b == 0 {
 			return nil, fmt.Errorf("the seed of xorshift+ cannot be zero")
 		}
-	}
-	// initial next
-	for _, x := range states {
-		x.next()
 	}
 	// init the xorshifts
 	rand := &xorshifts{
@@ -117,8 +97,8 @@ func (x *xorshifts) IntN(n int) (int, error) {
 // (which fixes the internal state length of xorshifts ) should be chosen carefully
 // O(n) space and O(n) time
 func (x *xorshifts) Permutation(n int) ([]int, error) {
-	if n <= 0 {
-		return nil, fmt.Errorf("inputs must be positive")
+	if n < 0 {
+		return nil, fmt.Errorf("population size cannot be negative")
 	}
 	items := make([]int, n)
 	for i := 0; i < n; i++ {
@@ -135,9 +115,13 @@ func (x *xorshifts) Permutation(n int) ([]int, error) {
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(n) space and O(n) time
 func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
-	if m <= 0 {
-		return nil, fmt.Errorf("inputs must be positive")
+	if m < 0 {
+		return nil, fmt.Errorf("sample size cannot be negative")
 	}
+	if n < m {
+		return nil, fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)
+	}
+	// condition n >= 0 is enforced by function Permutation(n)
 	items, _ := x.Permutation(n)
 	return items[:m], nil
 }
@@ -146,8 +130,8 @@ func (x *xorshifts) SubPermutation(n int, m int) ([]int, error) {
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(n) time
 func (x *xorshifts) Shuffle(n int, swap func(i, j int)) error {
-	if n <= 0 {
-		return fmt.Errorf("input must be positive")
+	if n < 0 {
+		return fmt.Errorf("population size cannot be negative")
 	}
 	for i := n - 1; i > 0; i-- {
 		j, _ := x.IntN(i + 1)
@@ -161,8 +145,11 @@ func (x *xorshifts) Shuffle(n int, swap func(i, j int)) error {
 // It implements the first (m) elements of Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(m) time
 func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) error {
-	if m <= 0 || n <= 0 {
-		return fmt.Errorf("inputs must be positive")
+	if m < 0 {
+		return fmt.Errorf("inputs cannot be negative")
+	}
+	if n < m {
+		return fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)
 	}
 	for i := 0; i < m; i++ {
 		j, _ := x.IntN(n - i)
@@ -171,29 +158,22 @@ func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) error {
 	return nil
 }
 
-// Encode encodes the internal state of random generator
-// NOTE: it is not possible to encode an object of random generator
-// by passing it to an encoder function like JSON, since its internal
-// state is not exported and hence encoded. Encode method compensates this.
-func (x *xorshifts) Encode() ([]byte, error) {
-	// keeps the encoded version of random generator
-	enc := make([]byte, 0)
+// state returns the internal state of an xorshift128+
+func (x *xorshiftp) state() []byte {
+	state := make([]byte, 16)
+	binary.BigEndian.PutUint64(state, x.a)
+	binary.BigEndian.PutUint64(state[8:], x.b)
+	return state
+}
 
-	// encodes state || index
-	for _, state := range x.states {
-		stateEncode, err := state.Encode()
-		if err != nil {
-			return nil, fmt.Errorf("could not encode state, %w", err)
-		}
-		enc = append(enc, stateEncode...)
+// State returns the internal state of the concatenated xorshifts
+func (x *xorshifts) State() []byte {
+	state := make([]byte, 0, 16*len(x.states))
+	j := x.stateIndex
+	for i := 0; i < len(x.states); i++ {
+		xorshift := x.states[j%len(x.states)]
+		state = append(state, xorshift.state()...)
+		j++
 	}
-
-	encStartIndex, err := encoding.DefaultEncoder.Encode(x.stateIndex)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode start index, %w", err)
-	}
-
-	enc = append(enc, encStartIndex...)
-
-	return enc, nil
+	return state
 }

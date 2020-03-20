@@ -7,7 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Assignments implements the ChunkDataPack memory pool.
+// Assignments implements the chunk assignment memory pool.
 type Assignments struct {
 	*Backend
 }
@@ -33,16 +33,16 @@ func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkassignment.Assig
 	if err != nil {
 		return nil, err
 	}
-	assignment, ok := entity.(*chunkassignment.Assignment)
+	adp, ok := entity.(*chunkassignment.AssignmentDataPack)
 	if !ok {
-		panic(fmt.Sprintf("invalid entity in assignments pool (%T)", entity))
+		return nil, fmt.Errorf("invalid entity in assignments pool (%T)", entity)
 	}
-	return assignment, nil
+	return adp.Assignment(), nil
 }
 
 // Add adds an Assignment to the mempool.
-func (a *Assignments) Add(assignment *chunkassignment.Assignment) error {
-	return a.Backend.Add(assignment)
+func (a *Assignments) Add(fingerprint flow.Identifier, assignment *chunkassignment.Assignment) error {
+	return a.Backend.Add(chunkassignment.NewAssignmentDataPack(fingerprint, assignment))
 }
 
 // Rem will remove the given Assignment from the memory pool; it will
@@ -61,7 +61,7 @@ func (a *Assignments) All() []*chunkassignment.Assignment {
 	entities := a.Backend.All()
 	assignments := make([]*chunkassignment.Assignment, 0, len(entities))
 	for _, entity := range entities {
-		assignments = append(assignments, entity.(*chunkassignment.Assignment))
+		assignments = append(assignments, entity.(*chunkassignment.AssignmentDataPack).Assignment())
 	}
 	return assignments
 }

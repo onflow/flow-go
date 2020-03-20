@@ -66,6 +66,7 @@ func (bp *BlockProducer) makeBlockForView(qc *hotstuff.QuorumCertificate, view u
 	block := hotstuff.Block{
 		BlockID:     header.ID(),
 		View:        view,
+		ProposerID:  header.ProposerID,
 		QC:          qc,
 		PayloadHash: header.PayloadHash,
 		Timestamp:   header.Timestamp,

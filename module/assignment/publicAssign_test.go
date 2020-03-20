@@ -1,6 +1,7 @@
 package assignment
 
 import (
+	"crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,13 +30,13 @@ func TestAssignment(t *testing.T) {
 	suite.Run(t, new(PublicAssignmentTestSuite))
 }
 
-// TestByNodeID evalues the correctness of ByNodeID method of PublicAssignment
+// TestByNodeID evaluates the correctness of ByNodeID method of PublicAssignment
 func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	size := 5
 	// creates ids and twice chunks of the ids
 	ids := test.CreateIDs(size)
-	chunks := a.CreateChunks(2 * size)
-	assignment := chunkassignment.NewAssignment(flow.Identifier{})
+	chunks := a.CreateChunks(2*size, a.T())
+	assignment := chunkassignment.NewAssignment()
 
 	// assigns two chunks to each verifier node
 	// j keeps track of chunks
@@ -68,8 +69,8 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	size := 5
 	// creates ids and twice chunks of the ids
 	var ids flow.IdentityList = test.CreateIDs(size)
-	chunks := a.CreateChunks(2)
-	assignment := chunkassignment.NewAssignment(flow.Identifier{})
+	chunks := a.CreateChunks(2, a.T())
+	assignment := chunkassignment.NewAssignment()
 
 	// assigns first chunk to non-duplicate list of verifiers
 	c := chunks.ByIndex(uint64(0))
@@ -92,19 +93,20 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	// creates random ids
 	count := 10
 	var idList flow.IdentityList = test.CreateIDs(count)
-	ids := idList.NodeIDs()
-	original := make([]flow.Identifier, count)
+	var ids flow.IdentifierList = idList.NodeIDs()
+	original := make(flow.IdentifierList, count)
 	copy(original, ids)
 
 	// Randomness:
 	rng1, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
-	permute(ids, len(ids), rng1)
+	err = rng1.Shuffle(len(ids), ids.Swap)
+	require.NoError(a.T(), err)
 
 	// permutation should not change length of the list
 	require.Len(a.T(), ids, count)
 
-	// list should be premuted
+	// list should be permuted
 	require.NotEqual(a.T(), ids, original)
 
 	// Deterministiciy:
@@ -112,7 +114,8 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	rng2, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
 	// permutes original list with the same seed
-	permute(original, len(original), rng2)
+	err = rng2.Shuffle(len(original), original.Swap)
+	require.NoError(a.T(), err)
 	require.Equal(a.T(), ids, original)
 }
 
@@ -124,14 +127,15 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	subset := 4
 
 	var idList flow.IdentityList = test.CreateIDs(count)
-	ids := idList.NodeIDs()
+	var ids flow.IdentifierList = idList.NodeIDs()
 	original := make([]flow.Identifier, count)
 	copy(original, ids)
 
 	// Randomness:
 	rng1, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
-	permute(ids, subset, rng1)
+	err = rng1.Samples(len(ids), subset, ids.Swap)
+	require.NoError(a.T(), err)
 
 	// permutation should not change length of the list
 	require.Len(a.T(), ids, count)
@@ -139,10 +143,6 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	// the initial subset of the list that is permuted should
 	// be different than the original
 	require.NotEqual(a.T(), ids[:subset], original[:subset])
-
-	// the rest of the list that is not permuted should be the same
-	// as the original
-	require.Equal(a.T(), ids[subset:], original[subset:])
 }
 
 // TestDeterministicy evaluates deterministic behavior of chunk assignment when
@@ -151,7 +151,7 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	c := 10    // keeps number of chunks
 	n := 10    // keeps number of verifier nodes
 	alpha := 1 // each chunk requires alpha verifiers
-	chunks := a.CreateChunks(c)
+	chunks := a.CreateChunks(c, a.T())
 
 	// making two random generator with the same seed
 	// random generator #1
@@ -180,7 +180,7 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.NoError(a.T(), err)
 
 	// list of nodes should get shuffled after public assignment
-	// but it should contain same elemets
+	// but it should contain same elements
 	require.Equal(a.T(), p1, p2)
 }
 
@@ -220,7 +220,7 @@ func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToMany() {
 func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, alpha int) {
 	rng, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
-	chunks := a.CreateChunks(chunkNum)
+	chunks := a.CreateChunks(chunkNum, a.T())
 
 	// creates nodes and keeps a copy of them
 	nodes := test.CreateIDs(verNum)
@@ -244,7 +244,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	rng, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
-	chunks := a.CreateChunks(20)
+	chunks := a.CreateChunks(20, a.T())
 
 	// creates nodes and keeps a copy of them
 	nodes := test.CreateIDs(5)
@@ -288,11 +288,21 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 
 // CreateChunk creates and returns num chunks. It only fills the Index part of
 // chunks to make them distinct from each other.
-func (a *PublicAssignmentTestSuite) CreateChunks(num int) flow.ChunkList {
+func (a *PublicAssignmentTestSuite) CreateChunks(num int, t *testing.T) flow.ChunkList {
 	list := flow.ChunkList{}
 	for i := 0; i < num; i++ {
+		// creates random state for each chunk
+		// to provide random ordering after sorting
+		state := make([]byte, 64)
+		_, err := rand.Read(state)
+		require.NoError(t, err)
+
+		// creates chunk
 		c := &flow.Chunk{
 			Index: uint64(i),
+			ChunkBody: flow.ChunkBody{
+				StartState: state,
+			},
 		}
 		list.Insert(c)
 	}

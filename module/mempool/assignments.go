@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Assignments represents a concurrency-safe memory pool for chunk data packs.
+// Assignments represents a concurrency-safe memory pool for chunk assignments
 type Assignments interface {
 
 	// Has checks whether the Assignment with the given hash is currently in
@@ -18,7 +18,7 @@ type Assignments interface {
 
 	// Add will add the given Assignment to the memory pool; it will error if
 	// the Assignment is already in the memory pool.
-	Add(assignment *chunkassignment.Assignment) error
+	Add(assignmentFingerprint flow.Identifier, assignment *chunkassignment.Assignment) error
 
 	// Rem will remove the given Assignment from the memory pool; it will
 	// return true if the Assignment was known and removed.
