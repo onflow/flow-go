@@ -84,7 +84,7 @@ enum TransactionStatus {
 
 message Transaction {
   bytes script = 1;
-  bytes referenceBlockHash = 2;
+  bytes referenceBlockID = 2;
   uint64 nonce = 3;
   uint64 computeLimit = 4;
   bytes PayerAccount = 5;
