@@ -185,7 +185,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		if err != nil {
 			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
 		}
-		return nil
+		return fmt.Errorf("could not identify the origin of receipt, added to pending pool %w", err)
 	}
 
 	// execution results are only valid from execution nodes

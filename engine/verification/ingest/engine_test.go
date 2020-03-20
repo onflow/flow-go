@@ -219,6 +219,7 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.state.On("Final").Return(suite.ss)
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
+	suite.pendingReceipts.On("Add", suite.receipt).Return(nil).Once()
 
 	// process should fail
 	err := eng.Process(unstakedIdentity, suite.receipt)
