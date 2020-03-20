@@ -141,18 +141,20 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 	return e
 }
 
+// TestHandleBlock passes a block to ingest engine and evaluates internal path
 func (suite *TestSuite) TestHandleBlock() {
 	eng := suite.TestNewEngine()
 
-	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
-
-	// expect that that the block be added to the mempool
+	// expects that the block be added to the mempool and block storage
 	suite.blocks.On("Add", suite.block).Return(nil).Once()
-	suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
+	// suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
 	suite.blockStorage.On("Store", suite.block).Return(nil).Once()
-	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
-	suite.authReceipts.On("Add", suite.receipt).Return(nil)
-	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true)
+
+	// expects that checkPendingChunks is executed checking for pending and authenticated receipts
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil).Twice()
+	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil).Once()
 
 	err := eng.Process(unittest.IdentifierFixture(), suite.block)
 	suite.Assert().Nil(err)
