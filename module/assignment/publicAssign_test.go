@@ -1,6 +1,7 @@
 package assignment
 
 import (
+	"crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	size := 5
 	// creates ids and twice chunks of the ids
 	ids := test.CreateIDs(size)
-	chunks := a.CreateChunks(2 * size)
+	chunks := a.CreateChunks(2*size, a.T())
 	assignment := chunkassignment.NewAssignment()
 
 	// assigns two chunks to each verifier node
@@ -68,7 +69,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	size := 5
 	// creates ids and twice chunks of the ids
 	var ids flow.IdentityList = test.CreateIDs(size)
-	chunks := a.CreateChunks(2)
+	chunks := a.CreateChunks(2, a.T())
 	assignment := chunkassignment.NewAssignment()
 
 	// assigns first chunk to non-duplicate list of verifiers
@@ -150,7 +151,7 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	c := 10    // keeps number of chunks
 	n := 10    // keeps number of verifier nodes
 	alpha := 1 // each chunk requires alpha verifiers
-	chunks := a.CreateChunks(c)
+	chunks := a.CreateChunks(c, a.T())
 
 	// making two random generator with the same seed
 	// random generator #1
@@ -219,7 +220,7 @@ func (a *PublicAssignmentTestSuite) TestChunkAssignmentOneToMany() {
 func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, alpha int) {
 	rng, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
-	chunks := a.CreateChunks(chunkNum)
+	chunks := a.CreateChunks(chunkNum, a.T())
 
 	// creates nodes and keeps a copy of them
 	nodes := test.CreateIDs(verNum)
@@ -243,7 +244,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	rng, err := random.NewRand(a.seed)
 	require.NoError(a.T(), err)
-	chunks := a.CreateChunks(20)
+	chunks := a.CreateChunks(20, a.T())
 
 	// creates nodes and keeps a copy of them
 	nodes := test.CreateIDs(5)
@@ -287,11 +288,21 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 
 // CreateChunk creates and returns num chunks. It only fills the Index part of
 // chunks to make them distinct from each other.
-func (a *PublicAssignmentTestSuite) CreateChunks(num int) flow.ChunkList {
+func (a *PublicAssignmentTestSuite) CreateChunks(num int, t *testing.T) flow.ChunkList {
 	list := flow.ChunkList{}
 	for i := 0; i < num; i++ {
+		// creates random state for each chunk
+		// to provide random ordering after sorting
+		state := make([]byte, 64)
+		_, err := rand.Read(state)
+		require.NoError(t, err)
+
+		// creates chunk
 		c := &flow.Chunk{
 			Index: uint64(i),
+			ChunkBody: flow.ChunkBody{
+				StartState: state,
+			},
 		}
 		list.Insert(c)
 	}
