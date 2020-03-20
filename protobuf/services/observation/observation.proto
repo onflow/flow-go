@@ -70,15 +70,15 @@ message SendTransactionResponse {
 }
 
 message GetLatestBlockRequest {
-  bool isSealed = 1;
+  bool is_sealed = 1;
 }
 
 message GetBlockByHashRequest {
-  bool hash = 1;
+  bytes hash = 1;
 }
 
 message GetBlockByHeightRequest {
-  bool height = 1;
+  uint64 height = 1;
 }
 
 message BlockResponse {
@@ -86,15 +86,15 @@ message BlockResponse {
 }
 
 message GetLatestBlockDetailsRequest {
-  bool isSealed = 1;
+  bool is_sealed = 1;
 }
 
 message GetBlockDetailsByHashRequest {
-  bool hash = 1;
+  bytes hash = 1;
 }
 
 message GetBlockDetailsByHeightRequest {
-  bool height = 1;
+  uint64 height = 1;
 }
 
 message BlockDetailsResponse {
@@ -102,11 +102,11 @@ message BlockDetailsResponse {
 }
 
 message GetCollectionByHashRequest {
-  bool hash = 1;
+  bytes hash = 1;
 }
 
 message GetCollectionByHeightRequest {
-  bool height = 1;
+  uint64 height = 1;
 }
 
 message CollectionResponse {
@@ -131,8 +131,8 @@ message ExecuteScriptResponse {
 
 message GetEventsRequest {
     string type = 1;
-    uint64 startBlock = 2;
-    uint64 endBlock = 3;
+    uint64 start_block = 2;
+    uint64 end_block = 3;
 }
 
 message GetEventsResponse {
