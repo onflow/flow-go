@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"strconv"
+	"os"
 	"strings"
 	"testing"
 
@@ -43,28 +43,52 @@ func (n *FlowNetwork) Identities() flow.IdentityList {
 	return il
 }
 
-// Start spins up the network.
+// Start starts the network.
 func (n *FlowNetwork) Start(ctx context.Context) {
 	n.suite.Start(ctx)
 }
 
-// Stop spins down the network and cleans up temporary directories.
+// Stop stops the network and cleans up all resources. If you need to inspect
+// state, first stop the containers, then check state, then clean up resources.
 func (n *FlowNetwork) Stop() error {
-	var merr *multierror.Error
+
+	err := n.StopContainers()
+	if err != nil {
+		return fmt.Errorf("could not stop network: %w", err)
+	}
+
+	err = n.Cleanup()
+	if err != nil {
+		return fmt.Errorf("could not clean up network resources: %w", err)
+	}
+
+	return nil
+}
+
+// StopContainers spins down the network.
+func (n *FlowNetwork) StopContainers() error {
 
 	// stop the containers
 	err := n.suite.Close()
 	if err != nil {
-		merr = multierror.Append(merr, err)
+		return fmt.Errorf("could not stop containers: %w", err)
 	}
 
+	return nil
+}
+
+// Cleanup cleans up all temporary files used by the network.
+func (n *FlowNetwork) Cleanup() error {
+
+	var merr *multierror.Error
+
 	// remove data directories
-	//for _, c := range n.Containers {
-	//	err := os.RemoveAll(c.DataDir)
-	//	if err != nil {
-	//		merr = multierror.Append(merr, err)
-	//	}
-	//}
+	for _, c := range n.Containers {
+		err := os.RemoveAll(c.DataDir)
+		if err != nil {
+			merr = multierror.Append(merr, err)
+		}
+	}
 
 	return merr.ErrorOrNil()
 }
@@ -94,7 +118,6 @@ type NodeConfig struct {
 	Role       flow.Role
 	Stake      uint64
 	Identifier flow.Identifier
-	CLIOpts    map[string]string // map from CLI flag name to value
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) *NodeConfig {
@@ -102,7 +125,6 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) *NodeConfig {
 		Role:       role,
 		Stake:      1000,                         // default stake
 		Identifier: unittest.IdentifierFixture(), // default random ID
-		CLIOpts:    make(map[string]string),
 	}
 
 	for _, apply := range opts {
@@ -110,12 +132,6 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) *NodeConfig {
 	}
 
 	return c
-}
-
-func WithClusters(clusters int) func(*NodeConfig) {
-	return func(conf *NodeConfig) {
-		conf.CLIOpts["nclusters"] = strconv.Itoa(clusters)
-	}
 }
 
 type rolesCounts map[flow.Role]uint
@@ -129,14 +145,6 @@ func countRoles(identities []*NodeConfig) rolesCounts {
 	}
 
 	return ret
-}
-
-func identifier(identifier flow.Identifier) flow.Identifier {
-	// Substitute magic zero value for random on
-	if identifier == flow.ZeroID {
-		return unittest.IdentifierFixture()
-	}
-	return identifier
 }
 
 func healthcheckGRPC(context context.Context, apiPort string) error {
@@ -205,7 +213,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		}
 
 		identity := flow.Identity{
-			NodeID:  identifier(node.Identifier),
+			NodeID:  node.Identifier,
 			Address: fmt.Sprintf("%s:%d", name, 2137),
 			Role:    node.Role,
 			Stake:   node.Stake,
@@ -234,25 +242,13 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		require.Nil(t, err)
 		flowContainer.DataDir = tmpdir
 
-		// add the volume to host config
-		//opts.Config.Volumes = map[string]struct{}{volume.Name: {}}
-
-		// try using binds rather than mount
-		//https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
+		// Bind the host directory to the container's database directory
+		// NOTE: I did this using the approach from:
+		// https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
 		opts.HostConfig.Binds = append(
 			opts.HostConfig.Binds,
 			fmt.Sprintf("%s:%s:rw", tmpdir, DefaultDataDir),
 		)
-
-		// mount the temp directory to the datadir in the container
-		//opts.HostConfig.Mounts = append(
-		//	opts.HostConfig.Mounts,
-		//	mount.Mount{
-		//		Type:   mount.TypeBind,
-		//		Source: tmpdir,
-		//		Target: DefaultDataDir,
-		//	},
-		//)
 
 		switch identity.Role {
 		// enhance with extras for collection node
@@ -303,7 +299,6 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 	for i := range nodes {
 
 		c := add(opts[i], identities[i])
-		fmt.Println("mounts: ", opts[i].HostConfig.Mounts, identities[i].NodeID, identities[i].Role)
 
 		containers[i] = c
 	}
