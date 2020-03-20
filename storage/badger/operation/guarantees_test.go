@@ -131,3 +131,57 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		})
 	})
 }
+
+func TestFindDecendants(t *testing.T) {
+	t.Run("should find all descendants", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			finalizedHeight := 3
+			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
+
+			err := db.Update(func(tx *badger.Txn) error {
+				// add finalized block
+				require.Nil(t, addIndex(tx, finalizedHeight, finalizedHeight-1, finalizedHeight-1))
+
+				// add unfinalized blocks
+				require.Nil(t, addIndex(tx, 4, 4, 3))
+				require.Nil(t, addIndex(tx, 5, 5, 4))
+				require.Nil(t, addIndex(tx, 6, 6, 5))
+				require.Nil(t, addIndex(tx, 7, 7, 6))
+				require.Nil(t, addIndex(tx, 8, 8, 7))
+				require.Nil(t, addIndex(tx, 9, 9, 8))
+				return nil
+			})
+
+			var descendants []flow.Identifier
+			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
+			require.Nil(t, err)
+
+			assert.Equal(t, toFlowIds(4, 5, 6, 7, 8, 9), descendants)
+
+			err = db.DropAll()
+			require.Nil(t, err)
+		})
+	})
+
+	t.Run("should exclude disconnected blocks", func(t *testing.T) {
+	})
+
+	t.Run("should include conflicting blocks", func(t *testing.T) {
+	})
+
+	t.Run("should not include old finalized blocks", func(t *testing.T) {
+	})
+}
+
+// helper to create a list Identifier from numbers
+func toFlowIds(ns ...int) []flow.Identifier {
+	ids := make([]flow.Identifier, len(ns))
+	for i, n := range ns {
+		ids[i] = flow.Identifier{byte(n)}
+	}
+	return ids
+}
+
+func addIndex(tx *badger.Txn, height int, blockID int, parentID int) error {
+	return IndexGuaranteePayload(uint64(height), flow.Identifier{byte(blockID)}, flow.Identifier{byte(parentID)}, make([]flow.Identifier, 0))(tx)
+}

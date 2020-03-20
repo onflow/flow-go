@@ -8,10 +8,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// can't use MaxUint64:
-// because constant 18446744073709551615 overflows int
-const MAX_BLOCK_HEIGHT = uint64(math.MaxUint32)
-
 func InsertGuarantee(guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
 	return insert(makePrefix(codeGuarantee, guarantee.CollectionID), guarantee)
 }
@@ -44,9 +40,9 @@ func CheckGuaranteePayload(height uint64, blockID flow.Identifier, candidateIDs 
 	return iterate(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(0)), searchduplicates(blockID, candidateIDs, invalidIDs))
 }
 
-// FindDecendants finds all the incorporated decendants for a given block.
-// Useful for finding all the incorporated unfinalized blocks for the finalized block.
-// "Incorporated" means blocks have to all connected to the given block.
-func FindDecendants(height uint64, blockID flow.Identifier, decendants *[]flow.Identifier) func(*badger.Txn) error {
-	return iterateKey(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, MAX_BLOCK_HEIGHT), finddescendant(blockID, decendants))
+// FindDescendants uses guarantee payload index to find all the incorporated descendants for a given block.
+// Useful for finding all the unfinalized and incorporated blocks
+// "Incorporated" means a block connects to a given block through a certain number of intermediate blocks
+func FindDescendants(height uint64, blockID flow.Identifier, descendants *[]flow.Identifier) func(*badger.Txn) error {
+	return iterateKey(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(math.MaxUint64)), finddescendant(blockID, descendants))
 }
