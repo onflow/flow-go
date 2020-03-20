@@ -1,9 +1,0 @@
-*.interp linguist-generated=true
-*.tokens linguist-generated=true
-parser/cadence_parser.go linguist-generated=true
-parser/cadence_lexer.go linguist-generated=true
-parser/cadence_base_listener.go linguist-generated=true
-parser/cadence_base_visitor.go linguist-generated=true
-parser/cadence_visitor.go linguist-generated=true
-parser/cadence_listener.go linguist-generated=true
-

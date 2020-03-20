@@ -3,6 +3,7 @@ package verifier
 import (
 	"fmt"
 
+	"github.com/dapperlabs/cadence/runtime"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
