@@ -157,6 +157,9 @@ type createFunc func() interface{}
 // and the entity was decoded.
 type handleFunc func() error
 
+// handleKeyFunc is a function that process the current key during a badger iteration.
+type handleKeyFunc func(key []byte)
+
 // iterationFunc is a function provided to our low-level iteration function that
 // allows us to pass badger efficiencies across badger boundaries. By calling it
 // for each iteration step, we can inject a function to check the key, a
@@ -267,6 +270,58 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 			if err != nil {
 				return fmt.Errorf("could not process value: %w", err)
 			}
+		}
+
+		return nil
+	}
+}
+
+// iterateKey iterate only the keys from the given `start` prefix to the given `end` prefix.
+// On each iteration, the key will be passed to the handle function to be handeld.
+// It is useful to traverse through the index when the data needed are all included in the
+// key itself without reading the value.
+func iterateKey(start []byte, end []byte, handle handleKeyFunc) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// initialize the default options and comparison modifier for iteration
+		modifier := 1
+		options := badger.DefaultIteratorOptions
+
+		// If start is bigger than end, we have a backwards iteration:
+		// 1) Seek will go to the first key that is equal or lesser than the
+		// start prefix. However, this will only include the first key with the
+		// start prefix; we need to add 0xff to the start prefix to cover all
+		// items with the start prefix.
+		// 2) We break the loop upon hitting the first item that has a key
+		// higher than the end prefix. In order to reverse this, we use a
+		// modifier for the comparison that reverses the check and makes it
+		// stop upon the first item before the end prefix.
+		// 3) We also set the reverse option on the iterator, so we step through
+		// all of the keys backwards.
+		if bytes.Compare(start, end) > 0 {
+			options.Reverse = true      // make sure to go in reverse order
+			start = append(start, 0xff) // make sure to start after start prefix
+			modifier = -1               // make sure to stop before end prefix
+		}
+
+		it := tx.NewIterator(options)
+		defer it.Close()
+
+		for it.Seek(start); it.Valid(); it.Next() {
+
+			item := it.Item()
+
+			// check if we have reached the end of our iteration
+			// NOTE: we have to cut down the prefix to the same length as the
+			// end prefix in order to go through all items that have the same
+			// partial prefix before breaking
+			key := item.Key()
+			prefix := key[0:len(end)]
+			if bytes.Compare(prefix, end)*modifier > 0 {
+				break
+			}
+
+			handle(key)
 		}
 
 		return nil
@@ -450,5 +505,35 @@ func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, i
 		}
 
 		return check, create, handle
+	}
+}
+
+// finddescendant returns an handleKey function for iteration. It iterates keys in badger
+// and find the descendants blocks (blocks with higher view) that connected to the block
+// by the given blockID.
+func finddescendant(blockID flow.Identifier, descendants *[]flow.Identifier) handleKeyFunc {
+	incorporated := make(map[flow.Identifier]struct{})
+
+	// set the input block as incorporated. (The scenario for the input block is usually the
+	// finalized block)
+	incorporated[blockID] = struct{}{}
+
+	return func(key []byte) {
+		_, blockID, parentID := fromPayloadIndex(key)
+
+		_, ok := incorporated[parentID]
+		if ok {
+			// if parent is incorporated, then this block is incorporated too.
+			// adding it to the descendants list.
+			(*descendants) = append((*descendants), blockID)
+			incorporated[blockID] = struct{}{}
+		}
+
+		// if a block's parent isn't found in the incorporated list, then it's not incorporated.
+		// And it will never be incorporated, because we are traversing blocks with height in
+		// the increasing order. So future blocks will have higher height, and is not possible
+		// to fill the gap between this block and any existing incorporated block. Even if there is,
+		// that block must be an invalid block anyway, which is fine not being included in the
+		// descendants list.
 	}
 }
