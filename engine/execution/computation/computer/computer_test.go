@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
@@ -31,7 +31,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Twice()
 
-		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -62,7 +62,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Times(totalTransactionCount)
 
-		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 

@@ -184,7 +184,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
-	registerDeltasStorage := storage.NewRegisterDeltas(node.DB)
 
 	levelDB := unittest.TempLevelDB(t)
 
@@ -196,7 +195,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, chunkDataPackStorage, executionResults, node.DB)
 
-	stateSync := sync.NewStateSynchronizer(node.State, registerDeltasStorage)
+	stateSync := sync.NewStateSynchronizer(node.State)
 
 	providerEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState, stateSync)
 	require.NoError(t, err)

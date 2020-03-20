@@ -196,15 +196,15 @@ func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *mess
 				Msg("sending block delta")
 
 			// TODO: include full block (header + payload) in response?
-			msg := &messages.ExecutionStateDelta{
-				BlockID: blockID,
-				Delta:   delta,
-			}
-
-			err := e.execSyncCon.Submit(msg, originID)
-			if err != nil {
-				return fmt.Errorf("could not submit block delta: %w", err)
-			}
+			//msg := &messages.ExecutionStateDelta{
+			//	BlockID: blockID,
+			//	Delta:   delta,
+			//}
+			//
+			//err := e.execSyncCon.Submit(msg, originID)
+			//if err != nil {
+			//	return fmt.Errorf("could not submit block delta: %w", err)
+			//}
 
 			return nil
 		},

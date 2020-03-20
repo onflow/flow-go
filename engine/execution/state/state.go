@@ -5,6 +5,8 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -18,9 +20,9 @@ import (
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
 type ExecutionState interface {
 	// NewView creates a new ready-only view at the given state commitment.
-	NewView(flow.StateCommitment) *View
+	NewView(flow.StateCommitment) *delta.View
 	// CommitDelta commits a register delta and returns the new state commitment.
-	CommitDelta(Delta) (flow.StateCommitment, error)
+	CommitDelta(delta.Delta) (flow.StateCommitment, error)
 
 	GetRegisters(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, error)
 	GetChunkRegisters(flow.Identifier) (flow.Ledger, error)
@@ -46,6 +48,9 @@ type ExecutionState interface {
 	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
 
 	FindLatestFinalizedAndExecutedBlock() (*flow.Header, error)
+
+	PersistStateViews(blockID flow.Identifier, views []*delta.View) error
+	RetrieveStateViews(blockID flow.Identifier) ([]*delta.View, error)
 }
 
 type state struct {
@@ -76,7 +81,7 @@ func NewExecutionState(
 	}
 }
 
-func LedgerGetRegister(ledger storage.Ledger, commitment flow.StateCommitment) GetRegisterFunc {
+func LedgerGetRegister(ledger storage.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
 	return func(key flow.RegisterID) ([]byte, error) {
 		values, err := ledger.GetRegisters(
 			[]flow.RegisterID{key},
@@ -94,11 +99,11 @@ func LedgerGetRegister(ledger storage.Ledger, commitment flow.StateCommitment) G
 	}
 }
 
-func (s *state) NewView(commitment flow.StateCommitment) *View {
-	return NewView(LedgerGetRegister(s.ls, commitment))
+func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
+	return delta.NewView(LedgerGetRegister(s.ls, commitment))
 }
 
-func CommitDelta(ledger storage.Ledger, delta Delta) (flow.StateCommitment, error) {
+func CommitDelta(ledger storage.Ledger, delta delta.Delta) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
 
 	// TODO: update CommitDelta to also return proofs
@@ -110,7 +115,7 @@ func CommitDelta(ledger storage.Ledger, delta Delta) (flow.StateCommitment, erro
 	return commit, nil
 }
 
-func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
+func (s *state) CommitDelta(delta delta.Delta) (flow.StateCommitment, error) {
 	return CommitDelta(s.ls, delta)
 }
 
@@ -218,4 +223,21 @@ func (s *state) FindLatestFinalizedAndExecutedBlock() (*flow.Header, error) {
 		return nil, err
 	}
 	return &header, nil
+}
+
+func (s *state) PersistStateViews(blockID flow.Identifier, views []*delta.View) error {
+	return s.db.Update(func(txn *badger.Txn) error {
+		return operation.InsertExecutionStateViews(blockID, views)(txn)
+	})
+}
+
+func (s *state) RetrieveStateViews(blockID flow.Identifier) ([]*delta.View, error) {
+	var views []*delta.View
+	err := s.db.View(func(txn *badger.Txn) error {
+		return operation.RetrieveExecutionStateViews(blockID, views)(txn)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return views, nil
 }

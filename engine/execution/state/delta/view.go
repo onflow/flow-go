@@ -1,6 +1,8 @@
-package state
+package delta
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 // GetRegisterFunc is a function that returns the value for a register.
 type GetRegisterFunc func(key flow.RegisterID) (flow.RegisterValue, error)

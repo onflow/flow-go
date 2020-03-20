@@ -18,11 +18,11 @@ type StateSynchronizer interface {
 
 func NewStateSynchronizer(
 	state protocol.State,
-	registerDeltas storage.RegisterDeltas,
+	//registerDeltas storage.RegisterDeltas,
 ) StateSynchronizer {
 	return &stateSync{
 		state:          state,
-		registerDeltas: registerDeltas,
+		//registerDeltas: registerDeltas,
 	}
 }
 

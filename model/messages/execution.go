@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -34,6 +35,8 @@ type ExecutionStateSyncRequest struct {
 }
 
 type ExecutionStateDelta struct {
-	BlockID flow.Identifier
-	Delta   flow.RegisterDelta
+	Block      *flow.Block
+	StateViews []*delta.View
+	StartState flow.StateCommitment
+	EndState   flow.StateCommitment
 }

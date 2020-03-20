@@ -1,17 +1,21 @@
 package ingestion
 
 import (
+	"bytes"
 	"fmt"
+	"math/rand"
 	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -34,6 +38,7 @@ type Engine struct {
 	state              protocol.State
 	conduit            network.Conduit
 	collectionConduit  network.Conduit
+	syncConduit        network.Conduit
 	blocks             storage.Blocks
 	payloads           storage.Payloads
 	collections        storage.Collections
@@ -43,7 +48,7 @@ type Engine struct {
 	execState          state.ExecutionState
 	wg                 sync.WaitGroup
 	syncModeThreshold  uint64 //how many consecutive orphaned blocks trigger sync
-	syncInProgress     bool
+	syncInProgress     *atomic.Bool
 }
 
 func New(
@@ -75,7 +80,7 @@ func New(
 		mempool:            mempool,
 		execState:          execState,
 		syncModeThreshold:  6, //TODO - config param maybe?
-		syncInProgress:     false,
+		syncInProgress:     atomic.NewBool(false),
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -88,8 +93,14 @@ func New(
 		return nil, errors.Wrap(err, "could not register collection provider engine")
 	}
 
+	syncConduit, err := net.Register(engine.ExecutionSync, &eng)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not register execution sync engine")
+	}
+
 	eng.conduit = con
 	eng.collectionConduit = collConduit
+	eng.syncConduit = syncConduit
 
 	return &eng, nil
 }
@@ -135,6 +146,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			err = e.handleBlock(v)
 		case *messages.CollectionResponse:
 			err = e.handleCollectionResponse(v)
+		case *messages.ExecutionStateDelta:
+			err = e.handleExecutionStateDelta(v, originID)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -192,7 +205,8 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		if queue, added := tryEnqueue(executableBlock, orphanQueues); added {
 			e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 			// this is only queue which grew and could trigger threshold
-			if !e.syncInProgress && queue.Height() > e.syncModeThreshold {
+			if !e.syncInProgress.Load() && queue.Height() > e.syncModeThreshold {
+				e.syncInProgress.Store(true)
 				// Start sync mode - initializing would require DB operation and will stop processing blocks here
 				// which is exactly what we want
 				e.StartSync(queue.Head.ExecutableBlock)
@@ -463,11 +477,31 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
-	chunks := make([]*flow.Chunk, len(result.StateViews))
+	err := e.execState.PersistStateViews(result.ExecutableBlock.Block.ID(), result.StateViews)
+	if err != nil {
+		return nil, err
+	}
 
+	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateViews, startState)
+	if err != nil {
+		return nil, err
+	}
+
+	err = e.providerEngine.BroadcastExecutionReceipt(receipt)
+	if err != nil {
+		return nil, fmt.Errorf("could not send broadcast order: %w", err)
+	}
+
+	return receipt.ExecutionResult.FinalStateCommit, nil
+}
+
+func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.View, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+	chunks := make([]*flow.Chunk, len(stateViews))
+
+	// TODO check current state root == startState
 	var endState flow.StateCommitment = startState
 
-	for i, view := range result.StateViews {
+	for i, view := range stateViews {
 		// TODO - Deltas should be applied to a particular state
 		var err error
 		endState, err = e.execState.CommitDelta(view.Delta())
@@ -489,7 +523,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
 
 		if err != nil {
-			return nil, fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, result.ExecutableBlock.Block.ID())
+			return nil, fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, block.ID())
 		}
 
 		chdp := generateChunkDataPack(chunk, allRegisters, values, proofs)
@@ -502,7 +536,12 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		startState = endState
 	}
 
-	executionResult, err := e.generateExecutionResultForBlock(result.ExecutableBlock, chunks, endState)
+	err := e.execState.PersistStateCommitment(block.ID(), endState)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store state commitment: %w", err)
+	}
+
+	executionResult, err := e.generateExecutionResultForBlock(block, chunks, endState)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -516,17 +555,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		ExecutorID:        e.me.NodeID(),
 	}
 
-	err = e.execState.PersistStateCommitment(result.ExecutableBlock.Block.ID(), endState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to store state commitment: %w", err)
-	}
-
-	err = e.providerEngine.BroadcastExecutionReceipt(receipt)
-	if err != nil {
-		return nil, fmt.Errorf("could not send broadcast order: %w", err)
-	}
-
-	return endState, nil
+	return receipt, nil
 }
 
 // generateChunk creates a chunk from the provided computation data.
@@ -562,12 +591,12 @@ func generateChunkHeader(
 // generateExecutionResultForBlock creates new ExecutionResult for a block from
 // the provided chunk results.
 func (e *Engine) generateExecutionResultForBlock(
-	block *entity.ExecutableBlock,
+	block *flow.Block,
 	chunks []*flow.Chunk,
 	endState flow.StateCommitment,
 ) (*flow.ExecutionResult, error) {
 
-	previousErID, err := e.execState.GetExecutionResultID(block.Block.ParentID)
+	previousErID, err := e.execState.GetExecutionResultID(block.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get previous execution result ID: %w", err)
 	}
@@ -575,13 +604,13 @@ func (e *Engine) generateExecutionResultForBlock(
 	er := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: previousErID,
-			BlockID:          block.Block.ID(),
+			BlockID:          block.ID(),
 			FinalStateCommit: endState,
 			Chunks:           chunks,
 		},
 	}
 
-	err = e.execState.PersistExecutionResult(block.Block.ID(), *er)
+	err = e.execState.PersistExecutionResult(block.ID(), *er)
 	if err != nil {
 		return nil, fmt.Errorf("could not persist execution result: %w", err)
 	}
@@ -589,11 +618,54 @@ func (e *Engine) generateExecutionResultForBlock(
 	return er, nil
 }
 
-func (e *Engine) StartSync(completeBlock *entity.ExecutableBlock) {
+func (e *Engine) StartSync(targetBlock *entity.ExecutableBlock) {
 	// find latest finalized block with state commitment
 	// this way we maximise chance of path existing between it and fresh one
 	// TODO - this doesn't make sense if we treat every block as finalized (MVP)
 
+	lastExecutedBlock, err := e.execState.FindLatestFinalizedAndExecutedBlock()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("error while starting sync - cannot find last executed block")
+	}
+
+	otherNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter())
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("error while finding other execution nodes identities")
+		return
+	}
+
+	if len(otherNodes) < 1 {
+		e.log.Fatal().Err(err).Msg("no other execution nodes to sync from")
+	}
+
+	// select other node at random
+	// TODO - protocol which surveys other nodes for state
+	// TODO - ability to sync from multiple servers
+	otherNodeIdentity := otherNodes[rand.Intn(len(otherNodes))]
+
+	err = e.syncConduit.Submit(&messages.ExecutionStateSyncRequest{
+		CurrentBlockID: lastExecutedBlock.ID(),
+		TargetBlockID:  targetBlock.Block.ID(),
+	}, otherNodeIdentity.NodeID)
+
+	if err != nil {
+		e.log.Fatal().Err(err).Str("target_node_id", otherNodeIdentity.NodeID.String()).Msg("error while requesting state sync from other node")
+	}
+}
+
+func (e *Engine) handleExecutionStateDelta(executionStateDelta *messages.ExecutionStateDelta, originID flow.Identifier) error {
+
+	//TODO - validate state sync, reject invalid messages, change provider
+	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateViews, executionStateDelta.StartState)
+	if err != nil {
+		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).Err(err).Msg("fatal error while processing sync message")
+	}
+
+	if bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, executionStateDelta.EndState) {
+		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).Err(err).Msg("processing sync message produced unexpected state commitment")
+	}
+
+	return nil
 }
 
 // generateChunkDataPack creates a chunk data pack

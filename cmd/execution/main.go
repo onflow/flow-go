@@ -80,8 +80,8 @@ func main() {
 			executionResults := badger.NewExecutionResults(node.DB)
 			stateCommitments = badger.NewCommits(node.DB)
 			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders, chunkDataPacks, executionResults, node.DB)
-			registerDeltas := badger.NewRegisterDeltas(node.DB)
-			stateSync := sync.NewStateSynchronizer(node.State, registerDeltas)
+			//registerDeltas := badger.NewRegisterDeltas(node.DB)
+			stateSync := sync.NewStateSynchronizer(node.State)
 
 			providerEngine, err = provider.New(
 				node.Logger,

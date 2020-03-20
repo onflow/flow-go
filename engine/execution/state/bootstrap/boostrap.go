@@ -6,13 +6,14 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
 // BootstrapLedger adds the above root account to the ledger
 func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
-	view := state.NewView(state.LedgerGetRegister(ledger, ledger.LatestStateCommitment()))
+	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.LatestStateCommitment()))
 
 	BootstrapView(view)
 
@@ -24,7 +25,7 @@ func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
 	return newStateCommitment, nil
 }
 
-func BootstrapView(view *state.View) {
+func BootstrapView(view *delta.View) {
 	privateKeyBytes, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
 	if err != nil {
 		panic("Cannot hex decode hardcoded key!")

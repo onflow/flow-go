@@ -20,4 +20,7 @@ type Local interface {
 	// generates and returns a signature over the message using the node's private key
 	// as well as the input hasher
 	Sign([]byte, crypto.Hasher) (crypto.Signature, error)
+
+	// NotMeFilter returns handy not-me filter for searching identity
+	NotMeFilter() flow.IdentityFilter
 }

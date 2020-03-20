@@ -252,7 +252,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	execState.On("GetExecutionResultID", executableBlock.Block.ParentID).Return(previousExecutionResultID, nil)
 	execState.On("PersistExecutionResult", executableBlock.Block.ID(), mock.Anything).Return(nil)
 
-	er, err := e.generateExecutionResultForBlock(executableBlock, nil, endState)
+	er, err := e.generateExecutionResultForBlock(executableBlock.Block, nil, endState)
 	assert.NoError(t, err)
 
 	assert.Equal(t, previousExecutionResultID, er.PreviousResultID)

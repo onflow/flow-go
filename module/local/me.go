@@ -5,6 +5,7 @@ package local
 import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 )
 
 type Local struct {
@@ -30,4 +31,8 @@ func (l *Local) Address() string {
 
 func (l *Local) Sign(msg []byte, hasher crypto.Hasher) (crypto.Signature, error) {
 	return l.sk.Sign(msg, hasher)
+}
+
+func (l *Local) NotMeFilter() flow.IdentityFilter {
+	return filter.Not(filter.HasNodeID(l.NodeID()))
 }

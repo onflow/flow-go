@@ -1,4 +1,4 @@
-package state_test
+package delta_test
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -15,7 +15,7 @@ func TestView_Get(t *testing.T) {
 	copy(registerID, "fruit")
 
 	t.Run("ValueNotSet", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -25,7 +25,7 @@ func TestView_Get(t *testing.T) {
 	})
 
 	t.Run("ValueNotInCache", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			if bytes.Equal(key, registerID) {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -38,7 +38,7 @@ func TestView_Get(t *testing.T) {
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			if bytes.Equal(key, registerID) {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -58,7 +58,7 @@ func TestView_Set(t *testing.T) {
 	registerID := make([]byte, 32)
 	copy(registerID, "fruit")
 
-	v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+	v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
@@ -75,7 +75,7 @@ func TestView_Set(t *testing.T) {
 	assert.Equal(t, flow.RegisterValue("orange"), b2)
 
 	t.Run("AfterDelete", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -97,7 +97,7 @@ func TestView_Delete(t *testing.T) {
 	copy(registerID, "fruit")
 
 	t.Run("ValueNotSet", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -116,7 +116,7 @@ func TestView_Delete(t *testing.T) {
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			if bytes.Equal(key, registerID) {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -149,11 +149,11 @@ func TestView_ApplyDelta(t *testing.T) {
 	copy(registerID2, "vegetable")
 
 	t.Run("EmptyView", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		d := state.NewDelta()
+		d := delta.NewDelta()
 		d.Set(registerID1, flow.RegisterValue("apple"))
 		d.Set(registerID2, flow.RegisterValue("carrot"))
 
@@ -169,14 +169,14 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("EmptyDelta", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 		v.Set(registerID2, flow.RegisterValue("carrot"))
 
-		d := state.NewDelta()
+		d := delta.NewDelta()
 
 		v.ApplyDelta(d)
 
@@ -190,13 +190,13 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("NoCollisions", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 
-		d := state.NewDelta()
+		d := delta.NewDelta()
 		d.Set(registerID2, flow.RegisterValue("carrot"))
 
 		v.ApplyDelta(d)
@@ -211,13 +211,13 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("OverwriteSetValue", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 
-		d := state.NewDelta()
+		d := delta.NewDelta()
 		d.Set(registerID1, flow.RegisterValue("orange"))
 
 		v.ApplyDelta(d)
@@ -228,14 +228,14 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("OverwriteDeletedValue", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 		v.Delete(registerID1)
 
-		d := state.NewDelta()
+		d := delta.NewDelta()
 		d.Set(registerID1, flow.RegisterValue("orange"))
 
 		v.ApplyDelta(d)
@@ -246,13 +246,13 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("DeleteSetValue", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 
-		d := state.NewDelta()
+		d := delta.NewDelta()
 		d.Delete(registerID1)
 
 		v.ApplyDelta(d)
@@ -270,7 +270,7 @@ func TestView_Reads(t *testing.T) {
 	registerID2 := make([]byte, 32)
 	copy(registerID2, "vegetable")
 
-	v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+	v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
@@ -280,7 +280,7 @@ func TestView_Reads(t *testing.T) {
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -296,7 +296,7 @@ func TestView_Reads(t *testing.T) {
 	})
 
 	t.Run("ValuesNotInCache", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			if bytes.Equal(key, registerID1) {
 				return flow.RegisterValue("orange"), nil
 			}

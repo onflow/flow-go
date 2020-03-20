@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -158,4 +159,8 @@ func (m *MockLocal) Sign(msg []byte, hasher crypto.Hasher) (crypto.Signature, er
 
 func (m *MockLocal) MockNodeID(id flow.Identifier) {
 	m.id = id
+}
+
+func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
+	return filter.Not(filter.HasNodeID(m.id))
 }

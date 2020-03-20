@@ -1,11 +1,11 @@
-package state_test
+package delta_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -14,7 +14,7 @@ func TestDelta_Get(t *testing.T) {
 	copy(registerID1, "fruit")
 
 	t.Run("ValueNotSet", func(t *testing.T) {
-		d := state.NewDelta()
+		d := delta.NewDelta()
 
 		b, exists := d.Get(registerID1)
 		assert.Nil(t, b)
@@ -22,7 +22,7 @@ func TestDelta_Get(t *testing.T) {
 	})
 
 	t.Run("ValueSet", func(t *testing.T) {
-		d := state.NewDelta()
+		d := delta.NewDelta()
 
 		d.Set(registerID1, flow.RegisterValue("apple"))
 
@@ -36,7 +36,7 @@ func TestDelta_Set(t *testing.T) {
 	registerID1 := make([]byte, 32)
 	copy(registerID1, "fruit")
 
-	d := state.NewDelta()
+	d := delta.NewDelta()
 
 	d.Set(registerID1, flow.RegisterValue("apple"))
 
@@ -56,7 +56,7 @@ func TestDelta_Delete(t *testing.T) {
 	copy(registerID1, "fruit")
 
 	t.Run("ValueNotSet", func(t *testing.T) {
-		d := state.NewDelta()
+		d := delta.NewDelta()
 
 		d.Delete(registerID1)
 
@@ -66,7 +66,7 @@ func TestDelta_Delete(t *testing.T) {
 	})
 
 	t.Run("ValueSet", func(t *testing.T) {
-		d := state.NewDelta()
+		d := delta.NewDelta()
 
 		d.Set(registerID1, flow.RegisterValue("apple"))
 		d.Delete(registerID1)
@@ -85,8 +85,8 @@ func TestDelta_MergeWith(t *testing.T) {
 	copy(registerID2, "vegetable")
 
 	t.Run("NoCollisions", func(t *testing.T) {
-		d1 := state.NewDelta()
-		d2 := state.NewDelta()
+		d1 := delta.NewDelta()
+		d2 := delta.NewDelta()
 
 		d1.Set(registerID1, flow.RegisterValue("apple"))
 		d2.Set(registerID2, flow.RegisterValue("carrot"))
@@ -101,8 +101,8 @@ func TestDelta_MergeWith(t *testing.T) {
 	})
 
 	t.Run("OverwriteSetValue", func(t *testing.T) {
-		d1 := state.NewDelta()
-		d2 := state.NewDelta()
+		d1 := delta.NewDelta()
+		d2 := delta.NewDelta()
 
 		d1.Set(registerID1, flow.RegisterValue("apple"))
 		d2.Set(registerID1, flow.RegisterValue("orange"))
@@ -114,8 +114,8 @@ func TestDelta_MergeWith(t *testing.T) {
 	})
 
 	t.Run("OverwriteDeletedValue", func(t *testing.T) {
-		d1 := state.NewDelta()
-		d2 := state.NewDelta()
+		d1 := delta.NewDelta()
+		d2 := delta.NewDelta()
 
 		d1.Set(registerID1, flow.RegisterValue("apple"))
 		d1.Delete(registerID1)
@@ -129,8 +129,8 @@ func TestDelta_MergeWith(t *testing.T) {
 	})
 
 	t.Run("DeleteSetValue", func(t *testing.T) {
-		d1 := state.NewDelta()
-		d2 := state.NewDelta()
+		d1 := delta.NewDelta()
+		d2 := delta.NewDelta()
 
 		d1.Set(registerID1, flow.RegisterValue("apple"))
 
