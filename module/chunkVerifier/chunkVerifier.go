@@ -52,9 +52,11 @@ func (fcv *FlowChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 	}
 
 	regMap := ch.ChunkDataPack.GetRegisterValues()
+	raiseErrorWithRead := false
 	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
 		val, ok := regMap[string(key)]
 		if !ok {
+			raiseErrorWithRead = true
 			return nil, fmt.Errorf("missing register")
 		}
 		return val, nil
@@ -70,27 +72,27 @@ func (fcv *FlowChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 		if err != nil {
 			return fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
-
 		if result.Succeeded() {
+			// Delta captures all register updates and only
+			// applies them if TX is successful.
 			chunkView.ApplyDelta(txView.Delta())
 		}
 	}
 	// TODO check the number of transactions and computation used
 
-	if err != nil {
-		return fmt.Errorf("failed to execute transactions: %w", err)
-	}
+	// Apply delta (register updates (chunk level) to the partial trie
+	// this returns the expected end state commitment after updates.
 
-	// Apply delta to ptrie
 	regs, values := chunkView.Delta().RegisterUpdates()
-	expectedEndState, err := ptrie.Update(regs, values)
+	expEndStateComm, err := ptrie.Update(regs, values)
 	if err != nil {
 		return fmt.Errorf("error updating partial trie %v", err)
 
 	}
-	// Check state commitment
-	if !bytes.Equal(expectedEndState, ch.EndState) {
-		return fmt.Errorf("final state commitment doesn't match: [%x] != [%x]", ptrie.GetRootHash(), ch.EndState)
+	// Check if the end state commitment mentioned in the chunk matches
+	// what the partial trie is providing.
+	if !bytes.Equal(expEndStateComm, ch.EndState) {
+		return fmt.Errorf("final state commitment doesn't match: [%x] != [%x]", expEndStateComm, ch.EndState)
 	}
 	return nil
 
