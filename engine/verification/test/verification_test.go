@@ -157,7 +157,7 @@ func TestHappyPath(t *testing.T) {
 	assert.Nil(t, err)
 
 	// the receipt should be added to the mempool
-	assert.True(t, verNode.Receipts.Has(completeER.Receipt.ID()))
+	assert.True(t, verNode.AuthReceipts.Has(completeER.Receipt.ID()))
 
 	// flush the chunk state request
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)

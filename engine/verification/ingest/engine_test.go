@@ -451,6 +451,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.authReceipts.On("Add", suite.receipt).Return(nil)
 			suite.collections.On("Add", suite.collection).Return(nil)
 			suite.blocks.On("Add", suite.block).Return(nil)
+			suite.blockStorage.On("Store", suite.block).Return(nil)
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
 			// we have all dependencies
@@ -462,6 +463,8 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
 			suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+			suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+			suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
 
 			// removing the resources for a chunk
 			suite.collections.On("Rem", suite.collection.ID()).Return(true).Once()
