@@ -736,7 +736,7 @@ func testProposalWrongParentBelow(t *testing.T) {
 
 	err = v.ValidateProposal(proposal)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "its view is above the finalized view, but its QC is below the finalized view")
+	require.Equal(t, err, hs.ErrUnverifiableBlock)
 }
 
 func testProposalInvalidQC(t *testing.T) {

@@ -383,13 +383,13 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handlePostInit(f)
 	}
 
-	if fnb.genesis != nil && fnb.genesisHandler != nil {
-		fnb.genesisHandler(fnb, fnb.genesis)
-	}
-
 	// set up all modules
 	for _, f := range fnb.modules {
 		fnb.handleModule(f)
+	}
+
+	if fnb.genesis != nil && fnb.genesisHandler != nil {
+		fnb.genesisHandler(fnb, fnb.genesis)
 	}
 
 	// initialize all components

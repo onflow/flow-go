@@ -43,3 +43,9 @@ func EjectTrueRandom(entities map[flow.Identifier]flow.Entity) (flow.Identifier,
 	}
 	return entityID, entity
 }
+
+// EjectPanic simply panics, crashing the program. Useful when cache is not expected
+// to grow beyond certain limits, but ejecting is not applicable
+func EjectPanic(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+	panic("unexpected: mempool size over the limit")
+}

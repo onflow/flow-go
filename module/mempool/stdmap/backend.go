@@ -78,7 +78,7 @@ func (b *Backdata) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
 }
 
-// Backend provides synchronized access to a backend
+// Backend provides synchronized access to a backdata
 type Backend struct {
 	sync.RWMutex
 	Backdata
@@ -129,10 +129,10 @@ func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, error) {
 	return b.Backdata.ByID(entityID)
 }
 
-// Run fetches the given item from the pool and runs given function on it, returning the entity after
+// Run executes a function giving it exclusive access to the backdata
 func (b *Backend) Run(f func(backdata *Backdata) error) error {
-	b.RLock()
-	defer b.RUnlock()
+	b.Lock()
+	defer b.Unlock()
 	err := f(&b.Backdata)
 	b.reduce()
 	return err

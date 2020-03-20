@@ -6,12 +6,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
@@ -77,10 +77,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 }
 
-func generateBlock(collectionCount, transactionCount int) *execution.CompleteBlock {
-	collections := make([]*execution.CompleteCollection, collectionCount)
+func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBlock {
+	collections := make([]*entity.CompleteCollection, collectionCount)
 	guarantees := make([]*flow.CollectionGuarantee, collectionCount)
-	completeCollections := make(map[flow.Identifier]*execution.CompleteCollection)
+	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
 
 	for i := 0; i < collectionCount; i++ {
 		collection := generateCollection(transactionCount)
@@ -98,13 +98,13 @@ func generateBlock(collectionCount, transactionCount int) *execution.CompleteBlo
 		},
 	}
 
-	return &execution.CompleteBlock{
+	return &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
 	}
 }
 
-func generateCollection(transactionCount int) *execution.CompleteCollection {
+func generateCollection(transactionCount int) *entity.CompleteCollection {
 	transactions := make([]*flow.TransactionBody, transactionCount)
 
 	for i := 0; i < transactionCount; i++ {
@@ -117,7 +117,7 @@ func generateCollection(transactionCount int) *execution.CompleteCollection {
 
 	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
 
-	return &execution.CompleteCollection{
+	return &entity.CompleteCollection{
 		Guarantee:    guarantee,
 		Transactions: transactions,
 	}
