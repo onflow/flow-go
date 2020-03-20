@@ -35,7 +35,7 @@ func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkassignment.Assig
 	}
 	adp, ok := entity.(*chunkassignment.AssignmentDataPack)
 	if !ok {
-		panic(fmt.Sprintf("invalid entity in assignments pool (%T)", entity))
+		return nil, fmt.Errorf("invalid entity in assignments pool (%T)", entity)
 	}
 	return adp.Assignment(), nil
 }
