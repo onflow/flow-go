@@ -15,29 +15,29 @@ service ObserveService {
   // Block (block header)
   // GetLatestBlock gets the latest sealed or unsealed block.
   rpc GetLatestBlock (GetLatestBlockRequest) returns (BlockResponse);
-  // GetBlockByHash gets a block by its hash
-  rpc GetBlockByHash (GetBlockByHashRequest) returns (BlockResponse);
+  // GetBlockByID gets a block by its ID
+  rpc GetBlockByID (GetBlockByIDRequest) returns (BlockResponse);
   // GetBlockByHeight gets a block by its height
   rpc GetBlockByHeight (GetBlockByHeightRequest) returns (BlockResponse);
 
   // Block details (block payload)
   // GetLatestBlockDetails gets the block details of the latest sealed or unsealed block.
   rpc GetLatestBlockDetails (GetLatestBlockDetailsRequest) returns (BlockDetailsResponse);
-  // GetBlockDetailsByHash gets the block details by the block hash
-  rpc GetBlockDetailsByHash (GetBlockDetailsByHashRequest) returns (BlockDetailsResponse);
+  // GetBlockDetailsByID gets the block details by the block ID
+  rpc GetBlockDetailsByID (GetBlockDetailsByIDRequest) returns (BlockDetailsResponse);
   // GetBlockDetailsByHeight gets the block details by the block height
   rpc GetBlockDetailsByHeight (GetBlockDetailsByHeightRequest) returns (BlockDetailsResponse);
 
   // Collection
-  // GetCollectionByHash gets a collection by its hash
-  rpc GetCollectionByHash (GetCollectionByHashRequest) returns (CollectionResponse);
+  // GetCollectionByID gets a collection by its ID
+  rpc GetCollectionByID (GetCollectionByIDRequest) returns (CollectionResponse);
   // GetCollectionByHeight gets a collection by its height
   rpc GetCollectionByHeight (GetCollectionByHeightRequest) returns (CollectionResponse);
 
   // Transaction
   // SendTransaction submits a transaction to the network.
   rpc SendTransaction (SendTransactionRequest) returns (SendTransactionResponse);
-  // GetTransactions gets a transaction by hash.
+  // GetTransactions gets a transaction by ID.
   rpc GetTransaction (GetTransactionRequest) returns (GetTransactionResponse);
   // GetTransactionStatus gets the statue of a transaction
   rpc GetTransactionStatus (GetTransactionRequest) returns (GetTransactionStatusResponse);
@@ -66,15 +66,15 @@ message SendTransactionRequest {
 }
 
 message SendTransactionResponse {
-  bytes hash = 1;
+  bytes id = 1;
 }
 
 message GetLatestBlockRequest {
   bool is_sealed = 1;
 }
 
-message GetBlockByHashRequest {
-  bytes hash = 1;
+message GetBlockByIDRequest {
+  bytes id = 1;
 }
 
 message GetBlockByHeightRequest {
@@ -89,8 +89,8 @@ message GetLatestBlockDetailsRequest {
   bool is_sealed = 1;
 }
 
-message GetBlockDetailsByHashRequest {
-  bytes hash = 1;
+message GetBlockDetailsByIDRequest {
+  bytes id = 1;
 }
 
 message GetBlockDetailsByHeightRequest {
@@ -101,8 +101,8 @@ message BlockDetailsResponse {
   flow.sdk.entities.Block block = 1;
 }
 
-message GetCollectionByHashRequest {
-  bytes hash = 1;
+message GetCollectionByIDRequest {
+  bytes id = 1;
 }
 
 message GetCollectionByHeightRequest {
@@ -141,7 +141,7 @@ message GetEventsResponse {
 
 
 message GetTransactionRequest {
-  bytes hash = 1;
+  bytes id = 1;
 }
 
 message GetTransactionResponse {

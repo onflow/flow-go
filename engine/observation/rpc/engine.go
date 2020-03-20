@@ -117,7 +117,7 @@ func (h *Handler) GetEvents(context.Context, *observation.GetEventsRequest) (*ob
 	return nil, nil
 }
 
-func (h *Handler) GetBlockByHash(context.Context, *observation.GetBlockByHashRequest) (*observation.BlockResponse, error) {
+func (h *Handler) GetBlockByID(context.Context, *observation.GetBlockByIDRequest) (*observation.BlockResponse, error) {
 	return nil, nil
 }
 
@@ -129,7 +129,7 @@ func (h *Handler) GetLatestBlockDetails(context.Context, *observation.GetLatestB
 	return nil, nil
 }
 
-func (h *Handler) GetBlockDetailsByHash(context.Context, *observation.GetBlockDetailsByHashRequest) (*observation.BlockDetailsResponse, error) {
+func (h *Handler) GetBlockDetailsByID(context.Context, *observation.GetBlockDetailsByIDRequest) (*observation.BlockDetailsResponse, error) {
 	return nil, nil
 }
 
@@ -137,7 +137,7 @@ func (h *Handler) GetBlockDetailsByHeight(context.Context, *observation.GetBlock
 	panic("implement me")
 }
 
-func (h *Handler) GetCollectionByHash(context.Context, *observation.GetCollectionByHashRequest) (*observation.CollectionResponse, error) {
+func (h *Handler) GetCollectionByID(context.Context, *observation.GetCollectionByIDRequest) (*observation.CollectionResponse, error) {
 	return nil, nil
 }
 
