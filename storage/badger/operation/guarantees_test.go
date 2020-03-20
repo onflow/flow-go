@@ -151,6 +151,7 @@ func TestFindDecendants(t *testing.T) {
 				require.Nil(t, addIndex(tx, 9, 9, 8))
 				return nil
 			})
+			require.Nil(t, err)
 
 			var descendants []flow.Identifier
 			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
@@ -183,6 +184,7 @@ func TestFindDecendants(t *testing.T) {
 				require.Nil(t, addIndex(tx, 13, 13, 8))
 				return nil
 			})
+			require.Nil(t, err)
 
 			var descendants []flow.Identifier
 			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
@@ -212,6 +214,7 @@ func TestFindDecendants(t *testing.T) {
 				require.Nil(t, addIndex(tx, 6, 6, 5))
 				return nil
 			})
+			require.Nil(t, err)
 
 			var descendants []flow.Identifier
 			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
@@ -240,6 +243,7 @@ func TestFindDecendants(t *testing.T) {
 				require.Nil(t, addIndex(tx, 6, 6, 5))
 				return nil
 			})
+			require.Nil(t, err)
 
 			var descendants []flow.Identifier
 			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
