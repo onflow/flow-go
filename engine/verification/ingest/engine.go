@@ -569,7 +569,12 @@ func (e *Engine) checkPendingChunks() {
 		if !blockReady {
 			continue
 		}
-		e.authReceipts.Add(receipt)
+		err := e.authReceipts.Add(receipt)
+		if err != nil {
+			e.log.Error().Err(err).
+				Hex("receipt_id", logging.ID(receipt.ID())).
+				Msg("could not add receipt to the authenticated receipts pool")
+		}
 		e.pendingReceipts.Rem(receipt.ID())
 	}
 
