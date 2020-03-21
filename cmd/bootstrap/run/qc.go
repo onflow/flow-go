@@ -43,24 +43,17 @@ func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCert
 		Timestamp:   block.Timestamp,
 	}
 
-	// TODO make dymanic
-	// make votes
-	vote1, err := signers[0].VoteFor(&hotBlock)
-	if err != nil {
-		return nil, err
-	}
-	vote2, err := signers[1].VoteFor(&hotBlock)
-	if err != nil {
-		return nil, err
-	}
-	vote3, err := signers[2].VoteFor(&hotBlock)
-	if err != nil {
-		return nil, err
+	sigs := make([]*hs.SingleSignature, len(signers))
+	for i, signer := range signers {
+		vote, err := signer.VoteFor(&hotBlock)
+		if err != nil {
+			return nil, err
+		}
+		sigs[i] = vote.Signature
 	}
 
 	// manually aggregate sigs
-	aggsig, err := signers[0].Aggregate(&hotBlock,
-		[]*hs.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
+	aggsig, err := signers[0].Aggregate(&hotBlock, sigs)
 	if err != nil {
 		return nil, err
 	}
