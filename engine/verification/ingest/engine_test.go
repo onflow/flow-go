@@ -147,10 +147,10 @@ func (suite *TestSuite) TestHandleBlock() {
 
 	// expects that the block be added to the mempool and block storage
 	suite.blocks.On("Add", suite.block).Return(nil).Once()
-	// suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
 	suite.blockStorage.On("Store", suite.block).Return(nil).Once()
 
 	// expects that checkPendingChunks is executed checking for pending and authenticated receipts
+	// pendingReceipts iteration on All happens twice one at handlingBlocks and one at checkPendingChunks
 	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil).Twice()
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
@@ -162,6 +162,8 @@ func (suite *TestSuite) TestHandleBlock() {
 	suite.blocks.AssertExpectations(suite.T())
 }
 
+// TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
+// but not the collections, it asks for the collections through the network
 func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	eng := suite.TestNewEngine()
 
@@ -170,25 +172,23 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 
-	suite.state.On("Final").Return(suite.ss, nil)
-	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
+	suite.state.On("Final").Return(suite.ss, nil).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
 	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
 	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Twice()
 
 	// we have the corresponding block and chunk state, but not the collection
-	suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil)
-	suite.collections.On("Has", suite.collection.ID()).Return(false)
-	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
-	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
-	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+	suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
+	suite.collections.On("Has", suite.collection.ID()).Return(false).Once()
+	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true).Once()
+	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil).Once()
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil).Once()
 
-	// expect that the receipt be added to the mempool, and return it in All
-	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+	// expect that we already have the receipt in the authenticated receipts mempool
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
-	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
-	suite.authReceipts.On("Add", suite.receipt).Return(nil)
-	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true)
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
+	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
