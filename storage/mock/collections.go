@@ -33,6 +33,29 @@ func (_m *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	return r0, r1
 }
 
+// CollectionIDByTransactionID provides a mock function with given fields: txID
+func (_m *Collections) CollectionIDByTransactionID(txID flow.Identifier) (*flow.Identifier, error) {
+	ret := _m.Called(txID)
+
+	var r0 *flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Identifier); ok {
+		r0 = rf(txID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Identifier)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(txID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // LightByID provides a mock function with given fields: collID
 func (_m *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection, error) {
 	ret := _m.Called(collID)
@@ -86,6 +109,20 @@ func (_m *Collections) Store(collection *flow.Collection) error {
 
 // StoreLight provides a mock function with given fields: collection
 func (_m *Collections) StoreLight(collection *flow.LightCollection) error {
+	ret := _m.Called(collection)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.LightCollection) error); ok {
+		r0 = rf(collection)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// StoreLightAndIndexByTransaction provides a mock function with given fields: collection
+func (_m *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
 	ret := _m.Called(collection)
 
 	var r0 error
