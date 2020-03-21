@@ -94,7 +94,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	ids = append(ids, id1, id2)
 	values = append(values, value1, value2)
 
-	db := unittest.TempLevelDB(t * testing.T)
+	db := unittest.TempLevelDB(t)
 
 	f, _ := ledger.NewTrieStorage(db)
 	startState, _ := f.UpdateRegisters(ids, values)
