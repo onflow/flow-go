@@ -32,12 +32,13 @@ const (
 	codeChunkHeader   = 27
 	codeChunkDataPack = 28
 
-	codeIndexIdentity               = 100
-	codeIndexGuarantee              = 101
-	codeIndexSeal                   = 102
-	codeIndexCollection             = 104
-	codeIndexSealByBlock            = 105
-	codeIndexExecutionResultByBlock = 106
+	codeIndexIdentity                = 100
+	codeIndexGuarantee               = 101
+	codeIndexSeal                    = 102
+	codeIndexCollection              = 104
+	codeIndexSealByBlock             = 105
+	codeIndexExecutionResultByBlock  = 106
+	codeIndexCollectionByTransaction = 107
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

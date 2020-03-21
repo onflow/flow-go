@@ -3,21 +3,20 @@
 package ingestion
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -32,48 +31,38 @@ type Engine struct {
 
 	// Conduits
 	collectionConduit network.Conduit
-	blockConduit      network.Conduit
-	receiptConduit    network.Conduit
 
-	// Mempools
-	blocks      mempool.Blocks
-	collections mempool.Collections
-	receipts    mempool.Receipts
+	// storage
+	collections  storage.Collections
+	transactions storage.Transactions
 }
 
 // New creates a new observation ingestion engine
-func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local, blocks mempool.Blocks, collections mempool.Collections, receipts mempool.Receipts) (*Engine, error) {
+func New(log zerolog.Logger,
+	net module.Network,
+	state protocol.State,
+	tracer trace.Tracer,
+	me module.Local,
+	collections storage.Collections,
+	transactions storage.Transactions) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log.With().Str("engine", "ingestion").Logger(),
-		tracer:      tracer,
-		state:       state,
-		me:          me,
-		blocks:      blocks,
-		collections: collections,
-		receipts:    receipts,
-	}
-
-	blockConduit, err := net.Register(engine.BlockProvider, eng)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		unit:         engine.NewUnit(),
+		log:          log.With().Str("engine", "ingestion").Logger(),
+		tracer:       tracer,
+		state:        state,
+		me:           me,
+		collections:  collections,
+		transactions: transactions,
 	}
 
 	collConduit, err := net.Register(engine.CollectionProvider, eng)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register collection provider engine")
+		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 	}
 
-	receiptConduit, err := net.Register(engine.ExecutionReceiptProvider, eng)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not register receipt provider engine")
-	}
-
-	eng.blockConduit = blockConduit
 	eng.collectionConduit = collConduit
-	eng.receiptConduit = receiptConduit
 
 	return eng, nil
 }
@@ -128,18 +117,17 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
 	case *flow.Block:
 		return e.onBlock(originID, entity)
+	case *messages.CollectionResponse:
+		return e.handleCollectionResponse(originID, entity)
 	case *flow.CollectionGuarantee:
 		return e.onCollectionGuarantee(originID, entity)
-	case *flow.Collection:
-		return e.onCollection(originID, entity)
-	case *flow.ExecutionReceipt:
-		return e.onExecutionReceipt(originID, entity)
 	default:
-		return errors.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
 // onBlock handles an incoming block.
+// TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
 func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 
 	e.log.Info().
@@ -148,12 +136,32 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 		Uint64("block_view", block.View).
 		Msg("received block")
 
-	err := e.blocks.Add(block)
+	return e.requestCollections(block.Guarantees...)
+}
+
+// handleCollectionResponse handles the response of the a collection request made earlier when a block was received
+func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
+	collection := response.Collection
+	light := collection.Light()
+
+	// store the light collection (collection minus the transaction body - those are stored separately)
+	// and add transaction ids as index
+	err := e.collections.StoreLightAndIndexByTransaction(&light)
 	if err != nil {
-		return fmt.Errorf("could not store block: %w", err)
+		// ignore collection if already seen
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			return nil
+		}
+		return err
 	}
 
-	// TODO: Do something with block
+	// now store each of the transaction body
+	for _, tx := range collection.Transactions {
+		err := e.transactions.Store(tx)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -171,7 +179,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// source for a collection guarantee (usually collection nodes)
 	id, err := e.state.Final().Identity(originID)
 	if err != nil {
-		return errors.Wrap(err, "could not get origin node identity")
+		return fmt.Errorf("could not get origin node identity: %w", err)
 	}
 
 	// check that the origin is a collection node; this check is fine even if it
@@ -180,54 +188,38 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// between consensus nodes anyway; we do no processing or validation in this
 	// engine beyond validating the origin
 	if id.Role != flow.RoleCollection {
-		return errors.Errorf("invalid origin node role (%s)", id.Role)
+		return fmt.Errorf("invalid origin node role (%s)", id.Role)
 	}
-	collID := guarantee.ID()
-	if !e.collections.Has(collID) {
-		// TODO rate limit these requests
-		err := e.requestCollection(collID)
+
+	return e.requestCollections(guarantee)
+}
+
+func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
+	ids, err := e.findCollectionNodes()
+	if err != nil {
+		return err
+	}
+
+	// Request all the collections for this block
+	for _, g := range guarantees {
+		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID()}, ids...)
 		if err != nil {
-			log.Error().
-				Err(err).
-				Hex("collection_id", logging.ID(collID)).
-				Msg("could not request collection")
+			return err
 		}
 	}
 
 	return nil
+
 }
 
-// onCollection for handling data about a collection from a collection node
-func (e *Engine) onCollection(originID flow.Identifier, guarantee *flow.Collection) error {
-	// TODO
-
-	return nil
-}
-
-// onExecutionReceipt handles an incoming execution receipts.
-func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-	// TODO
-
-	return nil
-}
-
-// requestCollection submits a request for the given collection to collection nodes.
-func (e *Engine) requestCollection(collID flow.Identifier) error {
-
-	collNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
+func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
+	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
-		return fmt.Errorf("could not load collection node identities: %w", err)
+		return nil, fmt.Errorf("could not retrieve identities: %w", err)
 	}
-
-	req := &messages.CollectionRequest{
-		ID: collID,
+	if len(identities) < 1 {
+		return nil, fmt.Errorf("no Collection identity found")
 	}
-
-	// TODO we should only submit to cluster which owns the collection
-	err = e.collectionConduit.Submit(req, collNodes.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
-	}
-
-	return nil
+	identifiers := flow.GetIDs(identities)
+	return identifiers, nil
 }

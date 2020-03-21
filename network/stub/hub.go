@@ -34,7 +34,7 @@ func (hub *Hub) Eventually(t *testing.T, condition func() bool) {
 	require.Eventually(t, func() bool {
 		hub.DeliverAll()
 		return condition()
-	}, time.Second*30, time.Millisecond*500)
+	}, time.Second*10, time.Millisecond*500)
 }
 
 // GetNetwork returns the Network by the network ID (or node ID)
