@@ -37,8 +37,8 @@ service ObserveService {
   rpc SendTransaction (SendTransactionRequest) returns (SendTransactionResponse);
   // GetTransactions gets a transaction by ID.
   rpc GetTransaction (GetTransactionRequest) returns (GetTransactionResponse);
-  // GetTransactionStatus gets the statue of a transaction
-  rpc GetTransactionStatus (GetTransactionRequest) returns (GetTransactionStatusResponse);
+  // GetTransactionResult gets the status of a transaction and the events associated with it
+  rpc GetTransactionResult (GetTransactionRequest) returns (GetTransactionResultResponse);
 
   // Account
   // GetAccount gets an account by address.
@@ -133,17 +133,15 @@ message GetEventsResponse {
     repeated flow.sdk.entities.Event events = 1;
 }
 
-
 message GetTransactionRequest {
   bytes id = 1;
 }
 
 message GetTransactionResponse {
   flow.sdk.entities.Transaction transaction = 1;
-  repeated flow.sdk.entities.Event events = 2;
 }
 
-message GetTransactionStatusResponse {
+message GetTransactionResultResponse {
   flow.sdk.entities.TransactionStatus status = 1;
   repeated flow.sdk.entities.Event events = 2;
 }

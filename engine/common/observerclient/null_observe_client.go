@@ -54,7 +54,7 @@ func (n NullObserverClient) GetTransaction(context.Context, *observation.GetTran
 	return nil, nil
 }
 
-func (n NullObserverClient) GetTransactionStatus(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionStatusResponse, error) {
+func (n NullObserverClient) GetTransactionResult(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResultResponse, error) {
 	return nil, nil
 }
 

@@ -123,6 +123,6 @@ func (h *Handler) GetCollectionByID(context.Context, *observation.GetCollectionB
 	return nil, nil
 }
 
-func (h *Handler) GetTransactionStatus(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionStatusResponse, error) {
+func (h *Handler) GetTransactionResult(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResultResponse, error) {
 	return nil, nil
 }
