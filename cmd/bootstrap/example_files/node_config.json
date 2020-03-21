@@ -1,0 +1,47 @@
+[
+  {
+    "Role": "collection",
+    "Address": "123.0.1.10",
+    "Stake": 110
+  },
+  {
+    "Role": "collection",
+    "Address": "123.0.1.20",
+    "Stake": 120
+  },
+  {
+    "Role": "collection",
+    "Address": "123.0.1.30",
+    "Stake": 130
+  },
+  {
+    "Role": "consensus",
+    "Address": "123.0.2.10",
+    "Stake": 210
+  },
+  {
+    "Role": "consensus",
+    "Address": "123.0.2.20",
+    "Stake": 220
+  },
+  {
+    "Role": "consensus",
+    "Address": "123.0.2.30",
+    "Stake": 230
+  },
+  {
+    "Role": "execution",
+    "Address": "123.0.3.10",
+    "Stake": 310
+  },
+  {
+    "Role": "verification",
+    "Address": "123.0.4.10",
+    "Stake": 410
+  },
+  {
+    "Role": "verification",
+    "Address": "123.0.4.20",
+    "Stake": 420
+  }
+]

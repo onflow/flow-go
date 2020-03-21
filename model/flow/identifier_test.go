@@ -1,11 +1,11 @@
 package flow_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -40,13 +40,13 @@ func TestIdentifierFormat(t *testing.T) {
 	})
 }
 
-func TestIdentifierYAML(t *testing.T) {
+func TestIdentifierJSON(t *testing.T) {
 	id := unittest.IdentifierFixture()
-	bz, err := yaml.Marshal(id)
+	bz, err := json.Marshal(id)
 	assert.NoError(t, err)
-	assert.Equal(t, fmt.Sprintf("%v\n", id), string(bz))
+	assert.Equal(t, fmt.Sprintf("\"%v\"", id), string(bz))
 	var actual flow.Identifier
-	err = yaml.Unmarshal(bz, &actual)
+	err = json.Unmarshal(bz, &actual)
 	assert.NoError(t, err)
 	assert.Equal(t, id, actual)
 }

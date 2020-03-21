@@ -56,21 +56,12 @@ func ParseRole(role string) (Role, error) {
 	}
 }
 
-func (r Role) MarshalYAML() (interface{}, error) {
-	return r.String(), nil
+func (r Role) MarshalText() ([]byte, error) {
+	return []byte(r.String()), nil
 }
 
-func (r *Role) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var s string
-	err := unmarshal(&s)
-	if err != nil {
-		return err
-	}
-
-	*r, err = ParseRole(s)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (r *Role) UnmarshalText(text []byte) error {
+	var err error
+	*r, err = ParseRole(string(text))
+	return err
 }

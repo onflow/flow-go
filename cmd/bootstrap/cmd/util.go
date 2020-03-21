@@ -3,6 +3,7 @@ package cmd
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v2"
 )
 
 const randomSeedBytes = 64
@@ -33,21 +33,21 @@ func generateRandomSeed() []byte {
 	return seed
 }
 
-func readYaml(filename string, target interface{}) {
+func readJSON(filename string, target interface{}) {
 	dat, err := ioutil.ReadFile(filename)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot read file")
+		log.Fatal().Err(err).Msg("cannot read json")
 	}
-	err = yaml.Unmarshal(dat, target)
+	err = json.Unmarshal(dat, target)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot unmarshal yaml in file")
+		log.Fatal().Err(err).Msg("cannot unmarshal json in file")
 	}
 }
 
-func writeYaml(filename string, data interface{}) {
-	bz, err := yaml.Marshal(data)
+func writeJSON(filename string, data interface{}) {
+	bz, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot marshal yaml")
+		log.Fatal().Err(err).Msg("cannot marshal json")
 	}
 
 	path := filepath.Join(outdir, filename)
@@ -62,7 +62,7 @@ func writeYaml(filename string, data interface{}) {
 		log.Fatal().Err(err).Msg("could not write file")
 	}
 
-	log.Info().Msgf("wrote yaml to file %v", path)
+	log.Info().Msgf("wrote json to file %v", path)
 }
 
 func pubKeyToBytes(key crypto.PublicKey) []byte {

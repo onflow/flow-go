@@ -12,31 +12,31 @@ import (
 var configFile string
 
 type NodeConfig struct {
-	Role    flow.Role `yaml:"role"`
-	Address string    `yaml:"address"`
-	Stake   uint64    `yaml:"stake"`
+	Role    flow.Role
+	Address string
+	Stake   uint64
 }
 
 type NodeInfoPriv struct {
-	Role           flow.Role       `yaml:"role"`
-	Address        string          `yaml:"address"`
-	NodeID         flow.Identifier `yaml:"nodeId"`
-	NetworkPrivKey NetworkPrivKey  `yaml:"networkPrivKey"`
-	StakingPrivKey StakingPrivKey  `yaml:"stakingPrivKey"`
+	Role           flow.Role
+	Address        string
+	NodeID         flow.Identifier
+	NetworkPrivKey EncodableNetworkPrivKey
+	StakingPrivKey EncodableStakingPrivKey
 }
 
 type NodeInfoPub struct {
-	Role          flow.Role       `yaml:"role"`
-	Address       string          `yaml:"address"`
-	NodeID        flow.Identifier `yaml:"nodeId"`
-	NetworkPubKey NetworkPubKey   `yaml:"networkPubKey"`
-	StakingPubKey StakingPubKey   `yaml:"stakingPubKey"`
-	Stake         uint64          `yaml:"stake"`
+	Role          flow.Role
+	Address       string
+	NodeID        flow.Identifier
+	NetworkPubKey EncodableNetworkPubKey
+	StakingPubKey EncodableStakingPubKey
+	Stake         uint64
 }
 
 func genNetworkAndStakingKeys() ([]NodeInfoPub, []NodeInfoPriv) {
 	var nodeConfigs []NodeConfig
-	readYaml(configFile, &nodeConfigs)
+	readJSON(configFile, &nodeConfigs)
 	nodes := len(nodeConfigs)
 	log.Info().Msgf("read %v node configurations", nodes)
 
@@ -61,10 +61,10 @@ func genNetworkAndStakingKeys() ([]NodeInfoPub, []NodeInfoPriv) {
 		nodeInfoPriv, nodeInfoPub := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
 		nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
 		nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
-		writeYaml(fmt.Sprintf("%v.node-info.priv.yml", nodeInfoPriv.NodeID), nodeInfoPriv)
+		writeJSON(fmt.Sprintf("%v.node-info.priv.json", nodeInfoPriv.NodeID), nodeInfoPriv)
 	}
 
-	writeYaml("node-infos.pub.yml", nodeInfosPub)
+	writeJSON("node-infos.pub.json", nodeInfosPub)
 
 	return nodeInfosPub, nodeInfosPriv
 }
@@ -84,16 +84,16 @@ func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.Priva
 		Role:           nodeConfig.Role,
 		Address:        nodeConfig.Address,
 		NodeID:         nodeID,
-		NetworkPrivKey: NetworkPrivKey{networkKey},
-		StakingPrivKey: StakingPrivKey{stakingKey},
+		NetworkPrivKey: EncodableNetworkPrivKey{networkKey},
+		StakingPrivKey: EncodableStakingPrivKey{stakingKey},
 	}
 
 	nodeInfoPub := NodeInfoPub{
 		Role:          nodeConfig.Role,
 		Address:       nodeConfig.Address,
 		NodeID:        nodeID,
-		NetworkPubKey: NetworkPubKey{networkKey.PublicKey()},
-		StakingPubKey: StakingPubKey{stakingKey.PublicKey()},
+		NetworkPubKey: EncodableNetworkPubKey{networkKey.PublicKey()},
+		StakingPubKey: EncodableStakingPubKey{stakingKey.PublicKey()},
 		Stake:         nodeConfig.Stake,
 	}
 

@@ -24,13 +24,16 @@ var finalizeCmd = &cobra.Command{
 
 		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgDataPub)
 
-		constructGenesisQC(&block, filterConsensusNodes(stakingNodes), filterConsensusNodesPriv(internalNodesPriv), dkgDataPriv)
+		constructGenesisQC(&block, filterConsensusNodes(stakingNodes),
+			filterConsensusNodesPriv(internalNodesPriv),
+			dkgDataPriv)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(finalizeCmd)
 
-	finalizeCmd.Flags().StringVarP(&configFile, "config", "c", "", "Path to a yml file containing multiple node configurations (node_role, network_address, stake) [required]")
+	finalizeCmd.Flags().StringVarP(&configFile, "config", "c", "",
+		"Path to a JSON file containing multiple node configurations (node_role, network_address, stake) [required]")
 	finalizeCmd.MarkFlagRequired("config")
 }

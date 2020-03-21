@@ -15,7 +15,7 @@ func constructGenesisBlock(stateComm flow.StateCommitment, nodes []NodeInfoPub, 
 	identityList := generateIdentityList(nodes, dkg)
 	block := run.GenerateRootBlock(identityList, seal)
 
-	writeYaml("genesis-block.yml", block)
+	writeJSON("genesis-block.json", block)
 
 	return block
 }

@@ -9,25 +9,25 @@ import (
 )
 
 type DKGParticipantPriv struct {
-	NodeID              flow.Identifier     `yaml:"nodeId"`
-	RandomBeaconPrivKey RandomBeaconPrivKey `yaml:"randomBeaconPrivKey"`
-	GroupIndex          int                 `yaml:"groupIndex"`
+	NodeID              flow.Identifier
+	RandomBeaconPrivKey EncodableRandomBeaconPrivKey
+	GroupIndex          int
 }
 
 type DKGParticipantPub struct {
-	NodeID             flow.Identifier    `yaml:"nodeId"`
-	RandomBeaconPubKey RandomBeaconPubKey `yaml:"randomBeaconPubKey"`
-	GroupIndex         int                `yaml:"groupIndex"`
+	NodeID             flow.Identifier
+	RandomBeaconPubKey EncodableRandomBeaconPubKey
+	GroupIndex         int
 }
 
 type DKGDataPriv struct {
-	PubGroupKey  RandomBeaconPubKey   `yaml:"pubGroupKey"`
-	Participants []DKGParticipantPriv `yaml:"participants"`
+	PubGroupKey  EncodableRandomBeaconPubKey
+	Participants []DKGParticipantPriv
 }
 
 type DKGDataPub struct {
-	PubGroupKey  RandomBeaconPubKey  `yaml:"pubGroupKey"`
-	Participants []DKGParticipantPub `yaml:"participants"`
+	PubGroupKey  EncodableRandomBeaconPubKey
+	Participants []DKGParticipantPub
 }
 
 func runDKG(nodes []NodeInfoPub) (DKGDataPub, DKGDataPriv) {
@@ -44,21 +44,21 @@ func runDKG(nodes []NodeInfoPub) (DKGDataPub, DKGDataPriv) {
 
 	dkgDataPriv := DKGDataPriv{
 		Participants: make([]DKGParticipantPriv, 0, n),
-		PubGroupKey:  RandomBeaconPubKey{dkgData.PubGroupKey},
+		PubGroupKey:  EncodableRandomBeaconPubKey{dkgData.PubGroupKey},
 	}
 	dkgDataPub := DKGDataPub{
 		Participants: make([]DKGParticipantPub, 0, n),
-		PubGroupKey:  RandomBeaconPubKey{dkgData.PubGroupKey},
+		PubGroupKey:  EncodableRandomBeaconPubKey{dkgData.PubGroupKey},
 	}
 	for i, nodeInfo := range nodes {
 		log.Debug().Int("i", i).Str("nodeId", nodeInfo.NodeID.String()).Msg("assembling dkg data")
 		partPriv, partPub := assembleDKGParticipant(nodeInfo, dkgData.Participants[i])
 		dkgDataPriv.Participants = append(dkgDataPriv.Participants, partPriv)
 		dkgDataPub.Participants = append(dkgDataPub.Participants, partPub)
-		writeYaml(fmt.Sprintf("%v.random-beacon.priv.yml", partPriv.NodeID), partPriv)
+		writeJSON(fmt.Sprintf("%v.random-beacon.priv.json", partPriv.NodeID), partPriv)
 	}
 
-	writeYaml("dkg-data.pub.yml", dkgDataPub)
+	writeJSON("dkg-data.pub.json", dkgDataPub)
 
 	return dkgDataPub, dkgDataPriv
 }
@@ -72,13 +72,13 @@ func assembleDKGParticipant(info NodeInfoPub, part run.DKGParticipant) (DKGParti
 
 	partPriv := DKGParticipantPriv{
 		NodeID:              info.NodeID,
-		RandomBeaconPrivKey: RandomBeaconPrivKey{part.Priv},
+		RandomBeaconPrivKey: EncodableRandomBeaconPrivKey{part.Priv},
 		GroupIndex:          part.GroupIndex,
 	}
 
 	partPub := DKGParticipantPub{
 		NodeID:             info.NodeID,
-		RandomBeaconPubKey: RandomBeaconPubKey{part.Priv.PublicKey()},
+		RandomBeaconPubKey: EncodableRandomBeaconPubKey{part.Priv.PublicKey()},
 		GroupIndex:         part.GroupIndex,
 	}
 

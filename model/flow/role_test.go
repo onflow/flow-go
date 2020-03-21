@@ -1,22 +1,22 @@
 package flow_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func TestRoleYAML(t *testing.T) {
+func TestRoleJSON(t *testing.T) {
 	r := flow.RoleCollection
-	bz, err := yaml.Marshal(r)
+	bz, err := json.Marshal(r)
 	assert.NoError(t, err)
-	assert.Equal(t, fmt.Sprintf("%v\n", r), string(bz))
+	assert.Equal(t, fmt.Sprintf("\"%v\"", r), string(bz))
 	var actual flow.Role
-	err = yaml.Unmarshal(bz, &actual)
+	err = json.Unmarshal(bz, &actual)
 	assert.NoError(t, err)
 	assert.Equal(t, r, actual)
 }

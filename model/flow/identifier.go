@@ -47,23 +47,14 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 	}
 }
 
-func (id Identifier) MarshalYAML() (interface{}, error) {
-	return id.String(), nil
+func (id Identifier) MarshalText() ([]byte, error) {
+	return []byte(id.String()), nil
 }
 
-func (id *Identifier) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var s string
-	err := unmarshal(&s)
-	if err != nil {
-		return err
-	}
-
-	*id, err = HexStringToIdentifier(s)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (id *Identifier) UnmarshalText(text []byte) error {
+	var err error
+	*id, err = HexStringToIdentifier(string(text))
+	return err
 }
 
 func HashToID(hash []byte) Identifier {
