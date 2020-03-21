@@ -11,29 +11,22 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
-// ChunkVerifier provides functionality to verify chunks
-type ChunkVerifier interface {
-	// Verify verifies the given VerifiableChunk by executing it and checking the final statecommitment
-	// TODO return challenges plus errors
-	Verify(ch *verification.VerifiableChunk) error
-}
-
-// FlowChunkVerifier is a verifier based on the current definitions of the flow network
-type FlowChunkVerifier struct {
+// ChunkVerifier is a verifier based on the current definitions of the flow network
+type ChunkVerifier struct {
 	vm        virtualmachine.VirtualMachine
 	trieDepth int
 }
 
-// NewFlowChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewFlowChunkVerifier(vm virtualmachine.VirtualMachine) *FlowChunkVerifier {
-	return &FlowChunkVerifier{
+// NewChunkVerifier creates a chunk verifier containing a flow virtual machine
+func NewChunkVerifier(vm virtualmachine.VirtualMachine) *ChunkVerifier {
+	return &ChunkVerifier{
 		vm:        vm,
 		trieDepth: 257,
 	}
 }
 
 // Verify verifies the given VerifiableChunk by executing it and checking the final statecommitment
-func (fcv *FlowChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
+func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 
 	// TODO check collection hash to match
 	if ch.ChunkDataPack == nil {
@@ -52,11 +45,9 @@ func (fcv *FlowChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 	}
 
 	regMap := ch.ChunkDataPack.GetRegisterValues()
-	raiseErrorWithRead := false
 	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
 		val, ok := regMap[string(key)]
 		if !ok {
-			raiseErrorWithRead = true
 			return nil, fmt.Errorf("missing register")
 		}
 		return val, nil

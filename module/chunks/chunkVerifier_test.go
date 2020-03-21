@@ -19,13 +19,13 @@ import (
 
 type ChunkVerifierTestSuite struct {
 	suite.Suite
-	verifier ChunkVerifier
+	verifier *ChunkVerifier
 }
 
 // Make sure variables are set properly
 // SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupTest() {
-	s.verifier = NewFlowChunkVerifier(newVirtualMachineMock())
+	s.verifier = NewChunkVerifier(newVirtualMachineMock())
 }
 
 // TestVerification invokes all the tests in this test suite
