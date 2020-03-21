@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"path/filepath"
+
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
@@ -18,12 +20,11 @@ func genGenesisExecutionState() flow.StateCommitment {
 	}
 	writeYaml("account-0.priv.yml", enc)
 
-	stateCommitment, err := run.GenerateExecutionState(account0Priv)
+	db := createLevelDB(filepath.Join(outdir, "execution-state"))
+	stateCommitment, err := run.GenerateExecutionState(db, account0Priv)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}
-
-	// TODO write genesis execution state to file
 
 	return stateCommitment
 }

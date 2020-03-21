@@ -1,0 +1,3 @@
+// contains CLI logic that can exit the program and read/write files. It also uses structures and data types that are
+// purely relevant for CLI purposes, such as encoding, decoding etc...
+package cmd

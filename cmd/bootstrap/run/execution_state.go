@@ -3,7 +3,6 @@ package run
 import (
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -12,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
-	"github.com/rs/zerolog/log"
 )
 
 func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
@@ -28,38 +26,17 @@ func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 	}, nil
 }
 
-func GenerateExecutionState(priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	levelDB := tempLevelDB()
-
+func GenerateExecutionState(levelDB *leveldb.LevelDB, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
 	ledgerStorage, err := ledger.NewTrieStorage(levelDB)
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO return levelDb so it can be dumped/serialized
 
 	return bootstrapLedger(ledgerStorage, priv)
 }
 
 func tempDBDir() (string, error) {
 	return ioutil.TempDir("", "flow-bootstrap-db")
-}
-
-func tempLevelDB() *leveldb.LevelDB {
-	dir, err := tempDBDir()
-	if err != nil {
-		log.Fatal().Err(err).Msg("error creating temp dir")
-	}
-
-	kvdbPath := filepath.Join(dir, "kvdb")
-	tdbPath := filepath.Join(dir, "tdb")
-
-	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
-	if err != nil {
-		log.Fatal().Err(err).Msg("error creating temp dir")
-	}
-
-	return db
 }
 
 func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
