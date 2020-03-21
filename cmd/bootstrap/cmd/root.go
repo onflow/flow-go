@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var outdir string
+
 var rootCmd = &cobra.Command{
 	Use:   "bootstrap",
 	Short: "Bootstrap a flow network",
@@ -23,12 +25,13 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVarP(&outdir, "outdir", "o", "bootstrap", "output directory for generated files")
+
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	cobra.OnInitialize(initConfig)
 }
 
-// initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.AutomaticEnv()
 }

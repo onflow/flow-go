@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -47,9 +49,19 @@ func writeYaml(filename string, data interface{}) {
 		log.Fatal().Err(err).Msg("cannot marshal yaml")
 	}
 
-	err = ioutil.WriteFile(filename, bz, 0644)
+	path := filepath.Join(outdir, filename)
 
-	log.Info().Msgf("wrote yaml to file %v", filename)
+	err = os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not create output dir")
+	}
+
+	err = ioutil.WriteFile(path, bz, 0644)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not write file")
+	}
+
+	log.Info().Msgf("wrote yaml to file %v", path)
 }
 
 func pubKeyToBytes(key crypto.PublicKey) []byte {
