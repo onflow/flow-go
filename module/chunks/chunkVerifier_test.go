@@ -1,8 +1,6 @@
 package chunks
 
 import (
-	"io/ioutil"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -140,17 +137,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 		ChunkDataPack: &chunkDataPack,
 	}
 
-}
-
-func TempLevelDB() (*leveldb.LevelDB, error) {
-	dir, err := ioutil.TempDir("", "flow-test-db")
-	if err != nil {
-		return nil, err
-	}
-	kvdbPath := filepath.Join(dir, "kvdb")
-	tdbPath := filepath.Join(dir, "tdb")
-	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
-	return db, err
 }
 
 type blockContextMock struct {
