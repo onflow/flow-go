@@ -214,23 +214,26 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
+// TestHandleReceipt_UnstakedSender evaluates sending an execution receipt from an unstaked node
+// it should go to the pending receipts and (later on) dropped from the cache
+// Todo dropping unauthenticated receipts from cache
 func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	eng := suite.TestNewEngine()
 
 	myIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	suite.me.On("NodeID").Return(myIdentity.NodeID)
+	suite.me.On("NodeID").Return(myIdentity.NodeID).Once()
 
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
-	suite.state.On("Final").Return(suite.ss)
-	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
-	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
-	suite.authReceipts.On("Add", suite.receipt).Return(nil)
+	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
+	suite.ss.On("Identity", unstakedIdentity).Return(nil, fmt.Errorf("unstaked node")).Once()
+
+	// receipt should go to the pending receipts mempool
 	suite.pendingReceipts.On("Add", suite.receipt).Return(nil).Once()
 	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}).Once()
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
-	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
-	suite.blocks.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("")).Once()
+	suite.blocks.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("block does not exist")).Once()
 
 	// process should fail
 	err := eng.Process(unstakedIdentity, suite.receipt)
@@ -238,6 +241,8 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 
 	// receipt should not be added
 	suite.authReceipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
+
+	// Todo (depends on handling edge cases): adding network call for requesting block of receipt from consensus nodes
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
