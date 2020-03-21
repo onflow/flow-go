@@ -30,9 +30,7 @@ service ObserveService {
 
   // Collection
   // GetCollectionByID gets a collection by its ID
-  rpc GetCollectionByID (GetCollectionByIDRequest) returns (CollectionResponse);
-  // GetCollectionByHeight gets a collection by its height
-  rpc GetCollectionByHeight (GetCollectionByHeightRequest) returns (CollectionResponse);
+  rpc GetCollectionByID (GetCollectionByIDRequest) returns (GetCollectionResponse);
 
   // Transaction
   // SendTransaction submits a transaction to the network.
@@ -105,11 +103,7 @@ message GetCollectionByIDRequest {
   bytes id = 1;
 }
 
-message GetCollectionByHeightRequest {
-  uint64 height = 1;
-}
-
-message CollectionResponse {
+message GetCollectionResponse {
   flow.sdk.entities.Collection collection = 1;
 }
 
@@ -151,4 +145,5 @@ message GetTransactionResponse {
 
 message GetTransactionStatusResponse {
   flow.sdk.entities.TransactionStatus status = 1;
+  repeated flow.sdk.entities.Event events = 2;
 }

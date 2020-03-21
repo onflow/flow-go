@@ -147,11 +147,7 @@ func (h *handler) GetBlockDetailsByHeight(context.Context, *observation.GetBlock
 	return nil, nil
 }
 
-func (h *handler) GetCollectionByID(context.Context, *observation.GetCollectionByIDRequest) (*observation.CollectionResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetCollectionByHeight(context.Context, *observation.GetCollectionByHeightRequest) (*observation.CollectionResponse, error) {
+func (h *handler) GetCollectionByID(context.Context, *observation.GetCollectionByIDRequest) (*observation.GetCollectionResponse, error) {
 	return nil, nil
 }
 

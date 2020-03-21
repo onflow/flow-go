@@ -52,7 +52,7 @@ func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTran
 	return h.collectionRPC.SendTransaction(ctx, req)
 }
 
-func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
+func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatestBlockRequest) (*observation.BlockResponse, error) {
 
 	header, err := h.getLatestBlockHeader(req.IsSealed)
 
@@ -65,7 +65,7 @@ func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatest
 		return nil, err
 	}
 
-	resp := &observation.GetLatestBlockResponse{
+	resp := &observation.BlockResponse{
 		Block: &msg,
 	}
 	return resp, nil
@@ -96,5 +96,33 @@ func (h *Handler) GetAccount(context.Context, *observation.GetAccountRequest) (*
 }
 
 func (h *Handler) GetEvents(context.Context, *observation.GetEventsRequest) (*observation.GetEventsResponse, error) {
+	return nil, nil
+}
+
+func (h *Handler) GetBlockByID(context.Context, *observation.GetBlockByIDRequest) (*observation.BlockResponse, error) {
+	return nil, nil
+}
+
+func (h *Handler) GetBlockByHeight(context.Context, *observation.GetBlockByHeightRequest) (*observation.BlockResponse, error) {
+	return nil, nil
+}
+
+func (h *Handler) GetLatestBlockDetails(context.Context, *observation.GetLatestBlockDetailsRequest) (*observation.BlockDetailsResponse, error) {
+	return nil, nil
+}
+
+func (h *Handler) GetBlockDetailsByID(context.Context, *observation.GetBlockDetailsByIDRequest) (*observation.BlockDetailsResponse, error) {
+	return nil, nil
+}
+
+func (h *Handler) GetBlockDetailsByHeight(context.Context, *observation.GetBlockDetailsByHeightRequest) (*observation.BlockDetailsResponse, error) {
+	return nil, nil
+}
+
+func (h *Handler) GetCollectionByID(context.Context, *observation.GetCollectionByIDRequest) (*observation.GetCollectionResponse, error) {
+	return nil, nil
+}
+
+func (h *Handler) GetTransactionStatus(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionStatusResponse, error) {
 	return nil, nil
 }

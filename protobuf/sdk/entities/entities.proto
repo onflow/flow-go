@@ -13,13 +13,12 @@ message BlockHeader {
 }
 
 message Block {
-  string chain_id = 1;
-  uint64 height = 2;
-  bytes parent_id = 3;
-  google.protobuf.Timestamp timestamp = 4;
-  repeated SignedCollectionHash signed_collection_hashes = 5;
-  repeated BlockSeal block_seals = 6;
-  repeated bytes signatures = 7;
+  uint64 height = 1;
+  bytes parent_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  repeated CollectionGuarantee collection_guarantees = 4;
+  repeated BlockSeal block_seals = 5;
+  repeated bytes signatures = 6;
 }
 
 // When computation results for past blocks become available, a corresponding execution receipt
@@ -32,10 +31,10 @@ message Block {
 // multiple past blocks in one new block without revising the structure.
 //
 message BlockSeal {
-  bytes block_hash = 1;
-  bytes executionReceiptHash = 2;
-  repeated bytes executionReceiptSignatures = 3; // Signatures from EN that issued the original ExecutionReceipt
-  repeated bytes resultApprovalSignatures = 4; // Signatures from AN that approved the  ExecutionReceipt
+  bytes block_id = 1;
+  bytes execution_receipt_id = 2;
+  repeated bytes execution_receipt_signatures = 3; // Signatures from EN that issued the original ExecutionReceipt
+  repeated bytes result_approval_signatures = 4; // Signatures from AN that approved the  ExecutionReceipt
 }
 
 message IntermediateRegisters {
@@ -85,20 +84,17 @@ enum TransactionStatus {
 message Transaction {
   bytes script = 1;
   bytes reference_block_id = 2;
-  uint64 nonce = 3;
-  uint64 compute_limit = 4;
-  bytes payer_account = 5;
-  repeated bytes script_accounts = 6;
-  repeated AccountSignature signatures = 7;
-  TransactionStatus status = 8;
+  bytes payer_account = 3;
+  repeated bytes script_accounts = 4;
+  repeated AccountSignature signatures = 5;
+  TransactionStatus status = 6;
 }
 
 message Collection {
   repeated Transaction transactions = 1;
-  bytes foundation_block_id = 2;
 }
 
-message SignedCollectionHash {
+message CollectionGuarantee {
   bytes collectionHash = 1;
   repeated bytes signatures = 2;
 }
