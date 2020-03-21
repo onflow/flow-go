@@ -1,4 +1,4 @@
-package chunkVerifier
+package chunks
 
 import (
 	"bytes"
@@ -41,7 +41,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 		ch.ChunkDataPack.Proofs(),
 	)
 	if err != nil {
-		return fmt.Errorf("error constructing partial trie %x", err)
+		return fmt.Errorf("error constructing partial trie %w", err)
 	}
 
 	regMap := ch.ChunkDataPack.GetRegisterValues()

@@ -1,4 +1,4 @@
-package chunkVerifier
+package chunks
 
 import (
 	"io/ioutil"
@@ -35,7 +35,7 @@ func TestVerification(t *testing.T) {
 
 // TestHappyPath tests verification of the baseline verifiable chunk
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
-	vch := GetBaselineVerifiableChunk([]byte{})
+	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
 	assert.NotNil(s.T(), vch)
 	err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
@@ -43,7 +43,7 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 
 // TestMissingRegisterTouchForUpdate tests verification of the a chunkdatapack missing a register touch (update)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
-	vch := GetBaselineVerifiableChunk([]byte(""))
+	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
@@ -54,13 +54,13 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 // TODO TestMissingRegisterTouchForRead
 
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
-	vch := GetBaselineVerifiableChunk([]byte("wrongEndState"))
+	vch := GetBaselineVerifiableChunk(s.T(), []byte("wrongEndState"))
 	assert.NotNil(s.T(), vch)
 	err := s.verifier.Verify(vch)
 	assert.NotNil(s.T(), err)
 }
 
-func GetBaselineVerifiableChunk(script []byte) *verification.VerifiableChunk {
+func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunk {
 	// Collection setup
 
 	coll := unittest.CollectionFixture(5)
@@ -94,10 +94,7 @@ func GetBaselineVerifiableChunk(script []byte) *verification.VerifiableChunk {
 	ids = append(ids, id1, id2)
 	values = append(values, value1, value2)
 
-	db, err := TempLevelDB()
-	if err != nil {
-		return nil
-	}
+	db := unittest.TempLevelDB(t * testing.T)
 
 	f, _ := ledger.NewTrieStorage(db)
 	startState, _ := f.UpdateRegisters(ids, values)

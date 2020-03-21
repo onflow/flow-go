@@ -9,8 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/assignment"
-	"github.com/dapperlabs/flow-go/module/chunkVerifier"
+	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
@@ -60,13 +59,13 @@ func main() {
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
-			chunkVerifier := chunkVerifier.NewChunkVerifier(vm)
+			chunkVerifier := chunks.NewChunkVerifier(vm)
 			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			alpha := 10
-			assigner := assignment.NewPublicAssignment(alpha)
+			assigner := chunks.NewPublicAssignment(alpha)
 			// https://github.com/dapperlabs/flow-go/issues/2703
 			// proper place and only referenced here
 			// Todo the hardcoded default value should be parameterized as alpha in a
