@@ -118,16 +118,16 @@ type message struct {
 
 // Send a message from one node to another
 func (proc *LocalDKGProcessor) Send(dest int, data []byte) {
-	log.Infof("%d Sending to %d:\n", proc.current, dest)
-	log.Debug(data)
+	log.Tracef("%d Sending to %d:\n", proc.current, dest)
+	log.Trace(data)
 	newMsg := &message{proc.current, data}
 	proc.chans[dest] <- newMsg
 }
 
 // Broadcast a message from one node to all nodes
 func (proc *LocalDKGProcessor) Broadcast(data []byte) {
-	log.Infof("%d Broadcasting:", proc.current)
-	log.Debug(data)
+	log.Tracef("%d Broadcasting:", proc.current)
+	log.Trace(data)
 	newMsg := &message{proc.current, data}
 	for i := 0; i < len(proc.chans); i++ {
 		if i != proc.current {
@@ -138,12 +138,12 @@ func (proc *LocalDKGProcessor) Broadcast(data []byte) {
 
 // Blacklist a node
 func (proc *LocalDKGProcessor) Blacklist(node int) {
-	log.Infof("%d wants to blacklist %d", proc.current, node)
+	log.Tracef("%d wants to blacklist %d", proc.current, node)
 }
 
 // FlagMisbehavior flags a node for misbehaviour
 func (proc *LocalDKGProcessor) FlagMisbehavior(node int, logData string) {
-	log.Infof("%d flags a misbehavior from %d: %s", proc.current, node, logData)
+	log.Tracef("%d flags a misbehavior from %d: %s", proc.current, node, logData)
 }
 
 // dkgRunChan simulates processing incoming messages by a node
@@ -152,7 +152,7 @@ func dkgRunChan(proc *LocalDKGProcessor, sync *sync.WaitGroup, phase int) {
 	for {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
-			log.Debugf("%d Receiving from %d:", proc.current, newMsg.orig)
+			log.Tracef("%d Receiving from %d:", proc.current, newMsg.orig)
 			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.data)
 			if err != nil {
 				panic(fmt.Errorf("failed to receive DKG msg: %w", err))
@@ -161,19 +161,19 @@ func dkgRunChan(proc *LocalDKGProcessor, sync *sync.WaitGroup, phase int) {
 		case <-time.After(200 * time.Millisecond):
 			switch phase {
 			case 0:
-				log.Infof("%d shares phase ended \n", proc.current)
+				log.Tracef("%d shares phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
 				if err != nil {
 					panic(fmt.Errorf("failed to wait for next timeout: %w", err))
 				}
 			case 1:
-				log.Infof("%d complaints phase ended \n", proc.current)
+				log.Tracef("%d complaints phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
 				if err != nil {
 					panic(fmt.Errorf("failed to wait for next timeout: %w", err))
 				}
 			case 2:
-				log.Infof("%d dkg ended \n", proc.current)
+				log.Tracef("%d dkg ended \n", proc.current)
 				privkey, pubgroupkey, _, err := proc.dkg.EndDKG()
 				if err != nil {
 					panic(fmt.Errorf("end dkg error should be nil: %w", err))
