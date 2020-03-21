@@ -18,6 +18,18 @@ func (n NullObserverClient) Ping(context.Context, *observation.PingRequest) (*ob
 	return nil, nil
 }
 
+func (n NullObserverClient) GetLatestBlockHeader(context.Context, *observation.GetLatestBlockHeaderRequest) (*observation.BlockHeaderResponse, error) {
+	return nil, nil
+}
+
+func (n NullObserverClient) GetBlockHeaderByID(context.Context, *observation.GetBlockHeaderByIDRequest) (*observation.BlockHeaderResponse, error) {
+	return nil, nil
+}
+
+func (n NullObserverClient) GetBlockHeaderByHeight(context.Context, *observation.GetBlockHeaderByHeightRequest) (*observation.BlockHeaderResponse, error) {
+	return nil, nil
+}
+
 func (n NullObserverClient) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.BlockResponse, error) {
 	return nil, nil
 }
@@ -30,19 +42,7 @@ func (n NullObserverClient) GetBlockByHeight(context.Context, *observation.GetBl
 	return nil, nil
 }
 
-func (n NullObserverClient) GetLatestBlockDetails(context.Context, *observation.GetLatestBlockDetailsRequest) (*observation.BlockDetailsResponse, error) {
-	return nil, nil
-}
-
-func (n NullObserverClient) GetBlockDetailsByID(context.Context, *observation.GetBlockDetailsByIDRequest) (*observation.BlockDetailsResponse, error) {
-	return nil, nil
-}
-
-func (n NullObserverClient) GetBlockDetailsByHeight(context.Context, *observation.GetBlockDetailsByHeightRequest) (*observation.BlockDetailsResponse, error) {
-	return nil, nil
-}
-
-func (n NullObserverClient) GetCollectionByID(context.Context, *observation.GetCollectionByIDRequest) (*observation.GetCollectionResponse, error) {
+func (n NullObserverClient) GetCollectionByID(context.Context, *observation.GetCollectionByIDRequest) (*observation.CollectionResponse, error) {
 	return nil, nil
 }
 
@@ -50,11 +50,11 @@ func (n NullObserverClient) SendTransaction(context.Context, *observation.SendTr
 	return nil, nil
 }
 
-func (n NullObserverClient) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
+func (n NullObserverClient) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.TransactionResponse, error) {
 	return nil, nil
 }
 
-func (n NullObserverClient) GetTransactionStatus(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionStatusResponse, error) {
+func (n NullObserverClient) GetTransactionResult(context.Context, *observation.GetTransactionRequest) (*observation.TransactionResultResponse, error) {
 	return nil, nil
 }
 

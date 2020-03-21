@@ -38,8 +38,8 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	handler := NewHandler(zerolog.Logger{}, state, nil, nil, nil)
 
 	// query the handler for the latest finalized block
-	req := &observation.GetLatestBlockRequest{IsSealed: false}
-	resp, err := handler.GetLatestBlock(context.Background(), req)
+	req := &observation.GetLatestBlockHeaderRequest{IsSealed: false}
+	resp, err := handler.GetLatestBlockHeader(context.Background(), req)
 
 	// make sure we got the latest block
 	suite.Require().NoError(err)
@@ -65,10 +65,10 @@ func (suite *Suite) TestGetLatestSealedBlock() {
 	handler := NewHandler(zerolog.Logger{}, state, nil, nil, headers)
 
 	// query the handler for the latest sealed block
-	req := &observation.GetLatestBlockRequest{IsSealed: true}
+	req := &observation.GetLatestBlockHeaderRequest{IsSealed: true}
 
 	// make sure we got the latest sealed block
-	resp, err := handler.GetLatestBlock(context.Background(), req)
+	resp, err := handler.GetLatestBlockHeader(context.Background(), req)
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
 	id := block.ID()
