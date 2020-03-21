@@ -57,7 +57,6 @@ func (m *PingRequest) XXX_DiscardUnknown() {
 var xxx_messageInfo_PingRequest proto.InternalMessageInfo
 
 type PingResponse struct {
-	Address              []byte   `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -88,87 +87,158 @@ func (m *PingResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_PingResponse proto.InternalMessageInfo
 
-func (m *PingResponse) GetAddress() []byte {
-	if m != nil {
-		return m.Address
-	}
-	return nil
+type GetLatestBlockHeaderRequest struct {
+	IsSealed             bool     `protobuf:"varint,1,opt,name=is_sealed,json=isSealed,proto3" json:"is_sealed,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-type SendTransactionRequest struct {
-	Transaction          *entities.Transaction `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
-	XXX_unrecognized     []byte                `json:"-"`
-	XXX_sizecache        int32                 `json:"-"`
-}
-
-func (m *SendTransactionRequest) Reset()         { *m = SendTransactionRequest{} }
-func (m *SendTransactionRequest) String() string { return proto.CompactTextString(m) }
-func (*SendTransactionRequest) ProtoMessage()    {}
-func (*SendTransactionRequest) Descriptor() ([]byte, []int) {
+func (m *GetLatestBlockHeaderRequest) Reset()         { *m = GetLatestBlockHeaderRequest{} }
+func (m *GetLatestBlockHeaderRequest) String() string { return proto.CompactTextString(m) }
+func (*GetLatestBlockHeaderRequest) ProtoMessage()    {}
+func (*GetLatestBlockHeaderRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2f8771b9f9d71bac, []int{2}
 }
 
-func (m *SendTransactionRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SendTransactionRequest.Unmarshal(m, b)
+func (m *GetLatestBlockHeaderRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetLatestBlockHeaderRequest.Unmarshal(m, b)
 }
-func (m *SendTransactionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SendTransactionRequest.Marshal(b, m, deterministic)
+func (m *GetLatestBlockHeaderRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetLatestBlockHeaderRequest.Marshal(b, m, deterministic)
 }
-func (m *SendTransactionRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SendTransactionRequest.Merge(m, src)
+func (m *GetLatestBlockHeaderRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetLatestBlockHeaderRequest.Merge(m, src)
 }
-func (m *SendTransactionRequest) XXX_Size() int {
-	return xxx_messageInfo_SendTransactionRequest.Size(m)
+func (m *GetLatestBlockHeaderRequest) XXX_Size() int {
+	return xxx_messageInfo_GetLatestBlockHeaderRequest.Size(m)
 }
-func (m *SendTransactionRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_SendTransactionRequest.DiscardUnknown(m)
+func (m *GetLatestBlockHeaderRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetLatestBlockHeaderRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SendTransactionRequest proto.InternalMessageInfo
+var xxx_messageInfo_GetLatestBlockHeaderRequest proto.InternalMessageInfo
 
-func (m *SendTransactionRequest) GetTransaction() *entities.Transaction {
+func (m *GetLatestBlockHeaderRequest) GetIsSealed() bool {
 	if m != nil {
-		return m.Transaction
+		return m.IsSealed
 	}
-	return nil
+	return false
 }
 
-type SendTransactionResponse struct {
+type GetBlockHeaderByIDRequest struct {
 	Id                   []byte   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *SendTransactionResponse) Reset()         { *m = SendTransactionResponse{} }
-func (m *SendTransactionResponse) String() string { return proto.CompactTextString(m) }
-func (*SendTransactionResponse) ProtoMessage()    {}
-func (*SendTransactionResponse) Descriptor() ([]byte, []int) {
+func (m *GetBlockHeaderByIDRequest) Reset()         { *m = GetBlockHeaderByIDRequest{} }
+func (m *GetBlockHeaderByIDRequest) String() string { return proto.CompactTextString(m) }
+func (*GetBlockHeaderByIDRequest) ProtoMessage()    {}
+func (*GetBlockHeaderByIDRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2f8771b9f9d71bac, []int{3}
 }
 
-func (m *SendTransactionResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SendTransactionResponse.Unmarshal(m, b)
+func (m *GetBlockHeaderByIDRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetBlockHeaderByIDRequest.Unmarshal(m, b)
 }
-func (m *SendTransactionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SendTransactionResponse.Marshal(b, m, deterministic)
+func (m *GetBlockHeaderByIDRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetBlockHeaderByIDRequest.Marshal(b, m, deterministic)
 }
-func (m *SendTransactionResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SendTransactionResponse.Merge(m, src)
+func (m *GetBlockHeaderByIDRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetBlockHeaderByIDRequest.Merge(m, src)
 }
-func (m *SendTransactionResponse) XXX_Size() int {
-	return xxx_messageInfo_SendTransactionResponse.Size(m)
+func (m *GetBlockHeaderByIDRequest) XXX_Size() int {
+	return xxx_messageInfo_GetBlockHeaderByIDRequest.Size(m)
 }
-func (m *SendTransactionResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_SendTransactionResponse.DiscardUnknown(m)
+func (m *GetBlockHeaderByIDRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetBlockHeaderByIDRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SendTransactionResponse proto.InternalMessageInfo
+var xxx_messageInfo_GetBlockHeaderByIDRequest proto.InternalMessageInfo
 
-func (m *SendTransactionResponse) GetId() []byte {
+func (m *GetBlockHeaderByIDRequest) GetId() []byte {
 	if m != nil {
 		return m.Id
+	}
+	return nil
+}
+
+type GetBlockHeaderByHeightRequest struct {
+	Height               uint64   `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GetBlockHeaderByHeightRequest) Reset()         { *m = GetBlockHeaderByHeightRequest{} }
+func (m *GetBlockHeaderByHeightRequest) String() string { return proto.CompactTextString(m) }
+func (*GetBlockHeaderByHeightRequest) ProtoMessage()    {}
+func (*GetBlockHeaderByHeightRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_2f8771b9f9d71bac, []int{4}
+}
+
+func (m *GetBlockHeaderByHeightRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetBlockHeaderByHeightRequest.Unmarshal(m, b)
+}
+func (m *GetBlockHeaderByHeightRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetBlockHeaderByHeightRequest.Marshal(b, m, deterministic)
+}
+func (m *GetBlockHeaderByHeightRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetBlockHeaderByHeightRequest.Merge(m, src)
+}
+func (m *GetBlockHeaderByHeightRequest) XXX_Size() int {
+	return xxx_messageInfo_GetBlockHeaderByHeightRequest.Size(m)
+}
+func (m *GetBlockHeaderByHeightRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetBlockHeaderByHeightRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetBlockHeaderByHeightRequest proto.InternalMessageInfo
+
+func (m *GetBlockHeaderByHeightRequest) GetHeight() uint64 {
+	if m != nil {
+		return m.Height
+	}
+	return 0
+}
+
+type BlockHeaderResponse struct {
+	Block                *entities.BlockHeader `protobuf:"bytes,1,opt,name=block,proto3" json:"block,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
+	XXX_unrecognized     []byte                `json:"-"`
+	XXX_sizecache        int32                 `json:"-"`
+}
+
+func (m *BlockHeaderResponse) Reset()         { *m = BlockHeaderResponse{} }
+func (m *BlockHeaderResponse) String() string { return proto.CompactTextString(m) }
+func (*BlockHeaderResponse) ProtoMessage()    {}
+func (*BlockHeaderResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_2f8771b9f9d71bac, []int{5}
+}
+
+func (m *BlockHeaderResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_BlockHeaderResponse.Unmarshal(m, b)
+}
+func (m *BlockHeaderResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_BlockHeaderResponse.Marshal(b, m, deterministic)
+}
+func (m *BlockHeaderResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BlockHeaderResponse.Merge(m, src)
+}
+func (m *BlockHeaderResponse) XXX_Size() int {
+	return xxx_messageInfo_BlockHeaderResponse.Size(m)
+}
+func (m *BlockHeaderResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_BlockHeaderResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_BlockHeaderResponse proto.InternalMessageInfo
+
+func (m *BlockHeaderResponse) GetBlock() *entities.BlockHeader {
+	if m != nil {
+		return m.Block
 	}
 	return nil
 }
@@ -184,7 +254,7 @@ func (m *GetLatestBlockRequest) Reset()         { *m = GetLatestBlockRequest{} }
 func (m *GetLatestBlockRequest) String() string { return proto.CompactTextString(m) }
 func (*GetLatestBlockRequest) ProtoMessage()    {}
 func (*GetLatestBlockRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{4}
+	return fileDescriptor_2f8771b9f9d71bac, []int{6}
 }
 
 func (m *GetLatestBlockRequest) XXX_Unmarshal(b []byte) error {
@@ -223,7 +293,7 @@ func (m *GetBlockByIDRequest) Reset()         { *m = GetBlockByIDRequest{} }
 func (m *GetBlockByIDRequest) String() string { return proto.CompactTextString(m) }
 func (*GetBlockByIDRequest) ProtoMessage()    {}
 func (*GetBlockByIDRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{5}
+	return fileDescriptor_2f8771b9f9d71bac, []int{7}
 }
 
 func (m *GetBlockByIDRequest) XXX_Unmarshal(b []byte) error {
@@ -262,7 +332,7 @@ func (m *GetBlockByHeightRequest) Reset()         { *m = GetBlockByHeightRequest
 func (m *GetBlockByHeightRequest) String() string { return proto.CompactTextString(m) }
 func (*GetBlockByHeightRequest) ProtoMessage()    {}
 func (*GetBlockByHeightRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{6}
+	return fileDescriptor_2f8771b9f9d71bac, []int{8}
 }
 
 func (m *GetBlockByHeightRequest) XXX_Unmarshal(b []byte) error {
@@ -291,17 +361,17 @@ func (m *GetBlockByHeightRequest) GetHeight() uint64 {
 }
 
 type BlockResponse struct {
-	Block                *entities.BlockHeader `protobuf:"bytes,1,opt,name=block,proto3" json:"block,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
-	XXX_unrecognized     []byte                `json:"-"`
-	XXX_sizecache        int32                 `json:"-"`
+	Block                *entities.Block `protobuf:"bytes,1,opt,name=block,proto3" json:"block,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
 }
 
 func (m *BlockResponse) Reset()         { *m = BlockResponse{} }
 func (m *BlockResponse) String() string { return proto.CompactTextString(m) }
 func (*BlockResponse) ProtoMessage()    {}
 func (*BlockResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{7}
+	return fileDescriptor_2f8771b9f9d71bac, []int{9}
 }
 
 func (m *BlockResponse) XXX_Unmarshal(b []byte) error {
@@ -322,163 +392,7 @@ func (m *BlockResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_BlockResponse proto.InternalMessageInfo
 
-func (m *BlockResponse) GetBlock() *entities.BlockHeader {
-	if m != nil {
-		return m.Block
-	}
-	return nil
-}
-
-type GetLatestBlockDetailsRequest struct {
-	IsSealed             bool     `protobuf:"varint,1,opt,name=is_sealed,json=isSealed,proto3" json:"is_sealed,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *GetLatestBlockDetailsRequest) Reset()         { *m = GetLatestBlockDetailsRequest{} }
-func (m *GetLatestBlockDetailsRequest) String() string { return proto.CompactTextString(m) }
-func (*GetLatestBlockDetailsRequest) ProtoMessage()    {}
-func (*GetLatestBlockDetailsRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{8}
-}
-
-func (m *GetLatestBlockDetailsRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetLatestBlockDetailsRequest.Unmarshal(m, b)
-}
-func (m *GetLatestBlockDetailsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetLatestBlockDetailsRequest.Marshal(b, m, deterministic)
-}
-func (m *GetLatestBlockDetailsRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetLatestBlockDetailsRequest.Merge(m, src)
-}
-func (m *GetLatestBlockDetailsRequest) XXX_Size() int {
-	return xxx_messageInfo_GetLatestBlockDetailsRequest.Size(m)
-}
-func (m *GetLatestBlockDetailsRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetLatestBlockDetailsRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetLatestBlockDetailsRequest proto.InternalMessageInfo
-
-func (m *GetLatestBlockDetailsRequest) GetIsSealed() bool {
-	if m != nil {
-		return m.IsSealed
-	}
-	return false
-}
-
-type GetBlockDetailsByIDRequest struct {
-	Id                   []byte   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *GetBlockDetailsByIDRequest) Reset()         { *m = GetBlockDetailsByIDRequest{} }
-func (m *GetBlockDetailsByIDRequest) String() string { return proto.CompactTextString(m) }
-func (*GetBlockDetailsByIDRequest) ProtoMessage()    {}
-func (*GetBlockDetailsByIDRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{9}
-}
-
-func (m *GetBlockDetailsByIDRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetBlockDetailsByIDRequest.Unmarshal(m, b)
-}
-func (m *GetBlockDetailsByIDRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetBlockDetailsByIDRequest.Marshal(b, m, deterministic)
-}
-func (m *GetBlockDetailsByIDRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetBlockDetailsByIDRequest.Merge(m, src)
-}
-func (m *GetBlockDetailsByIDRequest) XXX_Size() int {
-	return xxx_messageInfo_GetBlockDetailsByIDRequest.Size(m)
-}
-func (m *GetBlockDetailsByIDRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetBlockDetailsByIDRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetBlockDetailsByIDRequest proto.InternalMessageInfo
-
-func (m *GetBlockDetailsByIDRequest) GetId() []byte {
-	if m != nil {
-		return m.Id
-	}
-	return nil
-}
-
-type GetBlockDetailsByHeightRequest struct {
-	Height               uint64   `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *GetBlockDetailsByHeightRequest) Reset()         { *m = GetBlockDetailsByHeightRequest{} }
-func (m *GetBlockDetailsByHeightRequest) String() string { return proto.CompactTextString(m) }
-func (*GetBlockDetailsByHeightRequest) ProtoMessage()    {}
-func (*GetBlockDetailsByHeightRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{10}
-}
-
-func (m *GetBlockDetailsByHeightRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetBlockDetailsByHeightRequest.Unmarshal(m, b)
-}
-func (m *GetBlockDetailsByHeightRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetBlockDetailsByHeightRequest.Marshal(b, m, deterministic)
-}
-func (m *GetBlockDetailsByHeightRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetBlockDetailsByHeightRequest.Merge(m, src)
-}
-func (m *GetBlockDetailsByHeightRequest) XXX_Size() int {
-	return xxx_messageInfo_GetBlockDetailsByHeightRequest.Size(m)
-}
-func (m *GetBlockDetailsByHeightRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetBlockDetailsByHeightRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetBlockDetailsByHeightRequest proto.InternalMessageInfo
-
-func (m *GetBlockDetailsByHeightRequest) GetHeight() uint64 {
-	if m != nil {
-		return m.Height
-	}
-	return 0
-}
-
-type BlockDetailsResponse struct {
-	Block                *entities.Block `protobuf:"bytes,1,opt,name=block,proto3" json:"block,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
-	XXX_unrecognized     []byte          `json:"-"`
-	XXX_sizecache        int32           `json:"-"`
-}
-
-func (m *BlockDetailsResponse) Reset()         { *m = BlockDetailsResponse{} }
-func (m *BlockDetailsResponse) String() string { return proto.CompactTextString(m) }
-func (*BlockDetailsResponse) ProtoMessage()    {}
-func (*BlockDetailsResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{11}
-}
-
-func (m *BlockDetailsResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_BlockDetailsResponse.Unmarshal(m, b)
-}
-func (m *BlockDetailsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_BlockDetailsResponse.Marshal(b, m, deterministic)
-}
-func (m *BlockDetailsResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_BlockDetailsResponse.Merge(m, src)
-}
-func (m *BlockDetailsResponse) XXX_Size() int {
-	return xxx_messageInfo_BlockDetailsResponse.Size(m)
-}
-func (m *BlockDetailsResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_BlockDetailsResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_BlockDetailsResponse proto.InternalMessageInfo
-
-func (m *BlockDetailsResponse) GetBlock() *entities.Block {
+func (m *BlockResponse) GetBlock() *entities.Block {
 	if m != nil {
 		return m.Block
 	}
@@ -496,7 +410,7 @@ func (m *GetCollectionByIDRequest) Reset()         { *m = GetCollectionByIDReque
 func (m *GetCollectionByIDRequest) String() string { return proto.CompactTextString(m) }
 func (*GetCollectionByIDRequest) ProtoMessage()    {}
 func (*GetCollectionByIDRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{12}
+	return fileDescriptor_2f8771b9f9d71bac, []int{10}
 }
 
 func (m *GetCollectionByIDRequest) XXX_Unmarshal(b []byte) error {
@@ -524,41 +438,252 @@ func (m *GetCollectionByIDRequest) GetId() []byte {
 	return nil
 }
 
-type GetCollectionResponse struct {
+type CollectionResponse struct {
 	Collection           *entities.Collection `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
 	XXX_unrecognized     []byte               `json:"-"`
 	XXX_sizecache        int32                `json:"-"`
 }
 
-func (m *GetCollectionResponse) Reset()         { *m = GetCollectionResponse{} }
-func (m *GetCollectionResponse) String() string { return proto.CompactTextString(m) }
-func (*GetCollectionResponse) ProtoMessage()    {}
-func (*GetCollectionResponse) Descriptor() ([]byte, []int) {
+func (m *CollectionResponse) Reset()         { *m = CollectionResponse{} }
+func (m *CollectionResponse) String() string { return proto.CompactTextString(m) }
+func (*CollectionResponse) ProtoMessage()    {}
+func (*CollectionResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_2f8771b9f9d71bac, []int{11}
+}
+
+func (m *CollectionResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_CollectionResponse.Unmarshal(m, b)
+}
+func (m *CollectionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_CollectionResponse.Marshal(b, m, deterministic)
+}
+func (m *CollectionResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CollectionResponse.Merge(m, src)
+}
+func (m *CollectionResponse) XXX_Size() int {
+	return xxx_messageInfo_CollectionResponse.Size(m)
+}
+func (m *CollectionResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_CollectionResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CollectionResponse proto.InternalMessageInfo
+
+func (m *CollectionResponse) GetCollection() *entities.Collection {
+	if m != nil {
+		return m.Collection
+	}
+	return nil
+}
+
+type SendTransactionRequest struct {
+	Transaction          *entities.Transaction `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
+	XXX_unrecognized     []byte                `json:"-"`
+	XXX_sizecache        int32                 `json:"-"`
+}
+
+func (m *SendTransactionRequest) Reset()         { *m = SendTransactionRequest{} }
+func (m *SendTransactionRequest) String() string { return proto.CompactTextString(m) }
+func (*SendTransactionRequest) ProtoMessage()    {}
+func (*SendTransactionRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_2f8771b9f9d71bac, []int{12}
+}
+
+func (m *SendTransactionRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SendTransactionRequest.Unmarshal(m, b)
+}
+func (m *SendTransactionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SendTransactionRequest.Marshal(b, m, deterministic)
+}
+func (m *SendTransactionRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SendTransactionRequest.Merge(m, src)
+}
+func (m *SendTransactionRequest) XXX_Size() int {
+	return xxx_messageInfo_SendTransactionRequest.Size(m)
+}
+func (m *SendTransactionRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_SendTransactionRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SendTransactionRequest proto.InternalMessageInfo
+
+func (m *SendTransactionRequest) GetTransaction() *entities.Transaction {
+	if m != nil {
+		return m.Transaction
+	}
+	return nil
+}
+
+type SendTransactionResponse struct {
+	Id                   []byte   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SendTransactionResponse) Reset()         { *m = SendTransactionResponse{} }
+func (m *SendTransactionResponse) String() string { return proto.CompactTextString(m) }
+func (*SendTransactionResponse) ProtoMessage()    {}
+func (*SendTransactionResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_2f8771b9f9d71bac, []int{13}
 }
 
-func (m *GetCollectionResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetCollectionResponse.Unmarshal(m, b)
+func (m *SendTransactionResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SendTransactionResponse.Unmarshal(m, b)
 }
-func (m *GetCollectionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetCollectionResponse.Marshal(b, m, deterministic)
+func (m *SendTransactionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SendTransactionResponse.Marshal(b, m, deterministic)
 }
-func (m *GetCollectionResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetCollectionResponse.Merge(m, src)
+func (m *SendTransactionResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SendTransactionResponse.Merge(m, src)
 }
-func (m *GetCollectionResponse) XXX_Size() int {
-	return xxx_messageInfo_GetCollectionResponse.Size(m)
+func (m *SendTransactionResponse) XXX_Size() int {
+	return xxx_messageInfo_SendTransactionResponse.Size(m)
 }
-func (m *GetCollectionResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetCollectionResponse.DiscardUnknown(m)
+func (m *SendTransactionResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_SendTransactionResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_GetCollectionResponse proto.InternalMessageInfo
+var xxx_messageInfo_SendTransactionResponse proto.InternalMessageInfo
 
-func (m *GetCollectionResponse) GetCollection() *entities.Collection {
+func (m *SendTransactionResponse) GetId() []byte {
 	if m != nil {
-		return m.Collection
+		return m.Id
+	}
+	return nil
+}
+
+type GetTransactionRequest struct {
+	Id                   []byte   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GetTransactionRequest) Reset()         { *m = GetTransactionRequest{} }
+func (m *GetTransactionRequest) String() string { return proto.CompactTextString(m) }
+func (*GetTransactionRequest) ProtoMessage()    {}
+func (*GetTransactionRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_2f8771b9f9d71bac, []int{14}
+}
+
+func (m *GetTransactionRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetTransactionRequest.Unmarshal(m, b)
+}
+func (m *GetTransactionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetTransactionRequest.Marshal(b, m, deterministic)
+}
+func (m *GetTransactionRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetTransactionRequest.Merge(m, src)
+}
+func (m *GetTransactionRequest) XXX_Size() int {
+	return xxx_messageInfo_GetTransactionRequest.Size(m)
+}
+func (m *GetTransactionRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetTransactionRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetTransactionRequest proto.InternalMessageInfo
+
+func (m *GetTransactionRequest) GetId() []byte {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
+type TransactionResponse struct {
+	Transaction          *entities.Transaction `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"`
+	Events               []*entities.Event     `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
+	XXX_unrecognized     []byte                `json:"-"`
+	XXX_sizecache        int32                 `json:"-"`
+}
+
+func (m *TransactionResponse) Reset()         { *m = TransactionResponse{} }
+func (m *TransactionResponse) String() string { return proto.CompactTextString(m) }
+func (*TransactionResponse) ProtoMessage()    {}
+func (*TransactionResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_2f8771b9f9d71bac, []int{15}
+}
+
+func (m *TransactionResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_TransactionResponse.Unmarshal(m, b)
+}
+func (m *TransactionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_TransactionResponse.Marshal(b, m, deterministic)
+}
+func (m *TransactionResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TransactionResponse.Merge(m, src)
+}
+func (m *TransactionResponse) XXX_Size() int {
+	return xxx_messageInfo_TransactionResponse.Size(m)
+}
+func (m *TransactionResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_TransactionResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TransactionResponse proto.InternalMessageInfo
+
+func (m *TransactionResponse) GetTransaction() *entities.Transaction {
+	if m != nil {
+		return m.Transaction
+	}
+	return nil
+}
+
+func (m *TransactionResponse) GetEvents() []*entities.Event {
+	if m != nil {
+		return m.Events
+	}
+	return nil
+}
+
+type TransactionResultResponse struct {
+	Status               entities.TransactionStatus `protobuf:"varint,1,opt,name=status,proto3,enum=flow.sdk.entities.TransactionStatus" json:"status,omitempty"`
+	Events               []*entities.Event          `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
+	XXX_unrecognized     []byte                     `json:"-"`
+	XXX_sizecache        int32                      `json:"-"`
+}
+
+func (m *TransactionResultResponse) Reset()         { *m = TransactionResultResponse{} }
+func (m *TransactionResultResponse) String() string { return proto.CompactTextString(m) }
+func (*TransactionResultResponse) ProtoMessage()    {}
+func (*TransactionResultResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_2f8771b9f9d71bac, []int{16}
+}
+
+func (m *TransactionResultResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_TransactionResultResponse.Unmarshal(m, b)
+}
+func (m *TransactionResultResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_TransactionResultResponse.Marshal(b, m, deterministic)
+}
+func (m *TransactionResultResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TransactionResultResponse.Merge(m, src)
+}
+func (m *TransactionResultResponse) XXX_Size() int {
+	return xxx_messageInfo_TransactionResultResponse.Size(m)
+}
+func (m *TransactionResultResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_TransactionResultResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TransactionResultResponse proto.InternalMessageInfo
+
+func (m *TransactionResultResponse) GetStatus() entities.TransactionStatus {
+	if m != nil {
+		return m.Status
+	}
+	return entities.TransactionStatus_STATUS_UNKNOWN
+}
+
+func (m *TransactionResultResponse) GetEvents() []*entities.Event {
+	if m != nil {
+		return m.Events
 	}
 	return nil
 }
@@ -574,7 +699,7 @@ func (m *GetAccountRequest) Reset()         { *m = GetAccountRequest{} }
 func (m *GetAccountRequest) String() string { return proto.CompactTextString(m) }
 func (*GetAccountRequest) ProtoMessage()    {}
 func (*GetAccountRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{14}
+	return fileDescriptor_2f8771b9f9d71bac, []int{17}
 }
 
 func (m *GetAccountRequest) XXX_Unmarshal(b []byte) error {
@@ -613,7 +738,7 @@ func (m *GetAccountResponse) Reset()         { *m = GetAccountResponse{} }
 func (m *GetAccountResponse) String() string { return proto.CompactTextString(m) }
 func (*GetAccountResponse) ProtoMessage()    {}
 func (*GetAccountResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{15}
+	return fileDescriptor_2f8771b9f9d71bac, []int{18}
 }
 
 func (m *GetAccountResponse) XXX_Unmarshal(b []byte) error {
@@ -652,7 +777,7 @@ func (m *ExecuteScriptRequest) Reset()         { *m = ExecuteScriptRequest{} }
 func (m *ExecuteScriptRequest) String() string { return proto.CompactTextString(m) }
 func (*ExecuteScriptRequest) ProtoMessage()    {}
 func (*ExecuteScriptRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{16}
+	return fileDescriptor_2f8771b9f9d71bac, []int{19}
 }
 
 func (m *ExecuteScriptRequest) XXX_Unmarshal(b []byte) error {
@@ -691,7 +816,7 @@ func (m *ExecuteScriptResponse) Reset()         { *m = ExecuteScriptResponse{} }
 func (m *ExecuteScriptResponse) String() string { return proto.CompactTextString(m) }
 func (*ExecuteScriptResponse) ProtoMessage()    {}
 func (*ExecuteScriptResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{17}
+	return fileDescriptor_2f8771b9f9d71bac, []int{20}
 }
 
 func (m *ExecuteScriptResponse) XXX_Unmarshal(b []byte) error {
@@ -732,7 +857,7 @@ func (m *GetEventsRequest) Reset()         { *m = GetEventsRequest{} }
 func (m *GetEventsRequest) String() string { return proto.CompactTextString(m) }
 func (*GetEventsRequest) ProtoMessage()    {}
 func (*GetEventsRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{18}
+	return fileDescriptor_2f8771b9f9d71bac, []int{21}
 }
 
 func (m *GetEventsRequest) XXX_Unmarshal(b []byte) error {
@@ -785,7 +910,7 @@ func (m *GetEventsResponse) Reset()         { *m = GetEventsResponse{} }
 func (m *GetEventsResponse) String() string { return proto.CompactTextString(m) }
 func (*GetEventsResponse) ProtoMessage()    {}
 func (*GetEventsResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{19}
+	return fileDescriptor_2f8771b9f9d71bac, []int{22}
 }
 
 func (m *GetEventsResponse) XXX_Unmarshal(b []byte) error {
@@ -813,163 +938,30 @@ func (m *GetEventsResponse) GetEvents() []*entities.Event {
 	return nil
 }
 
-type GetTransactionRequest struct {
-	Id                   []byte   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *GetTransactionRequest) Reset()         { *m = GetTransactionRequest{} }
-func (m *GetTransactionRequest) String() string { return proto.CompactTextString(m) }
-func (*GetTransactionRequest) ProtoMessage()    {}
-func (*GetTransactionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{20}
-}
-
-func (m *GetTransactionRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetTransactionRequest.Unmarshal(m, b)
-}
-func (m *GetTransactionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetTransactionRequest.Marshal(b, m, deterministic)
-}
-func (m *GetTransactionRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetTransactionRequest.Merge(m, src)
-}
-func (m *GetTransactionRequest) XXX_Size() int {
-	return xxx_messageInfo_GetTransactionRequest.Size(m)
-}
-func (m *GetTransactionRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetTransactionRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetTransactionRequest proto.InternalMessageInfo
-
-func (m *GetTransactionRequest) GetId() []byte {
-	if m != nil {
-		return m.Id
-	}
-	return nil
-}
-
-type GetTransactionResponse struct {
-	Transaction          *entities.Transaction `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"`
-	Events               []*entities.Event     `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
-	XXX_unrecognized     []byte                `json:"-"`
-	XXX_sizecache        int32                 `json:"-"`
-}
-
-func (m *GetTransactionResponse) Reset()         { *m = GetTransactionResponse{} }
-func (m *GetTransactionResponse) String() string { return proto.CompactTextString(m) }
-func (*GetTransactionResponse) ProtoMessage()    {}
-func (*GetTransactionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{21}
-}
-
-func (m *GetTransactionResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetTransactionResponse.Unmarshal(m, b)
-}
-func (m *GetTransactionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetTransactionResponse.Marshal(b, m, deterministic)
-}
-func (m *GetTransactionResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetTransactionResponse.Merge(m, src)
-}
-func (m *GetTransactionResponse) XXX_Size() int {
-	return xxx_messageInfo_GetTransactionResponse.Size(m)
-}
-func (m *GetTransactionResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetTransactionResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetTransactionResponse proto.InternalMessageInfo
-
-func (m *GetTransactionResponse) GetTransaction() *entities.Transaction {
-	if m != nil {
-		return m.Transaction
-	}
-	return nil
-}
-
-func (m *GetTransactionResponse) GetEvents() []*entities.Event {
-	if m != nil {
-		return m.Events
-	}
-	return nil
-}
-
-type GetTransactionStatusResponse struct {
-	Status               entities.TransactionStatus `protobuf:"varint,1,opt,name=status,proto3,enum=flow.sdk.entities.TransactionStatus" json:"status,omitempty"`
-	Events               []*entities.Event          `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
-	XXX_unrecognized     []byte                     `json:"-"`
-	XXX_sizecache        int32                      `json:"-"`
-}
-
-func (m *GetTransactionStatusResponse) Reset()         { *m = GetTransactionStatusResponse{} }
-func (m *GetTransactionStatusResponse) String() string { return proto.CompactTextString(m) }
-func (*GetTransactionStatusResponse) ProtoMessage()    {}
-func (*GetTransactionStatusResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_2f8771b9f9d71bac, []int{22}
-}
-
-func (m *GetTransactionStatusResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_GetTransactionStatusResponse.Unmarshal(m, b)
-}
-func (m *GetTransactionStatusResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_GetTransactionStatusResponse.Marshal(b, m, deterministic)
-}
-func (m *GetTransactionStatusResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetTransactionStatusResponse.Merge(m, src)
-}
-func (m *GetTransactionStatusResponse) XXX_Size() int {
-	return xxx_messageInfo_GetTransactionStatusResponse.Size(m)
-}
-func (m *GetTransactionStatusResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_GetTransactionStatusResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_GetTransactionStatusResponse proto.InternalMessageInfo
-
-func (m *GetTransactionStatusResponse) GetStatus() entities.TransactionStatus {
-	if m != nil {
-		return m.Status
-	}
-	return entities.TransactionStatus_STATUS_UNKNOWN
-}
-
-func (m *GetTransactionStatusResponse) GetEvents() []*entities.Event {
-	if m != nil {
-		return m.Events
-	}
-	return nil
-}
-
 func init() {
 	proto.RegisterType((*PingRequest)(nil), "flow.services.observation.PingRequest")
 	proto.RegisterType((*PingResponse)(nil), "flow.services.observation.PingResponse")
-	proto.RegisterType((*SendTransactionRequest)(nil), "flow.services.observation.SendTransactionRequest")
-	proto.RegisterType((*SendTransactionResponse)(nil), "flow.services.observation.SendTransactionResponse")
+	proto.RegisterType((*GetLatestBlockHeaderRequest)(nil), "flow.services.observation.GetLatestBlockHeaderRequest")
+	proto.RegisterType((*GetBlockHeaderByIDRequest)(nil), "flow.services.observation.GetBlockHeaderByIDRequest")
+	proto.RegisterType((*GetBlockHeaderByHeightRequest)(nil), "flow.services.observation.GetBlockHeaderByHeightRequest")
+	proto.RegisterType((*BlockHeaderResponse)(nil), "flow.services.observation.BlockHeaderResponse")
 	proto.RegisterType((*GetLatestBlockRequest)(nil), "flow.services.observation.GetLatestBlockRequest")
 	proto.RegisterType((*GetBlockByIDRequest)(nil), "flow.services.observation.GetBlockByIDRequest")
 	proto.RegisterType((*GetBlockByHeightRequest)(nil), "flow.services.observation.GetBlockByHeightRequest")
 	proto.RegisterType((*BlockResponse)(nil), "flow.services.observation.BlockResponse")
-	proto.RegisterType((*GetLatestBlockDetailsRequest)(nil), "flow.services.observation.GetLatestBlockDetailsRequest")
-	proto.RegisterType((*GetBlockDetailsByIDRequest)(nil), "flow.services.observation.GetBlockDetailsByIDRequest")
-	proto.RegisterType((*GetBlockDetailsByHeightRequest)(nil), "flow.services.observation.GetBlockDetailsByHeightRequest")
-	proto.RegisterType((*BlockDetailsResponse)(nil), "flow.services.observation.BlockDetailsResponse")
 	proto.RegisterType((*GetCollectionByIDRequest)(nil), "flow.services.observation.GetCollectionByIDRequest")
-	proto.RegisterType((*GetCollectionResponse)(nil), "flow.services.observation.GetCollectionResponse")
+	proto.RegisterType((*CollectionResponse)(nil), "flow.services.observation.CollectionResponse")
+	proto.RegisterType((*SendTransactionRequest)(nil), "flow.services.observation.SendTransactionRequest")
+	proto.RegisterType((*SendTransactionResponse)(nil), "flow.services.observation.SendTransactionResponse")
+	proto.RegisterType((*GetTransactionRequest)(nil), "flow.services.observation.GetTransactionRequest")
+	proto.RegisterType((*TransactionResponse)(nil), "flow.services.observation.TransactionResponse")
+	proto.RegisterType((*TransactionResultResponse)(nil), "flow.services.observation.TransactionResultResponse")
 	proto.RegisterType((*GetAccountRequest)(nil), "flow.services.observation.GetAccountRequest")
 	proto.RegisterType((*GetAccountResponse)(nil), "flow.services.observation.GetAccountResponse")
 	proto.RegisterType((*ExecuteScriptRequest)(nil), "flow.services.observation.ExecuteScriptRequest")
 	proto.RegisterType((*ExecuteScriptResponse)(nil), "flow.services.observation.ExecuteScriptResponse")
 	proto.RegisterType((*GetEventsRequest)(nil), "flow.services.observation.GetEventsRequest")
 	proto.RegisterType((*GetEventsResponse)(nil), "flow.services.observation.GetEventsResponse")
-	proto.RegisterType((*GetTransactionRequest)(nil), "flow.services.observation.GetTransactionRequest")
-	proto.RegisterType((*GetTransactionResponse)(nil), "flow.services.observation.GetTransactionResponse")
-	proto.RegisterType((*GetTransactionStatusResponse)(nil), "flow.services.observation.GetTransactionStatusResponse")
 }
 
 func init() {
@@ -977,60 +969,59 @@ func init() {
 }
 
 var fileDescriptor_2f8771b9f9d71bac = []byte{
-	// 841 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x57, 0xcf, 0x4f, 0xdb, 0x48,
-	0x14, 0x56, 0x02, 0x04, 0x78, 0xf9, 0xb1, 0xbb, 0xb3, 0x01, 0xb2, 0x66, 0x97, 0x45, 0xd6, 0x2e,
-	0xb0, 0xbb, 0x60, 0x20, 0xb0, 0xa2, 0x55, 0x5b, 0xa9, 0xa5, 0xa4, 0xa1, 0x55, 0xa5, 0x56, 0x49,
-	0xd5, 0x4a, 0x5c, 0x90, 0xb1, 0x1f, 0x60, 0x61, 0xd9, 0xa9, 0x67, 0x42, 0xa1, 0x52, 0x0f, 0x3d,
-	0xf4, 0x56, 0xf5, 0xcf, 0xed, 0xb9, 0xca, 0x78, 0x6c, 0x8f, 0x8d, 0x63, 0xec, 0xf6, 0x36, 0xf3,
-	0xf2, 0x7d, 0xf3, 0x7d, 0x6f, 0x66, 0xfc, 0xde, 0x04, 0x56, 0x28, 0x7a, 0x97, 0x96, 0x81, 0x74,
-	0xd3, 0x3d, 0x19, 0x0d, 0x75, 0x66, 0xb9, 0x8e, 0x3c, 0xd6, 0x06, 0x9e, 0xcb, 0x5c, 0xf2, 0xdb,
-	0xa9, 0xed, 0xbe, 0xd3, 0x02, 0xb0, 0x26, 0x01, 0x94, 0x45, 0x6a, 0x5e, 0x6c, 0xa2, 0xc3, 0x2c,
-	0x66, 0x21, 0x0d, 0x07, 0x3e, 0x4f, 0xad, 0x43, 0xf5, 0xa5, 0xe5, 0x9c, 0xf5, 0xf0, 0xed, 0x10,
-	0x29, 0x53, 0xd7, 0xa0, 0xe6, 0x4f, 0xe9, 0xc0, 0x75, 0x28, 0x92, 0x16, 0x4c, 0xeb, 0xa6, 0xe9,
-	0x21, 0xa5, 0xad, 0xd2, 0x72, 0x69, 0xad, 0xd6, 0x0b, 0xa6, 0xea, 0x11, 0xcc, 0xf7, 0xd1, 0x31,
-	0x5f, 0x79, 0xba, 0x43, 0x75, 0x63, 0x24, 0x24, 0xd6, 0x20, 0x0f, 0xa1, 0xca, 0xa2, 0x28, 0xe7,
-	0x55, 0xdb, 0x4b, 0x9a, 0x6f, 0xd0, 0xbc, 0xd0, 0x42, 0x07, 0x32, 0x57, 0xa6, 0xa8, 0xff, 0xc0,
-	0xc2, 0x8d, 0xb5, 0x85, 0xa1, 0x06, 0x94, 0x2d, 0x53, 0x78, 0x29, 0x5b, 0xa6, 0xba, 0x0b, 0x73,
-	0x5d, 0x64, 0xcf, 0x75, 0x86, 0x94, 0xed, 0xdb, 0xae, 0x71, 0x11, 0xb8, 0x58, 0x84, 0x59, 0x8b,
-	0x1e, 0x53, 0xd4, 0x6d, 0xf4, 0xf1, 0x33, 0xbd, 0x19, 0x8b, 0xf6, 0xf9, 0x5c, 0xfd, 0x1b, 0x7e,
-	0xed, 0xa2, 0x8f, 0xdf, 0xbf, 0x7e, 0x7a, 0x10, 0x70, 0x92, 0x8b, 0x6f, 0xc3, 0x42, 0x04, 0x3b,
-	0x44, 0xeb, 0xec, 0x9c, 0x05, 0xd0, 0x79, 0xa8, 0x9c, 0xf3, 0x00, 0x87, 0x4f, 0xf6, 0xc4, 0x4c,
-	0xed, 0x40, 0x5d, 0xd8, 0x10, 0x86, 0x77, 0x61, 0xea, 0x64, 0x14, 0xc8, 0xd8, 0x07, 0x4e, 0x38,
-	0x44, 0xdd, 0x44, 0xaf, 0xe7, 0x83, 0xd5, 0x7b, 0xf0, 0x7b, 0x3c, 0xad, 0x03, 0x64, 0xba, 0x65,
-	0xd3, 0x5c, 0xd9, 0xad, 0x83, 0x12, 0xd8, 0x16, 0xb4, 0xac, 0x24, 0xef, 0xc0, 0xd2, 0x0d, 0x74,
-	0xbe, 0x5c, 0x9f, 0x40, 0x33, 0xee, 0x4d, 0xa4, 0xac, 0xc5, 0x53, 0x6e, 0x8d, 0x4b, 0x39, 0x48,
-	0xf6, 0x5f, 0x68, 0x75, 0x91, 0x3d, 0x76, 0x6d, 0x1b, 0xf9, 0x61, 0x67, 0xb9, 0x7d, 0xcd, 0xcf,
-	0x3b, 0xc2, 0x86, 0xa2, 0x0f, 0x00, 0x8c, 0x30, 0x2a, 0x94, 0xff, 0x48, 0x51, 0x96, 0xa8, 0x12,
-	0x41, 0xdd, 0x80, 0x5f, 0xba, 0xc8, 0x1e, 0x19, 0x86, 0x3b, 0x74, 0xc2, 0xc4, 0xc7, 0xdf, 0xfe,
-	0x67, 0x40, 0x64, 0x78, 0x78, 0xd6, 0xd3, 0xba, 0x1f, 0x12, 0x06, 0x94, 0x14, 0x03, 0x01, 0x29,
-	0x80, 0xaa, 0x1a, 0x34, 0x3b, 0x57, 0x68, 0x0c, 0x19, 0xf6, 0x0d, 0xcf, 0x1a, 0xc8, 0xdb, 0x4e,
-	0x79, 0x40, 0x88, 0x8b, 0x99, 0xba, 0x01, 0x73, 0x09, 0xbc, 0x90, 0x6f, 0xc2, 0xd4, 0xa5, 0x6e,
-	0x0f, 0x51, 0xe0, 0xfd, 0x89, 0x6a, 0xc2, 0xcf, 0x5d, 0x64, 0x9d, 0x4b, 0x74, 0x58, 0x78, 0x7d,
-	0x08, 0x4c, 0xb2, 0xeb, 0x81, 0x0f, 0x9c, 0xed, 0xf1, 0x31, 0xf9, 0x13, 0xaa, 0x94, 0xe9, 0x1e,
-	0x3b, 0xf6, 0xcf, 0xae, 0xcc, 0x8f, 0x1a, 0x78, 0x88, 0x9f, 0xd6, 0xe8, 0xce, 0xa1, 0x63, 0x8a,
-	0x9f, 0x27, 0xf8, 0xcf, 0x33, 0xe8, 0x98, 0xfc, 0x47, 0xb5, 0xc3, 0xf7, 0x2f, 0x50, 0x11, 0x86,
-	0xb6, 0xa0, 0x82, 0x3c, 0xd2, 0x2a, 0x2d, 0x4f, 0x8c, 0xb9, 0x09, 0x9c, 0xd2, 0x13, 0x38, 0x75,
-	0x95, 0x1f, 0x6f, 0x4a, 0x51, 0x49, 0xde, 0x83, 0xcf, 0x25, 0x98, 0x4f, 0x22, 0x85, 0xea, 0x0f,
-	0xd7, 0x1f, 0xc9, 0x77, 0x39, 0xa7, 0xef, 0x2f, 0x25, 0xfe, 0xc1, 0x4a, 0x2b, 0xf6, 0x99, 0xce,
-	0x86, 0xd1, 0x56, 0xdc, 0x87, 0x0a, 0xe5, 0x11, 0xee, 0xa7, 0xd1, 0xfe, 0x2b, 0xdb, 0x8f, 0x60,
-	0x0b, 0x4e, 0x71, 0x43, 0xed, 0xaf, 0x35, 0x68, 0xbc, 0xe0, 0x4d, 0x00, 0xfb, 0x7e, 0x53, 0x20,
-	0x6f, 0x60, 0x72, 0x54, 0xdb, 0xc9, 0x8a, 0x36, 0xb6, 0x57, 0x68, 0x52, 0x2f, 0x50, 0x56, 0x6f,
-	0xc5, 0x89, 0xdc, 0x6c, 0x68, 0xc4, 0x8b, 0x15, 0xd9, 0xca, 0xa0, 0xa6, 0x96, 0x6b, 0x65, 0x2d,
-	0x83, 0x11, 0x2f, 0xa8, 0xe7, 0x50, 0x93, 0x6b, 0x37, 0xd1, 0xb2, 0xb5, 0x92, 0x45, 0xbe, 0x80,
-	0xd2, 0x80, 0x7f, 0x39, 0xb1, 0xf2, 0x4f, 0xda, 0xb9, 0xd4, 0x62, 0xf5, 0xb3, 0x80, 0xe2, 0xc7,
-	0x52, 0xb2, 0x9d, 0x89, 0xda, 0x4a, 0xf6, 0x72, 0xef, 0x68, 0xbc, 0x53, 0x28, 0x9b, 0xb7, 0x89,
-	0x27, 0xab, 0xf7, 0x87, 0xa8, 0x37, 0x4a, 0xdd, 0x83, 0xfc, 0x9f, 0x23, 0xf1, 0x9b, 0xdd, 0xa6,
-	0xb8, 0xfc, 0xa7, 0x52, 0xd4, 0x74, 0x13, 0xfd, 0x88, 0xdc, 0x2d, 0xe2, 0x21, 0x7e, 0x06, 0x85,
-	0x7d, 0xbc, 0xe7, 0x05, 0x2d, 0xde, 0x94, 0xc8, 0x4e, 0xb6, 0x81, 0xd4, 0x16, 0xa6, 0x6c, 0xe5,
-	0x25, 0x85, 0xda, 0x57, 0xf0, 0x53, 0xe2, 0xfd, 0x43, 0xb6, 0x33, 0x16, 0x49, 0x7f, 0x87, 0x29,
-	0xed, 0x22, 0x14, 0xa1, 0x3c, 0xe4, 0x9f, 0xb2, 0x2c, 0x7c, 0x8b, 0xfb, 0x14, 0xdd, 0xed, 0x02,
-	0x8c, 0xe8, 0xde, 0x37, 0xd3, 0xca, 0xe7, 0x77, 0xa8, 0xef, 0xe5, 0x66, 0x24, 0x2a, 0xb4, 0x05,
-	0x10, 0xb5, 0x74, 0xb2, 0x9e, 0xbd, 0x4c, 0xfc, 0xa1, 0xa0, 0x6c, 0xe4, 0x44, 0x0b, 0x29, 0x0f,
-	0xea, 0xb1, 0x0e, 0x4e, 0xb2, 0x6e, 0x67, 0xda, 0xdb, 0x20, 0xf3, 0x4e, 0xa5, 0x3f, 0x0e, 0x4e,
-	0x61, 0x36, 0x6c, 0xd0, 0xe4, 0xbf, 0x6c, 0xbf, 0xb1, 0xc7, 0x82, 0xb2, 0x9e, 0x0f, 0xec, 0xeb,
-	0xec, 0xd7, 0x8f, 0xaa, 0x12, 0xe0, 0xa4, 0xc2, 0xff, 0x66, 0xec, 0x7c, 0x0b, 0x00, 0x00, 0xff,
-	0xff, 0x24, 0x53, 0x93, 0x0b, 0xc8, 0x0c, 0x00, 0x00,
+	// 823 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x57, 0x5b, 0x4f, 0xdb, 0x48,
+	0x18, 0x55, 0x02, 0x04, 0xf8, 0x72, 0xd9, 0xdd, 0xe1, 0x16, 0x8c, 0xd8, 0x45, 0xa3, 0x2d, 0xd0,
+	0x02, 0x06, 0x42, 0xd4, 0x56, 0x55, 0xab, 0xb6, 0xb4, 0x28, 0xf4, 0x22, 0xb5, 0x72, 0x2a, 0x55,
+	0xe2, 0x05, 0x19, 0x7b, 0x00, 0x0b, 0xcb, 0x4e, 0x3d, 0x13, 0x2e, 0x7d, 0xe8, 0x43, 0xdf, 0xaa,
+	0xfe, 0xcb, 0xfe, 0x92, 0x2a, 0xe3, 0xb1, 0x33, 0x0e, 0xc3, 0xe0, 0xd0, 0x37, 0xcf, 0xe4, 0x9c,
+	0x39, 0xe7, 0x9b, 0xcb, 0x77, 0x14, 0x58, 0xa6, 0x24, 0x3a, 0xf7, 0x1c, 0x42, 0x37, 0xc3, 0xa3,
+	0xde, 0xa7, 0xcd, 0xbc, 0x30, 0x90, 0xbf, 0xcd, 0x4e, 0x14, 0xb2, 0x10, 0xcd, 0x1f, 0xfb, 0xe1,
+	0x85, 0x99, 0x80, 0x4d, 0x09, 0x60, 0x2c, 0x50, 0xf7, 0x6c, 0x93, 0x04, 0xcc, 0x63, 0x1e, 0xa1,
+	0xe9, 0x47, 0xcc, 0xc3, 0x55, 0x28, 0x7f, 0xf4, 0x82, 0x13, 0x8b, 0x7c, 0xe9, 0x12, 0xca, 0x70,
+	0x0d, 0x2a, 0xf1, 0x90, 0x76, 0xc2, 0x80, 0x12, 0xfc, 0x04, 0x16, 0x5a, 0x84, 0xbd, 0xb7, 0x19,
+	0xa1, 0x6c, 0xd7, 0x0f, 0x9d, 0xb3, 0x7d, 0x62, 0xbb, 0x24, 0x12, 0x70, 0xb4, 0x00, 0x93, 0x1e,
+	0x3d, 0xa4, 0xc4, 0xf6, 0x89, 0x5b, 0x2f, 0x2c, 0x15, 0x56, 0x27, 0xac, 0x09, 0x8f, 0xb6, 0xf9,
+	0x18, 0xaf, 0xc1, 0x7c, 0x8b, 0xc8, 0xac, 0xdd, 0xab, 0x37, 0xaf, 0x13, 0x66, 0x0d, 0x8a, 0x5e,
+	0x4c, 0xa9, 0x58, 0x45, 0xcf, 0xc5, 0x8f, 0x60, 0x71, 0x10, 0xbc, 0x4f, 0xbc, 0x93, 0x53, 0x96,
+	0x10, 0x66, 0xa1, 0x74, 0xca, 0x27, 0x38, 0x69, 0xd4, 0x12, 0x23, 0xfc, 0x0e, 0xa6, 0x32, 0xc6,
+	0x62, 0xe3, 0xa8, 0x09, 0x63, 0x47, 0xbd, 0x69, 0x8e, 0x2e, 0x37, 0xfe, 0x35, 0xe3, 0xfd, 0x71,
+	0xcf, 0xcc, 0x74, 0x03, 0x64, 0x5a, 0x0c, 0xc6, 0x4d, 0x98, 0xc9, 0x96, 0x9b, 0xab, 0xd0, 0x7b,
+	0x30, 0x95, 0x78, 0xd7, 0x95, 0xb8, 0x0d, 0x73, 0x7d, 0x58, 0xbe, 0xe2, 0x9e, 0x43, 0x55, 0xd8,
+	0x10, 0x65, 0x99, 0xd9, 0xb2, 0xea, 0x37, 0x95, 0x95, 0x14, 0xf4, 0x00, 0xea, 0x2d, 0xc2, 0x5e,
+	0x85, 0xbe, 0x4f, 0x9c, 0xde, 0x65, 0xd0, 0xf9, 0x6b, 0x03, 0xea, 0x03, 0x53, 0xc5, 0x67, 0x00,
+	0x4e, 0x3a, 0x2b, 0x64, 0x17, 0x15, 0xb2, 0x12, 0x55, 0x22, 0xe0, 0x03, 0x98, 0x6d, 0x93, 0xc0,
+	0xfd, 0x14, 0xd9, 0x01, 0xb5, 0xc5, 0xca, 0xb1, 0xfc, 0x0b, 0x28, 0xb3, 0xfe, 0xac, 0xe6, 0x9c,
+	0x64, 0xae, 0x4c, 0xc1, 0xf7, 0x61, 0xee, 0xda, 0xda, 0xc2, 0xf5, 0x60, 0x6d, 0x2b, 0xfc, 0x60,
+	0x15, 0x2e, 0x06, 0x81, 0x3f, 0x0a, 0x30, 0xa5, 0x5a, 0xf0, 0x8f, 0xdd, 0xa2, 0x2d, 0x28, 0x91,
+	0x73, 0x12, 0x30, 0x5a, 0x2f, 0x2e, 0x8d, 0xdc, 0x70, 0x76, 0x7b, 0x3d, 0x80, 0x25, 0x70, 0xf8,
+	0x67, 0x01, 0xe6, 0xb3, 0x5e, 0xba, 0x3e, 0x4b, 0x1d, 0x3d, 0x85, 0x12, 0x65, 0x36, 0xeb, 0x52,
+	0x6e, 0xa6, 0xd6, 0xf8, 0x5f, 0x6f, 0xa6, 0xcd, 0xb1, 0x96, 0xe0, 0xdc, 0xc1, 0xcd, 0x06, 0xfc,
+	0xd3, 0x22, 0xec, 0xa5, 0xe3, 0x84, 0xdd, 0x20, 0xbd, 0xb8, 0x75, 0x18, 0xb7, 0x5d, 0x37, 0x22,
+	0x94, 0x8a, 0x3d, 0x4c, 0x86, 0xf8, 0x2d, 0x20, 0x19, 0x9e, 0x3e, 0xcb, 0x71, 0x3b, 0x9e, 0x12,
+	0x5b, 0x68, 0x28, 0x74, 0x13, 0x52, 0x02, 0xc5, 0x26, 0x4c, 0xef, 0x5d, 0x12, 0xa7, 0xcb, 0x48,
+	0xdb, 0x89, 0xbc, 0x8e, 0xfc, 0x6c, 0x28, 0x9f, 0x10, 0xe2, 0x62, 0x84, 0x37, 0x60, 0x66, 0x00,
+	0x2f, 0xe4, 0xa7, 0x61, 0xec, 0xdc, 0xf6, 0xbb, 0x44, 0xe0, 0xe3, 0x01, 0x76, 0xe1, 0xef, 0x16,
+	0x61, 0xbc, 0x5a, 0x9a, 0x2c, 0x8d, 0x60, 0x94, 0x5d, 0x75, 0x62, 0xe0, 0xa4, 0xc5, 0xbf, 0xd1,
+	0x7f, 0x50, 0xa6, 0xcc, 0x8e, 0xd8, 0x61, 0xfc, 0x04, 0x8b, 0xfc, 0xa9, 0x02, 0x9f, 0xe2, 0x8f,
+	0xae, 0xd7, 0x25, 0x48, 0xe0, 0x8a, 0x9f, 0x47, 0xf8, 0xcf, 0x13, 0x24, 0x70, 0xf9, 0x8f, 0x78,
+	0x8f, 0xef, 0x5f, 0xa2, 0x22, 0x0c, 0xf5, 0x8f, 0xa1, 0x90, 0xef, 0x18, 0x1a, 0xbf, 0x2a, 0x50,
+	0xfb, 0xc0, 0xbb, 0x3b, 0x69, 0xc7, 0xdd, 0x1e, 0x7d, 0x86, 0xd1, 0x5e, 0xd3, 0x46, 0xcb, 0xe6,
+	0x8d, 0x21, 0x60, 0x4a, 0x4d, 0xde, 0x58, 0xb9, 0x15, 0x27, 0xdc, 0x7d, 0x83, 0x69, 0x55, 0xf7,
+	0x47, 0x0f, 0x35, 0x0b, 0x68, 0xe2, 0xc2, 0x30, 0x35, 0x3c, 0x55, 0x13, 0xff, 0xca, 0xef, 0xd0,
+	0x40, 0x82, 0xa0, 0xa6, 0x5e, 0x5d, 0x1d, 0x38, 0x43, 0x6b, 0x7f, 0x2f, 0xc0, 0xac, 0x3a, 0x91,
+	0xd0, 0xe3, 0x21, 0x0c, 0x64, 0xfa, 0xfc, 0xd0, 0x26, 0x7c, 0xa8, 0x65, 0xf7, 0x13, 0x6d, 0xe5,
+	0xde, 0xfa, 0x44, 0x73, 0xf5, 0x36, 0xcd, 0x54, 0xed, 0x14, 0x2a, 0x72, 0x8e, 0x21, 0x33, 0x47,
+	0x9d, 0xf2, 0x16, 0xe7, 0x57, 0xea, 0xf0, 0x17, 0x97, 0x89, 0x42, 0xd4, 0xc8, 0xa5, 0x96, 0xdd,
+	0xcf, 0xfc, 0x8a, 0x17, 0xfc, 0xf5, 0x65, 0x83, 0x10, 0xed, 0xe8, 0x25, 0x95, 0xb1, 0x69, 0x6c,
+	0x68, 0x48, 0x8a, 0xfc, 0xbc, 0x84, 0xbf, 0x06, 0x42, 0x0a, 0x6d, 0x6b, 0x56, 0x50, 0x87, 0xa5,
+	0xd1, 0x18, 0x86, 0x22, 0x94, 0x23, 0x7e, 0x79, 0x64, 0xe1, 0x5b, 0x2e, 0x8f, 0x42, 0x57, 0x77,
+	0x05, 0x54, 0x9a, 0x71, 0xc7, 0xb8, 0x16, 0x5a, 0x77, 0x50, 0x6e, 0xe6, 0x56, 0x96, 0x43, 0xd1,
+	0x03, 0xe8, 0xa7, 0x0e, 0x5a, 0xd7, 0xab, 0x66, 0xb3, 0x4c, 0x7b, 0xb0, 0x8a, 0x28, 0x8b, 0xa0,
+	0x9a, 0x09, 0x19, 0xb4, 0xa9, 0xe1, 0xab, 0xe2, 0xcb, 0xd8, 0xca, 0x4f, 0x10, 0x9a, 0xc7, 0x30,
+	0x99, 0x66, 0x08, 0x5a, 0xd3, 0xfb, 0xcd, 0xe4, 0x99, 0xb1, 0x9e, 0x0f, 0x1c, 0xeb, 0xec, 0x56,
+	0x0f, 0xca, 0x12, 0xe0, 0xa8, 0xc4, 0xff, 0x2b, 0xec, 0xfc, 0x0e, 0x00, 0x00, 0xff, 0xff, 0xdd,
+	0x9d, 0x05, 0x5a, 0x8d, 0x0c, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1045,40 +1036,33 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type ObserveServiceClient interface {
-	// Ping is used to check if the observation node is up
+	// Ping is used to check if the observation node is alive and healthy.
 	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
-	// Block (block header)
-	// GetLatestBlock gets the latest sealed or unsealed block.
+	// GetLatestBlockHeader gets the latest sealed or unsealed block header.
+	GetLatestBlockHeader(ctx context.Context, in *GetLatestBlockHeaderRequest, opts ...grpc.CallOption) (*BlockHeaderResponse, error)
+	// GetBlockHeaderByID gets a block header by ID.
+	GetBlockHeaderByID(ctx context.Context, in *GetBlockHeaderByIDRequest, opts ...grpc.CallOption) (*BlockHeaderResponse, error)
+	// GetBlockHeaderByHeight gets a block header by height.
+	GetBlockHeaderByHeight(ctx context.Context, in *GetBlockHeaderByHeightRequest, opts ...grpc.CallOption) (*BlockHeaderResponse, error)
+	// GetLatestBlock gets the full payload of the latest sealed or unsealed block.
 	GetLatestBlock(ctx context.Context, in *GetLatestBlockRequest, opts ...grpc.CallOption) (*BlockResponse, error)
-	// GetBlockByID gets a block by its ID
+	// GetBlockByID gets a full block by ID.
 	GetBlockByID(ctx context.Context, in *GetBlockByIDRequest, opts ...grpc.CallOption) (*BlockResponse, error)
-	// GetBlockByHeight gets a block by its height
+	// GetBlockByHeight gets a full block by height.
 	GetBlockByHeight(ctx context.Context, in *GetBlockByHeightRequest, opts ...grpc.CallOption) (*BlockResponse, error)
-	// Block details (block payload)
-	// GetLatestBlockDetails gets the block details of the latest sealed or unsealed block.
-	GetLatestBlockDetails(ctx context.Context, in *GetLatestBlockDetailsRequest, opts ...grpc.CallOption) (*BlockDetailsResponse, error)
-	// GetBlockDetailsByID gets the block details by the block ID
-	GetBlockDetailsByID(ctx context.Context, in *GetBlockDetailsByIDRequest, opts ...grpc.CallOption) (*BlockDetailsResponse, error)
-	// GetBlockDetailsByHeight gets the block details by the block height
-	GetBlockDetailsByHeight(ctx context.Context, in *GetBlockDetailsByHeightRequest, opts ...grpc.CallOption) (*BlockDetailsResponse, error)
-	// Collection
-	// GetCollectionByID gets a collection by its ID
-	GetCollectionByID(ctx context.Context, in *GetCollectionByIDRequest, opts ...grpc.CallOption) (*GetCollectionResponse, error)
-	// Transaction
+	// GetCollectionByID gets a collection by ID.
+	GetCollectionByID(ctx context.Context, in *GetCollectionByIDRequest, opts ...grpc.CallOption) (*CollectionResponse, error)
 	// SendTransaction submits a transaction to the network.
 	SendTransaction(ctx context.Context, in *SendTransactionRequest, opts ...grpc.CallOption) (*SendTransactionResponse, error)
-	// GetTransactions gets a transaction by ID.
-	GetTransaction(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*GetTransactionResponse, error)
-	// GetTransactionStatus gets the statue of a transaction
-	GetTransactionStatus(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*GetTransactionStatusResponse, error)
-	// Account
+	// GetTransaction gets a transaction by ID.
+	GetTransaction(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*TransactionResponse, error)
+	// GetTransactionResult gets the result of a transaction.
+	GetTransactionResult(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*TransactionResultResponse, error)
 	// GetAccount gets an account by address.
 	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
-	// Script
 	// ExecuteScript executes a script against the latest sealed world state.
 	ExecuteScript(ctx context.Context, in *ExecuteScriptRequest, opts ...grpc.CallOption) (*ExecuteScriptResponse, error)
-	// Events
-	// GetEvents retrieves events matching a given query.
+	// GetEvents retrieves events matching the given query.
 	GetEvents(ctx context.Context, in *GetEventsRequest, opts ...grpc.CallOption) (*GetEventsResponse, error)
 }
 
@@ -1093,6 +1077,33 @@ func NewObserveServiceClient(cc *grpc.ClientConn) ObserveServiceClient {
 func (c *observeServiceClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
 	out := new(PingResponse)
 	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/Ping", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *observeServiceClient) GetLatestBlockHeader(ctx context.Context, in *GetLatestBlockHeaderRequest, opts ...grpc.CallOption) (*BlockHeaderResponse, error) {
+	out := new(BlockHeaderResponse)
+	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetLatestBlockHeader", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *observeServiceClient) GetBlockHeaderByID(ctx context.Context, in *GetBlockHeaderByIDRequest, opts ...grpc.CallOption) (*BlockHeaderResponse, error) {
+	out := new(BlockHeaderResponse)
+	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetBlockHeaderByID", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *observeServiceClient) GetBlockHeaderByHeight(ctx context.Context, in *GetBlockHeaderByHeightRequest, opts ...grpc.CallOption) (*BlockHeaderResponse, error) {
+	out := new(BlockHeaderResponse)
+	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetBlockHeaderByHeight", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1126,35 +1137,8 @@ func (c *observeServiceClient) GetBlockByHeight(ctx context.Context, in *GetBloc
 	return out, nil
 }
 
-func (c *observeServiceClient) GetLatestBlockDetails(ctx context.Context, in *GetLatestBlockDetailsRequest, opts ...grpc.CallOption) (*BlockDetailsResponse, error) {
-	out := new(BlockDetailsResponse)
-	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetLatestBlockDetails", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *observeServiceClient) GetBlockDetailsByID(ctx context.Context, in *GetBlockDetailsByIDRequest, opts ...grpc.CallOption) (*BlockDetailsResponse, error) {
-	out := new(BlockDetailsResponse)
-	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetBlockDetailsByID", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *observeServiceClient) GetBlockDetailsByHeight(ctx context.Context, in *GetBlockDetailsByHeightRequest, opts ...grpc.CallOption) (*BlockDetailsResponse, error) {
-	out := new(BlockDetailsResponse)
-	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetBlockDetailsByHeight", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *observeServiceClient) GetCollectionByID(ctx context.Context, in *GetCollectionByIDRequest, opts ...grpc.CallOption) (*GetCollectionResponse, error) {
-	out := new(GetCollectionResponse)
+func (c *observeServiceClient) GetCollectionByID(ctx context.Context, in *GetCollectionByIDRequest, opts ...grpc.CallOption) (*CollectionResponse, error) {
+	out := new(CollectionResponse)
 	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetCollectionByID", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -1171,8 +1155,8 @@ func (c *observeServiceClient) SendTransaction(ctx context.Context, in *SendTran
 	return out, nil
 }
 
-func (c *observeServiceClient) GetTransaction(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*GetTransactionResponse, error) {
-	out := new(GetTransactionResponse)
+func (c *observeServiceClient) GetTransaction(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*TransactionResponse, error) {
+	out := new(TransactionResponse)
 	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetTransaction", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -1180,9 +1164,9 @@ func (c *observeServiceClient) GetTransaction(ctx context.Context, in *GetTransa
 	return out, nil
 }
 
-func (c *observeServiceClient) GetTransactionStatus(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*GetTransactionStatusResponse, error) {
-	out := new(GetTransactionStatusResponse)
-	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetTransactionStatus", in, out, opts...)
+func (c *observeServiceClient) GetTransactionResult(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*TransactionResultResponse, error) {
+	out := new(TransactionResultResponse)
+	err := c.cc.Invoke(ctx, "/flow.services.observation.ObserveService/GetTransactionResult", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1218,40 +1202,33 @@ func (c *observeServiceClient) GetEvents(ctx context.Context, in *GetEventsReque
 
 // ObserveServiceServer is the server API for ObserveService service.
 type ObserveServiceServer interface {
-	// Ping is used to check if the observation node is up
+	// Ping is used to check if the observation node is alive and healthy.
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
-	// Block (block header)
-	// GetLatestBlock gets the latest sealed or unsealed block.
+	// GetLatestBlockHeader gets the latest sealed or unsealed block header.
+	GetLatestBlockHeader(context.Context, *GetLatestBlockHeaderRequest) (*BlockHeaderResponse, error)
+	// GetBlockHeaderByID gets a block header by ID.
+	GetBlockHeaderByID(context.Context, *GetBlockHeaderByIDRequest) (*BlockHeaderResponse, error)
+	// GetBlockHeaderByHeight gets a block header by height.
+	GetBlockHeaderByHeight(context.Context, *GetBlockHeaderByHeightRequest) (*BlockHeaderResponse, error)
+	// GetLatestBlock gets the full payload of the latest sealed or unsealed block.
 	GetLatestBlock(context.Context, *GetLatestBlockRequest) (*BlockResponse, error)
-	// GetBlockByID gets a block by its ID
+	// GetBlockByID gets a full block by ID.
 	GetBlockByID(context.Context, *GetBlockByIDRequest) (*BlockResponse, error)
-	// GetBlockByHeight gets a block by its height
+	// GetBlockByHeight gets a full block by height.
 	GetBlockByHeight(context.Context, *GetBlockByHeightRequest) (*BlockResponse, error)
-	// Block details (block payload)
-	// GetLatestBlockDetails gets the block details of the latest sealed or unsealed block.
-	GetLatestBlockDetails(context.Context, *GetLatestBlockDetailsRequest) (*BlockDetailsResponse, error)
-	// GetBlockDetailsByID gets the block details by the block ID
-	GetBlockDetailsByID(context.Context, *GetBlockDetailsByIDRequest) (*BlockDetailsResponse, error)
-	// GetBlockDetailsByHeight gets the block details by the block height
-	GetBlockDetailsByHeight(context.Context, *GetBlockDetailsByHeightRequest) (*BlockDetailsResponse, error)
-	// Collection
-	// GetCollectionByID gets a collection by its ID
-	GetCollectionByID(context.Context, *GetCollectionByIDRequest) (*GetCollectionResponse, error)
-	// Transaction
+	// GetCollectionByID gets a collection by ID.
+	GetCollectionByID(context.Context, *GetCollectionByIDRequest) (*CollectionResponse, error)
 	// SendTransaction submits a transaction to the network.
 	SendTransaction(context.Context, *SendTransactionRequest) (*SendTransactionResponse, error)
-	// GetTransactions gets a transaction by ID.
-	GetTransaction(context.Context, *GetTransactionRequest) (*GetTransactionResponse, error)
-	// GetTransactionStatus gets the statue of a transaction
-	GetTransactionStatus(context.Context, *GetTransactionRequest) (*GetTransactionStatusResponse, error)
-	// Account
+	// GetTransaction gets a transaction by ID.
+	GetTransaction(context.Context, *GetTransactionRequest) (*TransactionResponse, error)
+	// GetTransactionResult gets the result of a transaction.
+	GetTransactionResult(context.Context, *GetTransactionRequest) (*TransactionResultResponse, error)
 	// GetAccount gets an account by address.
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
-	// Script
 	// ExecuteScript executes a script against the latest sealed world state.
 	ExecuteScript(context.Context, *ExecuteScriptRequest) (*ExecuteScriptResponse, error)
-	// Events
-	// GetEvents retrieves events matching a given query.
+	// GetEvents retrieves events matching the given query.
 	GetEvents(context.Context, *GetEventsRequest) (*GetEventsResponse, error)
 }
 
@@ -1262,6 +1239,15 @@ type UnimplementedObserveServiceServer struct {
 func (*UnimplementedObserveServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
+func (*UnimplementedObserveServiceServer) GetLatestBlockHeader(ctx context.Context, req *GetLatestBlockHeaderRequest) (*BlockHeaderResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLatestBlockHeader not implemented")
+}
+func (*UnimplementedObserveServiceServer) GetBlockHeaderByID(ctx context.Context, req *GetBlockHeaderByIDRequest) (*BlockHeaderResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockHeaderByID not implemented")
+}
+func (*UnimplementedObserveServiceServer) GetBlockHeaderByHeight(ctx context.Context, req *GetBlockHeaderByHeightRequest) (*BlockHeaderResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockHeaderByHeight not implemented")
+}
 func (*UnimplementedObserveServiceServer) GetLatestBlock(ctx context.Context, req *GetLatestBlockRequest) (*BlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLatestBlock not implemented")
 }
@@ -1271,26 +1257,17 @@ func (*UnimplementedObserveServiceServer) GetBlockByID(ctx context.Context, req 
 func (*UnimplementedObserveServiceServer) GetBlockByHeight(ctx context.Context, req *GetBlockByHeightRequest) (*BlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlockByHeight not implemented")
 }
-func (*UnimplementedObserveServiceServer) GetLatestBlockDetails(ctx context.Context, req *GetLatestBlockDetailsRequest) (*BlockDetailsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetLatestBlockDetails not implemented")
-}
-func (*UnimplementedObserveServiceServer) GetBlockDetailsByID(ctx context.Context, req *GetBlockDetailsByIDRequest) (*BlockDetailsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockDetailsByID not implemented")
-}
-func (*UnimplementedObserveServiceServer) GetBlockDetailsByHeight(ctx context.Context, req *GetBlockDetailsByHeightRequest) (*BlockDetailsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockDetailsByHeight not implemented")
-}
-func (*UnimplementedObserveServiceServer) GetCollectionByID(ctx context.Context, req *GetCollectionByIDRequest) (*GetCollectionResponse, error) {
+func (*UnimplementedObserveServiceServer) GetCollectionByID(ctx context.Context, req *GetCollectionByIDRequest) (*CollectionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCollectionByID not implemented")
 }
 func (*UnimplementedObserveServiceServer) SendTransaction(ctx context.Context, req *SendTransactionRequest) (*SendTransactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendTransaction not implemented")
 }
-func (*UnimplementedObserveServiceServer) GetTransaction(ctx context.Context, req *GetTransactionRequest) (*GetTransactionResponse, error) {
+func (*UnimplementedObserveServiceServer) GetTransaction(ctx context.Context, req *GetTransactionRequest) (*TransactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTransaction not implemented")
 }
-func (*UnimplementedObserveServiceServer) GetTransactionStatus(ctx context.Context, req *GetTransactionRequest) (*GetTransactionStatusResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetTransactionStatus not implemented")
+func (*UnimplementedObserveServiceServer) GetTransactionResult(ctx context.Context, req *GetTransactionRequest) (*TransactionResultResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTransactionResult not implemented")
 }
 func (*UnimplementedObserveServiceServer) GetAccount(ctx context.Context, req *GetAccountRequest) (*GetAccountResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAccount not implemented")
@@ -1320,6 +1297,60 @@ func _ObserveService_Ping_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ObserveServiceServer).Ping(ctx, req.(*PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ObserveService_GetLatestBlockHeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLatestBlockHeaderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ObserveServiceServer).GetLatestBlockHeader(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/flow.services.observation.ObserveService/GetLatestBlockHeader",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ObserveServiceServer).GetLatestBlockHeader(ctx, req.(*GetLatestBlockHeaderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ObserveService_GetBlockHeaderByID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlockHeaderByIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ObserveServiceServer).GetBlockHeaderByID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/flow.services.observation.ObserveService/GetBlockHeaderByID",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ObserveServiceServer).GetBlockHeaderByID(ctx, req.(*GetBlockHeaderByIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ObserveService_GetBlockHeaderByHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlockHeaderByHeightRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ObserveServiceServer).GetBlockHeaderByHeight(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/flow.services.observation.ObserveService/GetBlockHeaderByHeight",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ObserveServiceServer).GetBlockHeaderByHeight(ctx, req.(*GetBlockHeaderByHeightRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1378,60 +1409,6 @@ func _ObserveService_GetBlockByHeight_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ObserveService_GetLatestBlockDetails_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetLatestBlockDetailsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ObserveServiceServer).GetLatestBlockDetails(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/flow.services.observation.ObserveService/GetLatestBlockDetails",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ObserveServiceServer).GetLatestBlockDetails(ctx, req.(*GetLatestBlockDetailsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ObserveService_GetBlockDetailsByID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBlockDetailsByIDRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ObserveServiceServer).GetBlockDetailsByID(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/flow.services.observation.ObserveService/GetBlockDetailsByID",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ObserveServiceServer).GetBlockDetailsByID(ctx, req.(*GetBlockDetailsByIDRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ObserveService_GetBlockDetailsByHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBlockDetailsByHeightRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ObserveServiceServer).GetBlockDetailsByHeight(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/flow.services.observation.ObserveService/GetBlockDetailsByHeight",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ObserveServiceServer).GetBlockDetailsByHeight(ctx, req.(*GetBlockDetailsByHeightRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _ObserveService_GetCollectionByID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetCollectionByIDRequest)
 	if err := dec(in); err != nil {
@@ -1486,20 +1463,20 @@ func _ObserveService_GetTransaction_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ObserveService_GetTransactionStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ObserveService_GetTransactionResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetTransactionRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ObserveServiceServer).GetTransactionStatus(ctx, in)
+		return srv.(ObserveServiceServer).GetTransactionResult(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/flow.services.observation.ObserveService/GetTransactionStatus",
+		FullMethod: "/flow.services.observation.ObserveService/GetTransactionResult",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ObserveServiceServer).GetTransactionStatus(ctx, req.(*GetTransactionRequest))
+		return srv.(ObserveServiceServer).GetTransactionResult(ctx, req.(*GetTransactionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1567,6 +1544,18 @@ var _ObserveService_serviceDesc = grpc.ServiceDesc{
 			Handler:    _ObserveService_Ping_Handler,
 		},
 		{
+			MethodName: "GetLatestBlockHeader",
+			Handler:    _ObserveService_GetLatestBlockHeader_Handler,
+		},
+		{
+			MethodName: "GetBlockHeaderByID",
+			Handler:    _ObserveService_GetBlockHeaderByID_Handler,
+		},
+		{
+			MethodName: "GetBlockHeaderByHeight",
+			Handler:    _ObserveService_GetBlockHeaderByHeight_Handler,
+		},
+		{
 			MethodName: "GetLatestBlock",
 			Handler:    _ObserveService_GetLatestBlock_Handler,
 		},
@@ -1577,18 +1566,6 @@ var _ObserveService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBlockByHeight",
 			Handler:    _ObserveService_GetBlockByHeight_Handler,
-		},
-		{
-			MethodName: "GetLatestBlockDetails",
-			Handler:    _ObserveService_GetLatestBlockDetails_Handler,
-		},
-		{
-			MethodName: "GetBlockDetailsByID",
-			Handler:    _ObserveService_GetBlockDetailsByID_Handler,
-		},
-		{
-			MethodName: "GetBlockDetailsByHeight",
-			Handler:    _ObserveService_GetBlockDetailsByHeight_Handler,
 		},
 		{
 			MethodName: "GetCollectionByID",
@@ -1603,8 +1580,8 @@ var _ObserveService_serviceDesc = grpc.ServiceDesc{
 			Handler:    _ObserveService_GetTransaction_Handler,
 		},
 		{
-			MethodName: "GetTransactionStatus",
-			Handler:    _ObserveService_GetTransactionStatus_Handler,
+			MethodName: "GetTransactionResult",
+			Handler:    _ObserveService_GetTransactionResult_Handler,
 		},
 		{
 			MethodName: "GetAccount",

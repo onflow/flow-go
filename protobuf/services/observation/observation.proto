@@ -6,66 +6,83 @@ option go_package = "observation";
 
 import "sdk/entities/entities.proto";
 
-// ObserveService is the user-facing API provided by access nodes.
+// ObserveService is the public-facing API provided by observation nodes.
 service ObserveService {
 
-  // Ping is used to check if the observation node is up
+  // Ping is used to check if the observation node is alive and healthy.
   rpc Ping (PingRequest) returns (PingResponse);
 
-  // Block (block header)
-  // GetLatestBlock gets the latest sealed or unsealed block.
+  // Block Headers
+
+  // GetLatestBlockHeader gets the latest sealed or unsealed block header.
+  rpc GetLatestBlockHeader (GetLatestBlockHeaderRequest) returns (BlockHeaderResponse);
+  // GetBlockHeaderByID gets a block header by ID.
+  rpc GetBlockHeaderByID (GetBlockHeaderByIDRequest) returns (BlockHeaderResponse);
+  // GetBlockHeaderByHeight gets a block header by height.
+  rpc GetBlockHeaderByHeight (GetBlockHeaderByHeightRequest) returns (BlockHeaderResponse);
+
+  // Blocks
+
+  // GetLatestBlock gets the full payload of the latest sealed or unsealed block.
   rpc GetLatestBlock (GetLatestBlockRequest) returns (BlockResponse);
-  // GetBlockByID gets a block by its ID
+  // GetBlockByID gets a full block by ID.
   rpc GetBlockByID (GetBlockByIDRequest) returns (BlockResponse);
-  // GetBlockByHeight gets a block by its height
+  // GetBlockByHeight gets a full block by height.
   rpc GetBlockByHeight (GetBlockByHeightRequest) returns (BlockResponse);
 
-  // Block details (block payload)
-  // GetLatestBlockDetails gets the block details of the latest sealed or unsealed block.
-  rpc GetLatestBlockDetails (GetLatestBlockDetailsRequest) returns (BlockDetailsResponse);
-  // GetBlockDetailsByID gets the block details by the block ID
-  rpc GetBlockDetailsByID (GetBlockDetailsByIDRequest) returns (BlockDetailsResponse);
-  // GetBlockDetailsByHeight gets the block details by the block height
-  rpc GetBlockDetailsByHeight (GetBlockDetailsByHeightRequest) returns (BlockDetailsResponse);
+  // Collections
 
-  // Collection
-  // GetCollectionByID gets a collection by its ID
-  rpc GetCollectionByID (GetCollectionByIDRequest) returns (GetCollectionResponse);
+  // GetCollectionByID gets a collection by ID.
+  rpc GetCollectionByID (GetCollectionByIDRequest) returns (CollectionResponse);
 
-  // Transaction
+  // Transactions
+
   // SendTransaction submits a transaction to the network.
   rpc SendTransaction (SendTransactionRequest) returns (SendTransactionResponse);
-  // GetTransactions gets a transaction by ID.
-  rpc GetTransaction (GetTransactionRequest) returns (GetTransactionResponse);
-  // GetTransactionStatus gets the statue of a transaction
-  rpc GetTransactionStatus (GetTransactionRequest) returns (GetTransactionStatusResponse);
+  // GetTransaction gets a transaction by ID.
+  rpc GetTransaction (GetTransactionRequest) returns (TransactionResponse);
+  // GetTransactionResult gets the result of a transaction.
+  rpc GetTransactionResult (GetTransactionRequest) returns (TransactionResultResponse);
 
-  // Account
+  // Accounts
+
   // GetAccount gets an account by address.
   rpc GetAccount (GetAccountRequest) returns (GetAccountResponse);
 
-  // Script
+  // Scripts
+
   // ExecuteScript executes a script against the latest sealed world state.
   rpc ExecuteScript (ExecuteScriptRequest) returns (ExecuteScriptResponse);
 
   // Events
-  // GetEvents retrieves events matching a given query.
+
+  // GetEvents retrieves events matching the given query.
   rpc GetEvents (GetEventsRequest) returns (GetEventsResponse);
 }
 
 message PingRequest {}
 
-message PingResponse {
-  bytes address = 1;
+message PingResponse {}
+
+// Block Headers
+
+message GetLatestBlockHeaderRequest {
+  bool is_sealed = 1;
 }
 
-message SendTransactionRequest {
-  flow.sdk.entities.Transaction transaction = 1;
-}
-
-message SendTransactionResponse {
+message GetBlockHeaderByIDRequest {
   bytes id = 1;
 }
+
+message GetBlockHeaderByHeightRequest {
+  uint64 height = 1;
+}
+
+message BlockHeaderResponse {
+  flow.sdk.entities.BlockHeader block = 1;
+}
+
+// Blocks
 
 message GetLatestBlockRequest {
   bool is_sealed = 1;
@@ -80,32 +97,44 @@ message GetBlockByHeightRequest {
 }
 
 message BlockResponse {
-  flow.sdk.entities.BlockHeader block = 1;
-}
-
-message GetLatestBlockDetailsRequest {
-  bool is_sealed = 1;
-}
-
-message GetBlockDetailsByIDRequest {
-  bytes id = 1;
-}
-
-message GetBlockDetailsByHeightRequest {
-  uint64 height = 1;
-}
-
-message BlockDetailsResponse {
   flow.sdk.entities.Block block = 1;
 }
+
+// Collections
 
 message GetCollectionByIDRequest {
   bytes id = 1;
 }
 
-message GetCollectionResponse {
+message CollectionResponse {
   flow.sdk.entities.Collection collection = 1;
 }
+
+// Transactions
+
+message SendTransactionRequest {
+  flow.sdk.entities.Transaction transaction = 1;
+}
+
+message SendTransactionResponse {
+  bytes id = 1;
+}
+
+message GetTransactionRequest {
+  bytes id = 1;
+}
+
+message TransactionResponse {
+  flow.sdk.entities.Transaction transaction = 1;
+  repeated flow.sdk.entities.Event events = 2;
+}
+
+message TransactionResultResponse {
+  flow.sdk.entities.TransactionStatus status = 1;
+  repeated flow.sdk.entities.Event events = 2;
+}
+
+// Accounts
 
 message GetAccountRequest {
   bytes address = 1;
@@ -115,6 +144,8 @@ message GetAccountResponse {
   flow.sdk.entities.Account account = 1;
 }
 
+// Scripts
+
 message ExecuteScriptRequest {
   bytes script = 1;
 }
@@ -123,27 +154,15 @@ message ExecuteScriptResponse {
   bytes value = 1;
 }
 
+// Events
+
 message GetEventsRequest {
-    string type = 1;
-    uint64 start_block = 2;
-    uint64 end_block = 3;
+  string type = 1;
+  uint64 start_block = 2;
+  uint64 end_block = 3;
 }
 
 message GetEventsResponse {
-    repeated flow.sdk.entities.Event events = 1;
+  repeated flow.sdk.entities.Event events = 1;
 }
 
-
-message GetTransactionRequest {
-  bytes id = 1;
-}
-
-message GetTransactionResponse {
-  flow.sdk.entities.Transaction transaction = 1;
-  repeated flow.sdk.entities.Event events = 2;
-}
-
-message GetTransactionStatusResponse {
-  flow.sdk.entities.TransactionStatus status = 1;
-  repeated flow.sdk.entities.Event events = 2;
-}
