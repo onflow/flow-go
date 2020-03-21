@@ -55,10 +55,10 @@ func runDKG(nodes []NodeInfoPub) (DKGDataPub, DKGDataPriv) {
 		partPriv, partPub := assembleDKGParticipant(nodeInfo, dkgData.Participants[i])
 		dkgDataPriv.Participants = append(dkgDataPriv.Participants, partPriv)
 		dkgDataPub.Participants = append(dkgDataPub.Participants, partPub)
-		writeJSON(fmt.Sprintf("%v.random-beacon.priv.json", partPriv.NodeID), partPriv)
+		writeJSON(fmt.Sprintf(filenameRandomBeaconPriv, partPriv.NodeID), partPriv)
 	}
 
-	writeJSON("dkg-data.pub.json", dkgDataPub)
+	writeJSON(filenameDKGDataPub, dkgDataPub)
 
 	return dkgDataPub, dkgDataPriv
 }

@@ -9,8 +9,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var configFile string
-
 type NodeConfig struct {
 	Role    flow.Role
 	Address string
@@ -36,7 +34,7 @@ type NodeInfoPub struct {
 
 func genNetworkAndStakingKeys() ([]NodeInfoPub, []NodeInfoPriv) {
 	var nodeConfigs []NodeConfig
-	readJSON(configFile, &nodeConfigs)
+	readJSON(flagConfig, &nodeConfigs)
 	nodes := len(nodeConfigs)
 	log.Info().Msgf("read %v node configurations", nodes)
 
@@ -61,10 +59,8 @@ func genNetworkAndStakingKeys() ([]NodeInfoPub, []NodeInfoPriv) {
 		nodeInfoPriv, nodeInfoPub := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
 		nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
 		nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
-		writeJSON(fmt.Sprintf("%v.node-info.priv.json", nodeInfoPriv.NodeID), nodeInfoPriv)
+		writeJSON(fmt.Sprintf(filenameNodeInfoPriv, nodeInfoPriv.NodeID), nodeInfoPriv)
 	}
-
-	writeJSON("node-infos.pub.json", nodeInfosPub)
 
 	return nodeInfosPub, nodeInfosPriv
 }

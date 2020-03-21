@@ -15,14 +15,12 @@ NOTE: Public and private keys are encoded in JSON files as base64 strings, not h
 ### Step 1: Generate networking and staking keys for partner nodes:
 
 ```bash
-go run -tags relic ./cmd/bootstrap key -a "example.com" -r "consensus" --networking-seed c06ffd55a8515e8bea7db873609e998f98eefbb7e9c185494c65cae567012788ee4eaf41
-706ffbac59f22f1fd81822c6877422f5d754a62bdbbce24c8382a74c --staking-seed 219cd6452c410c1518fe3afc1d2f6b78658a583495846d430d6c93baf9f92028213d407129cdaa0eea1f184c84a5f0bde6c5afa925b8e5a
-477b8ebe4cdd42384
+go run -tags relic ./cmd/bootstrap key -a "example.com" -r "consensus" --networking-seed d69b867d5932037c02a4f44335502138b56722adb07a8379ce6736fe4a0b9192443eb694bb3b7f18e0133d68f55a02a3997d6a163ce36280686cda3eba8524ca --staking-seed 23f2421dbcae62de1954b18bd6f4b96ca0aeeef90ea83d89aa542e727c7be78d0ed9a220b049b482cb3342c0534e429663f44d5d2c03ade73e74812489da884b -o ./bootstrap/partner-node-infos
 ```
 
 ### Step 2: Finalize the bootstrap process
 ```bash
-go run -tags relic ./cmd/bootstrap finalize -c ./cmd/bootstrap/example_files/node_config.json
+go run -tags relic ./cmd/bootstrap finalize -c ./cmd/bootstrap/example_files/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json
 ```
 
 ## Structure

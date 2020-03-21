@@ -134,3 +134,14 @@ func createLevelDB(dir string) *leveldb.LevelDB {
 
 	return db
 }
+
+func filesInDir(dir string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
+}
