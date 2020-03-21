@@ -97,6 +97,13 @@ func createValidators(signerData SignerData, block *flow.Block) ([]*hotstuff.Val
 		return nil, nil, err
 	}
 
+	// TODO remove, only for debugging
+	i, err := ps.Final().Identities()
+	if err != nil {
+		return nil, nil, err
+	}
+	fmt.Println(i)
+
 	signers := make([]*signature.RandomBeaconAwareSigProvider, n)
 	viewStates := make([]*hotstuff.ViewState, n)
 	validators := make([]*hotstuff.Validator, n)
