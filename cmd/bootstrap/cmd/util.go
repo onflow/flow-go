@@ -48,7 +48,7 @@ func writeJSON(filename string, data interface{}) {
 		log.Fatal().Err(err).Msg("cannot marshal json")
 	}
 
-	path := filepath.Join(outdir, filename)
+	path := filepath.Join(flagOutdir, filename)
 
 	err = os.MkdirAll(filepath.Dir(path), 0755)
 	if err != nil {
@@ -60,7 +60,7 @@ func writeJSON(filename string, data interface{}) {
 		log.Fatal().Err(err).Msg("could not write file")
 	}
 
-	log.Info().Msgf("wrote json to file %v", path)
+	log.Info().Msgf("wrote file %v", path)
 }
 
 func pubKeyToBytes(key crypto.PublicKey) []byte {

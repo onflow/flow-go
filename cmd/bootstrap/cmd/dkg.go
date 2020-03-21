@@ -33,7 +33,7 @@ type DKGDataPub struct {
 func runDKG(nodes []NodeInfoPub) (DKGDataPub, DKGDataPriv) {
 	n := len(nodes)
 
-	log.Info().Msgf("read %v node infos", n)
+	log.Info().Msgf("read %v node infos for DKG", n)
 
 	log.Debug().Msgf("will run DKG")
 	dkgData, err := run.RunDKG(n, generateRandomSeeds(n))

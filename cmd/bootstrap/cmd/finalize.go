@@ -24,22 +24,34 @@ var finalizeCmd = &cobra.Command{
 	Long: `Finalize the bootstrapping process, which includes generating of internal networking and staking keys,
 running the DKG for generating the random beacon keys, generating genesis execution state, seal, block and QC.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Info().Msg("✨ generating private networking and staking keys")
 		internalNodesPub, internalNodesPriv := genNetworkAndStakingKeys()
+		log.Info().Msg("")
 
+		log.Info().Msg("✨ assembling network and staking keys")
 		partnerNodes := assemblePartnerNodes()
 		stakingNodes := append(internalNodesPub, partnerNodes...)
-
 		writeJSON(filenameNodeInfosPub, stakingNodes)
+		log.Info().Msg("")
 
+		log.Info().Msg("✨ running DKG for consensus nodes")
 		dkgDataPub, dkgDataPriv := runDKG(filterConsensusNodes(stakingNodes))
+		log.Info().Msg("")
 
+		log.Info().Msg("✨ generating private key for account 0 and generating genesis execution state")
 		stateCommitment := genGenesisExecutionState()
+		log.Info().Msg("")
 
+		log.Info().Msg("✨ constructing genesis seal and genesis block")
 		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgDataPub)
+		log.Info().Msg("")
 
-		constructGenesisQC(&block, filterConsensusNodes(stakingNodes),
-			filterConsensusNodesPriv(internalNodesPriv),
+		log.Info().Msg("✨ constructing genesis seal and genesis block")
+		constructGenesisQC(&block, filterConsensusNodes(stakingNodes), filterConsensusNodesPriv(internalNodesPriv),
 			dkgDataPriv)
+		log.Info().Msg("")
+
+		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
 	},
 }
 
@@ -60,7 +72,7 @@ func init() {
 
 func assemblePartnerNodes() []NodeInfoPub {
 	partners := readPartnerNodes()
-	log.Info().Msgf("read %v partner node configurations", len(partners))
+	log.Info().Msgf("read %v partner node configuration files", len(partners))
 
 	var stakes PartnerStakes
 	readJSON(flagPartnerStakes, &stakes)

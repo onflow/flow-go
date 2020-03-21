@@ -10,11 +10,17 @@ import (
 	"github.com/spf13/viper"
 )
 
-var outdir string
+var (
+	flagOutdir   string
+	flagLogLevel string
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "bootstrap",
 	Short: "Bootstrap a flow network",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		setLogLevel()
+	},
 }
 
 func Execute() {
@@ -25,7 +31,10 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&outdir, "outdir", "o", "bootstrap", "output directory for generated files")
+	rootCmd.PersistentFlags().StringVarP(&flagOutdir, "outdir", "o", "bootstrap",
+		"output directory for generated files")
+	rootCmd.PersistentFlags().StringVarP(&flagLogLevel, "loglevel", "l", "info",
+		"log level (panic, fatal, error, warn, info, debug)")
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
@@ -34,4 +43,24 @@ func init() {
 
 func initConfig() {
 	viper.AutomaticEnv()
+}
+
+func setLogLevel() {
+	switch flagLogLevel {
+	case "panic":
+		zerolog.SetGlobalLevel(zerolog.PanicLevel)
+	case "fatal":
+		zerolog.SetGlobalLevel(zerolog.FatalLevel)
+	case "error":
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	case "warn":
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	case "info":
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	case "debug":
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	default:
+		log.Fatal().Str("loglevel", flagLogLevel).Msg("unsupported log level, choose one of \"panic\", \"fatal\", " +
+			"\"error\", \"warn\", \"info\" or \"debug\"")
+	}
 }
