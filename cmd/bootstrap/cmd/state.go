@@ -21,6 +21,7 @@ func genGenesisExecutionState() flow.StateCommitment {
 	writeYaml("account-0.priv.yml", enc)
 
 	db := createLevelDB(filepath.Join(outdir, "execution-state"))
+	defer db.SafeClose()
 	stateCommitment, err := run.GenerateExecutionState(db, account0Priv)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")

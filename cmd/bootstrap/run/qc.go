@@ -29,7 +29,13 @@ type SignerData struct {
 
 // TODO add a test with a validator as soon as https://github.com/dapperlabs/flow-go/blob/c34e266a3d8ec125a62361715db96cadd6747776/engine/consensus/hotstuff/validator_test.go#L186-L214 is merged
 func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCertificate, error) {
-	validators, signers, err := createValidators(signerData, block)
+	ps, db, err := NewProtocolState()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	validators, signers, err := createValidators(ps, signerData, block)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +77,7 @@ func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCert
 	return qc, nil
 }
 
-func createValidators(signerData SignerData, block *flow.Block) ([]*hotstuff.Validator, []*signature.RandomBeaconAwareSigProvider, error) {
+func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.Block) ([]*hotstuff.Validator, []*signature.RandomBeaconAwareSigProvider, error) {
 	n := len(signerData.Signers)
 
 	if len(signerData.DkgPubData.IdToDKGParticipantMap) < n {
@@ -79,13 +85,7 @@ func createValidators(signerData SignerData, block *flow.Block) ([]*hotstuff.Val
 			len(signerData.DkgPubData.IdToDKGParticipantMap), n)
 	}
 
-	ps, db, err := NewProtocolState()
-	if err != nil {
-		return nil, nil, err
-	}
-	defer db.Close()
-
-	err = ps.Mutate().Bootstrap(block)
+	err := ps.Mutate().Bootstrap(block)
 	if err != nil {
 		return nil, nil, err
 	}
