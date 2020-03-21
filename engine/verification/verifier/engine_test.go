@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/encoding"
@@ -20,6 +21,17 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
+
+// TODO add challeneges
+// if ChunkIndex == 0 : ok
+// if ChunkIndex == 1 : error
+// if ChunkIndex == 2 : challenge
+type ChunkVerifierMock struct {
+}
+
+func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) error {
+	return nil
+}
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
@@ -61,11 +73,12 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 }
 
 func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
-	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me)
+	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me, ChunkVerifierMock{})
 	require.Nil(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
 	return e
+
 }
 
 func (suite *VerifierEngineTestSuite) TestInvalidSender() {
@@ -92,8 +105,8 @@ func (suite *VerifierEngineTestSuite) TestIncorrectResult() {
 // The tests evaluates that a result approval is emitted to all consensus nodes
 // about the input execution receipt
 func (suite *VerifierEngineTestSuite) TestVerify() {
-	eng := suite.TestNewEngine()
 
+	eng := suite.TestNewEngine()
 	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
 	// creates a verifiable chunk

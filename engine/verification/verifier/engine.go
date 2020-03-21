@@ -3,14 +3,11 @@ package verifier
 import (
 	"fmt"
 
-	"github.com/dapperlabs/cadence/runtime"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/encoding"
@@ -26,13 +23,13 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit    *engine.Unit                  // used to control startup/shutdown
-	log     zerolog.Logger                // used to log relevant actions
-	conduit network.Conduit               // used to propagate result approvals
-	me      module.Local                  // used to access local node information
-	state   protocol.State                // used to access the protocol state
-	rah     crypto.Hasher                 // used as hasher to sign the result approvals
-	vm      virtualmachine.VirtualMachine // used to execute transactions
+	unit    *engine.Unit         // used to control startup/shutdown
+	log     zerolog.Logger       // used to log relevant actions
+	conduit network.Conduit      // used to propagate result approvals
+	me      module.Local         // used to access local node information
+	state   protocol.State       // used to access the protocol state
+	rah     crypto.Hasher        // used as hasher to sign the result approvals
+	chVerif module.ChunkVerifier // used to verify chunks
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -41,17 +38,16 @@ func New(
 	net module.Network,
 	state protocol.State,
 	me module.Local,
+	chVerif module.ChunkVerifier,
 ) (*Engine, error) {
 
-	rt := runtime.NewInterpreterRuntime()
-
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log,
-		state: state,
-		me:    me,
-		vm:    virtualmachine.New(rt),
-		rah:   utils.NewResultApprovalHasher(),
+		unit:    engine.NewUnit(),
+		log:     log,
+		state:   state,
+		me:      me,
+		chVerif: chVerif,
+		rah:     utils.NewResultApprovalHasher(),
 	}
 
 	var err error
@@ -178,37 +174,12 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 // executeChunk executes the transactions for a single chunk and returns the
 // resultant end state, or an error if execution failed.
 // TODO unit testing
-func (e *Engine) executeChunk(res *verification.VerifiableChunk) (flow.StateCommitment, error) {
-	blockCtx := e.vm.NewBlockContext(&res.Block.Header)
-
-	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
-		registers := res.ChunkState.Registers
-		val, ok := registers[string(key)]
-		if !ok {
-			return nil, fmt.Errorf("missing register")
-		}
-		return val, nil
+func (e *Engine) executeChunk(ch *verification.VerifiableChunk) (flow.StateCommitment, error) {
+	err := e.chVerif.Verify(ch)
+	if err != nil {
+		return nil, fmt.Errorf("chunk verification failed for verifiable chunk [%d] of receipt [%x], error: %v", ch.ChunkIndex, ch.Receipt.ID(), err)
 	}
-
-	chunkView := state.NewView(getRegister)
-
-	// executes all transactions in this chunk
-	for _, tx := range res.Collection.Transactions {
-		txView := chunkView.NewChild()
-
-		result, err := blockCtx.ExecuteTransaction(txView, tx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to execute transaction: %w", err)
-		}
-
-		if result.Succeeded() {
-			chunkView.ApplyDelta(txView.Delta())
-		}
-	}
-
-	// TODO compute and return state commitment
-
-	return nil, nil
+	return ch.EndState, nil
 }
 
 // signAttestation extracts, signs and returns the attestation part of the result approval

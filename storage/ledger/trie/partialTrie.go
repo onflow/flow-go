@@ -29,9 +29,6 @@ func (p *PSMT) GetRootHash() []byte {
 
 // Update updates the register values and returns rootValue after updates
 func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, error) {
-	if len(registerIDs) != len(values) {
-		return nil, fmt.Errorf("number of elements in registerIDs and values mismatch")
-	}
 	for i, key := range registerIDs {
 		value := values[i]
 
@@ -50,10 +47,12 @@ func NewPSMT(
 	height int,
 	keys [][]byte,
 	values [][]byte,
-	proofholder proofHolder,
+	proofs [][]byte,
 ) (*PSMT, error) {
 
 	psmt := PSMT{newNode(nil, height-1), height, make(map[string]*node)}
+	// TODO add checks for decode proof
+	proofholder := DecodeProof(proofs)
 
 	// iterating over proofs
 	for i, proofSize := range proofholder.sizes {
@@ -141,11 +140,11 @@ func NewPSMT(
 			psmt.keyLookUp[string(key)] = currentNode
 			currentNode.value = defaultLeafHash
 		}
-		// check if the state commitment matches
-		// useing computeValue instead of value for extensive checking
-		if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
-			return nil, fmt.Errorf("root hash doesn't match the proofs")
-		}
+	}
+	// check if the state commitment matches
+	// useing computeValue instead of value for extensive checking
+	if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
+		return nil, fmt.Errorf("root hash doesn't match the proofs")
 	}
 	return &psmt, nil
 }
