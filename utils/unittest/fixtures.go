@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	crand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"time"
@@ -288,6 +289,35 @@ func IdentifierFixture() flow.Identifier {
 func WithRole(role flow.Role) func(*flow.Identity) {
 	return func(id *flow.Identity) {
 		id.Role = role
+	}
+}
+
+func generateRandomSeed() []byte {
+	seed := make([]byte, 64)
+	if _, err := crand.Read(seed); err != nil {
+		panic(err)
+	}
+	return seed
+}
+
+// WithRole adds a role to an identity fixture.
+func WithRandomPublicKeys() func(*flow.Identity) {
+	return func(id *flow.Identity) {
+		randBeac, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
+		if err != nil {
+			panic(err)
+		}
+		id.RandomBeaconPubKey = randBeac.PublicKey()
+		stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
+		if err != nil {
+			panic(err)
+		}
+		id.StakingPubKey = stak.PublicKey()
+		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, generateRandomSeed())
+		if err != nil {
+			panic(err)
+		}
+		id.NetworkPubKey = netw.PublicKey()
 	}
 }
 
