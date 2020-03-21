@@ -172,7 +172,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 
-	suite.state.On("Final").Return(suite.ss, nil).Once()
+	suite.state.On("Final").Return(suite.ss, nil)
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
 	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
 	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Twice()
