@@ -14,6 +14,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
+	"github.com/dapperlabs/flow-go/engine/common/observerclient"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 )
@@ -86,10 +87,9 @@ func (i *Ingress) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
+	observerclient.NullObserverClient
 	engine network.Engine
 }
-
-var _ observation.ObserveServiceServer = &handler{}
 
 // Ping responds to requests when the server is up.
 func (h *handler) Ping(ctx context.Context, req *observation.PingRequest) (*observation.PingResponse, error) {
@@ -112,54 +112,4 @@ func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTran
 	txID := tx.ID()
 
 	return &observation.SendTransactionResponse{Id: txID[:]}, nil
-}
-
-// Remaining handler functions are no-ops to implement the Observation API
-// protobuf service.
-func (h *handler) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.BlockResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetAccount(context.Context, *observation.GetAccountRequest) (*observation.GetAccountResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) ExecuteScript(context.Context, *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetEvents(context.Context, *observation.GetEventsRequest) (*observation.GetEventsResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetBlockByID(context.Context, *observation.GetBlockByIDRequest) (*observation.BlockResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetBlockByHeight(context.Context, *observation.GetBlockByHeightRequest) (*observation.BlockResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetLatestBlockDetails(context.Context, *observation.GetLatestBlockDetailsRequest) (*observation.BlockDetailsResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetBlockDetailsByID(context.Context, *observation.GetBlockDetailsByIDRequest) (*observation.BlockDetailsResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetBlockDetailsByHeight(context.Context, *observation.GetBlockDetailsByHeightRequest) (*observation.BlockDetailsResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetCollectionByID(context.Context, *observation.GetCollectionByIDRequest) (*observation.GetCollectionResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetTransactionStatus(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionStatusResponse, error) {
-	return nil, nil
 }
