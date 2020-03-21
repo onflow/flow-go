@@ -35,7 +35,8 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine) *Engine {
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine: e,
+			NullObserverClient: observerclient.NullObserverClient{},
+			engine:             e,
 		},
 		server: grpc.NewServer(),
 		config: config,

@@ -39,7 +39,8 @@ func New(config Config, e *ingest.Engine) *Ingress {
 	ingress := &Ingress{
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine: e,
+			NullObserverClient: observerclient.NullObserverClient{},
+			engine:             e,
 		},
 		server: grpc.NewServer(),
 		config: config,

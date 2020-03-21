@@ -31,11 +31,12 @@ func NewHandler(log zerolog.Logger,
 	c observation.ObserveServiceClient,
 	headers storage.Headers) *Handler {
 	return &Handler{
-		executionRPC:  e,
-		collectionRPC: c,
-		headers:       headers,
-		state:         s,
-		log:           log,
+		executionRPC:       e,
+		collectionRPC:      c,
+		headers:            headers,
+		state:              s,
+		log:                log,
+		NullObserverClient: observerclient.NullObserverClient{},
 	}
 }
 
