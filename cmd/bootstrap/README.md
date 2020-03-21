@@ -12,8 +12,18 @@ NOTE: Public and private keys are encoded in JSON files as base64 strings, not h
 
 ## Example Process
 
-Step 1: TODO
-Step 2: Finalize the bootstrap process `go run -tags relic ./cmd/bootstrap finalize -c ./cmd/bootstrap/example_files/node_config.json`
+### Step 1: Generate networking and staking keys for partner nodes:
+
+```bash
+go run -tags relic ./cmd/bootstrap key -a "example.com" -r "consensus" --networking-seed c06ffd55a8515e8bea7db873609e998f98eefbb7e9c185494c65cae567012788ee4eaf41
+706ffbac59f22f1fd81822c6877422f5d754a62bdbbce24c8382a74c --staking-seed 219cd6452c410c1518fe3afc1d2f6b78658a583495846d430d6c93baf9f92028213d407129cdaa0eea1f184c84a5f0bde6c5afa925b8e5a
+477b8ebe4cdd42384
+```
+
+### Step 2: Finalize the bootstrap process
+```bash
+go run -tags relic ./cmd/bootstrap finalize -c ./cmd/bootstrap/example_files/node_config.json
+```
 
 ## Structure
 

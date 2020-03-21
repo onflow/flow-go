@@ -15,8 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const randomSeedBytes = 64
-
 func generateRandomSeeds(n int) [][]byte {
 	seeds := make([][]byte, 0, n)
 	for i := 0; i < n; i++ {
@@ -26,7 +24,7 @@ func generateRandomSeeds(n int) [][]byte {
 }
 
 func generateRandomSeed() []byte {
-	seed := make([]byte, 64)
+	seed := make([]byte, randomSeedBytes)
 	if _, err := rand.Read(seed); err != nil {
 		log.Fatal().Err(err).Msg("cannot generate random seeds")
 	}

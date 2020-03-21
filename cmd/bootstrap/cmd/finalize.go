@@ -7,10 +7,9 @@ import (
 // finalizeCmd represents the finalize command
 var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
-	Short: "Finalizes the bootstrapping process",
-	Long: `Finalizes the bootstrapping process, which includes generating of internal networking and staking keys,
-		running the DKG for generating the random beacon keys, generating genesis execution state, seal, block and
-		QC.`,
+	Short: "Finalize the bootstrapping process",
+	Long: `Finalize the bootstrapping process, which includes generating of internal networking and staking keys,
+running the DKG for generating the random beacon keys, generating genesis execution state, seal, block and QC.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		internalNodesPub, internalNodesPriv := genNetworkAndStakingKeys()
 
@@ -34,6 +33,6 @@ func init() {
 	rootCmd.AddCommand(finalizeCmd)
 
 	finalizeCmd.Flags().StringVarP(&configFile, "config", "c", "",
-		"Path to a JSON file containing multiple node configurations (node_role, network_address, stake) [required]")
+		"path to a JSON file containing multiple node configurations (node_role, network_address, stake)")
 	finalizeCmd.MarkFlagRequired("config")
 }
