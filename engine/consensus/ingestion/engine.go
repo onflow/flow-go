@@ -3,6 +3,8 @@
 package ingestion
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -110,6 +112,37 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 		Hex("origin_id", originID[:]).
 		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("collection guarantee received")
+
+	clusters, err := e.state.Final().Clusters()
+	if err != nil {
+		return fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	guarantors := guarantee.Signers
+
+	// ensure there is at least one guarantor
+	if len(guarantors) == 0 {
+		return fmt.Errorf("invalid collection guarantee with no guarantors")
+	}
+
+	cluster, ok := clusters.ByNodeID(guarantors[0])
+	if !ok {
+		return fmt.Errorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
+	}
+
+	// NOTE: Eventually we should check the signatures, ensure a quorum of the
+	// cluster, and ensure HotStuff finalization rules. Likely a cluster-specific
+	// version of the follower will be a good fit for this. For now, collection
+	// nodes independently decide when a collection is finalized and we only check
+	// that the guarantors are all from the same cluster.
+
+	// ensure the guarantors are from the same cluster
+	for _, guarantorID := range guarantors {
+		_, exists := cluster.ByNodeID(guarantorID)
+		if !exists {
+			return fmt.Errorf("inconsistent guarantors from different clusters")
+		}
+	}
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a collection guarantee (usually collection nodes)

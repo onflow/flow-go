@@ -15,9 +15,9 @@ func ClusterFilterFor(sn Snapshot, id flow.Identifier) (flow.IdentityFilter, err
 	if err != nil {
 		return nil, fmt.Errorf("could not get clusters: %w", err)
 	}
-	cluster, err := clusters.ByNodeID(id)
-	if err != nil {
-		return nil, fmt.Errorf("could not get cluster for node: %w", err)
+	cluster, ok := clusters.ByNodeID(id)
+	if !ok {
+		return nil, fmt.Errorf("could not get cluster for node")
 	}
 
 	return filter.In(cluster), nil

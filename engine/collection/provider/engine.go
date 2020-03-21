@@ -232,9 +232,9 @@ func (e *Engine) SubmitTransactionRequest(req *messages.TransactionRequest) erro
 	}
 
 	// get the nodes in my cluster
-	clusterNodes, err := clusters.ByNodeID(e.me.NodeID())
-	if err != nil {
-		return fmt.Errorf("could not get my cluster: %w", err)
+	clusterNodes, ok := clusters.ByNodeID(e.me.NodeID())
+	if !ok {
+		return fmt.Errorf("could not get my cluster")
 	}
 
 	// remove myself from the list
