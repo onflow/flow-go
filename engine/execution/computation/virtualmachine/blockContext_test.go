@@ -3,11 +3,11 @@ package virtualmachine_test
 import (
 	"testing"
 
+	"github.com/dapperlabs/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -25,7 +25,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 			ScriptAccounts: []flow.Address{unittest.AddressFixture()},
 			Script: []byte(`
                 transaction {
-                  prepare(signer: Account) {}
+                  prepare(signer: AuthAccount) {}
                 }
             `),
 		}
@@ -45,7 +45,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 transaction {
                   var x: Int
 
-                  prepare(signer: Account) {
+                  prepare(signer: AuthAccount) {
                     self.x = 0
                   }
 
@@ -96,7 +96,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 			Script: []byte(`
                 transaction {
                   execute {
-				    Account([], [])
+				    AuthAccount(publicKeys: [], code: [])
 				  }
                 }
             `),

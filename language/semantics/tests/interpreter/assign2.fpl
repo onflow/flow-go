@@ -1,7 +1,0 @@
-fun test(): Int {
-    var x = 2;
-    x = 3;
-    return x
-};
-
-assert test() == 3

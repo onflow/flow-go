@@ -3,6 +3,7 @@ package verifier
 import (
 	"fmt"
 
+	"github.com/dapperlabs/cadence/runtime"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 

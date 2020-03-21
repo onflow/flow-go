@@ -469,7 +469,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 	}
 
 	// chunk data pack exists and retrieved and returned
-	chunkDataPack, err := e.chunkDataPacks.ByID(chunkID)
+	chunkDataPack, err := e.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
 		// couldn't get chunk state from mempool, the chunk cannot yet be verified
 		log.Error().

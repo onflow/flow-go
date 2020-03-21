@@ -29,6 +29,7 @@ func NewRandomBeaconAwareSigProvider(
 ) RandomBeaconAwareSigProvider {
 	// TODO: ensure viewState.DKGPublicData() != nil
 	return RandomBeaconAwareSigProvider{
+		// encoding.ConsensusVoteTag is used here since only consensus node will use random beacon sig
 		StakingSigProvider: NewStakingSigProvider(viewState, encoding.ConsensusVoteTag, me),
 		RandomBeaconSigner: NewRandomBeaconSigner(viewState, randomBeaconPrivateKey),
 	}

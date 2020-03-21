@@ -121,12 +121,14 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	}
 	// Group public key
 	Y := &PubKeyBLS_BLS12381{
+		alg:   s.fvss[0].blsContext,
 		point: *jointPublicKey,
 	}
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range jointy {
 		y[i] = &PubKeyBLS_BLS12381{
+			alg:   s.fvss[0].blsContext,
 			point: p,
 		}
 	}

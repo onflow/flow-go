@@ -24,10 +24,6 @@
 #define SK_BITS             (Fr_BITS)
 #define SK_LEN              BITS_TO_BYTES(SK_BITS)    
 
-#define SIG_VALID   1
-#define SIG_INVALID 0
-#define SIG_ERROR   0xFF
-
 // Compressed and uncompressed points
 #define COMPRESSED      1
 #define UNCOMPRESSED    0
@@ -38,7 +34,7 @@
 #define SINGLE_PAIRING (DOUBLE_PAIRING^1)
 
 // Signature membership check
-#define MEMBERSHIP_CHECK 0
+#define MEMBERSHIP_CHECK 1
 
 // algorithm choice for the hashing to G1 
 #define HASHCHECK 1
@@ -87,5 +83,6 @@ void     _ep_write_bin_compact(byte *, const ep_st *,  const int);
 void     _ep2_read_bin_compact(ep2_st* , const byte *,  const int);
 void     _ep2_write_bin_compact(byte *, const ep2_st *,  const int);
 void     mapToG1(ep_st* h, const byte* data, const int len);
+int      checkMembership_G2(const ep2_t p);
 
 #endif

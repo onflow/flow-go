@@ -166,7 +166,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-	suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 	// expect that the receipt be added to the mempool, and return it in All
 	suite.receipts.On("Add", suite.receipt).Return(nil).Once()
@@ -443,7 +443,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-			suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 			// removing the resources for a chunk

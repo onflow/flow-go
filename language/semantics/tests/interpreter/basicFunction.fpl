@@ -1,4 +1,0 @@
-fun test(): Int {
-  return 42
-};
-assert test() == 42

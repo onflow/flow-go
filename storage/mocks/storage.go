@@ -167,6 +167,21 @@ func (mr *MockCollectionsMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockCollections)(nil).ByID), arg0)
 }
 
+// CollectionIDByTransactionID mocks base method
+func (m *MockCollections) CollectionIDByTransactionID(arg0 flow.Identifier) (*flow.Identifier, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CollectionIDByTransactionID", arg0)
+	ret0, _ := ret[0].(*flow.Identifier)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CollectionIDByTransactionID indicates an expected call of CollectionIDByTransactionID
+func (mr *MockCollectionsMockRecorder) CollectionIDByTransactionID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CollectionIDByTransactionID", reflect.TypeOf((*MockCollections)(nil).CollectionIDByTransactionID), arg0)
+}
+
 // LightByID mocks base method
 func (m *MockCollections) LightByID(arg0 flow.Identifier) (*flow.LightCollection, error) {
 	m.ctrl.T.Helper()
@@ -222,6 +237,20 @@ func (m *MockCollections) StoreLight(arg0 *flow.LightCollection) error {
 func (mr *MockCollectionsMockRecorder) StoreLight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreLight", reflect.TypeOf((*MockCollections)(nil).StoreLight), arg0)
+}
+
+// StoreLightAndIndexByTransaction mocks base method
+func (m *MockCollections) StoreLightAndIndexByTransaction(arg0 *flow.LightCollection) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoreLightAndIndexByTransaction", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StoreLightAndIndexByTransaction indicates an expected call of StoreLightAndIndexByTransaction
+func (mr *MockCollectionsMockRecorder) StoreLightAndIndexByTransaction(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreLightAndIndexByTransaction", reflect.TypeOf((*MockCollections)(nil).StoreLightAndIndexByTransaction), arg0)
 }
 
 // MockCommits is a mock of Commits interface

@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
 func AddressFixture() flow.Address {
@@ -25,11 +26,15 @@ func AccountSignatureFixture() flow.AccountSignature {
 }
 
 func BlockFixture() flow.Block {
+	return BlockWithParentFixture(IdentifierFixture())
+}
+
+func BlockWithParentFixture(parentID flow.Identifier) flow.Block {
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
 		Guarantees: CollectionGuaranteesFixture(16),
 	}
-	header := BlockHeaderFixture()
+	header := BlockHeaderWithParentFixture(parentID)
 	header.PayloadHash = payload.Hash()
 	return flow.Block{
 		Header:  header,
@@ -38,8 +43,12 @@ func BlockFixture() flow.Block {
 }
 
 func BlockHeaderFixture() flow.Header {
+	return BlockHeaderWithParentFixture(IdentifierFixture())
+}
+
+func BlockHeaderWithParentFixture(parentID flow.Identifier) flow.Header {
 	return flow.Header{
-		ParentID: IdentifierFixture(),
+		ParentID: parentID,
 		View:     rand.Uint64(),
 	}
 }
@@ -158,9 +167,9 @@ func StateViewFixture() *state.View {
 	})
 }
 
-func CompleteCollectionFixture() *execution.CompleteCollection {
+func CompleteCollectionFixture() *entity.CompleteCollection {
 	txBody := TransactionBodyFixture()
-	return &execution.CompleteCollection{
+	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
 			CollectionID: flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
 			Signatures:   SignaturesFixture(16),
@@ -169,10 +178,15 @@ func CompleteCollectionFixture() *execution.CompleteCollection {
 	}
 }
 
-func CompleteBlockFixture(collections int) *execution.CompleteBlock {
+func ExecutableBlockFixture(collections int) *entity.ExecutableBlock {
 
-	completeCollections := make(map[flow.Identifier]*execution.CompleteCollection, collections)
-	block := BlockFixture()
+	return ExecutableBlockFixtureWithParent(collections, IdentifierFixture())
+}
+
+func ExecutableBlockFixtureWithParent(collections int, parentID flow.Identifier) *entity.ExecutableBlock {
+
+	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, collections)
+	block := BlockWithParentFixture(parentID)
 	block.Guarantees = nil
 
 	for i := 0; i < collections; i++ {
@@ -183,7 +197,7 @@ func CompleteBlockFixture(collections int) *execution.CompleteBlock {
 
 	block.PayloadHash = block.Payload.Hash()
 
-	return &execution.CompleteBlock{
+	return &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
 	}
@@ -195,20 +209,20 @@ func ComputationResultFixture(n int) *execution.ComputationResult {
 		stateViews[i] = StateViewFixture()
 	}
 	return &execution.ComputationResult{
-		CompleteBlock: CompleteBlockFixture(n),
-		StateViews:    stateViews,
+		ExecutableBlock: ExecutableBlockFixture(n),
+		StateViews:      stateViews,
 	}
 }
 
-func ComputationResultForBlockFixture(completeBlock *execution.CompleteBlock) *execution.ComputationResult {
-	n := len(completeBlock.CompleteCollections)
+func ComputationResultForBlockFixture(executableBlock *entity.ExecutableBlock) *execution.ComputationResult {
+	n := len(executableBlock.CompleteCollections)
 	stateViews := make([]*state.View, n)
 	for i := 0; i < n; i++ {
 		stateViews[i] = StateViewFixture()
 	}
 	return &execution.ComputationResult{
-		CompleteBlock: completeBlock,
-		StateViews:    stateViews,
+		ExecutableBlock: executableBlock,
+		StateViews:      stateViews,
 	}
 }
 
