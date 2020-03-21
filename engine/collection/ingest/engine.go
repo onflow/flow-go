@@ -145,9 +145,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// transaction
 	txCluster := clusters.ByTxID(tx.ID())
 	localID := e.me.NodeID()
-	localCluster, err := clusters.ByNodeID(localID)
-	if err != nil {
-		return fmt.Errorf("could not get local cluster: %w", err)
+	localCluster, ok := clusters.ByNodeID(localID)
+	if !ok {
+		return fmt.Errorf("could not get local cluster")
 	}
 
 	log = log.With().
