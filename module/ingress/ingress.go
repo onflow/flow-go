@@ -14,7 +14,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/common/observerclient"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 )
@@ -39,8 +38,8 @@ func New(config Config, e *ingest.Engine) *Ingress {
 	ingress := &Ingress{
 		unit: engine.NewUnit(),
 		handler: &handler{
-			NullObserverClient: observerclient.NullObserverClient{},
-			engine:             e,
+			UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
+			engine:                            e,
 		},
 		server: grpc.NewServer(),
 		config: config,
@@ -88,7 +87,7 @@ func (i *Ingress) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	observerclient.NullObserverClient
+	observation.UnimplementedObserveServiceServer
 	engine network.Engine
 }
 

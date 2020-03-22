@@ -5,7 +5,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine/common/observerclient"
 	"github.com/dapperlabs/flow-go/engine/observation/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
@@ -15,7 +14,7 @@ import (
 
 // Handler implements a subset of the Observation API
 type Handler struct {
-	observerclient.NullObserverClient
+	observation.UnimplementedObserveServiceServer
 	executionRPC  observation.ObserveServiceClient
 	collectionRPC observation.ObserveServiceClient
 	log           zerolog.Logger
@@ -31,12 +30,12 @@ func NewHandler(log zerolog.Logger,
 	c observation.ObserveServiceClient,
 	headers storage.Headers) *Handler {
 	return &Handler{
-		executionRPC:       e,
-		collectionRPC:      c,
-		headers:            headers,
-		state:              s,
-		log:                log,
-		NullObserverClient: observerclient.NullObserverClient{},
+		executionRPC:                      e,
+		collectionRPC:                     c,
+		headers:                           headers,
+		state:                             s,
+		log:                               log,
+		UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
 	}
 }
 

@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/common/observerclient"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 )
@@ -35,8 +34,8 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine) *Engine {
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			NullObserverClient: observerclient.NullObserverClient{},
-			engine:             e,
+			UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
+			engine:                            e,
 		},
 		server: grpc.NewServer(),
 		config: config,
@@ -81,7 +80,7 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	observerclient.NullObserverClient
+	observation.UnimplementedObserveServiceServer
 	engine *ingestion.Engine
 }
 
