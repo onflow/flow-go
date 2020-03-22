@@ -14,6 +14,7 @@ import (
 
 // Handler implements a subset of the Observation API
 type Handler struct {
+	observation.UnimplementedObserveServiceServer
 	executionRPC  observation.ObserveServiceClient
 	collectionRPC observation.ObserveServiceClient
 	log           zerolog.Logger
@@ -29,11 +30,12 @@ func NewHandler(log zerolog.Logger,
 	c observation.ObserveServiceClient,
 	headers storage.Headers) *Handler {
 	return &Handler{
-		executionRPC:  e,
-		collectionRPC: c,
-		headers:       headers,
-		state:         s,
-		log:           log,
+		executionRPC:                      e,
+		collectionRPC:                     c,
+		headers:                           headers,
+		state:                             s,
+		log:                               log,
+		UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
 	}
 }
 
@@ -52,7 +54,7 @@ func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTran
 	return h.collectionRPC.SendTransaction(ctx, req)
 }
 
-func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
+func (h *Handler) GetLatestBlockHeader(ctx context.Context, req *observation.GetLatestBlockHeaderRequest) (*observation.BlockHeaderResponse, error) {
 
 	header, err := h.getLatestBlockHeader(req.IsSealed)
 
@@ -65,7 +67,7 @@ func (h *Handler) GetLatestBlock(ctx context.Context, req *observation.GetLatest
 		return nil, err
 	}
 
-	resp := &observation.GetLatestBlockResponse{
+	resp := &observation.BlockHeaderResponse{
 		Block: &msg,
 	}
 	return resp, nil
@@ -84,17 +86,4 @@ func (h *Handler) getLatestBlockHeader(isSealed bool) (*flow.Header, error) {
 	// Otherwise, for the latest finalized block, just query the state
 	return h.state.Final().Head()
 
-}
-
-func (h *Handler) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
-	// TODO lookup transaction in local transaction storage
-	return nil, nil
-}
-
-func (h *Handler) GetAccount(context.Context, *observation.GetAccountRequest) (*observation.GetAccountResponse, error) {
-	return nil, nil
-}
-
-func (h *Handler) GetEvents(context.Context, *observation.GetEventsRequest) (*observation.GetEventsResponse, error) {
-	return nil, nil
 }
