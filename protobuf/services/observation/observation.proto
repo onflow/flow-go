@@ -126,7 +126,6 @@ message GetTransactionRequest {
 
 message TransactionResponse {
   flow.sdk.entities.Transaction transaction = 1;
-  repeated flow.sdk.entities.Event events = 2;
 }
 
 message TransactionResultResponse {
@@ -165,4 +164,3 @@ message GetEventsRequest {
 message GetEventsResponse {
   repeated flow.sdk.entities.Event events = 1;
 }
-
