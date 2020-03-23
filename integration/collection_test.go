@@ -1,11 +1,13 @@
-package integration
+package integration_test
 
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
+	sdk "github.com/dapperlabs/flow-go-sdk"
 	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/m4ksio/testingdock"
@@ -17,7 +19,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestCollection(t *testing.T) {
@@ -57,7 +58,13 @@ func TestCollection(t *testing.T) {
 	client, err := client.New(fmt.Sprintf(":%s", ingressPort))
 	assert.Nil(t, err)
 
-	sdkTx := unittest.SDKTransactionFixture()
+	sdkTx := sdk.Transaction{
+		Script:             []byte("fun main() {}"),
+		ReferenceBlockHash: []byte{1, 2, 3, 4},
+		Nonce:              rand.Uint64(),
+		ComputeLimit:       10,
+		PayerAccount:       sdk.RootAddress,
+	}
 	err = client.SendTransaction(ctx, sdkTx)
 	assert.Nil(t, err)
 
