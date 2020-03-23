@@ -211,6 +211,10 @@ func (sk *PrKeyECDSA) Encode() ([]byte, error) {
 	return nil, cryptoError{"curve is not supported"}
 }
 
+func (sk *PrKeyECDSA) Equals(other PrivateKey) bool {
+	return KeysEqual(sk, other)
+}
+
 // PubKeyECDSA is the public key of ECDSA, it implements PublicKey
 type PubKeyECDSA struct {
 	// the signature algo
@@ -254,4 +258,8 @@ func (pk *PubKeyECDSA) Encode() ([]byte, error) {
 		return pk.rawEncode()
 	}
 	return nil, cryptoError{"curve is not supported"}
+}
+
+func (sk *PubKeyECDSA) Equals(other PublicKey) bool {
+	return KeysEqual(sk, other)
 }

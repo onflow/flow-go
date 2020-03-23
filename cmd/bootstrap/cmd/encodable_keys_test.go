@@ -92,8 +92,7 @@ func TestEncodableStakingPubKeyNil(t *testing.T) {
 	require.Equal(t, key, dec)
 }
 
-// TODO activate again
-func SkipTestEncodableStakingPrivKey(t *testing.T) {
+func TestEncodableStakingPrivKey(t *testing.T) {
 	stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
 	require.NoError(t, err)
 	key := EncodableStakingPrivKey{stak}
@@ -105,7 +104,8 @@ func SkipTestEncodableStakingPrivKey(t *testing.T) {
 	var dec EncodableStakingPrivKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, key, dec)
+
+	require.True(t, key.Equals(dec), "encoded/decoded key equality check failed")
 }
 
 func TestEncodableStakingPrivKeyNil(t *testing.T) {
@@ -149,8 +149,7 @@ func TestEncodableRandomBeaconPubKeyNil(t *testing.T) {
 	require.Equal(t, key, dec)
 }
 
-// TODO activate again
-func SkipTestEncodableRandomBeaconPrivKey(t *testing.T) {
+func TestEncodableRandomBeaconPrivKey(t *testing.T) {
 	randbeac, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
 	require.NoError(t, err)
 	key := EncodableRandomBeaconPrivKey{randbeac}
@@ -162,7 +161,8 @@ func SkipTestEncodableRandomBeaconPrivKey(t *testing.T) {
 	var dec EncodableRandomBeaconPrivKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, key, dec)
+
+	require.True(t, key.Equals(dec), "encoded/decoded key equality check failed")
 }
 
 func TestEncodableRandomBeaconPrivKeyNil(t *testing.T) {

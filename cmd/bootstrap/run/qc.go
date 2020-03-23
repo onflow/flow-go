@@ -27,7 +27,6 @@ type SignerData struct {
 	Signers    []Signer
 }
 
-// TODO add a test with a validator as soon as https://github.com/dapperlabs/flow-go/blob/c34e266a3d8ec125a62361715db96cadd6747776/engine/consensus/hotstuff/validator_test.go#L186-L214 is merged
 func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCertificate, error) {
 	ps, db, err := NewProtocolState()
 	if err != nil {
