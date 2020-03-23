@@ -179,7 +179,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		// TODO: potential attack on authenticity
 		// stores ER in pending receipts till a block arrives authenticating this
 		err = e.pendingReceipts.Add(receipt)
-		if err != nil {
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
 		}
 
@@ -193,7 +193,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		// store the execution receipt in the store of the engine
 		// this will fail if the receipt already exists in the store
 		err = e.authReceipts.Add(receipt)
-		if err != nil {
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			return fmt.Errorf("could not store execution receipt: %w", err)
 		}
 
@@ -526,7 +526,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		// a collection is missing, the receipt cannot yet be verified
 		// TODO rate limit these requests
 		err := e.requestCollection(collID)
-		if err != nil {
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			log.Error().
 				Err(err).
 				Hex("collection_id", logging.ID(collID)).

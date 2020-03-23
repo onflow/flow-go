@@ -10,7 +10,6 @@ import (
 type Receipts interface {
 
 	// Add will add the given receipt for the node with the given ID.
-	// It does NOT return an error if one try adding a duplicate receipt
 	Add(receipt *flow.ExecutionReceipt) error
 
 	// Has checks if the given receipt is part of the memory pool.
