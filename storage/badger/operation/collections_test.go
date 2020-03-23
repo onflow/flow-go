@@ -70,5 +70,20 @@ func TestCollections(t *testing.T) {
 
 			assert.Equal(t, expected, actual)
 		})
+
+		t.Run("Index and lookup by transaction ID", func(t *testing.T) {
+			expected := unittest.IdentifierFixture()
+			transactionID := unittest.IdentifierFixture()
+			actual := flow.Identifier{}
+
+			_ = db.Update(func(tx *badger.Txn) error {
+				err := IndexCollectionByTransaction(transactionID, expected)(tx)
+				assert.Nil(t, err)
+				err = RetrieveCollectionID(transactionID, &actual)(tx)
+				assert.Nil(t, err)
+				return nil
+			})
+			assert.Equal(t, expected, actual)
+		})
 	})
 }

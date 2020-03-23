@@ -469,7 +469,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 	}
 
 	// chunk data pack exists and retrieved and returned
-	chunkDataPack, err := e.chunkDataPacks.ByID(chunkID)
+	chunkDataPack, err := e.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
 		// couldn't get chunk state from mempool, the chunk cannot yet be verified
 		log.Error().
@@ -582,10 +582,21 @@ func (e *Engine) checkPendingChunks() {
 				continue
 			}
 
+			index := chunk.Index
+			var endState flow.StateCommitment
+			if int(index) == len(receipt.ExecutionResult.Chunks)-1 {
+				// last chunk in receipt takes final state commitment
+				endState = receipt.ExecutionResult.FinalStateCommit
+			} else {
+				// any chunk except last takes the subsequent chunk's start state
+				endState = receipt.ExecutionResult.Chunks[index+1].StartState
+			}
+
 			// creates a verifiable chunk for assigned chunk
 			vchunk := &verification.VerifiableChunk{
 				ChunkIndex: chunk.Index,
 				Receipt:    receipt,
+				EndState:   endState,
 				Block:      block,
 				Collection: collection,
 				ChunkState: chunkState,

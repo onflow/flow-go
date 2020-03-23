@@ -3,11 +3,14 @@ package main
 import (
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/cadence/runtime"
+
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/assignment"
+	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
@@ -55,12 +58,18 @@ func main() {
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me)
+			rt := runtime.NewInterpreterRuntime()
+			vm := virtualmachine.New(rt)
+			chunkVerifier := chunks.NewChunkVerifier(vm)
+			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			alpha := 10
-			assigner := assignment.NewPublicAssignment(alpha)
+			assigner, err := chunks.NewPublicAssignment(alpha)
+			if err != nil {
+				return nil, err
+			}
 			// https://github.com/dapperlabs/flow-go/issues/2703
 			// proper place and only referenced here
 			// Todo the hardcoded default value should be parameterized as alpha in a

@@ -6,7 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
-	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
 type TrieStorage struct {
@@ -52,7 +51,7 @@ func (f *TrieStorage) GetRegisters(
 // UpdateRegisters updates the values at the given registers
 // This is trusted so no proof is generated
 func (f *TrieStorage) UpdateRegisters(
-	ids [][]byte,
+	ids []flow.RegisterID,
 	values []flow.RegisterValue,
 ) (
 	newStateCommitment flow.StateCommitment,
@@ -72,6 +71,7 @@ func (f *TrieStorage) UpdateRegisters(
 	}
 
 	err = f.tree.Update(ids, values)
+
 	return f.tree.GetRoot().GetValue(), err
 }
 
@@ -87,33 +87,33 @@ func (f *TrieStorage) GetRegistersWithProof(
 ) {
 	values, proofHldr, err := f.tree.Read(registerIDs, false, stateCommitment)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Could not get registers with proofs: %w", err)
 	}
-	// The following code is the encoding logic
-	// Each slice in the proofHolder is stored as a byte array, and the whole thing is stored
-	// as a [][]byte
-	// First we have a byte, and set the first bit to 1 if it is an inclusion proof
-	// Then the size is encoded as a single byte
-	// Then the flag is encoded
-	// Finally the proofs are encoded one at a time, and is stored as a byte array
-	proofs = make([]flow.StorageProof, 0)
-	for i := 0; i < proofHldr.GetSize(); i++ {
-		flag, singleProof, inclusion, size := proofHldr.ExportProof(i)
-		byteSize := []byte{size}
-		byteInclusion := make([]byte, 1)
-		if inclusion {
-			utils.SetBit(byteInclusion, 0)
-		}
-		proof := append(byteInclusion, byteSize...)
-		proof = append(proof, flag...)
-		for _, p := range singleProof {
-			proof = append(proof, p...)
-		}
-		// ledgerStorage is a struct that holds our SM
-		proofs = append(proofs, proof)
-	}
-
+	proofs = trie.EncodeProof(proofHldr)
 	return values, proofs, err
+}
+
+func (f *TrieStorage) GetRegisterTouches(
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+) (
+	[]flow.RegisterTouch,
+	error,
+) {
+	values, proofs, err := f.GetRegistersWithProof(registerIDs, stateCommitment)
+	if err != nil {
+		return nil, err
+	}
+	rets := make([]flow.RegisterTouch, 0, len(registerIDs))
+	for i, reg := range registerIDs {
+		rt := flow.RegisterTouch{
+			RegisterID: reg,
+			Value:      values[i],
+			Proof:      proofs[i],
+		}
+		rets = append(rets, rt)
+	}
+	return rets, nil
 }
 
 // UpdateRegistersWithProof updates the values at the given registers

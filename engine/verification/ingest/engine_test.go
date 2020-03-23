@@ -166,7 +166,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-	suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 	// expect that the receipt be added to the mempool, and return it in All
 	suite.receipts.On("Add", suite.receipt).Return(nil).Once()
@@ -443,7 +443,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-			suite.chunkDataPacks.On("ByID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 			// removing the resources for a chunk
@@ -556,11 +556,20 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 		er := unittest.CompleteExecutionResultFixture(chunksNum)
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
-		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
+		for j, chunk := range er.Receipt.ExecutionResult.Chunks {
 			a.Add(chunk, []flow.Identifier{verID.NodeID})
-			//if chunkCounter % 2 == 0 {
+
+			var endState flow.StateCommitment
+			// last chunk
+			if j == len(er.Receipt.ExecutionResult.Chunks)-1 {
+				endState = er.Receipt.ExecutionResult.FinalStateCommit
+			} else {
+				endState = er.Receipt.ExecutionResult.Chunks[j+1].StartState
+			}
+
 			vc := &verification.VerifiableChunk{
 				ChunkIndex: chunk.Index,
+				EndState:   endState,
 				Block:      er.Block,
 				Receipt:    er.Receipt,
 				Collection: er.Collections[chunk.Index],

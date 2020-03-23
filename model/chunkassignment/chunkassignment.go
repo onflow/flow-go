@@ -50,3 +50,35 @@ func (a *Assignment) ByNodeID(this flow.Identifier) []uint64 {
 	}
 	return chunks
 }
+
+// AssignmentDataPack
+//
+// AssignmentDataPack provides a storable representation of chunk assignments on
+// mempool
+type AssignmentDataPack struct {
+	assignment  *Assignment
+	fingerprint flow.Identifier
+}
+
+// NewAssignmentDataPack casts an assignment and its fingerprint into an assignment data pack
+func NewAssignmentDataPack(fingerprint flow.Identifier, assignment *Assignment) *AssignmentDataPack {
+	return &AssignmentDataPack{
+		assignment:  assignment,
+		fingerprint: fingerprint,
+	}
+}
+
+// ID returns the unique identifier for assignment data pack
+func (a *AssignmentDataPack) ID() flow.Identifier {
+	return a.fingerprint
+}
+
+// Checksum returns the checksum of the assignment data pack
+func (a *AssignmentDataPack) Checksum() flow.Identifier {
+	return flow.MakeID(a)
+}
+
+// Assignment returns the assignment part of the assignment data pack
+func (a *AssignmentDataPack) Assignment() *Assignment {
+	return a.assignment
+}

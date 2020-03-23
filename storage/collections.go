@@ -25,4 +25,11 @@ type Collections interface {
 	// ByID returns the collection with the given ID, including all
 	// transactions within the collection.
 	ByID(collID flow.Identifier) (*flow.Collection, error)
+
+	// StoreLightAndIndexByTransaction inserts the collection (only transactions hashes) and adds a transaction id index
+	// for each of the transactions within the collection
+	StoreLightAndIndexByTransaction(collection *flow.LightCollection) error
+
+	// CollectionIDByTransactionID returns the collection ID for the given transaction ID
+	CollectionIDByTransactionID(txID flow.Identifier) (*flow.Identifier, error)
 }

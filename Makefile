@@ -29,6 +29,9 @@ crypto/relic:
 crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
 
+crypto/relic/update:
+	git submodule update --recursive
+
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
