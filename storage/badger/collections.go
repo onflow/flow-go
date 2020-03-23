@@ -119,3 +119,42 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 		return nil
 	})
 }
+
+func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
+	return c.db.Update(func(tx *badger.Txn) error {
+		err := operation.InsertCollection(collection)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert collection: %w", err)
+		}
+
+		for _, t := range collection.Transactions {
+			err = operation.IndexCollectionByTransaction(t, collection.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert transaction ID: %w", err)
+			}
+		}
+
+		return nil
+	})
+}
+
+func (c *Collections) CollectionIDByTransactionID(txID flow.Identifier) (*flow.Identifier, error) {
+	collectionID := &flow.Identifier{}
+
+	err := c.db.View(func(tx *badger.Txn) error {
+		err := operation.RetrieveCollectionID(txID, collectionID)(tx)
+		if err != nil {
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return storage.ErrNotFound
+			}
+			return fmt.Errorf("could not retrieve collection id: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return collectionID, nil
+}

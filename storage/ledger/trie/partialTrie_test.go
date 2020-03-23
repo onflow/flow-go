@@ -25,7 +25,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 	trie := newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
 	defer trie.SafeClose()
 	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
-	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, *proofHldr)
+	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 	require.NoError(t, err, "error building partial trie")
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
 		t.Fatal("root hash doesn't match [before set]")
@@ -81,7 +81,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 	require.NoError(t, err, "error updating trie")
 
 	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
-	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, *proofHldr)
+	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 	require.NoError(t, err, "error building partial trie")
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
@@ -125,7 +125,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 	trie := newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
 	defer trie.SafeClose()
 	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
-	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, *proofHldr)
+	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 	require.NoError(t, err, "error building partial trie")
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
@@ -176,7 +176,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 	trie := newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
 	defer trie.SafeClose()
 	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
-	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, *proofHldr)
+	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 	require.NoError(t, err, "error building partial trie")
 
 	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {

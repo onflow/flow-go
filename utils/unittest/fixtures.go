@@ -510,6 +510,7 @@ func VerifiableChunkFixture() *verification.VerifiableChunk {
 
 	return &verification.VerifiableChunk{
 		ChunkIndex: chunk.Index,
+		EndState:   StateCommitmentFixture(),
 		Block:      &block,
 		Receipt:    &receipt,
 		Collection: &coll,
