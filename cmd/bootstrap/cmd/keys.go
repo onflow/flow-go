@@ -38,6 +38,9 @@ func genNetworkAndStakingKeys() ([]NodeInfoPub, []NodeInfoPriv) {
 	nodes := len(nodeConfigs)
 	log.Info().Msgf("read %v node configurations", nodes)
 
+	validateAddressesUnique(nodeConfigs)
+	log.Debug().Msg("all node addresses are unique")
+
 	log.Debug().Msgf("will generate %v networking keys", nodes)
 	networkKeys, err := run.GenerateNetworkingKeys(nodes, generateRandomSeeds(nodes))
 	if err != nil {
@@ -94,4 +97,13 @@ func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.Priva
 	}
 
 	return nodeInfoPriv, nodeInfoPub
+}
+
+func validateAddressesUnique(ns []NodeConfig) {
+	lookup := make(map[string]struct{})
+	for _, n := range ns {
+		if _, ok := lookup[n.Address], ok {
+			log.Fatal().Str("address", n.Address).Msg("duplicate node address in config")
+		}
+	}
 }
