@@ -43,6 +43,10 @@ func NewReceipts(limit uint) (*Receipts, error) {
 
 // Add adds an execution receipt to the mempool.
 func (r *Receipts) Add(receipt *flow.ExecutionReceipt) error {
+	if r.Backend.Has(receipt.ID()) {
+		// avoids adding a duplicate receipt to prevent returning error
+		return nil
+	}
 	r.register(receipt)
 	err := r.Backend.Add(receipt)
 	if err != nil {

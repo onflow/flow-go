@@ -182,6 +182,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		if err != nil {
 			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
 		}
+
 	} else {
 		// execution results are only valid from execution nodes
 		if origin.Role != flow.RoleExecution {
@@ -195,6 +196,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		if err != nil {
 			return fmt.Errorf("could not store execution receipt: %w", err)
 		}
+
 	}
 
 	e.checkPendingChunks()
@@ -567,6 +569,7 @@ func (e *Engine) checkPendingChunks() {
 				Hex("receipt_id", logging.ID(receipt.ID())).
 				Msg("could not add receipt to the authenticated receipts pool")
 		}
+
 		e.pendingReceipts.Rem(receipt.ID())
 	}
 
