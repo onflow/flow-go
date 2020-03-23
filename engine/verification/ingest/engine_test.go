@@ -656,7 +656,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					_ = verNode.IngestEngine.Process(exeID.NodeID, receipt)
 				}
 
-				switch 1 {
+				switch j % 2 {
 				case 0:
 					// block then receipt
 					sendBlock()
