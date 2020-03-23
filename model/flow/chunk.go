@@ -45,6 +45,42 @@ type ChunkDataPack struct {
 	RegisterTouches []RegisterTouch
 }
 
+// GetRegisterValues returns a map of register key values
+func (cdp *ChunkDataPack) GetRegisterValues() map[string]RegisterValue {
+	ret := make(map[string]RegisterValue)
+	for _, rt := range cdp.RegisterTouches {
+		ret[string(rt.RegisterID)] = rt.Value
+	}
+	return ret
+}
+
+// Registers returns a list of register Ids (ordered)
+func (cdp *ChunkDataPack) Registers() []RegisterID {
+	registers := make([]RegisterID, 0, len(cdp.RegisterTouches))
+	for _, rt := range cdp.RegisterTouches {
+		registers = append(registers, rt.RegisterID)
+	}
+	return registers
+}
+
+// Values returns a list of values (ordered)
+func (cdp *ChunkDataPack) Values() []RegisterValue {
+	values := make([]RegisterValue, 0, len(cdp.RegisterTouches))
+	for _, rt := range cdp.RegisterTouches {
+		values = append(values, rt.Value)
+	}
+	return values
+}
+
+// Proofs returns a list of proofs (ordered)
+func (cdp *ChunkDataPack) Proofs() []StorageProof {
+	proofs := make([]StorageProof, 0, len(cdp.RegisterTouches))
+	for _, rt := range cdp.RegisterTouches {
+		proofs = append(proofs, rt.Proof)
+	}
+	return proofs
+}
+
 // ID returns the unique identifier for the concrete view, which is the ID of
 // the chunk the view is for.
 func (c *ChunkDataPack) ID() Identifier {
