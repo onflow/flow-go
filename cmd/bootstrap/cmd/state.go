@@ -22,12 +22,12 @@ func genGenesisExecutionState() flow.StateCommitment {
 
 	dbpath := filepath.Join(flagOutdir, dirnameExecutionState)
 	db := createLevelDB(dbpath)
-	defer log.Info().Msgf("wrote execution state db to directory %v", dbpath)
 	defer db.SafeClose()
 	stateCommitment, err := run.GenerateExecutionState(db, account0Priv)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}
+	log.Info().Msgf("wrote execution state db to directory %v", dbpath)
 
 	return stateCommitment
 }

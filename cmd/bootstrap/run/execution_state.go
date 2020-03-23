@@ -2,7 +2,6 @@ package run
 
 import (
 	"fmt"
-	"io/ioutil"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -28,15 +27,12 @@ func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 
 func GenerateExecutionState(levelDB *leveldb.LevelDB, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
 	ledgerStorage, err := ledger.NewTrieStorage(levelDB)
+	defer ledgerStorage.CloseStorage()
 	if err != nil {
 		return nil, err
 	}
 
 	return bootstrapLedger(ledgerStorage, priv)
-}
-
-func tempDBDir() (string, error) {
-	return ioutil.TempDir("", "flow-bootstrap-db")
 }
 
 func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {

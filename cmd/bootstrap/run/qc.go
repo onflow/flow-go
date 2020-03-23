@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io/ioutil"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
@@ -149,4 +150,8 @@ func NewRandomBeaconSigProvider(ps protocol.State, dkgPubData *hotstuff.DKGPubli
 
 	sigProvider := signature.NewRandomBeaconAwareSigProvider(vs, me, randomBeaconKey)
 	return &sigProvider, nil
+}
+
+func tempDBDir() (string, error) {
+	return ioutil.TempDir("", "flow-bootstrap-db")
 }
