@@ -113,7 +113,9 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("collection guarantee received")
 
-	clusters, err := e.state.Final().Clusters()
+	final := e.state.Final()
+
+	clusters, err := final.Clusters()
 	if err != nil {
 		return fmt.Errorf("could not get clusters: %w", err)
 	}
@@ -146,7 +148,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a collection guarantee (usually collection nodes)
-	id, err := e.state.Final().Identity(originID)
+	id, err := final.Identity(originID)
 	if err != nil {
 		return errors.Wrap(err, "could not get origin node identity")
 	}

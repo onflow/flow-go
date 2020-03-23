@@ -9,16 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
+	mockprotocol "github.com/dapperlabs/flow-go/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestOnCollectionGuaranteeValid(t *testing.T) {
 
-	prop := &network.Engine{}
-	state := &protocol.State{}
-	final := &protocol.Snapshot{}
+	prop := &mocknetwork.Engine{}
+	state := &mockprotocol.State{}
+	final := &mockprotocol.Snapshot{}
 
 	e := &Engine{
 		prop:  prop,
@@ -26,15 +26,21 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.CollectionGuarantee{CollectionID: unittest.IdentifierFixture()}
-	identity := unittest.IdentityFixture()
-	identity.Role = flow.RoleCollection
+	guarantee := unittest.CollectionGuaranteeFixture()
+	guarantee.Signers = []flow.Identifier{originID}
+	guarantee.Signatures = unittest.SignaturesFixture(1)
+
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	identity.NodeID = originID
+	clusters := flow.NewClusterList(1)
+	clusters.Add(0, identity)
 
 	state.On("Final").Return(final).Once()
 	final.On("Identity", originID).Return(identity, nil).Once()
-	prop.On("SubmitLocal", coll).Return().Once()
+	final.On("Clusters").Return(clusters, nil).Once()
+	prop.On("SubmitLocal", guarantee).Return().Once()
 
-	err := e.onCollectionGuarantee(originID, coll)
+	err := e.onCollectionGuarantee(originID, guarantee)
 	require.NoError(t, err)
 
 	state.AssertExpectations(t)
@@ -44,9 +50,9 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 
 func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 
-	prop := &network.Engine{}
-	state := &protocol.State{}
-	final := &protocol.Snapshot{}
+	prop := &mocknetwork.Engine{}
+	state := &mockprotocol.State{}
+	final := &mockprotocol.Snapshot{}
 
 	e := &Engine{
 		prop:  prop,
@@ -54,14 +60,20 @@ func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.CollectionGuarantee{CollectionID: unittest.IdentifierFixture()}
-	identity := unittest.IdentityFixture()
-	identity.Role = flow.RoleCollection
+	guarantee := unittest.CollectionGuaranteeFixture()
+	guarantee.Signers = []flow.Identifier{originID}
+	guarantee.Signatures = unittest.SignaturesFixture(1)
+
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	identity.NodeID = originID
+	clusters := flow.NewClusterList(1)
+	clusters.Add(0, identity)
 
 	state.On("Final").Return(final).Once()
+	final.On("Clusters").Return(clusters, nil).Once()
 	final.On("Identity", originID).Return(nil, errors.New("identity error")).Once()
 
-	err := e.onCollectionGuarantee(originID, coll)
+	err := e.onCollectionGuarantee(originID, guarantee)
 	require.Error(t, err)
 
 	state.AssertExpectations(t)
@@ -71,9 +83,9 @@ func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 
 func TestOnCollectionGuaranteeInvalidRole(t *testing.T) {
 
-	prop := &network.Engine{}
-	state := &protocol.State{}
-	final := &protocol.Snapshot{}
+	prop := &mocknetwork.Engine{}
+	state := &mockprotocol.State{}
+	final := &mockprotocol.Snapshot{}
 
 	e := &Engine{
 		prop:  prop,
@@ -81,14 +93,21 @@ func TestOnCollectionGuaranteeInvalidRole(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.CollectionGuarantee{CollectionID: unittest.IdentifierFixture()}
-	identity := unittest.IdentityFixture()
-	identity.Role = flow.RoleConsensus
+	guarantee := unittest.CollectionGuaranteeFixture()
+	guarantee.Signers = []flow.Identifier{originID}
+	guarantee.Signatures = unittest.SignaturesFixture(1)
+
+	// origin node has wrong role (consensus)
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	identity.NodeID = originID
+	clusters := flow.NewClusterList(1)
+	clusters.Add(0, identity)
 
 	state.On("Final").Return(final).Once()
+	final.On("Clusters").Return(clusters, nil).Once()
 	final.On("Identity", originID).Return(identity, nil).Once()
 
-	err := e.onCollectionGuarantee(originID, coll)
+	err := e.onCollectionGuarantee(originID, guarantee)
 	require.Error(t, err)
 
 	state.AssertExpectations(t)
