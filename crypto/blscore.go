@@ -76,13 +76,21 @@ func seedRelic(seed []byte) {
 	C._seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
-// returns a random number in Z/Z.r
+// returns a random number in Zr
 func randZr(x *scalar) error {
 	C._bn_randZr((*C.bn_st)(x))
 	if x == nil {
 		return cryptoError{"the memory allocation of the random number has failed"}
 	}
 	return nil
+}
+
+// mapKeyZr reads a private key from a slice of bytes and maps it to Zr
+// the resulting scalar is in the range 1< k < (r-1)
+func mapKeyZr(x *scalar, src []byte) {
+	C.bn_privateKey_mod_r((*C.bn_st)(x),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src)))
 }
 
 // TEST/DEBUG/BENCH
@@ -159,6 +167,12 @@ func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool
 		(C.int)(len(data)))
 
 	return (verif == valid)
+}
+
+// checkMembershipZr checks a scalar is less than the groups order (r)
+func (sk *scalar) checkMembershipZr() bool {
+	verif := C.checkMembership_Zr((*C.bn_st)(sk))
+	return verif == valid
 }
 
 // membershipCheckG2 runs a membership check of BLS public keys on BLS12-381 curve.

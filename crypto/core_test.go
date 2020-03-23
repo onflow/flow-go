@@ -9,13 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPRGSeeding(t *testing.T) {
+func TestDeterministicKeyGen(t *testing.T) {
 	// 2 keys generated with the same seed should be equal
 	seed := []byte{1, 2, 3, 4}
-	sk1, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	h, _ := NewHasher(SHA3_384)
+	sk1, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
 	assert.Nil(t, err)
 	pk1Bytes, _ := sk1.PublicKey().Encode()
-	sk2, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	sk2, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
 	assert.Nil(t, err)
 	pk2Bytes, _ := sk2.PublicKey().Encode()
 	assert.Equal(t, pk1Bytes, pk2Bytes)

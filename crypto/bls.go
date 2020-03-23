@@ -51,20 +51,23 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac Hasher) (boo
 	return pk.alg.blsVerify(&pk.point, s, h), nil
 }
 
-// GeneratePrKey generates a private key for BLS on BLS12381 curve
+// generatePrivateKey generates a private key for BLS on BLS12381 curve
+// All the bytes of the input seed will be used. The minimum size of the input seed
+// is 48 bytes.
 func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
+	minSeedLen := PrKeyLenBLS_BLS12381 + (securityBits / 8)
+	if len(seed) < minSeedLen {
+		return nil, cryptoError{fmt.Sprintf("seed should be at least %d bytes", minSeedLen)}
+	}
+
 	sk := &PrKeyBLS_BLS12381{
 		alg: a,
 		// public key is not computed
 		pk: nil,
 	}
-	// seed the RNG
-	seedRelic(seed)
-	// Generate private key here
-	err := randZr(&(sk.scalar))
-	if err != nil {
-		return nil, err
-	}
+
+	// maps the seed to a private key
+	mapKeyZr(&(sk.scalar), seed)
 	return sk, nil
 }
 
@@ -77,7 +80,10 @@ func (a *BLS_BLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey,
 		pk:  nil,
 	}
 	readScalar(&sk.scalar, privateKeyBytes)
-	return sk, nil
+	if sk.scalar.checkMembershipZr() {
+		return sk, nil
+	}
+	return nil, cryptoError{"the private key is not a valid BLS12-381 curve key"}
 }
 
 func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {

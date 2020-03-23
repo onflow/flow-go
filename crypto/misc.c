@@ -96,6 +96,19 @@ void _bn_randZr(bn_t x) {
     bn_free(r);
 }
 
+// reads a private key from an array and maps it to Zr
+// the resulting scalar is in the range 1 < a < (r-1)
+void bn_privateKey_mod_r(bn_st* a, const uint8_t* bin, int len) {
+    bn_read_bin(a, bin, len);
+    bn_t r;
+    bn_new(r); 
+    g2_get_ord(r);
+    bn_sub_dig(r,r,3);
+    bn_mod_basic(a,a,r);
+    bn_add_dig(a,a,2);
+    bn_free(r);
+}
+
 
 // reads a bit in a prime field element at a given index
 // whether the field element is in Montgomery domain or not

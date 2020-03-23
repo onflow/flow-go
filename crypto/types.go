@@ -37,6 +37,9 @@ func (f HashingAlgorithm) String() string {
 }
 
 const (
+	// targeted bits of security
+	securityBits = 128
+
 	// Lengths of hash outputs in bytes
 	HashLenSha2_256 = 32
 	HashLenSha2_384 = 48
@@ -46,15 +49,18 @@ const (
 	// BLS signature scheme lengths
 
 	// BLS12-381
-	compression = 1 // 1 for compressed, 0 for uncompressed
+	// p size in bytes
+	fieldSize = 48
+	// Points compression: 1 for compressed, 0 for uncompressed
+	compression = 1
 	// the length is divided by 2 if compression is on
-	SignatureLenBLS_BLS12381 = 48 * (2 - compression)
+	SignatureLenBLS_BLS12381 = fieldSize * (2 - compression)
 	PrKeyLenBLS_BLS12381     = 32
 	// the length is divided by 2 if compression is on
-	PubKeyLenBLS_BLS12381 = 96 * (2 - compression)
+	PubKeyLenBLS_BLS12381 = 2 * fieldSize * (2 - compression)
 	// Input length of the optimized SwU map to G1: 2*(P_size+security)
 	// security being 128 bits
-	OpSwUInputLenBLS_BLS12381 = 128
+	OpSwUInputLenBLS_BLS12381 = 2 * (fieldSize + (securityBits / 8))
 
 	// ECDSA
 

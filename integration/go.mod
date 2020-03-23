@@ -11,7 +11,6 @@ require (
 	github.com/m4ksio/testingdock v0.4.1
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/stretchr/testify v1.5.1
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 )
 
 replace github.com/dapperlabs/flow-go => ../

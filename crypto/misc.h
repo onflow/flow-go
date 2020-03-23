@@ -24,9 +24,10 @@ void    _fp_print(char*, fp_t);
 void    _bn_print(char*, bn_st*);
 void    _ep_print(char*, ep_st*);
 void    _ep2_print(char*, ep2_st*);
-void    fp_read_raw(fp_t a, const dig_t *raw, int len);
+void    fp_read_raw(fp_t, const dig_t *, int);
 void    _seed_relic(byte*, int);
 void    _bn_randZr(bn_t);
+void    bn_privateKey_mod_r(bn_st*, const uint8_t*, int);
 void    _G1scalarGenMult(ep_st*, const bn_st*);
 void    opswu_test(uint8_t *, const uint8_t *, int);
 

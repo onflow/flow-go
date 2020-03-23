@@ -129,6 +129,16 @@ void _G2scalarGenMult(ep2_st* res, const bn_st *expo) {
     g2_mul_gen(res, (bn_st*)expo);
 }
 
+// checks an input scalar is less than the groups order (r)
+int checkMembership_Zr(const bn_st* a){
+    bn_t r;
+    bn_new(r); 
+    g2_get_ord(r);
+    int res = bn_cmp(a,r);
+    if (res == RLC_LT) return VALID;
+    return INVALID;
+}
+
 
 // checks if input point s is on the curve E1 
 // and is in the subgroup G1
