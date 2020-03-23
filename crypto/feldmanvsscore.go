@@ -6,8 +6,11 @@ package crypto
 // #include "dkg_include.h"
 import "C"
 
-func (s *feldmanVSSstate) generateShares(seed []byte) {
-	seedRelic(seed)
+func (s *feldmanVSSstate) generateShares(seed []byte) error {
+	err := seedRelic(seed)
+	if err != nil {
+		return err
+	}
 	// Generate a polyomial P in Zr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
 	s.A = make([]pointG2, s.threshold+1)
@@ -45,6 +48,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) {
 	s.AReceived = true
 	s.xReceived = true
 	s.validKey = true
+	return nil
 }
 
 func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {

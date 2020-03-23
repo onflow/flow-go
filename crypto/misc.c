@@ -75,7 +75,7 @@ void fp_read_raw(fp_t a, const dig_t *raw, int len) {
  
 
 // seeds relic PRG
-void _seed_relic(byte* seed, int len) {
+void seed_relic(byte* seed, int len) {
     #if RAND == HASHD
     // instantiate a new DRBG
     ctx_t *ctx = core_get();
@@ -85,7 +85,7 @@ void _seed_relic(byte* seed, int len) {
 }
 
 // generates a random number less than the order r
-void _bn_randZr(bn_t x) {
+void bn_randZr(bn_t x) {
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);

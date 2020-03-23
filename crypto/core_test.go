@@ -26,7 +26,8 @@ func TestDeterministicKeyGen(t *testing.T) {
 func TestG1(t *testing.T) {
 	NewSigner(BLS_BLS12381)
 
-	seedRelic([]byte{0})
+	h, _ := NewHasher(SHA3_256)
+	seedRelic(h.ComputeHash([]byte{0}))
 	var expo scalar
 	randZr(&expo)
 	var res pointG1
@@ -37,7 +38,8 @@ func TestG1(t *testing.T) {
 // G1 bench
 func BenchmarkG1(b *testing.B) {
 	NewSigner(BLS_BLS12381)
-	seedRelic([]byte{0})
+	h, _ := NewHasher(SHA3_256)
+	seedRelic(h.ComputeHash([]byte{0}))
 	var expo scalar
 	randZr(&expo)
 	var res pointG1
@@ -65,7 +67,8 @@ func TestG2(t *testing.T) {
 // G2 bench
 func BenchmarkG2(b *testing.B) {
 	NewSigner(BLS_BLS12381)
-	seedRelic([]byte{0})
+	h, _ := NewHasher(SHA3_256)
+	seedRelic(h.ComputeHash([]byte{0}))
 	var expo scalar
 	randZr(&expo)
 	var res pointG2

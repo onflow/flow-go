@@ -75,17 +75,17 @@ func _G2scalarGenMult(res *pointG2, expo *scalar) {
 
 // seeds the internal relic random function
 func seedRelic(seed []byte) error {
-	if len(seed) < securityBits/8 {
+	if len(seed) < (securityBits / 8) {
 		return cryptoError{fmt.Sprintf("seed length needs to be larger than %d",
 			securityBits/8)}
 	}
-	C._seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
+	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 	return nil
 }
 
 // returns a random number in Zr
 func randZr(x *scalar) error {
-	C._bn_randZr((*C.bn_st)(x))
+	C.bn_randZr((*C.bn_st)(x))
 	if x == nil {
 		return cryptoError{"the memory allocation of the random number has failed"}
 	}

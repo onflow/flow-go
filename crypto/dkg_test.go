@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDKG(t *testing.T) {
@@ -147,7 +148,7 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 		var err error
 		processors[current].dkg, err = NewDKG(dkg, n, current,
 			&processors[current], lead)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	phase := 0
@@ -157,14 +158,15 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 
 	// start DKG in all nodes
 	// start listening on the channels
-	seed := []byte{1, 2, 3}
+	h, _ := NewHasher(SHA3_256)
+	seed := h.ComputeHash([]byte{1, 2, 3})
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		// start dkg could also run in parallel
 		// but they are run sequentially to avoid having non-deterministic
 		// output (the PRG used is common)
 		err := processors[current].dkg.StartDKG(seed)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 		go dkgRunChan(&processors[current], &sync, t, phase)
 	}
 	phase++
@@ -279,18 +281,18 @@ func dkgRunChan(proc *testDKGProcessor,
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving from %d:", proc.current, newMsg.orig)
 			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.data)
-			assert.Nil(t, err)
+			require.Nil(t, err)
 		// if timeout, stop and finalize
 		case <-time.After(200 * time.Millisecond):
 			switch phase {
 			case 0:
 				log.Infof("%d shares phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
-				assert.Nil(t, err)
+				require.Nil(t, err)
 			case 1:
 				log.Infof("%d complaints phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
-				assert.Nil(t, err)
+				require.Nil(t, err)
 			case 2:
 				log.Infof("%d dkg ended \n", proc.current)
 				_, pk, _, err := proc.dkg.EndDKG()
