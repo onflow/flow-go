@@ -97,15 +97,15 @@ void _bn_randZr(bn_t x) {
 }
 
 // reads a private key from an array and maps it to Zr
-// the resulting scalar is in the range 1 < a < (r-1)
+// the resulting scalar is in the range 0 < a < r
 void bn_privateKey_mod_r(bn_st* a, const uint8_t* bin, int len) {
     bn_read_bin(a, bin, len);
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
-    bn_sub_dig(r,r,3);
+    bn_sub_dig(r,r,1);
     bn_mod_basic(a,a,r);
-    bn_add_dig(a,a,2);
+    bn_add_dig(a,a,1);
     bn_free(r);
 }
 

@@ -7,7 +7,10 @@ package crypto
 // #include "bls_include.h"
 import "C"
 
-// TODO: remove -wall after reaching a stable version
+import (
+	"fmt"
+)
+
 // TODO: enable QUIET in relic
 
 // Go wrappers to C types
@@ -71,9 +74,13 @@ func _G2scalarGenMult(res *pointG2, expo *scalar) {
 // TEST/DEBUG
 
 // seeds the internal relic random function
-func seedRelic(seed []byte) {
-	// TODO: define the length of seed
+func seedRelic(seed []byte) error {
+	if len(seed) < securityBits/8 {
+		return cryptoError{fmt.Sprintf("seed length needs to be larger than %d",
+			securityBits/8)}
+	}
 	C._seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
+	return nil
 }
 
 // returns a random number in Zr
@@ -86,7 +93,7 @@ func randZr(x *scalar) error {
 }
 
 // mapKeyZr reads a private key from a slice of bytes and maps it to Zr
-// the resulting scalar is in the range 1< k < (r-1)
+// the resulting scalar is in the range 0 < k < r
 func mapKeyZr(x *scalar, src []byte) {
 	C.bn_privateKey_mod_r((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
