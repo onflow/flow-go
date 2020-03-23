@@ -60,7 +60,8 @@ const (
 	PubKeyLenBLS_BLS12381 = 2 * fieldSize * (2 - compression)
 	// Input length of the optimized SwU map to G1: 2*(P_size+security)
 	// security being 128 bits
-	OpSwUInputLenBLS_BLS12381 = 2 * (fieldSize + (securityBits / 8))
+	OpSwUInputLenBLS_BLS12381    = 2 * (fieldSize + (securityBits / 8))
+	KeyGenSeedMinLenBLS_BLS12381 = PrKeyLenBLS_BLS12381 + (securityBits / 8)
 
 	// ECDSA
 
@@ -68,13 +69,13 @@ const (
 	SignatureLenECDSA_P256     = 64
 	PrKeyLenECDSA_P256         = 32
 	PubKeyLenECDSA_P256        = 64
-	KeyGenSeedMinLenECDSA_P256 = 40
+	KeyGenSeedMinLenECDSA_P256 = PrKeyLenECDSA_P256 + (securityBits / 8)
 
 	// SEC p256k1
 	SignatureLenECDSA_SECp256k1     = 64
 	PrKeyLenECDSA_SECp256k1         = 32
 	PubKeyLenECDSA_SECp256k1        = 64
-	KeyGenSeedMinLenECDSA_SECp256k1 = 40
+	KeyGenSeedMinLenECDSA_SECp256k1 = PrKeyLenECDSA_SECp256k1 + (securityBits / 8)
 
 	// DKG and Threshold Signatures
 	DKGMinSize       int = 3

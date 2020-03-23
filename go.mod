@@ -3,6 +3,7 @@ module github.com/dapperlabs/flow-go
 go 1.13
 
 require (
+	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dapperlabs/cadence v0.0.0-20200319034220-e57278d2b982
 	github.com/dapperlabs/flow-go/crypto v0.3.1
 	github.com/dapperlabs/flow-go/protobuf v0.3.1
@@ -26,6 +27,7 @@ require (
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/opentracing/opentracing-go v1.1.0
+	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.3.0
 	github.com/rs/zerolog v1.15.0

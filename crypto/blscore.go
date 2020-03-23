@@ -168,6 +168,9 @@ func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 
 // Checks the validity of a bls signature
 func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
+	if len(s) != signatureLengthBLS_BLS12381 {
+		return false
+	}
 	verif := C._blsVerify((*C.ep2_st)(pk),
 		(*C.uchar)(&s[0]),
 		(*C.uchar)(&data[0]),
