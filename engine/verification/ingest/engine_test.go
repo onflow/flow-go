@@ -478,7 +478,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
 			// we have all dependencies
-			suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil)
+			suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 			suite.collections.On("Has", suite.collection.ID()).Return(true)
 			suite.collections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)

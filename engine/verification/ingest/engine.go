@@ -53,7 +53,6 @@ func New(
 	verifierEng network.Engine,
 	authReceipts mempool.Receipts,
 	pendingReceipts mempool.Receipts,
-	blocks mempool.Blocks,
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
 	chunkDataPacks mempool.ChunkDataPacks,
