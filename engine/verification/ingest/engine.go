@@ -33,16 +33,18 @@ type Engine struct {
 	chunksConduit      network.Conduit
 	me                 module.Local
 	state              protocol.State
-	verifierEng        network.Engine   // for submitting ERs that are ready to be verified
-	authReceipts       mempool.Receipts // keeps receipts with authenticated origin IDs
-	pendingReceipts    mempool.Receipts // keeps receipts pending for their originID to be authenticated
+	verifierEng        network.Engine         // for submitting ERs that are ready to be verified
+	authReceipts       mempool.Receipts       // keeps receipts with authenticated origin IDs
+	pendingReceipts    mempool.Receipts       // keeps receipts pending for their originIDs to be authenticated
+	authCollections    mempool.Collections    // keeps collections with authenticated origin IDs
+	pendingCollections mempool.Collections    // keeps collections pending for their origin IDs to be authenticated
+	chunkDataPacks     mempool.ChunkDataPacks //
 	blockPool          mempool.Blocks
-	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
-	chunkDataPacks     mempool.ChunkDataPacks
-	blockStorage       storage.Blocks
-	checkChunksLock    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
-	assigner           module.ChunkAssigner // used to determine chunks this node needs to verify
+
+	blockStorage    storage.Blocks
+	checkChunksLock sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
+	assigner        module.ChunkAssigner // used to determine chunks this node needs to verify
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -71,7 +73,7 @@ func New(
 		pendingReceipts: pendingReceipts,
 		verifierEng:     verifierEng,
 		blockPool:       blocks,
-		collections:     collections,
+		authCollections: collections,
 		chunkStates:     chunkStates,
 		chunkDataPacks:  chunkDataPacks,
 		blockStorage:    blockStorage,
@@ -298,7 +300,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		return fmt.Errorf("invalid role for receiving collection: %s", origin.Role)
 	}
 
-	err = e.collections.Add(coll)
+	err = e.authCollections.Add(coll)
 	if err != nil {
 		return fmt.Errorf("could not add collection to mempool: %w", err)
 	}
@@ -528,7 +530,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 	// request the collection if we don't already have it
 	collID := block.Guarantees[collIndex].ID()
 
-	if !e.collections.Has(collID) {
+	if !e.authCollections.Has(collID) {
 		// a collection is missing, the receipt cannot yet be verified
 		// TODO rate limit these requests
 		err := e.requestCollection(collID)
@@ -541,7 +543,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		return nil, false
 	}
 
-	coll, err := e.collections.ByID(collID)
+	coll, err := e.authCollections.ByID(collID)
 	if err != nil {
 		// couldn't get the collection from mempool, the receipt cannot be verified
 		log.Error().
@@ -647,7 +649,7 @@ func (e *Engine) checkPendingChunks() {
 			// for now, we clean the mempool from only the collection, as otherwise
 			// ingest engine sends the chunk corresponding to this collection everytime
 			// this function gets called, since it has everything that is needed to verify this
-			e.collections.Rem(collection.ID())
+			e.authCollections.Rem(collection.ID())
 		}
 	}
 }
