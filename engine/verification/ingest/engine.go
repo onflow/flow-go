@@ -36,7 +36,6 @@ type Engine struct {
 	verifierEng        network.Engine   // for submitting ERs that are ready to be verified
 	authReceipts       mempool.Receipts // keeps receipts with authenticated origin IDs
 	pendingReceipts    mempool.Receipts // keeps receipts pending for their originID to be authenticated
-	blockPool          mempool.Blocks
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
 	chunkDataPacks     mempool.ChunkDataPacks
@@ -70,7 +69,6 @@ func New(
 		authReceipts:    authReceipts,
 		pendingReceipts: pendingReceipts,
 		verifierEng:     verifierEng,
-		blockPool:       blocks,
 		collections:     collections,
 		chunkStates:     chunkStates,
 		chunkDataPacks:  chunkDataPacks,
@@ -251,11 +249,6 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		return fmt.Errorf("could not store block: %w", err)
 	}
 
-	err = e.blockPool.Add(block)
-	if err != nil {
-		return fmt.Errorf("could not store block: %w", err)
-	}
-
 	blockID := block.ID()
 	for _, receipt := range e.pendingReceipts.All() {
 		if receipt.ExecutionResult.BlockID == blockID {
@@ -415,7 +408,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
 // TODO does not yet request block
 func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this execution
-	block, err := e.blockPool.ByID(receipt.ExecutionResult.BlockID)
+	block, err := e.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		// TODO should request the block here. For now, we require that we
 		// have received the block at this point as there is no way to request it
