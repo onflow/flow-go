@@ -1,11 +1,13 @@
 package flow_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -36,4 +38,15 @@ func TestIdentifierFormat(t *testing.T) {
 		expected := fmt.Sprintf("%%!d(flow.Identifier=%s)", id)
 		assert.Equal(t, expected, formatted)
 	})
+}
+
+func TestIdentifierJSON(t *testing.T) {
+	id := unittest.IdentifierFixture()
+	bz, err := json.Marshal(id)
+	assert.NoError(t, err)
+	assert.Equal(t, fmt.Sprintf("\"%v\"", id), string(bz))
+	var actual flow.Identifier
+	err = json.Unmarshal(bz, &actual)
+	assert.NoError(t, err)
+	assert.Equal(t, id, actual)
 }
