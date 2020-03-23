@@ -323,9 +323,10 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
+	nodeId := IdentifierFixture()
 	id := flow.Identity{
-		NodeID:  IdentifierFixture(),
-		Address: "address",
+		NodeID:  nodeId,
+		Address: fmt.Sprintf("address-%v", nodeId[0:7]),
 		Role:    flow.RoleConsensus,
 		Stake:   1000,
 	}
