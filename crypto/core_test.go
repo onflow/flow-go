@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDeterministicKeyGen(t *testing.T) {
@@ -20,6 +21,30 @@ func TestDeterministicKeyGen(t *testing.T) {
 	assert.Nil(t, err)
 	pk2Bytes, _ := sk2.PublicKey().Encode()
 	assert.Equal(t, pk1Bytes, pk2Bytes)
+}
+
+// test the deterministicity of the reelic PRG (used by the DKG polynimials)
+func TestPRGseeding(t *testing.T) {
+	NewSigner(BLS_BLS12381)
+	// 2 scalars generated with the same seed should be equal
+	h, _ := NewHasher(SHA3_384)
+	seed := h.ComputeHash([]byte{1, 2, 3, 4})
+	// 1st scalar (wrapped in a private key)
+	err := seedRelic(seed)
+	require.Nil(t, err)
+	var sk1 PrKeyBLS_BLS12381
+	err = randZr(&sk1.scalar)
+	require.Nil(t, err)
+	// 2nd scalar (wrapped in a private key)
+	err = seedRelic(seed)
+	require.Nil(t, err)
+	var sk2 PrKeyBLS_BLS12381
+	err = randZr(&sk2.scalar)
+	require.Nil(t, err)
+	// compare the 2 scalars (by comparing the private keys)
+	sk1Bytes, _ := sk1.Encode()
+	sk2Bytes, _ := sk2.Encode()
+	assert.Equal(t, sk1Bytes, sk2Bytes)
 }
 
 // TestG1 helps debugging but is not a unit test
