@@ -79,7 +79,6 @@ var one = new(big.Int).SetInt64(1)
 
 // goecdsaGenerateKey generates a public and private key pair
 // for the crypto/ecdsa library
-// (modified from https://golang.org/src/crypto/ecdsa/ecdsa.go)
 func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *goecdsa.PrivateKey {
 	k := new(big.Int).SetBytes(seed)
 	n := new(big.Int).Sub(c.Params().N, one)
@@ -97,7 +96,8 @@ func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *goecdsa.PrivateKey {
 // This is only a test function!
 func (a *ECDSAalgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
-	minSeedLen := Nlen + 8
+	// extra 128 bits to reduce the modular reduction bias
+	minSeedLen := Nlen + (securityBits / 8)
 	if len(seed) < minSeedLen {
 		return nil, cryptoError{fmt.Sprintf("seed should be at least %d bytes", minSeedLen)}
 	}
