@@ -599,11 +599,20 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 		er := unittest.CompleteExecutionResultFixture(chunksNum)
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
-		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
+		for j, chunk := range er.Receipt.ExecutionResult.Chunks {
 			a.Add(chunk, []flow.Identifier{verID.NodeID})
-			//if chunkCounter % 2 == 0 {
+
+			var endState flow.StateCommitment
+			// last chunk
+			if j == len(er.Receipt.ExecutionResult.Chunks)-1 {
+				endState = er.Receipt.ExecutionResult.FinalStateCommit
+			} else {
+				endState = er.Receipt.ExecutionResult.Chunks[j+1].StartState
+			}
+
 			vc := &verification.VerifiableChunk{
 				ChunkIndex: chunk.Index,
+				EndState:   endState,
 				Block:      er.Block,
 				Receipt:    er.Receipt,
 				Collection: er.Collections[chunk.Index],
