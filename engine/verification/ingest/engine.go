@@ -26,21 +26,22 @@ import (
 // all dependent resources for each execution receipt and relays a complete
 // execution result to the verifier engine when all dependencies are ready.
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	collectionsConduit network.Conduit
-	stateConduit       network.Conduit
-	chunksConduit      network.Conduit
-	me                 module.Local
-	state              protocol.State
-	verifierEng        network.Engine         // for submitting ERs that are ready to be verified
-	authReceipts       mempool.Receipts       // keeps receipts with authenticated origin IDs
-	pendingReceipts    mempool.Receipts       // keeps receipts pending for their originIDs to be authenticated
-	authCollections    mempool.Collections    // keeps collections with authenticated origin IDs
-	pendingCollections mempool.Collections    // keeps collections pending for their origin IDs to be authenticated
-	chunkDataPacks     mempool.ChunkDataPacks //
-	blockPool          mempool.Blocks
-	chunkStates        mempool.ChunkStates
+	unit                  *engine.Unit
+	log                   zerolog.Logger
+	collectionsConduit    network.Conduit
+	stateConduit          network.Conduit
+	chunksConduit         network.Conduit
+	me                    module.Local
+	state                 protocol.State
+	verifierEng           network.Engine         // for submitting ERs that are ready to be verified
+	authReceipts          mempool.Receipts       // keeps receipts with authenticated origin IDs
+	pendingReceipts       mempool.Receipts       // keeps receipts pending for their originIDs to be authenticated
+	authCollections       mempool.Collections    // keeps collections with authenticated origin IDs
+	pendingCollections    mempool.Collections    // keeps collections pending for their origin IDs to be authenticated
+	pendingChunkDataPacks mempool.ChunkDataPacks // keeps chunk data packs pending for their origin ID to be authenticated
+	authChunkDataPacks    mempool.ChunkDataPacks // keeps chunk data packs with authenticated origin IDs
+	blockPool             mempool.Blocks
+	chunkStates           mempool.ChunkStates
 
 	blockStorage    storage.Blocks
 	checkChunksLock sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
@@ -65,19 +66,19 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:            engine.NewUnit(),
-		log:             log,
-		state:           state,
-		me:              me,
-		authReceipts:    authReceipts,
-		pendingReceipts: pendingReceipts,
-		verifierEng:     verifierEng,
-		blockPool:       blocks,
-		authCollections: collections,
-		chunkStates:     chunkStates,
-		chunkDataPacks:  chunkDataPacks,
-		blockStorage:    blockStorage,
-		assigner:        assigner,
+		unit:               engine.NewUnit(),
+		log:                log,
+		state:              state,
+		me:                 me,
+		authReceipts:       authReceipts,
+		pendingReceipts:    pendingReceipts,
+		verifierEng:        verifierEng,
+		blockPool:          blocks,
+		authCollections:    collections,
+		chunkStates:        chunkStates,
+		authChunkDataPacks: chunkDataPacks,
+		blockStorage:       blockStorage,
+		assigner:           assigner,
 	}
 
 	var err error
@@ -230,7 +231,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 	// store the chunk data pack in the store of the engine
 	// this will fail if the receipt already exists in the store
-	err = e.chunkDataPacks.Add(chunkDataPack)
+	err = e.authChunkDataPacks.Add(chunkDataPack)
 	if err != nil {
 		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
@@ -477,7 +478,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 		Hex("receipt_id", logging.Entity(receipt)).
 		Logger()
 
-	if !e.chunkDataPacks.Has(chunkID) {
+	if !e.authChunkDataPacks.Has(chunkID) {
 		// the chunk data pack is missing, the chunk cannot yet be verified
 		// TODO rate limit these requests
 		err := e.requestChunkDataPack(chunkID)
@@ -491,7 +492,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 	}
 
 	// chunk data pack exists and retrieved and returned
-	chunkDataPack, err := e.chunkDataPacks.ByChunkID(chunkID)
+	chunkDataPack, err := e.authChunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
 		// couldn't get chunk state from mempool, the chunk cannot yet be verified
 		log.Error().
