@@ -564,7 +564,7 @@ func (e *Engine) checkPendingChunks() {
 			continue
 		}
 		err := e.authReceipts.Add(receipt)
-		if err != nil {
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			e.log.Error().Err(err).
 				Hex("receipt_id", logging.ID(receipt.ID())).
 				Msg("could not add receipt to the authenticated receipts pool")
