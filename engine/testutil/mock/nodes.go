@@ -80,7 +80,6 @@ type VerificationNode struct {
 	GenericNode
 	AuthReceipts    mempool.Receipts
 	PendingReceipts mempool.Receipts
-	Blocks          mempool.Blocks
 	BlockStorage    storage.Blocks
 	Collections     mempool.Collections
 	ChunkStates     mempool.ChunkStates

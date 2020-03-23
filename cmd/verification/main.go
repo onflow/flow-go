@@ -25,7 +25,7 @@ func main() {
 		err             error
 		authReceipts    *stdmap.Receipts
 		pendingReceipts *stdmap.Receipts
-		blocks          *stdmap.Blocks
+		blockStorage    *storage.Blocks
 		collections     *stdmap.Collections
 		chunkStates     *stdmap.ChunkStates
 		chunkDataPacks  *stdmap.ChunkDataPacks
@@ -51,9 +51,11 @@ func main() {
 			collections, err = stdmap.NewCollections(collectionLimit)
 			return err
 		}).
-		Module("blocks mempool", func(node *cmd.FlowNodeBuilder) error {
-			blocks, err = stdmap.NewBlocks(blockLimit)
-			return err
+		Module("blocks storage", func(node *cmd.FlowNodeBuilder) error {
+			// creates a block storage for the node
+			// to reflect incoming blocks on state
+			blockStorage = storage.NewBlocks(node.DB)
+			return nil
 		}).
 		Module("chunk states mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkStates, err = stdmap.NewChunkStates(chunkLimit)
@@ -82,10 +84,6 @@ func main() {
 			// should be moved to a configuration class
 			// DISCLAIMER: alpha down there is not a production-level value
 
-			// creates a block storage for the node
-			// to reflect incoming blocks on state
-			blockStorage := storage.NewBlocks(node.DB)
-
 			eng, err := ingest.New(node.Logger,
 				node.Network,
 				node.State,
@@ -93,7 +91,6 @@ func main() {
 				verifierEng,
 				authReceipts,
 				pendingReceipts,
-				blocks,
 				collections,
 				chunkStates,
 				chunkDataPacks,

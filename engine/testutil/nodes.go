@@ -265,11 +265,6 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
-	if node.Blocks == nil {
-		node.Blocks, err = stdmap.NewBlocks(1000)
-		require.Nil(t, err)
-	}
-
 	if node.Collections == nil {
 		node.Collections, err = stdmap.NewCollections(1000)
 		require.Nil(t, err)
@@ -305,7 +300,6 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.VerifierEngine,
 			node.AuthReceipts,
 			node.PendingReceipts,
-			node.Blocks,
 			node.Collections,
 			node.ChunkStates,
 			node.ChunkDataPacks,
