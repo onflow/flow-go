@@ -3,10 +3,11 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/rs/zerolog/log"
 )
 
 type NodeConfig struct {
@@ -102,7 +103,7 @@ func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.Priva
 func validateAddressesUnique(ns []NodeConfig) {
 	lookup := make(map[string]struct{})
 	for _, n := range ns {
-		if _, ok := lookup[n.Address], ok {
+		if _, ok := lookup[n.Address]; ok {
 			log.Fatal().Str("address", n.Address).Msg("duplicate node address in config")
 		}
 	}

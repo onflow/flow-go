@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 func TestEncodableNetworkPubKey(t *testing.T) {

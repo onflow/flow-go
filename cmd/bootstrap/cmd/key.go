@@ -3,10 +3,11 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 var (
@@ -71,13 +72,13 @@ func init() {
 
 	keyCmd.Flags().StringVarP(&flagRole, "role", "r", "",
 		"node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"observation\")")
-	keyCmd.MarkFlagRequired("role")
+	_ = keyCmd.MarkFlagRequired("role")
 	keyCmd.Flags().StringVarP(&flagAddress, "address", "a", "", "network address")
-	keyCmd.MarkFlagRequired("address")
+	_ = keyCmd.MarkFlagRequired("address")
 	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", []byte{}, "networking seed")
-	keyCmd.MarkFlagRequired("networking-seed")
+	_ = keyCmd.MarkFlagRequired("networking-seed")
 	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", []byte{}, "staking seed")
-	keyCmd.MarkFlagRequired("staking-seed")
+	_ = keyCmd.MarkFlagRequired("staking-seed")
 }
 
 func validateRole(role string) flow.Role {

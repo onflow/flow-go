@@ -1,10 +1,11 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
+
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/rs/zerolog/log"
 )
 
 func constructGenesisQC(block *flow.Block, nodeInfosPub []NodeInfoPub, nodeInfosPriv []NodeInfoPriv, dkgDataPriv DKGDataPriv) {

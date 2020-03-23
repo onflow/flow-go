@@ -3,9 +3,10 @@ package cmd
 import (
 	"path/filepath"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/rs/zerolog/log"
 )
 
 func genGenesisExecutionState() flow.StateCommitment {

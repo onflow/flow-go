@@ -27,7 +27,9 @@ func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 
 func GenerateExecutionState(levelDB *leveldb.LevelDB, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
 	ledgerStorage, err := ledger.NewTrieStorage(levelDB)
-	defer ledgerStorage.CloseStorage()
+	defer func() {
+		_, _ = ledgerStorage.CloseStorage()
+	}()
 	if err != nil {
 		return nil, err
 	}

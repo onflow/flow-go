@@ -5,8 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/rs/zerolog/log"
+
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 type DKGParticipant struct {
@@ -104,11 +105,6 @@ type LocalDKGProcessor struct {
 	privkey     crypto.PrivateKey
 	pubgroupkey crypto.PublicKey
 }
-
-const (
-	dkgType int = iota
-	tsType
-)
 
 type message struct {
 	orig int

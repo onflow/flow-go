@@ -1,14 +1,11 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
+
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/rs/zerolog/log"
 )
-
-var stateCommitmentFile string
-var nodeInfosFile string
-var dkgDataPubFile string
 
 func constructGenesisBlock(stateComm flow.StateCommitment, nodes []NodeInfoPub, dkg DKGDataPub) flow.Block {
 	seal := run.GenerateRootSeal(stateComm)

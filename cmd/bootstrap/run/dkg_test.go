@@ -3,8 +3,9 @@ package run
 import (
 	"testing"
 
-	"github.com/dapperlabs/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestRunDKG(t *testing.T) {

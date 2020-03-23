@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/mocks"
@@ -14,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/protocol"
 	protoBadger "github.com/dapperlabs/flow-go/protocol/badger"
-	"github.com/dgraph-io/badger/v2"
 )
 
 type Signer struct {
@@ -74,7 +75,7 @@ func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCert
 	// validate QC
 	err = validators[0].ValidateQC(qc, &hotBlock)
 
-	return qc, nil
+	return qc, err
 }
 
 func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.Block) ([]*hotstuff.Validator, []*signature.RandomBeaconAwareSigProvider, error) {

@@ -30,11 +30,3 @@ func GenerateKeys(algo crypto.SigningAlgorithm, n int, seeds [][]byte) ([]crypto
 
 	return keys, nil
 }
-
-func convertToSeeds(s []string) [][]byte {
-	seeds := make([][]byte, len(s), len(s))
-	for i := range s {
-		seeds[i] = []byte(s[i])
-	}
-	return seeds
-}

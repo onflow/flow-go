@@ -2,17 +2,17 @@ package cmd
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
-	"github.com/rs/zerolog/log"
 )
 
 func generateRandomSeeds(n int) [][]byte {
@@ -81,19 +81,6 @@ func privKeyToBytes(key crypto.PrivateKey) []byte {
 		log.Fatal().Err(err).Msg("cannot encode private key")
 	}
 	return enc
-}
-
-func privKeyToString(key crypto.PrivateKey) string {
-	return fmt.Sprintf("%x", privKeyToBytes(key))
-}
-
-func unmarshalToBytes(unmarshal func(interface{}) error) ([]byte, error) {
-	var s string
-	err := unmarshal(&s)
-	if err != nil {
-		return nil, err
-	}
-	return hex.DecodeString(s)
 }
 
 func filterConsensusNodes(nodes []NodeInfoPub) []NodeInfoPub {

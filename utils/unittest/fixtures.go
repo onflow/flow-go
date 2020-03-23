@@ -548,14 +548,14 @@ func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 
 // SeedFixture returns a random []byte with length n
 func SeedFixture(n int) []byte {
-	var seed = make([]byte, n, n)
+	var seed = make([]byte, n)
 	_, _ = rand.Read(seed[0:n])
 	return seed
 }
 
 // SeedFixtures returns a list of m random []byte, each having length n
 func SeedFixtures(m int, n int) [][]byte {
-	var seeds = make([][]byte, m, m)
+	var seeds = make([][]byte, m, n)
 	for i := range seeds {
 		seeds[i] = SeedFixture(n)
 	}

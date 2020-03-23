@@ -3,10 +3,11 @@ package run
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/test"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateGenesisQC(t *testing.T) {

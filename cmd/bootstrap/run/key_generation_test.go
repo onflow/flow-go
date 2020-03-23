@@ -3,9 +3,10 @@ package run
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateKeys(t *testing.T) {

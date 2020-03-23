@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 var (
@@ -60,14 +61,14 @@ func init() {
 
 	finalizeCmd.Flags().StringVarP(&flagConfig, "config", "c", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
-	finalizeCmd.MarkFlagRequired("config")
+	_ = finalizeCmd.MarkFlagRequired("config")
 	finalizeCmd.Flags().StringVarP(&flagPartnerNodeInfoDir, "partner-dir", "p", "", fmt.Sprintf("path to directory "+
 		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
 		"NetworkPubKey, StakingPubKey)", filenamePartnerNodeInfoSuffix))
-	finalizeCmd.MarkFlagRequired("partner-dir")
+	_ = finalizeCmd.MarkFlagRequired("partner-dir")
 	finalizeCmd.Flags().StringVarP(&flagPartnerStakes, "partner-stakes", "s", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
-	finalizeCmd.MarkFlagRequired("partner-stakes")
+	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
 }
 
 func assemblePartnerNodes() []NodeInfoPub {
