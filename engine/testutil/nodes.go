@@ -26,6 +26,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -264,11 +265,6 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
-	if node.Blocks == nil {
-		node.Blocks, err = stdmap.NewBlocks(1000)
-		require.Nil(t, err)
-	}
-
 	if node.Collections == nil {
 		node.Collections, err = stdmap.NewCollections(1000)
 		require.Nil(t, err)
@@ -289,7 +285,10 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.VerifierEngine == nil {
-		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me)
+		rt := runtime.NewInterpreterRuntime()
+		vm := virtualmachine.New(rt)
+		chunkVerifier := chunks.NewChunkVerifier(vm)
+		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, chunkVerifier)
 		require.Nil(t, err)
 	}
 
@@ -301,7 +300,6 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.VerifierEngine,
 			node.AuthReceipts,
 			node.PendingReceipts,
-			node.Blocks,
 			node.Collections,
 			node.ChunkStates,
 			node.ChunkDataPacks,

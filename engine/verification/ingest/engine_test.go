@@ -51,7 +51,6 @@ type TestSuite struct {
 	verifierEng *network.Engine
 	// mock mempools used by the ingest engine, valid resources should be added
 	// to these when they are received from an appropriate node role.
-	blocks          *mempool.Blocks
 	authReceipts    *mempool.Receipts
 	pendingReceipts *mempool.Receipts
 	collections     *mempool.Collections
@@ -85,7 +84,6 @@ func (suite *TestSuite) SetupTest() {
 	suite.state = &protocol.State{}
 	suite.me = &module.Local{}
 	suite.ss = &protocol.Snapshot{}
-	suite.blocks = &mempool.Blocks{}
 	suite.blockStorage = &storage.Blocks{}
 	suite.authReceipts = &mempool.Receipts{}
 	suite.pendingReceipts = &mempool.Receipts{}
@@ -128,7 +126,6 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.verifierEng,
 		suite.authReceipts,
 		suite.pendingReceipts,
-		suite.blocks,
 		suite.collections,
 		suite.chunkStates,
 		suite.chunkDataPacks,
@@ -146,7 +143,6 @@ func (suite *TestSuite) TestHandleBlock() {
 	eng := suite.TestNewEngine()
 
 	// expects that the block be added to the mempool and block storage
-	suite.blocks.On("Add", suite.block).Return(nil).Once()
 	suite.blockStorage.On("Store", suite.block).Return(nil).Once()
 
 	// expects that checkPendingChunks is executed checking for pending and authenticated receipts
@@ -159,7 +155,7 @@ func (suite *TestSuite) TestHandleBlock() {
 	err := eng.Process(unittest.IdentifierFixture(), suite.block)
 	suite.Assert().Nil(err)
 
-	suite.blocks.AssertExpectations(suite.T())
+	suite.blockStorage.AssertExpectations(suite.T())
 }
 
 // TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
@@ -178,7 +174,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Twice()
 
 	// we have the corresponding block and chunk state, but not the collection
-	suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
 	suite.collections.On("Has", suite.collection.ID()).Return(false).Once()
 	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true).Once()
 	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil).Once()
@@ -233,7 +229,7 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.pendingReceipts.On("Add", suite.receipt).Return(nil).Once()
 	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}).Once()
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
-	suite.blocks.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("block does not exist")).Once()
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("block does not exist")).Once()
 
 	// process should fail
 	err := eng.Process(unstakedIdentity, suite.receipt)
@@ -473,12 +469,11 @@ func (suite *TestSuite) TestVerifyReady() {
 			// allow adding the received resource to mempool
 			suite.authReceipts.On("Add", suite.receipt).Return(nil)
 			suite.collections.On("Add", suite.collection).Return(nil)
-			suite.blocks.On("Add", suite.block).Return(nil)
 			suite.blockStorage.On("Store", suite.block).Return(nil)
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
 			// we have all dependencies
-			suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil)
+			suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 			suite.collections.On("Has", suite.collection.ID()).Return(true)
 			suite.collections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
@@ -540,7 +535,7 @@ func TestConcurrency(t *testing.T) {
 			chunksNum:   1,
 		},
 		{
-			erCount:     10,
+			erCount:     5,
 			senderCount: 10,
 			chunksNum:   1,
 		},
@@ -599,11 +594,20 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 		er := unittest.CompleteExecutionResultFixture(chunksNum)
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
-		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
+		for j, chunk := range er.Receipt.ExecutionResult.Chunks {
 			a.Add(chunk, []flow.Identifier{verID.NodeID})
-			//if chunkCounter % 2 == 0 {
+
+			var endState flow.StateCommitment
+			// last chunk
+			if j == len(er.Receipt.ExecutionResult.Chunks)-1 {
+				endState = er.Receipt.ExecutionResult.FinalStateCommit
+			} else {
+				endState = er.Receipt.ExecutionResult.Chunks[j+1].StartState
+			}
+
 			vc := &verification.VerifiableChunk{
 				ChunkIndex: chunk.Index,
+				EndState:   endState,
 				Block:      er.Block,
 				Receipt:    er.Receipt,
 				Collection: er.Collections[chunk.Index],
@@ -652,7 +656,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					_ = verNode.IngestEngine.Process(exeID.NodeID, receipt)
 				}
 
-				switch 1 {
+				switch j % 2 {
 				case 0:
 					// block then receipt
 					sendBlock()

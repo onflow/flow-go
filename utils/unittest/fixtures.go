@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	crand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"time"
@@ -291,11 +292,41 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 	}
 }
 
+func generateRandomSeed() []byte {
+	seed := make([]byte, 64)
+	if _, err := crand.Read(seed); err != nil {
+		panic(err)
+	}
+	return seed
+}
+
+// WithRole adds a role to an identity fixture.
+func WithRandomPublicKeys() func(*flow.Identity) {
+	return func(id *flow.Identity) {
+		randBeac, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
+		if err != nil {
+			panic(err)
+		}
+		id.RandomBeaconPubKey = randBeac.PublicKey()
+		stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
+		if err != nil {
+			panic(err)
+		}
+		id.StakingPubKey = stak.PublicKey()
+		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, generateRandomSeed())
+		if err != nil {
+			panic(err)
+		}
+		id.NetworkPubKey = netw.PublicKey()
+	}
+}
+
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
+	nodeId := IdentifierFixture()
 	id := flow.Identity{
-		NodeID:  IdentifierFixture(),
-		Address: "address",
+		NodeID:  nodeId,
+		Address: fmt.Sprintf("address-%v", nodeId[0:7]),
 		Role:    flow.RoleConsensus,
 		Stake:   1000,
 	}
@@ -492,6 +523,7 @@ func VerifiableChunkFixture() *verification.VerifiableChunk {
 
 	return &verification.VerifiableChunk{
 		ChunkIndex: chunk.Index,
+		EndState:   StateCommitmentFixture(),
 		Block:      &block,
 		Receipt:    &receipt,
 		Collection: &coll,
@@ -513,4 +545,20 @@ func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 		StartState:      StateCommitmentFixture(),
 		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
 	}
+}
+
+// SeedFixture returns a random []byte with length n
+func SeedFixture(n int) []byte {
+	var seed = make([]byte, n)
+	_, _ = rand.Read(seed[0:n])
+	return seed
+}
+
+// SeedFixtures returns a list of m random []byte, each having length n
+func SeedFixtures(m int, n int) [][]byte {
+	var seeds = make([][]byte, m, n)
+	for i := range seeds {
+		seeds[i] = SeedFixture(n)
+	}
+	return seeds
 }

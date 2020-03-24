@@ -3,11 +3,14 @@ package main
 import (
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/cadence/runtime"
+
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/assignment"
+	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -22,7 +25,7 @@ func main() {
 		err             error
 		authReceipts    *stdmap.Receipts
 		pendingReceipts *stdmap.Receipts
-		blocks          *stdmap.Blocks
+		blockStorage    *storage.Blocks
 		collections     *stdmap.Collections
 		chunkStates     *stdmap.ChunkStates
 		chunkDataPacks  *stdmap.ChunkDataPacks
@@ -48,9 +51,11 @@ func main() {
 			collections, err = stdmap.NewCollections(collectionLimit)
 			return err
 		}).
-		Module("blocks mempool", func(node *cmd.FlowNodeBuilder) error {
-			blocks, err = stdmap.NewBlocks(blockLimit)
-			return err
+		Module("blocks storage", func(node *cmd.FlowNodeBuilder) error {
+			// creates a block storage for the node
+			// to reflect incoming blocks on state
+			blockStorage = storage.NewBlocks(node.DB)
+			return nil
 		}).
 		Module("chunk states mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkStates, err = stdmap.NewChunkStates(chunkLimit)
@@ -61,12 +66,15 @@ func main() {
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me)
+			rt := runtime.NewInterpreterRuntime()
+			vm := virtualmachine.New(rt)
+			chunkVerifier := chunks.NewChunkVerifier(vm)
+			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			alpha := 10
-			assigner, err := assignment.NewPublicAssignment(alpha)
+			assigner, err := chunks.NewPublicAssignment(alpha)
 			if err != nil {
 				return nil, err
 			}
@@ -76,10 +84,6 @@ func main() {
 			// should be moved to a configuration class
 			// DISCLAIMER: alpha down there is not a production-level value
 
-			// creates a block storage for the node
-			// to reflect incoming blocks on state
-			blockStorage := storage.NewBlocks(node.DB)
-
 			eng, err := ingest.New(node.Logger,
 				node.Network,
 				node.State,
@@ -87,7 +91,6 @@ func main() {
 				verifierEng,
 				authReceipts,
 				pendingReceipts,
-				blocks,
 				collections,
 				chunkStates,
 				chunkDataPacks,

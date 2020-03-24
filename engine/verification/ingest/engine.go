@@ -26,26 +26,24 @@ import (
 // all dependent resources for each execution receipt and relays a complete
 // execution result to the verifier engine when all dependencies are ready.
 type Engine struct {
-	unit                  *engine.Unit
-	log                   zerolog.Logger
-	collectionsConduit    network.Conduit
-	stateConduit          network.Conduit
-	chunksConduit         network.Conduit
-	me                    module.Local
-	state                 protocol.State
-	verifierEng           network.Engine         // for submitting ERs that are ready to be verified
-	authReceipts          mempool.Receipts       // keeps receipts with authenticated origin IDs
-	pendingReceipts       mempool.Receipts       // keeps receipts pending for their originIDs to be authenticated
+	unit               *engine.Unit
+	log                zerolog.Logger
+	collectionsConduit network.Conduit
+	stateConduit       network.Conduit
+	chunksConduit      network.Conduit
+	me                 module.Local
+	state              protocol.State
+	verifierEng        network.Engine   // for submitting ERs that are ready to be verified
+	authReceipts       mempool.Receipts // keeps receipts with authenticated origin IDs
+	pendingReceipts    mempool.Receipts // keeps receipts pending for their originID to be authenticated
 	authCollections       mempool.Collections    // keeps collections with authenticated origin IDs
 	pendingCollections    mempool.Collections    // keeps collections pending for their origin IDs to be authenticated
 	pendingChunkDataPacks mempool.ChunkDataPacks // keeps chunk data packs pending for their origin ID to be authenticated
 	authChunkDataPacks    mempool.ChunkDataPacks // keeps chunk data packs with authenticated origin IDs
-	blockPool             mempool.Blocks
+	blockStorage       storage.Blocks
+	checkChunksLock    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
+	assigner           module.ChunkAssigner // used to determine chunks this node needs to verify
 	chunkStates           mempool.ChunkStates
-
-	blockStorage    storage.Blocks
-	checkChunksLock sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
-	assigner        module.ChunkAssigner // used to determine chunks this node needs to verify
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -57,7 +55,6 @@ func New(
 	verifierEng network.Engine,
 	authReceipts mempool.Receipts,
 	pendingReceipts mempool.Receipts,
-	blocks mempool.Blocks,
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
 	chunkDataPacks mempool.ChunkDataPacks,
@@ -66,16 +63,15 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:               engine.NewUnit(),
-		log:                log,
-		state:              state,
-		me:                 me,
-		authReceipts:       authReceipts,
-		pendingReceipts:    pendingReceipts,
-		verifierEng:        verifierEng,
-		blockPool:          blocks,
+		unit:            engine.NewUnit(),
+		log:             log,
+		state:           state,
+		me:              me,
+		authReceipts:    authReceipts,
+		pendingReceipts: pendingReceipts,
+		verifierEng:     verifierEng,
 		authCollections:    collections,
-		chunkStates:        chunkStates,
+		chunkStates:     chunkStates,
 		authChunkDataPacks: chunkDataPacks,
 		blockStorage:       blockStorage,
 		assigner:           assigner,
@@ -185,9 +181,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		// TODO: potential attack on authenticity
 		// stores ER in pending receipts till a block arrives authenticating this
 		err = e.pendingReceipts.Add(receipt)
-		if err != nil {
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
 		}
+
 	} else {
 		// execution results are only valid from execution nodes
 		if origin.Role != flow.RoleExecution {
@@ -198,9 +195,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		// store the execution receipt in the store of the engine
 		// this will fail if the receipt already exists in the store
 		err = e.authReceipts.Add(receipt)
-		if err != nil {
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			return fmt.Errorf("could not store execution receipt: %w", err)
 		}
+
 	}
 
 	e.checkPendingChunks()
@@ -250,11 +248,6 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		Msg("received block")
 
 	err := e.blockStorage.Store(block)
-	if err != nil {
-		return fmt.Errorf("could not store block: %w", err)
-	}
-
-	err = e.blockPool.Add(block)
 	if err != nil {
 		return fmt.Errorf("could not store block: %w", err)
 	}
@@ -418,7 +411,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
 // TODO does not yet request block
 func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this execution
-	block, err := e.blockPool.ByID(receipt.ExecutionResult.BlockID)
+	block, err := e.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		// TODO should request the block here. For now, we require that we
 		// have received the block at this point as there is no way to request it
@@ -535,7 +528,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		// a collection is missing, the receipt cannot yet be verified
 		// TODO rate limit these requests
 		err := e.requestCollection(collID)
-		if err != nil {
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			log.Error().
 				Err(err).
 				Hex("collection_id", logging.ID(collID)).
@@ -573,11 +566,12 @@ func (e *Engine) checkPendingChunks() {
 			continue
 		}
 		err := e.authReceipts.Add(receipt)
-		if err != nil {
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			e.log.Error().Err(err).
 				Hex("receipt_id", logging.ID(receipt.ID())).
 				Msg("could not add receipt to the authenticated receipts pool")
 		}
+
 		e.pendingReceipts.Rem(receipt.ID())
 	}
 
@@ -621,10 +615,21 @@ func (e *Engine) checkPendingChunks() {
 				continue
 			}
 
+			index := chunk.Index
+			var endState flow.StateCommitment
+			if int(index) == len(receipt.ExecutionResult.Chunks)-1 {
+				// last chunk in receipt takes final state commitment
+				endState = receipt.ExecutionResult.FinalStateCommit
+			} else {
+				// any chunk except last takes the subsequent chunk's start state
+				endState = receipt.ExecutionResult.Chunks[index+1].StartState
+			}
+
 			// creates a verifiable chunk for assigned chunk
 			vchunk := &verification.VerifiableChunk{
 				ChunkIndex: chunk.Index,
 				Receipt:    receipt,
+				EndState:   endState,
 				Block:      block,
 				Collection: collection,
 				ChunkState: chunkState,

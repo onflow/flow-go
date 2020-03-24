@@ -47,6 +47,16 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 	}
 }
 
+func (id Identifier) MarshalText() ([]byte, error) {
+	return []byte(id.String()), nil
+}
+
+func (id *Identifier) UnmarshalText(text []byte) error {
+	var err error
+	*id, err = HexStringToIdentifier(string(text))
+	return err
+}
+
 func HashToID(hash []byte) Identifier {
 	var id Identifier
 	copy(id[:], hash)
@@ -59,6 +69,17 @@ func MakeID(body interface{}) Identifier {
 	hasher := crypto.NewSHA3_256()
 	hash := hasher.ComputeHash(data)
 	return HashToID(hash)
+}
+
+// PublicKeyToID creates an ID from a public key.
+func PublicKeyToID(pub crypto.PublicKey) (Identifier, error) {
+	b, err := pub.Encode()
+	if err != nil {
+		return Identifier{}, err
+	}
+	hasher := crypto.NewSHA3_256()
+	hash := hasher.ComputeHash(b)
+	return HashToID(hash), nil
 }
 
 // GetIDs gets the IDs for a slice of entities.

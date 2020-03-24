@@ -34,7 +34,8 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine) *Engine {
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine: e,
+			UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
+			engine:                            e,
 		},
 		server: grpc.NewServer(),
 		config: config,
@@ -79,6 +80,7 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
+	observation.UnimplementedObserveServiceServer
 	engine *ingestion.Engine
 }
 
@@ -102,25 +104,4 @@ func (h *handler) ExecuteScript(
 	}
 
 	return res, nil
-}
-
-// Remaining handler functions are no-ops to implement the Observation API protobuf service.
-func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetAccount(context.Context, *observation.GetAccountRequest) (*observation.GetAccountResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetEvents(context.Context, *observation.GetEventsRequest) (*observation.GetEventsResponse, error) {
-	return nil, nil
 }
