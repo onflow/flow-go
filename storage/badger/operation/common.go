@@ -277,7 +277,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 }
 
 // iterateKey iterate only the keys from the given `start` prefix to the given `end` prefix.
-// On each iteration, the key will be passed to the handle function to be handeld.
+// On each iteration, the key will be passed to the handle function to be handled.
 // It is useful to traverse through the index when the data needed are all included in the
 // key itself without reading the value.
 func iterateKey(start []byte, end []byte, handle handleKeyFunc) func(*badger.Txn) error {
