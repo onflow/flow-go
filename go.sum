@@ -83,8 +83,8 @@ github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f/go.mod h1:E3G3o1h8I7cfc
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
 github.com/cpuguy83/go-md2man/v2 v2.0.0/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
-github.com/dapperlabs/cadence v0.0.0-20200319034220-e57278d2b982 h1:lFOyW/e+Edq/IeTWBpWeVOLXhHM7CWW9t9x+1paPi00=
-github.com/dapperlabs/cadence v0.0.0-20200319034220-e57278d2b982/go.mod h1:WgzAWRd7gcxi6dfJmEdeTArtQVGOr48oLxLW4adsztk=
+github.com/dapperlabs/cadence v0.0.0-20200321002116-1f8e9f246c35 h1:E0KIE//KJu8K6SGXlwf74CdrRwYM6I8yNhemgborn1A=
+github.com/dapperlabs/cadence v0.0.0-20200321002116-1f8e9f246c35/go.mod h1:WgzAWRd7gcxi6dfJmEdeTArtQVGOr48oLxLW4adsztk=
 github.com/dapperlabs/flow-go v0.2.5-beta/go.mod h1:3Iei+H9h8nkk7z2/va57Of0WJnSuGG2fLIYbrLYuTz0=
 github.com/dapperlabs/flow-go v0.3.1/go.mod h1:8BlPYzvhrI1vpQJ9tPZuQVAZ2FODolgcMzdSCWMZRTk=
 github.com/dapperlabs/flow-go/language v0.2.5-beta/go.mod h1:RzkZ4AFbhD8svV+niFMxT2d9mwg6j0QO+nqQlFYhVuM=
@@ -112,6 +112,7 @@ github.com/dgryski/go-farm v0.0.0-20190104051053-3adb47b1fb0f/go.mod h1:SqUrOPUn
 github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2 h1:tdlZCpZ/P9DhczCTSixgIKmwPv6+wP5DGjqLYw5SUiA=
 github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2/go.mod h1:SqUrOPUnsFjfmXRMNPybcSiG0BgUW2AuFH8PAnS2iTw=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
+github.com/docker/docker v1.4.2-0.20180625184442-8e610b2b55bf h1:sh8rkQZavChcmakYiSlqu2425CHyFXLZZnvm7PDpU8M=
 github.com/docker/docker v1.4.2-0.20180625184442-8e610b2b55bf/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/dustin/go-humanize v1.0.0 h1:VSnTsYCnlFHaM2/igO1h6X3HA71jcobQuxemgkq4zYo=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
