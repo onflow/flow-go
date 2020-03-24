@@ -8,11 +8,12 @@ import (
 	"time"
 
 	sdk "github.com/dapperlabs/flow-go-sdk"
-	"github.com/dapperlabs/flow-go-sdk/client"
+
 	"github.com/dapperlabs/flow-go-sdk/keys"
 	"github.com/m4ksio/testingdock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/integration/network"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -74,13 +75,9 @@ func sendTransaction(t *testing.T, apiPort string) {
 	key, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA2_256, seed)
 	require.NoError(t, err)
 
-	nonce := 2137
-
 	tx := sdk.Transaction{
 		Script:             []byte("fun main() {}"),
 		ReferenceBlockHash: []byte{1, 2, 3, 4},
-		Nonce:              uint64(nonce),
-		ComputeLimit:       10,
 		PayerAccount:       sdk.RootAddress,
 	}
 
@@ -89,6 +86,34 @@ func sendTransaction(t *testing.T, apiPort string) {
 
 	tx.AddSignature(sdk.RootAddress, sig)
 
-	err = c.SendTransaction(context.Background(), tx)
+	flowTxBody := flowTxBodyFromSDKTx(tx)
+	fmt.Println("sending")
+	err = c.SendTransaction(context.Background(), flowTxBody)
+	fmt.Println("sending")
 	require.NoError(t, err)
+}
+
+func flowTxBodyFromSDKTx(stx sdk.Transaction) flow.TransactionBody {
+
+	scriptAccounts := make([]flow.Address, len(stx.ScriptAccounts))
+	for i, ssa := range stx.ScriptAccounts {
+		scriptAccounts[i] = flow.BytesToAddress(ssa.Bytes())
+	}
+
+	signs := make([]flow.AccountSignature, len(stx.Signatures))
+	for i, sign := range stx.Signatures {
+		signs[i] = flow.AccountSignature{
+			Account:   flow.BytesToAddress(sign.Account.Bytes()),
+			Signature: sign.Signature,
+		}
+	}
+
+	txBody := flow.TransactionBody{
+		ReferenceBlockID: flow.HashToID(stx.ReferenceBlockHash),
+		Script:           stx.Script,
+		PayerAccount:     flow.BytesToAddress(stx.PayerAccount.Bytes()),
+		ScriptAccounts:   scriptAccounts,
+		Signatures:       signs,
+	}
+	return txBody
 }
