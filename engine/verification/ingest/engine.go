@@ -33,17 +33,16 @@ type Engine struct {
 	chunksConduit      network.Conduit
 	me                 module.Local
 	state              protocol.State
-	verifierEng        network.Engine   // for submitting ERs that are ready to be verified
-	authReceipts       mempool.Receipts // keeps receipts with authenticated origin IDs
-	pendingReceipts    mempool.Receipts // keeps receipts pending for their originID to be authenticated
-	authCollections       mempool.Collections    // keeps collections with authenticated origin IDs
-	pendingCollections    mempool.Collections    // keeps collections pending for their origin IDs to be authenticated
-	pendingChunkDataPacks mempool.ChunkDataPacks // keeps chunk data packs pending for their origin ID to be authenticated
-	authChunkDataPacks    mempool.ChunkDataPacks // keeps chunk data packs with authenticated origin IDs
+	verifierEng        network.Engine         // for submitting ERs that are ready to be verified
+	authReceipts       mempool.Receipts       // keeps receipts with authenticated origin IDs
+	pendingReceipts    mempool.Receipts       // keeps receipts pending for their originID to be authenticated
+	authCollections    mempool.Collections    // keeps collections with authenticated origin IDs
+	pendingCollections mempool.Collections    // keeps collections pending for their origin IDs to be authenticated
+	chunkDataPacks     mempool.ChunkDataPacks // keeps chunk data packs with authenticated origin IDs
 	blockStorage       storage.Blocks
 	checkChunksLock    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
 	assigner           module.ChunkAssigner // used to determine chunks this node needs to verify
-	chunkStates           mempool.ChunkStates
+	chunkStates        mempool.ChunkStates
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -70,11 +69,11 @@ func New(
 		authReceipts:    authReceipts,
 		pendingReceipts: pendingReceipts,
 		verifierEng:     verifierEng,
-		authCollections:    collections,
+		authCollections: collections,
 		chunkStates:     chunkStates,
-		authChunkDataPacks: chunkDataPacks,
-		blockStorage:       blockStorage,
-		assigner:           assigner,
+		chunkDataPacks:  chunkDataPacks,
+		blockStorage:    blockStorage,
+		assigner:        assigner,
 	}
 
 	var err error
@@ -229,7 +228,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 	// store the chunk data pack in the store of the engine
 	// this will fail if the receipt already exists in the store
-	err = e.authChunkDataPacks.Add(chunkDataPack)
+	err = e.chunkDataPacks.Add(chunkDataPack)
 	if err != nil {
 		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
@@ -471,7 +470,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 		Hex("receipt_id", logging.Entity(receipt)).
 		Logger()
 
-	if !e.authChunkDataPacks.Has(chunkID) {
+	if !e.chunkDataPacks.Has(chunkID) {
 		// the chunk data pack is missing, the chunk cannot yet be verified
 		// TODO rate limit these requests
 		err := e.requestChunkDataPack(chunkID)
@@ -485,7 +484,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 	}
 
 	// chunk data pack exists and retrieved and returned
-	chunkDataPack, err := e.authChunkDataPacks.ByChunkID(chunkID)
+	chunkDataPack, err := e.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
 		// couldn't get chunk state from mempool, the chunk cannot yet be verified
 		log.Error().
