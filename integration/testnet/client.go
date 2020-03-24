@@ -1,4 +1,4 @@
-package testclient
+package testnet
 
 import (
 	"context"
@@ -11,26 +11,27 @@ import (
 	"github.com/dapperlabs/flow-go/integration/dsl"
 )
 
-type TestClient struct {
+// Client is a GRPC client of the Observation API exposed by the Flow network.
+type Client struct {
 	client *client.Client
 	key    *sdk.AccountPrivateKey
 }
 
-func New(addr string, key *sdk.AccountPrivateKey) (*TestClient, error) {
+func NewClient(addr string, key *sdk.AccountPrivateKey) (*Client, error) {
 
 	client, err := client.New(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	tc := &TestClient{
+	tc := &Client{
 		client: client,
 		key:    key,
 	}
 	return tc, nil
 }
 
-func (c *TestClient) DeployContract(ctx context.Context, contract dsl.CadenceCode) error {
+func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) error {
 
 	code := dsl.Transaction{
 		Import: dsl.Import{},
@@ -42,7 +43,7 @@ func (c *TestClient) DeployContract(ctx context.Context, contract dsl.CadenceCod
 	return c.SendTransaction(ctx, code)
 }
 
-func (c *TestClient) SendTransaction(ctx context.Context, code dsl.CadenceCode) error {
+func (c *Client) SendTransaction(ctx context.Context, code dsl.CadenceCode) error {
 
 	codeStr := code.ToCadence()
 
@@ -65,7 +66,7 @@ func (c *TestClient) SendTransaction(ctx context.Context, code dsl.CadenceCode) 
 	return c.client.SendTransaction(ctx, tx)
 }
 
-func (c *TestClient) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, error) {
+func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, error) {
 
 	code := script.ToCadence()
 

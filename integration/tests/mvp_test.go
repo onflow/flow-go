@@ -1,4 +1,4 @@
-package integration_test
+package tests_test
 
 import (
 	"bytes"
@@ -15,8 +15,8 @@ import (
 	sdk "github.com/dapperlabs/flow-go-sdk"
 
 	"github.com/dapperlabs/flow-go-sdk/keys"
+
 	"github.com/dapperlabs/flow-go/integration/dsl"
-	"github.com/dapperlabs/flow-go/integration/testclient"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -58,10 +58,10 @@ func TestMVP_Network(t *testing.T) {
 	key, err := generateRandomKey()
 	require.NoError(t, err)
 
-	colClient, err := testclient.New(fmt.Sprintf(":%s", colNodeAPIPort), key)
+	colClient, err := testnet.New(fmt.Sprintf(":%s", colNodeAPIPort), key)
 	require.NoError(t, err)
 
-	exeClient, err := testclient.New(fmt.Sprintf(":%s", exeNodeAPIPort), key)
+	exeClient, err := testnet.New(fmt.Sprintf(":%s", exeNodeAPIPort), key)
 	require.NoError(t, err)
 
 	runMVPTest(t, colClient, exeClient)
@@ -76,13 +76,13 @@ func TestMVP_Emulator(t *testing.T) {
 	key, err := getEmulatorKey()
 	require.NoError(t, err)
 
-	c, err := testclient.New(":3569", key)
+	c, err := testnet.New(":3569", key)
 	require.NoError(t, err)
 
 	runMVPTest(t, c, c)
 }
 
-func runMVPTest(t *testing.T, colClient *testclient.TestClient, exeClient *testclient.TestClient) {
+func runMVPTest(t *testing.T, colClient *testnet.Client, exeClient *testnet.Client) {
 
 	ctx := context.Background()
 
@@ -111,7 +111,7 @@ func runMVPTest(t *testing.T, colClient *testclient.TestClient, exeClient *testc
 	}, 30*time.Second, time.Second)
 }
 
-func deployCounter(ctx context.Context, client *testclient.TestClient) error {
+func deployCounter(ctx context.Context, client *testnet.Client) error {
 
 	contract := dsl.Contract{
 		Name: "Testing",
@@ -139,7 +139,7 @@ func deployCounter(ctx context.Context, client *testclient.TestClient) error {
 	return client.DeployContract(ctx, contract)
 }
 
-func readCounter(ctx context.Context, client *testclient.TestClient) (int, error) {
+func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
 	script := dsl.Main{
 		ReturnType: "Int",
@@ -160,7 +160,7 @@ func readCounter(ctx context.Context, client *testclient.TestClient) (int, error
 	return int(i.Value.Int64()), nil
 }
 
-func createCounter(ctx context.Context, client *testclient.TestClient) error {
+func createCounter(ctx context.Context, client *testnet.Client) error {
 
 	return client.SendTransaction(ctx, dsl.Transaction{
 		Import: dsl.Import{Address: sdk.RootAddress},
