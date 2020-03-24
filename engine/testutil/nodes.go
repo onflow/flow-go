@@ -196,7 +196,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, chunkDataPackStorage, executionResults, node.DB)
 
-	stateSync := sync.NewStateSynchronizer(node.State)
+	stateSync := sync.NewStateSynchronizer(execState)
 
 	providerEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState, stateSync)
 	require.NoError(t, err)
@@ -235,7 +235,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		BadgerDB:        node.DB,
 		LevelDB:         levelDB,
 		VM:              vm,
-		State:           execState,
+		ExecutionState:  execState,
 	}
 }
 

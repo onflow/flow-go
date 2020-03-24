@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	executionSync "github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -49,6 +50,7 @@ type Engine struct {
 	wg                 sync.WaitGroup
 	syncModeThreshold  uint64 //how many consecutive orphaned blocks trigger sync
 	syncInProgress     *atomic.Bool
+	stateSync          executionSync.StateSynchronizer
 }
 
 func New(
@@ -81,6 +83,7 @@ func New(
 		execState:          execState,
 		syncModeThreshold:  6, //TODO - config param maybe?
 		syncInProgress:     atomic.NewBool(false),
+		stateSync:          executionSync.NewStateSynchronizer(execState),
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -148,6 +151,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			err = e.handleCollectionResponse(v)
 		case *messages.ExecutionStateDelta:
 			err = e.handleExecutionStateDelta(v, originID)
+		case *messages.ExecutionStateSyncRequest:
+			return e.onExecutionStateSyncRequest(originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -373,6 +378,52 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	return identifiers, nil
 }
 
+func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *messages.ExecutionStateSyncRequest) error {
+	e.log.Info().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("current_block_id", logging.ID(req.CurrentBlockID)).
+		Hex("target_block_id", logging.ID(req.TargetBlockID)).
+		Msg("received execution state synchronization request")
+
+	id, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+	}
+
+	if id.Role != flow.RoleExecution {
+		return fmt.Errorf("invalid role for requesting state synchronization: %s", id.Role)
+	}
+
+	err = e.stateSync.DeltaRange(
+		req.CurrentBlockID,
+		req.TargetBlockID,
+		func(blockID flow.Identifier, delta *messages.ExecutionStateDelta) error {
+			e.log.Debug().
+				Hex("origin_id", logging.ID(originID)).
+				Hex("block_id", logging.ID(blockID)).
+				Msg("sending block delta")
+
+			// TODO: include full block (header + payload) in response?
+			//msg := &messages.ExecutionStateDelta{
+			//	BlockID: blockID,
+			//	Delta:   delta,
+			//}
+			//
+			err := e.syncConduit.Submit(delta, originID)
+			if err != nil {
+				return fmt.Errorf("could not submit block delta: %w", err)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to process block range: %w", err)
+	}
+
+	return nil
+}
+
 func (e *Engine) clearCollectionsCache(block *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) {
 	for _, collection := range block.Block.Guarantees {
 		backdata.Rem(collection.ID())
@@ -477,11 +528,6 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
-	err := e.execState.PersistStateViews(result.ExecutableBlock.Block.ID(), result.StateViews)
-	if err != nil {
-		return nil, err
-	}
-
 	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateViews, startState)
 	if err != nil {
 		return nil, err
@@ -496,6 +542,12 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 }
 
 func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.View, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+
+	err := e.execState.PersistStateViews(block.ID(), stateViews)
+	if err != nil {
+		return nil, err
+	}
+
 	chunks := make([]*flow.Chunk, len(stateViews))
 
 	// TODO check current state root == startState
@@ -536,7 +588,7 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.Vie
 		startState = endState
 	}
 
-	err := e.execState.PersistStateCommitment(block.ID(), endState)
+	err = e.execState.PersistStateCommitment(block.ID(), endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}

@@ -59,6 +59,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
 	collectionConduit := network.NewMockConduit(ctrl)
+	syncConduit := network.NewMockConduit(ctrl)
 
 	me := module.NewMockLocal(ctrl)
 	me.EXPECT().NodeID().Return(myself).AnyTimes()
@@ -90,6 +91,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
 	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, computationEngine, providerEngine, executionState)
 	require.NoError(t, err)
@@ -186,6 +188,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 	ctx.executionState.On("NewView", executableBlock.StartState).Return(nil)
 
 	ctx.computationManager.On("ComputeBlock", executableBlock, mock.Anything).Return(computationResult, nil).Once()
+
+	ctx.executionState.On("PersistStateViews", executableBlock.Block.ID(), mock.Anything).Return(nil)
 
 	for _, view := range computationResult.StateViews {
 		ctx.executionState.On("CommitDelta", view.Delta()).Return(newStateCommitment, nil)

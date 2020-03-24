@@ -2,15 +2,11 @@
 
 package protocol
 
-import (
-	"github.com/dapperlabs/flow-go/model/flow"
-)
+import "github.com/dapperlabs/flow-go/model/flow"
 
-// State represents the full protocol state of the local node. It allows us to
-// obtain snapshots of the state at any point of the protocol state history, as
-// well as mutating the protocol state in a consistent manner.
-type State interface {
-
+// ReadOnlyState represents the full protocol state of the local node. It allows us to
+// obtain snapshots of the state at any point of the protocol state history.
+type ReadOnlyState interface {
 	// Final returns the snapshot of the persistent protocol state at the latest
 	// finalized block, and the returned snapshot is therefore immutable over
 	// time.
@@ -26,6 +22,12 @@ type State interface {
 	// the protocol state, and can thus represent an ambiguous state that was or
 	// will never be finalized.
 	AtBlockID(blockID flow.Identifier) Snapshot
+}
+
+// State allows, in addition to ReadOnlyState,  mutating the protocol state in a consistent manner.
+type State interface {
+
+	ReadOnlyState
 
 	// Mutate will create a mutator for the persistent protocol state. It allows
 	// us to extend the protocol state in a consistent manner that conserves the

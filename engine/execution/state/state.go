@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/model/messages"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -13,16 +14,10 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
-// TODO Many operations here are should be transactional, so we need to refactor this
-// to store a reference to DB and compose operations and procedures rather then
-// just being amalgamate of proxies for single transactions operation
-
-// ExecutionState is an interface used to access and mutate the execution state of the blockchain.
-type ExecutionState interface {
+// ReadOnlyExecutionState allows to read the execution state
+type ReadOnlyExecutionState interface {
 	// NewView creates a new ready-only view at the given state commitment.
 	NewView(flow.StateCommitment) *delta.View
-	// CommitDelta commits a register delta and returns the new state commitment.
-	CommitDelta(delta.Delta) (flow.StateCommitment, error)
 
 	GetRegisters(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, error)
 	GetChunkRegisters(flow.Identifier) (flow.Ledger, error)
@@ -31,26 +26,43 @@ type ExecutionState interface {
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
-	// PersistStateCommitment saves a state commitment by the given block ID.
-	PersistStateCommitment(flow.Identifier, flow.StateCommitment) error
 
 	// ChunkHeaderByChunkID returns the chunk header for the provided chunk ID.
 	ChunkHeaderByChunkID(flow.Identifier) (*flow.ChunkHeader, error)
-	// PersistChunkHeader saves a chunk header by chunk ID.
-	PersistChunkHeader(*flow.ChunkHeader) error
 
 	// ChunkHeaderByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
-	// PersistChunkDataPack stores a chunk data pack by chunk ID.
-	PersistChunkDataPack(*flow.ChunkDataPack) error
 
 	GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error)
-	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
 
 	FindLatestFinalizedAndExecutedBlock() (*flow.Header, error)
 
+	RetrieveStateDelta(blockID flow.Identifier) (*messages.ExecutionStateDelta, error)
+}
+
+// TODO Many operations here are should be transactional, so we need to refactor this
+// to store a reference to DB and compose operations and procedures rather then
+// just being amalgamate of proxies for single transactions operation
+
+// ExecutionState is an interface used to access and mutate the execution state of the blockchain.
+type ExecutionState interface {
+	ReadOnlyExecutionState
+
+	// CommitDelta commits a register delta and returns the new state commitment.
+	CommitDelta(delta.Delta) (flow.StateCommitment, error)
+
+	// PersistStateCommitment saves a state commitment by the given block ID.
+	PersistStateCommitment(flow.Identifier, flow.StateCommitment) error
+
+	// PersistChunkHeader saves a chunk header by chunk ID.
+	PersistChunkHeader(*flow.ChunkHeader) error
+
+	// PersistChunkDataPack stores a chunk data pack by chunk ID.
+	PersistChunkDataPack(*flow.ChunkDataPack) error
+
+	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
+
 	PersistStateViews(blockID flow.Identifier, views []*delta.View) error
-	RetrieveStateViews(blockID flow.Identifier) ([]*delta.View, error)
 }
 
 type state struct {
@@ -231,13 +243,34 @@ func (s *state) PersistStateViews(blockID flow.Identifier, views []*delta.View) 
 	})
 }
 
-func (s *state) RetrieveStateViews(blockID flow.Identifier) ([]*delta.View, error) {
-	var views []*delta.View
+func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
+	var block flow.Block
+	var startStateCommitment flow.StateCommitment
+	var endStateCommitment flow.StateCommitment
+	var stateViews []*delta.View
 	err := s.db.View(func(txn *badger.Txn) error {
-		return operation.RetrieveExecutionStateViews(blockID, views)(txn)
+		err := procedure.RetrieveBlock(blockID, &block)(txn)
+		if err != nil {
+			return err
+		}
+		err = operation.LookupStateCommitment(blockID, &endStateCommitment)(txn)
+		if err != nil {
+			return err
+		}
+		err = operation.LookupStateCommitment(block.ParentID, &startStateCommitment)(txn)
+		if err != nil {
+			return err
+		}
+
+		return operation.RetrieveExecutionStateViews(blockID, stateViews)(txn)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return views, nil
+	return &messages.ExecutionStateDelta{
+		Block:      &block,
+		StateViews: stateViews,
+		StartState: startStateCommitment,
+		EndState:   endStateCommitment,
+	}, nil
 }

@@ -3,46 +3,46 @@ package sync
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/model/messages"
 )
 
 type StateSynchronizer interface {
-	PersistDelta(blockID flow.Identifier, set flow.RegisterDelta) error
+	//PersistDelta(blockID flow.Identifier, set flow.RegisterDelta) error
 	DeltaRange(
 		startID, endID flow.Identifier,
-		onDelta func(blockID flow.Identifier, delta flow.RegisterDelta) error,
+		onDelta func(blockID flow.Identifier, delta *messages.ExecutionStateDelta) error,
 	) error
 }
 
 func NewStateSynchronizer(
-	state protocol.State,
-	//registerDeltas storage.RegisterDeltas,
+	state state.ReadOnlyExecutionState,
+//registerDeltas storage.RegisterDeltas,
 ) StateSynchronizer {
 	return &stateSync{
-		state:          state,
+		execState: state,
 		//registerDeltas: registerDeltas,
 	}
 }
 
 type stateSync struct {
-	state          protocol.State
-	registerDeltas storage.RegisterDeltas
+	execState state.ReadOnlyExecutionState
+	//registerDeltas storage.RegisterDeltas
 }
 
-func (ss *stateSync) PersistDelta(blockID flow.Identifier, set flow.RegisterDelta) error {
-	err := ss.registerDeltas.Store(blockID, &set)
-	if err != nil {
-		return fmt.Errorf("failed to persist block delta: %w", err)
-	}
-
-	return nil
-}
+//func (ss *stateSync) PersistDelta(blockID flow.Identifier, set flow.RegisterDelta) error {
+//	err := ss.registerDeltas.Store(blockID, &set)
+//	if err != nil {
+//		return fmt.Errorf("failed to persist block delta: %w", err)
+//	}
+//
+//	return nil
+//}
 
 func (ss *stateSync) DeltaRange(
 	startID, endID flow.Identifier,
-	onDelta func(blockID flow.Identifier, delta flow.RegisterDelta) error,
+	onDelta func(blockID flow.Identifier, delta *messages.ExecutionStateDelta) error,
 ) error {
 	blockID := startID
 
@@ -51,36 +51,39 @@ func (ss *stateSync) DeltaRange(
 	// - case 2: we are missing start of range
 	// - case 3: we are missing end of range
 	for blockID != flow.ZeroID {
-		header, err := ss.state.AtBlockID(blockID).Head()
+
+		delta, err := ss.execState.RetrieveStateDelta(blockID)
+
 		if err != nil {
-			return fmt.Errorf("failed to load block: %w", err)
+			return fmt.Errorf("failed to retrieve state delta: %w", err)
 		}
 
-		delta, err := ss.getDelta(blockID)
-		if err != nil {
-			return err
-		}
+		//delta, err := ss.getDelta(header)
+		//if err != nil {
+		//	return err
+		//}
 
 		err = onDelta(blockID, delta)
 		if err != nil {
 			return fmt.Errorf("failed to handle block delta: %w", err)
 		}
 
-		blockID = header.ParentID
-
-		if header.ID() == endID {
+		if delta.Block.ID() == endID {
 			break
 		}
+
+		blockID = delta.Block.ParentID
 	}
 
 	return nil
 }
 
-func (ss *stateSync) getDelta(blockID flow.Identifier) (flow.RegisterDelta, error) {
-	set, err := ss.registerDeltas.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve block delta: %w", err)
-	}
-
-	return *set, nil
-}
+//func (ss *stateSync) getDelta(header *flow.Header) (*messages.ExecutionStateDelta, error) {
+//
+//	set, err := ss.registerDeltas.ByBlockID(blockID)
+//	if err != nil {
+//		return nil, fmt.Errorf("failed to retrieve block delta: %w", err)
+//	}
+//
+//	return *set, nil
+//}

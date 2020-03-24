@@ -41,4 +41,3 @@ func init() {
 	}
 }
 
-type RegisterDelta map[string][]byte

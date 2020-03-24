@@ -29,21 +29,21 @@ type Engine struct {
 	unit          *engine.Unit
 	log           zerolog.Logger
 	receiptCon    network.Conduit
-	state         protocol.State
-	execState     state.ExecutionState
+	state         protocol.ReadOnlyState
+	execState     state.ReadOnlyExecutionState
 	me            module.Local
 	execStateCon  network.Conduit
 	chunksConduit network.Conduit
 	stateSync     sync.StateSynchronizer
-	execSyncCon   network.Conduit
+	syncCon   network.Conduit
 }
 
 func New(
 	logger zerolog.Logger,
 	net module.Network,
-	state protocol.State,
+	state protocol.ReadOnlyState,
 	me module.Local,
-	execState state.ExecutionState,
+	execState state.ReadOnlyExecutionState,
 	stateSync sync.StateSynchronizer,
 ) (*Engine, error) {
 
@@ -76,10 +76,10 @@ func New(
 	}
 	eng.chunksConduit = chunksConduit
 
-	eng.execSyncCon, err = net.Register(engine.ExecutionSync, &eng)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not register execution sync engine")
-	}
+	//eng.syncCon, err = net.Register(engine.ExecutionSync, &eng)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "could not register execution sync engine")
+	//}
 
 	return &eng, nil
 }
@@ -121,8 +121,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			err = e.onExecutionStateRequest(originID, v)
 		case *messages.ChunkDataPackRequest:
 			err = e.handleChunkDataPackRequest(originID, v.ChunkID)
-		case *messages.ExecutionStateSyncRequest:
-			return e.onExecutionStateSyncRequest(originID, v)
 		case *messages.ExecutionStateDelta:
 			return e.onExecutionStateDelta(originID, v)
 		default:
@@ -170,51 +168,6 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 	return nil
 }
 
-func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *messages.ExecutionStateSyncRequest) error {
-	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("current_block_id", logging.ID(req.CurrentBlockID)).
-		Hex("target_block_id", logging.ID(req.TargetBlockID)).
-		Msg("received execution state synchronization request")
-
-	id, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", id, err)
-	}
-
-	if id.Role != flow.RoleExecution {
-		return fmt.Errorf("invalid role for requesting state synchronization: %s", id.Role)
-	}
-
-	err = e.stateSync.DeltaRange(
-		req.CurrentBlockID,
-		req.TargetBlockID,
-		func(blockID flow.Identifier, delta flow.RegisterDelta) error {
-			e.log.Debug().
-				Hex("origin_id", logging.ID(originID)).
-				Hex("block_id", logging.ID(blockID)).
-				Msg("sending block delta")
-
-			// TODO: include full block (header + payload) in response?
-			//msg := &messages.ExecutionStateDelta{
-			//	BlockID: blockID,
-			//	Delta:   delta,
-			//}
-			//
-			//err := e.execSyncCon.Submit(msg, originID)
-			//if err != nil {
-			//	return fmt.Errorf("could not submit block delta: %w", err)
-			//}
-
-			return nil
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to process block range: %w", err)
-	}
-
-	return nil
-}
 
 func (e *Engine) onExecutionStateDelta(originID flow.Identifier, req *messages.ExecutionStateDelta) error {
 	// TODO: apply delta to store

@@ -8,8 +8,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/encoding"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
@@ -53,7 +53,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 		return val, nil
 	}
 
-	chunkView := state.NewView(getRegister)
+	chunkView := delta.NewView(getRegister)
 
 	// executes all transactions in this chunk
 	for i, tx := range ch.Collection.Transactions {

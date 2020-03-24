@@ -65,7 +65,7 @@ type ExecutionNode struct {
 	BadgerDB        *badger.DB
 	LevelDB         *leveldb.LevelDB
 	VM              virtualmachine.VirtualMachine
-	State           state.ExecutionState
+	ExecutionState  state.ExecutionState
 }
 
 func (en ExecutionNode) Done() {
