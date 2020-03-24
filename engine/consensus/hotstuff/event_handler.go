@@ -430,6 +430,7 @@ func (e *EventHandler) processVote(vote *hotstuff.Vote) error {
 			Uint64("vote_view", vote.View).
 			Hex("voting_block", logging.ID(vote.BlockID)).
 			Msg("block for vote not found")
+		return nil
 	}
 
 	// if the voting block can be found, we should be able to validate the vote
