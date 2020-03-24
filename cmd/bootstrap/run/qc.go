@@ -126,6 +126,9 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 	}
 
 	state, err := protoBadger.NewState(db)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	err = state.Mutate().Bootstrap(block)
 	if err != nil {
