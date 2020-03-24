@@ -158,9 +158,6 @@ func TestFindDecendants(t *testing.T) {
 			require.Nil(t, err)
 
 			assert.Equal(t, toFlowIds(4, 5, 6, 7, 8, 9), descendants)
-
-			err = db.DropAll()
-			require.Nil(t, err)
 		})
 	})
 
@@ -191,9 +188,6 @@ func TestFindDecendants(t *testing.T) {
 			require.Nil(t, err)
 
 			assert.Equal(t, toFlowIds(4, 5, 7, 8, 13), descendants)
-
-			err = db.DropAll()
-			require.Nil(t, err)
 		})
 	})
 
@@ -221,9 +215,6 @@ func TestFindDecendants(t *testing.T) {
 			require.Nil(t, err)
 
 			assert.Equal(t, toFlowIds(4, 5, 10, 6, 11), descendants)
-
-			err = db.DropAll()
-			require.Nil(t, err)
 		})
 	})
 
@@ -250,9 +241,35 @@ func TestFindDecendants(t *testing.T) {
 			require.Nil(t, err)
 
 			assert.Equal(t, toFlowIds(4, 5, 6), descendants)
+		})
+	})
 
-			err = db.DropAll()
+	t.Run("should not include the finalized block itself", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			finalizedHeight := 3
+			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
+
+			err := db.Update(func(tx *badger.Txn) error {
+				// this test case verifies that when iterating through the keys,
+				// keys as the same height as the finalized block should be ignored
+				require.Nil(t, addIndex(tx, finalizedHeight, 1, finalizedHeight))
+
+				// add finalized block
+				require.Nil(t, addIndex(tx, finalizedHeight, finalizedHeight, finalizedHeight-1))
+
+				// add unfinalized blocks
+				require.Nil(t, addIndex(tx, 4, 4, 3))
+				require.Nil(t, addIndex(tx, 5, 5, 4))
+				require.Nil(t, addIndex(tx, 6, 6, 5))
+				return nil
+			})
 			require.Nil(t, err)
+
+			var descendants []flow.Identifier
+			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
+			require.Nil(t, err)
+
+			assert.Equal(t, toFlowIds(4, 5, 6), descendants)
 		})
 	})
 }
