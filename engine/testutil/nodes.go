@@ -44,7 +44,7 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 
 	db := unittest.TempBadgerDB(t)
 
-	state, err := UncheckedState(db, identities)
+	state, genesis, err := UncheckedState(db, identities)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -70,12 +70,13 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 	require.NoError(t, err)
 
 	return mock.GenericNode{
-		Log:    log,
-		Tracer: tracer,
-		DB:     db,
-		State:  state,
-		Me:     me,
-		Net:    stub,
+		Log:     log,
+		Tracer:  tracer,
+		DB:      db,
+		State:   state,
+		Me:      me,
+		Net:     stub,
+		Genesis: genesis,
 	}
 }
 

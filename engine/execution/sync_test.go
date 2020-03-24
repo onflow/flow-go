@@ -29,6 +29,18 @@ func TestSyncFlow(t *testing.T) {
 
 	identities := flow.IdentityList{colID, conID, exe1ID, exe2ID, verID}
 
+	// exe1 will sync from exe2 after exe2 executes transactions
+	exeNode1 := testutil.ExecutionNode(t, hub, exe1ID, identities)
+	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities)
+	defer exeNode1.Done()
+	defer exeNode2.Done()
+
+	collectionNode := testutil.GenericNode(t, hub, colID, identities)
+	verificationNode := testutil.GenericNode(t, hub, verID, identities)
+	//consensusNode := testutil.GenericNode(t, hub, conID, identities)
+
+
+
 	genesis := flow.Genesis(identities)
 
 	tx1 := testutil2.DeployCounterContractTransaction()
@@ -45,10 +57,14 @@ func TestSyncFlow(t *testing.T) {
 	//	col3.ID(): col3,
 	//}
 
+
+	fmt.Printf("genesis1 ID %x\n", genesis.ID())
+	fmt.Printf("genesis2 ID %x\n", exeNode2.Genesis.ID())
+
 	//Create two blocks, with one tx each
 	block1 := &flow.Block{
 		Header: flow.Header{
-			ParentID: genesis.ID(),
+			ParentID: exeNode2.Genesis.ID(),
 			View:     42,
 		},
 		Payload: flow.Payload{
@@ -62,7 +78,7 @@ func TestSyncFlow(t *testing.T) {
 
 	block2 := &flow.Block{
 		Header: flow.Header{
-			ParentID: block1.ParentID,
+			ParentID: block1.ID(),
 			View:     44,
 		},
 		Payload: flow.Payload{
@@ -88,15 +104,8 @@ func TestSyncFlow(t *testing.T) {
 	//	},
 	//}
 
-	// exe1 will sync from exe2 after exe2 executes transactions
-	exeNode1 := testutil.ExecutionNode(t, hub, exe1ID, identities)
-	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities)
-	defer exeNode1.Done()
-	defer exeNode2.Done()
 
-	collectionNode := testutil.GenericNode(t, hub, colID, identities)
-	verificationNode := testutil.GenericNode(t, hub, verID, identities)
-	//consensusNode := testutil.GenericNode(t, hub, conID, identities)
+
 
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
