@@ -1,4 +1,4 @@
-package network_test
+package testnet_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 
-	"github.com/dapperlabs/flow-go/integration/network"
+	"github.com/dapperlabs/flow-go/integration/testnet"
 )
 
 // data for easy asserting interesting fields
@@ -21,14 +21,14 @@ type nodeInfo struct {
 
 func TestNetworkSetupBasic(t *testing.T) {
 
-	net := []*network.NodeConfig{
-		network.NewNodeConfig(flow.RoleCollection),
-		network.NewNodeConfig(flow.RoleConsensus),
-		network.NewNodeConfig(flow.RoleExecution),
-		network.NewNodeConfig(flow.RoleVerification),
+	net := []*testnet.NodeConfig{
+		testnet.NewNodeConfig(flow.RoleCollection),
+		testnet.NewNodeConfig(flow.RoleConsensus),
+		testnet.NewNodeConfig(flow.RoleExecution),
+		testnet.NewNodeConfig(flow.RoleVerification),
 	}
 
-	flowNetwork, err := network.PrepareFlowNetwork(context.Background(), t, "testing", net)
+	flowNetwork, err := testnet.PrepareFlowNetwork(context.Background(), t, "testing", net)
 	require.NoError(t, err)
 
 	assert.Len(t, flowNetwork.Containers, len(net))
@@ -47,17 +47,17 @@ func TestNetworkSetupBasic(t *testing.T) {
 
 func TestNetworkSetupMultipleNodes(t *testing.T) {
 
-	net := []*network.NodeConfig{
-		network.NewNodeConfig(flow.RoleCollection),
-		network.NewNodeConfig(flow.RoleCollection),
-		network.NewNodeConfig(flow.RoleCollection),
-		network.NewNodeConfig(flow.RoleVerification),
-		network.NewNodeConfig(flow.RoleVerification),
-		network.NewNodeConfig(flow.RoleVerification),
-		network.NewNodeConfig(flow.RoleExecution),
+	net := []*testnet.NodeConfig{
+		testnet.NewNodeConfig(flow.RoleCollection),
+		testnet.NewNodeConfig(flow.RoleCollection),
+		testnet.NewNodeConfig(flow.RoleCollection),
+		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleExecution),
 	}
 
-	flowNetwork, err := network.PrepareFlowNetwork(context.Background(), t, "testing", net)
+	flowNetwork, err := testnet.PrepareFlowNetwork(context.Background(), t, "testing", net)
 	require.NoError(t, err)
 
 	assert.Len(t, flowNetwork.Containers, len(net))
@@ -77,7 +77,7 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 	assert.Subset(t, realData, expectedData)
 }
 
-func getNodeInfos(flowNetwork *network.FlowNetwork) []nodeInfo {
+func getNodeInfos(flowNetwork *testnet.FlowNetwork) []nodeInfo {
 	realData := make([]nodeInfo, len(flowNetwork.Containers))
 
 	for i, container := range flowNetwork.Containers {

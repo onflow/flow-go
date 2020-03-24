@@ -16,8 +16,8 @@ import (
 
 	"github.com/dapperlabs/flow-go-sdk/keys"
 	"github.com/dapperlabs/flow-go/integration/dsl"
-	"github.com/dapperlabs/flow-go/integration/network"
 	"github.com/dapperlabs/flow-go/integration/testclient"
+	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -25,13 +25,13 @@ func TestMVP_Network(t *testing.T) {
 
 	t.Skip()
 
-	colNode := network.NewNodeConfig(flow.RoleCollection)
+	colNode := testnet.NewNodeConfig(flow.RoleCollection)
 
-	net := []*network.NodeConfig{
+	net := []*testnet.NodeConfig{
 		colNode,
-		network.NewNodeConfig(flow.RoleConsensus),
-		network.NewNodeConfig(flow.RoleExecution),
-		network.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleConsensus),
+		testnet.NewNodeConfig(flow.RoleExecution),
+		testnet.NewNodeConfig(flow.RoleVerification),
 	}
 
 	// Enable verbose logging
@@ -39,7 +39,7 @@ func TestMVP_Network(t *testing.T) {
 
 	ctx := context.Background()
 
-	flowNetwork, err := network.PrepareFlowNetwork(ctx, t, "mvp", net)
+	flowNetwork, err := testnet.PrepareFlowNetwork(ctx, t, "mvp", net)
 	require.NoError(t, err)
 
 	flowNetwork.Start(ctx)
@@ -47,12 +47,12 @@ func TestMVP_Network(t *testing.T) {
 
 	colContainer, ok := flowNetwork.ContainerByID(colNode.Identifier)
 	require.True(t, ok)
-	colNodeAPIPort := colContainer.Ports[network.ColNodeAPIPort]
+	colNodeAPIPort := colContainer.Ports[testnet.ColNodeAPIPort]
 	require.NotEqual(t, "", colNodeAPIPort)
 
 	exeContainer, ok := flowNetwork.ContainerByID(colNode.Identifier)
 	require.True(t, ok)
-	exeNodeAPIPort := exeContainer.Ports[network.ExeNodeAPIPort]
+	exeNodeAPIPort := exeContainer.Ports[testnet.ExeNodeAPIPort]
 	require.NotEqual(t, "", exeNodeAPIPort)
 
 	key, err := generateRandomKey()

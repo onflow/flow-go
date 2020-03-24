@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	clusterstate "github.com/dapperlabs/flow-go/cluster/badger"
-	"github.com/dapperlabs/flow-go/integration/network"
+	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -24,24 +24,24 @@ import (
 func TestCollection(t *testing.T) {
 
 	var (
-		colNode1 = network.NewNodeConfig(flow.RoleCollection, func(c *network.NodeConfig) {
+		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
 			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")
 		})
-		colNode2 = network.NewNodeConfig(flow.RoleCollection, func(c *network.NodeConfig) {
+		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
 			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
 		})
-		conNode = network.NewNodeConfig(flow.RoleConsensus)
-		exeNode = network.NewNodeConfig(flow.RoleExecution)
-		verNode = network.NewNodeConfig(flow.RoleVerification)
+		conNode = testnet.NewNodeConfig(flow.RoleConsensus)
+		exeNode = testnet.NewNodeConfig(flow.RoleExecution)
+		verNode = testnet.NewNodeConfig(flow.RoleVerification)
 	)
 
-	nodes := []*network.NodeConfig{colNode1, colNode2, conNode, exeNode, verNode}
+	nodes := []*testnet.NodeConfig{colNode1, colNode2, conNode, exeNode, verNode}
 
 	testingdock.Verbose = true
 
 	ctx := context.Background()
 
-	net, err := network.PrepareFlowNetwork(ctx, t, "col", nodes)
+	net, err := testnet.PrepareFlowNetwork(ctx, t, "col", nodes)
 	require.Nil(t, err)
 
 	net.Start(ctx)
@@ -53,7 +53,7 @@ func TestCollection(t *testing.T) {
 	assert.True(t, ok)
 
 	// get the node's ingress port and create an RPC client
-	ingressPort, ok := colContainer.Ports[network.ColNodeAPIPort]
+	ingressPort, ok := colContainer.Ports[testnet.ColNodeAPIPort]
 	assert.True(t, ok)
 	client, err := client.New(fmt.Sprintf(":%s", ingressPort))
 	assert.Nil(t, err)
