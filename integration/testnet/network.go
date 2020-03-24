@@ -15,9 +15,8 @@ import (
 	"github.com/m4ksio/testingdock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/utils/unittest"
-
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 const (
