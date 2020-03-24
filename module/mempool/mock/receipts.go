@@ -41,50 +41,25 @@ func (_m *Receipts) All() []*flow.ExecutionReceipt {
 	return r0
 }
 
-// ByID provides a mock function with given fields: receiptID
-func (_m *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
-	ret := _m.Called(receiptID)
+// ByBlockID provides a mock function with given fields: blockID
+func (_m *Receipts) ByBlockID(blockID flow.Identifier) []*flow.ExecutionReceipt {
+	ret := _m.Called(blockID)
 
-	var r0 *flow.ExecutionReceipt
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ExecutionReceipt); ok {
-		r0 = rf(receiptID)
+	var r0 []*flow.ExecutionReceipt
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.ExecutionReceipt); ok {
+		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ExecutionReceipt)
+			r0 = ret.Get(0).([]*flow.ExecutionReceipt)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(receiptID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
-// ByResultID provides a mock function with given fields: resultID
-func (_m *Receipts) ByResultID(resultID flow.Identifier) (*flow.ExecutionReceipt, error) {
-	ret := _m.Called(resultID)
-
-	var r0 *flow.ExecutionReceipt
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ExecutionReceipt); ok {
-		r0 = rf(resultID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ExecutionReceipt)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(resultID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+// DropForBlock provides a mock function with given fields: blockID
+func (_m *Receipts) DropForBlock(blockID flow.Identifier) {
+	_m.Called(blockID)
 }
 
 // Has provides a mock function with given fields: receiptID
@@ -101,22 +76,6 @@ func (_m *Receipts) Has(receiptID flow.Identifier) bool {
 	return r0
 }
 
-// Hash provides a mock function with given fields:
-func (_m *Receipts) Hash() flow.Identifier {
-	ret := _m.Called()
-
-	var r0 flow.Identifier
-	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Identifier)
-		}
-	}
-
-	return r0
-}
-
 // Rem provides a mock function with given fields: receiptID
 func (_m *Receipts) Rem(receiptID flow.Identifier) bool {
 	ret := _m.Called(receiptID)
@@ -126,20 +85,6 @@ func (_m *Receipts) Rem(receiptID flow.Identifier) bool {
 		r0 = rf(receiptID)
 	} else {
 		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
-// Size provides a mock function with given fields:
-func (_m *Receipts) Size() uint {
-	ret := _m.Called()
-
-	var r0 uint
-	if rf, ok := ret.Get(0).(func() uint); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint)
 	}
 
 	return r0

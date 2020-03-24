@@ -1,28 +1,13 @@
 package libp2p
 
 import (
-	"crypto/md5"
+	"crypto/sha512"
 	"encoding/binary"
 	"io"
 	"math/rand"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
 )
-
-// GetPeerID returns the LibP2P peer id derived from the given Name
-// e.g. node1 will generate a peer id of QmUqrhCAbnT7jnhMnKY2d1Py9N5PfEvvHazuJfpzn5fFVB
-func GetPeerID(name string) (peer.ID, error) {
-	key, err := GetPublicKey(name)
-	if err != nil {
-		return "", err
-	}
-	id, err := peer.IDFromPublicKey(key.GetPublic())
-	if err != nil {
-		return "", err
-	}
-	return id, nil
-}
 
 // GetPublicKey generates a ECDSA key pair using the given seed
 func GetPublicKey(seed string) (crypto.PrivKey, error) {
@@ -41,7 +26,7 @@ func GetPublicKey(seed string) (crypto.PrivKey, error) {
 // Generates an int64 seed given a string in a deterministic and consistent manner (the same seed string will always
 // return the same int64 seed)
 func generateSeed(seed string) (int64, error) {
-	h := md5.New()
+	h := sha512.New()
 	// Generate the MD5 hash of the given string
 	_, err := io.WriteString(h, seed)
 	if err != nil {

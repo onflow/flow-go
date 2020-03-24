@@ -51,8 +51,8 @@ func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option
 	default:
 	}
 
-	// query the overlay to get all the other nodes
-	ids, err := d.overlay.Identity()
+	// query the overlay to get all the other nodes that should be directly connected to this node for 1-k messaging
+	ids, err := d.overlay.Topology()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ids: %w", err)
 	}
@@ -70,7 +70,14 @@ func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option
 		if err != nil {
 			return nil, fmt.Errorf("could not parse address %s: %w", id.Address, err)
 		}
-		nodeAddress := NodeAddress{Name: id.NodeID.String(), IP: ip, Port: port}
+
+		// convert the Flow key to a LibP2P key
+		lkey, err := PublicKey(id.NetworkPubKey)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert flow public key to libp2p public key: %v", err)
+		}
+
+		nodeAddress := NodeAddress{Name: id.NodeID.String(), IP: ip, Port: port, PubKey: lkey}
 		addrInfo, err := GetPeerInfo(nodeAddress)
 		if err != nil {
 			return nil, fmt.Errorf(" invalid node address: %s, %w", nodeAddress.Name, err)

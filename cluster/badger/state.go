@@ -8,16 +8,21 @@ import (
 )
 
 type State struct {
-	db *badger.DB
+	db      *badger.DB
+	chainID string // aka cluster ID
 }
 
-func NewState(db *badger.DB) (*State, error) {
-	state := &State{db: db}
+func NewState(db *badger.DB, chainID string) (*State, error) {
+	state := &State{
+		db:      db,
+		chainID: chainID,
+	}
 	return state, nil
 }
 
 func (s *State) Final() cluster.Snapshot {
 	snapshot := &Snapshot{
+		state: s,
 		final: true,
 	}
 	return snapshot
@@ -25,6 +30,7 @@ func (s *State) Final() cluster.Snapshot {
 
 func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 	snapshot := &Snapshot{
+		state:   s,
 		blockID: blockID,
 	}
 	return snapshot

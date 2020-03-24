@@ -11,27 +11,20 @@ type Middleware struct {
 	mock.Mock
 }
 
-// Publish provides a mock function with given fields: topic, msg
-func (_m *Middleware) Publish(topic string, msg interface{}) error {
-	ret := _m.Called(topic, msg)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, interface{}) error); ok {
-		r0 = rf(topic, msg)
-	} else {
-		r0 = ret.Error(0)
+// Send provides a mock function with given fields: channelID, msg, targetIDs
+func (_m *Middleware) Send(channelID uint8, msg interface{}, targetIDs ...flow.Identifier) error {
+	_va := make([]interface{}, len(targetIDs))
+	for _i := range targetIDs {
+		_va[_i] = targetIDs[_i]
 	}
-
-	return r0
-}
-
-// Send provides a mock function with given fields: nodeID, msg
-func (_m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
-	ret := _m.Called(nodeID, msg)
+	var _ca []interface{}
+	_ca = append(_ca, channelID, msg)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, interface{}) error); ok {
-		r0 = rf(nodeID, msg)
+	if rf, ok := ret.Get(0).(func(uint8, interface{}, ...flow.Identifier) error); ok {
+		r0 = rf(channelID, msg, targetIDs...)
 	} else {
 		r0 = ret.Error(0)
 	}

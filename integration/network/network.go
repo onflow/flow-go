@@ -143,7 +143,6 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		opts.Config.Cmd = []string{
 			fmt.Sprintf("--entries=%s", networkIdentities),
 			fmt.Sprintf("--nodeid=%s", identity.NodeID.String()),
-			fmt.Sprintf("--connections=%d", len(nodes)-1),
 			"--loglevel=debug",
 		}
 

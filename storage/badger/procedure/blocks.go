@@ -17,11 +17,17 @@ func InsertBlock(block *flow.Block) func(*badger.Txn) error {
 		// store the block header
 		err := operation.InsertHeader(&block.Header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not store block header: %w", err)
+			return fmt.Errorf("could not insert block header: %w", err)
+		}
+
+		// insert the block payload
+		err = InsertPayload(&block.Payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert block payload: %w", err)
 		}
 
 		// index the block payload
-		err = IndexPayload(&block.Payload)(tx)
+		err = IndexPayload(&block.Header, &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index block payload: %w", err)
 		}
@@ -41,7 +47,7 @@ func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn)
 		}
 
 		// get the block payload
-		err = RetrievePayload(block.Header.PayloadHash, &block.Payload)(tx)
+		err = RetrievePayload(block.Header.ID(), &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
@@ -80,13 +86,13 @@ func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// insert the number to block mapping
-		err = operation.InsertNumber(header.Number, header.ID())(tx)
+		err = operation.InsertNumber(header.View, header.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}
 
 		// update the finalized boundary
-		err = operation.UpdateBoundary(header.Number)(tx)
+		err = operation.UpdateBoundary(header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update finalized boundary: %w", err)
 		}
@@ -95,6 +101,70 @@ func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		// that we can keep validating entities and generating slashing
 		// challenges for some time - the pruning should happen some place else
 		// after a certain delay of blocks
+
+		return nil
+	}
+}
+
+func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// insert the block header & payload
+		err := InsertBlock(genesis)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis block: %w", err)
+		}
+
+		// apply the stake deltas
+		err = ApplyDeltas(genesis.Height, genesis.Identities)(tx)
+		if err != nil {
+			return fmt.Errorf("could not apply stake deltas: %w", err)
+		}
+
+		// get first seal
+		seal := genesis.Seals[0]
+
+		// index the block seal
+		err = operation.IndexSealIDByBlock(genesis.ID(), seal.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index seal by block: %w", err)
+		}
+
+		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: flow.ZeroID,
+			BlockID:          genesis.ID(),
+			FinalStateCommit: seal.FinalState,
+		}}
+
+		// index the commit for the execution node
+		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index commit: %w", err)
+		}
+
+		// insert first execution result
+		err = operation.InsertExecutionResult(&result)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis result: %w", err)
+		}
+
+		// index first execution block for genesis block
+		err = operation.IndexExecutionResult(genesis.ID(), result.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index genesis result: %w", err)
+		}
+
+		// insert the block number mapping
+		err = operation.InsertNumber(0, genesis.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not initialize boundary: %w", err)
+		}
+
+		// insert the finalized boundary
+		err = operation.InsertBoundary(genesis.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not update boundary: %w", err)
+		}
 
 		return nil
 	}

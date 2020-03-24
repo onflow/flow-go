@@ -2,11 +2,9 @@ package hotstuff
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
-
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -15,78 +13,64 @@ type BlockProducer struct {
 	signer    Signer
 	viewState *ViewState
 	builder   module.Builder
-
-	// chainID is used for specifying the chainID field for new blocks
-	chainID string
 }
 
 // NewBlockProducer creates a new BlockProducer
-func NewBlockProducer(signer Signer, viewState *ViewState, builder module.Builder, chainID string) (*BlockProducer, error) {
+func NewBlockProducer(signer Signer, viewState *ViewState, builder module.Builder) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
 		viewState: viewState,
 		builder:   builder,
-		chainID:   chainID,
 	}
 	return bp, nil
 }
 
 // MakeBlockProposal will build a proposal for the given view with the given QC
-func (bp *BlockProducer) MakeBlockProposal(view uint64, qcblock *types.QCBlock) (*types.BlockProposal, error) {
+func (bp *BlockProducer) MakeBlockProposal(qc *hotstuff.QuorumCertificate, view uint64) (*hotstuff.Proposal, error) {
 
 	// create the block for the view
-	block, err := bp.makeBlockForView(view, qcblock)
+	block, err := bp.makeBlockForView(qc, view)
 	if err != nil {
 		return nil, fmt.Errorf("could not create block for view: %w", err)
 	}
 
 	// then sign the proposal
-	signedBlockProposal, err := bp.signBlockProposal(block)
+	proposal, err := bp.signer.Propose(block)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign block proposal: %w", err)
 	}
 
-	return signedBlockProposal, nil
+	return proposal, nil
 }
 
 // makeBlockForView gets the payload hash from mempool and build a block on top of the given qc for the given view.
-func (bp *BlockProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) (*types.Block, error) {
-	// define the block header build function
-	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
-		header := flow.Header{
-			ChainID:     bp.chainID,
-			View:        view,
-			Number:      qcblock.Height() + 1,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    qcblock.BlockID(),
-			ParentView:  qcblock.View(),
-			PayloadHash: payloadHash,
-			ProposerID:  flow.ZeroID, // TODO: fill in our own ID here
-		}
-		return &header, nil
+func (bp *BlockProducer) makeBlockForView(qc *hotstuff.QuorumCertificate, view uint64) (*hotstuff.Block, error) {
+
+	// the custom functions allows us to set some custom fields on the block;
+	// in hotstuff, we use this for view number and signature-related fields
+	setHotstuffFields := func(header *flow.Header) {
+		header.View = view
+		header.ProposerID = bp.viewState.myID
+		header.ParentStakingSigs = qc.AggregatedSignature.StakingSignatures
+		header.ParentRandomBeaconSig = qc.AggregatedSignature.RandomBeaconSignature
+		header.ParentSigners = qc.AggregatedSignature.SignerIDs
 	}
 
-	// let the builder create the payload and store relevant stuff
-	header, err := bp.builder.BuildOn(qcblock.BlockID(), build)
+	// retrieve a fully built block header from the builder
+	header, err := bp.builder.BuildOn(qc.BlockID, setHotstuffFields)
 	if err != nil {
 		return nil, fmt.Errorf("could not build header: %w", err)
-
 	}
 
 	// turn the header into a block header proposal as known by hotstuff
-	// TODO: probably need to populate a few more fields
-	block := types.NewBlock(header.ID(), header.View, qcblock.QC(), header.PayloadHash[:], header.Number, header.ChainID)
-
-	return block, nil
-}
-
-// signBlockProposal takes a unsigned proposal, signes it and returns a signed block proposal
-func (bp *BlockProducer) signBlockProposal(proposal *types.Block) (*types.BlockProposal, error) {
-	// signing the proposal
-	blockProposal, err := bp.signer.SignBlock(proposal)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign the block (blockID: %v, view: %v): %w", proposal.BlockID, proposal.View, err)
+	block := hotstuff.Block{
+		BlockID:     header.ID(),
+		View:        view,
+		ProposerID:  header.ProposerID,
+		QC:          qc,
+		PayloadHash: header.PayloadHash,
+		Timestamp:   header.Timestamp,
 	}
 
-	return blockProposal, nil
+	return &block, nil
 }

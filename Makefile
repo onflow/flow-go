@@ -1,3 +1,4 @@
+
 # The short Git commit hash
 SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
@@ -19,7 +20,6 @@ UNAME := $(shell uname)
 # The location of the k8s YAML files
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
-export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
 export DOCKER_BUILDKIT := 1
 
 crypto/relic:
@@ -28,6 +28,9 @@ crypto/relic:
 
 crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
+
+crypto/relic/update:
+	git submodule update --recursive
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
@@ -40,7 +43,7 @@ endif
 ifeq ($(UNAME), Darwin)
 	brew install capnp
 endif
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.1; \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -50,13 +53,15 @@ endif
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
 	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
 
-.PHONY: test
-test: generate-mocks
+.PHONY: unittest
+unittest:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
-	$(MAKE) -C language test
 	$(MAKE) -C integration test
+
+.PHONY: test
+test: generate-mocks unittest
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -91,20 +96,31 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
 	GO111MODULE=on mockgen -destination=network/mocks/engine.go -package=mocks github.com/dapperlabs/flow-go/network Engine
 	GO111MODULE=on mockgen -destination=protocol/mocks/state.go -package=mocks github.com/dapperlabs/flow-go/protocol State
+	GO111MODULE=on mockgen -destination=engine/consensus/hotstuff/mocks/sig_aggregator.go -package=mocks github.com/dapperlabs/flow-go/engine/consensus/hotstuff SigAggregator
 	GO111MODULE=on mockgen -destination=protocol/mocks/snapshot.go -package=mocks github.com/dapperlabs/flow-go/protocol Snapshot
 	GO111MODULE=on mockgen -destination=protocol/mocks/mutator.go -package=mocks github.com/dapperlabs/flow-go/protocol Mutator
+	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'BlockComputer' -dir=engine/execution/computation/computer -case=underscore -output="engine/execution/computation/computer/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ComputationManager' -dir=engine/execution/computation -case=underscore -output="engine/execution/computation/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ProviderEngine' -dir=engine/execution/provider -case=underscore -output="engine/execution/provider/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=cluster -case=underscore -output="cluster/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	GO111MODULE=on mockery -name '.*' -dir=module/trace -case=underscore -output="./module/trace/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/virtualmachine -case=underscore -output="./engine/execution/computation/virtualmachine/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
+	# hotstuff mocks
 	GO111MODULE=on mockery -name 'Consumer' -dir="./engine/consensus/hotstuff/notifications/" -case=underscore -output="./engine/consensus/hotstuff/notifications/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Vertex' -dir="./engine/consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./engine/consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ForksReader' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
+	GO111MODULE=on mockery -name 'Signer' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
+	GO111MODULE=on mockery -name 'SigVerifier' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
+	GO111MODULE=on mockery -name 'SigAggregator' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -114,7 +130,7 @@ tidy:
 .PHONY: lint
 lint:
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v ./...
+	 golangci-lint run -v --build-tags relic ./...
 
 .PHONY: ci
 ci: install-tools tidy lint test coverage
@@ -139,26 +155,56 @@ docker-ci-team-city:
 
 .PHONY: docker-build-collection
 docker-build-collection:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection --target production \
 		-t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection:$(IMAGE_TAG) .
+
+.PHONY: docker-build-collection-debug
+docker-build-collection-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection --target debug \
+		-t gcr.io/dl-flow/collection-debug:latest -t "gcr.io/dl-flow/collection-debug:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection-debug:$(IMAGE_TAG) .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus --target production \
 		-t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-consensus-debug
+docker-build-consensus-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus --target debug \
+		-t gcr.io/dl-flow/consensus-debug:latest -t "gcr.io/dl-flow/consensus-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution
 docker-build-execution:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution --target production \
 		-t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-execution-debug
+docker-build-execution-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution --target debug \
+		-t gcr.io/dl-flow/execution-debug:latest -t "gcr.io/dl-flow/execution-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification
 docker-build-verification:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target production \
 		-t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification:$(IMAGE_TAG)" .
 
+.PHONY: docker-build-verification-debug
+docker-build-verification-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target debug \
+		-t gcr.io/dl-flow/verification-debug:latest -t "gcr.io/dl-flow/verification-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification-debug:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-observation
+docker-build-observation:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=observation --target production \
+		-t gcr.io/dl-flow/observation:latest -t "gcr.io/dl-flow/observation:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/observation:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-observation-debug
+docker-build-observation-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=observation --target debug \
+		-t gcr.io/dl-flow/observation-debug:latest -t "gcr.io/dl-flow/observation-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/observation-debug:$(IMAGE_TAG)" .
+
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-observation
 
 .PHONY: docker-push-collection
 docker-push-collection:
@@ -184,8 +230,14 @@ docker-push-verification:
 	docker push "gcr.io/dl-flow/verification:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/verification:$(IMAGE_TAG)"
 
+.PHONY: docker-push-observation
+docker-push-observation:
+	docker push gcr.io/dl-flow/observation:latest
+	docker push "gcr.io/dl-flow/observation:$(SHORT_COMMIT)"
+	docker push "gcr.io/dl-flow/observation:$(IMAGE_TAG)"
+
 .PHONY: docker-push-flow
-docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification
+docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-observation
 
 .PHONY: docker-run-collection
 docker-run-collection:
@@ -203,17 +255,9 @@ docker-run-execution:
 docker-run-verification:
 	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/verification:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries verification-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
-# Builds the VS Code extension
-.PHONY: build-vscode-extension
-build-vscode-extension:
-	cd language/tools/vscode-extension && npm run package;
-
-# Builds and promotes the VS Code extension. Promoting here means re-generating
-# the embedded extension binary used in the CLI for installation.
-.PHONY: promote-vscode-extension
-promote-vscode-extension: build-vscode-extension
-	cp language/tools/vscode-extension/cadence-*.vsix ./cli/flow/cadence/vscode/cadence.vsix;
-	go generate ./cli/flow/cadence/vscode;
+.PHONY: docker-run-observation
+docker-run-observation:
+	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/observation:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries observation-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 # Check if the go version is 1.13. flow-go only supports go 1.13
 .PHONY: check-go-version

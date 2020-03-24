@@ -2,8 +2,7 @@
 
 package crypto
 
-// #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/include -I./relic/include/low
-// #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
+// #cgo CFLAGS: -g -Wall -std=c99
 // #include "dkg_include.h"
 import "C"
 

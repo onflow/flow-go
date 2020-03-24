@@ -9,36 +9,48 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/testutil"
+	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
-	module "github.com/dapperlabs/flow-go/module/mock"
+	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-type TestSuite struct {
+// TODO add challeneges
+// if ChunkIndex == 0 : ok
+// if ChunkIndex == 1 : error
+// if ChunkIndex == 2 : challenge
+type ChunkVerifierMock struct {
+}
+
+func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) error {
+	return nil
+}
+
+type VerifierEngineTestSuite struct {
 	suite.Suite
-	net   *module.Network
-	state *protocol.State
-	ss    *protocol.Snapshot
-	me    *module.Local
-	// mock conduit for submitting result approvals
-	conduit *network.Conduit
+	net     *mockmodule.Network
+	state   *protocol.State
+	ss      *protocol.Snapshot
+	me      *MockLocal
+	sk      crypto.PrivateKey
+	hasher  crypto.Hasher
+	conduit *network.Conduit // mocks conduit for submitting result approvals
 }
 
-func TestVerifierEgine(t *testing.T) {
-	suite.Run(t, new(TestSuite))
+func TestVerifierEngine(t *testing.T) {
+	suite.Run(t, new(VerifierEngineTestSuite))
 }
 
-func (suite *TestSuite) SetupTest() {
+func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.state = &protocol.State{}
-	suite.net = &module.Network{}
-	suite.me = &module.Local{}
+	suite.net = &mockmodule.Network{}
 	suite.ss = &protocol.Snapshot{}
 	suite.conduit = &network.Conduit{}
 
@@ -47,173 +59,116 @@ func (suite *TestSuite) SetupTest() {
 		Once()
 
 	suite.state.On("Final").Return(suite.ss)
+
+	// Mocks the signature oracle of the engine
+	//
+	// generates signing and verification keys
+	seed := []byte{1, 2, 3, 4}
+	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	require.NoError(suite.T(), err)
+	suite.sk = sk
+	// tag of hasher should be the same as the tag of engine's hasher
+	suite.hasher = utils.NewResultApprovalHasher()
+	suite.me = NewMockLocal(sk, flow.Identifier{}, suite.T())
 }
 
-func (suite *TestSuite) TestNewEngine() *verifier.Engine {
-	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me)
+func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
+	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me, ChunkVerifierMock{})
 	require.Nil(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
 	return e
+
 }
 
-func (suite *TestSuite) TestInvalidSender() {
+func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	eng := suite.TestNewEngine()
 
 	myID := unittest.IdentifierFixture()
 	invalidID := unittest.IdentifierFixture()
 
-	suite.me.On("NodeID").Return(myID)
+	// mocks NodeID method of the local
+	suite.me.MockNodeID(myID)
 
-	completeRA := unittest.CompleteExecutionResultFixture()
+	completeRA := unittest.CompleteExecutionResultFixture(1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
 }
 
-func (suite *TestSuite) TestIncorrectResult() {
+func (suite *VerifierEngineTestSuite) TestIncorrectResult() {
 	// TODO when ERs are verified
-	suite.T().Skip()
 }
 
-func (suite *TestSuite) TestVerify() {
-	eng := suite.TestNewEngine()
+// TestVerify tests the verification path for a single verifiable chunk, which is
+// assigned to the verifier node, and is passed by the ingest engine
+// The tests evaluates that a result approval is emitted to all consensus nodes
+// about the input execution receipt
+func (suite *VerifierEngineTestSuite) TestVerify() {
 
+	eng := suite.TestNewEngine()
 	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	completeER := unittest.CompleteExecutionResultFixture()
+	// creates a verifiable chunk
+	vChunk := unittest.VerifiableChunkFixture()
 
-	suite.me.On("NodeID").Return(myID).Once()
-	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil).Once()
+	// mocking node ID using the LocalMock
+	suite.me.MockNodeID(myID)
+	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
+
 	suite.conduit.
-		On("Submit", testifymock.Anything, consensusNodes.Get(0).NodeID).
+		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
 			// check that the approval matches the input execution result
 			ra, ok := args[0].(*flow.ResultApproval)
 			suite.Assert().True(ok)
-			suite.Assert().Equal(completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+			suite.Assert().Equal(vChunk.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+
+			// verifies the signature over the result approval
+			batst, err := encoding.DefaultEncoder.Encode(ra.ResultApprovalBody.Attestation())
+			suite.Assert().NoError(err)
+			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, batst, suite.hasher))
 		}).
 		Once()
 
-	err := eng.Process(myID, &completeER)
+	err := eng.Process(myID, vChunk)
 	suite.Assert().Nil(err)
 
-	suite.me.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
 	suite.conduit.AssertExpectations(suite.T())
 }
 
-// checks that an execution result received by the verification node results in:
-// - request of the appropriate collection
-// - formation of a complete execution result by the ingest engine
-// - broadcast of a matching result approval to consensus nodes
-func TestHappyPath(t *testing.T) {
-	hub := stub.NewNetworkHub()
+// MockLocal represents a mock of Local
+// We needed to develop a separate mock for Local as we could not mock
+// a method with return values
+type MockLocal struct {
+	sk crypto.PrivateKey
+	t  testifymock.TestingT
+	id flow.Identifier
+}
 
-	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	conIdentityList := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	conIdentity := conIdentityList.Get(0)
+func NewMockLocal(sk crypto.PrivateKey, id flow.Identifier, t testifymock.TestingT) *MockLocal {
+	return &MockLocal{
+		sk: sk,
+		t:  t,
+		id: id,
+	}
+}
 
-	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
+func (m *MockLocal) NodeID() flow.Identifier {
+	return m.id
+}
 
-	verNode := testutil.VerificationNode(t, hub, verIdentity, identities)
-	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
+func (m *MockLocal) Address() string {
+	require.Fail(m.t, "should not call MockLocal Address")
+	return ""
+}
 
-	completeER := unittest.CompleteExecutionResultFixture()
+func (m *MockLocal) Sign(msg []byte, hasher crypto.Hasher) (crypto.Signature, error) {
+	return m.sk.Sign(msg, hasher)
+}
 
-	// mock the execution node with a generic node and mocked engine
-	// to handle request for chunk state
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
-	exeEngine := new(network.Engine)
-	exeConduit, err := exeNode.Net.Register(engine.ExecutionStateProvider, exeEngine)
-	assert.Nil(t, err)
-	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			req, ok := args[1].(*messages.ExecutionStateRequest)
-			require.True(t, ok)
-			assert.Equal(t, completeER.Receipt.ExecutionResult.Chunks.ByIndex(0).ID(), req.ChunkID)
-
-			res := &messages.ExecutionStateResponse{
-				State: *completeER.ChunkStates[0],
-			}
-			err := exeConduit.Submit(res, verIdentity.NodeID)
-			assert.Nil(t, err)
-		}).
-		Return(nil).
-		Once()
-
-	// mock the consensus node with a generic node and mocked engine to assert
-	// that the result approval is broadcast
-	conNode := testutil.GenericNode(t, hub, conIdentity, identities)
-	conEngine := new(network.Engine)
-	conEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			ra, ok := args[1].(*flow.ResultApproval)
-			assert.True(t, ok)
-			assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
-		}).
-		Return(nil).
-		Once()
-	_, err = conNode.Net.Register(engine.ApprovalProvider, conEngine)
-	assert.Nil(t, err)
-
-	// assume the verification node has received the block
-	err = verNode.Blocks.Add(completeER.Block)
-	assert.Nil(t, err)
-
-	// inject the collection into the collection node mempool
-	err = colNode.Collections.Store(completeER.Collections[0])
-	assert.Nil(t, err)
-
-	// send the ER from execution to verification node
-	err = verNode.IngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
-	assert.Nil(t, err)
-
-	// the receipt should be added to the mempool
-	assert.True(t, verNode.Receipts.Has(completeER.Receipt.ID()))
-
-	// flush the chunk state request
-	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
-	assert.True(t, ok)
-	verNet.DeliverSome(func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.ExecutionStateProvider
-	})
-
-	// flush the chunk state response
-	exeNet, ok := hub.GetNetwork(exeIdentity.NodeID)
-	assert.True(t, ok)
-	exeNet.DeliverSome(func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.ExecutionStateProvider
-	})
-
-	// the chunk state should be added to the mempool
-	assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
-
-	// flush the collection request
-	verNet.DeliverSome(func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.CollectionProvider
-	})
-
-	// flush the collection response
-	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
-	assert.True(t, ok)
-	colNet.DeliverSome(func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.CollectionProvider
-	})
-
-	// flush the result approval broadcast
-	verNet.DeliverAllRecursive()
-
-	// assert that the RA was received
-	conEngine.AssertExpectations(t)
-
-	// the receipt should be removed from the mempool
-	assert.False(t, verNode.Receipts.Has(completeER.Receipt.ID()))
-	// associated resources should be removed from the mempool
-	assert.False(t, verNode.Collections.Has(completeER.Collections[0].ID()))
-	assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
-	assert.False(t, verNode.Blocks.Has(completeER.Block.ID()))
+func (m *MockLocal) MockNodeID(id flow.Identifier) {
+	m.id = id
 }

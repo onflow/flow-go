@@ -15,11 +15,7 @@ void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, 
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
-    // Barett reduction constant
-    // TODO: hardcode u
-    bn_st u;
-    bn_new(&u)
-    bn_mod_pre_barrt(&u, &r);
+
     // powers of x
     bn_st bn_x;         // maximum is |n|+|r| --> 264 bits
     ep_new(&bn_x);
@@ -37,10 +33,11 @@ void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, 
     for (int i=0; i<a_size; i++) {
         bn_mul(&mult, &a[i], &bn_x);
         bn_add(&acc, &acc, &mult);
-        bn_mod_barrt(&acc, &acc, &r, &u);
-        // TODO: hardcode x^i mod r ?
+        bn_mod_basic(&acc, &acc, &r);
+        // Use basic reduction as it's an 8-bits reduction 
+        // in the worst case (|bn_x|<|r|+8 )
         bn_mul_dig(&bn_x, &bn_x, x);
-        bn_mod_barrt(&bn_x, &bn_x, &r, &u);
+        bn_mod_basic(&bn_x, &bn_x, &r);
     }
     // exports the result
     const int out_size = Fr_BYTES;
@@ -53,14 +50,13 @@ void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, 
     bn_free(&mult);
     bn_free(&r);
     bn_free(&bn_x);
-    bn_free(&u);
 }
 
 // computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 // and stores the point in y
-// r is the order of G2, u is the barett constant associated to r
+// r is the order of G2
 static void G2_polynomialImage(ep2_st* y, const ep2_st* A, const int len_A,
-         const byte x, const bn_st* r, const bn_st* u){
+         const byte x, const bn_st* r){
     // powers of x
     bn_st bn_x;         // maximum is |n|+|r| --> 264 bits
     bn_new(&bn_x);
@@ -76,9 +72,10 @@ static void G2_polynomialImage(ep2_st* y, const ep2_st* A, const int len_A,
     for (int i=0; i < len_A; i++) {
         ep2_mul_lwnaf(&mult, (ep2_st*)&A[i], &bn_x);
         ep2_add_projc(&acc, &acc, &mult);
-        // TODO: hardcode x^i mod r ?
         bn_mul_dig(&bn_x, &bn_x, x);
-        bn_mod_barrt(&bn_x, &bn_x, r, u);
+        // Use basic reduction as it's an 8-bits reduction 
+        // in the worst case (|bn_x|<|r|+8 )
+        bn_mod_basic(&bn_x, &bn_x, r);
     }
     // export the result
     ep2_copy(y, &acc);
@@ -97,16 +94,10 @@ void G2_polynomialImages(ep2_st* y, const int len_y, const ep2_st* A, const int 
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
-    // Barett reduction constant
-    // TODO: hardcode u
-    bn_st u;
-    bn_new(&u)
-    bn_mod_pre_barrt(&u, &r);
     for (byte i=0; i<len_y; i++) {
         //y[i] = Q(i+1)
-        G2_polynomialImage(y+i , A, len_A, i+1, &r, &u);
+        G2_polynomialImage(y+i , A, len_A, i+1, &r);
     }
-    bn_free(&u);
     bn_free(&r);
 }
 

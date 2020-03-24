@@ -13,11 +13,11 @@ type Role uint8
 
 // Enumeration of the available flow node roles.
 const (
-	RoleCollection   = 1
-	RoleConsensus    = 2
-	RoleExecution    = 3
-	RoleVerification = 4
-	RoleObservation  = 5
+	RoleCollection   Role = 1
+	RoleConsensus    Role = 2
+	RoleExecution    Role = 3
+	RoleVerification Role = 4
+	RoleObservation  Role = 5
 )
 
 // String returns a string version of role.
@@ -54,4 +54,14 @@ func ParseRole(role string) (Role, error) {
 	default:
 		return 0, errors.Errorf("invalid role string (%s)", role)
 	}
+}
+
+func (r Role) MarshalText() ([]byte, error) {
+	return []byte(r.String()), nil
+}
+
+func (r *Role) UnmarshalText(text []byte) error {
+	var err error
+	*r, err = ParseRole(string(text))
+	return err
 }

@@ -15,7 +15,7 @@ type Transactions interface {
 
 	// Add will add the given transaction to the memory pool; it will error if
 	// the transaction is already in the memory pool.
-	Add(tx *flow.Transaction) error
+	Add(tx *flow.TransactionBody) error
 
 	// Rem will remove the given transaction from the memory pool; it will
 	// will return true if the transaction was known and removed.
@@ -23,14 +23,14 @@ type Transactions interface {
 
 	// ByID will retrieve the given transaction from the memory pool; it will
 	// error if the transaction is not in the memory pool.
-	ByID(txID flow.Identifier) (*flow.Transaction, error)
+	ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint
 
 	// All will retrieve all transactions that are currently in the memory pool
 	// as a slice.
-	All() []*flow.Transaction
+	All() []*flow.TransactionBody
 
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.

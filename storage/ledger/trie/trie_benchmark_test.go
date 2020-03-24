@@ -100,7 +100,7 @@ func BenchmarkVerifyProof(b *testing.B) {
 		}
 		b.Run(strconv.Itoa(mark.size), func(b *testing.B) {
 			for i, key := range readKeys {
-				res := VerifyInclusionProof(key, values[i], proofs.flags[i], proofs.proofs[i], proofs.sizes[i], s.GetRoot().value, GetDefaultHashes(), s.height)
+				res := VerifyInclusionProof(key, values[i], proofs.flags[i], proofs.proofs[i], proofs.sizes[i], s.GetRoot().value, s.height)
 				if !res {
 					b.Error("Incorrect")
 				}
@@ -141,7 +141,7 @@ func BenchmarkVerifyHistoricalStates(b *testing.B) {
 		}
 		b.Run(strconv.Itoa(mark.size), func(b *testing.B) {
 			for i, key := range readKeys {
-				res := VerifyInclusionProof(key, values[i], proofs.flags[i], proofs.proofs[i], proofs.sizes[i], oldRoot, GetDefaultHashes(), new_smt.height)
+				res := VerifyInclusionProof(key, values[i], proofs.flags[i], proofs.proofs[i], proofs.sizes[i], oldRoot, new_smt.height)
 				if !res {
 					b.Error("Incorrect")
 				}

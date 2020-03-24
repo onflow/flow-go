@@ -1,9 +1,0 @@
-fun test(): Int {
-    var x = 0;
-    while x < 5 {
-        x = x + 2
-    };
-    return x
-};
-
-assert test() == 6

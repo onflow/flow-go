@@ -5,9 +5,10 @@ package json
 import (
 	"encoding/json"
 
-	"github.com/dapperlabs/flow-go/model/messages"
-
 	"github.com/pkg/errors"
+
+	"github.com/dapperlabs/flow-go/model/coldstuff"
+	"github.com/dapperlabs/flow-go/model/messages"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
@@ -35,8 +36,28 @@ func encode(v interface{}) (*Envelope, error) {
 	case *message.Echo:
 		code = CodeEcho
 
+	// Consensus
+	case *messages.BlockProposal:
+		code = CodeBlockProposal
+	case *messages.BlockVote:
+		code = CodeBlockVote
+	case *coldstuff.Commit:
+		code = CodeBlockCommit
+
+	// Cluster consensus
+	case *messages.ClusterBlockProposal:
+		code = CodeClusterBlockProposal
+	case *messages.ClusterBlockVote:
+		code = CodeClusterBlockVote
+	case *messages.ClusterBlockRequest:
+		code = CodeClusterBlockRequest
+	case *messages.ClusterBlockResponse:
+		code = CodeClusterBlockResponse
+
 	case *flow.CollectionGuarantee:
 		code = CodeCollectionGuarantee
+	case *flow.TransactionBody:
+		code = CodeTransactionBody
 	case *flow.Transaction:
 		code = CodeTransaction
 
@@ -54,6 +75,10 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeExecutionStateRequest
 	case *messages.ExecutionStateResponse:
 		code = CodeExecutionStateResponse
+	case *messages.ChunkDataPackRequest:
+		code = CodeChunkDataPackRequest
+	case *messages.ChunkDataPackResponse:
+		code = CodeChunkDataPackResponse
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)

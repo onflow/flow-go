@@ -34,6 +34,13 @@ func TestCollections(t *testing.T) {
 			assert.Equal(t, expected, actual)
 		})
 
+		t.Run("Check", func(t *testing.T) {
+			var exists bool
+			err := db.Update(CheckCollection(expected.ID(), &exists))
+			require.NoError(t, err)
+			assert.True(t, exists)
+		})
+
 		t.Run("Remove", func(t *testing.T) {
 			err := db.Update(RemoveCollection(expected.ID()))
 			require.NoError(t, err)
@@ -41,6 +48,42 @@ func TestCollections(t *testing.T) {
 			var actual flow.LightCollection
 			err = db.View(RetrieveCollection(expected.ID(), &actual))
 			assert.Error(t, err)
+		})
+
+		t.Run("Index and lookup", func(t *testing.T) {
+			expected := unittest.CollectionFixture(1).Light()
+			blockID := unittest.IdentifierFixture()
+			parentID := unittest.IdentifierFixture()
+			height := uint64(1)
+
+			_ = db.Update(func(tx *badger.Txn) error {
+				err := InsertCollection(&expected)(tx)
+				assert.Nil(t, err)
+				err = IndexCollectionPayload(height, blockID, parentID, &expected)(tx)
+				assert.Nil(t, err)
+				return nil
+			})
+
+			var actual flow.LightCollection
+			err := db.View(LookupCollectionPayload(height, blockID, parentID, &actual))
+			assert.Nil(t, err)
+
+			assert.Equal(t, expected, actual)
+		})
+
+		t.Run("Index and lookup by transaction ID", func(t *testing.T) {
+			expected := unittest.IdentifierFixture()
+			transactionID := unittest.IdentifierFixture()
+			actual := flow.Identifier{}
+
+			_ = db.Update(func(tx *badger.Txn) error {
+				err := IndexCollectionByTransaction(transactionID, expected)(tx)
+				assert.Nil(t, err)
+				err = RetrieveCollectionID(transactionID, &actual)(tx)
+				assert.Nil(t, err)
+				return nil
+			})
+			assert.Equal(t, expected, actual)
 		})
 	})
 }

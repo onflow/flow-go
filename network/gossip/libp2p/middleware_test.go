@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
@@ -42,6 +43,10 @@ func (m *MiddlewareTestSuit) SetupTest() {
 	require.Len(m.Suite.T(), m.mws, m.size)
 	// starts the middlewares
 	m.StartMiddlewares()
+}
+
+func (m *MiddlewareTestSuit) TearDownTest() {
+	m.StopMiddlewares()
 }
 
 // TestPingRawReception tests the middleware for solely the
@@ -113,13 +118,15 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 			target = 0
 		}
 
-		ip, port := m.mws[target].libP2PNode.GetIPPort()
+		ip, port := m.mws[target].GetIPPort()
+		key := m.mws[target].PublicKey()
 
 		// mocks an identity
 		flowID := flow.Identity{
-			NodeID:  m.ids[target],
-			Address: fmt.Sprintf("%s:%s", ip, port),
-			Role:    flow.RoleCollection,
+			NodeID:        m.ids[target],
+			Address:       fmt.Sprintf("%s:%s", ip, port),
+			Role:          flow.RoleCollection,
+			NetworkPubKey: key,
 		}
 		idMap := idMaps[i]
 		idMap[flowID.NodeID] = flowID
@@ -144,7 +151,7 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 
 	msg := createMessage(m.ids[firstNode], m.ids[lastNode])
 
-	err = m.mws[firstNode].Send(m.ids[lastNode], msg)
+	err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	select {
@@ -176,7 +183,7 @@ func (m *MiddlewareTestSuit) MultiPing(count int) {
 				wg.Done()
 			})
 		go func() {
-			err = m.mws[firstNode].Send(m.ids[lastNode], msg)
+			err = m.mws[firstNode].Send(0, msg, m.ids[lastNode])
 			require.NoError(m.Suite.T(), err)
 		}()
 	}
@@ -211,7 +218,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			err = m.mws[lastNode].Send(m.mws[firstNode].me, replyMsg)
+			err = m.mws[lastNode].Send(0, replyMsg, m.mws[firstNode].me)
 			assert.NoError(m.T(), err)
 
 		})
@@ -222,7 +229,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 			wg.Done()
 		})
 
-	err = m.mws[firstNode].Send(m.ids[lastNode], sendMsg)
+	err = m.mws[firstNode].Send(0, sendMsg, m.ids[lastNode])
 	require.NoError(m.Suite.T(), err)
 
 	wg.Wait()
@@ -251,8 +258,10 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 		codec := json.NewCodec()
 
+		key := m.generateNetworkingKey(target[:])
+
 		// creates new middleware
-		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID)
+		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)
@@ -283,4 +292,25 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 	}
 
 	return message
+}
+
+func (m *MiddlewareTestSuit) StopMiddlewares() {
+	// start all the middlewares
+	for i := 0; i < m.size; i++ {
+		// start the middleware
+		m.mws[i].Stop()
+	}
+	m.mws = nil
+	m.ov = nil
+	m.ids = nil
+	m.size = 0
+}
+
+// generateNetworkingKey generates a Flow ECDSA key using the given seed
+func (m *MiddlewareTestSuit) generateNetworkingKey(seed []byte) crypto.PrivateKey {
+	s := make([]byte, 100)
+	copy(s, seed)
+	prvKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, s)
+	require.NoError(m.Suite.T(), err)
+	return prvKey
 }

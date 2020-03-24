@@ -3,22 +3,35 @@
 package libp2p
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net"
 	"strconv"
 	"sync"
 
+	ggio "github.com/gogo/protobuf/io"
+	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
+)
+
+type communicationMode int
+
+const (
+	NoOp communicationMode = iota
+	OneToOne
+	OneToK
 )
 
 // Middleware handles the input & output on the direct connections we have to
@@ -30,18 +43,19 @@ type Middleware struct {
 	log        zerolog.Logger
 	codec      network.Codec
 	ov         middleware.Overlay
-	cc         *ConnectionCache
 	wg         *sync.WaitGroup
 	libP2PNode *P2PNode
 	stop       chan struct{}
 	me         flow.Identifier
 	host       string
 	port       string
+	key        crypto.PrivateKey
+	validators []validators.MessageValidator
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
-func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier) (*Middleware, error) {
+func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier, key crypto.PrivateKey) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -50,19 +64,26 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 	p2p := &P2PNode{}
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// add validators to filter out unwanted messages received by this node
+	validators := []validators.MessageValidator{
+		validators.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
+		validators.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
+	}
+
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
 		ctx:        ctx,
 		cancel:     cancel,
 		log:        log,
 		codec:      codec,
-		cc:         NewConnectionCache(),
 		libP2PNode: p2p,
 		wg:         &sync.WaitGroup{},
 		stop:       make(chan struct{}),
 		me:         flowID,
 		host:       ip,
 		port:       port,
+		key:        key,
+		validators: validators,
 	}
 
 	return m, err
@@ -78,6 +99,10 @@ func (m *Middleware) GetIPPort() (string, string) {
 	return m.libP2PNode.GetIPPort()
 }
 
+func (m *Middleware) PublicKey() crypto.PublicKey {
+	return m.key.PublicKey()
+}
+
 // Start will start the middleware.
 func (m *Middleware) Start(ov middleware.Overlay) error {
 
@@ -87,12 +112,20 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
 
 	// create PubSub options for libp2p to use the discovery object
-	psOption := pubsub.WithDiscovery(d)
+	psOptions := []pubsub.Option{pubsub.WithDiscovery(d),
+		pubsub.WithMessageSigning(false),
+		pubsub.WithStrictSignatureVerification(false),
+	}
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 
+	libp2pKey, err := PrivKey(m.key)
+	if err != nil {
+		return fmt.Errorf("failed to translate Flow key to Libp2p key: %w", err)
+	}
+
 	// start the libp2p node
-	err := m.libP2PNode.Start(m.ctx, nodeAddress, m.log, m.handleIncomingStream, psOption)
+	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, psOptions...)
 
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
@@ -108,19 +141,15 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 func (m *Middleware) Stop() {
 	close(m.stop)
 
-	// stop all the connections
-	for _, conn := range m.cc.GetAll() {
-		conn.Stop()
-	}
-
 	// cancel the context (this also signals libp2p go routines to exit)
 	m.cancel()
 
 	// stop libp2p
-	err := m.libP2PNode.Stop()
+	done, err := m.libP2PNode.Stop()
 	if err != nil {
 		log.Error().Err(err).Msg("stopping failed")
 	} else {
+		<-done
 		log.Debug().Msg("node stopped successfully")
 	}
 
@@ -128,32 +157,54 @@ func (m *Middleware) Stop() {
 	m.wg.Wait()
 }
 
-// Send will try to send the given message to the given peer.
-func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
-	m.Lock()
-	defer m.Unlock()
-	found, stale := false, false
-	var conn *WriteConnection
-
-	log := m.log.With().Str("nodeid", targetID.String()).Logger()
-
-	if conn, found = m.cc.Get(targetID); found {
-		// check if the peer is still running
-		select {
-		case <-conn.done:
-			// connection found to be stale; replace with a new one
-			log.Debug().Msg("existing connection already closed ")
-			stale = true
-			conn = nil
-			m.cc.Remove(targetID)
-		default:
-			log.Debug().Msg("reusing existing connection")
+// Send sends the message to the set of target ids
+// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.sendDirect
+// Otherwise, middleware.publish is used, which uses the PubSub method of communication.
+func (m *Middleware) Send(channelID uint8, msg interface{}, targetIDs ...flow.Identifier) error {
+	var err error
+	mode := m.chooseMode(channelID, msg, targetIDs...)
+	// decide what mode of communication to use
+	switch mode {
+	case NoOp:
+		// TODO: Decide if this is actually an error or not
+		// return fmt.Errorf("empty list of target Ids")
+		return nil
+	case OneToOne:
+		if targetIDs[0] == m.me {
+			// to avoid self dial by the underlay
+			m.log.Debug().Msg("self dial attempt")
+			return nil
 		}
-	} else {
-		log.Debug().Str("nodeid", targetID.String()).Msg("connection not found, creating one")
+		err = m.sendDirect(targetIDs[0], msg)
+	case OneToK:
+		err = m.publish(strconv.Itoa(int(channelID)), msg)
+	default:
+		err = fmt.Errorf("invalid communcation mode: %d", mode)
 	}
 
-	if !found || stale {
+	if err != nil {
+		return fmt.Errorf("failed to send message to %s:%w", targetIDs, err)
+	}
+	return nil
+}
+
+// chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
+func (m *Middleware) chooseMode(_ uint8, _ interface{}, targetIDs ...flow.Identifier) communicationMode {
+	switch len(targetIDs) {
+	case 0:
+		return NoOp
+	case 1:
+		return OneToOne
+	default:
+		return OneToK
+	}
+}
+
+// sendDirect will try to send the given message to the given peer utilizing a 1-1 direct connection
+func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error {
+
+	switch msg := msg.(type) {
+	case *message.Message:
 
 		// get an identity to connect to. The identity provides the destination TCP address.
 		idsMap, err := m.ov.Identity()
@@ -165,50 +216,59 @@ func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
 			return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
 		}
 
-		// create new connection
-		conn, err = m.connect(flowIdentity.NodeID.String(), flowIdentity.Address)
+		// create new stream
+		// (streams don't need to be reused and are fairly inexpensive to be created for each send.
+		// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
+		// sent out the the receiver
+		stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address, flowIdentity.NetworkPubKey)
 		if err != nil {
-			return fmt.Errorf("could not create new connection for %s: %w", targetID.String(), err)
+			return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
 		}
 
-		// cache the connection against the node id
-		m.cc.Add(flowIdentity.NodeID, conn)
+		// create a gogo protobuf writer
+		bufw := bufio.NewWriter(stream)
+		writer := ggio.NewDelimitedWriter(bufw)
 
-		// kick-off a go routine (one for each outbound connection)
-		m.wg.Add(1)
-		go m.handleOutboundConnection(flowIdentity.NodeID, conn)
-
-	}
-
-	// send the message if connection still valid
-	select {
-	case <-conn.done:
-		return errors.Errorf("connection has closed (node_id: %s)", targetID.String())
-	default:
-		switch msg := msg.(type) {
-		case *message.Message:
-			// Write message to outbound channel only if it is of the correct type
-			conn.outbound <- msg
-		default:
-			err := errors.Errorf("middleware received invalid message type (%T)", msg)
-			return err
+		err = writer.WriteMsg(msg)
+		if err != nil {
+			return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
 		}
+
+		// flush the stream
+		err = bufw.Flush()
+		if err != nil {
+			return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
+		}
+
+		// close the stream immediately
+		// helpers.FullClose will close the stream, wait for an EOF and then call reset on the stream
+		// this is the ideal way of closing the stream in libp2p as of now
+		go helpers.FullClose(stream)
+
 		return nil
+
+	default:
+		err := errors.Errorf("invalid message type (%T)", msg)
+		return err
 	}
 }
 
-// connect creates a new connection
-func (m *Middleware) connect(flowID string, address string) (*WriteConnection, error) {
-
-	log := m.log.With().Str("targetid", flowID).Str("address", address).Logger()
+// connect creates a new stream
+func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey) (libp2pnetwork.Stream, error) {
 
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse address %s:%v", address, err)
 	}
 
+	// convert the Flow key to a LibP2P key
+	lkey, err := PublicKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert flow key to libp2p key: %v", err)
+	}
+
 	// Create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port}
+	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port, PubKey: lkey}
 
 	// Create a stream for it
 	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)
@@ -216,25 +276,8 @@ func (m *Middleware) connect(flowID string, address string) (*WriteConnection, e
 		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
 	}
 
-	clog := m.log.With().
-		Str("local_addr", stream.Conn().LocalPeer().String()).
-		Str("remote_addr", stream.Conn().RemotePeer().String()).
-		Logger()
-
-	// create the write connection handler
-	conn := NewWriteConnection(clog, stream)
-
-	log.Info().Msg("connection established")
-
-	return conn, nil
-}
-
-func (m *Middleware) handleOutboundConnection(targetID flow.Identifier, conn *WriteConnection) {
-	defer m.wg.Done()
-	// Remove the conn from the cache when done
-	defer m.cc.Remove(targetID)
-	// kick off the send loop
-	conn.SendLoop()
+	log.Info().Str("targetid", flowID).Str("address", address).Msg("stream created")
+	return stream, nil
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -325,23 +368,26 @@ SubscriptionLoop:
 	}
 }
 
-// processMessager processes a message and eventuall passes it to the overlay
+// processMessage processes a message and eventually passes it to the overlay
 func (m *Middleware) processMessage(msg *message.Message) {
-	nodeID, err := getSenderID(msg)
-	if err != nil {
-		log.Error().Err(err).Msg("could not extract sender ID")
+
+	// run through all the message validators
+	for _, v := range m.validators {
+		// if any one fails, stop message propagation
+		if !v.Validate(*msg) {
+			return
+		}
 	}
-	if nodeID == m.me {
-		return
-	}
-	err = m.ov.Receive(nodeID, msg)
+
+	// if validation passed, send the message to the overlay
+	err := m.ov.Receive(flow.HashToID(msg.OriginID), msg)
 	if err != nil {
 		log.Error().Err(err).Msg("could not deliver payload")
 	}
 }
 
 // Publish publishes the given payload on the topic
-func (m *Middleware) Publish(topic string, msg interface{}) error {
+func (m *Middleware) publish(topic string, msg interface{}) error {
 	switch msg := msg.(type) {
 	case *message.Message:
 
@@ -364,15 +410,4 @@ func (m *Middleware) Publish(topic string, msg interface{}) error {
 		return err
 	}
 	return nil
-}
-
-func getSenderID(msg *message.Message) (flow.Identifier, error) {
-	// Extract sender id
-	if len(msg.OriginID) < 32 {
-		err := fmt.Errorf("invalid sender id")
-		return flow.ZeroID, err
-	}
-	var id flow.Identifier
-	copy(id[:], msg.OriginID)
-	return id, nil
 }

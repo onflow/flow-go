@@ -44,6 +44,10 @@ func (tb TransactionBody) ID() Identifier {
 	return MakeID(tb)
 }
 
+func (tb TransactionBody) Checksum() Identifier {
+	return MakeID(tb)
+}
+
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	TransactionBody
@@ -145,7 +149,7 @@ func (f TransactionField) String() string {
 }
 
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
-func (tx *Transaction) MissingFields() []string {
+func (tx *TransactionBody) MissingFields() []string {
 	// Required fields are Script, ReferenceBlockHash, Nonce, ComputeLimit, PayerAccount
 	missingFields := make([]string, 0)
 

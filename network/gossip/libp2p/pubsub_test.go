@@ -162,15 +162,21 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 
 	// creating nodes
 	for i := 1; i <= count; i++ {
+
+		name := fmt.Sprintf("node%d", i)
+		pkey, err := generateNetworkingKey(name)
+		require.NoError(psts.Suite.T(), err)
+
 		n := &P2PNode{}
 		nodeID := NodeAddress{
-			Name: fmt.Sprintf("node%d", i),
-			IP:   "0.0.0.0", // localhost
-			Port: "0",       // random Port number
+			Name:   name,
+			IP:     "0.0.0.0",        // localhost
+			Port:   "0",              // random Port number
+			PubKey: pkey.GetPublic(), // the networking public key
 		}
 
 		psOption := pubsub.WithDiscovery(d)
-		err := n.Start(psts.ctx, nodeID, logger, handlerFunc, psOption)
+		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, psOption)
 		require.NoError(psts.Suite.T(), err)
 		require.Eventuallyf(psts.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()
@@ -184,6 +190,8 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 // StopNodes stop all nodes in the input slice
 func (psts *PubSubTestSuite) StopNodes(nodes []*P2PNode) {
 	for _, n := range nodes {
-		assert.NoError(psts.Suite.T(), n.Stop())
+		done, err := n.Stop()
+		assert.NoError(psts.Suite.T(), err)
+		<-done
 	}
 }

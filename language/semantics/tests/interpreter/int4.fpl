@@ -1,4 +1,0 @@
-fun test(): Int8 {
-    return 1
-};
-assert test() == 1

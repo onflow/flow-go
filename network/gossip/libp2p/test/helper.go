@@ -5,11 +5,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 )
 
 // helper offers a set of functions that are shared among different tests
@@ -32,25 +33,27 @@ func CreateIDs(count int) []*flow.Identity {
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
-func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool) ([]*libp2p.Network, error) {
+func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool, tops ...middleware.Topology) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
+	// create an empty identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
+	// identities are set to appropriate IP Port after the network and middleware are started
+	identities := make(flow.IdentityList, len(ids))
 
-	// creates and mocks the state
-	var snapshot *SnapshotMock
-	if dryrun {
-		snapshot = &SnapshotMock{ids: ids}
-	} else {
-		snapshot = &SnapshotMock{ids: flow.IdentityList{}}
+	// if no topology is passed in, use the default topology for all networks
+	if tops == nil {
+		tops = make([]middleware.Topology, count)
+		rpt := libp2p.NewRandPermTopology()
+		for i := range tops {
+			tops[i] = rpt
+		}
 	}
-	state := &protocol.State{}
-	state.On("Final").Return(snapshot)
 
 	for i := 0; i < count; i++ {
 		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), state, me, mws[i], csize)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), identities, me, mws[i], csize, tops[i])
 		if err != nil {
 			return nil, fmt.Errorf("could not create error %w", err)
 		}
@@ -58,27 +61,33 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		nets = append(nets, net)
 	}
 
-	// if dryrun then don't actually start the network just return the network objects
-	if dryrun {
-		return nets, nil
+	// if dryrun then don't actually start the network
+	if !dryrun {
+		for _, net := range nets {
+			<-net.Ready()
+		}
 	}
 
-	for _, net := range nets {
-		<-net.Ready()
-	}
-
-	for i, m := range mws {
+	// set the identities to appropriate ip and port
+	for i := range ids {
 		// retrieves IP and port of the middleware
-		ip, port := m.GetIPPort()
+		var ip, port string
+		var key crypto.PublicKey
+		if !dryrun {
+			m := mws[i]
+			ip, port = m.GetIPPort()
+			key = m.PublicKey()
+		}
 
 		// mocks an identity for the middleware
-		id := &flow.Identity{
-			NodeID:  ids[i].NodeID,
-			Address: fmt.Sprintf("%s:%s", ip, port),
-			Role:    flow.RoleCollection,
-			Stake:   0,
+		id := flow.Identity{
+			NodeID:        ids[i].NodeID,
+			Address:       fmt.Sprintf("%s:%s", ip, port),
+			Role:          flow.RoleCollection,
+			Stake:         0,
+			NetworkPubKey: key,
 		}
-		snapshot.ids = append(snapshot.ids, id)
+		identities[i] = &id
 	}
 
 	return nets, nil
@@ -89,8 +98,14 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 	count := len(identities)
 	mws := make([]*libp2p.Middleware, 0)
 	for i := 0; i < count; i++ {
+
+		key, err := GenerateNetworkingKey(identities[i].NodeID)
+		if err != nil {
+			return nil, err
+		}
+
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID)
+		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key)
 		if err != nil {
 			return nil, err
 		}
@@ -112,14 +127,21 @@ func (s *SnapshotMock) Identity(nodeID flow.Identifier) (*flow.Identity, error) 
 	return nil, fmt.Errorf(" not implemented")
 }
 
-func (s *SnapshotMock) Commit() (flow.StateCommitment, error) {
-	return nil, fmt.Errorf(" not implemented")
-}
-
 func (s *SnapshotMock) Clusters() (*flow.ClusterList, error) {
 	return nil, fmt.Errorf(" not implemented")
 }
 
 func (s *SnapshotMock) Head() (*flow.Header, error) {
 	return nil, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Seal() (flow.Seal, error) {
+	return flow.Seal{}, fmt.Errorf(" not implemented")
+}
+
+// GenerateNetworkingKey generates a Flow ECDSA key using the given seed
+func GenerateNetworkingKey(seed flow.Identifier) (crypto.PrivateKey, error) {
+	s := make([]byte, 48)
+	copy(s, seed[:])
+	return crypto.GeneratePrivateKey(crypto.ECDSA_P256, s)
 }

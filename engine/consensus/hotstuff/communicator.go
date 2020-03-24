@@ -1,7 +1,7 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -10,7 +10,7 @@ import (
 type Communicator interface {
 
 	// SendVote sends the given vote to the given node.
-	SendVote(vote *types.Vote, to flow.Identifier) error
+	SendVote(blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature, recipientID flow.Identifier) error
 
 	// BroadcastProposal sends the given block proposal to all nodes
 	// participating in the consensus process.

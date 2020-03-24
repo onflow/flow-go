@@ -2,6 +2,7 @@ package leveldb
 
 import (
 	"bytes"
+	"errors"
 	"path/filepath"
 
 	"github.com/syndtr/goleveldb/leveldb"
@@ -22,7 +23,11 @@ type LevelDB struct {
 
 // GetKVDB calls a get on the key-value database
 func (s *LevelDB) GetKVDB(key []byte) ([]byte, error) {
-	return s.kvdb.Get(key, nil)
+	value, err := s.kvdb.Get(key, nil)
+	if errors.Is(err, leveldb.ErrNotFound) {
+		return value, databases.ErrNotFound
+	}
+	return value, err
 }
 
 // GetTrieDB calls Get on the TrieDB in the interface

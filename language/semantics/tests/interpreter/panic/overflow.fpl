@@ -1,3 +1,0 @@
-let x: UInt8 = 255;
-
-let y = x + 1

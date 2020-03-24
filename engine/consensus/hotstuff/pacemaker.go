@@ -3,7 +3,7 @@ package hotstuff
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // PaceMaker for HotStuff. The component is passive in that it only reacts to method calls.
@@ -40,7 +40,7 @@ type PaceMaker interface {
 
 	// UpdateCurViewWithQC will check if the given QC will allow PaceMaker to fast
 	// forward to QC.view+1. If PaceMaker incremented the current View, a NewViewEvent will be returned
-	UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool)
+	UpdateCurViewWithQC(qc *hotstuff.QuorumCertificate) (*hotstuff.NewViewEvent, bool)
 
 	// UpdateCurViewWithBlock will check if the given block will allow PaceMaker to fast forward
 	// to the BlockProposal's view. If yes, the PaceMaker will update it's internal value for
@@ -49,7 +49,7 @@ type PaceMaker interface {
 	// The parameter `nextPrimary` indicates to the PaceMaker whether or not this replica is the
 	// primary for the NEXT view taking block.view as reference.
 	// True corresponds to this replica being the next primary.
-	UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool)
+	UpdateCurViewWithBlock(block *hotstuff.Block, isLeaderForNextView bool) (*hotstuff.NewViewEvent, bool)
 
 	// TimeoutChannel returns the timeout channel for the CURRENTLY ACTIVE timeout.
 	// Each time the pace maker starts a new timeout, this channel is replaced.
@@ -60,7 +60,7 @@ type PaceMaker interface {
 	// a NewViewEvent.
 	// It is the responsibility of the calling code to ensure that NO STALE timeouts are
 	// delivered to the PaceMaker.
-	OnTimeout() *types.NewViewEvent
+	OnTimeout() *hotstuff.NewViewEvent
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view)
 	Start()

@@ -14,27 +14,27 @@ type Transactions struct {
 	*Backend
 }
 
-// NewTransactions creates a new memory pool for transactions.
-func NewTransactions() (*Transactions, error) {
+// NewTransactions creates a new memory pool for transctions.
+func NewTransactions(limit uint) (*Transactions, error) {
 	t := &Transactions{
-		Backend: NewBackend(),
+		Backend: NewBackend(WithLimit(limit)),
 	}
 
 	return t, nil
 }
 
 // Add adds a transaction to the mempool.
-func (t *Transactions) Add(tx *flow.Transaction) error {
+func (t *Transactions) Add(tx *flow.TransactionBody) error {
 	return t.Backend.Add(tx)
 }
 
 // ByID returns the transaction with the given ID from the mempool.
-func (t *Transactions) ByID(txID flow.Identifier) (*flow.Transaction, error) {
+func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
 	entity, err := t.Backend.ByID(txID)
 	if err != nil {
 		return nil, err
 	}
-	tx, ok := entity.(*flow.Transaction)
+	tx, ok := entity.(*flow.TransactionBody)
 	if !ok {
 		panic(fmt.Sprintf("invalid entity in transaction pool (%T)", entity))
 	}
@@ -42,15 +42,11 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.Transaction, error) {
 }
 
 // All returns all transactions from the mempool.
-func (t *Transactions) All() []*flow.Transaction {
+func (t *Transactions) All() []*flow.TransactionBody {
 	entities := t.Backend.All()
-	txs := make([]*flow.Transaction, 0, len(entities))
+	txs := make([]*flow.TransactionBody, 0, len(entities))
 	for _, entity := range entities {
-		tx, ok := entity.(*flow.Transaction)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in transaction pool (%T)", entity))
-		}
-		txs = append(txs, tx)
+		txs = append(txs, entity.(*flow.TransactionBody))
 	}
 	return txs
 }

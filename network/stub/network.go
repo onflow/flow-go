@@ -68,10 +68,6 @@ func (mn *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.
 		TargetIDs: targetIDs,
 	}
 
-	if mn.hub.isSync {
-		return mn.sendToAllTargets(m)
-	}
-
 	mn.buffer(m)
 
 	return nil
@@ -96,12 +92,12 @@ func (mn *Network) buffer(m *PendingMessage) {
 	mn.hub.Buffer.Save(m)
 }
 
-// DeliverAllRecursive sends all pending messages to the receivers. The receivers
+// DeliverAll sends all pending messages to the receivers. The receivers
 // might be triggered to forward messages to its peers, so this function will
 // block until all receivers have done their forwarding.
-func (mn *Network) DeliverAllRecursive() {
+func (mn *Network) DeliverAll(recursive bool) {
 	mn.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
-		_ = mn.sendToAllTargets(m)
+		_ = mn.sendToAllTargets(m, recursive)
 	})
 }
 
@@ -109,22 +105,22 @@ func (mn *Network) DeliverAllRecursive() {
 // those that satisfy the shouldDrop predicate function. All messages that
 // satisfy the shouldDrop predicate are permanently dropped. This function will
 // block until all receivers have done their forwarding.
-func (mn *Network) DeliverAllRecursiveExcept(shouldDrop func(*PendingMessage) bool) {
+func (mn *Network) DeliverAllExcept(recursive bool, shouldDrop func(*PendingMessage) bool) {
 	mn.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
 		if shouldDrop(m) {
 			return
 		}
-		_ = mn.sendToAllTargets(m)
+		_ = mn.sendToAllTargets(m, recursive)
 	})
 }
 
 // DeliverSome delivers all messages in the buffer that satisfy the
 // shouldDeliver predicate. Any messages that are not delivered remain in the
 // buffer.
-func (mn *Network) DeliverSome(shouldDeliver func(*PendingMessage) bool) {
+func (mn *Network) DeliverSome(recursive bool, shouldDeliver func(*PendingMessage) bool) {
 	mn.hub.Buffer.Deliver(func(m *PendingMessage) bool {
 		if shouldDeliver(m) {
-			return mn.sendToAllTargets(m) != nil
+			return mn.sendToAllTargets(m, recursive) != nil
 		}
 		return false
 	})
@@ -132,11 +128,14 @@ func (mn *Network) DeliverSome(shouldDeliver func(*PendingMessage) bool) {
 
 // sendToAllTargets send a message to all its targeted nodes if the targeted
 // node has not yet seen it.
-func (mn *Network) sendToAllTargets(m *PendingMessage) error {
+func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 	mn.Lock()
 	defer mn.Unlock()
 
-	key := eventKey(m.ChannelID, m.Event)
+	key, err := eventKey(m.ChannelID, m.Event)
+	if err != nil {
+		return err
+	}
 	for _, nodeID := range m.TargetIDs {
 		// Find the network of the targeted node
 		receiverNetwork, exist := mn.hub.GetNetwork(nodeID)
@@ -159,13 +158,19 @@ func (mn *Network) sendToAllTargets(m *PendingMessage) error {
 			return errors.Errorf("Network can not find engine ID: %v for node: %v", m.ChannelID, nodeID)
 		}
 
-		// Find the engine of the targeted network
-		// Call `Process` to let receiver engine receive the event directly.
-		err := receiverEngine.Process(m.From, m.Event)
-
-		if err != nil {
-			return errors.Wrapf(err, "senderEngine failed to process event: %v", m.Event)
+		if recursive {
+			err := receiverEngine.Process(m.From, m.Event)
+			if err != nil {
+				return errors.Wrapf(err, "senderEngine failed to process event: %v", m.Event)
+			}
+		} else {
+			// Call `Submit` to let receiver engine receive the event directly.
+			// Submit is supposed to process event asynchronously, but if it doesn't we are risking
+			// deadlock (if it trigger another message sending we might end up calling this very function again)
+			// Running it in Go-routine is some cheap form of defense against deadlock in tests
+			go receiverEngine.Submit(m.From, m.Event)
 		}
+
 	}
 	return nil
 }

@@ -9,11 +9,11 @@ import (
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/receipts"
+	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -39,6 +39,7 @@ type CollectionNode struct {
 	GenericNode
 	Pool            mempool.Transactions
 	Collections     storage.Collections
+	Transactions    storage.Transactions
 	IngestionEngine *collectioningest.Engine
 	ProviderEngine  *provider.Engine
 }
@@ -58,9 +59,9 @@ type ConsensusNode struct {
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	BlocksEngine    *ingestion.Engine
-	ExecutionEngine *execution.Engine
-	ReceiptsEngine  *receipts.Engine
+	IngestionEngine *ingestion.Engine
+	ExecutionEngine *computation.Manager
+	ReceiptsEngine  *executionprovider.Engine
 	BadgerDB        *badger.DB
 	LevelDB         *leveldb.LevelDB
 	VM              virtualmachine.VirtualMachine
@@ -68,8 +69,7 @@ type ExecutionNode struct {
 }
 
 func (en ExecutionNode) Done() {
-	<-en.BlocksEngine.Done()
-	<-en.ExecutionEngine.Done()
+	<-en.IngestionEngine.Done()
 	<-en.ReceiptsEngine.Done()
 	en.BadgerDB.Close()
 	en.LevelDB.SafeClose()
@@ -78,10 +78,12 @@ func (en ExecutionNode) Done() {
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
 	GenericNode
-	Receipts       mempool.Receipts
-	Blocks         mempool.Blocks
-	Collections    mempool.Collections
-	ChunkStates    mempool.ChunkStates
-	IngestEngine   network.Engine
-	VerifierEngine network.Engine
+	AuthReceipts    mempool.Receipts
+	PendingReceipts mempool.Receipts
+	BlockStorage    storage.Blocks
+	Collections     mempool.Collections
+	ChunkStates     mempool.ChunkStates
+	ChunkDataPacks  mempool.ChunkDataPacks
+	IngestEngine    network.Engine
+	VerifierEngine  network.Engine
 }

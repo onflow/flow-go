@@ -2,7 +2,6 @@ package trie
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -10,11 +9,11 @@ import (
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
-var EmptySlice []byte
 var nilChild []byte = make([]byte, 32)
 
 // node is a struct for constructing our Tree
@@ -40,16 +39,33 @@ type SMT struct {
 	lruCache             *lru.Cache               // LRU cache of stringified keys to proofs
 }
 
-// Hash hashes any input with SHA256.
-func Hash(data ...[]byte) []byte {
-	hasher := sha256.New()
-	for i := 0; i < len(data); i++ {
-		_, err := hasher.Write(data[i])
-		if err != nil {
-			panic(err)
-		}
+// HashLeaf generates hash value for leaf nodes (SHA3-256).
+func HashLeaf(key []byte, value []byte) []byte {
+	hasher := crypto.NewSHA3_256()
+	_, err := hasher.Write(key)
+	if err != nil {
+		panic(err)
 	}
-	return hasher.Sum(nil)
+	_, err = hasher.Write(value)
+	if err != nil {
+		panic(err)
+	}
+
+	return hasher.SumHash()
+}
+
+// HashInterNode generates hash value for intermediate nodes (SHA3-256).
+func HashInterNode(hash1 []byte, hash2 []byte) []byte {
+	hasher := crypto.NewSHA3_256()
+	_, err := hasher.Write(hash1)
+	if err != nil {
+		panic(err)
+	}
+	_, err = hasher.Write(hash2)
+	if err != nil {
+		panic(err)
+	}
+	return hasher.SumHash()
 }
 
 // newNode creates a new node with the provided value and no children
@@ -72,6 +88,51 @@ func (n *node) GetValue() []byte {
 // GetHeight returns the height of the node.
 func (n *node) GetHeight() int {
 	return n.height
+}
+
+// ComputeValue recomputes value for this node in recursive manner
+func (n *node) ComputeValue() []byte {
+	// leaf node
+	if n.Lchild == nil && n.Rchild == nil {
+		return n.value
+	}
+	// otherwise compute
+	h1 := GetDefaultHashForHeight(n.height - 1)
+	if n.Lchild != nil {
+		h1 = n.Lchild.ComputeValue()
+	}
+	h2 := GetDefaultHashForHeight(n.height - 1)
+	if n.Rchild != nil {
+		h2 = n.Rchild.ComputeValue()
+	}
+	// For debugging purpose uncomment this
+	// n.value = HashInterNode(h1, h2)
+	return HashInterNode(h1, h2)
+}
+
+func (n node) String() string {
+	right := ""
+	if n.Rchild != nil {
+		right = n.Rchild.String()
+	}
+	left := ""
+	if n.Lchild != nil {
+		left = n.Lchild.String()
+	}
+	return fmt.Sprintf("%v: (%v,%v) left> %v right> %v ", n.height, n.key, hex.EncodeToString(n.value), left, right)
+}
+
+// FmtStr provides formated string represntation of the node and sub tree
+func (n node) FmtStr(prefix string) string {
+	right := ""
+	if n.Rchild != nil {
+		right = fmt.Sprintf("\n%v", n.Rchild.FmtStr(prefix+"\t"))
+	}
+	left := ""
+	if n.Lchild != nil {
+		left = fmt.Sprintf("\n%v", n.Lchild.FmtStr(prefix+"\t"))
+	}
+	return fmt.Sprintf("%v%v: (%v,%v) %v %v ", prefix, n.height, n.key, hex.EncodeToString(n.value), left, right)
 }
 
 // NewSMT creates a new Sparse Merkle Tree.
@@ -97,7 +158,7 @@ func NewSMT(
 	s.height = height
 
 	// Set root to the highest level default node
-	s.root = newNode(GetDefaultHashForHeight(height), height-1)
+	s.root = newNode(GetDefaultHashForHeight(height-1), height-1)
 	s.historicalStates = make(map[string]databases.DAL)
 	s.numHistoricalStates = numHistoricalStates
 	s.numFullStates = numFullStates
@@ -116,7 +177,7 @@ func NewSMT(
 
 // proofHolder is a struct that holds the proofs and flags from a proof check
 type proofHolder struct {
-	flags      [][]byte   // The flags of the proofs
+	flags      [][]byte   // The flags of the proofs (is set if an intermediate node has a non-default)
 	proofs     [][][]byte // the non-default nodes in the proof
 	inclusions []bool     // flag indicating if this is an inclusion or exclusion
 	sizes      []uint8    // size of the proof in steps
@@ -226,9 +287,10 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root []byte) ([][]byte, *proofHo
 	values := make([][]byte, len(keys))
 	// the case where we are reading from current state
 	if bytes.Equal(root, currRoot) {
+
 		for i, key := range keys {
 			res, err := s.database.GetKVDB(key)
-			if err != nil {
+			if err != nil && !errors.Is(err, databases.ErrNotFound) {
 				return nil, nil, err
 			}
 			values[i] = res
@@ -255,7 +317,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root []byte) ([][]byte, *proofHo
 					}
 				}
 
-				if res == nil {
+				if res == nil && !errors.Is(err, databases.ErrNotFound) {
 					return nil, nil, err
 				}
 			}
@@ -309,7 +371,7 @@ func (s *SMT) verifyInclusionFlag(key []byte, flag []byte) bool {
 
 // GetProof searching the tree for a value if it exists, and returns the flag and then proof
 func (s *SMT) GetProof(key []byte) ([]byte, [][]byte, uint8, bool) {
-	flag := make([]byte, s.GetHeight()/8)
+	flag := make([]byte, s.GetHeight()/8) // Flag is used to save space by removing default hashesh (zeros) from the proofs
 	proof := make([][]byte, 0)
 	proofLen := uint8(0)
 
@@ -355,7 +417,6 @@ func (s *SMT) GetProof(key []byte) ([]byte, [][]byte, uint8, bool) {
 	if curr.key == nil {
 		return flag, proof, proofLen, false
 	}
-
 	return flag, proof, proofLen, true
 }
 
@@ -474,39 +535,37 @@ func (s *SMT) GetHistoricalProof(key []byte, root []byte, database databases.DAL
 // VerifyInclusionProof calculates the inclusion proof from a given root, flag, proof list, and size.
 //
 // This function is exclusively for inclusive proofs
-func VerifyInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte, size uint8, root []byte, hashes [256][]byte, height int) bool {
+func VerifyInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte, size uint8, root []byte, height int) bool {
 	// get index of proof we start our calculations from
 	proofIndex := 0
 
 	if len(proof) != 0 {
 		proofIndex = len(proof) - 1
 	}
-
 	// base case at the bottom of the trie
-	computed := Hash(key, value)
-	for i := int(size); i > 0; i-- {
+	computed := ComputeCompactValue(key, value, height-int(size)-1, height)
+	for i := int(size) - 1; i > -1; i-- {
 		// hashing is order dependant
-		if utils.IsBitSet(key, i-1) {
-			if !utils.IsBitSet(flag, i-1) {
-				computed = Hash(hashes[(height-1)-i], computed)
+		if utils.IsBitSet(key, i) {
+			if !utils.IsBitSet(flag, i) {
+				computed = HashInterNode(GetDefaultHashForHeight((height-i)-2), computed)
 			} else {
-				computed = Hash(proof[proofIndex], computed)
-				proofIndex = proofIndex - 1
+				computed = HashInterNode(proof[proofIndex], computed)
+				proofIndex--
 			}
-
 		} else {
-			if !utils.IsBitSet(flag, i-1) {
-				computed = Hash(computed, hashes[(height-1)-i])
+			if !utils.IsBitSet(flag, i) {
+				computed = HashInterNode(computed, GetDefaultHashForHeight((height-i)-2))
 			} else {
-				computed = Hash(computed, proof[proofIndex])
-				proofIndex = proofIndex - 1
+				computed = HashInterNode(computed, proof[proofIndex])
+				proofIndex--
 			}
 		}
 	}
 	return bytes.Equal(computed, root)
 }
 
-func VerifyNonInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte, size uint8, root []byte, hashes [256][]byte, height int) bool {
+func VerifyNonInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte, size uint8, root []byte, height int) bool {
 	// get index of proof we start our calculations from
 	proofIndex := 0
 
@@ -515,23 +574,22 @@ func VerifyNonInclusionProof(key []byte, value []byte, flag []byte, proof [][]by
 	}
 
 	// base case at the bottom of the trie
-	computed := Hash(key, value)
-	for i := int(size); i > 0; i-- {
-		//hashing is order dependant
-		if utils.IsBitSet(key, i-1) {
-			if !utils.IsBitSet(flag, i-1) {
-				computed = Hash(hashes[(height-1)-i], computed)
+	computed := ComputeCompactValue(key, value, height-int(size)-1, height)
+	for i := int(size) - 1; i > -1; i-- {
+		// hashing is order dependant
+		if utils.IsBitSet(key, i) {
+			if !utils.IsBitSet(flag, i) {
+				computed = HashInterNode(GetDefaultHashForHeight((height-i)-2), computed)
 			} else {
-				computed = Hash(proof[proofIndex], computed)
-				proofIndex = proofIndex - 1
+				computed = HashInterNode(proof[proofIndex], computed)
+				proofIndex--
 			}
-
 		} else {
-			if !utils.IsBitSet(flag, i-1) {
-				computed = Hash(computed, hashes[(height-1)-i])
+			if !utils.IsBitSet(flag, i) {
+				computed = HashInterNode(computed, GetDefaultHashForHeight((height-i)-2))
 			} else {
-				computed = Hash(computed, proof[proofIndex])
-				proofIndex = proofIndex - 1
+				computed = HashInterNode(computed, proof[proofIndex])
+				proofIndex--
 			}
 		}
 	}
@@ -628,37 +686,42 @@ func (s *SMT) GetRoot() *node {
 }
 
 func (s *SMT) insertIntoKeys(insert []byte, keys [][]byte, values [][]byte) ([][]byte, [][]byte, error) {
+	// Initialize new slices, with capacity accounting for the inserted value
+	newKeys := make([][]byte, 0, len(keys)+1)
+	newValues := make([][]byte, 0, len(values)+1)
+
 	for i, key := range keys {
 		if bytes.Equal(insert, key) {
 			return keys, values, nil
 		}
 
+		// Assuming the keys are presorted, this means we've found the spot in the slice to insert
 		if bytes.Compare(insert, key) < 0 {
-			// Insert the key into the keys
-			newkeys := make([][]byte, 0)
-			newkeys = append(newkeys, keys[:i]...)
-			newkeys = append(newkeys, insert)
-			newkeys = append(newkeys, keys[i:]...)
+			// Insert the new key and remaining keys into the newKeys
+			newKeys = append(newKeys, insert)
+			newKeys = append(newKeys, keys[i:]...)
 
-			// Insert the old value into values
-			newvalues := make([][]byte, 0)
-			newvalues = append(newvalues, values[:i]...)
+			// Insert the old value and remaining values into newValues
 			oldVal, err := s.database.GetKVDB(insert)
 			if err != nil {
 				return nil, nil, err
 			}
-			newvalues = append(newvalues, oldVal)
-			newvalues = append(newvalues, values[i:]...)
+			newValues = append(newValues, oldVal)
+			newValues = append(newValues, values[i:]...)
 
-			return newkeys, newvalues, nil
+			return newKeys, newValues, nil
 		}
+		// Otherwise, append the key + value pair and loop
+		newKeys = append(newKeys, keys[i])
+		newValues = append(newValues, values[i])
 	}
 
+	// Did not find a spot for it in the slice, means it's place is at the end
 	oldVal, err := s.database.GetKVDB(insert)
 	if err != nil {
 		return nil, nil, err
 	}
-	return append(keys, insert), append(values, oldVal), nil
+	return append(newKeys, insert), append(newValues, oldVal), nil
 }
 
 // UpdateAtomically updates the trie atomically and returns the state root
@@ -716,7 +779,7 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 
 // GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
 // we just return the children
-func (n *node) GetandSetChildren(hashes [256][]byte) (*node, *node) {
+func (n *node) GetandSetChildren(hashes [257][]byte) (*node, *node) {
 	if n.Lchild == nil {
 		n.Lchild = newNode(nil, n.height-1)
 	}
@@ -763,7 +826,7 @@ func (s *SMT) updateRight(lnode *node, rnode *node, rootNode *node, rkeys [][]by
 // ComputeRoot either returns a new leafNode or computes a new rootNode by hashing its children
 func (s *SMT) ComputeRootNode(lnode *node, rnode *node, oldRootNode *node, keys [][]byte, values [][]byte, height int) *node {
 	if lnode == nil && rnode == nil {
-		ln := newNode(Hash(keys[0], values[0]), height)
+		ln := newNode(ComputeCompactValue(keys[0], values[0], height, s.height), height)
 		ln.key = keys[0]
 		s.database.PutIntoBatcher(ln.value, ln.key)
 		return ln
@@ -786,13 +849,13 @@ func (s *SMT) interiorNode(lnode *node, rnode *node, height int) *node {
 
 	// Hashes the children depending on if they are nil or filled
 	if (lnode != nil) && (rnode != nil) {
-		in := newNode(Hash(lnode.value, rnode.value), height)
+		in := newNode(HashInterNode(lnode.value, rnode.value), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		s.database.PutIntoBatcher(in.value, append(in.Lchild.value, in.Rchild.value...))
 		return in
 	} else if lnode == nil && rnode != nil {
-		in := newNode(Hash(GetDefaultHashForHeight(height), rnode.value), height)
+		in := newNode(HashInterNode(GetDefaultHashForHeight(height-1), rnode.value), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		// if the left node is nil value of the Rchild attached to key in DB will be prefaced by
@@ -802,7 +865,7 @@ func (s *SMT) interiorNode(lnode *node, rnode *node, height int) *node {
 		s.database.PutIntoBatcher(in.value, append(lFlag, in.Rchild.value...))
 		return in
 	} else if rnode == nil && lnode != nil {
-		in := newNode(Hash(lnode.value, GetDefaultHashForHeight(height)), height)
+		in := newNode(HashInterNode(lnode.value, GetDefaultHashForHeight(height-1)), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		rFlag := make([]byte, 1)
@@ -831,6 +894,53 @@ func (s *SMT) SafeClose() (error, error) {
 	return nil, nil
 }
 
+// ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
+func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []byte {
+
+	computedHash := HashLeaf(key, value)
+
+	for j := maxHeight - 2; j > maxHeight-height-2; j-- {
+		if utils.IsBitSet(key, j) { // right branching
+			computedHash = HashInterNode(GetDefaultHashForHeight(maxHeight-j-2), computedHash)
+		} else { // left branching
+			computedHash = HashInterNode(computedHash, GetDefaultHashForHeight(maxHeight-j-2))
+		}
+	}
+	return computedHash
+}
+
+// EncodeProof encodes a proof holder into an array of byte arrays
+// The following code is the encoding logic
+// Each slice in the proofHolder is stored as a byte array, and the whole thing is stored
+// as a [][]byte
+// First we have a byte, and set the first bit to 1 if it is an inclusion proof
+// Then the size is encoded as a single byte
+// Then the flag is encoded (size is defined by size)
+// Finally the proofs are encoded one at a time, and is stored as a byte array
+func EncodeProof(pholder *proofHolder) [][]byte {
+	proofs := make([][]byte, 0)
+	for i := 0; i < pholder.GetSize(); i++ {
+		flag, singleProof, inclusion, size := pholder.ExportProof(i)
+		byteSize := []byte{size}
+		byteInclusion := make([]byte, 1)
+		if inclusion {
+			utils.SetBit(byteInclusion, 0)
+		}
+		proof := append(byteInclusion, byteSize...)
+
+		flagSize := []byte{uint8(len(flag))}
+		proof = append(proof, flagSize...)
+		proof = append(proof, flag...)
+
+		for _, p := range singleProof {
+			proof = append(proof, p...)
+		}
+		// ledgerStorage is a struct that holds our SM
+		proofs = append(proofs, proof)
+	}
+	return proofs
+}
+
 // DecodeProof takes in an encodes array of byte arrays an converts them into a proofHolder
 func DecodeProof(proofs [][]byte) *proofHolder {
 	flags := make([][]byte, 0)
@@ -847,21 +957,17 @@ func DecodeProof(proofs [][]byte) *proofHolder {
 		byteInclusion := proof[0:1]
 		inclusion := utils.IsBitSet(byteInclusion, 0)
 		inclusions = append(inclusions, inclusion)
-		sizes = append(sizes, proof[1:2]...)
-		if len(proof) > 34 {
-			flags = append(flags, proof[2:33])
-		} else {
-			flags = append(flags, proof[2:])
-		}
+		size := proof[1:2]
+		sizes = append(sizes, size...)
+		flagSize := int(proof[2])
+		flags = append(flags, proof[3:flagSize+3])
 		byteProofs := make([][]byte, 0)
-		i := 33
-		for i < len(proof) {
+		for i := flagSize + 3; i < len(proof); i += 32 {
 			if i+32 <= len(proof) {
 				byteProofs = append(byteProofs, proof[i:i+32])
 			} else {
 				byteProofs = append(byteProofs, proof[i:])
 			}
-			i = i + 32
 		}
 		newProofs = append(newProofs, byteProofs)
 	}

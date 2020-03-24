@@ -36,6 +36,14 @@ void _ep2_print(char* s, ep2_st* p) {
     g2_print(p);
 }
 
+// return macro values to the upper Go Layer
+int get_valid() {
+    return VALID;
+}
+
+int get_invalid() {
+    return INVALID;
+}
 
 // Reads a prime field element from a digit vecotor in little-endian format.
 void fp_read_raw(fp_t a, const dig_t *raw, int len) {
@@ -345,7 +353,7 @@ void _ep2_write_bin_compact(byte *bin, const ep2_st *a, const int len) {
 void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {
-        THROW(ERR_NO_BUFFER);
+        THROW(ERR_NO_VALID);
         return;
     }
 

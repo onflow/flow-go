@@ -1,6 +1,8 @@
 package libp2p
 
 import (
+	"io"
+
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
@@ -42,8 +44,21 @@ RecvLoop:
 
 		var msg message.Message
 		err := r.ReadMsg(&msg)
+		// error handling done similar to comm.go in pubsub (as suggested by libp2p folks)
 		if err != nil {
-			rc.log.Error().Str("peer", rc.stream.Conn().RemotePeer().String()).Err(err)
+			// if the sender closes the connection an EOF is received otherwise an actual error is received
+			if err != io.EOF {
+				rc.log.Error().Err(err)
+				err = rc.stream.Reset()
+				if err != nil {
+					rc.log.Error().Err(err)
+				}
+			} else {
+				err = rc.stream.Close()
+				if err != nil {
+					rc.log.Error().Err(err)
+				}
+			}
 			rc.stop()
 			return
 		}

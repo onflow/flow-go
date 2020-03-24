@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/logging"
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -55,67 +56,117 @@ func NewEventHandler(
 
 // OnReceiveVote processes the vote when a vote is received.
 // It is assumed that the voting block is not a missing block
-func (e *EventHandler) OnReceiveVote(vote *types.Vote) error {
+func (e *EventHandler) OnReceiveVote(vote *hotstuff.Vote) error {
+
 	e.log.Info().
+		Hex("vote_id", logging.ID(vote.ID())).
 		Hex("vote_block", logging.ID(vote.BlockID)).
 		Uint64("vote_view", vote.View).
 		Msg("vote received")
 
 	// votes for finalized view or older should be dropped:
 	if vote.View <= e.forks.FinalizedView() {
+
+		e.log.Info().
+			Hex("vote_id", logging.ID(vote.ID())).
+			Msg("vote's view is equal or below the finalized view")
+
 		return nil
 	}
-	return e.processVote(vote)
-}
 
-// OnReceiveBlockHeader processes the block when a block proposal is received.
-// It is assumed that the block proposal is incorporated. (its parent can be found
-// in the forks)
-func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
-	e.log.Info().
-		Hex("block", logging.ID(block.BlockID())).
-		Uint64("qc_view", block.QC().View).
-		Uint64("block_view", block.View()).
-		Msg("block proposal received")
-
-	// find the parent of the block
-	parent, found := e.forks.GetBlock(block.QC().BlockID)
-	if !found {
-		return fmt.Errorf("cannot find block's parent when receiving block header: %v", block.QC().BlockID)
+	err := e.processVote(vote)
+	if err != nil {
+		return fmt.Errorf("failed processing Vote: %w", err)
 	}
 
-	// validate the block
-	_, validBlock, err := e.validator.ValidateBlock(block, parent)
-	if err != nil {
-		return fmt.Errorf("invalid block header: %w", err)
+	e.log.Info().
+		Hex("vote_id", logging.ID(vote.ID())).
+		Msg("done processing vote")
+
+	return nil
+}
+
+// OnReceiveProposal processes the block when a block proposal is received.
+// It is assumed that the block proposal is incorporated. (its parent can be found
+// in the forks)
+func (e *EventHandler) OnReceiveProposal(proposal *hotstuff.Proposal) error {
+
+	e.log.Info().
+		Hex("block_id", logging.ID(proposal.Block.BlockID)).
+		Uint64("block_view", proposal.Block.View).
+		Uint64("qc_view", proposal.Block.QC.View).
+		Hex("qc_id", logging.ID(proposal.Block.QC.BlockID)).
+		Msg("proposal received")
+
+	// validate the block. exit if the proposal is invalid
+	err := e.validator.ValidateProposal(proposal)
+	if errors.Is(err, hotstuff.ErrorInvalidBlock{}) {
+		e.log.Warn().
+			Hex("block_id", logging.ID(proposal.Block.BlockID)).
+			Msg("invalid proposal")
+		return nil
+	}
+	if errors.Is(err, hotstuff.ErrUnverifiableBlock) {
+		e.log.Warn().
+			Hex("block_id", logging.ID(proposal.Block.BlockID)).
+			Hex("qc_block_id", logging.ID(proposal.Block.QC.BlockID)).
+			Msg("unverifiable proposal")
+
+		// even if the block is unverifiable because the QC has been
+		// pruned, it still needs to be added to the forks, otherwise,
+		// a new block with a QC to this block will fail to be added
+		// to forks and crash the event loop.
+	} else if err != nil {
+		return fmt.Errorf("cannot validate proposal (%x): %w", proposal.Block.BlockID, err)
 	}
 
 	// store the block. the block will also be validated there
-	err = e.forks.AddBlock(validBlock)
+	err = e.forks.AddBlock(proposal.Block)
 	if err != nil {
-		return fmt.Errorf("cannot store block: %w", err)
+		return fmt.Errorf("cannot store block (%x): %w", proposal.Block.BlockID, err)
 	}
 
-	curView := e.paceMaker.CurView()
+	// store the proposer's vote in voteAggregator
+	_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
 
 	// if the block is for the current view, then process the current block
-	if block.View() == curView {
-		return e.processBlockForCurrentView(validBlock)
+	curView := e.paceMaker.CurView()
+	if proposal.Block.View == curView {
+		err = e.processBlockForCurrentView(proposal.Block)
+		if err != nil {
+			return fmt.Errorf("failed processing current block: %w", err)
+		}
+
+		e.log.Info().
+			Hex("block_id", logging.ID(proposal.Block.BlockID)).
+			Msg("done processing proposal for current view")
+
+		return nil
 	}
 
 	// if the block is not for the current view, try to build QC from votes for this block
-	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(validBlock)
+	qc, built, err := e.voteAggregator.BuildQCOnReceivedBlock(proposal.Block)
 	if err != nil {
-		switch {
-		case errors.Is(err, types.ErrInsufficientVotes):
-			// if we don't have enough votes to build QC for this block, proceed with block.qc instead
-			qc = validBlock.QC()
-		default:
-			return fmt.Errorf("building qc for block failed: %w", err)
-		}
+		return fmt.Errorf("building qc for block (%x) failed: %w", proposal.Block.BlockID, err)
 	}
+
+	if !built {
+		// if we don't have enough votes to build QC for this block, proceed with block.qc instead
+		qc = proposal.Block.QC
+	}
+
 	// process the QC
-	return e.processQC(qc)
+	err = e.processQC(qc)
+
+	if err != nil {
+		return fmt.Errorf("failed processing qc from block (%x): %w", proposal.Block.BlockID, err)
+	}
+
+	e.log.Info().
+		Hex("block_id", logging.ID(proposal.Block.BlockID)).
+		Msg("done proessing proposal for non current view")
+
+	return nil
 }
 
 // TimeoutChannel returns the channel for subscribing the waiting timeout on receiving
@@ -127,10 +178,9 @@ func (e *EventHandler) TimeoutChannel() <-chan time.Time {
 // OnLocalTimeout is called when the timeout event created by pacemaker looped through the
 // event loop.
 func (e *EventHandler) OnLocalTimeout() error {
-
-	e.log.Info().Msg("local timeout triggered")
-
 	curView := e.paceMaker.CurView()
+
+	e.log.Info().Uint64("cur_view", curView).Msg("local timeout triggered")
 
 	newview := e.paceMaker.OnTimeout()
 
@@ -152,37 +202,63 @@ func (e *EventHandler) Start() error {
 // It reads the current view, and check if it needs to proposal or vote for block.
 func (e *EventHandler) startNewView() error {
 	curView := e.paceMaker.CurView()
-
 	e.log.Info().
-		Uint64("curView", curView).
+		Uint64("cur_view", curView).
 		Msg("start new view")
+	e.pruneSubcomponents()
 
 	if e.viewState.IsSelfLeaderForView(curView) {
+
 		// as the leader of the current view,
 		// build the block proposal for the current view
-
-		qcForCurProposal, err := e.forks.MakeForkChoice(curView)
+		_, qc, err := e.forks.MakeForkChoice(curView)
 		if err != nil {
 			return fmt.Errorf("can not make for choice for view %v: %w", curView, err)
 		}
 
-		curProposal, err := e.blockProducer.MakeBlockProposal(curView, qcForCurProposal)
+		proposal, err := e.blockProducer.MakeBlockProposal(qc, curView)
 		if err != nil {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 		}
 
-		err = e.forks.AddBlock(curProposal)
+		// broadcast the proposal
+		header := hotstuff.ProposalToFlow(proposal)
+		err = e.network.BroadcastProposal(header)
+		if err != nil {
+			// when the network failed sending the proposal due to network issues, it will NOT
+			// return error.
+			// so if there is an error returned here, it must be some exception. It could be, i.e:
+			// 1) the network layer double checks the proposal, and the check failed.
+			// 2) the network layer had some exception encoding the proposal
+			/// ...
+			e.log.Warn().
+				Hex("proposal_id", logging.ID(proposal.Block.BlockID)).
+				Msg("failed to broadcast a block")
+			return fmt.Errorf("can not broadcast the new proposal (%x) for view (%v): %w", proposal.Block.BlockID, proposal.Block.View, err)
+		}
+
+		// store the proposer's vote in voteAggregator
+		// note: duplicate here to account for an edge case
+		// where we are the leader of current view as well
+		// as the next view
+		_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
+
+		err = e.forks.AddBlock(proposal.Block)
 		if err != nil {
 			return fmt.Errorf("cannot store block for curProposal: %w", err)
 		}
 
-		return e.processBlockForCurrentView(curProposal)
+		return e.processBlockForCurrentView(proposal.Block)
 	}
 
 	// as a replica of the current view,
 	// find and process the block for the current view
 	blocks := e.forks.GetBlocksForView(curView)
 	if len(blocks) == 0 {
+
+		e.log.Info().
+			Uint64("cur_view", curView).Msg("waiting for proposal for current view")
+
 		// if there is no block stored before for the current view, then exit and keep
 		// waiting
 		return nil
@@ -197,17 +273,31 @@ func (e *EventHandler) startNewView() error {
 	return e.processBlockForCurrentView(block)
 }
 
+// pruneSubcomponents prunes EventHandler's sub-components
+// Currently, the implementation follows the simplest design to prune once when we enter a
+// new view instead of immediately when a block is finalized.
+//
+// Technically, EventHandler (and all other components) could consume Forks' OnBlockFinalized
+// notifications and prune immediately. However, we have followed the design paradigm that all
+// events are only for HotStuff-External components. The interaction of the HotStuff-internal
+// components is directly handled by the EventHandler.
+func (e *EventHandler) pruneSubcomponents() {
+	e.voteAggregator.PruneByView(e.forks.FinalizedView())
+}
+
 // processBlockForCurrentView processes the block for the current view.
 // It is called AFTER the block has been stored or found in Forks
 // It checks whether to vote for this block.
 // It might trigger a view change to go to a different view, which might re-enter this function.
-func (e *EventHandler) processBlockForCurrentView(block *types.BlockProposal) error {
-	curView := e.paceMaker.CurView()
+func (e *EventHandler) processBlockForCurrentView(block *hotstuff.Block) error {
+
 	// this is a sanity check to see if the block is really for the current view.
-	if block.View() != curView {
+	curView := e.paceMaker.CurView()
+	if block.View != curView {
 		return fmt.Errorf("sanity check fails: block proposal's view does not match with curView, (blockView: %v, curView: %v)",
-			block.View(), curView)
+			block.View, curView)
 	}
+
 	// checking if I'm the next leader
 	nextLeader := e.viewState.LeaderForView(curView + 1)
 	isNextLeader := e.viewState.IsSelf(nextLeader.ID())
@@ -215,26 +305,37 @@ func (e *EventHandler) processBlockForCurrentView(block *types.BlockProposal) er
 	if isNextLeader {
 		return e.processBlockForCurrentViewIfIsNextLeader(block)
 	}
+
 	// if I'm not the next leader
 	return e.processBlockForCurrentViewIfIsNotNextLeader(block, nextLeader)
 }
 
-func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *types.BlockProposal) error {
-	isNextLeader := true
-	curView := block.View()
+func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *hotstuff.Block) error {
 
 	// voter performs all the checks to decide whether to vote for this block or not.
 	// note this call has to make before calling pacemaker, because calling to pace maker first might
 	// cause the `curView` here to be stale
-	ownVote, shouldVote := e.voter.ProduceVoteIfVotable(block, curView)
+	isNextLeader := true
+	curView := block.View
+	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
+	shouldVote := true
+	if err != nil {
+		if errors.Is(err, hotstuff.NoVoteError{}) {
+			// if this block should not be voted, then change shouldVote to false
+			e.log.Debug().Msgf("should not vote for this block: %w", err)
+			shouldVote = false
+		} else {
+			// unknown error, exit the event loop
+			return fmt.Errorf("could not produce vote: %w", err)
+		}
+	}
 
-	nv, viewChanged := e.paceMaker.UpdateCurViewWithBlock(block, isNextLeader)
 	// if i'm the next leader, then stay at the current view to collect votes for the block of the current view.
+	nv, viewChanged := e.paceMaker.UpdateCurViewWithBlock(block, isNextLeader)
 	if viewChanged {
 		// this is a sanity check.
 		// when I've processed the block for the current view and I'm the next leader,
 		// the pacemaker should not trigger a view change.
-		// log fatal error
 		return fmt.Errorf("pacemaker should not trigger a view change, but it changed to view. (newview: %v)", nv.View)
 	}
 
@@ -248,16 +349,36 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *types.Blo
 	return e.processVote(ownVote)
 }
 
-func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *types.BlockProposal, nextLeader *flow.Identity) error {
-	isNextLeader := false
-	curView := block.View()
+func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *hotstuff.Block, nextLeader *flow.Identity) error {
 
 	// voter performs all the checks to decide whether to vote for this block or not.
-	ownVote, shouldVote := e.voter.ProduceVoteIfVotable(block, curView)
+	isNextLeader := false
+	curView := block.View
+
+	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
+	shouldVote := true
+
+	if err != nil {
+		switch err.(type) {
+		// if this block should not be voted, then change shouldVote to false
+		case *hotstuff.NoVoteError:
+			e.log.Debug().Msgf("should not vote for this block: %w", err)
+			shouldVote = false
+		default:
+			// unknown error, exit the event loop
+			return fmt.Errorf("could not produce vote: %w", err)
+		}
+	}
 
 	// send my vote if I should vote and I'm not the leader
 	if shouldVote {
-		err := e.network.SendVote(ownVote, nextLeader.NodeID)
+		err := e.network.SendVote(
+			ownVote.BlockID,
+			ownVote.View,
+			ownVote.Signature.StakingSignature,
+			ownVote.Signature.RandomBeaconSignature,
+			nextLeader.NodeID,
+		)
 		if err != nil {
 			// TODO: should we error here? E.g.
 			//    return fmt.Errorf("failed to send vote: %w", err)
@@ -282,16 +403,13 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *types.
 
 // tryBuildQCForBlock checks whether there are enough votes to build a QC for the given block,
 // and process the QC if a QC was built.
-func (e *EventHandler) tryBuildQCForBlock(block *types.BlockProposal) error {
-	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(block)
+func (e *EventHandler) tryBuildQCForBlock(block *hotstuff.Block) error {
+	qc, built, err := e.voteAggregator.BuildQCOnReceivedBlock(block)
 	if err != nil {
-		switch {
-		case errors.Is(err, types.ErrInsufficientVotes):
-			// if we don't have enough votes to build QC for this block:
-			return nil // nothing more to do for processing block
-		default:
-			return fmt.Errorf("building qc for block failed: %w", err)
-		}
+		return fmt.Errorf("building qc for block failed: %w", err)
+	}
+	if !built {
+		return nil
 	}
 	return e.processQC(qc)
 }
@@ -299,34 +417,31 @@ func (e *EventHandler) tryBuildQCForBlock(block *types.BlockProposal) error {
 // processVote stores the vote and check whether a QC can be built.
 // If a QC is built, then process the QC.
 // It assumes the voting block can be found in forks
-func (e *EventHandler) processVote(vote *types.Vote) error {
+func (e *EventHandler) processVote(vote *hotstuff.Vote) error {
 	// read the voting block
 	block, found := e.forks.GetBlock(vote.BlockID)
 	if !found {
 		// store the pending vote if voting block is not found.
 		// We don't need to proactively fetch the missing voting block, because the chain compliance layer has acknowledged
 		// the missing block and requested it already.
-		err := e.voteAggregator.StorePendingVote(vote)
+		_ = e.voteAggregator.StorePendingVote(vote)
 
 		e.log.Info().
 			Uint64("vote_view", vote.View).
 			Hex("voting_block", logging.ID(vote.BlockID)).
 			Msg("block for vote not found")
-
-		return fmt.Errorf("could not process pending vote: %w", err)
 	}
 
 	// if the voting block can be found, we should be able to validate the vote
 	// and check if we can build a QC with it.
-	qc, err := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
+	qc, built, err := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
 	if err != nil {
-		switch {
-		case errors.Is(err, types.ErrInsufficientVotes):
-			// if we don't have enough votes to build QC for this block:
-			return nil // nothing more to do for processing vote
-		default:
-			return fmt.Errorf("building qc for block failed: %w", err)
-		}
+		return fmt.Errorf("building qc for block failed: %w", err)
+	}
+	// if we don't have enough votes to build QC for this block:
+	// nothing more to do for processing vote
+	if !built {
+		return nil
 	}
 
 	return e.processQC(qc)
@@ -334,7 +449,7 @@ func (e *EventHandler) processVote(vote *types.Vote) error {
 
 // processQC stores the QC and check whether the QC will trigger view change.
 // If triggered, then go to the new view.
-func (e *EventHandler) processQC(qc *types.QuorumCertificate) error {
+func (e *EventHandler) processQC(qc *hotstuff.QuorumCertificate) error {
 	err := e.forks.AddQC(qc)
 
 	if err != nil {

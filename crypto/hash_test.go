@@ -143,14 +143,14 @@ func TestKmac128(t *testing.T) {
 	}
 	outputSize := 32
 
-	alg := NewKMAC_128(key, customizers[0], outputSize)
+	alg, _ := NewKMAC_128(key, customizers[0], outputSize)
 	_, _ = alg.Write(input[0:2])
 	_, _ = alg.Write(input[2:])
 	hash := alg.SumHash()
 	checkBytes(t, input, expected[0], hash)
 
 	for i := 0; i < len(customizers); i++ {
-		alg = NewKMAC_128(key, customizers[i], outputSize)
+		alg, _ = NewKMAC_128(key, customizers[i], outputSize)
 		hash = alg.ComputeHash(input)
 		checkBytes(t, input, expected[i], hash)
 	}

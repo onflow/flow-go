@@ -14,11 +14,16 @@ static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint8_t*
     // using little Fermat theorem
     bn_new(&r_2);
     bn_sub_dig(&r_2, &r, 2);
-    // Barett reduction constant
-    // TODO: hardcode u
+    //#define MOD_METHOD MONTY
+    #define MOD_METHOD BASIC
+
+    #if MOD_METHOD == MONTY   
     bn_st u;
     bn_new(&u)
-    bn_mod_pre_barrt(&u, &r);
+    // Montgomery reduction constant
+    // TODO: hardcode u
+    bn_mod_pre_monty(&u, &r);
+    #endif
 
     // temp buffers
     bn_st acc, inv, base, numerator;
@@ -35,7 +40,7 @@ static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint8_t*
     int sign = 1;
 
     // loops is the maximum number of loops that takes the accumulator to 
-    // overflow modulo r. Mainly the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < r
+    // overflow modulo r, mainly the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < r
     const int loops = MAX_IND_LOOPS;
     int k,j = 0;
     while (j<len) {
@@ -49,18 +54,34 @@ static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint8_t*
             bn_mul_dig(&base, &base, abs((int)signers[j]-i));
             bn_mul_dig(&numerator, &numerator, signers[j]+1);
         }
-        // compute the inverse using little Fernat theorem
+        // compute the inverse using little Fermat theorem
         bn_mxp_slide(&inv, &base, &r_2, &r);
+        #if MOD_METHOD == MONTY 
+        // convert to Montgomery domain
+        bn_mod_monty_conv(&inv, &inv,&r );
+        bn_mod_monty_conv(&numerator, &numerator, &r);
+        bn_mod_monty_conv(&acc, &acc, &r);
+        // multiply
+        bn_mul(&acc, &acc, &inv);
+        bn_mod_monty(&acc, &acc, &r, &u);
+        bn_mul(&acc, &acc, &numerator);
+        bn_mod_monty(&acc, &acc, &r, &u);
+        bn_mod_monty_back(&acc, &acc, &r);
+        #elif MOD_METHOD == BASIC 
         bn_mul(&acc, &acc, &inv);
         bn_mul(&acc, &acc, &numerator);
-        bn_mod_barrt(&acc, &acc, &r, &u);
+        bn_mod_basic(&acc, &acc, &r);
+        #endif
     }
     if (sign) bn_copy(res, &acc);
     else bn_sub(res, &r, &acc);
 
     // free the temp memory
     bn_free(&r);bn_free(&r_1);
-    bn_free(&u);bn_free(&acc);
+    #if MOD_METHOD == MONTY   
+    bn_free(&u);
+    #endif
+    bn_free(&acc);
     bn_free(&inv);bn_free(&base);
     bn_free(&numerator);
 }

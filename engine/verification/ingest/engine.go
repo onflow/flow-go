@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -16,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -28,15 +30,18 @@ type Engine struct {
 	log                zerolog.Logger
 	collectionsConduit network.Conduit
 	stateConduit       network.Conduit
+	chunksConduit      network.Conduit
 	me                 module.Local
 	state              protocol.State
-	verifierEng        network.Engine // for submitting ERs that are ready to be verified
-	receipts           mempool.Receipts
-	blocks             mempool.Blocks
+	verifierEng        network.Engine   // for submitting ERs that are ready to be verified
+	authReceipts       mempool.Receipts // keeps receipts with authenticated origin IDs
+	pendingReceipts    mempool.Receipts // keeps receipts pending for their originID to be authenticated
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
-	// protects the checkPendingReceipts method to prevent double-verifying
-	checkReceiptsMu sync.Mutex
+	chunkDataPacks     mempool.ChunkDataPacks
+	blockStorage       storage.Blocks
+	checkChunksLock    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
+	assigner           module.ChunkAssigner // used to determine chunks this node needs to verify
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -46,22 +51,28 @@ func New(
 	state protocol.State,
 	me module.Local,
 	verifierEng network.Engine,
-	receipts mempool.Receipts,
-	blocks mempool.Blocks,
+	authReceipts mempool.Receipts,
+	pendingReceipts mempool.Receipts,
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
+	chunkDataPacks mempool.ChunkDataPacks,
+	blockStorage storage.Blocks,
+	assigner module.ChunkAssigner,
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log,
-		state:       state,
-		me:          me,
-		receipts:    receipts,
-		verifierEng: verifierEng,
-		blocks:      blocks,
-		collections: collections,
-		chunkStates: chunkStates,
+		unit:            engine.NewUnit(),
+		log:             log,
+		state:           state,
+		me:              me,
+		authReceipts:    authReceipts,
+		pendingReceipts: pendingReceipts,
+		verifierEng:     verifierEng,
+		collections:     collections,
+		chunkStates:     chunkStates,
+		chunkDataPacks:  chunkDataPacks,
+		blockStorage:    blockStorage,
+		assigner:        assigner,
 	}
 
 	var err error
@@ -70,12 +81,18 @@ func New(
 		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
 	}
 
+	// for chunk states and chunk data packs.
 	e.stateConduit, err = net.Register(engine.ExecutionStateProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on execution state provider channel: %w", err)
 	}
 
-	_, err = net.Register(engine.ReceiptProvider, e)
+	e.chunksConduit, err = net.Register(engine.ChunkDataPackProvider, e)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not register chunk data pack provider engine")
+	}
+
+	_, err = net.Register(engine.ExecutionReceiptProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on execution receipt provider channel: %w", err)
 	}
@@ -140,6 +157,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.handleCollection(originID, &resource.Collection)
 	case *messages.ExecutionStateResponse:
 		return e.handleExecutionStateResponse(originID, resource)
+	case *messages.ChunkDataPackResponse:
+		return e.handleChunkDataPack(originID, &resource.Data)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
@@ -148,34 +167,72 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // handleExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
 // a result approval upon successful verification
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("execution receipt received")
 
 	// TODO: correctness check for execution receipts
+	// extracts list of verifier nodes id
+	origin, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
+	if err != nil {
+		// TODO: potential attack on authenticity
+		// stores ER in pending receipts till a block arrives authenticating this
+		err = e.pendingReceipts.Add(receipt)
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
+			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
+		}
 
-	id, err := e.state.Final().Identity(originID)
+	} else {
+		// execution results are only valid from execution nodes
+		if origin.Role != flow.RoleExecution {
+			// TODO: potential attack on integrity
+			return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", origin.NodeID, origin.Role)
+		}
+
+		// store the execution receipt in the store of the engine
+		// this will fail if the receipt already exists in the store
+		err = e.authReceipts.Add(receipt)
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
+			return fmt.Errorf("could not store execution receipt: %w", err)
+		}
+
+	}
+
+	e.checkPendingChunks()
+
+	return nil
+}
+
+// handleChunkDataPack receives a chunk data pack and stores that in the mempool
+func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) error {
+	e.log.Info().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
+		Msg("chunk data pack received")
+
+	// TODO tracking request feature
+	// https://github.com/dapperlabs/flow-go/issues/2970
+	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
 		// TODO: potential attack on authenticity
 		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
 	}
 
-	// execution results are only valid from execution nodes
-	if id.Role != flow.RoleExecution {
+	// chunk data pack should only be sent by an execution node
+	if origin.Role != flow.RoleExecution {
 		// TODO: potential attack on integrity
-		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", id.NodeID, id.Role)
+		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", origin.NodeID, origin.Role)
 	}
 
-	// store the execution receipt in the store of the engine
+	// store the chunk data pack in the store of the engine
 	// this will fail if the receipt already exists in the store
-	err = e.receipts.Add(receipt)
+	err = e.chunkDataPacks.Add(chunkDataPack)
 	if err != nil {
 		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
 
-	e.checkPendingReceipts()
+	e.checkPendingChunks()
 
 	return nil
 }
@@ -185,15 +242,29 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	e.log.Info().
 		Hex("block_id", logging.Entity(block)).
-		Uint64("block_number", block.Number).
+		Uint64("block_view", block.View).
 		Msg("received block")
 
-	err := e.blocks.Add(block)
+	err := e.blockStorage.Store(block)
 	if err != nil {
 		return fmt.Errorf("could not store block: %w", err)
 	}
 
-	e.checkPendingReceipts()
+	blockID := block.ID()
+	for _, receipt := range e.pendingReceipts.All() {
+		if receipt.ExecutionResult.BlockID == blockID {
+			// adds receipt to authenticated receipts pool
+			err := e.authReceipts.Add(receipt)
+			if err != nil {
+				return fmt.Errorf("could not move receipt to authenticated receipts pool: %w", err)
+			}
+
+			// removes receipt from pending receipts pool
+			e.pendingReceipts.Rem(receipt.ID())
+		}
+	}
+
+	e.checkPendingChunks()
 
 	return nil
 }
@@ -208,13 +279,17 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		Hex("collection_id", logging.Entity(coll)).
 		Msg("collection received")
 
-	id, err := e.state.Final().Identity(originID)
+	// extracts list of verifier nodes id
+	//
+	// TODO tracking request feature
+	// https://github.com/dapperlabs/flow-go/issues/2970
+	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+		return fmt.Errorf("invalid origin id (%s): %w", origin, err)
 	}
 
-	if id.Role != flow.RoleCollection {
-		return fmt.Errorf("invalid role for receiving collection: %s", id.Role)
+	if origin.Role != flow.RoleCollection {
+		return fmt.Errorf("invalid role for receiving collection: %s", origin.Role)
 	}
 
 	err = e.collections.Add(coll)
@@ -222,7 +297,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		return fmt.Errorf("could not add collection to mempool: %w", err)
 	}
 
-	e.checkPendingReceipts()
+	e.checkPendingChunks()
 
 	return nil
 }
@@ -237,6 +312,10 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 		Hex("chunk_id", logging.ID(res.State.ChunkID)).
 		Msg("execution state received")
 
+	// extracts list of verifier nodes id
+	//
+	// TODO tracking request feature
+	// https://github.com/dapperlabs/flow-go/issues/2970
 	id, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
@@ -251,7 +330,7 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 		return fmt.Errorf("could not add execution state (chunk_id=%s): %w", res.State.ChunkID, err)
 	}
 
-	e.checkPendingReceipts()
+	e.checkPendingChunks()
 
 	return nil
 }
@@ -259,6 +338,8 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 // requestCollection submits a request for the given collection to collection nodes.
 func (e *Engine) requestCollection(collID flow.Identifier) error {
 
+	// extracts list of verifier nodes id
+	//
 	collNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
 		return fmt.Errorf("could not load collection node identities: %w", err)
@@ -281,6 +362,8 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 // given chunk to execution nodes.
 func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 
+	// extracts list of verifier nodes id
+	//
 	exeNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not load execution node identities: %w", err)
@@ -298,13 +381,35 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 	return nil
 }
 
+// requestChunkDataPack submits a request for the given chunk ID to the execution nodes.
+func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
+	// extracts list of verifier nodes id
+	//
+	execNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return fmt.Errorf("could not load execution nodes identities: %w", err)
+	}
+
+	req := &messages.ChunkDataPackRequest{
+		ChunkID: chunkID,
+	}
+
+	// TODO we should only submit to execution node that generated execution receipt
+	err = e.chunksConduit.Submit(req, execNodes.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)
+	}
+
+	return nil
+}
+
 // getBlockForReceipt checks the block referenced by the given receipt. If the
 // block is available locally, returns true and the block. Otherwise, returns
 // false and requests the block.
 // TODO does not yet request block
 func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this execution
-	block, err := e.blocks.ByID(receipt.ExecutionResult.BlockID)
+	block, err := e.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		// TODO should request the block here. For now, we require that we
 		// have received the block at this point as there is no way to request it
@@ -314,191 +419,277 @@ func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block
 	return block, true
 }
 
-// getChunkStatesForReceipt checks all chunk states depended on by the given
-// execution receipt. If all chunk states are available locally, returns true
-// and an list of the required chunk states, ordered by their block order.
-// Otherwise, returns false and requests any chunk states that are not yet
-// locally available.
-func (e *Engine) getChunkStatesForReceipt(receipt *flow.ExecutionReceipt) ([]*flow.ChunkState, bool) {
+// getChunkStateForReceipt checks the chunk state depended on by the given
+// execution receipt. If the chunk state is available locally, returns true
+// as well as the chunk data itself.
+// Otherwise, returns false and requests the chunk state
+func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkState, bool) {
 
 	log := e.log.With().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
+		Hex("chunk_id", logging.ID(chunkID)).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Logger()
 
-	chunks := receipt.ExecutionResult.Chunks.Items()
-
-	// whether all chunk states for the receipt are available locally
-	ready := true
-	chunkStates := make([]*flow.ChunkState, 0, len(chunks))
-
-	for _, chunk := range chunks {
-		if !e.chunkStates.Has(chunk.ID()) {
-			// a chunk state is missing, the receipt cannot yet be verified
-			ready = false
-
-			// TODO rate limit these requests
-			err := e.requestExecutionState(chunk.ID())
-			if err != nil {
-				log.Error().
-					Err(err).
-					Hex("chunk_id", logging.ID(chunk.ID())).
-					Msg("could not request chunk state")
-			}
-			continue
-		}
-
-		chunkState, err := e.chunkStates.ByID(chunk.ID())
+	if !e.chunkStates.Has(chunkID) {
+		// the chunk state is missing, the chunk cannot yet be verified
+		// TODO rate limit these requests
+		err := e.requestExecutionState(chunkID)
 		if err != nil {
-			// couldn't get chunk state from mempool, the receipt cannot yet be verified
-			ready = false
-
 			log.Error().
 				Err(err).
-				Hex("chunk_id", logging.ID(chunk.ID())).
-				Msg("could not get chunk")
-			continue
+				Hex("chunk_id", logging.ID(chunkID)).
+				Msg("could not request chunk state")
 		}
-
-		chunkStates = append(chunkStates, chunkState)
+		return nil, false
 	}
 
-	// sanity check to ensure no chunk states were missed
-	if len(chunks) != len(chunkStates) {
-		ready = false
+	// chunk state exists and retrieved and returned
+	chunkState, err := e.chunkStates.ByID(chunkID)
+	if err != nil {
+		// couldn't get chunk state from mempool, the chunk cannot yet be verified
+		log.Error().
+			Err(err).
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("could not get chunk")
+		return nil, false
 	}
-
-	if ready {
-		return chunkStates, true
-	}
-
-	return nil, false
+	return chunkState, true
 }
 
-// getCollectionsForReceipt checks all collections depended on by the
-// given execution receipt. Returns true if all collections are available
-// locally. If the collections are not available locally, they are requested.
-func (e *Engine) getCollectionsForReceipt(block *flow.Block, receipt *flow.ExecutionReceipt) ([]*flow.Collection, bool) {
+// getChunkDataPackForReceipt checks the chunk data pack associated with a chunk ID and
+// execution receipt. If the chunk data pack is available locally, returns true
+// as well as the chunk data pack itself.
+// Otherwise, returns false and requests the chunk data pack
+func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
+
+	log := e.log.With().
+		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Hex("receipt_id", logging.Entity(receipt)).
+		Logger()
+
+	if !e.chunkDataPacks.Has(chunkID) {
+		// the chunk data pack is missing, the chunk cannot yet be verified
+		// TODO rate limit these requests
+		err := e.requestChunkDataPack(chunkID)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Hex("chunk_id", logging.ID(chunkID)).
+				Msg("could not request chunk data pack")
+		}
+		return nil, false
+	}
+
+	// chunk data pack exists and retrieved and returned
+	chunkDataPack, err := e.chunkDataPacks.ByChunkID(chunkID)
+	if err != nil {
+		// couldn't get chunk state from mempool, the chunk cannot yet be verified
+		log.Error().
+			Err(err).
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("could not get chunk data pack")
+		return nil, false
+	}
+	return chunkDataPack, true
+}
+
+// getCollectionForChunk checks the collection depended on the
+// given execution receipt and chunk. Returns true if the collections is available
+// locally. If the collections is not available locally, it is requested.
+func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.ExecutionReceipt, chunk *flow.Chunk) (*flow.Collection, bool) {
 
 	log := e.log.With().
 		Hex("block_id", logging.ID(block.ID())).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Logger()
 
-	chunks := receipt.ExecutionResult.Chunks.Items()
-
 	// whether all collections for the receipt are available locally
-	ready := true
-	collections := make([]*flow.Collection, 0, len(chunks))
 
-	for _, chunk := range chunks {
-		collIndex := int(chunk.CollectionIndex)
+	collIndex := int(chunk.CollectionIndex)
 
-		// ensure the collection index specified by the ER is valid
-		if len(block.Guarantees) <= collIndex {
-			log.Error().
-				Int("collection_index", collIndex).
-				Msg("could not get collections - invalid collection index")
+	// ensure the collection index specified by the ER is valid
+	if len(block.Guarantees) <= collIndex {
+		log.Error().
+			Int("collection_index", collIndex).
+			Msg("could not get collections - invalid collection index")
 
-			// TODO this means the block or receipt is invalid, for now fail fast
-			ready = false
-			break
-		}
+		// TODO this means the block or receipt is invalid, for now fail fast
+		return nil, false
+	}
 
-		// request the collection if we don't already have it
-		collID := block.Guarantees[collIndex].ID()
+	// request the collection if we don't already have it
+	collID := block.Guarantees[collIndex].ID()
 
-		if !e.collections.Has(collID) {
-			// a collection is missing, the receipt cannot yet be verified
-			ready = false
-
-			// TODO rate limit these requests
-			err := e.requestCollection(collID)
-			if err != nil {
-				log.Error().
-					Err(err).
-					Hex("collection_id", logging.ID(collID)).
-					Msg("could not request collection")
-			}
-			continue
-		}
-
-		coll, err := e.collections.ByID(collID)
-		if err != nil {
-			// couldn't get the collection from mempool, the receipt cannot be verified
-			ready = false
-
+	if !e.collections.Has(collID) {
+		// a collection is missing, the receipt cannot yet be verified
+		// TODO rate limit these requests
+		err := e.requestCollection(collID)
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			log.Error().
 				Err(err).
 				Hex("collection_id", logging.ID(collID)).
-				Msg("could not get collection")
-			continue
+				Msg("could not request collection")
 		}
-
-		collections = append(collections, coll)
+		return nil, false
 	}
 
-	// sanity check to ensure no chunk states were missed
-	if len(chunks) != len(collections) {
-		ready = false
+	coll, err := e.collections.ByID(collID)
+	if err != nil {
+		// couldn't get the collection from mempool, the receipt cannot be verified
+		log.Error().
+			Err(err).
+			Hex("collection_id", logging.ID(collID)).
+			Msg("could not get collection")
+		return nil, false
 	}
 
-	if ready {
-		return collections, true
-	}
-
-	return nil, false
+	return coll, true
 }
 
-// checkPendingReceipts checks all pending receipts in the mempool and verifies
+// checkPendingChunks checks all pending chunks of receipts in the mempool and verifies
 // any that are ready for verification.
 //
 // NOTE: this method is protected by mutex to prevent double-verifying ERs.
-func (e *Engine) checkPendingReceipts() {
-	e.checkReceiptsMu.Lock()
-	defer e.checkReceiptsMu.Unlock()
+func (e *Engine) checkPendingChunks() {
+	e.checkChunksLock.Lock()
+	defer e.checkChunksLock.Unlock()
 
-	receipts := e.receipts.All()
+	// asks for missing blocks
+	pending := e.pendingReceipts.All()
+	for _, receipt := range pending {
+		_, blockReady := e.getBlockForReceipt(receipt)
+		if !blockReady {
+			continue
+		}
+		err := e.authReceipts.Add(receipt)
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
+			e.log.Error().Err(err).
+				Hex("receipt_id", logging.ID(receipt.ID())).
+				Msg("could not add receipt to the authenticated receipts pool")
+		}
+
+		e.pendingReceipts.Rem(receipt.ID())
+	}
+
+	receipts := e.authReceipts.All()
 
 	for _, receipt := range receipts {
 		block, blockReady := e.getBlockForReceipt(receipt)
-
-		chunkStates, chunkStatesReady := e.getChunkStatesForReceipt(receipt)
-
 		// we can't get collections without the block
 		if !blockReady {
 			continue
 		}
 
-		collections, collectionsReady := e.getCollectionsForReceipt(block, receipt)
+		mychunks, err := e.myChunks(&receipt.ExecutionResult)
+		// extracts list of chunks assigned to this Verification node
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+				Msg("could not fetch the assigned chunks")
+			continue
+		}
 
-		if blockReady && chunkStatesReady && collectionsReady {
-			res := &verification.CompleteExecutionResult{
-				Receipt:     receipt,
-				Block:       block,
-				Collections: collections,
-				ChunkStates: chunkStates,
+		for _, chunk := range mychunks {
+			chunkState, chunkStateReady := e.getChunkStateForReceipt(receipt, chunk.ID())
+			if !chunkStateReady {
+				// can not verify a chunk without its state, moves to the next chunk
+				continue
+			}
+
+			// TODO replace chunk state with chunk data pack
+			_, chunkDataPackReady := e.getChunkDataPackForReceipt(receipt, chunk.ID())
+			if !chunkDataPackReady {
+				// can not verify a chunk without its chunk data, moves to the next chunk
+				continue
+			}
+
+			// retrieves collection corresponding to the chunk
+			collection, collectionReady := e.getCollectionForChunk(block, receipt, chunk)
+			if !collectionReady {
+				// can not verify a chunk without its collection, moves to the next chunk
+				continue
+			}
+
+			index := chunk.Index
+			var endState flow.StateCommitment
+			if int(index) == len(receipt.ExecutionResult.Chunks)-1 {
+				// last chunk in receipt takes final state commitment
+				endState = receipt.ExecutionResult.FinalStateCommit
+			} else {
+				// any chunk except last takes the subsequent chunk's start state
+				endState = receipt.ExecutionResult.Chunks[index+1].StartState
+			}
+
+			// creates a verifiable chunk for assigned chunk
+			vchunk := &verification.VerifiableChunk{
+				ChunkIndex: chunk.Index,
+				Receipt:    receipt,
+				EndState:   endState,
+				Block:      block,
+				Collection: collection,
+				ChunkState: chunkState,
 			}
 
 			// verify the receipt
-			err := e.verifierEng.ProcessLocal(res)
+			err := e.verifierEng.ProcessLocal(vchunk)
 			if err != nil {
 				e.log.Error().
 					Err(err).
 					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-					Msg("could not get complete execution result")
+					Hex("chunk_id", logging.ID(chunk.ID())).
+					Msg("could not pass chunk to verifier engine")
 				continue
 			}
 
-			// if the receipt was verified, remove it and associated resources from the mempool
-			e.receipts.Rem(receipt.ID())
-			e.blocks.Rem(block.ID())
-			for _, coll := range collections {
-				e.collections.Rem(coll.ID())
-			}
-			for _, chunkState := range chunkStates {
-				e.chunkStates.Rem(chunkState.ID())
-			}
+			// TODO add a tracker to clean the memory up from resources that have already been verified
+			// https://github.com/dapperlabs/flow-go/issues/2750
+			// clean up would be something like this:
+			// cleans the execution receipt from receipts mempool
+			// cleans block form blocks mempool
+			// cleans all chunk states from chunkStates mempool
+			// for now, we clean the mempool from only the collection, as otherwise
+			// ingest engine sends the chunk corresponding to this collection everytime
+			// this function gets called, since it has everything that is needed to verify this
+			e.collections.Rem(collection.ID())
 		}
 	}
+}
+
+// myChunks returns the list of chunks in the chunk list that this verifier node
+// is assigned to
+func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
+
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
+	verifierNodes, err := e.state.Final().
+		Identities(filter.HasRole(flow.RoleVerification))
+	if err != nil {
+		return nil, fmt.Errorf("could not load verifier node IDs: %w", err)
+	}
+
+	rng, err := utils.NewChunkAssignmentRNG(res)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate random generator: %w", err)
+	}
+	// TODO pull up caching of chunk assignments to here
+	a, err := e.assigner.Assign(verifierNodes, res.Chunks, rng)
+	if err != nil {
+		return nil, fmt.Errorf("could not create chunk assignment %w", err)
+	}
+
+	// indices of chunks assigned to this node
+	chunkIndices := a.ByNodeID(e.me.NodeID())
+
+	// mine keeps the list of chunks assigned to this node
+	mine := make(flow.ChunkList, 0, len(chunkIndices))
+	for _, index := range chunkIndices {
+		mine = append(mine, res.Chunks.ByIndex(index))
+	}
+
+	return mine, nil
 }

@@ -1,7 +1,7 @@
 package notifications
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // SkippedAheadConsumer consumes notifications of type `OnSkippedAhead`
@@ -32,7 +32,7 @@ type EnteringViewConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type StartingTimeoutConsumer interface {
-	OnStartingTimeout(timerInfo *types.TimerInfo)
+	OnStartingTimeout(timerInfo *hotstuff.TimerInfo)
 }
 
 // ReachedTimeoutConsumer consumes notifications of type `OnReachedTimeout`,
@@ -42,7 +42,7 @@ type StartingTimeoutConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type ReachedTimeoutConsumer interface {
-	OnReachedTimeout(timeout *types.TimerInfo)
+	OnReachedTimeout(timeout *hotstuff.TimerInfo)
 }
 
 // QcIncorporatedConsumer consumes notifications of type `OnQcIncorporated`,
@@ -52,7 +52,7 @@ type ReachedTimeoutConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type QcIncorporatedConsumer interface {
-	OnQcIncorporated(*types.QuorumCertificate)
+	OnQcIncorporated(*hotstuff.QuorumCertificate)
 }
 
 // ForkChoiceGeneratedConsumer consumes notifications of type `OnForkChoiceGenerated`,
@@ -63,7 +63,7 @@ type QcIncorporatedConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type ForkChoiceGeneratedConsumer interface {
-	OnForkChoiceGenerated(uint64, *types.QuorumCertificate)
+	OnForkChoiceGenerated(uint64, *hotstuff.QuorumCertificate)
 }
 
 // BlockIncorporatedConsumer consumes notifications of type `OnBlockIncorporated`,
@@ -73,7 +73,7 @@ type ForkChoiceGeneratedConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type BlockIncorporatedConsumer interface {
-	OnBlockIncorporated(*types.BlockProposal)
+	OnBlockIncorporated(*hotstuff.Block)
 }
 
 // FinalizedBlockConsumer consumes notifications of type `OnFinalizedBlock`,
@@ -83,7 +83,7 @@ type BlockIncorporatedConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type FinalizedBlockConsumer interface {
-	OnFinalizedBlock(*types.BlockProposal)
+	OnFinalizedBlock(*hotstuff.Block)
 }
 
 // DoubleProposeDetectedConsumer consumes notifications of type `OnDoubleProposeDetected`,
@@ -93,5 +93,23 @@ type FinalizedBlockConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type DoubleProposeDetectedConsumer interface {
-	OnDoubleProposeDetected(*types.BlockProposal, *types.BlockProposal)
+	OnDoubleProposeDetected(*hotstuff.Block, *hotstuff.Block)
+}
+
+// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
+// whenever a double voting (same voter voting for different blocks at the same view) was detected.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+type DoubleVotingDetectedConsumer interface {
+	OnDoubleVotingDetected(*hotstuff.Vote, *hotstuff.Vote)
+}
+
+// OnInvalidVoteDetected notifications are produced by the Vote Aggregation logic
+// whenever an invalid vote was detected.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+type InvalidVoteDetectedConsumer interface {
+	OnInvalidVoteDetected(*hotstuff.Vote)
 }

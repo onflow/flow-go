@@ -3,70 +3,53 @@ package hotstuff
 import (
 	"fmt"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // Voter produces votes for the given block
 type Voter struct {
-	signer    Signer
-	viewState *ViewState
-	forks     Forks
-	// Need to keep track of the last view we voted for so we don't double vote accidentally
-	lastVotedView uint64
-	log           zerolog.Logger
+	signer        Signer
+	forks         ForksReader
+	lastVotedView uint64 // need to keep track of the last view we voted for so we don't double vote accidentally
 }
 
 // NewVoter creates a new Voter instance
-func (v *Voter) NewVoter(signer Signer, viewState *ViewState, forks Forks, log zerolog.Logger) *Voter {
+func NewVoter(signer Signer, forks ForksReader, lastVotedView uint64) *Voter {
 	return &Voter{
 		signer:        signer,
-		viewState:     viewState,
 		forks:         forks,
-		lastVotedView: 0,
-		log:           log,
+		lastVotedView: lastVotedView,
 	}
 }
 
 // ProduceVoteIfVotable will make a decision on whether it will vote for the given proposal, the returned
-// boolean indicates whether to vote or not.
+// error indicates whether to vote or not.
 // In order to ensure that only a safe node will be voted, Voter will ask Forks whether a vote is a safe node or not.
 // The curView is taken as input to ensure Voter will only vote for proposals at current view and prevent double voting.
-// This method will only ever _once_ return a `non-nil, true` vote: the very first time it encounters a safe block of the
+// This method will only ever _once_ return a `non-nil vote, nil` vote: the very first time it encounters a safe block of the
 //  current view to vote for. Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
-// (including repeated calls with the initial block we voted for also return `nil, false`).
-func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, bool) {
-	if v.forks.IsSafeBlock(bp) {
-		log.Info().Msg("received block is not a safe node, don't vote")
-		return nil, false
+// (including repeated calls with the initial block we voted for also return `nil, error`).
+func (v *Voter) ProduceVoteIfVotable(block *hotstuff.Block, curView uint64) (*hotstuff.Vote, error) {
+	if !v.forks.IsSafeBlock(block) {
+		return nil, &hotstuff.NoVoteError{Msg: "not safe block"}
 	}
 
-	if curView != bp.Block.View {
-		log.Info().Uint64("view", bp.Block.View).Uint64("curView", curView).
-			Msg("received block's view is not our current view, don't vote")
-		return nil, false
+	if curView != block.View {
+		return nil, &hotstuff.NoVoteError{Msg: "not for current view"}
 	}
 
 	if curView <= v.lastVotedView {
-		log.Info().Uint64("lastVotedView", v.lastVotedView).Uint64("curView", curView).
-			Msg("received block's view is <= lastVotedView, don't vote")
-		return nil, false
+		return nil, &hotstuff.NoVoteError{Msg: "not above the last voted view"}
 	}
 
-	vote, err := v.produceVote(bp)
+	vote, err := v.signer.VoteFor(block)
 	if err != nil {
-		return nil, false
+		return nil, fmt.Errorf("could not vote for block: %w", err)
 	}
-	return vote, true
-}
 
-func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
-	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.BlockID())
-	vote, err := v.signer.SignVote(unsignedVote)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign the vote (blockID: %v, view: %v): %w", unsignedVote.BlockID, unsignedVote.View, err)
-	}
+	// vote for the current view has been produced, update lastVotedView
+	// to prevent from voting for the same view again
+	v.lastVotedView = curView
+
 	return vote, nil
 }

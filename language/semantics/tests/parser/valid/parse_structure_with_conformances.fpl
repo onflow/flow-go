@@ -1,1 +1,0 @@
-struct Test: Foo, Bar {}

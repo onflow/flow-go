@@ -5,32 +5,32 @@ package flow
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
-func Genesis(ids IdentityList) *Block {
+func Genesis(identities IdentityList) *Block {
 
 	// create the first seal with zero references
 	seal := Seal{
 		BlockID:       ZeroID,
 		PreviousState: nil,
-		FinalState:    trie.GetDefaultHashForHeight(255),
+		FinalState:    GenesisStateCommitment,
 	}
 
 	// create the raw content for the genesis block
 	payload := Payload{
-		Identities: ids,
+		Identities: identities,
 		Guarantees: nil,
 		Seals:      []*Seal{&seal},
 	}
 
 	// create the header
 	header := Header{
-		Number:      0,
-		Timestamp:   time.Unix(1575244800, 0).UTC(),
+		ChainID:     DefaultChainID,
 		ParentID:    ZeroID,
+		Height:      0,
 		PayloadHash: payload.Hash(),
-		ProposerID:  ZeroID,
+		Timestamp:   GenesisTime(),
 	}
 
 	// combine to block
@@ -58,58 +58,44 @@ func (b Block) Valid() bool {
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	// Number is the block number, a monotonically incrementing counter of
-	// finalized blocks.
-	// TODO should we rename this Height?
-	Number uint64
-	// View is the view number at which this block was proposed.
-	View uint64
-
-	// ChainID is a chain-specific value to prevent replay attacks.
-	ChainID string
-	// Timestamp is the time at which this block was proposed. The proposing
-	// node can choose any time, so this should not be trusted as accurate.
-	Timestamp time.Time
-
-	// ParentID is the ID of this block's parent.
-	ParentID Identifier
-	// PayloadHash is a hash of the payload of this block.
-	PayloadHash Identifier
-
-	// ParentView is the view number of the parent of this block.
-	ParentView uint64
-	// ParentSig is an aggregated signature for the parent block.
-	ParentSig *AggregatedSignature
-	// ProposerID is the ID of the node that proposed this block.
-	ProposerID Identifier
-
-	// ProposerSig is the signature of the proposer over the header body.
-	// NOTE: This is omitted from the ID.
-	ProposerSig *PartialSignature
+	ChainID                 string     // ChainID is a chain-specific value to prevent replay attacks.
+	ParentID                Identifier // ParentID is the ID of this block's parent.
+	Height                  uint64
+	PayloadHash             Identifier // PayloadHash is a hash of the payload of this block.
+	Timestamp               time.Time  // Timestamp is the time at which this block was proposed. The proposing node can choose any time, so this should not be trusted as accurate.
+	View                    uint64     // View is the view number at which this block was proposed.
+	ParentSigners           []Identifier
+	ParentStakingSigs       []crypto.Signature // ParentStakingSigs is an aggregated staking signature for the parent block.
+	ParentRandomBeaconSig   crypto.Signature   // ParentRandomBeaconSig is a reconstructed signature for random beacon for the parent block.
+	ProposerID              Identifier
+	ProposerStakingSig      crypto.Signature // ProposerStakingSig is the signature of the proposer over the header body with the staking key.
+	ProposerRandomBeaconSig crypto.Signature // ProposerRandomBeaconSig is the signature of the proposer over the header body with the random beacon key share.
 }
 
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {
-		Number      uint64
-		View        uint64
-		ChainID     string
-		Timestamp   time.Time
-		ParentID    Identifier
-		PayloadHash Identifier
-		ProposerID  Identifier
-		ParentView  uint64
-		ParentSig   *AggregatedSignature
+		ChainID               string
+		ParentID              Identifier
+		Height                uint64
+		PayloadHash           Identifier
+		Timestamp             time.Time
+		View                  uint64
+		ProposerID            Identifier
+		ParentSigners         []Identifier
+		ParentStakingSigs     []crypto.Signature
+		ParentRandomBeaconSig crypto.Signature
 	}{
-		Number:      h.Number,
-		ChainID:     h.ChainID,
-		View:        h.View,
-		Timestamp:   h.Timestamp,
-		ParentID:    h.ParentID,
-		PayloadHash: h.PayloadHash,
-		ProposerID:  h.ProposerID,
-		ParentView:  h.ParentView,
-		ParentSig:   h.ParentSig,
+		ChainID:               h.ChainID,
+		ParentID:              h.ParentID,
+		Height:                h.Height,
+		PayloadHash:           h.PayloadHash,
+		Timestamp:             h.Timestamp,
+		View:                  h.View,
+		ProposerID:            h.ProposerID,
+		ParentSigners:         h.ParentSigners,
+		ParentStakingSigs:     h.ParentStakingSigs,
+		ParentRandomBeaconSig: h.ParentRandomBeaconSig,
 	}
 }
 
@@ -137,4 +123,13 @@ func (p Payload) Hash() Identifier {
 	collHash := MerkleRoot(GetIDs(p.Guarantees)...)
 	sealHash := MerkleRoot(GetIDs(p.Seals)...)
 	return ConcatSum(idHash, collHash, sealHash)
+}
+
+// PendingBlock is a wrapper type representing a block that cannot yet be
+// processed. The block header, payload, and sender ID are stored together
+// while waiting for the block to become processable.
+type PendingBlock struct {
+	OriginID Identifier
+	Header   *Header
+	Payload  *Payload
 }

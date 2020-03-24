@@ -10,27 +10,32 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestHeaderInsertRetrieve(t *testing.T) {
+func TestHeaderInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := flow.Header{
-			Number:      1337,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    flow.Identifier{0x11},
-			PayloadHash: flow.Identifier{0x22},
-			ProposerID:  flow.Identifier{0x33},
-			ParentSig: &flow.AggregatedSignature{
-				Raw:     []byte{0x44},
-				Signers: []flow.Identifier{flow.Identifier{0x44}},
-			},
+			View:                  1337,
+			Timestamp:             time.Now().UTC(),
+			ParentID:              flow.Identifier{0x11},
+			PayloadHash:           flow.Identifier{0x22},
+			ProposerID:            flow.Identifier{0x33},
+			ParentStakingSigs:     []crypto.Signature{[]byte{0x88}},
+			ParentRandomBeaconSig: crypto.Signature{0x77},
+			ParentSigners:         []flow.Identifier{flow.Identifier{0x44}},
 		}
 		blockID := expected.ID()
 
 		err := db.Update(InsertHeader(&expected))
 		require.Nil(t, err)
+
+		var exists bool
+		err = db.View(CheckHeader(blockID, &exists))
+		require.Nil(t, err)
+		require.True(t, exists)
 
 		var actual flow.Header
 		err = db.View(RetrieveHeader(blockID, &actual))

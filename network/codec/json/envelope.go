@@ -15,8 +15,20 @@ const (
 	CodeResponse
 	CodeEcho
 
+	// consensus
+	CodeBlockProposal
+	CodeBlockVote
+	CodeBlockCommit // coldstuff-only
+
+	// cluster consensus
+	CodeClusterBlockProposal
+	CodeClusterBlockVote
+	CodeClusterBlockRequest
+	CodeClusterBlockResponse
+
 	CodeCollectionGuarantee
 	CodeTransaction
+	CodeTransactionBody
 
 	CodeBlock
 
@@ -27,6 +39,8 @@ const (
 
 	CodeExecutionStateRequest
 	CodeExecutionStateResponse
+	CodeChunkDataPackRequest
+	CodeChunkDataPackResponse
 )
 
 // Envelope is a wrapper to convey type information with JSON encoding without

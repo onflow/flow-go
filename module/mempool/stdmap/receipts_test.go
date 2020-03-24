@@ -16,7 +16,7 @@ func TestReceiptPool(t *testing.T) {
 	item1 := unittest.ExecutionReceiptFixture()
 	item2 := unittest.ExecutionReceiptFixture()
 
-	pool, err := stdmap.NewReceipts()
+	pool, err := stdmap.NewReceipts(1000)
 	require.NoError(t, err)
 
 	t.Run("should be able to add first", func(t *testing.T) {

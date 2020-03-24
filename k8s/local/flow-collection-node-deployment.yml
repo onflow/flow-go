@@ -197,8 +197,6 @@ spec:
             - '$(POD_NAME)'
             - '--entries'
             - '$(NODE_ENTRIES)'
-            - '--connections'
-            - '5'
             - '--datadir'
             - '/flowdb'
             - '--ingress-addr'

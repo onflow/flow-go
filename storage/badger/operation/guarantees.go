@@ -18,10 +18,22 @@ func RetrieveGuarantee(collID flow.Identifier, guarantee *flow.CollectionGuarant
 	return retrieve(makePrefix(codeGuarantee, collID), guarantee)
 }
 
-func IndexGuarantee(payloadHash flow.Identifier, guaranteeID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexGuarantee, payloadHash, guaranteeID), guaranteeID)
+func IndexGuaranteePayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, guaranteeIDs []flow.Identifier) func(*badger.Txn) error {
+	return insert(toPayloadIndex(codeIndexGuarantee, height, blockID, parentID), guaranteeIDs)
 }
 
-func LookupGuarantees(payloadHash flow.Identifier, collIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return traverse(makePrefix(codeIndexGuarantee, payloadHash), lookup(collIDs))
+func LookupGuaranteePayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, collIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(toPayloadIndex(codeIndexGuarantee, height, blockID, parentID), collIDs)
+}
+
+// VerifyGuaranteePayload verifies that the candidate collection IDs
+// don't exist in any ancestor block.
+func VerifyGuaranteePayload(height uint64, blockID flow.Identifier, collIDs []flow.Identifier) func(*badger.Txn) error {
+	return iterate(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(0)), validatepayload(blockID, collIDs))
+}
+
+// CheckGuaranteePayload populates `invalidIDs` with any IDs in the candidate
+// set that already exist in an ancestor block.
+func CheckGuaranteePayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
+	return iterate(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(0)), searchduplicates(blockID, candidateIDs, invalidIDs))
 }

@@ -21,9 +21,9 @@ func AccountSignatureToMessage(a flow.AccountSignature) *entities.AccountSignatu
 	}
 }
 
-func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
+func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error) {
 	if m == nil {
-		return flow.Transaction{}, fmt.Errorf("message is empty")
+		return flow.TransactionBody{}, fmt.Errorf("message is empty")
 	}
 
 	scriptAccounts := make([]flow.Address, len(m.ScriptAccounts))
@@ -36,20 +36,16 @@ func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
 		signatures[i] = MessageToAccountSignature(accountSig)
 	}
 
-	return flow.Transaction{TransactionBody: flow.TransactionBody{
+	return flow.TransactionBody{
 		Script:           m.GetScript(),
-		ReferenceBlockID: flow.HashToID(m.ReferenceBlockHash),
-		Nonce:            m.GetNonce(),
-		ComputeLimit:     m.GetComputeLimit(),
+		ReferenceBlockID: flow.HashToID(m.ReferenceBlockId),
 		PayerAccount:     flow.BytesToAddress(m.PayerAccount),
 		ScriptAccounts:   scriptAccounts,
 		Signatures:       signatures,
-	},
-		Status: flow.TransactionStatus(m.GetStatus()),
 	}, nil
 }
 
-func TransactionToMessage(t flow.Transaction) *entities.Transaction {
+func TransactionToMessage(t flow.TransactionBody) *entities.Transaction {
 	scriptAccounts := make([][]byte, len(t.ScriptAccounts))
 	for i, account := range t.ScriptAccounts {
 		scriptAccounts[i] = account.Bytes()
@@ -61,13 +57,10 @@ func TransactionToMessage(t flow.Transaction) *entities.Transaction {
 	}
 
 	return &entities.Transaction{
-		Script:             t.Script,
-		ReferenceBlockHash: t.ReferenceBlockID[:],
-		Nonce:              t.Nonce,
-		ComputeLimit:       t.ComputeLimit,
-		PayerAccount:       t.PayerAccount.Bytes(),
-		ScriptAccounts:     scriptAccounts,
-		Signatures:         signatures,
-		Status:             entities.TransactionStatus(t.Status),
+		Script:           t.Script,
+		ReferenceBlockId: t.ReferenceBlockID[:],
+		PayerAccount:     t.PayerAccount.Bytes(),
+		ScriptAccounts:   scriptAccounts,
+		Signatures:       signatures,
 	}
 }

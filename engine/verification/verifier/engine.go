@@ -6,11 +6,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/language/runtime"
+	"github.com/dapperlabs/flow-go/engine/verification/utils"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -23,12 +23,13 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit    *engine.Unit    // used to control startup/shutdown
-	log     zerolog.Logger  // used to log relevant actions
-	conduit network.Conduit // used to propagate result approvals
-	me      module.Local    // used to access local node information
-	state   protocol.State  // used to access the protocol state
-	runtime runtime.Runtime // used to execute transactions
+	unit    *engine.Unit         // used to control startup/shutdown
+	log     zerolog.Logger       // used to log relevant actions
+	conduit network.Conduit      // used to propagate result approvals
+	me      module.Local         // used to access local node information
+	state   protocol.State       // used to access the protocol state
+	rah     crypto.Hasher        // used as hasher to sign the result approvals
+	chVerif module.ChunkVerifier // used to verify chunks
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -37,6 +38,7 @@ func New(
 	net module.Network,
 	state protocol.State,
 	me module.Local,
+	chVerif module.ChunkVerifier,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -44,7 +46,8 @@ func New(
 		log:     log,
 		state:   state,
 		me:      me,
-		runtime: runtime.NewInterpreterRuntime(),
+		chVerif: chVerif,
+		rah:     utils.NewResultApprovalHasher(),
 	}
 
 	var err error
@@ -99,36 +102,28 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // process receives and submits an event to the verifier engine for processing.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
-	case *verification.CompleteExecutionResult:
+	case *verification.VerifiableChunk:
 		return e.verify(originID, resource)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// verify handles the core verification process. It accepts an execution
-// result and all dependent resources, verifies the result, and emits a
+// verify handles the core verification process. It accepts a verifiable chunk
+// and all dependent resources, verifies the chunk, and emits a
 // result approval if applicable.
 //
 // If any part of verification fails, an error is returned, indicating to the
 // initiating engine that the verification must be re-tried.
-// TODO assumes blocks with one chunk
-func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExecutionResult) error {
+func (e *Engine) verify(originID flow.Identifier, chunk *verification.VerifiableChunk) error {
 
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote origin for verify")
 	}
-
-	chunkID := res.Receipt.ExecutionResult.Chunks.ByIndex(0).ID()
-
-	computedEndState, err := e.executeChunk(res)
-	if err != nil {
-		return fmt.Errorf("could not verify chunk (id=%s): %w", chunkID, err)
-	}
-
-	// TODO for now, we discard the computed end state and approve the ER
-	_ = computedEndState
-
+	// extracts list of verifier nodes id
+	//
+	// TODO state extraction should be done based on block references
+	// https://github.com/dapperlabs/flow-go/issues/2787
 	consensusNodes, err := e.state.Final().
 		Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
@@ -136,10 +131,31 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 		return fmt.Errorf("could not load consensus node IDs: %w", err)
 	}
 
+	// extracts chunk ID
+	chunkID := chunk.Receipt.ExecutionResult.Chunks.ByIndex(chunk.ChunkIndex).ID()
+	// executes assigned chunks
+	computedEndState, err := e.executeChunk(chunk)
+	if err != nil {
+		return fmt.Errorf("could not execute chunk (id=%s): %w", chunkID, err)
+	}
+	// TODO for now, we discard the computed end state and approve the ER
+	_ = computedEndState
+
+	// prepares and signs result approval body part
+	body := flow.ResultApprovalBody{
+		ExecutionResultID: chunk.Receipt.ExecutionResult.ID(),
+		ChunkIndex:        chunk.ChunkIndex,
+	}
+
+	// generates a signature over the attestation part of approval
+	sign, err := e.signAttestation(&body)
+	if err != nil {
+		return fmt.Errorf("could not generate attestation signature: %w", err)
+	}
+
 	approval := &flow.ResultApproval{
-		ResultApprovalBody: flow.ResultApprovalBody{
-			ExecutionResultID: res.Receipt.ExecutionResult.ID(),
-		},
+		ResultApprovalBody: body,
+		VerifierSignature:  sign,
 	}
 
 	// broadcast result approval to consensus nodes
@@ -148,7 +164,6 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
 	}
-
 	e.log.Info().
 		Hex("chunk_id", logging.ID(chunkID)).
 		Msg("submitted result approval")
@@ -158,36 +173,31 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 
 // executeChunk executes the transactions for a single chunk and returns the
 // resultant end state, or an error if execution failed.
-func (e *Engine) executeChunk(res *verification.CompleteExecutionResult) (flow.StateCommitment, error) {
-	blockCtx := virtualmachine.NewBlockContext(e.runtime, &res.Block.Header)
+// TODO unit testing
+func (e *Engine) executeChunk(ch *verification.VerifiableChunk) (flow.StateCommitment, error) {
+	err := e.chVerif.Verify(ch)
+	if err != nil {
+		return nil, fmt.Errorf("chunk verification failed for verifiable chunk [%d] of receipt [%x], error: %v", ch.ChunkIndex, ch.Receipt.ID(), err)
+	}
+	return ch.EndState, nil
+}
 
-	getRegister := func(key string) ([]byte, error) {
-		registers := res.ChunkStates[0].Registers
+// signAttestation extracts, signs and returns the attestation part of the result approval
+func (e *Engine) signAttestation(body *flow.ResultApprovalBody) (crypto.Signature, error) {
+	// extracts attestation part
+	atst := body.Attestation()
 
-		val, ok := registers[key]
-		if !ok {
-			return nil, fmt.Errorf("missing register")
-		}
-
-		return val, nil
+	// encodes attestation into bytes
+	batst, err := encoding.DefaultEncoder.Encode(atst)
+	if err != nil {
+		return nil, fmt.Errorf("could encode attestation: %w", err)
 	}
 
-	chunkView := state.NewView(getRegister)
-
-	for _, tx := range res.Collections[0].Transactions {
-		txView := chunkView.NewChild()
-
-		result, err := blockCtx.ExecuteTransaction(txView, tx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to execute transaction: %w", err)
-		}
-
-		if result.Succeeded() {
-			chunkView.ApplyDelta(txView.Delta())
-		}
+	// signs attestation
+	signature, err := e.me.Sign(batst, e.rah)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign attestation: %w", err)
 	}
 
-	// TODO compute and return state commitment
-
-	return nil, nil
+	return signature, nil
 }

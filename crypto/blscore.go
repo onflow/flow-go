@@ -2,7 +2,7 @@
 
 package crypto
 
-// #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/include -I./relic/include/low
+// #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
 // #include "bls_include.h"
 import "C"
@@ -22,6 +22,8 @@ type ctx struct {
 var signatureLengthBLS_BLS12381 = int(C._getSignatureLengthBLS_BLS12381())
 var pubKeyLengthBLS_BLS12381 = int(C._getPubKeyLengthBLS_BLS12381())
 var prKeyLengthBLS_BLS12381 = int(C._getPrKeyLengthBLS_BLS12381())
+var valid = C.get_valid()
+var invalid = C.get_invalid()
 
 // init sets the context of BLS12381 curve
 func (a *BLS_BLS12381Algo) init() error {
@@ -74,7 +76,7 @@ func seedRelic(seed []byte) {
 	C._seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
-// returns a random number on Z/Z.r
+// returns a random number in Z/Z.r
 func randZr(x *scalar) error {
 	C._bn_randZr((*C.bn_st)(x))
 	if x == nil {
@@ -106,6 +108,22 @@ func (x *scalar) setInt(a int) {
 	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
 }
 
+// writeScalar writes a G2 point in a slice of bytes
+func writeScalar(dest []byte, x *scalar) {
+	C.bn_write_bin((*C.uchar)(&dest[0]),
+		(C.int)(prKeyLengthBLS_BLS12381),
+		(*C.bn_st)(x),
+	)
+}
+
+// readScalar reads a scalar from a slice of bytes
+func readScalar(x *scalar, src []byte) {
+	C.bn_read_bin((*C.bn_st)(x),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src)),
+	)
+}
+
 // writePointG2 writes a G2 point in a slice of bytes
 func writePointG2(dest []byte, a *pointG2) {
 	C._ep2_write_bin_compact((*C.uchar)(&dest[0]),
@@ -115,10 +133,10 @@ func writePointG2(dest []byte, a *pointG2) {
 }
 
 // readVerifVector reads a G2 point from a slice of bytes
-func readPointG2(a *pointG2, data []byte) {
+func readPointG2(a *pointG2, src []byte) {
 	C._ep2_read_bin_compact((*C.ep2_st)(a),
-		(*C.uchar)(&data[0]),
-		(C.int)(len(data)),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src)),
 	)
 }
 
@@ -140,11 +158,16 @@ func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool
 		(*C.uchar)(&data[0]),
 		(C.int)(len(data)))
 
-	const sigValid = 1 // same value as in include.h
-	const sigErr = 0xFF
+	return (verif == valid)
+}
 
-	if verif == sigErr {
-		panic("Relic memory allocation failed")
-	}
-	return (verif == sigValid)
+// membershipCheckG2 runs a membership check of BLS public keys on BLS12-381 curve.
+// Returns true if the public key is on the correct subgroup of the curve
+// and false otherwise
+// It is necessary to run this test once for every public key before
+// it is used to verify BLS signatures. The library calls this function whenever
+// it imports a key through the function DecodePublicKey.
+func (pk *pointG2) checkMembershipG2() bool {
+	verif := C.checkMembership_G2((*C.ep2_st)(pk))
+	return verif == valid
 }

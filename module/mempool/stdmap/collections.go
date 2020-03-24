@@ -14,9 +14,9 @@ type Collections struct {
 }
 
 // NewCollections creates a new memory pool for collection.
-func NewCollections() (*Collections, error) {
+func NewCollections(limit uint) (*Collections, error) {
 	g := &Collections{
-		Backend: NewBackend(),
+		Backend: NewBackend(WithLimit(limit)),
 	}
 
 	return g, nil
@@ -45,11 +45,7 @@ func (g *Collections) All() []*flow.Collection {
 	entities := g.Backend.All()
 	colls := make([]*flow.Collection, 0, len(entities))
 	for _, entity := range entities {
-		coll, ok := entity.(*flow.Collection)
-		if !ok {
-			panic(fmt.Sprintf("invalid entity in collection pool (%T)", entity))
-		}
-		colls = append(colls, coll)
+		colls = append(colls, entity.(*flow.Collection))
 	}
 	return colls
 }

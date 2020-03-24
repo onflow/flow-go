@@ -11,10 +11,10 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-func IndexIdentities(payloadHash flow.Identifier, identities []*flow.Identity) func(*badger.Txn) error {
+func IndexIdentities(height uint64, blockID flow.Identifier, parentID flow.Identifier, identities []*flow.Identity) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// check and index the identities
+		// check that all identities are part of the database
 		for _, identity := range identities {
 			var exists bool
 			err := operation.CheckIdentity(identity.NodeID, &exists)(tx)
@@ -24,28 +24,39 @@ func IndexIdentities(payloadHash flow.Identifier, identities []*flow.Identity) f
 			if !exists {
 				return fmt.Errorf("node identity missing in DB (%x)", identity.NodeID)
 			}
-			err = operation.IndexIdentity(payloadHash, identity.NodeID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not index identity (%x): %w", identity.NodeID, err)
-			}
+		}
+
+		// insert list of IDs into the payload index
+		err := operation.IndexIdentityPayload(height, blockID, parentID, flow.GetIDs(identities))(tx)
+		if err != nil {
+			return fmt.Errorf("could not index identities: %w", err)
 		}
 
 		return nil
 	}
 }
 
-func RetrieveIdentities(payloadHash flow.Identifier, identities *[]*flow.Identity) func(*badger.Txn) error {
-
-	// make sure we have a zero value
-	*identities = make([]*flow.Identity, 0)
+func RetrieveIdentities(blockID flow.Identifier, identities *[]*flow.Identity) func(*badger.Txn) error {
 
 	return func(tx *badger.Txn) error {
 
-		// get the collection IDs for the identities
+		// get the header so we have the height
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header: %w", err)
+		}
+
+		// get the nodeIDs for the identities
 		var nodeIDs []flow.Identifier
-		err := operation.LookupIdentities(payloadHash, &nodeIDs)(tx)
+		err = operation.LookupIdentityPayload(header.Height, blockID, header.ParentID, &nodeIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup identities: %w", err)
+		}
+
+		// return if there are no identities
+		if len(nodeIDs) == 0 {
+			return nil
 		}
 
 		// get all identities

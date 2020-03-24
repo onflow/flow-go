@@ -3,71 +3,31 @@ package ingestion
 //revive:disable:unexported-return
 
 import (
-	"fmt"
-
-	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
 type Mempool struct {
-	*stdmap.Backend
+	BlockByCollection *stdmap.BlockByCollections
+	ExecutionQueue    *stdmap.Queues
+	OrphanQueue       *stdmap.Queues
 }
 
-type blockByCollection struct {
-	CollectionID flow.Identifier
-	Block        *execution.CompleteBlock
+func (m *Mempool) Run(f func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueue *stdmap.QueuesBackdata, orphanQueue *stdmap.QueuesBackdata) error) error {
+	return m.ExecutionQueue.Run(func(queueBackdata *stdmap.QueuesBackdata) error {
+		return m.BlockByCollection.Run(func(blockByCollectionBackdata *stdmap.BlockByCollectionBackdata) error {
+			return m.OrphanQueue.Run(func(orphanBackdata *stdmap.QueuesBackdata) error {
+				return f(blockByCollectionBackdata, queueBackdata, orphanBackdata)
+			})
+		})
+	})
 }
 
-func (b *blockByCollection) ID() flow.Identifier {
-
-	return b.CollectionID
-}
-
-func (b *blockByCollection) Checksum() flow.Identifier {
-	return b.CollectionID
-}
-
-type Backdata struct {
-	*stdmap.Backdata
-}
-
-func (a *Backdata) ByID(id flow.Identifier) (*blockByCollection, error) {
-	entity, err := a.Backdata.ByID(id)
-	if err != nil {
-		return nil, err
-	}
-	block, ok := entity.(*blockByCollection)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in complete block mempool  (%T)", entity))
-	}
-	return block, nil
-}
-
-func newMempool() (*Mempool, error) {
-	a := &Mempool{
-		Backend: stdmap.NewBackend(),
+func newMempool() *Mempool {
+	m := &Mempool{
+		BlockByCollection: stdmap.NewBlockByCollections(),
+		ExecutionQueue:    stdmap.NewQueues(),
+		OrphanQueue:       stdmap.NewQueues(),
 	}
 
-	return a, nil
-}
-
-func (b *Mempool) Add(block *blockByCollection) error {
-	return b.Backend.Add(block)
-}
-
-func (b *Mempool) Get(id flow.Identifier) (*blockByCollection, error) {
-	backdata := &Backdata{b.Backdata}
-	return backdata.ByID(id)
-}
-
-func (b *Mempool) Run(f func(backdata *Backdata) error) error {
-	b.RLock()
-	defer b.RUnlock()
-
-	err := f(&Backdata{b.Backdata})
-	if err != nil {
-		return err
-	}
-	return nil
+	return m
 }

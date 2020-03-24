@@ -1,7 +1,9 @@
 package flow
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strconv"
 
@@ -15,11 +17,13 @@ var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|obs
 
 // Identity represents a node identity.
 type Identity struct {
-	NodeID  Identifier
-	Address string
-	Role    Role
-	Stake   uint64
-	PubKey  crypto.PublicKey
+	NodeID             Identifier
+	Address            string
+	Role               Role
+	Stake              uint64
+	StakingPubKey      crypto.PublicKey
+	RandomBeaconPubKey crypto.PublicKey
+	NetworkPubKey      crypto.PublicKey
 }
 
 // ParseIdentity parses a string representation of an identity.
@@ -65,6 +69,66 @@ func (id Identity) ID() Identifier {
 // Checksum returns a checksum for the identity including mutable attributes.
 func (id Identity) Checksum() Identifier {
 	return MakeID(id)
+}
+
+type jsonMarshalIdentity struct {
+	NodeID             Identifier
+	Address            string
+	Role               Role
+	Stake              uint64
+	StakingPubKey      []byte
+	RandomBeaconPubKey []byte
+	NetworkPubKey      []byte
+}
+
+func (id *Identity) UnmarshalJSON(b []byte) error {
+	var m jsonMarshalIdentity
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	id.NodeID = m.NodeID
+	id.Address = m.Address
+	id.Role = m.Role
+	id.Stake = m.Stake
+	var err error
+	if m.StakingPubKey != nil {
+		if id.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLS_BLS12381, m.StakingPubKey); err != nil {
+			return err
+		}
+	}
+	if m.RandomBeaconPubKey != nil {
+		if id.RandomBeaconPubKey, err = crypto.DecodePublicKey(crypto.BLS_BLS12381, m.RandomBeaconPubKey); err != nil {
+			return err
+		}
+	}
+	if m.NetworkPubKey != nil {
+		if id.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSA_SECp256k1, m.NetworkPubKey); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (id Identity) MarshalJSON() ([]byte, error) {
+	m := jsonMarshalIdentity{id.NodeID, id.Address, id.Role, id.Stake, nil, nil, nil}
+	var err error
+	if id.StakingPubKey != nil {
+		if m.StakingPubKey, err = id.StakingPubKey.Encode(); err != nil {
+			return nil, err
+		}
+	}
+	if id.RandomBeaconPubKey != nil {
+		if m.RandomBeaconPubKey, err = id.RandomBeaconPubKey.Encode(); err != nil {
+			return nil, err
+		}
+	}
+	if id.NetworkPubKey != nil {
+		if m.NetworkPubKey, err = id.NetworkPubKey.Encode(); err != nil {
+			return nil, err
+		}
+	}
+
+	return json.Marshal(m)
 }
 
 // IdentityFilter is a filter on identities.
@@ -115,7 +179,35 @@ func (il IdentityList) Count() uint {
 	return uint(len(il))
 }
 
-// Get returns the node at the given index.
-func (il IdentityList) Get(i uint) *Identity {
-	return il[int(i)]
+// ByIndex returns the node at the given index.
+func (il IdentityList) ByIndex(index uint) (*Identity, bool) {
+	if index >= uint(len(il)) {
+		return nil, false
+	}
+	return il[int(index)], true
+}
+
+// ByNodeID gets a node from the list by node ID.
+func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
+	for _, identity := range il {
+		if identity.NodeID == nodeID {
+			return identity, true
+		}
+	}
+	return nil, false
+}
+
+// Sample returns simple random sample from the `IdentityList`
+func (il IdentityList) Sample(size uint) IdentityList {
+	if size > uint(len(il)) {
+		size = uint(len(il))
+	}
+	dup := make([]*Identity, 0, len(il))
+	for _, identity := range il {
+		dup = append(dup, identity)
+	}
+	rand.Shuffle(len(dup), func(i int, j int) {
+		dup[i], dup[j] = dup[j], dup[i]
+	})
+	return dup[:size]
 }

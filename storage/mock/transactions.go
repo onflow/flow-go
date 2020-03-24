@@ -33,20 +33,6 @@ func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error
 	return r0, r1
 }
 
-// Remove provides a mock function with given fields: txID
-func (_m *Transactions) Remove(txID flow.Identifier) error {
-	ret := _m.Called(txID)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
-		r0 = rf(txID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Store provides a mock function with given fields: tx
 func (_m *Transactions) Store(tx *flow.TransactionBody) error {
 	ret := _m.Called(tx)

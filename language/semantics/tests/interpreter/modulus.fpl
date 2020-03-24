@@ -1,2 +1,0 @@
-let x = 5 % 3;
-assert x == 2

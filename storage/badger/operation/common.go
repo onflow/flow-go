@@ -4,6 +4,7 @@ package operation
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -166,8 +167,8 @@ type iterationFunc func() (checkFunc, createFunc, handleFunc)
 
 // lookup is the default iteration function allowing us to collect a list of
 // entity IDs from an index.
-func lookup(entityIDs *[]flow.Identifier) iterationFunc {
-	*entityIDs = make([]flow.Identifier, 0)
+func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleFunc) {
+	*entityIDs = make([]flow.Identifier, 0, len(*entityIDs))
 	return func() (checkFunc, createFunc, handleFunc) {
 		check := func(key []byte) bool {
 			return true
@@ -192,10 +193,34 @@ func lookup(entityIDs *[]flow.Identifier) iterationFunc {
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
+//
+// TODO: this function is unbounded – pass context.Context to this or calling
+// functions to allow timing functions out.
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		it := tx.NewIterator(badger.DefaultIteratorOptions)
+		// initialize the default options and comparison modifier for iteration
+		modifier := 1
+		options := badger.DefaultIteratorOptions
+
+		// If start is bigger than end, we have a backwards iteration:
+		// 1) Seek will go to the first key that is equal or lesser than the
+		// start prefix. However, this will only include the first key with the
+		// start prefix; we need to add 0xff to the start prefix to cover all
+		// items with the start prefix.
+		// 2) We break the loop upon hitting the first item that has a key
+		// higher than the end prefix. In order to reverse this, we use a
+		// modifier for the comparison that reverses the check and makes it
+		// stop upon the first item before the end prefix.
+		// 3) We also set the reverse option on the iterator, so we step through
+		// all of the keys backwards.
+		if bytes.Compare(start, end) > 0 {
+			options.Reverse = true      // make sure to go in reverse order
+			start = append(start, 0xff) // make sure to start after start prefix
+			modifier = -1               // make sure to stop before end prefix
+		}
+
+		it := tx.NewIterator(options)
 		defer it.Close()
 
 		for it.Seek(start); it.Valid(); it.Next() {
@@ -203,7 +228,12 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 			item := it.Item()
 
 			// check if we have reached the end of our iteration
-			if end != nil && bytes.Compare(item.Key(), end) > 0 {
+			// NOTE: we have to cut down the prefix to the same length as the
+			// end prefix in order to go through all items that have the same
+			// partial prefix before breaking
+			key := item.Key()
+			prefix := key[0:len(end)]
+			if bytes.Compare(prefix, end)*modifier > 0 {
 				break
 			}
 
@@ -211,7 +241,6 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 			check, create, handle := iteration()
 
 			// check if we should process the item at all
-			key := item.Key()
 			ok := check(key)
 			if !ok {
 				continue
@@ -252,6 +281,9 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 // functions specific to processing the given key-value pair.
 func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
+		if len(prefix) == 0 {
+			return fmt.Errorf("prefix must not be empty")
+		}
 
 		opts := badger.DefaultIteratorOptions
 		// NOTE: this is an optimization only, it does not enforce that all
@@ -299,5 +331,124 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 		}
 
 		return nil
+	}
+}
+
+func toPayloadIndex(code uint8, height uint64, blockID flow.Identifier, parentID flow.Identifier) []byte {
+	return makePrefix(code, height, blockID, parentID)
+}
+
+func fromPayloadIndex(key []byte) (uint64, flow.Identifier, flow.Identifier) {
+	height := binary.BigEndian.Uint64(key[1:9])
+	blockID := flow.HashToID(key[9:41])
+	parentID := flow.HashToID(key[41:73])
+	return height, blockID, parentID
+}
+
+// validatepayload creates an iteration function used for ensuring no entities in
+// a new payload have already been included in an ancestor payload. The input
+// set of entity IDs represents the IDs of all entities in the candidate block
+// payload. If any of these candidate entities have already been included in an
+// ancestor block, a sentinel error is returned.
+//
+// This is useful for verifying an existing payload, for example in a block
+// proposal from another node, where the desired output is accept/reject.
+func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterationFunc {
+
+	// build lookup table for payload entities
+	lookup := make(map[flow.Identifier]struct{})
+	for _, checkID := range checkIDs {
+		lookup[checkID] = struct{}{}
+	}
+
+	return func() (checkFunc, createFunc, handleFunc) {
+
+		// check will check whether we are on the next block we want to check
+		// if we are not on the block we care about, we ignore the entry
+		// otherwise, we forward to the next parent and check the entry
+		check := func(key []byte) bool {
+			_, currentID, nextID := fromPayloadIndex(key)
+			if currentID != blockID {
+				return false
+			}
+			blockID = nextID
+			return true
+		}
+
+		// create returns a slice of IDs to decode the payload index entry into
+		var entityIDs []flow.Identifier
+		create := func() interface{} {
+			return &entityIDs
+		}
+
+		// handle will check the payload index entry entity IDs against the
+		// entity IDs we are checking as a new payload; if any of them matches,
+		// the payload is not valid, as it contains a duplicate entity
+		handle := func() error {
+			for _, entityID := range entityIDs {
+				_, ok := lookup[entityID]
+				if ok {
+					return fmt.Errorf("duplicate payload entity (%s): %w", entityID, storage.ErrAlreadyIndexed)
+				}
+			}
+			return nil
+		}
+
+		return check, create, handle
+	}
+}
+
+// searchduplicates creates an iteration function similar to validatepayload. Rather
+// than returning an error when ANY duplicate IDs are found, searchduplicates
+// tracks any duplicate IDs and populates a map containing all invalid IDs
+// from the candidate set.
+//
+// This is useful when building a payload locally, where we want to know which
+// entities are valid for inclusion so we can produce a valid block proposal.
+func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) iterationFunc {
+
+	// build lookup table for candidate payload entities
+	lookup := make(map[flow.Identifier]struct{})
+	for _, id := range candidateIDs {
+		lookup[id] = struct{}{}
+	}
+
+	// ensure the map is instantiated and empty
+	*invalidIDs = make(map[flow.Identifier]struct{})
+
+	return func() (checkFunc, createFunc, handleFunc) {
+
+		// check will check whether we are on the next block we want to check
+		// if we are not on the block we care about, we ignore the entry
+		// otherwise, we forward to the next parent and check the entry
+		check := func(key []byte) bool {
+			_, currentID, nextID := fromPayloadIndex(key)
+			if currentID != blockID {
+				return false
+			}
+			blockID = nextID
+			return true
+		}
+
+		// create returns a slice of IDs to decode the payload index entry into
+		var entityIDs []flow.Identifier
+		create := func() interface{} {
+			return &entityIDs
+		}
+
+		// handle will check the payload index entry entity IDs against the
+		// entity IDs we are checking as a new payload; if any of them matches,
+		// the payload is not valid, as it contains a duplicate entity
+		handle := func() error {
+			for _, entityID := range entityIDs {
+				_, isInvalid := lookup[entityID]
+				if isInvalid {
+					(*invalidIDs)[entityID] = struct{}{}
+				}
+			}
+			return nil
+		}
+
+		return check, create, handle
 	}
 }

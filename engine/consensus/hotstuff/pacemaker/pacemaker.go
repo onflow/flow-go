@@ -6,10 +6,9 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // FlowPaceMaker is a basic implementation of hotstuff.PaceMaker
@@ -20,9 +19,9 @@ type FlowPaceMaker struct {
 	started        *atomic.Bool
 }
 
-func NewFlowPaceMaker(startView uint64, timeoutController *timeout.Controller, notifier notifications.Consumer) (hotstuff.PaceMaker, error) {
+func NewFlowPaceMaker(startView uint64, timeoutController *timeout.Controller, notifier notifications.Consumer) (*FlowPaceMaker, error) {
 	if startView < 1 {
-		return nil, &types.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
+		return nil, &hotstuff.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
 	}
 	pm := FlowPaceMaker{
 		currentView:    startView,
@@ -37,7 +36,7 @@ func NewFlowPaceMaker(startView uint64, timeoutController *timeout.Controller, n
 // ensures that the view number is STRICTLY monotonously increasing. The method
 // gotoView panics as a last resort if FlowPaceMaker is modified to violate this condition.
 // Hence, gotoView will _always_ return a NewViewEvent for an _increased_ view number.
-func (p *FlowPaceMaker) gotoView(newView uint64) *types.NewViewEvent {
+func (p *FlowPaceMaker) gotoView(newView uint64) *hotstuff.NewViewEvent {
 	if newView <= p.currentView {
 		// This should never happen: in the current implementation, it is trivially apparent that
 		// newView is _always_ larger than currentView. This check is to protect the code from
@@ -49,9 +48,9 @@ func (p *FlowPaceMaker) gotoView(newView uint64) *types.NewViewEvent {
 		p.notifier.OnSkippedAhead(newView)
 	}
 	p.currentView = newView
-	timerInfo := p.timeoutControl.StartTimeout(types.ReplicaTimeout, newView)
+	timerInfo := p.timeoutControl.StartTimeout(hotstuff.ReplicaTimeout, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
-	return &types.NewViewEvent{View: p.currentView}
+	return &hotstuff.NewViewEvent{View: p.currentView}
 }
 
 // CurView returns the current view
@@ -63,7 +62,7 @@ func (p *FlowPaceMaker) TimeoutChannel() <-chan time.Time {
 	return p.timeoutControl.Channel()
 }
 
-func (p *FlowPaceMaker) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool) {
+func (p *FlowPaceMaker) UpdateCurViewWithQC(qc *hotstuff.QuorumCertificate) (*hotstuff.NewViewEvent, bool) {
 	if qc.View < p.currentView {
 		return nil, false
 	}
@@ -74,15 +73,15 @@ func (p *FlowPaceMaker) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types
 	return p.gotoView(qc.View + 1), true
 }
 
-func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
+func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *hotstuff.Block, isLeaderForNextView bool) (*hotstuff.NewViewEvent, bool) {
 	// use block's QC to fast-forward if possible
-	newViewOnQc, newViewOccurredOnQc := p.UpdateCurViewWithQC(block.QC())
-	if block.View() != p.currentView {
+	newViewOnQc, newViewOccurredOnQc := p.UpdateCurViewWithQC(block.QC)
+	if block.View != p.currentView {
 		return newViewOnQc, newViewOccurredOnQc
 	}
 	// block is for current view
 
-	if p.timeoutControl.TimerInfo().Mode != types.ReplicaTimeout {
+	if p.timeoutControl.TimerInfo().Mode != hotstuff.ReplicaTimeout {
 		// i.e. we are already on timeout.VoteCollectionTimeout.
 		// This edge case can occur as follows:
 		// * we previously already have processed a block for the current view
@@ -100,21 +99,21 @@ func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *types.BlockProposal, isLea
 	return newViewOnBlock, newViewOccurredOnBlock
 }
 
-func (p *FlowPaceMaker) actOnBlockForCurView(isLeaderForNextView bool) (*types.NewViewEvent, bool) {
+func (p *FlowPaceMaker) actOnBlockForCurView(isLeaderForNextView bool) (*hotstuff.NewViewEvent, bool) {
 	if isLeaderForNextView {
-		timerInfo := p.timeoutControl.StartTimeout(types.VoteCollectionTimeout, p.currentView)
+		timerInfo := p.timeoutControl.StartTimeout(hotstuff.VoteCollectionTimeout, p.currentView)
 		p.notifier.OnStartingTimeout(timerInfo)
 		return nil, false
 	}
 	return p.gotoView(p.currentView + 1), true
 }
 
-func (p *FlowPaceMaker) OnTimeout() *types.NewViewEvent {
+func (p *FlowPaceMaker) OnTimeout() *hotstuff.NewViewEvent {
 	p.emitTimeoutNotifications(p.timeoutControl.TimerInfo())
 	return p.gotoView(p.currentView + 1)
 }
 
-func (p *FlowPaceMaker) emitTimeoutNotifications(timeout *types.TimerInfo) {
+func (p *FlowPaceMaker) emitTimeoutNotifications(timeout *hotstuff.TimerInfo) {
 	p.notifier.OnReachedTimeout(timeout)
 }
 
@@ -122,6 +121,6 @@ func (p *FlowPaceMaker) Start() {
 	if p.started.Swap(true) {
 		return
 	}
-	timerInfo := p.timeoutControl.StartTimeout(types.ReplicaTimeout, p.currentView)
+	timerInfo := p.timeoutControl.StartTimeout(hotstuff.ReplicaTimeout, p.currentView)
 	p.notifier.OnStartingTimeout(timerInfo)
 }

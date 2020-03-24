@@ -3,6 +3,7 @@ package cmd
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -14,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -32,14 +34,19 @@ type BaseConfig struct {
 	NodeName    string
 	Entries     []string
 	Timeout     time.Duration
-	Connections uint
 	datadir     string
 	level       string
 	metricsPort uint
+	nClusters   uint
 }
 
-type namedReadyFn struct {
-	fn   func(*FlowNodeBuilder) module.ReadyDoneAware
+type namedModuleFunc struct {
+	fn   func(*FlowNodeBuilder) error
+	name string
+}
+
+type namedComponentFunc struct {
+	fn   func(*FlowNodeBuilder) (module.ReadyDoneAware, error)
 	name string
 }
 
@@ -65,13 +72,15 @@ type FlowNodeBuilder struct {
 	DB             *badger.DB
 	Me             *local.Local
 	State          *protocol.State
-	readyDoneFns   []namedReadyFn
+	modules        []namedModuleFunc
+	components     []namedComponentFunc
 	doneObject     []namedDoneObject
 	sig            chan os.Signal
 	Network        *libp2p.Network
 	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
 	postInitFns    []func(*FlowNodeBuilder)
 	genesis        *flow.Block
+	sk             crypto.PrivateKey
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -80,36 +89,55 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.NodeID, "nodeid", notSet, "identity of our node")
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
-	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e", []string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
+	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e",
+		[]string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
-	fnb.flags.UintVarP(&fnb.BaseConfig.Connections, "connections", "c", 0, "number of connections to establish to peers")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
+	fnb.flags.UintVar(&fnb.BaseConfig.nClusters, "nclusters", 2, "number of collection node clusters")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
-	fnb.Component("flow network", func(builder *FlowNodeBuilder) module.ReadyDoneAware {
-
-		fnb.Logger.Info().Msg("initializing network stack")
+	fnb.Component("network", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 		codec := json.NewCodec()
 
-		mw, err := libp2p.NewMiddleware(fnb.Logger, codec, fnb.Me.Address(), fnb.Me.NodeID())
-		fnb.MustNot(err).Msg("could not initialize flow middleware")
+		nk, err := loadPrivateNetworkKey(fnb.Me.NodeID())
+		if err != nil {
+			return nil, fmt.Errorf("could not load private key: %w", err)
+		}
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw, 10e6)
-		fnb.MustNot(err).Msg("could not initialize flow network")
+		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID(), nk)
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize middleware: %w", err)
+		}
+
+		ids, err := fnb.State.Final().Identities()
+		if err != nil {
+			return nil, fmt.Errorf("could not get network identities: %w", err)
+		}
+
+		// temporary fix to make public keys available to the networking layer
+		// populate the Networking keys for each identity with public keys generated with the node identifier as the seed
+		// TODO: https://github.com/dapperlabs/flow-go/issues/2693 should make this obsolete
+		err = generatePublicNetworkKey(ids)
+		fnb.MustNot(err).Msg("could not generate public key")
+
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize network: %w", err)
+		}
+
 		fnb.Network = net
-		return net
+		return net, err
 	})
 }
 
 func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
-	fnb.Component("metrics server", func(builder *FlowNodeBuilder) module.ReadyDoneAware {
-		fnb.Logger.Info().Msg("initializing metrics server")
+	fnb.Component("metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
-		return server
+		return server, nil
 	})
 }
 
@@ -158,7 +186,7 @@ func (fnb *FlowNodeBuilder) initTracer() {
 }
 
 func (fnb *FlowNodeBuilder) initState() {
-	state, err := protocol.NewState(fnb.DB)
+	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	//check if database is initialized
@@ -197,23 +225,42 @@ func (fnb *FlowNodeBuilder) initState() {
 	id, err := state.Final().Identity(myID)
 	fnb.MustNot(err).Msg("could not get identity")
 
-	fnb.Me, err = local.New(id)
+	fnb.sk, err = loadPrivateKey()
+	fnb.MustNot(err).Msg("could not load private key")
+
+	fnb.Me, err = local.New(id, fnb.sk)
 	fnb.MustNot(err).Msg("could not initialize local")
 
 	fnb.State = state
 }
 
-func (fnb *FlowNodeBuilder) handleReadyAware(v namedReadyFn) {
+func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
+	err := v.fn(fnb)
+	if err != nil {
+		fnb.Logger.Fatal().Err(err).Str("module", v.name).Msg("module initialization failed")
+	} else {
+		fnb.Logger.Info().Str("module", v.name).Msg("module initialization complete")
+	}
+}
 
-	readyAware := v.fn(fnb)
+func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
+
+	log := fnb.Logger.With().Str("component", v.name).Logger()
+
+	readyAware, err := v.fn(fnb)
+	if err != nil {
+		log.Fatal().Err(err).Msg("component initialization failed")
+	} else {
+		log.Info().Msg("component initialization complete")
+	}
 
 	select {
 	case <-readyAware.Ready():
-		fnb.Logger.Info().Msgf("%s ready", v.name)
+		log.Info().Msg("component startup complete")
 	case <-time.After(fnb.BaseConfig.Timeout):
-		fnb.Logger.Fatal().Msgf("could not start %s", v.name)
+		log.Fatal().Msg("component startup timed out")
 	case <-fnb.sig:
-		fnb.Logger.Warn().Msgf("%s start aborted", v.name)
+		log.Warn().Msg("component startup aborted")
 		os.Exit(1)
 	}
 
@@ -223,15 +270,16 @@ func (fnb *FlowNodeBuilder) handleReadyAware(v namedReadyFn) {
 }
 
 func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
-	fnb.Logger.Info().Msgf("stopping %s", v.name)
+
+	log := fnb.Logger.With().Str("component", v.name).Logger()
 
 	select {
 	case <-v.ob.Done():
-		fnb.Logger.Info().Msgf("%s shutdown complete", v.name)
+		log.Info().Msg("component shutdown complete")
 	case <-time.After(fnb.BaseConfig.Timeout):
-		fnb.Logger.Fatal().Msgf("could not stop %s", v.name)
+		log.Fatal().Msg("component shutdown timed out")
 	case <-fnb.sig:
-		fnb.Logger.Warn().Msgf("%s stop aborted", v.name)
+		log.Warn().Msg("component shutdown aborted")
 		os.Exit(1)
 	}
 }
@@ -242,10 +290,12 @@ func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) *FlowNodeBuilder 
 	return fnb
 }
 
-// Create enables setting up dependencies of the node with the context of the
-// builder.
-func (fnb *FlowNodeBuilder) Create(f func(builder *FlowNodeBuilder)) *FlowNodeBuilder {
-	f(fnb)
+// Module enables setting up dependencies of the engine with the builder context.
+func (fnb *FlowNodeBuilder) Module(name string, f func(builder *FlowNodeBuilder) error) *FlowNodeBuilder {
+	fnb.modules = append(fnb.modules, namedModuleFunc{
+		fn:   f,
+		name: name,
+	})
 	return fnb
 }
 
@@ -266,8 +316,8 @@ func (fnb *FlowNodeBuilder) MustNot(err error) *zerolog.Event {
 // When the node is run, this component will be started with `Ready`. When the
 // node is stopped, we will wait for the component to exit gracefully with
 // `Done`.
-func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) module.ReadyDoneAware) *FlowNodeBuilder {
-	fnb.readyDoneFns = append(fnb.readyDoneFns, namedReadyFn{
+func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) (module.ReadyDoneAware, error)) *FlowNodeBuilder {
+	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:   f,
 		name: name,
 	})
@@ -290,10 +340,9 @@ func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBui
 func FlowNode(name string) *FlowNodeBuilder {
 
 	builder := &FlowNodeBuilder{
-		BaseConfig:   BaseConfig{},
-		flags:        pflag.CommandLine,
-		name:         name,
-		readyDoneFns: make([]namedReadyFn, 0),
+		BaseConfig: BaseConfig{},
+		flags:      pflag.CommandLine,
+		name:       name,
 	}
 
 	builder.baseFlags()
@@ -334,12 +383,18 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handlePostInit(f)
 	}
 
+	// set up all modules
+	for _, f := range fnb.modules {
+		fnb.handleModule(f)
+	}
+
 	if fnb.genesis != nil && fnb.genesisHandler != nil {
 		fnb.genesisHandler(fnb, fnb.genesis)
 	}
 
-	for _, f := range fnb.readyDoneFns {
-		fnb.handleReadyAware(f)
+	// initialize all components
+	for _, f := range fnb.components {
+		fnb.handleComponent(f)
 	}
 
 	fnb.Logger.Info().Msgf("%s node startup complete", fnb.name)
@@ -362,4 +417,68 @@ func (fnb *FlowNodeBuilder) Run() {
 
 func (fnb *FlowNodeBuilder) handlePostInit(f func(node *FlowNodeBuilder)) {
 	f(fnb)
+}
+
+// load private key loads the private key of the node, e.g., from disk
+//
+// DISCLAIMER: should not use the current version at the production-level
+// https://github.com/dapperlabs/flow-go/issues/2667
+//
+// The current version generates and returns a private key. It is solely to keep the
+// code compiled correctly, and avoid nil panics. However, the implementation of this
+// function should be replaced with a proper loading/generating functionality of the key
+func loadPrivateKey() (crypto.PrivateKey, error) {
+	// todo: replace the following implementation with a proper loading or generating functionality for keys
+	// todo: https://github.com/dapperlabs/flow-go/issues/2667
+	// generates a seed soley for sake of integration tests
+	// seed should be replaced by a secure functionality as part of the mentioned issue
+	seed := make([]byte, 48)
+	_, err := rand.Read(seed)
+	if err != nil {
+		return nil, err
+	}
+
+	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	return sk, err
+}
+
+// loadPrivateNetworkKey loads the private network key of the node, e.g., from disk (similar to what is being done
+/// for the staking key)
+// The seed for the key is set to the Flow Identifier so that Public keys of remote nodes can also be deterministically generated
+// Eventually, of course this key should come via some external key bootstrapping mechanism
+// DISCLAIMER: should not use the current version at the production-level
+// https://github.com/dapperlabs/flow-go/issues/2693
+//
+// The current version generates and returns a private key. It is solely to keep the
+// code compiled correctly, and avoid nil panics. However, the implementation of this
+// function should be replaced with a proper loading/generating functionality of the key
+func loadPrivateNetworkKey(id flow.Identifier) (crypto.PrivateKey, error) {
+	// todo: replace the following implementation with a proper loading or generating functionality for keys
+	// todo: https://github.com/dapperlabs/flow-go/issues/2693
+	// generates a seed solely for sake of integration tests
+	// seed should be replaced by a secure functionality as part of the mentioned issue
+	seed := make([]byte, 48)
+	copy(seed, id[:])
+	// currently we only support ECDSA 256 keys (TODO: issue #2740)
+	nk, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
+	return nk, err
+}
+
+// generatePublicNetworkKey generates a public network key for each remote node using the node Flow identifier as the seed
+//
+// DISCLAIMER: should not use the current version at the production-level
+// The networking public key depends on the private key, hence till the private key distribution is resolved across nodes
+// the public keys need to be generated on the fly in a deterministic manner to allow one libp2p node to address
+// the other.
+// When issue https://github.com/dapperlabs/flow-go/issues/2693 is done, this code should be redundant as the public keys
+// will be passed is as command line args,
+func generatePublicNetworkKey(ids flow.IdentityList) error {
+	for _, id := range ids {
+		pk, err := loadPrivateNetworkKey(id.ID())
+		if err != nil {
+			return err
+		}
+		id.NetworkPubKey = pk.PublicKey()
+	}
+	return nil
 }

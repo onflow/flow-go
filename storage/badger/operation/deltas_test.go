@@ -90,7 +90,7 @@ func TestDeltasTraverse(t *testing.T) {
 		}
 
 		actual := make(map[flow.Identifier]int64)
-		process := func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) error {
+		process := func(nodeID flow.Identifier, delta int64) error {
 			actual[nodeID] += delta
 			return nil
 		}

@@ -7,6 +7,9 @@
 
 typedef uint8_t byte;
 
+#define VALID   1
+#define INVALID 0
+
 #define BITS_TO_BYTES(x) ((x+7)>>3)
 #define BITS_TO_DIGITS(x) ((x+63)>>6)
 #define MIN(a,b) ((a)>(b)?(b):(a))
@@ -14,6 +17,8 @@ typedef uint8_t byte;
 // Most of the functions are written for ALLOC=AUTO not ALLOC=DYNAMIC
 
 // Debug related functions
+int     get_valid();
+int     get_invalid();
 void    _bytes_print(char*, byte*, int);
 void    _fp_print(char*, fp_t);
 void    _bn_print(char*, bn_st*);

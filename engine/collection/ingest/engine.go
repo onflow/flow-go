@@ -105,7 +105,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // to the transaction mempool.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *flow.Transaction:
+	case *flow.TransactionBody:
 		return e.onTransaction(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -114,7 +114,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onTransaction handles receipt of a new transaction. This can be submitted
 // from outside the system or routed from another collection node.
-func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) error {
+func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
@@ -180,7 +180,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) e
 }
 
 // TODO: implement
-func (e *Engine) validateTransaction(tx *flow.Transaction) error {
+func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
 	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
 		return ErrIncompleteTransaction{missing: missingFields}

@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"errors"
 	"io/ioutil"
 	"testing"
 
@@ -13,27 +14,27 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	merr "github.com/dapperlabs/flow-go/module/mempool"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
-	serr "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
+
+var reachedEnd = errors.New("reached end of test")
 
 func TestNewEngine(t *testing.T) {
 
 	log := zerolog.New(ioutil.Discard)
 
 	net := &module.Network{}
-	net.On("Register", uint8(engine.ReceiptProvider), mock.Anything).Return(&network.Conduit{}, nil).Once()
+	net.On("Register", uint8(engine.ExecutionReceiptProvider), mock.Anything).Return(&network.Conduit{}, nil).Once()
 	net.On("Register", uint8(engine.ApprovalProvider), mock.Anything).Return(&network.Conduit{}, nil).Once()
 
 	state := &protocol.State{}
 	me := &module.Local{}
-	results := &storage.Results{}
+	results := &storage.ExecutionResults{}
 	receipts := &mempool.Receipts{}
 	approvals := &mempool.Approvals{}
 	seals := &mempool.Seals{}
@@ -41,6 +42,7 @@ func TestNewEngine(t *testing.T) {
 	e, err := New(log, net, state, me, results, receipts, approvals, seals)
 	require.NoError(t, err)
 
+	assert.NotNil(t, e.unit)
 	assert.NotNil(t, e.log)
 	assert.Same(t, state, e.state)
 	assert.Same(t, me, e.me)
@@ -52,20 +54,24 @@ func TestNewEngine(t *testing.T) {
 	net.AssertExpectations(t)
 }
 
-func TestOnReceiptCorrectRole(t *testing.T) {
+func TestOnReceiptValid(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	receipt := unittest.ExecutionReceiptFixture()
+	receipt.ExecutorID = identity.NodeID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
 	approvals := &mempool.Approvals{}
 	receipts := &mempool.Receipts{}
 
 	state.On("Final").Return(snapshot)
+
+	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
-	approvals.On("ByResultID", mock.Anything).Return(nil, merr.ErrEntityNotFound)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -74,58 +80,160 @@ func TestOnReceiptCorrectRole(t *testing.T) {
 	}
 
 	err := e.onReceipt(identity.NodeID, receipt)
-	assert.NoError(t, err)
+	assert.True(t, errors.Is(err, reachedEnd))
 
 	if receipts.AssertNumberOfCalls(t, "Add", 1) {
 		receipts.AssertCalled(t, "Add", receipt)
 	}
-	if approvals.AssertNumberOfCalls(t, "ByResultID", 1) {
-		approvals.AssertCalled(t, "ByResultID", receipt.ExecutionResult.ID())
-	}
 }
 
-func TestOnReceiptWrongRole(t *testing.T) {
+func TestOnReceiptWrongExecutor(t *testing.T) {
 
-	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	receipt := unittest.ExecutionReceiptFixture()
+	receipt.ExecutorID = flow.ZeroID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
 	approvals := &mempool.Approvals{}
 	receipts := &mempool.Receipts{}
 
 	state.On("Final").Return(snapshot)
+
+	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
-	approvals.On("ByResultID", mock.Anything).Return(nil, merr.ErrEntityNotFound)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
-		receipts:  receipts,
 		approvals: approvals,
+		receipts:  receipts,
 	}
 
 	err := e.onReceipt(identity.NodeID, receipt)
 	assert.Error(t, err)
+	assert.False(t, errors.Is(err, reachedEnd))
 
-	approvals.AssertNumberOfCalls(t, "Add", 0)
-	receipts.AssertNumberOfCalls(t, "ByResultID", 0)
+	receipts.AssertNumberOfCalls(t, "Add", 0)
 }
 
-func TestOnApprovalCorrectRole(t *testing.T) {
+func TestOnReceiptMissingIdentity(t *testing.T) {
 
-	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	approval := unittest.ResultApprovalFixture()
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	receipt := unittest.ExecutionReceiptFixture()
+	receipt.ExecutorID = identity.NodeID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
 	approvals := &mempool.Approvals{}
 	receipts := &mempool.Receipts{}
 
 	state.On("Final").Return(snapshot)
+
+	state.On("AtBlockID", mock.Anything).Return(boundary)
+	snapshot.On("Identity", mock.Anything).Return(nil, errors.New("identity missing"))
+	receipts.On("Add", mock.Anything).Return(nil)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+
+	e := Engine{
+		state:     state,
+		approvals: approvals,
+		receipts:  receipts,
+	}
+
+	err := e.onReceipt(identity.NodeID, receipt)
+	assert.Error(t, err)
+	assert.False(t, errors.Is(err, reachedEnd))
+
+	receipts.AssertNumberOfCalls(t, "Add", 0)
+}
+
+func TestOnReceiptZeroStake(t *testing.T) {
+
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	receipt := unittest.ExecutionReceiptFixture()
+	receipt.ExecutorID = identity.NodeID
+	identity.Stake = 0
+
+	state := &protocol.State{}
+	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
+	approvals := &mempool.Approvals{}
+	receipts := &mempool.Receipts{}
+
+	state.On("Final").Return(snapshot)
+
+	state.On("AtBlockID", mock.Anything).Return(boundary)
+	snapshot.On("Identity", mock.Anything).Return(identity, nil)
+	receipts.On("Add", mock.Anything).Return(nil)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+
+	e := Engine{
+		state:     state,
+		approvals: approvals,
+		receipts:  receipts,
+	}
+
+	err := e.onReceipt(identity.NodeID, receipt)
+	assert.Error(t, err)
+	assert.False(t, errors.Is(err, reachedEnd))
+
+	receipts.AssertNumberOfCalls(t, "Add", 0)
+}
+
+func TestOnReceiptWrongRole(t *testing.T) {
+
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	receipt := unittest.ExecutionReceiptFixture()
+	receipt.ExecutorID = identity.NodeID
+
+	state := &protocol.State{}
+	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
+	approvals := &mempool.Approvals{}
+	receipts := &mempool.Receipts{}
+
+	state.On("Final").Return(snapshot)
+
+	state.On("AtBlockID", mock.Anything).Return(boundary)
+	snapshot.On("Identity", mock.Anything).Return(identity, nil)
+	receipts.On("Add", mock.Anything).Return(nil)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+
+	e := Engine{
+		state:     state,
+		approvals: approvals,
+		receipts:  receipts,
+	}
+
+	err := e.onReceipt(identity.NodeID, receipt)
+	assert.Error(t, err)
+	assert.False(t, errors.Is(err, reachedEnd))
+
+	receipts.AssertNumberOfCalls(t, "Add", 0)
+}
+
+func TestOnApprovalValid(t *testing.T) {
+
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	approval := unittest.ResultApprovalFixture()
+	approval.ResultApprovalBody.ApproverID = identity.NodeID
+
+	state := &protocol.State{}
+	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
+	approvals := &mempool.Approvals{}
+	receipts := &mempool.Receipts{}
+
+	state.On("Final").Return(snapshot)
+
+	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
-	receipts.On("ByResultID", mock.Anything).Return(nil, merr.ErrEntityNotFound)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -134,30 +242,31 @@ func TestOnApprovalCorrectRole(t *testing.T) {
 	}
 
 	err := e.onApproval(identity.NodeID, approval)
-	assert.NoError(t, err)
+	assert.True(t, errors.Is(err, reachedEnd))
 
 	if approvals.AssertNumberOfCalls(t, "Add", 1) {
 		approvals.AssertCalled(t, "Add", approval)
 	}
-	if receipts.AssertNumberOfCalls(t, "ByResultID", 1) {
-		receipts.AssertCalled(t, "ByResultID", approval.ResultApprovalBody.ExecutionResultID)
-	}
 }
 
-func TestOnApprovalWrongRole(t *testing.T) {
+func TestOnApprovalWrongApprover(t *testing.T) {
 
-	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
+	approval.ResultApprovalBody.ApproverID = flow.ZeroID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
 	approvals := &mempool.Approvals{}
 	receipts := &mempool.Receipts{}
 
 	state.On("Final").Return(snapshot)
+
+	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
-	receipts.On("ByResultID", mock.Anything).Return(nil, merr.ErrEntityNotFound)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -167,187 +276,101 @@ func TestOnApprovalWrongRole(t *testing.T) {
 
 	err := e.onApproval(identity.NodeID, approval)
 	assert.Error(t, err)
+	assert.False(t, errors.Is(err, reachedEnd))
 
 	approvals.AssertNumberOfCalls(t, "Add", 0)
-	receipts.AssertNumberOfCalls(t, "ByResultID", 0)
 }
 
-func TestMatchReceiptAvailableApproval(t *testing.T) {
+func TestOnApprovalMissingIdentity(t *testing.T) {
 
-	receipt := unittest.ExecutionReceiptFixture()
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
-	result := unittest.ExecutionResultFixture()
+	approval.ResultApprovalBody.ApproverID = identity.NodeID
 
+	state := &protocol.State{}
+	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
 	approvals := &mempool.Approvals{}
-	results := &storage.Results{}
-	seals := &mempool.Seals{}
+	receipts := &mempool.Receipts{}
 
-	approvals.On("ByResultID", mock.Anything).Return(approval, nil)
-	results.On("ByID", mock.Anything).Return(result, nil)
-	results.On("Store", mock.Anything).Return(nil)
-	seals.On("Add", mock.Anything).Return(nil)
+	state.On("Final").Return(snapshot)
+	state.On("AtBlockID", mock.Anything).Return(boundary)
+	snapshot.On("Identity", mock.Anything).Return(nil, errors.New("identity missing"))
+	approvals.On("Add", mock.Anything).Return(nil)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		state:     state,
+		receipts:  receipts,
 		approvals: approvals,
-		results:   results,
-		seals:     seals,
 	}
 
-	err := e.matchReceipt(receipt)
-	assert.NoError(t, err)
+	err := e.onApproval(identity.NodeID, approval)
+	assert.Error(t, err)
+	assert.False(t, errors.Is(err, reachedEnd))
 
-	if approvals.AssertNumberOfCalls(t, "ByResultID", 1) {
-		approvals.AssertCalled(t, "ByResultID", receipt.ExecutionResult.ID())
-	}
-	if results.AssertNumberOfCalls(t, "ByID", 1) {
-		results.AssertCalled(t, "ByID", receipt.ExecutionResult.PreviousResultID)
-	}
+	approvals.AssertNumberOfCalls(t, "Add", 0)
 }
 
-func TestMatchReceiptMissingApproval(t *testing.T) {
+func TestOnApprovalZeroStake(t *testing.T) {
 
-	receipt := unittest.ExecutionReceiptFixture()
-	result := unittest.ExecutionResultFixture()
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	approval := unittest.ResultApprovalFixture()
+	approval.ResultApprovalBody.ApproverID = identity.NodeID
+	identity.Stake = 0
 
+	state := &protocol.State{}
+	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
 	approvals := &mempool.Approvals{}
-	results := &storage.Results{}
-	seals := &mempool.Seals{}
+	receipts := &mempool.Receipts{}
 
-	approvals.On("ByResultID", mock.Anything).Return(nil, merr.ErrEntityNotFound)
-	results.On("ByID", mock.Anything).Return(result, nil)
-	results.On("Store", mock.Anything).Return(nil)
-	seals.On("Add", mock.Anything).Return(nil)
+	state.On("Final").Return(snapshot)
+	state.On("AtBlockID", mock.Anything).Return(boundary)
+	snapshot.On("Identity", mock.Anything).Return(identity, nil)
+	approvals.On("Add", mock.Anything).Return(nil)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		state:     state,
+		receipts:  receipts,
 		approvals: approvals,
-		results:   results,
-		seals:     seals,
 	}
 
-	err := e.matchReceipt(receipt)
-	assert.NoError(t, err)
+	err := e.onApproval(identity.NodeID, approval)
+	assert.Error(t, err)
+	assert.False(t, errors.Is(err, reachedEnd))
 
-	if approvals.AssertNumberOfCalls(t, "ByResultID", 1) {
-		approvals.AssertCalled(t, "ByResultID", receipt.ExecutionResult.ID())
-	}
-	results.AssertNumberOfCalls(t, "ByID", 0)
+	approvals.AssertNumberOfCalls(t, "Add", 0)
 }
 
-func TestMatchApprovalAvailableReceipt(t *testing.T) {
+func TestOnApprovalWrongRole(t *testing.T) {
 
+	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	approval := unittest.ResultApprovalFixture()
-	receipt := unittest.ExecutionReceiptFixture()
-	result := unittest.ExecutionResultFixture()
+	approval.ResultApprovalBody.ApproverID = identity.NodeID
 
+	state := &protocol.State{}
+	snapshot := &protocol.Snapshot{}
+	boundary := &protocol.Snapshot{}
+	approvals := &mempool.Approvals{}
 	receipts := &mempool.Receipts{}
-	results := &storage.Results{}
-	seals := &mempool.Seals{}
 
-	receipts.On("ByResultID", mock.Anything).Return(receipt, nil)
-	results.On("ByID", mock.Anything).Return(result, nil)
-	results.On("Store", mock.Anything).Return(nil)
-	seals.On("Add", mock.Anything).Return(nil)
-
-	e := Engine{
-		receipts: receipts,
-		results:  results,
-		seals:    seals,
-	}
-
-	err := e.matchApproval(approval)
-	assert.NoError(t, err)
-
-	if receipts.AssertNumberOfCalls(t, "ByResultID", 1) {
-		receipts.AssertCalled(t, "ByResultID", approval.ResultApprovalBody.ExecutionResultID)
-	}
-	if results.AssertNumberOfCalls(t, "ByID", 1) {
-		results.AssertCalled(t, "ByID", receipt.ExecutionResult.PreviousResultID)
-	}
-}
-
-func TestMatchApprovalMissingReceipt(t *testing.T) {
-
-	approval := unittest.ResultApprovalFixture()
-	result := unittest.ExecutionResultFixture()
-
-	receipts := &mempool.Receipts{}
-	results := &storage.Results{}
-	seals := &mempool.Seals{}
-
-	receipts.On("ByResultID", mock.Anything).Return(nil, merr.ErrEntityNotFound)
-	results.On("ByID", mock.Anything).Return(result, nil)
-	results.On("Store", mock.Anything).Return(nil)
-	seals.On("Add", mock.Anything).Return(nil)
+	state.On("Final").Return(snapshot)
+	state.On("AtBlockID", mock.Anything).Return(boundary)
+	snapshot.On("Identity", mock.Anything).Return(identity, nil)
+	approvals.On("Add", mock.Anything).Return(nil)
+	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
-		receipts: receipts,
-		results:  results,
-		seals:    seals,
+		state:     state,
+		receipts:  receipts,
+		approvals: approvals,
 	}
 
-	err := e.matchApproval(approval)
-	assert.NoError(t, err)
+	err := e.onApproval(identity.NodeID, approval)
+	assert.Error(t, err)
+	assert.False(t, errors.Is(err, reachedEnd))
 
-	if receipts.AssertNumberOfCalls(t, "ByResultID", 1) {
-		receipts.AssertCalled(t, "ByResultID", approval.ResultApprovalBody.ExecutionResultID)
-	}
-	results.AssertNumberOfCalls(t, "ByID", 0)
-}
-
-func TestCreateSealResultExists(t *testing.T) {
-
-	receipt := unittest.ExecutionReceiptFixture()
-	approval := unittest.ResultApprovalFixture()
-	result := unittest.ExecutionResultFixture()
-	seal := flow.Seal{
-		BlockID:       receipt.ExecutionResult.BlockID,
-		PreviousState: result.FinalStateCommit,
-		FinalState:    receipt.ExecutionResult.FinalStateCommit,
-	}
-
-	results := &storage.Results{}
-	seals := &mempool.Seals{}
-
-	results.On("ByID", mock.Anything).Return(result, nil)
-	results.On("Store", mock.Anything).Return(nil)
-	seals.On("Add", mock.Anything).Return(nil)
-
-	e := Engine{
-		results: results,
-		seals:   seals,
-	}
-
-	err := e.createSeal(receipt, approval)
-	assert.NoError(t, err)
-
-	if results.AssertNumberOfCalls(t, "Store", 1) {
-		results.AssertCalled(t, "Store", &receipt.ExecutionResult)
-	}
-	if seals.AssertNumberOfCalls(t, "Add", 1) {
-		seals.AssertCalled(t, "Add", &seal)
-	}
-}
-
-func TestCreateSealResultMissing(t *testing.T) {
-
-	receipt := unittest.ExecutionReceiptFixture()
-	approval := unittest.ResultApprovalFixture()
-
-	results := &storage.Results{}
-	seals := &mempool.Seals{}
-
-	results.On("ByID", mock.Anything).Return(nil, serr.ErrNotFound)
-	results.On("Store", mock.Anything).Return(nil)
-	seals.On("Add", mock.Anything).Return(nil)
-
-	e := Engine{
-		results: results,
-		seals:   seals,
-	}
-
-	err := e.createSeal(receipt, approval)
-	assert.NoError(t, err)
-
-	results.AssertNumberOfCalls(t, "Store", 0)
-	seals.AssertNumberOfCalls(t, "Add", 0)
+	approvals.AssertNumberOfCalls(t, "Add", 0)
 }

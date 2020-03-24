@@ -20,7 +20,7 @@ func TestCollectionPool(t *testing.T) {
 		CollectionID: flow.Identifier{0x02},
 	}
 
-	pool, err := stdmap.NewGuarantees()
+	pool, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
 
 	t.Run("should be able to add first", func(t *testing.T) {

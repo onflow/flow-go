@@ -11,10 +11,10 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-func IndexGuarantees(payloadHash flow.Identifier, guarantees []*flow.CollectionGuarantee) func(*badger.Txn) error {
+func IndexGuarantees(height uint64, blockID flow.Identifier, parentID flow.Identifier, guarantees []*flow.CollectionGuarantee) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// check and index the guarantees
+		// check that all guarantees are part of the database
 		for _, guarantee := range guarantees {
 			var exists bool
 			err := operation.CheckGuarantee(guarantee.CollectionID, &exists)(tx)
@@ -24,30 +24,38 @@ func IndexGuarantees(payloadHash flow.Identifier, guarantees []*flow.CollectionG
 			if !exists {
 				return fmt.Errorf("node guarantee missing in DB (%x)", guarantee.CollectionID)
 			}
+		}
 
-			// TODO: Revisit duplicate handling logic
-			err = operation.AllowDuplicates(operation.IndexGuarantee(payloadHash, guarantee.CollectionID))(tx)
-			if err != nil {
-				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.CollectionID, err)
-			}
+		// insert the list of IDs into the payload index
+		err := operation.IndexGuaranteePayload(height, blockID, parentID, flow.GetIDs(guarantees))(tx)
+		if err != nil {
+			return fmt.Errorf("could not index guarantees: %w", err)
 		}
 
 		return nil
 	}
 }
 
-func RetrieveGuarantees(payloadHash flow.Identifier, guarantees *[]*flow.CollectionGuarantee) func(*badger.Txn) error {
-
-	// make sure we have a zero value
-	*guarantees = make([]*flow.CollectionGuarantee, 0)
-
+func RetrieveGuarantees(blockID flow.Identifier, guarantees *[]*flow.CollectionGuarantee) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
+
+		// get the header so we have the height
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header: %w", err)
+		}
 
 		// get the collection IDs for the guarantees
 		var collIDs []flow.Identifier
-		err := operation.LookupGuarantees(payloadHash, &collIDs)(tx)
+		err = operation.LookupGuaranteePayload(header.Height, blockID, header.ParentID, &collIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup guarantees: %w", err)
+		}
+
+		// return if there are no collections
+		if len(collIDs) == 0 {
+			return nil
 		}
 
 		// get all guarantees

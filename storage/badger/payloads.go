@@ -23,13 +23,16 @@ func NewPayloads(db *badger.DB) *Payloads {
 	return p
 }
 
-func (p *Payloads) Store(payload *flow.Payload) error {
+func (p *Payloads) Store(header *flow.Header, payload *flow.Payload) error {
 	return p.db.Update(func(tx *badger.Txn) error {
+		if header.PayloadHash != payload.Hash() {
+			return fmt.Errorf("payload integrity check failed")
+		}
 		err := procedure.InsertPayload(payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload: %w", err)
 		}
-		err = procedure.IndexPayload(payload)(tx)
+		err = procedure.IndexPayload(header, payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
 		}
@@ -37,8 +40,12 @@ func (p *Payloads) Store(payload *flow.Payload) error {
 	})
 }
 
-func (p *Payloads) ByPayloadHash(payloadHash flow.Identifier) (*flow.Payload, error) {
+func (p *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {
 	var payload flow.Payload
-	err := p.db.View(procedure.RetrievePayload(payloadHash, &payload))
-	return &payload, err
+	err := p.db.View(procedure.RetrievePayload(blockID, &payload))
+	if err != nil {
+		return nil, err
+	}
+
+	return &payload, nil
 }

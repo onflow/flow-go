@@ -48,21 +48,6 @@ func (mr *MockSnapshotMockRecorder) Clusters() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clusters", reflect.TypeOf((*MockSnapshot)(nil).Clusters))
 }
 
-// Commit mocks base method
-func (m *MockSnapshot) Commit() ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Commit")
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Commit indicates an expected call of Commit
-func (mr *MockSnapshotMockRecorder) Commit() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockSnapshot)(nil).Commit))
-}
-
 // Head mocks base method
 func (m *MockSnapshot) Head() (*flow.Header, error) {
 	m.ctrl.T.Helper()
@@ -110,4 +95,19 @@ func (m *MockSnapshot) Identity(arg0 flow.Identifier) (*flow.Identity, error) {
 func (mr *MockSnapshotMockRecorder) Identity(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Identity", reflect.TypeOf((*MockSnapshot)(nil).Identity), arg0)
+}
+
+// Seal mocks base method
+func (m *MockSnapshot) Seal() (flow.Seal, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Seal")
+	ret0, _ := ret[0].(flow.Seal)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Seal indicates an expected call of Seal
+func (mr *MockSnapshotMockRecorder) Seal() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Seal", reflect.TypeOf((*MockSnapshot)(nil).Seal))
 }

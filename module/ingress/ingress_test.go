@@ -21,7 +21,10 @@ func TestSubmitTransaction(t *testing.T) {
 		engine: &engine,
 	}
 
-	tx := unittest.TransactionFixture()
+	tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
+		tb.Nonce = 0
+		tb.ComputeLimit = 0
+	})
 
 	t.Run("should submit transaction to engine", func(t *testing.T) {
 		engine.On("ProcessLocal", &tx).Return(nil).Once()
@@ -35,7 +38,7 @@ func TestSubmitTransaction(t *testing.T) {
 		engine.AssertCalled(t, "ProcessLocal", &tx)
 
 		// should return the fingerprint of the submitted transaction
-		assert.Equal(t, tx.ID(), flow.HashToID(res.Hash))
+		assert.Equal(t, tx.ID(), flow.HashToID(res.Id))
 	})
 
 	t.Run("should pass through error", func(t *testing.T) {

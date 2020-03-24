@@ -135,7 +135,7 @@ ConsentLoop:
 			proposalID := proposal.ID()
 
 			log = log.With().
-				Uint64("proposal_number", proposal.Number).
+				Uint64("proposal_number", proposal.View).
 				Hex("proposal_id", proposalID[:]).
 				Logger()
 
@@ -148,7 +148,8 @@ ConsentLoop:
 			}
 
 			log.Info().Msg("proposal committed")
-			payload, err := e.payloads.ByPayloadHash(proposal.PayloadHash)
+
+			payload, err := e.payloads.ByBlockID(proposalID)
 			if err != nil {
 				e.log.Error().Err(err).Msg("could retrieve payload hash")
 				continue ConsentLoop
@@ -176,19 +177,12 @@ func (e *Engine) createProposal() (*flow.Header, error) {
 	}
 
 	// define the block header build function
-	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
-		header := flow.Header{
-			Number:      parent.Number + 1,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    parent.ID(),
-			PayloadHash: payloadHash,
-			ProposerID:  e.me.NodeID(),
-		}
-		return &header, nil
+	setProposer := func(header *flow.Header) {
+		header.ProposerID = e.me.NodeID()
 	}
 
 	// create the proposal payload on top of the parent
-	proposal, err := e.builder.BuildOn(parent.ID(), build)
+	proposal, err := e.builder.BuildOn(parent.ID(), setProposer)
 	if err != nil {
 		return nil, fmt.Errorf("could not create block: %w", err)
 	}
@@ -200,14 +194,8 @@ func (e *Engine) createProposal() (*flow.Header, error) {
 // will extend the current blockchain state with it and finalize it.
 func (e *Engine) commitProposal(proposal *flow.Header) error {
 
-	// store the proposal in our database
-	err := e.headers.Store(proposal)
-	if err != nil {
-		return fmt.Errorf("could not store proposal: %w", err)
-	}
-
 	// extend our blockchain state with the proposal
-	err = e.state.Mutate().Extend(proposal.ID())
+	err := e.state.Mutate().Extend(proposal.ID())
 	if err != nil {
 		return fmt.Errorf("could not extend state: %w", err)
 	}

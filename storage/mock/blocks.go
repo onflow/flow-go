@@ -10,6 +10,29 @@ type Blocks struct {
 	mock.Mock
 }
 
+// ByHeight provides a mock function with given fields: height
+func (_m *Blocks) ByHeight(height uint64) (*flow.Block, error) {
+	ret := _m.Called(height)
+
+	var r0 *flow.Block
+	if rf, ok := ret.Get(0).(func(uint64) *flow.Block); ok {
+		r0 = rf(height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Block)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(height)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ByID provides a mock function with given fields: blockID
 func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	ret := _m.Called(blockID)
@@ -26,29 +49,6 @@ func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
 		r1 = rf(blockID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ByNumber provides a mock function with given fields: number
-func (_m *Blocks) ByNumber(number uint64) (*flow.Block, error) {
-	ret := _m.Called(number)
-
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(uint64) *flow.Block); ok {
-		r0 = rf(number)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(uint64) error); ok {
-		r1 = rf(number)
 	} else {
 		r1 = ret.Error(1)
 	}

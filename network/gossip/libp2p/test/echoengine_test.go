@@ -4,14 +4,17 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	gologging "github.com/whyrusleeping/go-logging"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
@@ -35,7 +38,7 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *StubEngineTestSuite) SetupTest() {
 	const count = 2
-	//golog.SetAllLoggers(gologging.INFO)
+	golog.SetAllLoggers(gologging.INFO)
 	s.ids = CreateIDs(count)
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -55,7 +58,7 @@ func (s *StubEngineTestSuite) TearDownTest() {
 		// closes the network
 		case <-net.Done():
 			continue
-		case <-time.After(1 * time.Second):
+		case <-time.After(3 * time.Second):
 			s.Suite.Fail("could not stop the network")
 		}
 	}
@@ -63,16 +66,13 @@ func (s *StubEngineTestSuite) TearDownTest() {
 
 // TestSingleMessage tests sending a single message from sender to receiver
 func (s *StubEngineTestSuite) TestSingleMessage() {
-	s.T().Skip()
 	// set to false for no echo expectation
-	s.T().Skip()
-	//.singleMessage(false)
+	s.singleMessage(false)
 }
 
 // TestSingleMessage tests sending a single message from sender to receiver
 // it also evaluates the correct reception of an echo message back
 func (s *StubEngineTestSuite) TestSingleEcho() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.singleMessage(true)
 }
@@ -80,7 +80,6 @@ func (s *StubEngineTestSuite) TestSingleEcho() {
 // TestMultiMsgSync tests sending multiple messages from sender to receiver
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestMultiMsgSync() {
-	s.T().Skip()
 	// set to false for no echo expectation
 	s.multiMessageSync(false, 10)
 }
@@ -89,7 +88,6 @@ func (s *StubEngineTestSuite) TestMultiMsgSync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.multiMessageSync(true, 10)
 }
@@ -97,7 +95,6 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
 // TestMultiMsgAsync tests sending multiple messages from sender to receiver
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestMultiMsgAsync() {
-	s.T().Skip()
 	// set to false for no echo expectation
 	s.multiMessageAsync(false, 10)
 }
@@ -106,7 +103,6 @@ func (s *StubEngineTestSuite) TestMultiMsgAsync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.multiMessageAsync(true, 10)
 }
@@ -115,7 +111,6 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
 // on deduplicating the received messages. Messages are delivered to the receiver
 // in a sequential manner.
 func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
-	s.T().Skip()
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
@@ -147,7 +142,6 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 // on deduplicating the received messages. Messages are delivered to the receiver
 // in parallel.
 func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
-	s.T().Skip()
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
@@ -163,11 +157,15 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 	}
 
 	// sends the same message 10 times
+	wg := sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
 		}()
 	}
+	wg.Wait()
 	time.Sleep(1 * time.Second)
 
 	// receiver should only see the message once, and the rest should be dropped due to
@@ -211,8 +209,11 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 	}
 
 	// sends the same message 10 times on both channels
+	wg := sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			// sender1 to receiver1 on channel1
 			require.NoError(s.Suite.T(), sender1.con.Submit(event, s.ids[rcvNode].NodeID))
 
@@ -220,6 +221,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 			require.NoError(s.Suite.T(), sender2.con.Submit(event, s.ids[rcvNode].NodeID))
 		}()
 	}
+	wg.Wait()
 	time.Sleep(1 * time.Second)
 
 	// each receiver should only see the message once, and the rest should be dropped due to

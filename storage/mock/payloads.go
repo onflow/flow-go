@@ -10,13 +10,13 @@ type Payloads struct {
 	mock.Mock
 }
 
-// ByPayloadHash provides a mock function with given fields: payloadHash
-func (_m *Payloads) ByPayloadHash(payloadHash flow.Identifier) (*flow.Payload, error) {
-	ret := _m.Called(payloadHash)
+// ByBlockID provides a mock function with given fields: blockID
+func (_m *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {
+	ret := _m.Called(blockID)
 
 	var r0 *flow.Payload
 	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Payload); ok {
-		r0 = rf(payloadHash)
+		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Payload)
@@ -25,7 +25,7 @@ func (_m *Payloads) ByPayloadHash(payloadHash flow.Identifier) (*flow.Payload, e
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(payloadHash)
+		r1 = rf(blockID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -33,13 +33,13 @@ func (_m *Payloads) ByPayloadHash(payloadHash flow.Identifier) (*flow.Payload, e
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: payload
-func (_m *Payloads) Store(payload *flow.Payload) error {
-	ret := _m.Called(payload)
+// Store provides a mock function with given fields: header, payload
+func (_m *Payloads) Store(header *flow.Header, payload *flow.Payload) error {
+	ret := _m.Called(header, payload)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Payload) error); ok {
-		r0 = rf(payload)
+	if rf, ok := ret.Get(0).(func(*flow.Header, *flow.Payload) error); ok {
+		r0 = rf(header, payload)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -35,15 +35,16 @@ func RetrieveDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta 
 	return retrieve(toDeltaKey(number, role, nodeID), delta)
 }
 
-func TraverseDeltas(from uint64, to uint64, filters []flow.IdentityFilter, process func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) error) func(*badger.Txn) error {
+func TraverseDeltas(from uint64, to uint64, filters []flow.IdentityFilter, process func(nodeID flow.Identifier, delta int64) error) func(*badger.Txn) error {
 	iteration := func() (checkFunc, createFunc, handleFunc) {
-		var number uint64
 		var role flow.Role
 		var nodeID flow.Identifier
-		var delta int64
 		check := func(key []byte) bool {
-			number, role, nodeID = fromDeltaKey(key)
-			id := flow.Identity{NodeID: nodeID, Role: role}
+			_, role, nodeID = fromDeltaKey(key)
+			// NOTE: we set the stake to 1 so that the stake filter passes;
+			// after all, stakes are the addition of all deltas and we can't
+			// tell yet if the node has a remaining stake here
+			id := flow.Identity{NodeID: nodeID, Role: role, Stake: 1}
 			for _, filter := range filters {
 				if !filter(&id) {
 					return false
@@ -51,13 +52,14 @@ func TraverseDeltas(from uint64, to uint64, filters []flow.IdentityFilter, proce
 			}
 			return true
 		}
+		var delta int64
 		create := func() interface{} {
 			return &delta
 		}
 		handle := func() error {
-			return process(number, role, nodeID, delta)
+			return process(nodeID, delta)
 		}
 		return check, create, handle
 	}
-	return iterate(makePrefix(codeDelta, from), makePrefix(codeDelta, to+1), iteration)
+	return iterate(makePrefix(codeDelta, from), makePrefix(codeDelta, to), iteration)
 }

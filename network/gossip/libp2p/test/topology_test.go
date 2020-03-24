@@ -1,7 +1,6 @@
 package test
 
 import (
-	gojson "encoding/json"
 	"os"
 	"sort"
 	"testing"
@@ -11,10 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 )
 
 // TopologyTestSuite tests the bare minimum requirements of a randomized
@@ -41,8 +40,12 @@ func (n *TopologyTestSuite) SetupTest() {
 	me := n.ids[0]
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+
+	key, err := GenerateNetworkingKey(me.NodeID)
+	require.NoError(n.Suite.T(), err)
+
 	// creates a middleware instance
-	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID)
+	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID, key)
 	require.NoError(n.Suite.T(), err)
 
 	// creates and mocks a network instance
@@ -74,45 +77,60 @@ func (n *TopologyTestSuite) TestMembership() {
 	}
 }
 
-// TestUniqueness generates n.count many random topologies of size n.count/2 and
-// evaluates all those generated topology to be unique
-func (n *TopologyTestSuite) TestUniqueness() {
-	// creates a hasher instance
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
-	require.NoError(n.Suite.T(), err)
-
-	// set of all generated topologies
-	topSet := make(map[string]struct{})
-
+// TestDeteministicity verifies that the same seed generates the same topology
+func (n *TopologyTestSuite) TestDeteministicity() {
+	var top middleware.Topology = &libp2p.RandPermTopology{}
 	// topology of size count/2
 	topSize := n.count / 2
-	require.NotEqual(n.Suite.T(), topSize, 0)
+	var previous, current []string
 
 	for i := 0; i < n.count; i++ {
-		// generates a randomized topology of half of the size of system
-		top, err := n.nets.Topology()
+		previous = current
+		current = nil
+		// generate a new topology with a the same ids, size and seed
+		idMap, err := top.Subset(n.ids, topSize, "sameseed")
 		require.NoError(n.Suite.T(), err)
-		require.Len(n.Suite.T(), top, topSize)
 
-		// converts topology to a sorted list
-		topList := make([]string, 0)
-		for id := range top {
-			topList = append(topList, id.String())
+		for _, v := range idMap {
+			current = append(current, v.NodeID.String())
 		}
-		sort.Strings(topList)
+		// no guarantees about order is made by Topology.Subset(), hence sort the return values before comparision
+		sort.Strings(current)
 
-		// encodes the list
-		fp, err := gojson.Marshal(topList)
-		require.NoError(n.Suite.T(), err)
-		// takes hash of encoded list
-		hash := hasher.ComputeHash(fp)
-
-		// generated topologies should be unique
-		if _, ok := topSet[hash.Hex()]; ok {
-			require.Fail(n.Suite.T(), "repeated topology detected")
+		if previous == nil {
+			continue
 		}
 
-		// stores hash in the set
-		topSet[hash.Hex()] = struct{}{}
+		// assert that a different seed generates a different topology
+		require.Equal(n.Suite.T(), previous, current)
+	}
+}
+
+// TestUniqueness verifies that different seeds generates different topologies
+func (n *TopologyTestSuite) TestUniqueness() {
+	var top middleware.Topology = &libp2p.RandPermTopology{}
+	// topology of size count/2
+	topSize := n.count / 2
+	var previous, current []string
+
+	for i := 0; i < n.count; i++ {
+		previous = current
+		current = nil
+		// generate a new topology with a the same ids, size but a different seed for each iteration
+		identity, _ := n.ids.ByIndex(uint(i))
+		idMap, err := top.Subset(n.ids, topSize, identity.NodeID.String())
+		require.NoError(n.Suite.T(), err)
+
+		for _, v := range idMap {
+			current = append(current, v.NodeID.String())
+		}
+		sort.Strings(current)
+
+		if previous == nil {
+			continue
+		}
+
+		// assert that a different seed generates a different topology
+		require.NotEqual(n.Suite.T(), previous, current)
 	}
 }

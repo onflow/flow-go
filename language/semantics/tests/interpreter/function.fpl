@@ -1,3 +1,0 @@
-fun test(_ x:Int, a y:Int, b:Int): Int { return x+y+b };
-let x:Int = test(3,a:2,b:1);
-assert x == 6
