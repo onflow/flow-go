@@ -24,8 +24,10 @@ const (
 	// DefaultDataDir is the default directory for the node database.
 	DefaultDataDir = "/flow"
 
-	// IngressApiPort is the name used for the collection node ingress API.
-	IngressApiPort = "ingress-api"
+	// ColNodeAPIPort is the name used for the collection node API port.
+	ColNodeAPIPort = "col-ingress-port"
+	// ExeNodeAPIPort is the name used for the execution node API port.
+	ExeNodeAPIPort = "exe-api-port"
 )
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
@@ -255,7 +257,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		case flow.RoleCollection:
 
 			// get a free host port for the collection node ingress grpc service
-			ingressPort := testingdock.RandomPort(t)
+			apiPort := testingdock.RandomPort(t)
 
 			opts.Config.ExposedPorts = nat.PortSet{
 				"9000/tcp": {},
@@ -265,16 +267,40 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 				"9000/tcp": []nat.PortBinding{
 					{
 						HostIP:   "0.0.0.0",
-						HostPort: ingressPort,
+						HostPort: apiPort,
 					},
 				},
 			}
 
 			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
-				return healthcheckGRPC(context, ingressPort)
+				return healthcheckGRPC(context, apiPort)
 			})
 
-			flowContainer.Ports[IngressApiPort] = ingressPort
+			flowContainer.Ports[ColNodeAPIPort] = apiPort
+
+		case flow.RoleExecution:
+
+			apiPort := testingdock.RandomPort(t)
+
+			opts.Config.ExposedPorts = nat.PortSet{
+				"9000/tcp": {},
+			}
+			opts.Config.Cmd = append(opts.Config.Cmd, fmt.Sprintf("--rpc-addr=%s:9000", opts.Name))
+			opts.HostConfig = &container.HostConfig{
+				PortBindings: nat.PortMap{
+					"9000/tcp": []nat.PortBinding{
+						{
+							HostIP:   "0.0.0.0",
+							HostPort: apiPort,
+						},
+					},
+				},
+			}
+			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
+				return healthcheckGRPC(context, apiPort)
+			})
+
+			flowContainer.Ports[ExeNodeAPIPort] = apiPort
 		}
 
 		c := suite.Container(*opts)
