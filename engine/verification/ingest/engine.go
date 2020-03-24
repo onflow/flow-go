@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
+	tracker2 "github.com/dapperlabs/flow-go/model/verification/tracker"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
@@ -215,9 +216,15 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
 		Msg("chunk data pack received")
 
-	// TODO tracking request feature
-	// https://github.com/dapperlabs/flow-go/issues/2970
-	origin, err := e.state.Final().Identity(originID)
+	// checks if this event is a reply of a prior request
+	// extracts the tracker
+	tracker, err := e.chunkDataPackTackers.ByChunkID(chunkDataPack.ChunkID)
+	if err != nil {
+		return fmt.Errorf("no tracker available for chunk ID: %x", chunkDataPack.ChunkID)
+	}
+
+	// checks the authenticity of origin ID
+	origin, err := e.state.AtBlockID(tracker.BlockID).Identity(originID)
 	if err != nil {
 		// TODO: potential attack on authenticity
 		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
@@ -386,7 +393,7 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 }
 
 // requestChunkDataPack submits a request for the given chunk ID to the execution nodes.
-func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
+func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Identifier) error {
 	// extracts list of verifier nodes id
 	//
 	execNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
@@ -404,6 +411,16 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)
 	}
 
+	// caches a tracker for successfully submitted requests
+	tracker := &tracker2.ChunkDataPackTracker{
+		ChunkID: chunkID,
+		BlockID: blockID,
+	}
+	err = e.chunkDataPackTackers.Add(tracker)
+	// Todo handle the case of duplicate trackers
+	if err != nil && err != mempool.ErrEntityAlreadyExists {
+		return fmt.Errorf("could not store tracker of chunk data pack request in mempool: %w", err)
+	}
 	return nil
 }
 
@@ -476,7 +493,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 	if !e.chunkDataPacks.Has(chunkID) {
 		// the chunk data pack is missing, the chunk cannot yet be verified
 		// TODO rate limit these requests
-		err := e.requestChunkDataPack(chunkID)
+		err := e.requestChunkDataPack(chunkID, receipt.ExecutionResult.BlockID)
 		if err != nil {
 			log.Error().
 				Err(err).
