@@ -1,4 +1,4 @@
-package tests_test
+package tests
 
 import (
 	"bytes"
@@ -58,10 +58,10 @@ func TestMVP_Network(t *testing.T) {
 	key, err := generateRandomKey()
 	require.NoError(t, err)
 
-	colClient, err := testnet.New(fmt.Sprintf(":%s", colNodeAPIPort), key)
+	colClient, err := testnet.NewClient(fmt.Sprintf(":%s", colNodeAPIPort), key)
 	require.NoError(t, err)
 
-	exeClient, err := testnet.New(fmt.Sprintf(":%s", exeNodeAPIPort), key)
+	exeClient, err := testnet.NewClient(fmt.Sprintf(":%s", exeNodeAPIPort), key)
 	require.NoError(t, err)
 
 	runMVPTest(t, colClient, exeClient)
@@ -76,7 +76,7 @@ func TestMVP_Emulator(t *testing.T) {
 	key, err := getEmulatorKey()
 	require.NoError(t, err)
 
-	c, err := testnet.New(":3569", key)
+	c, err := testnet.NewClient(":3569", key)
 	require.NoError(t, err)
 
 	runMVPTest(t, c, c)
