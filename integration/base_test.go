@@ -3,23 +3,27 @@ package integration_test
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
-	sdk "github.com/dapperlabs/flow-go-sdk"
-	"github.com/dapperlabs/flow-go-sdk/client"
-	"github.com/dapperlabs/flow-go-sdk/keys"
-	"github.com/dapperlabs/flow-go-sdk/language/encoding"
 	"github.com/m4ksio/testingdock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/cadence/encoding"
+	sdk "github.com/dapperlabs/flow-go-sdk"
+
+	"github.com/dapperlabs/flow-go-sdk/keys"
+	"github.com/dapperlabs/flow-go/integration/dsl"
 	. "github.com/dapperlabs/flow-go/integration/network"
+	"github.com/dapperlabs/flow-go/integration/testclient"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func Test_MVPNetwork(t *testing.T) {
+
+	t.Skip()
 
 	net := []*FlowNode{
 		{
@@ -71,10 +75,10 @@ func Test_MVPNetwork(t *testing.T) {
 	key, err := generateRandomKey()
 	require.NoError(t, err)
 
-	collectionClient, err := testClient(collectionNodeApiPort, key)
+	collectionClient, err := testclient.New(fmt.Sprintf(":%s", collectionNodeApiPort), key)
 	require.NoError(t, err)
 
-	executionClient, err := testClient(executionNodeApiPort, key)
+	executionClient, err := testclient.New(fmt.Sprintf(":%s", executionNodeApiPort), key)
 	require.NoError(t, err)
 
 	runMVPTest(t, collectionClient, executionClient)
@@ -89,47 +93,104 @@ func Test_MVPEmulator(t *testing.T) {
 	key, err := getEmulatorKey()
 	require.NoError(t, err)
 
-	c, err := testClient("3569", key)
+	c, err := testclient.New(":3569", key)
 	require.NoError(t, err)
 
 	runMVPTest(t, c, c)
 }
 
-func runMVPTest(t *testing.T, collectionClient *FlowTestClient, executionClient *FlowTestClient) {
+func runMVPTest(t *testing.T, collectionClient *testclient.TestClient, executionClient *testclient.TestClient) {
+
+	ctx := context.Background()
+
 	// contract is not deployed, so script fails
-	counter, err := readCounter(executionClient)
+	counter, err := readCounter(ctx, executionClient)
 	require.Error(t, err)
 
-
-	err = deployCounter(collectionClient)
+	err = deployCounter(ctx, collectionClient)
 	require.NoError(t, err)
 
-	//script executes eventually, but no counter instance is created
+	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(executionClient)
+		counter, err = readCounter(ctx, executionClient)
 
 		return err == nil && counter == -3
 	}, 30*time.Second, time.Second)
 
-	err = createCounter(collectionClient)
+	err = createCounter(ctx, collectionClient)
 	require.NoError(t, err)
 
-	//counter is created and incremented eventually
+	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(executionClient)
+		counter, err = readCounter(ctx, executionClient)
 
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)
 }
 
-func testClient(port string, key *sdk.AccountPrivateKey) (*FlowTestClient, error) {
+func deployCounter(ctx context.Context, client *testclient.TestClient) error {
 
-	c, err := client.New("localhost:"+port)
-	if err != nil {
-		return nil, err
+	contract := dsl.Contract{
+		Name: "Testing",
+		Members: []dsl.CadenceCode{
+			dsl.Resource{
+				Name: "Counter",
+				Code: `
+				pub var count: Int
+
+				init() {
+					self.count = 0
+				}
+				pub fun add(_ count: Int) {
+					self.count = self.count + count
+				}`,
+			},
+			dsl.Code(`
+				pub fun createCounter(): @Counter {
+					return <-create Counter()
+      			}`,
+			),
+		},
 	}
 
-	return NewFlowTestClient(context.Background(), c, key), nil
+	return client.DeployContract(ctx, contract)
+}
+
+func readCounter(ctx context.Context, client *testclient.TestClient) (int, error) {
+
+	script := dsl.Main{
+		ReturnType: "Int",
+		Code:       "return getAccount(0x01).published[&Testing.Counter]?.count ?? -3",
+	}
+
+	res, err := client.ExecuteScript(ctx, script)
+	if err != nil {
+		return 0, err
+	}
+
+	decoder := encoding.NewDecoder(bytes.NewReader(res))
+	i, err := decoder.DecodeInt()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(i.Value.Int64()), nil
+}
+
+func createCounter(ctx context.Context, client *testclient.TestClient) error {
+
+	return client.SendTransaction(ctx, dsl.Transaction{
+		Import: dsl.Import{Address: sdk.RootAddress},
+		Content: dsl.Prepare{
+			Content: dsl.Code(`
+				if signer.storage[Testing.Counter] == nil {
+				let existing <- signer.storage[Testing.Counter] <- Testing.createCounter()
+            	    destroy existing
+            	    signer.published[&Testing.Counter] = &signer.storage[Testing.Counter] as Testing.Counter
+            	}
+            	signer.published[&Testing.Counter]?.add(2)`),
+		}})
+
 }
 
 func generateRandomKey() (*sdk.AccountPrivateKey, error) {
@@ -139,72 +200,8 @@ func generateRandomKey() (*sdk.AccountPrivateKey, error) {
 	return &key, err
 }
 
-func deployCounter(testClient *FlowTestClient) error {
-
-	return testClient.DeployContract(Contract{
-		Name: "Testing",
-		Members: []CadenceCode{
-			Resource{"Counter", `
-			pub var count: Int
-
-			init() {
-				self.count = 0
-			}
-			pub fun add(_ count: Int) {
-				self.count = self.count + count
-			}`},
-			Code(`
-			pub fun createCounter(): @Counter {
-          		return <-create Counter()
-      		}`),
-		},
-	})
-}
-
-func readCounter(testClient *FlowTestClient) (int, error) {
-
-	value, err := testClient.ExecuteScript(Main{
-		ReturnType: "Int",
-		Code:       "return getAccount(0x01).published[&Testing.Counter]?.count ?? -3",
-	})
-
-	if err != nil {
-		return 0, err
-	}
-
-	decoder := encoding.NewDecoder(bytes.NewReader(value))
-	i, err := decoder.DecodeInt()
-
-	if err != nil {
-		return 0, err
-	}
-
-	return int(i.Value.Int64()), nil
-}
-
-func createCounter(testClient *FlowTestClient) error {
-
-	return testClient.SendTransaction(Transaction{
-		Import{sdk.RootAddress},
-		Prepare{
-			Code(`
-			if signer.storage[Testing.Counter] == nil {
-                let existing <- signer.storage[Testing.Counter] <- Testing.createCounter()
-                destroy existing
-                signer.published[&Testing.Counter] = &signer.storage[Testing.Counter] as Testing.Counter
-            }
-            signer.published[&Testing.Counter]?.add(2)`),
-		}})
-
-}
-
-
 func getEmulatorKey() (*sdk.AccountPrivateKey, error) {
-	prKeyBytes, err := hex.DecodeString("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203")
-	if err != nil {
-		return nil, err
-	}
-	key, err := sdk.DecodeAccountPrivateKey(prKeyBytes)
+	key, err := keys.DecodePrivateKeyHex("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203")
 	if err != nil {
 		return nil, err
 	}
