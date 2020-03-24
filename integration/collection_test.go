@@ -53,7 +53,7 @@ func TestCollection(t *testing.T) {
 	assert.True(t, ok)
 
 	// get the node's ingress port and create an RPC client
-	ingressPort, ok := colContainer.Ports[network.IngressApiPort]
+	ingressPort, ok := colContainer.Ports[network.ColNodeAPIPort]
 	assert.True(t, ok)
 	client, err := client.New(fmt.Sprintf(":%s", ingressPort))
 	assert.Nil(t, err)
