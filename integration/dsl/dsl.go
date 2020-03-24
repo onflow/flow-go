@@ -1,4 +1,4 @@
-package network
+package dsl
 
 import (
 	"encoding/hex"
@@ -16,46 +16,50 @@ type Transaction struct {
 	Import  Import
 	Content CadenceCode
 }
+
 func (t Transaction) ToCadence() string {
 	return fmt.Sprintf("%s \n transaction { %s }", t.Import.ToCadence(), t.Content.ToCadence())
-
 }
 
 type Prepare struct {
 	Content CadenceCode
 }
-func (t Prepare) ToCadence() string {
-	return fmt.Sprintf("prepare(signer: Account) { %s }", t.Content.ToCadence())
+
+func (p Prepare) ToCadence() string {
+	return fmt.Sprintf("prepare(signer: Account) { %s }", p.Content.ToCadence())
 }
 
 type Contract struct {
 	Name    string
 	Members []CadenceCode
 }
-func (t Contract) ToCadence() string {
 
-	memberStrings := make([]string, len(t.Members))
-	for i, member := range t.Members {
+func (c Contract) ToCadence() string {
+
+	memberStrings := make([]string, len(c.Members))
+	for i, member := range c.Members {
 		memberStrings[i] = member.ToCadence()
 	}
 
-	return fmt.Sprintf("pub contract %s { %s }", t.Name, strings.Join(memberStrings, "\n"))
+	return fmt.Sprintf("pub contract %s { %s }", c.Name, strings.Join(memberStrings, "\n"))
 }
 
 type Resource struct {
 	Name string
 	Code string
 }
-func (t Resource) ToCadence() string {
-	return fmt.Sprintf("pub resource %s { %s }", t.Name, t.Code)
+
+func (r Resource) ToCadence() string {
+	return fmt.Sprintf("pub resource %s { %s }", r.Name, r.Code)
 }
 
 type Import struct {
 	Address sdk.Address
 }
-func (t Import) ToCadence() string {
-	if t.Address != sdk.ZeroAddress {
-		return fmt.Sprintf("import 0x%s", t.Address.Short())
+
+func (i Import) ToCadence() string {
+	if i.Address != sdk.ZeroAddress {
+		return fmt.Sprintf("import 0x%s", i.Address.Short())
 	}
 	return ""
 }
@@ -63,9 +67,10 @@ func (t Import) ToCadence() string {
 type UpdateAccountCode struct {
 	Code string
 }
-func (t UpdateAccountCode) ToCadence() string {
 
-	bytes := []byte(t.Code)
+func (u UpdateAccountCode) ToCadence() string {
+
+	bytes := []byte(u.Code)
 
 	hexCode := hex.EncodeToString(bytes)
 
@@ -131,11 +136,13 @@ type Main struct {
 	ReturnType string
 	Code       string
 }
-func (t Main) ToCadence() string {
-	return fmt.Sprintf("import 0x01\npub fun main(): %s { %s }", t.ReturnType, t.Code)
+
+func (m Main) ToCadence() string {
+	return fmt.Sprintf("import 0x01\npub fun main(): %s { %s }", m.ReturnType, m.Code)
 }
 
 type Code string
-func (t Code) ToCadence() string {
-	return string(t)
+
+func (c Code) ToCadence() string {
+	return string(c)
 }
