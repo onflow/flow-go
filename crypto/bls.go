@@ -139,6 +139,10 @@ func (a *PrKeyBLS_BLS12381) Encode() ([]byte, error) {
 	return dest, nil
 }
 
+func (sk *PrKeyBLS_BLS12381) Equals(other PrivateKey) bool {
+	return KeysEqual(sk, other)
+}
+
 // PubKeyBLS_BLS12381 is the public key of BLS using BLS12_381,
 // it implements PublicKey
 type PubKeyBLS_BLS12381 struct {
@@ -160,4 +164,8 @@ func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {
 	dest := make([]byte, pubKeyLengthBLS_BLS12381)
 	writePointG2(dest, &a.point)
 	return dest, nil
+}
+
+func (sk *PubKeyBLS_BLS12381) Equals(other PublicKey) bool {
+	return KeysEqual(sk, other)
 }

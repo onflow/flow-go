@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func main() {
@@ -22,8 +23,9 @@ func main() {
 		blockLimit      uint
 		chunkLimit      uint
 		err             error
-		receipts        *stdmap.Receipts
-		blocks          *stdmap.Blocks
+		authReceipts    *stdmap.Receipts
+		pendingReceipts *stdmap.Receipts
+		blockStorage    *storage.Blocks
 		collections     *stdmap.Collections
 		chunkStates     *stdmap.ChunkStates
 		chunkDataPacks  *stdmap.ChunkDataPacks
@@ -37,17 +39,23 @@ func main() {
 			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 100000, "maximum number of chunk states in the memory pool")
 		}).
-		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			receipts, err = stdmap.NewReceipts(receiptLimit)
+		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			authReceipts, err = stdmap.NewReceipts(receiptLimit)
+			return err
+		}).
+		Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingReceipts, err = stdmap.NewReceipts(receiptLimit)
 			return err
 		}).
 		Module("collections mempool", func(node *cmd.FlowNodeBuilder) error {
 			collections, err = stdmap.NewCollections(collectionLimit)
 			return err
 		}).
-		Module("blocks mempool", func(node *cmd.FlowNodeBuilder) error {
-			blocks, err = stdmap.NewBlocks(blockLimit)
-			return err
+		Module("blocks storage", func(node *cmd.FlowNodeBuilder) error {
+			// creates a block storage for the node
+			// to reflect incoming blocks on state
+			blockStorage = storage.NewBlocks(node.DB)
+			return nil
 		}).
 		Module("chunk states mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkStates, err = stdmap.NewChunkStates(chunkLimit)
@@ -75,7 +83,19 @@ func main() {
 			// Todo the hardcoded default value should be parameterized as alpha in a
 			// should be moved to a configuration class
 			// DISCLAIMER: alpha down there is not a production-level value
-			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates, chunkDataPacks, assigner)
+
+			eng, err := ingest.New(node.Logger,
+				node.Network,
+				node.State,
+				node.Me,
+				verifierEng,
+				authReceipts,
+				pendingReceipts,
+				collections,
+				chunkStates,
+				chunkDataPacks,
+				blockStorage,
+				assigner)
 			return eng, err
 		}).
 		Run()

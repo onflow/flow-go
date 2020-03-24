@@ -55,3 +55,13 @@ func ParseRole(role string) (Role, error) {
 		return 0, errors.Errorf("invalid role string (%s)", role)
 	}
 }
+
+func (r Role) MarshalText() ([]byte, error) {
+	return []byte(r.String()), nil
+}
+
+func (r *Role) UnmarshalText(text []byte) error {
+	var err error
+	*r, err = ParseRole(string(text))
+	return err
+}

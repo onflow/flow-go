@@ -255,13 +255,13 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		apply(&node)
 	}
 
-	if node.Receipts == nil {
-		node.Receipts, err = stdmap.NewReceipts(1000)
+	if node.AuthReceipts == nil {
+		node.AuthReceipts, err = stdmap.NewReceipts(1000)
 		require.Nil(t, err)
 	}
 
-	if node.Blocks == nil {
-		node.Blocks, err = stdmap.NewBlocks(1000)
+	if node.PendingReceipts == nil {
+		node.PendingReceipts, err = stdmap.NewReceipts(1000)
 		require.Nil(t, err)
 	}
 
@@ -280,6 +280,10 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
+	if node.BlockStorage == nil {
+		node.BlockStorage = storage.NewBlocks(node.DB)
+	}
+
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
 		vm := virtualmachine.New(rt)
@@ -294,11 +298,12 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.State,
 			node.Me,
 			node.VerifierEngine,
-			node.Receipts,
-			node.Blocks,
+			node.AuthReceipts,
+			node.PendingReceipts,
 			node.Collections,
 			node.ChunkStates,
 			node.ChunkDataPacks,
+			node.BlockStorage,
 			assigner)
 		require.Nil(t, err)
 	}

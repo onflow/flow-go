@@ -7,10 +7,11 @@ import (
 )
 
 type Seal struct {
-	BlockID       Identifier
-	PreviousState StateCommitment
-	FinalState    StateCommitment
-	Signature     crypto.Signature
+	BlockID           Identifier
+	ExecutionResultID Identifier
+	PreviousState     StateCommitment
+	FinalState        StateCommitment
+	Signature         crypto.Signature
 }
 
 func (s Seal) Body() interface{} {

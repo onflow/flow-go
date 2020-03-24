@@ -27,6 +27,7 @@ import (
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -50,11 +51,12 @@ type TestSuite struct {
 	verifierEng *network.Engine
 	// mock mempools used by the ingest engine, valid resources should be added
 	// to these when they are received from an appropriate node role.
-	blocks         *mempool.Blocks
-	receipts       *mempool.Receipts
-	collections    *mempool.Collections
-	chunkStates    *mempool.ChunkStates
-	chunkDataPacks *mempool.ChunkDataPacks
+	authReceipts    *mempool.Receipts
+	pendingReceipts *mempool.Receipts
+	collections     *mempool.Collections
+	chunkStates     *mempool.ChunkStates
+	chunkDataPacks  *mempool.ChunkDataPacks
+	blockStorage    *storage.Blocks
 	// resources fixtures
 	collection    *flow.Collection
 	block         *flow.Block
@@ -82,8 +84,9 @@ func (suite *TestSuite) SetupTest() {
 	suite.state = &protocol.State{}
 	suite.me = &module.Local{}
 	suite.ss = &protocol.Snapshot{}
-	suite.blocks = &mempool.Blocks{}
-	suite.receipts = &mempool.Receipts{}
+	suite.blockStorage = &storage.Blocks{}
+	suite.authReceipts = &mempool.Receipts{}
+	suite.pendingReceipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
@@ -121,11 +124,12 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.state,
 		suite.me,
 		suite.verifierEng,
-		suite.receipts,
-		suite.blocks,
+		suite.authReceipts,
+		suite.pendingReceipts,
 		suite.collections,
 		suite.chunkStates,
 		suite.chunkDataPacks,
+		suite.blockStorage,
 		suite.assigner)
 	require.Nil(suite.T(), err, "could not create an engine")
 
@@ -134,20 +138,28 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 	return e
 }
 
+// TestHandleBlock passes a block to ingest engine and evaluates internal path
 func (suite *TestSuite) TestHandleBlock() {
 	eng := suite.TestNewEngine()
 
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	// expects that the block be added to the mempool and block storage
+	suite.blockStorage.On("Store", suite.block).Return(nil).Once()
 
-	// expect that that the block be added to the mempool
-	suite.blocks.On("Add", suite.block).Return(nil).Once()
+	// expects that checkPendingChunks is executed checking for pending and authenticated receipts
+	// pendingReceipts iteration on All happens twice one at handlingBlocks and one at checkPendingChunks
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil).Twice()
+	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil).Once()
 
 	err := eng.Process(unittest.IdentifierFixture(), suite.block)
 	suite.Assert().Nil(err)
 
-	suite.blocks.AssertExpectations(suite.T())
+	suite.blockStorage.AssertExpectations(suite.T())
 }
 
+// TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
+// but not the collections, it asks for the collections through the network
 func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	eng := suite.TestNewEngine()
 
@@ -157,20 +169,22 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 
 	suite.state.On("Final").Return(suite.ss, nil)
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
 	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
 	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Twice()
 
 	// we have the corresponding block and chunk state, but not the collection
-	suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil)
-	suite.collections.On("Has", suite.collection.ID()).Return(false)
-	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
-	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
-	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
+	suite.collections.On("Has", suite.collection.ID()).Return(false).Once()
+	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true).Once()
+	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil).Once()
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil).Once()
 
-	// expect that the receipt be added to the mempool, and return it in All
-	suite.receipts.On("Add", suite.receipt).Return(nil).Once()
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+	// expect that we already have the receipt in the authenticated receipts mempool
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
+	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
@@ -189,30 +203,42 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	err := eng.Process(execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
 
-	suite.receipts.AssertExpectations(suite.T())
+	suite.authReceipts.AssertExpectations(suite.T())
 	suite.collectionsConduit.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
+// TestHandleReceipt_UnstakedSender evaluates sending an execution receipt from an unstaked node
+// it should go to the pending receipts and (later on) dropped from the cache
+// Todo dropping unauthenticated receipts from cache
 func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	eng := suite.TestNewEngine()
 
 	myIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	suite.me.On("NodeID").Return(myIdentity.NodeID)
+	suite.me.On("NodeID").Return(myIdentity.NodeID).Once()
 
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
-	suite.state.On("Final").Return(suite.ss)
-	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
+	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
+	suite.ss.On("Identity", unstakedIdentity).Return(nil, fmt.Errorf("unstaked node")).Once()
+
+	// receipt should go to the pending receipts mempool
+	suite.pendingReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}).Once()
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("block does not exist")).Once()
 
 	// process should fail
 	err := eng.Process(unstakedIdentity, suite.receipt)
-	suite.Assert().Error(err)
+	require.NoError(suite.T(), err)
 
 	// receipt should not be added
-	suite.receipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
+	suite.authReceipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
+
+	// Todo (depends on handling edge cases): adding network call for requesting block of receipt from consensus nodes
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -230,6 +256,7 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 			// mock the receipt coming from the invalid role
 			invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
 			suite.state.On("Final").Return(suite.ss)
+			suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 			suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 
 			receipt := unittest.ExecutionReceiptFixture()
@@ -239,7 +266,7 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 			suite.Assert().Error(err)
 
 			// receipt should not be added
-			suite.receipts.AssertNotCalled(suite.T(), "Add", &receipt)
+			suite.authReceipts.AssertNotCalled(suite.T(), "Add", &receipt)
 
 			// verifier should not be called
 			suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -255,8 +282,10 @@ func (suite *TestSuite) TestHandleCollection() {
 	// mock the collection coming from an collection node
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", collIdentity.NodeID).Return(collIdentity, nil).Once()
 
 	// expect that the collection be added to the mempool
@@ -277,6 +306,7 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
 	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
 
 	err := eng.Process(unstakedIdentity, suite.collection)
@@ -301,6 +331,7 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 		// mock the collection coming from the invalid role
 		invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
 		suite.state.On("Final").Return(suite.ss).Once()
+		suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 
 		err := eng.Process(invalidIdentity.NodeID, suite.collection)
@@ -317,8 +348,10 @@ func (suite *TestSuite) TestHandleExecutionState() {
 	// mock the state coming from an execution node
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", exeIdentity.NodeID).Return(exeIdentity, nil).Once()
 
 	// expect that the state be added to the mempool
@@ -343,6 +376,7 @@ func (suite *TestSuite) TestHandleExecutionState_UnstakedSender() {
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
 	suite.state.On("Final").Return(suite.ss).Once()
+	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
 
 	res := &messages.ExecutionStateResponse{
@@ -371,6 +405,7 @@ func (suite *TestSuite) TestHandleExecutionState_SenderWithWrongRole() {
 		// mock the state coming from the invalid role
 		invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
 		suite.state.On("Final").Return(suite.ss).Once()
+		suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 
 		err := eng.Process(invalidIdentity.NodeID, suite.chunkState)
@@ -425,26 +460,29 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.SetupTest()
 			eng := suite.TestNewEngine()
 
-			suite.state.On("Final").Return(suite.ss, nil)
+			suite.state.On("Final", testifymock.Anything).Return(suite.ss, nil)
+			suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil).Once()
 			suite.ss.On("Identities", testifymock.Anything).Return(flow.IdentityList{verIdentity}, nil).Once()
 			suite.me.On("NodeID").Return(verIdentity.NodeID)
 
 			// allow adding the received resource to mempool
-			suite.receipts.On("Add", suite.receipt).Return(nil)
+			suite.authReceipts.On("Add", suite.receipt).Return(nil)
 			suite.collections.On("Add", suite.collection).Return(nil)
-			suite.blocks.On("Add", suite.block).Return(nil)
+			suite.blockStorage.On("Store", suite.block).Return(nil)
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
 			// we have all dependencies
-			suite.blocks.On("ByID", suite.block.ID()).Return(suite.block, nil)
+			suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 			suite.collections.On("Has", suite.collection.ID()).Return(true)
 			suite.collections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
+			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+			suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+			suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true)
 			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
-			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 			// removing the resources for a chunk
 			suite.collections.On("Rem", suite.collection.ID()).Return(true).Once()
@@ -497,7 +535,7 @@ func TestConcurrency(t *testing.T) {
 			chunksNum:   1,
 		},
 		{
-			erCount:     10,
+			erCount:     5,
 			senderCount: 10,
 			chunksNum:   1,
 		},
