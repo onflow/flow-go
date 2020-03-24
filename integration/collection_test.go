@@ -45,8 +45,7 @@ func TestCollection(t *testing.T) {
 	require.Nil(t, err)
 
 	net.Start(ctx)
-	// TODO uncomment this - for debugging leave the containers up
-	//defer net.Cleanup()
+	defer net.Cleanup()
 
 	// get the collection node container
 	colContainer, ok := net.ContainerByID(colNode1.Identifier)
