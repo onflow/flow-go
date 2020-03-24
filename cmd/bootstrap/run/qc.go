@@ -30,7 +30,7 @@ type SignerData struct {
 }
 
 func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCertificate, error) {
-	ps, db, err := NewProtocolState()
+	ps, db, err := NewProtocolState(block)
 	if err != nil {
 		return nil, err
 	}
@@ -86,13 +86,7 @@ func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.
 			len(signerData.DkgPubData.IdToDKGParticipantMap), n)
 	}
 
-	err := ps.Mutate().Bootstrap(block)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	signers := make([]*signature.RandomBeaconAwareSigProvider, n)
-	viewStates := make([]*hotstuff.ViewState, n)
 	validators := make([]*hotstuff.Validator, n)
 
 	f := &mocks.ForksReader{}
@@ -112,7 +106,6 @@ func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.
 		if err != nil {
 			return nil, nil, err
 		}
-		viewStates[i] = vs
 
 		// create validator
 		v := hotstuff.NewValidator(vs, f, s)
@@ -121,7 +114,7 @@ func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.
 	return validators, signers, nil
 }
 
-func NewProtocolState() (*protoBadger.State, *badger.DB, error) {
+func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error) {
 	dir, err := tempDBDir()
 	if err != nil {
 		return nil, nil, err
@@ -133,6 +126,14 @@ func NewProtocolState() (*protoBadger.State, *badger.DB, error) {
 	}
 
 	state, err := protoBadger.NewState(db)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = state.Mutate().Bootstrap(block)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return state, db, err
 }
