@@ -26,23 +26,24 @@ import (
 // all dependent resources for each execution receipt and relays a complete
 // execution result to the verifier engine when all dependencies are ready.
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	collectionsConduit network.Conduit
-	stateConduit       network.Conduit
-	chunksConduit      network.Conduit
-	me                 module.Local
-	state              protocol.State
-	verifierEng        network.Engine         // for submitting ERs that are ready to be verified
-	authReceipts       mempool.Receipts       // keeps receipts with authenticated origin IDs
-	pendingReceipts    mempool.Receipts       // keeps receipts pending for their originID to be authenticated
-	authCollections    mempool.Collections    // keeps collections with authenticated origin IDs
-	pendingCollections mempool.Collections    // keeps collections pending for their origin IDs to be authenticated
-	chunkDataPacks     mempool.ChunkDataPacks // keeps chunk data packs with authenticated origin IDs
-	blockStorage       storage.Blocks
-	checkChunksLock    sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
-	assigner           module.ChunkAssigner // used to determine chunks this node needs to verify
-	chunkStates        mempool.ChunkStates
+	unit                 *engine.Unit
+	log                  zerolog.Logger
+	collectionsConduit   network.Conduit
+	stateConduit         network.Conduit
+	chunksConduit        network.Conduit
+	me                   module.Local
+	state                protocol.State
+	verifierEng          network.Engine                // for submitting ERs that are ready to be verified
+	authReceipts         mempool.Receipts              // keeps receipts with authenticated origin IDs
+	pendingReceipts      mempool.Receipts              // keeps receipts pending for their originID to be authenticated
+	authCollections      mempool.Collections           // keeps collections with authenticated origin IDs
+	pendingCollections   mempool.Collections           // keeps collections pending for their origin IDs to be authenticated
+	chunkDataPacks       mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
+	chunkDataPackTackers mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
+	blockStorage         storage.Blocks
+	checkChunksLock      sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
+	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
+	chunkStates          mempool.ChunkStates
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -57,23 +58,25 @@ func New(
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
 	chunkDataPacks mempool.ChunkDataPacks,
+	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:            engine.NewUnit(),
-		log:             log,
-		state:           state,
-		me:              me,
-		authReceipts:    authReceipts,
-		pendingReceipts: pendingReceipts,
-		verifierEng:     verifierEng,
-		authCollections: collections,
-		chunkStates:     chunkStates,
-		chunkDataPacks:  chunkDataPacks,
-		blockStorage:    blockStorage,
-		assigner:        assigner,
+		unit:                 engine.NewUnit(),
+		log:                  log,
+		state:                state,
+		me:                   me,
+		authReceipts:         authReceipts,
+		pendingReceipts:      pendingReceipts,
+		verifierEng:          verifierEng,
+		authCollections:      collections,
+		chunkStates:          chunkStates,
+		chunkDataPacks:       chunkDataPacks,
+		chunkDataPackTackers: chunkDataPackTrackers,
+		blockStorage:         blockStorage,
+		assigner:             assigner,
 	}
 
 	var err error

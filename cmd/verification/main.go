@@ -18,18 +18,19 @@ import (
 func main() {
 
 	var (
-		receiptLimit    uint
-		collectionLimit uint
-		blockLimit      uint
-		chunkLimit      uint
-		err             error
-		authReceipts    *stdmap.Receipts
-		pendingReceipts *stdmap.Receipts
-		blockStorage    *storage.Blocks
-		collections     *stdmap.Collections
-		chunkStates     *stdmap.ChunkStates
-		chunkDataPacks  *stdmap.ChunkDataPacks
-		verifierEng     *verifier.Engine
+		receiptLimit         uint
+		collectionLimit      uint
+		blockLimit           uint
+		chunkLimit           uint
+		err                  error
+		authReceipts         *stdmap.Receipts
+		pendingReceipts      *stdmap.Receipts
+		blockStorage         *storage.Blocks
+		collections          *stdmap.Collections
+		chunkStates          *stdmap.ChunkStates
+		chunkDataPacks       *stdmap.ChunkDataPacks
+		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
+		verifierEng          *verifier.Engine
 	)
 
 	cmd.FlowNode("verification").
@@ -65,6 +66,10 @@ func main() {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
 			return err
 		}).
+		Module("chunk data pack tracker mempool", func(node *cmd.FlowNodeBuilder) error {
+			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit)
+			return err
+		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
@@ -94,6 +99,7 @@ func main() {
 				collections,
 				chunkStates,
 				chunkDataPacks,
+				chunkDataPackTracker,
 				blockStorage,
 				assigner)
 			return eng, err

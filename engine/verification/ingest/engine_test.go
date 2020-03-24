@@ -51,12 +51,13 @@ type TestSuite struct {
 	verifierEng *network.Engine
 	// mock mempools used by the ingest engine, valid resources should be added
 	// to these when they are received from an appropriate node role.
-	authReceipts    *mempool.Receipts
-	pendingReceipts *mempool.Receipts
-	collections     *mempool.Collections
-	chunkStates     *mempool.ChunkStates
-	chunkDataPacks  *mempool.ChunkDataPacks
-	blockStorage    *storage.Blocks
+	authReceipts         *mempool.Receipts
+	pendingReceipts      *mempool.Receipts
+	collections          *mempool.Collections
+	chunkStates          *mempool.ChunkStates
+	chunkDataPacks       *mempool.ChunkDataPacks
+	chunkDataPackTracker *mempool.ChunkDataPackTrackers
+	blockStorage         *storage.Blocks
 	// resources fixtures
 	collection    *flow.Collection
 	block         *flow.Block
@@ -90,6 +91,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
+	suite.chunkDataPackTracker = &mempool.ChunkDataPackTrackers{}
 	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := unittest.CompleteExecutionResultFixture(1)
@@ -129,6 +131,7 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.collections,
 		suite.chunkStates,
 		suite.chunkDataPacks,
+		suite.chunkDataPackTracker,
 		suite.blockStorage,
 		suite.assigner)
 	require.Nil(suite.T(), err, "could not create an engine")

@@ -14,6 +14,6 @@ func (c *ChunkDataPackTracker) ID() flow.Identifier {
 	return c.ChunkID
 }
 
-func (c *ChunkDataPackTracker) CheckSum() flow.Identifier {
+func (c *ChunkDataPackTracker) Checksum() flow.Identifier {
 	return flow.MakeID(c)
 }
