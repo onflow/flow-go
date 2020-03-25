@@ -109,6 +109,7 @@ func main() {
 				computationManager,
 				providerEngine,
 				executionState,
+				6, //TODO - config param maybe?
 			)
 			return ingestionEng, err
 		}).
