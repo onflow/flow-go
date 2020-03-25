@@ -83,7 +83,7 @@ void     _ep_write_bin_compact(byte *, const ep_st *,  const int);
 void     _ep2_read_bin_compact(ep2_st* , const byte *,  const int);
 void     _ep2_write_bin_compact(byte *, const ep2_st *,  const int);
 void     mapToG1(ep_st* h, const byte* data, const int len);
-int     checkMembership_Zr(const bn_st* a);
+int      checkMembership_Zr(const bn_st* a);
 int      checkMembership_G2(const ep2_t p);
 
 #endif

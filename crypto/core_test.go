@@ -42,8 +42,10 @@ func TestPRGseeding(t *testing.T) {
 	err = randZr(&sk2.scalar)
 	require.Nil(t, err)
 	// compare the 2 scalars (by comparing the private keys)
-	sk1Bytes, _ := sk1.Encode()
-	sk2Bytes, _ := sk2.Encode()
+	sk1Bytes, err := sk1.Encode()
+	require.Nil(t, err)
+	sk2Bytes, err := sk2.Encode()
+	require.Nil(t, err)
 	assert.Equal(t, sk1Bytes, sk2Bytes)
 }
 
