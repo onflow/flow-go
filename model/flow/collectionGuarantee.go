@@ -10,7 +10,7 @@ import (
 // to announce collections to consensus nodes.
 type CollectionGuarantee struct {
 	CollectionID Identifier         // ID of the collection being guaranteed
-	Signers      []Identifier       // list of guarantors
+	SignerIDs    []Identifier       // list of guarantors
 	Signatures   []crypto.Signature // guarantor signatures
 }
 

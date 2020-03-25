@@ -126,7 +126,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
 	return &flow.CollectionGuarantee{
 		CollectionID: IdentifierFixture(),
-		Signers:      IdentifierListFixture(16),
+		SignerIDs:    IdentifierListFixture(16),
 		Signatures:   SignaturesFixture(16),
 	}
 }

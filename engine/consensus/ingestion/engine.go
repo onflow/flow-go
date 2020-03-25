@@ -120,7 +120,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 		return fmt.Errorf("could not get clusters: %w", err)
 	}
 
-	guarantors := guarantee.Signers
+	guarantors := guarantee.SignerIDs
 
 	// ensure there is at least one guarantor
 	if len(guarantors) == 0 {
