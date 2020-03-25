@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/go-multierror"
 	"github.com/m4ksio/testingdock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
