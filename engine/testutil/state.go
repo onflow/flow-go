@@ -10,7 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
-func UncheckedState(db *badger.DB, identities flow.IdentityList) (*protocol.State, *flow.Block, error) {
+func UncheckedState(db *badger.DB, identities flow.IdentityList) (*protocol.State, error) {
 
 	genesis := flow.Genesis(identities)
 
@@ -18,13 +18,13 @@ func UncheckedState(db *badger.DB, identities flow.IdentityList) (*protocol.Stat
 		return procedure.Bootstrap(genesis)(txn)
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not bootstrap: %w", err)
+		return nil, fmt.Errorf("could not bootstrap: %w", err)
 	}
 
 	state, err := protocol.NewState(db)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not initialize state: %w", err)
+		return nil, fmt.Errorf("could not initialize state: %w", err)
 	}
 
-	return state, genesis, nil
+	return state, nil
 }

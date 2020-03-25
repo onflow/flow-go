@@ -72,7 +72,7 @@ func TestExecutionFlow(t *testing.T) {
 		},
 	}
 
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
 
 	collectionNode := testutil.GenericNode(t, hub, colID, identities)
@@ -178,7 +178,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 		},
 	}
 
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
 
 	consensus1Node := testutil.GenericNode(t, hub, con1ID, identities)
@@ -234,7 +234,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		},
 	}
 
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
 
 	verification1Node := testutil.GenericNode(t, hub, ver1ID, identities)

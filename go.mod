@@ -40,6 +40,7 @@ require (
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
 	google.golang.org/grpc v1.26.0
+	gotest.tools v2.2.0+incompatible
 	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )
 

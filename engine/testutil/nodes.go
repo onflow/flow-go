@@ -40,11 +40,11 @@ import (
 )
 
 func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
-	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 
 	db := unittest.TempBadgerDB(t)
 
-	state, genesis, err := UncheckedState(db, identities)
+	state, err := UncheckedState(db, identities)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -76,7 +76,6 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 		State:   state,
 		Me:      me,
 		Net:     stub,
-		Genesis: genesis,
 	}
 }
 
@@ -176,7 +175,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 	return nodes
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity) mock.ExecutionNode {
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64) mock.ExecutionNode {
 	node := GenericNode(t, hub, identity, identities)
 
 	blocksStorage := storage.NewBlocks(node.DB)
@@ -225,6 +224,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computationEngine,
 		providerEngine,
 		execState,
+		syncThreshold,
 	)
 	require.NoError(t, err)
 

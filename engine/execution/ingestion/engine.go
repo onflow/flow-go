@@ -64,6 +64,7 @@ func New(
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
+	syncThreshold uint64,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
@@ -81,7 +82,7 @@ func New(
 		providerEngine:     providerEngine,
 		mempool:            mempool,
 		execState:          execState,
-		syncModeThreshold:  6, //TODO - config param maybe?
+		syncModeThreshold:  syncThreshold,
 		syncInProgress:     atomic.NewBool(false),
 		stateSync:          executionSync.NewStateSynchronizer(execState),
 	}
@@ -136,8 +137,12 @@ func (e *Engine) Ready() <-chan struct{} {
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		e.wg.Wait() //wait for block execution
+		e.Wait()
 	})
+}
+
+func (e *Engine) Wait() {
+	e.wg.Wait() //wait for block execution
 }
 
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
@@ -193,7 +198,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
 	}
 
-	err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueue *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
+	err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
 
 		err := e.sendCollectionsRequest(executableBlock, blockByCollection)
 		if err != nil {
@@ -201,13 +206,15 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		}
 
 		// if block fits into execution queue, that's it
-		if queue, added := tryEnqueue(executableBlock, executionQueue); added {
+		if queue, added := tryEnqueue(executableBlock, executionQueues); added {
+			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to existing execution queue")
 			e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 			return nil
 		}
 
 		// if block fits into orphan queues
 		if queue, added := tryEnqueue(executableBlock, orphanQueues); added {
+			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to existing orphan queue")
 			e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 			// this is only queue which grew and could trigger threshold
 			if !e.syncInProgress.Load() && queue.Height() > e.syncModeThreshold {
@@ -227,6 +234,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 			if err != nil {
 				panic(fmt.Sprintf("cannot add orphaned block: %s", err))
 			}
+			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
 			return nil
 		}
 		// any other error while accessing storage - panic
@@ -235,10 +243,11 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		}
 
 		executableBlock.StartState = stateCommitment
-		newQueue, err := enqueue(executableBlock, executionQueue) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
+		newQueue, err := enqueue(executableBlock, executionQueues) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
 		if err != nil {
 			panic(fmt.Sprintf("cannot enqueue block for execution: %s", err))
 		}
+		e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to execution queue")
 
 		e.tryRequeueOrphans(executableBlock, newQueue, orphanQueues)
 
@@ -355,6 +364,8 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		}
 
 		if executableBlock.IsComplete() {
+			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
+
 			e.wg.Add(1)
 			go e.executeBlock(executableBlock)
 		}
