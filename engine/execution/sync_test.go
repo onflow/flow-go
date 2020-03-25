@@ -10,7 +10,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/dapperlabs/flow-go/engine"
-	testutil2 "github.com/dapperlabs/flow-go/engine/execution/testutil"
+	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -42,9 +42,9 @@ func TestSyncFlow(t *testing.T) {
 
 	genesis := flow.Genesis(identities)
 
-	tx1 := testutil2.DeployCounterContractTransaction()
-	tx2 := testutil2.CreateCounterTransaction()
-	tx3 := testutil2.AddToCounterTransaction()
+	tx1 := execTestutil.DeployCounterContractTransaction()
+	tx2 := execTestutil.CreateCounterTransaction()
+	tx3 := execTestutil.AddToCounterTransaction()
 
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
