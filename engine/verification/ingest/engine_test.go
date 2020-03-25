@@ -22,6 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/model/verification/tracker"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -515,6 +516,76 @@ func (suite *TestSuite) TestVerifyReady() {
 
 		})
 	}
+}
+
+// TestChunkDataPackTracker_UntrackedChunkDataPack tests that ingest engine process method returns an error
+// if it receives a ChunkDataPackResponse that does not have any tracker in the engine's mempool
+func (suite *TestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
+	suite.SetupTest()
+	eng := suite.TestNewEngine()
+
+	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+
+	// creates a chunk fixture, its data pack, and the data pack response
+	chunk := unittest.ChunkFixture()
+	chunkDataPack := unittest.ChunkDataPackFixture(chunk.ID())
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: chunkDataPack}
+
+	// mocks tracker to return an error for this chunk ID
+	suite.chunkDataPackTracker.On("ByChunkID", chunkDataPack.ChunkID).
+		Return(nil, fmt.Errorf("does not exist"))
+	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
+
+	// asserts that process of an untracked chunk data pack returns with an error
+	suite.Assert().NotNil(err)
+	suite.chunkDataPackTracker.AssertExpectations(suite.T())
+}
+
+// TestChunkDataPackTracker_HappyPath evaluates the happy path of receiving a chunk data pack upon a request
+func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
+	suite.SetupTest()
+	eng := suite.TestNewEngine()
+
+	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+
+	// creates a block
+	block := unittest.BlockFixture()
+	// creates a chunk fixture, its data pack, and the data pack response for the block
+	chunk := unittest.ChunkFixture()
+	chunkDataPack := unittest.ChunkDataPackFixture(chunk.ID())
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: chunkDataPack}
+
+	// creates a tracker for chunk data pack that binds it to the block
+	track := &tracker.ChunkDataPackTracker{
+		BlockID: block.ID(),
+		ChunkID: chunkDataPack.ChunkID,
+	}
+
+	// mocks tracker to return the tracker for the chunk data pack
+	suite.chunkDataPackTracker.On("ByChunkID", chunkDataPack.ChunkID).Return(track, nil).Once()
+
+	// mocks state of ingest engine to return execution node ID
+	suite.state.On("AtBlockID", track.BlockID).Return(suite.ss, nil).Once()
+	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
+
+	// chunk data pack should be successfully added to mempool and the tracker should be removed
+	suite.chunkDataPacks.On("Add", &chunkDataPack).Return(nil).Once()
+	suite.chunkDataPackTracker.On("Rem", chunkDataPack.ChunkID).Return(true).Once()
+
+	// terminates call to checkPendingChunks as it is out of this test's scope
+	suite.pendingReceipts.On("All").Return(nil).Once()
+	suite.authReceipts.On("All").Return(nil).Once()
+
+	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
+
+	// asserts that process of a tracked chunk data pack should return no error
+	suite.Assert().Nil(err)
+	suite.chunkDataPackTracker.AssertExpectations(suite.T())
+	suite.chunkDataPacks.AssertExpectations(suite.T())
+	suite.state.AssertExpectations(suite.T())
+	suite.ss.AssertExpectations(suite.T())
+	suite.pendingReceipts.AssertExpectations(suite.T())
+	suite.authReceipts.AssertExpectations(suite.T())
 }
 
 func TestConcurrency(t *testing.T) {

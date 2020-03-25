@@ -243,6 +243,9 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
 
+	// removes chunk data pack tracker pool
+	e.chunkDataPackTackers.Rem(chunkDataPack.ChunkID)
+
 	e.checkPendingChunks()
 
 	return nil
