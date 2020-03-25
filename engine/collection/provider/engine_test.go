@@ -63,6 +63,8 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 	t := suite.T()
 
 	guarantee := unittest.CollectionGuaranteeFixture()
+	guarantee.SignerIDs = []flow.Identifier{suite.colNode.Me.NodeID()}
+	guarantee.Signatures = unittest.SignaturesFixture(1)
 
 	err := suite.colNode.ProviderEngine.SubmitCollectionGuarantee(guarantee)
 	assert.NoError(t, err)

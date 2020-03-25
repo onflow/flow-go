@@ -225,6 +225,7 @@ func (e *coldStuff) sendProposal() error {
 	setProposer := func(header *flow.Header) {
 		header.ProposerID = myIdentity.NodeID
 		header.View = e.round.Parent().View + 1
+		header.ParentSigners = e.participants.NodeIDs()
 	}
 
 	// define payload and build next block
