@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/m4ksio/testingdock"
 
 	"github.com/dapperlabs/flow-go/utils/unittest"
+
+	"github.com/dapperlabs/flow-go/integration/client"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )

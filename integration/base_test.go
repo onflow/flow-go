@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"testing"
 	"time"
@@ -12,9 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/cadence/encoding"
-	sdk "github.com/dapperlabs/flow-go-sdk"
 
-	"github.com/dapperlabs/flow-go-sdk/keys"
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	. "github.com/dapperlabs/flow-go/integration/network"
 	"github.com/dapperlabs/flow-go/integration/testclient"
@@ -178,9 +178,9 @@ func readCounter(ctx context.Context, client *testclient.TestClient) (int, error
 }
 
 func createCounter(ctx context.Context, client *testclient.TestClient) error {
-
+	rootAddress := flow.BytesToAddress(big.NewInt(1).Bytes())
 	return client.SendTransaction(ctx, dsl.Transaction{
-		Import: dsl.Import{Address: sdk.RootAddress},
+		Import: dsl.Import{Address: rootAddress},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				if signer.storage[Testing.Counter] == nil {
@@ -193,18 +193,30 @@ func createCounter(ctx context.Context, client *testclient.TestClient) error {
 
 }
 
-func generateRandomKey() (*sdk.AccountPrivateKey, error) {
+func generateRandomKey() (*flow.AccountPrivateKey, error) {
 	seed := make([]byte, 40)
 	_, _ = rand.Read(seed)
-	key, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA2_256, seed)
-	return &key, err
-}
-
-func getEmulatorKey() (*sdk.AccountPrivateKey, error) {
-	key, err := keys.DecodePrivateKeyHex("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203")
+	key, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
 	if err != nil {
 		return nil, err
 	}
 
-	return &key, nil
+	return &flow.AccountPrivateKey{
+		PrivateKey: key,
+		SignAlgo:   key.Algorithm(),
+		HashAlgo:   crypto.SHA3_256,
+	}, nil
+
+}
+
+func getEmulatorKey() (*flow.AccountPrivateKey, error) {
+	key, err := crypto.DecodePrivateKey(crypto.ECDSA_P256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
+	if err != nil {
+		return nil, err
+	}
+	return &flow.AccountPrivateKey{
+		PrivateKey: key,
+		SignAlgo:   key.Algorithm(),
+		HashAlgo:   crypto.SHA3_256,
+	}, nil
 }
