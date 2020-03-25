@@ -6,13 +6,15 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/mock"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/signature"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	hs "github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/protocol"
 	protoBadger "github.com/dapperlabs/flow-go/protocol/badger"
@@ -29,7 +31,7 @@ type SignerData struct {
 	Signers    []Signer
 }
 
-func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCertificate, error) {
+func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*model.QuorumCertificate, error) {
 	ps, db, err := NewProtocolState(block)
 	if err != nil {
 		return nil, err
@@ -41,7 +43,7 @@ func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCert
 		return nil, err
 	}
 
-	hotBlock := hs.Block{
+	hotBlock := model.Block{
 		BlockID:     block.ID(),
 		View:        block.View,
 		ProposerID:  block.ProposerID,
@@ -50,7 +52,7 @@ func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCert
 		Timestamp:   block.Timestamp,
 	}
 
-	sigs := make([]*hs.SingleSignature, len(signers))
+	sigs := make([]*model.SingleSignature, len(signers))
 	for i, signer := range signers {
 		vote, err := signer.VoteFor(&hotBlock)
 		if err != nil {
@@ -66,7 +68,7 @@ func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCert
 	}
 
 	// make QC
-	qc := &hs.QuorumCertificate{
+	qc := &model.QuorumCertificate{
 		View:                hotBlock.View,
 		BlockID:             hotBlock.BlockID,
 		AggregatedSignature: aggsig,
@@ -78,7 +80,7 @@ func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*hs.QuorumCert
 	return qc, err
 }
 
-func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.Block) ([]*hotstuff.Validator, []*signature.RandomBeaconAwareSigProvider, error) {
+func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.Block) ([]*validator.Validator, []*signature.RandomBeaconAwareSigProvider, error) {
 	n := len(signerData.Signers)
 
 	if len(signerData.DkgPubData.IdToDKGParticipantMap) < n {
@@ -87,9 +89,9 @@ func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.
 	}
 
 	signers := make([]*signature.RandomBeaconAwareSigProvider, n)
-	validators := make([]*hotstuff.Validator, n)
+	validators := make([]*validator.Validator, n)
 
-	f := &mocks.ForksReader{}
+	f := &mock.ForksReader{}
 
 	for i, signer := range signerData.Signers {
 		// create signer
@@ -102,13 +104,13 @@ func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.
 		signers[i] = s
 
 		// create view state
-		vs, err := hotstuff.NewViewState(ps, signerData.DkgPubData, signer.Identity.NodeID, filter.HasRole(flow.RoleConsensus))
+		vs, err := viewstate.New(ps, signerData.DkgPubData, signer.Identity.NodeID, filter.HasRole(flow.RoleConsensus))
 		if err != nil {
 			return nil, nil, err
 		}
 
 		// create validator
-		v := hotstuff.NewValidator(vs, f, s)
+		v := validator.New(vs, f, s)
 		validators[i] = v
 	}
 	return validators, signers, nil
@@ -141,7 +143,7 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 // create a new RandomBeaconAwareSigProvider
 func NewRandomBeaconSigProvider(ps protocol.State, dkgPubData *hotstuff.DKGPublicData, id *flow.Identity,
 	stakingKey crypto.PrivateKey, randomBeaconKey crypto.PrivateKey) (*signature.RandomBeaconAwareSigProvider, error) {
-	vs, err := hotstuff.NewViewState(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
+	vs, err := viewstate.New(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create view state: %w", err)
 	}
@@ -151,7 +153,7 @@ func NewRandomBeaconSigProvider(ps protocol.State, dkgPubData *hotstuff.DKGPubli
 	}
 
 	sigProvider := signature.NewRandomBeaconAwareSigProvider(vs, me, randomBeaconKey)
-	return &sigProvider, nil
+	return sigProvider, nil
 }
 
 func tempDBDir() (string, error) {
