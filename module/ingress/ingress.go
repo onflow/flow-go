@@ -38,7 +38,8 @@ func New(config Config, e *ingest.Engine) *Ingress {
 	ingress := &Ingress{
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine: e,
+			UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
+			engine:                            e,
 		},
 		server: grpc.NewServer(),
 		config: config,
@@ -86,6 +87,7 @@ func (i *Ingress) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
+	observation.UnimplementedObserveServiceServer
 	engine network.Engine
 }
 
@@ -109,27 +111,5 @@ func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTran
 
 	txID := tx.ID()
 
-	return &observation.SendTransactionResponse{Hash: txID[:]}, nil
-}
-
-// Remaining handler functions are no-ops to implement the Observation API
-// protobuf service.
-func (h *handler) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetAccount(context.Context, *observation.GetAccountRequest) (*observation.GetAccountResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) ExecuteScript(context.Context, *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
-	return nil, nil
-}
-
-func (h *handler) GetEvents(context.Context, *observation.GetEventsRequest) (*observation.GetEventsResponse, error) {
-	return nil, nil
+	return &observation.SendTransactionResponse{Id: txID[:]}, nil
 }

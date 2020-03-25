@@ -53,6 +53,7 @@ func TestEncDecPrivateKey(t *testing.T) {
 	// decode the private key
 	skCopy, err := DecodePrivateKey(BLS_BLS12381, skBytes)
 	require.Nil(t, err)
+	assert.True(t, sk.Equals(skCopy), "key equality check failed")
 	// check the encode and decode are consistent
 	skCopyBytes, err := skCopy.Encode()
 	require.NoError(t, err)
@@ -77,6 +78,7 @@ func TestEncDecPublicKey(t *testing.T) {
 	pkCopy, err := DecodePublicKey(BLS_BLS12381, pkBytes)
 	// membership check should be valid
 	assert.Nil(t, err)
+	assert.True(t, pk.Equals(pkCopy), "key equality check failed")
 	// check the encode and decode are consistent
 	pkCopyBytes, err := pkCopy.Encode()
 	require.NoError(t, err)

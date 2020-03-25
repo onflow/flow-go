@@ -172,6 +172,33 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			})
 
 			flowContainer.Ports["api"] = collectionNodeAPIPort
+
+
+		case flow.RoleExecution:
+
+			executionNodeAPIPort := testingdock.RandomPort(t)
+
+			opts.Config.ExposedPorts = nat.PortSet{
+				"9000/tcp": struct{}{},
+			}
+			opts.Config.Cmd = append(opts.Config.Cmd, fmt.Sprintf("--rpc-addr=%s:9000", opts.Name))
+			opts.HostConfig = &container.HostConfig{
+				PortBindings: nat.PortMap{
+					nat.Port("9000/tcp"): []nat.PortBinding{
+						{
+							HostIP:   "0.0.0.0",
+							HostPort: executionNodeAPIPort,
+						},
+					},
+				},
+			}
+			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
+				return healthcheckGRPC(context, executionNodeAPIPort)
+			})
+
+			flowContainer.Ports["api"] = executionNodeAPIPort
+
+
 		}
 
 		c := suite.Container(*opts)
