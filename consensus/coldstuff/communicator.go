@@ -1,7 +1,7 @@
 package coldstuff
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
 )
 

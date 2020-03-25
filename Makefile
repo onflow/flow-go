@@ -96,7 +96,8 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
 	GO111MODULE=on mockgen -destination=network/mocks/engine.go -package=mocks github.com/dapperlabs/flow-go/network Engine
 	GO111MODULE=on mockgen -destination=protocol/mocks/state.go -package=mocks github.com/dapperlabs/flow-go/protocol State
-	GO111MODULE=on mockgen -destination=engine/consensus/hotstuff/mocks/sig_aggregator.go -package=mocks github.com/dapperlabs/flow-go/engine/consensus/hotstuff SigAggregator
+	GO111MODULE=on mockgen -destination=consensus/hotstuff/mocks/sig_verifier.go -package=mocks github.com/dapperlabs/flow-go/consensus/hotstuff SigVerifier
+	GO111MODULE=on mockgen -destination=consensus/hotstuff/mocks/sig_aggregator.go -package=mocks github.com/dapperlabs/flow-go/consensus/hotstuff SigAggregator
 	GO111MODULE=on mockgen -destination=protocol/mocks/snapshot.go -package=mocks github.com/dapperlabs/flow-go/protocol Snapshot
 	GO111MODULE=on mockgen -destination=protocol/mocks/mutator.go -package=mocks github.com/dapperlabs/flow-go/protocol Mutator
 	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
@@ -114,13 +115,10 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/virtualmachine -case=underscore -output="./engine/execution/computation/virtualmachine/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
-	# hotstuff mocks
-	GO111MODULE=on mockery -name 'Consumer' -dir="./engine/consensus/hotstuff/notifications/" -case=underscore -output="./engine/consensus/hotstuff/notifications/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'Vertex' -dir="./engine/consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./engine/consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'ForksReader' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
-	GO111MODULE=on mockery -name 'Signer' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
-	GO111MODULE=on mockery -name 'SigVerifier' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
-	GO111MODULE=on mockery -name 'SigAggregator' -dir="./engine/consensus/hotstuff" -case=underscore -output="./engine/consensus/hotstuff/mocks" -outpkg="mocks"
+	GO111MODULE=on mockery -name 'Consumer' -dir="./consensus/hotstuff/notifications/" -case=underscore -output="./consensus/hotstuff/notifications/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mock" -outpkg="mock"
+
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
