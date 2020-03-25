@@ -3,12 +3,9 @@ package tests
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"testing"
 	"time"
 
-	sdk "github.com/dapperlabs/flow-go-sdk"
-	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/m4ksio/testingdock"
 	"github.com/stretchr/testify/assert"
@@ -54,17 +51,13 @@ func TestCollection(t *testing.T) {
 	// get the node's ingress port and create an RPC client
 	ingressPort, ok := colContainer.Ports[testnet.ColNodeAPIPort]
 	assert.True(t, ok)
-	client, err := client.New(fmt.Sprintf(":%s", ingressPort))
+
+	key, err := generateRandomKey()
+	assert.Nil(t, err)
+	client, err := testnet.NewClient(fmt.Sprintf(":%s", ingressPort), key)
 	assert.Nil(t, err)
 
-	sdkTx := sdk.Transaction{
-		Script:             []byte("fun main() {}"),
-		ReferenceBlockHash: []byte{1, 2, 3, 4},
-		Nonce:              rand.Uint64(),
-		ComputeLimit:       10,
-		PayerAccount:       sdk.RootAddress,
-	}
-	err = client.SendTransaction(ctx, sdkTx)
+	err = client.SendTransaction(ctx, noopTransaction())
 	assert.Nil(t, err)
 
 	// give the cluster a chance to do some consensus

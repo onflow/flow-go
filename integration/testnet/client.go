@@ -2,22 +2,24 @@ package testnet
 
 import (
 	"context"
-	"math/rand"
+	"math/big"
 
-	sdk "github.com/dapperlabs/flow-go-sdk"
-	"github.com/dapperlabs/flow-go-sdk/client"
-	"github.com/dapperlabs/flow-go-sdk/keys"
-
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/integration/dsl"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 // Client is a GRPC client of the Observation API exposed by the Flow network.
+// NOTE: we use integration/client rather than sdk/client as a stopgap until
+// the SDK client is updated with the latest protobuf definitions.
 type Client struct {
 	client *client.Client
-	key    *sdk.AccountPrivateKey
+	key    *flow.AccountPrivateKey
 }
 
-func NewClient(addr string, key *sdk.AccountPrivateKey) (*Client, error) {
+func NewClient(addr string, key *flow.AccountPrivateKey) (*Client, error) {
 
 	client, err := client.New(addr)
 	if err != nil {
@@ -43,25 +45,28 @@ func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) e
 	return c.SendTransaction(ctx, code)
 }
 
-func (c *Client) SendTransaction(ctx context.Context, code dsl.CadenceCode) error {
+func (c *Client) SendTransaction(ctx context.Context, code dsl.Transaction) error {
 
 	codeStr := code.ToCadence()
 
-	tx := sdk.Transaction{
-		Script:             []byte(codeStr),
-		ReferenceBlockHash: nil,
-		Nonce:              rand.Uint64(),
-		ComputeLimit:       10,
-		PayerAccount:       sdk.RootAddress,
-		ScriptAccounts:     []sdk.Address{sdk.RootAddress},
+	rootAddress := flow.BytesToAddress(big.NewInt(1).Bytes())
+	tx := flow.TransactionBody{
+		Script:           []byte(codeStr),
+		ReferenceBlockID: unittest.IdentifierFixture(),
+		PayerAccount:     rootAddress,
 	}
 
-	sig, err := keys.SignTransaction(tx, *c.key)
+	sig, err := signTransaction(tx, c.key.PrivateKey)
 	if err != nil {
 		return err
 	}
 
-	tx.AddSignature(sdk.RootAddress, sig)
+	accountSig := flow.AccountSignature{
+		Account:   rootAddress,
+		Signature: sig.Bytes(),
+	}
+
+	tx.Signatures = append(tx.Signatures, accountSig)
 
 	return c.client.SendTransaction(ctx, tx)
 }
@@ -76,4 +81,18 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, er
 	}
 
 	return res, nil
+}
+
+// signTransaction signs a transaction with a private key.
+func signTransaction(tx flow.TransactionBody, privateKey crypto.PrivateKey) (crypto.Signature, error) {
+	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	if err != nil {
+		return nil, err
+	}
+
+	transaction := flow.Transaction{
+		TransactionBody: tx,
+	}
+	b := transaction.Singularity()
+	return privateKey.Sign(b, hasher)
 }
