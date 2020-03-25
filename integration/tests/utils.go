@@ -34,7 +34,7 @@ func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 	return int(i.Value.Int64()), nil
 }
 
-func createCounterTransaction(ctx context.Context, client *testnet.Client) error {
+func createCounter(ctx context.Context, client *testnet.Client) error {
 	return client.SendTransaction(ctx, dsl.Transaction{
 		Import: dsl.Import{Address: flow.RootAddress},
 		Content: dsl.Prepare{
