@@ -277,7 +277,7 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 
 	if node.ChunkStateTracker == nil {
 		node.ChunkStateTracker, err = stdmap.NewChunkStateTrackers(1000)
-		require.NotNil(t, err)
+		require.Nil(t, err)
 	}
 
 	if node.ChunkDataPacks == nil {

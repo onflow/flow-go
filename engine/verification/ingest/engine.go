@@ -328,8 +328,7 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 		Hex("chunk_id", logging.ID(res.State.ChunkID)).
 		Msg("execution state received")
 
-	// checks if this event is a reply of a prior request
-	// extracts the tracker
+	// checks if this event is a reply of a prior request extracts the tracker
 	tracker, err := e.chunkStateTrackers.ByChunkID(res.State.ChunkID)
 	if err != nil {
 		return fmt.Errorf("no chunk state tracker available for chunk ID: %x", res.State.ChunkID)
@@ -352,7 +351,7 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 	}
 
 	// removes chunk state tracker from mempool
-	e.chunkDataPackTackers.Rem(res.State.ChunkID)
+	e.chunkStateTrackers.Rem(res.State.ChunkID)
 
 	e.checkPendingChunks()
 
