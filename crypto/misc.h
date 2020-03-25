@@ -7,8 +7,8 @@
 
 typedef uint8_t byte;
 
-#define VALID   1
-#define INVALID 0
+#define VALID   RLC_OK
+#define INVALID RLC_ERR
 
 #define BITS_TO_BYTES(x) ((x+7)>>3)
 #define BITS_TO_DIGITS(x) ((x+63)>>6)

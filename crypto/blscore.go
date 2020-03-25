@@ -148,11 +148,14 @@ func writePointG2(dest []byte, a *pointG2) {
 }
 
 // readVerifVector reads a G2 point from a slice of bytes
-func readPointG2(a *pointG2, src []byte) {
-	C._ep2_read_bin_compact((*C.ep2_st)(a),
+func readPointG2(a *pointG2, src []byte) error {
+	if C.ep2_read_bin_compact((*C.ep2_st)(a),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)),
-	)
+	) != valid {
+		return cryptoError{"reading a G2 point has failed"}
+	}
+	return nil
 }
 
 // computes a bls signature

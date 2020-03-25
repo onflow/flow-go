@@ -93,7 +93,9 @@ func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, er
 	pk := &PubKeyBLS_BLS12381{
 		alg: a,
 	}
-	readPointG2(&pk.point, publicKeyBytes)
+	if readPointG2(&pk.point, publicKeyBytes) != nil {
+		return nil, cryptoError{"the input slice does not encode a public key"}
+	}
 	if pk.point.checkMembershipG2() {
 		return pk, nil
 	}

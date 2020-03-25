@@ -94,7 +94,11 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	}
 	// read the verification vector
 	s.A = make([]pointG2, s.threshold+1)
-	readVerifVector(s.A, data)
+	err := readVerifVector(s.A, data)
+	if err != nil {
+		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		return
+	}
 
 	s.y = make([]pointG2, s.size)
 	s.computePublicKeys()
@@ -128,11 +132,14 @@ func writeVerifVector(dest []byte, A []pointG2) {
 
 // readVerifVector imports A vector from an array of bytes,
 // assuming the slice length matches the vector length
-func readVerifVector(A []pointG2, src []byte) {
-	C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
+func readVerifVector(A []pointG2, src []byte) error {
+	if C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(A)),
-	)
+	) != valid {
+		return cryptoError{"the verifcation vector does not encode public keys correctly"}
+	}
+	return nil
 }
 
 func (s *feldmanVSSstate) verifyShare() bool {

@@ -220,27 +220,27 @@ void _ep_write_bin_compact(byte *bin, const ep_st *a, const int len) {
 // len is the size of the input buffer
 // The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // The code is a modified version of Relic ep_write_bin
-void _ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
+int ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
     const int G1size = (G1_BYTES/(SERIALIZATION+1));
     if (len!=G1size) {
         THROW(ERR_NO_BUFFER);
-        return;
+        return RLC_ERR;
     }
     // check if the point is infinity
     if (bin[0] & 0x40) {
         // check if the remaining bits are cleared
         if (bin[0] & 0x3F) {
             THROW(ERR_NO_VALID);
-            return;
+            return RLC_ERR;
         }
         for (int i=1; i<G1size-1; i++) {
             if (bin[i]) {
                 THROW(ERR_NO_VALID);
-                return;
+                return RLC_ERR;
             } 
         }
 		ep_set_infty(a);
-		return;
+		return RLC_OK;
 	} 
 
     int compressed = bin[0] >> 7;
@@ -248,7 +248,7 @@ void _ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
 
     if (y_is_odd && (!compressed)) {
         THROW(ERR_NO_VALID);
-        return;
+        return RLC_ERR;
     } 
 
 	a->norm = 1;
@@ -256,7 +256,7 @@ void _ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
     byte* temp = (byte*)malloc(Fp_BYTES);
     if (!temp) {
         THROW(ERR_NO_MEMORY);
-        return;
+        return RLC_ERR;
     }
     memcpy(temp, bin, Fp_BYTES);
     temp[0] &= 0x1F;
@@ -271,6 +271,7 @@ void _ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
         fp_set_bit(a->y, 0, y_is_odd);
         ep_upk_generic(a, a);
     }
+    return RLC_OK;
 }
 
 // uncompress a G2 point p into r taken into account the coordinate x
@@ -361,13 +362,13 @@ void _ep2_write_bin_compact(byte *bin, const ep2_st *a, const int len) {
     ep_free(t);
 }
 
-// _ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
+// ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // The code is a modified version of Relic ep_write_bin
-void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
+int ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {
         THROW(ERR_NO_VALID);
-        return;
+        return RLC_ERR;
     }
 
     // check if the point in infinity
@@ -375,22 +376,22 @@ void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
         // the remaining bits need to be cleared
         if (bin[0] & 0x3F) {
             THROW(ERR_NO_VALID);
-            return;
+            return RLC_ERR;
         }
         for (int i=1; i<G2size-1; i++) {
             if (bin[i]) {
                 THROW(ERR_NO_VALID);
-                return;
+                return RLC_ERR;
             } 
         }
 		ep2_set_infty(a);
-		return;
+		return RLC_OK;
 	} 
     byte compressed = bin[0] >> 7;
     byte y_is_odd = (bin[0] >> 5) & 1;
     if (y_is_odd && (!compressed)) {
         THROW(ERR_NO_VALID);
-        return;
+        return RLC_ERR;
     } 
 	a->norm = 1;
 	fp_set_dig(a->z[0], 1);
@@ -398,7 +399,7 @@ void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
     byte* temp = (byte*)malloc(2*Fp_BYTES);
     if (!temp) {
         THROW(ERR_NO_MEMORY);
-        return;
+        return RLC_ERR;
     }
     memcpy(temp, bin, 2*Fp_BYTES);
     // clear the header bits
@@ -416,4 +417,5 @@ void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
 		fp_zero(a->y[1]);
         ep2_upk_generic(a, a);
     }
+    return RLC_OK;
 }

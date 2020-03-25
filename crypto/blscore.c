@@ -206,11 +206,12 @@ int _blsVerify(const ep2_st *pk, const byte* sig, const byte* data, const int le
 
     // elemsG1[0] = s
     ep_new(elemsG1[0]);
-    _ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
+    if (ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN) != RLC_OK) 
+        return INVALID;
 
  #if MEMBERSHIP_CHECK
     // check s is on curve and in G1
-    if (checkMembership_G1(elemsG1[0])!=1)
+    if (checkMembership_G1(elemsG1[0]) != VALID)
         return INVALID;
  #endif
 
