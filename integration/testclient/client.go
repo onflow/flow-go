@@ -2,21 +2,21 @@ package testclient
 
 import (
 	"context"
-	"math/rand"
+	"math/big"
 
-	sdk "github.com/dapperlabs/flow-go-sdk"
-	"github.com/dapperlabs/flow-go-sdk/client"
-	"github.com/dapperlabs/flow-go-sdk/keys"
-
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/integration/dsl"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 type TestClient struct {
 	client *client.Client
-	key    *sdk.AccountPrivateKey
+	key    *flow.AccountPrivateKey
 }
 
-func New(addr string, key *sdk.AccountPrivateKey) (*TestClient, error) {
+func New(addr string, key *flow.AccountPrivateKey) (*TestClient, error) {
 
 	client, err := client.New(addr)
 	if err != nil {
@@ -46,21 +46,24 @@ func (c *TestClient) SendTransaction(ctx context.Context, code dsl.CadenceCode) 
 
 	codeStr := code.ToCadence()
 
-	tx := sdk.Transaction{
-		Script:             []byte(codeStr),
-		ReferenceBlockHash: nil,
-		Nonce:              rand.Uint64(),
-		ComputeLimit:       10,
-		PayerAccount:       sdk.RootAddress,
-		ScriptAccounts:     []sdk.Address{sdk.RootAddress},
+	rootAddress := flow.BytesToAddress(big.NewInt(1).Bytes())
+	tx := flow.TransactionBody{
+		Script:           []byte(codeStr),
+		ReferenceBlockID: unittest.IdentifierFixture(),
+		PayerAccount:     rootAddress,
 	}
 
-	sig, err := keys.SignTransaction(tx, *c.key)
+	sig, err := signTransaction(tx, c.key.PrivateKey)
 	if err != nil {
 		return err
 	}
 
-	tx.AddSignature(sdk.RootAddress, sig)
+	accountSig := flow.AccountSignature{
+		Account:   rootAddress,
+		Signature: sig.Bytes(),
+	}
+
+	tx.Signatures = append(tx.Signatures, accountSig)
 
 	return c.client.SendTransaction(ctx, tx)
 }
@@ -75,4 +78,18 @@ func (c *TestClient) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte
 	}
 
 	return res, nil
+}
+
+// signTransaction signs a transaction with a private key.
+func signTransaction(tx flow.TransactionBody, privateKey crypto.PrivateKey) (crypto.Signature, error) {
+	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	if err != nil {
+		return nil, err
+	}
+
+	transaction := flow.Transaction{
+		TransactionBody: tx,
+	}
+	b := transaction.Singularity()
+	return privateKey.Sign(b, hasher)
 }
