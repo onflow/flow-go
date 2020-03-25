@@ -365,7 +365,7 @@ func (suite *TestSuite) TestHandleExecutionState_TrackedExecutionState() {
 	// mocks a tracker for this chunk state
 	suite.chunkStateTracker.On("ByChunkID", suite.chunkState.ChunkID).Return(stateTracker, nil).Once()
 	suite.state.On("Final").Return(suite.ss).Once()
-	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
+	suite.state.On("AtBlockID", suite.receipt.ExecutionResult.BlockID).Return(suite.ss, nil)
 	suite.ss.On("Identity", exeIdentity.NodeID).Return(exeIdentity, nil).Once()
 	// mocks a removing the tracker from memory once the state is processed
 	suite.chunkStateTracker.On("Rem", suite.chunkState.ChunkID).Return(true).Once()
@@ -399,7 +399,7 @@ func (suite *TestSuite) TestHandleExecutionState_Tracked_UnstakedSender() {
 
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
-	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
+	suite.state.On("AtBlockID", suite.receipt.ExecutionResult.BlockID).Return(suite.ss, nil).Once()
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
 
 	// mocks a tracker for this chunk state
@@ -436,7 +436,7 @@ func (suite *TestSuite) TestHandleExecutionState_SenderWithWrongRole() {
 		// mock the state coming from the invalid role
 		invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
 		suite.state.On("Final").Return(suite.ss).Once()
-		suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
+		suite.state.On("AtBlockID", suite.receipt.ExecutionResult.BlockID).Return(suite.ss, nil)
 		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 
 		err := eng.Process(invalidIdentity.NodeID, suite.chunkState)
