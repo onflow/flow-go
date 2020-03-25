@@ -3,7 +3,9 @@ package cmd
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -16,17 +18,27 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
+	model "github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network/codec/json"
+	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
-const notSet = "not set"
+const (
+	notSet = "not set"
+
+	// Genesis Filenames
+	dkgPublicData       = "dkg-data.pub.json"
+	trustedRootBlock    = "genesis-block.json"
+	rootBlockSignatures = "genesis-qc.json"
+	identityList        = "node-infos.pub.json"
+)
 
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
@@ -38,6 +50,7 @@ type BaseConfig struct {
 	level       string
 	metricsPort uint
 	nClusters   uint
+	genesisDir  string
 }
 
 type namedModuleFunc struct {
@@ -91,6 +104,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e",
 		[]string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
+	fnb.flags.StringVarP(&fnb.BaseConfig.genesisDir, "genesispath", "g", "./bootstrap", "path to the genesisblock")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
@@ -101,7 +115,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 	fnb.Component("network", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-		codec := json.NewCodec()
+		codec := jsoncodec.NewCodec()
 
 		nk, err := loadPrivateNetworkKey(fnb.Me.NodeID())
 		if err != nil {
@@ -198,13 +212,36 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		fnb.Logger.Info().Msg("bootstrapping empty database")
 
-		var ids flow.IdentityList
-		for _, entry := range fnb.BaseConfig.Entries {
-			id, err := flow.ParseIdentity(entry)
-			if err != nil {
-				fnb.Logger.Fatal().Err(err).Str("entry", entry).Msg("could not parse identity")
-			}
-			ids = append(ids, id)
+		ids, err := loadIdentityList(fnb.BaseConfig.genesisDir + "/" + identityList)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading identity list")
+		}
+		// for _, entry := range fnb.BaseConfig.Entries {
+		// 	id, err := flow.ParseIdentity(entry)
+		// 	if err != nil {
+		// 		fnb.Logger.Fatal().Err(err).Str("entry", entry).Msg("could not parse identity")
+		// 	}
+		// 	ids = append(ids, id)
+		// }
+
+		// Load the rest of the genesis info, eventually needed for the consensus follower
+		genesisHeader, err := loadTrustedRootBlock(fnb.BaseConfig.genesisDir + "/" + trustedRootBlock)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
+		} else {
+			fmt.Println(genesisHeader)
+		}
+		genesisQC, err := loadRootBlockSignatures(fnb.BaseConfig.genesisDir + "/" + rootBlockSignatures)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
+		} else {
+			fmt.Println(genesisQC)
+		}
+		dkgPub, err := loadDKGPublicData(fnb.BaseConfig.genesisDir + "/" + dkgPublicData)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
+		} else {
+			fmt.Println(dkgPub)
 		}
 
 		fnb.genesis = flow.Genesis(ids)
@@ -481,4 +518,45 @@ func generatePublicNetworkKey(ids flow.IdentityList) error {
 		id.NetworkPubKey = pk.PublicKey()
 	}
 	return nil
+}
+
+func loadIdentityList(path string) (flow.IdentityList, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	idList := &flow.IdentityList{}
+	err = json.Unmarshal(data, idList)
+	return *idList, err
+}
+
+func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	dkg := &hotstuff.DKGPublicData{}
+	err = json.Unmarshal(data, dkg)
+	return dkg, err
+}
+
+func loadTrustedRootBlock(path string) (*flow.Header, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	genesisBlock := &flow.Header{}
+	err = json.Unmarshal(data, genesisBlock)
+	return genesisBlock, err
+
+}
+
+func loadRootBlockSignatures(path string) (*model.AggregatedSignature, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	qc := &model.AggregatedSignature{}
+	err = json.Unmarshal(data, qc)
+	return qc, err
 }

@@ -1,0 +1,20 @@
+{
+  "PubGroupKey": "ozMCkDzzriFyaSn7uTB3W90FkDu7Blh4WRttBc1oXUi9hAyT4ijJQnlrTCVGHZiuBHVptvw8xq4k8NU+E+MxAVlx/Ooivp+sjwTJlE/TSsj5Fi70M3r+Rhkv3VrhVaWV",
+  "Participants": [
+    {
+      "NodeID": "07add0f38cfddad4c514d43dce1595362ba19a3834800f794524ca3888bd9e03",
+      "RandomBeaconPubKey": "slChjvcf/2/eZH4BYv1O5xIOCnIwExd+k1s4ZMED7VoUW0vLZ5mSJx+3o0mCGztgDlfoabsGLoYkokQ60SJWOIEfuPQ3ycdZdRMCQnuDNZ5AhsePa7Uh8LY2HGBbHpRj",
+      "GroupIndex": 0
+    },
+    {
+      "NodeID": "2d42ccdd6e666db594f298bf34b16bae3bca6f8247c349e78d9a64e7d80c2a0e",
+      "RandomBeaconPubKey": "tAr+XNhyAau8am+pzB6IPZdbO3sbMzaKaTltcJTE603XeTvSr/HtHZB/qtwX26gMDYHeP+9XahnDit/cNQY3Wed4R/T+nOdI0pdYvxuqEMbibV1Xf9o043xajjkZrJko",
+      "GroupIndex": 1
+    },
+    {
+      "NodeID": "7fdd1f19c6a417521f3b54d7764688a7e8460edb97a4b83bcba9fa2d01587c8d",
+      "RandomBeaconPubKey": "i5nrz+tKZ+7fk2j8edrDabXknxJKBS3IHvcMtRG9S+HRVBgXZOqXPfl9xVLTj2LoAe5cbjFw3zR5H7qXc7KVYbtHrsJInPJ6oJaHD+AaPu7j8TsoqiKH4QJwW0iqug9/",
+      "GroupIndex": 2
+    }
+  ]
+}

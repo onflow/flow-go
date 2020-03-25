@@ -1,0 +1,17 @@
+{
+  "View": 0,
+  "BlockID": "b7b8cdfee785a7624ce638aa5fb8b1494db3022e09c72964c23b0e724278d9c7",
+  "AggregatedSignature": {
+    "StakingSignatures": [
+      "lZQLbSSMPg80sOtnuKlXJVe7Q3Eu/0MaK45hDvkKvTBzWCHtTPaPk/siW3c84e1x",
+      "sgPU9pQY/ibECAk46QGDlKfKVn7fZxeBz5LU4R7v8CETwbKbef+/NCQPSxBoSGVp",
+      "l3CgFstSpHRCvmAjdlVHuwElvc9riT3o4PUgBxV6lBW+lxmK7Bc1go9CqrY4LepV"
+    ],
+    "RandomBeaconSignature": "lSktfOhzuFI6XllrG8BsAmfdKCTneB3jFxueM8b0XRFStYETQ5oS5mpQt8D3PPc0",
+    "SignerIDs": [
+      "07add0f38cfddad4c514d43dce1595362ba19a3834800f794524ca3888bd9e03",
+      "2d42ccdd6e666db594f298bf34b16bae3bca6f8247c349e78d9a64e7d80c2a0e",
+      "7fdd1f19c6a417521f3b54d7764688a7e8460edb97a4b83bcba9fa2d01587c8d"
+    ]
+  }
+}
