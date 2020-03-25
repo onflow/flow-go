@@ -46,5 +46,5 @@ func CheckGuaranteePayload(height uint64, blockID flow.Identifier, candidateIDs 
 // Note: the descendants doesn't include the blockID itself
 func FindDescendants(height uint64, blockID flow.Identifier, descendants *[]flow.Identifier) func(*badger.Txn) error {
 	// height + 1 to exclude the blockID, and all blocks at the same height
-	return iterateKey(makePrefix(codeIndexGuarantee, height+1), makePrefix(codeIndexGuarantee, uint64(math.MaxUint64)), finddescendant(blockID, descendants))
+	return iterate(makePrefix(codeIndexGuarantee, height+1), makePrefix(codeIndexGuarantee, uint64(math.MaxUint64)), keyonly(finddescendant(blockID, descendants)))
 }

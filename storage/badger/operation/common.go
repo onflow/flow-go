@@ -276,58 +276,6 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 	}
 }
 
-// iterateKey iterate only the keys from the given `start` prefix to the given `end` prefix.
-// On each iteration, the key will be passed to the handle function to be handled.
-// It is useful to traverse through the index when the data needed are all included in the
-// key itself without reading the value.
-func iterateKey(start []byte, end []byte, handle handleKeyFunc) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// initialize the default options and comparison modifier for iteration
-		modifier := 1
-		options := badger.DefaultIteratorOptions
-
-		// If start is bigger than end, we have a backwards iteration:
-		// 1) Seek will go to the first key that is equal or lesser than the
-		// start prefix. However, this will only include the first key with the
-		// start prefix; we need to add 0xff to the start prefix to cover all
-		// items with the start prefix.
-		// 2) We break the loop upon hitting the first item that has a key
-		// higher than the end prefix. In order to reverse this, we use a
-		// modifier for the comparison that reverses the check and makes it
-		// stop upon the first item before the end prefix.
-		// 3) We also set the reverse option on the iterator, so we step through
-		// all of the keys backwards.
-		if bytes.Compare(start, end) > 0 {
-			options.Reverse = true      // make sure to go in reverse order
-			start = append(start, 0xff) // make sure to start after start prefix
-			modifier = -1               // make sure to stop before end prefix
-		}
-
-		it := tx.NewIterator(options)
-		defer it.Close()
-
-		for it.Seek(start); it.Valid(); it.Next() {
-
-			item := it.Item()
-
-			// check if we have reached the end of our iteration
-			// NOTE: we have to cut down the prefix to the same length as the
-			// end prefix in order to go through all items that have the same
-			// partial prefix before breaking
-			key := item.Key()
-			prefix := key[0:len(end)]
-			if bytes.Compare(prefix, end)*modifier > 0 {
-				break
-			}
-
-			handle(key)
-		}
-
-		return nil
-	}
-}
-
 // traverse iterates over a range of keys defined by a prefix.
 //
 // The prefix must be shared by all keys in the iteration.
@@ -535,5 +483,32 @@ func finddescendant(blockID flow.Identifier, descendants *[]flow.Identifier) han
 		// to fill the gap between this block and any existing incorporated block. Even if there is,
 		// that block must be an invalid block anyway, which is fine not being included in the
 		// descendants list.
+	}
+}
+
+// keyonly returns an iterationFunc that only iterate keys of the index.
+// It is useful to traverse through the index when the data needed are all included in the
+// key itself without reading the value.
+func keyonly(handleKey handleKeyFunc) iterationFunc {
+	return func() (checkFunc, createFunc, handleFunc) {
+		// the check function has side effect which passes the key to the handleKey function
+		// for processing
+		check := func(key []byte) bool {
+			handleKey(key)
+
+			// return false to stop parsing the value of the key
+			return false
+		}
+
+		// create and handle won't be called in the iteration, simply return nil
+		create := func() interface{} {
+			return nil
+		}
+
+		handle := func() error {
+			return nil
+		}
+
+		return check, create, handle
 	}
 }
