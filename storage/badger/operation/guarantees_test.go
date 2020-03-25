@@ -157,7 +157,7 @@ func TestFindDecendants(t *testing.T) {
 			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
 			require.Nil(t, err)
 
-			assert.Equal(t, toFlowIds(4, 5, 6, 7, 8, 9), descendants)
+			assert.Equal(t, toFlowIDs(4, 5, 6, 7, 8, 9), descendants)
 		})
 	})
 
@@ -187,7 +187,7 @@ func TestFindDecendants(t *testing.T) {
 			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
 			require.Nil(t, err)
 
-			assert.Equal(t, toFlowIds(4, 5, 7, 8, 13), descendants)
+			assert.Equal(t, toFlowIDs(4, 5, 7, 8, 13), descendants)
 		})
 	})
 
@@ -214,7 +214,7 @@ func TestFindDecendants(t *testing.T) {
 			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
 			require.Nil(t, err)
 
-			assert.Equal(t, toFlowIds(4, 5, 10, 6, 11), descendants)
+			assert.Equal(t, toFlowIDs(4, 5, 10, 6, 11), descendants)
 		})
 	})
 
@@ -240,7 +240,7 @@ func TestFindDecendants(t *testing.T) {
 			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
 			require.Nil(t, err)
 
-			assert.Equal(t, toFlowIds(4, 5, 6), descendants)
+			assert.Equal(t, toFlowIDs(4, 5, 6), descendants)
 		})
 	})
 
@@ -269,13 +269,13 @@ func TestFindDecendants(t *testing.T) {
 			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
 			require.Nil(t, err)
 
-			assert.Equal(t, toFlowIds(4, 5, 6), descendants)
+			assert.Equal(t, toFlowIDs(4, 5, 6), descendants)
 		})
 	})
 }
 
 // helper to create a list Identifier from numbers
-func toFlowIds(ns ...int) []flow.Identifier {
+func toFlowIDs(ns ...int) []flow.Identifier {
 	ids := make([]flow.Identifier, len(ns))
 	for i, n := range ns {
 		ids[i] = flow.Identifier{byte(n)}
