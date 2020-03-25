@@ -162,14 +162,6 @@ func (tx *TransactionBody) MissingFields() []string {
 	// 	missingFields = append(missingFields, TransactionFieldRefBlockHash.String())
 	// }
 
-	if tx.Nonce == 0 {
-		missingFields = append(missingFields, TransactionFieldNonce.String())
-	}
-
-	if tx.ComputeLimit == 0 {
-		missingFields = append(missingFields, TransactionFieldComputeLimit.String())
-	}
-
 	if tx.PayerAccount == ZeroAddress {
 		missingFields = append(missingFields, TransactionFieldPayerAccount.String())
 	}

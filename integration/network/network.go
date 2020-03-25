@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/m4ksio/testingdock"
 
 	"github.com/dapperlabs/flow-go/utils/unittest"
+
+	"github.com/dapperlabs/flow-go/integration/client"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -172,6 +173,33 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			})
 
 			flowContainer.Ports["api"] = collectionNodeAPIPort
+
+
+		case flow.RoleExecution:
+
+			executionNodeAPIPort := testingdock.RandomPort(t)
+
+			opts.Config.ExposedPorts = nat.PortSet{
+				"9000/tcp": struct{}{},
+			}
+			opts.Config.Cmd = append(opts.Config.Cmd, fmt.Sprintf("--rpc-addr=%s:9000", opts.Name))
+			opts.HostConfig = &container.HostConfig{
+				PortBindings: nat.PortMap{
+					nat.Port("9000/tcp"): []nat.PortBinding{
+						{
+							HostIP:   "0.0.0.0",
+							HostPort: executionNodeAPIPort,
+						},
+					},
+				},
+			}
+			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
+				return healthcheckGRPC(context, executionNodeAPIPort)
+			})
+
+			flowContainer.Ports["api"] = executionNodeAPIPort
+
+
 		}
 
 		c := suite.Container(*opts)
