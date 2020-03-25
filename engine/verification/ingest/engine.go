@@ -45,6 +45,7 @@ type Engine struct {
 	checkChunksLock      sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
 	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
 	chunkStates          mempool.ChunkStates
+	chunkStateTrackers   mempool.ChunkStateTrackers // keeps track of chunk state requests that this engine made
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -58,6 +59,7 @@ func New(
 	pendingReceipts mempool.Receipts,
 	collections mempool.Collections,
 	chunkStates mempool.ChunkStates,
+	chunkStateTrackers mempool.ChunkStateTrackers,
 	chunkDataPacks mempool.ChunkDataPacks,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	blockStorage storage.Blocks,
@@ -74,6 +76,7 @@ func New(
 		verifierEng:          verifierEng,
 		authCollections:      collections,
 		chunkStates:          chunkStates,
+		chunkStateTrackers:   chunkStateTrackers,
 		chunkDataPacks:       chunkDataPacks,
 		chunkDataPackTackers: chunkDataPackTrackers,
 		blockStorage:         blockStorage,
@@ -243,7 +246,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
 
-	// removes chunk data pack tracker pool
+	// removes chunk data pack tracker from  mempool
 	e.chunkDataPackTackers.Rem(chunkDataPack.ChunkID)
 
 	e.checkPendingChunks()
@@ -320,17 +323,21 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 // states for particular chunks. It adds the state to the mempool and checks for
 // pending receipts that are ready for verification.
 func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *messages.ExecutionStateResponse) error {
-
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(res.State.ChunkID)).
 		Msg("execution state received")
 
+	// checks if this event is a reply of a prior request
+	// extracts the tracker
+	tracker, err := e.chunkStateTrackers.ByChunkID(res.State.ChunkID)
+	if err != nil {
+		return fmt.Errorf("no chunk state tracker available for chunk ID: %x", res.State.ChunkID)
+	}
+
 	// extracts list of verifier nodes id
 	//
-	// TODO tracking request feature
-	// https://github.com/dapperlabs/flow-go/issues/2970
-	id, err := e.state.Final().Identity(originID)
+	id, err := e.state.AtBlockID(tracker.BlockID).Identity(originID)
 	if err != nil {
 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
 	}
@@ -343,6 +350,9 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 	if err != nil {
 		return fmt.Errorf("could not add execution state (chunk_id=%s): %w", res.State.ChunkID, err)
 	}
+
+	// removes chunk state tracker from mempool
+	e.chunkDataPackTackers.Rem(res.State.ChunkID)
 
 	e.checkPendingChunks()
 
@@ -374,7 +384,7 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 
 // requestExecutionState submits a request for the state required by the
 // given chunk to execution nodes.
-func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
+func (e *Engine) requestExecutionState(chunkID flow.Identifier, blockID flow.Identifier) error {
 
 	// extracts list of verifier nodes id
 	//
@@ -390,6 +400,17 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 	err = e.stateConduit.Submit(req, exeNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit request for execution state (chunk_id=%s): %w", chunkID, err)
+	}
+
+	// caches a tracker for successfully submitted requests
+	tracker := &tracker2.ChunkStateTracker{
+		ChunkID: chunkID,
+		BlockID: blockID,
+	}
+	err = e.chunkStateTrackers.Add(tracker)
+	// Todo handle the case of duplicate trackers
+	if err != nil && err != mempool.ErrEntityAlreadyExists {
+		return fmt.Errorf("could not store tracker of chunk state request in mempool: %w", err)
 	}
 
 	return nil
@@ -458,7 +479,7 @@ func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID
 	if !e.chunkStates.Has(chunkID) {
 		// the chunk state is missing, the chunk cannot yet be verified
 		// TODO rate limit these requests
-		err := e.requestExecutionState(chunkID)
+		err := e.requestExecutionState(chunkID, receipt.ExecutionResult.BlockID)
 		if err != nil {
 			log.Error().
 				Err(err).

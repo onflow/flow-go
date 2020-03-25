@@ -30,6 +30,7 @@ func main() {
 		chunkStates          *stdmap.ChunkStates
 		chunkDataPacks       *stdmap.ChunkDataPacks
 		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
+		chunkStateTracker    *stdmap.ChunkStateTrackers
 		verifierEng          *verifier.Engine
 	)
 
@@ -60,6 +61,10 @@ func main() {
 		}).
 		Module("chunk states mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkStates, err = stdmap.NewChunkStates(chunkLimit)
+			return err
+		}).
+		Module("chunk state tracker mempool", func(node *cmd.FlowNodeBuilder) error {
+			chunkStateTracker, err = stdmap.NewChunkStateTrackers(chunkLimit)
 			return err
 		}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -98,6 +103,7 @@ func main() {
 				pendingReceipts,
 				collections,
 				chunkStates,
+				chunkStateTracker,
 				chunkDataPacks,
 				chunkDataPackTracker,
 				blockStorage,

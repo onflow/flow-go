@@ -56,6 +56,7 @@ type TestSuite struct {
 	pendingReceipts      *mempool.Receipts
 	collections          *mempool.Collections
 	chunkStates          *mempool.ChunkStates
+	chunkStateTracker    *mempool.ChunkStateTrackers
 	chunkDataPacks       *mempool.ChunkDataPacks
 	chunkDataPackTracker *mempool.ChunkDataPackTrackers
 	blockStorage         *storage.Blocks
@@ -91,6 +92,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.pendingReceipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 	suite.chunkStates = &mempool.ChunkStates{}
+	suite.chunkStateTracker = &mempool.ChunkStateTrackers{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
 	suite.chunkDataPackTracker = &mempool.ChunkDataPackTrackers{}
 	suite.assigner = &module.ChunkAssigner{}
@@ -131,6 +133,7 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.pendingReceipts,
 		suite.collections,
 		suite.chunkStates,
+		suite.chunkStateTracker,
 		suite.chunkDataPacks,
 		suite.chunkDataPackTracker,
 		suite.blockStorage,

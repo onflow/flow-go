@@ -83,6 +83,7 @@ type VerificationNode struct {
 	BlockStorage          storage.Blocks
 	Collections           mempool.Collections
 	ChunkStates           mempool.ChunkStates
+	ChunkStateTracker     mempool.ChunkStateTrackers
 	ChunkDataPacks        mempool.ChunkDataPacks
 	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
 	IngestEngine          network.Engine

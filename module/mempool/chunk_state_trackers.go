@@ -6,7 +6,7 @@ import (
 )
 
 // ChunkStateTrackers represents a concurrency-safe memory pool of chunk states
-type ChunkStatePackTrackers interface {
+type ChunkStateTrackers interface {
 
 	// Add will add the given chunk state tracker.
 	Add(cst *tracker.ChunkStateTracker) error
