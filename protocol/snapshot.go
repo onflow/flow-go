@@ -35,4 +35,6 @@ type Snapshot interface {
 	// depending on our selection criteria. Either way, it's the block on which
 	// we should build the next block in the context of the selected state.
 	Head() (*flow.Header, error)
+
+	Unfinalized() ([]flow.Identifier, error)
 }
