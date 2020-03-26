@@ -270,6 +270,11 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
+	if node.PendingCollections == nil {
+		node.PendingCollections, err = stdmap.NewCollections(1000)
+		require.Nil(t, err)
+	}
+
 	if node.CollectionTrackers == nil {
 		node.CollectionTrackers, err = stdmap.NewCollectionTrackers(1000)
 		require.Nil(t, err)
