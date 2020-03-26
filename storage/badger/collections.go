@@ -98,7 +98,7 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 			if errors.Is(err, badger.ErrKeyNotFound) {
 				return storage.ErrNotFound
 			}
-			return fmt.Errorf("could nto retrieve transaction: %w", err)
+			return fmt.Errorf("could not retrieve collection: %w", err)
 		}
 
 		return nil
@@ -138,16 +138,24 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	})
 }
 
-func (c *Collections) CollectionIDByTransactionID(txID flow.Identifier) (*flow.Identifier, error) {
-	collectionID := &flow.Identifier{}
-
+func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
+	var collection flow.LightCollection
 	err := c.db.View(func(tx *badger.Txn) error {
-		err := operation.RetrieveCollectionID(txID, collectionID)(tx)
+		collID := &flow.Identifier{}
+		err := operation.RetrieveCollectionID(txID, collID)(tx)
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
 				return storage.ErrNotFound
 			}
 			return fmt.Errorf("could not retrieve collection id: %w", err)
+		}
+
+		err = operation.RetrieveCollection(*collID, &collection)(tx)
+		if err != nil {
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return storage.ErrNotFound
+			}
+			return fmt.Errorf("could not retrieve collection: %w", err)
 		}
 
 		return nil
@@ -156,5 +164,5 @@ func (c *Collections) CollectionIDByTransactionID(txID flow.Identifier) (*flow.I
 		return nil, err
 	}
 
-	return collectionID, nil
+	return &collection, nil
 }

@@ -36,6 +36,8 @@ type Suite struct {
 	me           *module.Local
 	net          *module.Network
 	provider     *network.Engine
+	blocks       *storage.Blocks
+	headers      *storage.Headers
 	collections  *storage.Collections
 	transactions *storage.Transactions
 	eng          *Engine
@@ -71,10 +73,12 @@ func (suite *Suite) SetupTest() {
 		Once()
 
 	suite.provider = new(network.Engine)
+	suite.blocks = new(storage.Blocks)
+	suite.headers = new(storage.Headers)
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
 
-	eng, err := New(log, suite.net, suite.proto.state, tracer, suite.me, suite.collections, suite.transactions)
+	eng, err := New(log, suite.net, suite.proto.state, tracer, suite.me, suite.blocks, suite.headers, suite.collections, suite.transactions)
 	require.NoError(suite.T(), err)
 	suite.eng = eng
 
@@ -85,15 +89,20 @@ func (suite *Suite) TestHandleBlock() {
 	originID := unittest.IdentifierFixture()
 	block := unittest.BlockFixture()
 
-	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-	suite.proto.snapshot.On("Identities", mock.Anything).Return(collIdentities, nil).Once()
+	cNodeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
+	suite.proto.snapshot.On("Identities", mock.Anything).Return(cNodeIdentities, nil).Once()
+
+	// expect that the block storage is indexed with each of the collection guarantee
+	suite.blocks.On("IndexByGuarantees", block.ID()).Return(nil).Once()
 
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
 
 	err := suite.eng.Process(originID, &block)
 	require.NoError(suite.T(), err)
-	suite.net.AssertExpectations(suite.T())
+	suite.proto.snapshot.AssertExpectations(suite.T())
+	suite.headers.AssertExpectations(suite.T())
+	suite.collectionsConduit.AssertExpectations(suite.T())
 }
 
 // TestHandleCollection checks that when a Collection is received, it is persisted

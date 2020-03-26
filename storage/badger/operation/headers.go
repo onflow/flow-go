@@ -19,3 +19,11 @@ func CheckHeader(blockID flow.Identifier, exists *bool) func(*badger.Txn) error 
 func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHeader, blockID), header)
 }
+
+func IndexHeaderByCollection(collectionID, headerID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexHeaderByCollection, collectionID), headerID)
+}
+
+func LookupHeaderIDByCollectionID(collectionID flow.Identifier, headerID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexHeaderByCollection, collectionID), headerID)
+}

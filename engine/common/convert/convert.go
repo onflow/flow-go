@@ -1,4 +1,4 @@
-package ingress
+package convert
 
 import (
 	"fmt"
@@ -63,4 +63,30 @@ func TransactionToMessage(t flow.TransactionBody) *entities.Transaction {
 		ScriptAccounts:   scriptAccounts,
 		Signatures:       signatures,
 	}
+}
+
+func BlockHeaderToMessage(h *flow.Header) (entities.BlockHeader, error) {
+	id := h.ID()
+	bh := entities.BlockHeader{
+		Id:       id[:],
+		ParentId: h.ParentID[:],
+		Height:   h.Height,
+	}
+	return bh, nil
+}
+
+func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
+	if c == nil || c.Transactions == nil {
+		return nil, fmt.Errorf("invalid collection")
+	}
+
+	transactions := make([]*entities.Transaction, len(c.Transactions))
+	for i, t := range c.Transactions {
+		transactions[i] = TransactionToMessage(*t)
+	}
+
+	ce := &entities.Collection{
+		Transactions: transactions,
+	}
+	return ce, nil
 }
