@@ -264,6 +264,10 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			// TODO creating badger db here
 			db, err := badger.Open(badger.DefaultOptions(tmpdir).WithLogger(nil))
 			assert.Nil(t, err)
+			err = db.Update(func(tx *badger.Txn) error {
+				return tx.Set([]byte{1, 2}, []byte{3, 4})
+			})
+			assert.Nil(t, err)
 			err = db.Close()
 			assert.Nil(t, err)
 		}
