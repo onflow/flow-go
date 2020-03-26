@@ -50,6 +50,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			return fmt.Errorf("could not get blocks to finalize: %w", err)
 		}
 
+		// if there are no blocks to finalize, we may have already finalized
+		// this block - exit early
+		if len(toFinalize) == 0 {
+			return nil
+		}
+
 		// the first block to finalize is the new finalized head
 		head := toFinalize[0]
 
