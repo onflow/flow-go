@@ -3,6 +3,8 @@ package tests
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -67,6 +69,46 @@ func TestCollection(t *testing.T) {
 
 	identities := net.Identities()
 
+	// TODO check+set permissions
+	{
+		fmt.Println(colContainer.DataDir)
+		stat, err := os.Stat(colContainer.DataDir)
+		assert.Nil(t, err)
+		fmt.Println(stat.Mode().String())
+
+		err = os.Chown(colContainer.DataDir, os.Getuid(), os.Getgid())
+		if err != nil {
+			fmt.Println("chown err: ", err.Error())
+		}
+
+		stat, err = os.Stat(colContainer.DataDir)
+		assert.Nil(t, err)
+		fmt.Println(stat.Mode().String())
+
+		err = filepath.Walk(colContainer.DataDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				fmt.Println("walk err: ", err.Error())
+			}
+			fmt.Println("walk pre-chown: ", path, info.Mode().String(), info.Sys())
+			err = os.Chown(path, os.Getuid(), os.Getgid())
+			if err != nil {
+				fmt.Println("walk chown err: ", err)
+			}
+			err = os.Chmod(path, 0777)
+			if err != nil {
+				fmt.Println("walk chmod err: ", err)
+			}
+			stat, err := os.Stat(path)
+			if err != nil {
+				fmt.Println("walk stat err: ", err)
+				return nil
+			}
+			fmt.Println("walk post-chown: ", path, stat.Mode().String())
+			return nil
+		})
+		assert.Nil(t, err)
+	}
+
 	// create a database
 	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
 	db, err := badger.Open(badger.DefaultOptions(colContainer.DataDir).WithLogger(nil))
@@ -79,4 +121,5 @@ func TestCollection(t *testing.T) {
 
 	// should be able to read a valid latest block
 	assert.Equal(t, chainID, head.ChainID)
+	t.Fail()
 }

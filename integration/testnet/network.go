@@ -247,8 +247,18 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		}
 		tmpdir, err := ioutil.TempDir(tmproot, "flow-integration")
 		require.Nil(t, err)
-		flowContainer.DataDir = tmpdir
-		fmt.Println(tmpdir)
+		// TODO checking and setting permissions
+		{
+			fmt.Println(tmpdir)
+			stat, err := os.Stat(tmpdir)
+			require.Nil(t, err)
+			fmt.Println(stat.Mode().String())
+			err = os.Chmod(tmpdir, 0777)
+			require.Nil(t, err)
+			stat, err = os.Stat(tmpdir)
+			require.Nil(t, err)
+			flowContainer.DataDir = tmpdir
+		}
 
 		// Bind the host directory to the container's database directory
 		// NOTE: I did this using the approach from:
