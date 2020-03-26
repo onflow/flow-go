@@ -75,7 +75,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 		// there are no blocks to finalize, we may have already finalized
 		// this block - exit early
-		if boundary <= header.Height {
+		if boundary >= header.Height {
 			return nil
 		}
 
