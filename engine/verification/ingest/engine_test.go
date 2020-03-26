@@ -194,6 +194,12 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	// we have the corresponding block and chunk state, but not the collection
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
 	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
+
+	// mocks that collection does not exit in the mempools and we do not have a tracker for it
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false).Once()
+	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
+	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil).Once()
+
 	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true).Once()
 	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil).Once()
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
@@ -302,6 +308,7 @@ func (suite *TestSuite) TestHandleCollection_Tracked() {
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
@@ -350,6 +357,8 @@ func (suite *TestSuite) TestHandleCollection_Untracked() {
 
 }
 
+// TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
+// process method should return an error
 func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	eng := suite.TestNewEngine()
 
@@ -358,6 +367,9 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
+
+	// mocks a tracker for the collection
+	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 
 	err := eng.Process(unstakedIdentity, suite.collection)
 	suite.Assert().Error(err)
@@ -369,6 +381,8 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
+// TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
+// process method should return an error
 func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 
 	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleObservation}
@@ -383,6 +397,8 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 		suite.state.On("Final").Return(suite.ss).Once()
 		suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
+		// mocks a tracker for the collection
+		suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 
 		err := eng.Process(invalidIdentity.NodeID, suite.collection)
 		suite.Assert().Error(err)
