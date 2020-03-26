@@ -302,7 +302,6 @@ func (suite *TestSuite) TestHandleCollection_Tracked() {
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
-	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
@@ -322,6 +321,33 @@ func (suite *TestSuite) TestHandleCollection_Tracked() {
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+}
+
+// TestHandleCollection_Untracked evaluates receiving an  un-tracked collection
+// It expects that the collection to be added to the pending receipts
+func (suite *TestSuite) TestHandleCollection_Untracked() {
+	eng := suite.TestNewEngine()
+
+	// mock the collection coming from an collection node
+	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).
+		Return(nil, fmt.Errorf("does not exit")).Once()
+	// expects the the collection to be added to pending receipts
+	suite.pendingCollections.On("Add", suite.collection).Return(nil).Once()
+
+	err := eng.Process(collIdentity.NodeID, suite.collection)
+	suite.Assert().Nil(err)
+
+	suite.authCollections.AssertExpectations(suite.T())
+	suite.collectionTrackers.AssertExpectations(suite.T())
+
+	// verifier should not be called
+	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+	// does not expect that the collection be added to the mempool
+	suite.authCollections.AssertNotCalled(suite.T(), "Add", suite.collection)
+	// does not expect tracker to be removed from trackers mempool
+	suite.collectionTrackers.AssertNotCalled(suite.T(), "Rem", suite.collection.ID())
+
 }
 
 func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
