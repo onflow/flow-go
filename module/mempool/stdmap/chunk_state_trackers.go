@@ -12,7 +12,7 @@ type ChunkStateTrackers struct {
 	*Backend
 }
 
-// NewChunkStateTrackers creates a new memory pool for NewChunkStateTrackers.
+// NewChunkStateTrackers creates a new memory pool for ChunkStateTrackers.
 func NewChunkStateTrackers(limit uint) (*ChunkStateTrackers, error) {
 	a := &ChunkStateTrackers{
 		Backend: NewBackend(WithLimit(limit)),
