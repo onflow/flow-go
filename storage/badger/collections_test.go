@@ -33,10 +33,11 @@ func TestCollections(t *testing.T) {
 
 		// retrieve the collection light id by each of its transaction id
 		for _, txID := range expected.Transactions {
-			actualID, err := store.CollectionIDByTransactionID(txID)
+			collLight, err := store.LightByTransactionID(txID)
+			actualID := collLight.ID()
 			// check that the collection id can indeed be retrieved by transaction id
 			require.Nil(t, err)
-			assert.Equal(t, &expectedID, actualID)
+			assert.Equal(t, expectedID, actualID)
 		}
 
 	})

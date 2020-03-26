@@ -215,3 +215,42 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 		return nil
 	}
 }
+
+func IndexBlockByGuarantees(blockID flow.Identifier) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		block := &flow.Block{}
+		err := RetrieveBlock(blockID, block)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve block for guarantee index: %w", err)
+		}
+
+		for _, g := range block.Payload.Guarantees {
+			collectionID := g.CollectionID
+			err = operation.IndexHeaderByCollection(collectionID, block.Header.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not add block guarantee index: %w", err)
+			}
+		}
+		return nil
+	}
+}
+
+func RetrieveBlockByCollectionID(collectionID flow.Identifier, block *flow.Block) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		headerID := &flow.Identifier{}
+
+		// get the block header
+		err := operation.LookupHeaderIDByCollectionID(collectionID, headerID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header: %w", err)
+		}
+
+		// get the complete block
+		err = RetrieveBlock(*headerID, block)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve block: %w", err)
+		}
+		return nil
+	}
+}

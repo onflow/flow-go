@@ -1,9 +1,8 @@
 run:
   timeout: 5m
   skip-dirs:
-    - engine/consensus/hotstuff
-    - engine/consensus/eventdriven
-
+    - consensus/hotstuff
+    
 linters-settings:
   goimports:
     # put imports beginning with prefix after 3rd-party packages;

@@ -39,6 +39,7 @@ const (
 	codeIndexSealByBlock             = 105
 	codeIndexExecutionResultByBlock  = 106
 	codeIndexCollectionByTransaction = 107
+	codeIndexHeaderByCollection      = 108
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {
