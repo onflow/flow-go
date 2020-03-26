@@ -75,6 +75,12 @@ func RetrieveUnfinalizedAncestors(blockID flow.Identifier, unfinalized *[]*flow.
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
+		// if the block has already been finalized, exit early
+		if boundary >= header.Height {
+			*unfinalized = []*flow.Header{}
+			return nil
+		}
+
 		// retrieve the ID of the last finalized block as marker for stopping
 		var headID flow.Identifier
 		err = operation.RetrieveNumber(boundary, &headID)(tx)
