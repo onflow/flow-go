@@ -36,5 +36,7 @@ type Snapshot interface {
 	// we should build the next block in the context of the selected state.
 	Head() (*flow.Header, error)
 
+	// Unfinalized returns the unfinalized block IDs that connect to the finalized
+	// block.
 	Unfinalized() ([]flow.Identifier, error)
 }
