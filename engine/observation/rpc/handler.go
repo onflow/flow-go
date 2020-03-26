@@ -233,6 +233,40 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *observation.GetColle
 	return resp, nil
 }
 
+func (h *Handler) GetLatestBlock(_ context.Context, req *observation.GetLatestBlockRequest) (*observation.BlockResponse, error) {
+	var header *flow.Header
+	var err error
+	if req.IsSealed {
+		// get the latest seal header from storage
+		header, err = h.getLatestSealedHeader()
+	} else {
+		// get the finalized header from state
+		header, err = h.state.Final().Head()
+	}
+
+	if err != nil {
+		err = getError(err, "Block")
+		return nil, err
+	}
+
+	block, err := h.blocks.ByID(header.ID())
+	if err != nil {
+		err = getError(err, "Block")
+		return nil, err
+	}
+
+	msg, err := convert.BlockToMessage(block)
+	if err != nil {
+		err = getError(err, "Block")
+		return nil, err
+	}
+
+	resp := &observation.BlockResponse{
+		Block: msg,
+	}
+	return resp, nil
+}
+
 func getError(err error, entity string) error {
 	if errors.Is(err, storage.ErrNotFound) {
 		return status.Error(codes.NotFound, fmt.Sprintf("%s not found: %v", entity, err))

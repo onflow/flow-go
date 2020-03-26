@@ -86,6 +86,8 @@ func (e *blockComputer) executeCollection(
 			return fmt.Errorf("failed to execute transaction: %w", err)
 		}
 
+		// Persistence
+
 		if result.Succeeded() {
 			collectionView.ApplyDelta(txView.Delta())
 		}
