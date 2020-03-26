@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m4ksio/testingdock"
+	"github.com/dapperlabs/testingdock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/integration/dsl"

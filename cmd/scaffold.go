@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -369,7 +370,7 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	// initialize signal catcher
 	fnb.sig = make(chan os.Signal, 1)
-	signal.Notify(fnb.sig, os.Interrupt)
+	signal.Notify(fnb.sig, os.Interrupt, syscall.SIGTERM)
 
 	// parse configuration parameters
 	pflag.Parse()

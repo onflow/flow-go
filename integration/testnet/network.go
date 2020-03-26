@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dapperlabs/testingdock"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/go-multierror"
-	"github.com/m4ksio/testingdock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
