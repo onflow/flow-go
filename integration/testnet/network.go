@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/go-multierror"
@@ -248,6 +249,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		}
 		tmpdir, err := ioutil.TempDir(tmproot, "flow-integration")
 		require.Nil(t, err)
+		flowContainer.DataDir = tmpdir
 		// TODO checking and setting permissions
 		{
 			fmt.Println(tmpdir)
@@ -258,7 +260,12 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			assert.Nil(t, err)
 			stat, err = os.Stat(tmpdir)
 			assert.Nil(t, err)
-			flowContainer.DataDir = tmpdir
+
+			// TODO creating badger db here
+			db, err := badger.Open(badger.DefaultOptions(tmpdir).WithLogger(nil))
+			assert.Nil(t, err)
+			err = db.Close()
+			assert.Nil(t, err)
 		}
 
 		// Bind the host directory to the container's database directory

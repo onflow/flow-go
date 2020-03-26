@@ -3,6 +3,7 @@ package cmd
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -24,6 +25,8 @@ import (
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
+	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 const notSet = "not set"
@@ -190,12 +193,10 @@ func (fnb *FlowNodeBuilder) initState() {
 	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
-	//check if database is initialized
-	lsm, vlog := fnb.DB.Size()
-	if vlog > 0 || lsm > 0 {
-		fnb.Logger.Debug().Msg("using existing database")
-	} else {
-		//Bootstrap!
+	// check if database is initialized
+	head, err := state.Final().Head()
+	if errors.Is(err, storage.ErrNotFound) {
+		// Bootstrap!
 
 		fnb.Logger.Info().Msg("bootstrapping empty database")
 
@@ -213,7 +214,13 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
-
+	} else if err != nil {
+		fnb.Logger.Fatal().Err(err).Msg("could not check database")
+	} else {
+		fnb.Logger.Debug().
+			Hex("final_id", logging.ID(head.ID())).
+			Uint64("final_height", head.Height).
+			Msg("using existing database")
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.NodeID)
