@@ -95,9 +95,9 @@ type FlowNodeBuilder struct {
 	sk             crypto.PrivateKey
 
 	// genesis information
-	genesisBlock *flow.Block
-	genesisQC    *model.AggregatedSignature
-	dkgPubData   *hotstuff.DKGPublicData
+	GenesisBlock *flow.Block
+	GenesisQC    *model.AggregatedSignature
+	DKGPubData   *hotstuff.DKGPublicData
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -224,26 +224,26 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 
 		// Load the rest of the genesis info, eventually needed for the consensus follower
-		fnb.genesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.genesisDir + "/" + trustedRootBlock)
+		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.genesisDir + "/" + trustedRootBlock)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		} else {
-			fmt.Println(fnb.genesisBlock)
+			fmt.Println(fnb.GenesisBlock)
 		}
-		fnb.genesisQC, err = loadRootBlockSignatures(fnb.BaseConfig.genesisDir + "/" + rootBlockSignatures)
+		fnb.GenesisQC, err = loadRootBlockSignatures(fnb.BaseConfig.genesisDir + "/" + rootBlockSignatures)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		} else {
-			fmt.Println(fnb.genesisQC)
+			fmt.Println(fnb.GenesisQC)
 		}
-		fnb.dkgPubData, err = loadDKGPublicData(fnb.BaseConfig.genesisDir + "/" + dkgPublicData)
+		fnb.DKGPubData, err = loadDKGPublicData(fnb.BaseConfig.genesisDir + "/" + dkgPublicData)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 		} else {
-			fmt.Println(fnb.dkgPubData)
+			fmt.Println(fnb.DKGPubData)
 		}
 
-		err = state.Mutate().Bootstrap(fnb.genesisBlock)
+		err = state.Mutate().Bootstrap(fnb.GenesisBlock)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
@@ -422,8 +422,8 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handleModule(f)
 	}
 
-	if fnb.genesisBlock != nil && fnb.genesisHandler != nil {
-		fnb.genesisHandler(fnb, fnb.genesisBlock)
+	if fnb.GenesisBlock != nil && fnb.genesisHandler != nil {
+		fnb.genesisHandler(fnb, fnb.GenesisBlock)
 	}
 
 	// initialize all components
