@@ -36,8 +36,8 @@ func (c *CollectionTrackers) Rem(collID flow.Identifier) bool {
 	return c.Backend.Rem(collID)
 }
 
-// ByCollectionID returns the collection tracker for the given chunk ID.
-func (c *ChunkStateTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
+// ByCollectionID returns the collection tracker for the given collection ID.
+func (c *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
 	entity, err := c.Backend.ByID(collID)
 	if err != nil {
 		return nil, err

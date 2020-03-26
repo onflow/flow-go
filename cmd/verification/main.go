@@ -26,7 +26,9 @@ func main() {
 		authReceipts         *stdmap.Receipts
 		pendingReceipts      *stdmap.Receipts
 		blockStorage         *storage.Blocks
-		collections          *stdmap.Collections
+		authCollections      *stdmap.Collections
+		pendingCollections   *stdmap.Collections
+		collectionTrackers   *stdmap.CollectionTrackers
 		chunkStates          *stdmap.ChunkStates
 		chunkDataPacks       *stdmap.ChunkDataPacks
 		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
@@ -37,7 +39,7 @@ func main() {
 	cmd.FlowNode("verification").
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of collections in the memory pool")
+			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of authCollections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 100000, "maximum number of chunk states in the memory pool")
 		}).
@@ -49,8 +51,16 @@ func main() {
 			pendingReceipts, err = stdmap.NewReceipts(receiptLimit)
 			return err
 		}).
-		Module("collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			collections, err = stdmap.NewCollections(collectionLimit)
+		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
+			authCollections, err = stdmap.NewCollections(collectionLimit)
+			return err
+		}).
+		Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingCollections, err = stdmap.NewCollections(collectionLimit)
+			return err
+		}).
+		Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
+			collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
 			return err
 		}).
 		Module("blocks storage", func(node *cmd.FlowNodeBuilder) error {
@@ -101,7 +111,9 @@ func main() {
 				verifierEng,
 				authReceipts,
 				pendingReceipts,
-				collections,
+				authCollections,
+				pendingCollections,
+				collectionTrackers,
 				chunkStates,
 				chunkStateTracker,
 				chunkDataPacks,

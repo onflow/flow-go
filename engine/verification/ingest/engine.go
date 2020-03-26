@@ -39,6 +39,7 @@ type Engine struct {
 	pendingReceipts      mempool.Receipts              // keeps receipts pending for their originID to be authenticated
 	authCollections      mempool.Collections           // keeps collections with authenticated origin IDs
 	pendingCollections   mempool.Collections           // keeps collections pending for their origin IDs to be authenticated
+	collectionTrackers   mempool.CollectionTrackers    // keeps track of collection requests that this engine made
 	chunkDataPacks       mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
 	chunkDataPackTackers mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
 	blockStorage         storage.Blocks
@@ -57,7 +58,9 @@ func New(
 	verifierEng network.Engine,
 	authReceipts mempool.Receipts,
 	pendingReceipts mempool.Receipts,
-	collections mempool.Collections,
+	authCollections mempool.Collections,
+	pendingCollections mempool.Collections,
+	collectionTrackers mempool.CollectionTrackers,
 	chunkStates mempool.ChunkStates,
 	chunkStateTrackers mempool.ChunkStateTrackers,
 	chunkDataPacks mempool.ChunkDataPacks,
@@ -74,7 +77,9 @@ func New(
 		authReceipts:         authReceipts,
 		pendingReceipts:      pendingReceipts,
 		verifierEng:          verifierEng,
-		authCollections:      collections,
+		authCollections:      authCollections,
+		pendingCollections:   pendingCollections,
+		collectionTrackers:   collectionTrackers,
 		chunkStates:          chunkStates,
 		chunkStateTrackers:   chunkStateTrackers,
 		chunkDataPacks:       chunkDataPacks,

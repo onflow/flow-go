@@ -54,7 +54,9 @@ type TestSuite struct {
 	// to these when they are received from an appropriate node role.
 	authReceipts         *mempool.Receipts
 	pendingReceipts      *mempool.Receipts
-	collections          *mempool.Collections
+	authCollections      *mempool.Collections
+	pendingCollections   *mempool.Collections
+	collectionTrackers   *mempool.CollectionTrackers
 	chunkStates          *mempool.ChunkStates
 	chunkStateTracker    *mempool.ChunkStateTrackers
 	chunkDataPacks       *mempool.ChunkDataPacks
@@ -90,7 +92,9 @@ func (suite *TestSuite) SetupTest() {
 	suite.blockStorage = &storage.Blocks{}
 	suite.authReceipts = &mempool.Receipts{}
 	suite.pendingReceipts = &mempool.Receipts{}
-	suite.collections = &mempool.Collections{}
+	suite.authCollections = &mempool.Collections{}
+	suite.pendingCollections = &mempool.Collections{}
+	suite.collectionTrackers = &mempool.CollectionTrackers{}
 	suite.chunkStates = &mempool.ChunkStates{}
 	suite.chunkStateTracker = &mempool.ChunkStateTrackers{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
@@ -131,7 +135,9 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.verifierEng,
 		suite.authReceipts,
 		suite.pendingReceipts,
-		suite.collections,
+		suite.authCollections,
+		suite.pendingCollections,
+		suite.collectionTrackers,
 		suite.chunkStates,
 		suite.chunkStateTracker,
 		suite.chunkDataPacks,
@@ -182,7 +188,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// we have the corresponding block and chunk state, but not the collection
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
-	suite.collections.On("Has", suite.collection.ID()).Return(false).Once()
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
 	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true).Once()
 	suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil).Once()
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
@@ -296,12 +302,12 @@ func (suite *TestSuite) TestHandleCollection() {
 	suite.ss.On("Identity", collIdentity.NodeID).Return(collIdentity, nil).Once()
 
 	// expect that the collection be added to the mempool
-	suite.collections.On("Add", suite.collection).Return(nil).Once()
+	suite.authCollections.On("Add", suite.collection).Return(nil).Once()
 
 	err := eng.Process(collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
-	suite.collections.AssertExpectations(suite.T())
+	suite.authCollections.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -320,7 +326,7 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	suite.Assert().Error(err)
 
 	// should not add collection to mempool
-	suite.collections.AssertNotCalled(suite.T(), "Add", suite.collection)
+	suite.authCollections.AssertNotCalled(suite.T(), "Add", suite.collection)
 
 	// should not call verifier
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -345,7 +351,7 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 		suite.Assert().Error(err)
 
 		// should not add collection to mempool
-		suite.collections.AssertNotCalled(suite.T(), "Add", suite.collection)
+		suite.authCollections.AssertNotCalled(suite.T(), "Add", suite.collection)
 	}
 }
 
@@ -529,14 +535,14 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			// allow adding the received resource to mempool
 			suite.authReceipts.On("Add", suite.receipt).Return(nil)
-			suite.collections.On("Add", suite.collection).Return(nil)
+			suite.authCollections.On("Add", suite.collection).Return(nil)
 			suite.blockStorage.On("Store", suite.block).Return(nil)
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
 			// we have all dependencies
 			suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
-			suite.collections.On("Has", suite.collection.ID()).Return(true)
-			suite.collections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
+			suite.authCollections.On("Has", suite.collection.ID()).Return(true)
+			suite.authCollections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
 			suite.chunkStateTracker.On("ByChunkID", suite.chunkState.ID()).Return(stateTracker, nil)
@@ -548,7 +554,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 			// removing the resources for a chunk
-			suite.collections.On("Rem", suite.collection.ID()).Return(true).Once()
+			suite.authCollections.On("Rem", suite.collection.ID()).Return(true).Once()
 
 			// we have the assignment of chunk
 			a := chunkassignment.NewAssignment()

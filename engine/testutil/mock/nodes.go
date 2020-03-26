@@ -81,7 +81,9 @@ type VerificationNode struct {
 	AuthReceipts          mempool.Receipts
 	PendingReceipts       mempool.Receipts
 	BlockStorage          storage.Blocks
-	Collections           mempool.Collections
+	AuthCollections       mempool.Collections
+	PendingCollections    mempool.Collections
+	CollectionTrackers    mempool.CollectionTrackers
 	ChunkStates           mempool.ChunkStates
 	ChunkStateTracker     mempool.ChunkStateTrackers
 	ChunkDataPacks        mempool.ChunkDataPacks
