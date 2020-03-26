@@ -12,7 +12,6 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/m4ksio/testingdock v0.4.1
 	github.com/stretchr/testify v1.5.1
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	google.golang.org/grpc v1.26.0
 )
 
