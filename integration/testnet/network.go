@@ -238,10 +238,17 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			"--nclusters=1",
 		}
 
-		// get a temporary directory in the host
-		tmpdir, err := ioutil.TempDir("/tmp", "flow-integration")
+		// get a temporary directory in the host. On macOS the default tmp
+		// directory is NOT accessible to Docker by default, so we use /tmp
+		// instead. On Teamcity, we use $TMP (which is not set on macOS).
+		tmproot := os.Getenv("TMP")
+		if tmproot == "" {
+			tmproot = "/tmp"
+		}
+		tmpdir, err := ioutil.TempDir(tmproot, "flow-integration")
 		require.Nil(t, err)
 		flowContainer.DataDir = tmpdir
+		fmt.Println(tmpdir)
 
 		// Bind the host directory to the container's database directory
 		// NOTE: I did this using the approach from:
