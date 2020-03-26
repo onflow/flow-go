@@ -12,6 +12,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/go-multierror"
 	"github.com/m4ksio/testingdock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/integration/client"
@@ -254,9 +255,9 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			require.Nil(t, err)
 			fmt.Println(stat.Mode().String())
 			err = os.Chmod(tmpdir, 0777)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			stat, err = os.Stat(tmpdir)
-			require.Nil(t, err)
+			assert.Nil(t, err)
 			flowContainer.DataDir = tmpdir
 		}
 
