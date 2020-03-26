@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
@@ -30,7 +31,7 @@ func TestSubmitTransaction(t *testing.T) {
 		engine.On("ProcessLocal", &tx).Return(nil).Once()
 
 		res, err := h.SendTransaction(context.Background(), &observation.SendTransactionRequest{
-			Transaction: TransactionToMessage(tx),
+			Transaction: convert.TransactionToMessage(tx),
 		})
 		require.NoError(t, err)
 
@@ -46,7 +47,7 @@ func TestSubmitTransaction(t *testing.T) {
 		engine.On("ProcessLocal", &tx).Return(expected).Once()
 
 		res, err := h.SendTransaction(context.Background(), &observation.SendTransactionRequest{
-			Transaction: TransactionToMessage(tx),
+			Transaction: convert.TransactionToMessage(tx),
 		})
 		if assert.Error(t, err) {
 			assert.Equal(t, expected, err)

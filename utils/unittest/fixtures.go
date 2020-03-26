@@ -126,6 +126,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
 	return &flow.CollectionGuarantee{
 		CollectionID: IdentifierFixture(),
+		SignerIDs:    IdentifierListFixture(16),
 		Signatures:   SignaturesFixture(16),
 	}
 }
@@ -277,6 +278,14 @@ func HashFixture(size int) crypto.Hash {
 		hash[i] = byte(i)
 	}
 	return hash
+}
+
+func IdentifierListFixture(n int) []flow.Identifier {
+	list := make([]flow.Identifier, n)
+	for i := 0; i < n; i++ {
+		list[i] = IdentifierFixture()
+	}
+	return list
 }
 
 func IdentifierFixture() flow.Identifier {

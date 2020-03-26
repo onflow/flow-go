@@ -17,10 +17,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
-	model "github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -92,8 +92,12 @@ type FlowNodeBuilder struct {
 	Network        *libp2p.Network
 	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
 	postInitFns    []func(*FlowNodeBuilder)
-	genesis        *flow.Block
 	sk             crypto.PrivateKey
+
+	// genesis information
+	GenesisBlock *flow.Block
+	GenesisQC    *model.AggregatedSignature
+	DKGPubData   *hotstuff.DKGPublicData
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -203,53 +207,46 @@ func (fnb *FlowNodeBuilder) initState() {
 	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
-	//check if database is initialized
+	// check if database is initialized
 	lsm, vlog := fnb.DB.Size()
 	if vlog > 0 || lsm > 0 {
 		fnb.Logger.Debug().Msg("using existing database")
 	} else {
-		//Bootstrap!
+		// Bootstrap!
 
 		fnb.Logger.Info().Msg("bootstrapping empty database")
 
 		ids, err := loadIdentityList(fnb.BaseConfig.genesisDir + "/" + identityList)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading identity list")
+		} else {
+			fmt.Println(ids)
 		}
-		// for _, entry := range fnb.BaseConfig.Entries {
-		// 	id, err := flow.ParseIdentity(entry)
-		// 	if err != nil {
-		// 		fnb.Logger.Fatal().Err(err).Str("entry", entry).Msg("could not parse identity")
-		// 	}
-		// 	ids = append(ids, id)
-		// }
 
 		// Load the rest of the genesis info, eventually needed for the consensus follower
-		genesisHeader, err := loadTrustedRootBlock(fnb.BaseConfig.genesisDir + "/" + trustedRootBlock)
+		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.genesisDir + "/" + trustedRootBlock)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		} else {
-			fmt.Println(genesisHeader)
+			fmt.Println(fnb.GenesisBlock)
 		}
-		genesisQC, err := loadRootBlockSignatures(fnb.BaseConfig.genesisDir + "/" + rootBlockSignatures)
+		fnb.GenesisQC, err = loadRootBlockSignatures(fnb.BaseConfig.genesisDir + "/" + rootBlockSignatures)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		} else {
-			fmt.Println(genesisQC)
+			fmt.Println(fnb.GenesisQC)
 		}
-		dkgPub, err := loadDKGPublicData(fnb.BaseConfig.genesisDir + "/" + dkgPublicData)
+		fnb.DKGPubData, err = loadDKGPublicData(fnb.BaseConfig.genesisDir + "/" + dkgPublicData)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 		} else {
-			fmt.Println(dkgPub)
+			fmt.Println(fnb.DKGPubData)
 		}
 
-		fnb.genesis = flow.Genesis(ids)
-		err = state.Mutate().Bootstrap(fnb.genesis)
+		err = state.Mutate().Bootstrap(fnb.GenesisBlock)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
-
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.NodeID)
@@ -425,8 +422,8 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handleModule(f)
 	}
 
-	if fnb.genesis != nil && fnb.genesisHandler != nil {
-		fnb.genesisHandler(fnb, fnb.genesis)
+	if fnb.GenesisBlock != nil && fnb.genesisHandler != nil {
+		fnb.genesisHandler(fnb, fnb.GenesisBlock)
 	}
 
 	// initialize all components
@@ -540,14 +537,14 @@ func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
 	return dkg, err
 }
 
-func loadTrustedRootBlock(path string) (*flow.Header, error) {
+func loadTrustedRootBlock(path string) (*flow.Block, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	genesisBlock := &flow.Header{}
-	err = json.Unmarshal(data, genesisBlock)
-	return genesisBlock, err
+	var genesisBlock flow.Block
+	err = json.Unmarshal(data, &genesisBlock)
+	return &genesisBlock, err
 
 }
 

@@ -10,6 +10,29 @@ type Blocks struct {
 	mock.Mock
 }
 
+// ByCollectionID provides a mock function with given fields: collectionID
+func (_m *Blocks) ByCollectionID(collectionID flow.Identifier) (*flow.Block, error) {
+	ret := _m.Called(collectionID)
+
+	var r0 *flow.Block
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Block); ok {
+		r0 = rf(collectionID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Block)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(collectionID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ByHeight provides a mock function with given fields: height
 func (_m *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	ret := _m.Called(height)
@@ -54,6 +77,20 @@ func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	}
 
 	return r0, r1
+}
+
+// IndexByGuarantees provides a mock function with given fields: blockID
+func (_m *Blocks) IndexByGuarantees(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Store provides a mock function with given fields: block
