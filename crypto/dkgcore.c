@@ -114,13 +114,15 @@ void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
 
 // imports an array of ep2_st from an array of bytes
 // the length matching is supposed to be already done
-void ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
+int ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
     const int size = (G2_BYTES/(SERIALIZATION+1));
     byte* p = (byte*) src;
     for (int i=0; i<len; i++){
-        _ep2_read_bin_compact(&A[i], p, size);
+        if (ep2_read_bin_compact(&A[i], p, size) != RLC_OK)
+            return RLC_ERR;
         p += size;
     }
+    return RLC_OK;
 }
 
 // returns 1 if g2^x = y, where g2 is the generatot of G2

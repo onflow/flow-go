@@ -180,6 +180,8 @@ func (s *Snapshot) Seal() (flow.Seal, error) {
 // regardless of the order.
 func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 
+	nClusters := s.state.clusters
+
 	// get the node identities
 	identities, err := s.Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
@@ -192,9 +194,9 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 	})
 
 	// create the desired number of clusters and assign nodes
-	clusters := flow.NewClusterList(s.state.clusters)
+	clusters := flow.NewClusterList(nClusters)
 	for i, identity := range identities {
-		index := uint(i) % s.state.clusters
+		index := uint(i) % nClusters
 		clusters.Add(index, identity)
 	}
 

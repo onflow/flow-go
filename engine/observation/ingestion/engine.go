@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
@@ -33,6 +32,8 @@ type Engine struct {
 	collectionConduit network.Conduit
 
 	// storage
+	blocks       storage.Blocks
+	headers      storage.Headers
 	collections  storage.Collections
 	transactions storage.Transactions
 }
@@ -43,6 +44,8 @@ func New(log zerolog.Logger,
 	state protocol.State,
 	tracer trace.Tracer,
 	me module.Local,
+	blocks storage.Blocks,
+	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions) (*Engine, error) {
 
@@ -53,6 +56,8 @@ func New(log zerolog.Logger,
 		tracer:       tracer,
 		state:        state,
 		me:           me,
+		blocks:       blocks,
+		headers:      headers,
 		collections:  collections,
 		transactions: transactions,
 	}
@@ -119,8 +124,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onBlock(originID, entity)
 	case *messages.CollectionResponse:
 		return e.handleCollectionResponse(originID, entity)
-	case *flow.CollectionGuarantee:
-		return e.onCollectionGuarantee(originID, entity)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -128,14 +131,15 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onBlock handles an incoming block.
 // TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
-func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
+func (e *Engine) onBlock(_ flow.Identifier, block *flow.Block) error {
 
-	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("block_id", logging.Entity(block)).
-		Uint64("block_view", block.View).
-		Msg("received block")
+	// index the block storage with each of the collection guarantee
+	err := e.blocks.IndexByGuarantees(block.ID())
+	if err != nil {
+		return err
+	}
 
+	// request each of the collections from the collection node
 	return e.requestCollections(block.Guarantees...)
 }
 
@@ -164,34 +168,6 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 	}
 
 	return nil
-}
-
-// onCollectionGuarantee is used to process collection guarantees received
-// from nodes that are not consensus nodes (notably collection nodes).
-func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
-
-	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee received")
-
-	// get the identity of the origin node, so we can check if it's a valid
-	// source for a collection guarantee (usually collection nodes)
-	id, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return fmt.Errorf("could not get origin node identity: %w", err)
-	}
-
-	// check that the origin is a collection node; this check is fine even if it
-	// excludes our own ID - in the case of local submission of collections, we
-	// should use the propagation engine, which is for exchange of collections
-	// between consensus nodes anyway; we do no processing or validation in this
-	// engine beyond validating the origin
-	if id.Role != flow.RoleCollection {
-		return fmt.Errorf("invalid origin node role (%s)", id.Role)
-	}
-
-	return e.requestCollections(guarantee)
 }
 
 func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {

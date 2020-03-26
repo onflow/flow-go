@@ -99,7 +99,8 @@ func RunDKGKeys(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []c
 		chans[i] = make(chan *message, 2*n)
 	}
 	// start DKG in all nodes but the leader
-	seed := []byte{1, 2, 3, byte(n)}
+	h, _ := crypto.NewHasher(crypto.SHA3_256)
+	seed := h.ComputeHash([]byte{1, 2, 3, byte(n)})
 	wg.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)

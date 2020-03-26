@@ -44,3 +44,19 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		assert.Equal(t, expected, actual)
 	})
 }
+
+func TestHeaderIDIndexByCollectionID(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		headerID := unittest.IdentifierFixture()
+		collectionID := unittest.IdentifierFixture()
+
+		err := db.Update(IndexHeaderByCollection(collectionID, headerID))
+		require.Nil(t, err)
+
+		actualID := &flow.Identifier{}
+		err = db.View(LookupHeaderIDByCollectionID(collectionID, actualID))
+		require.Nil(t, err)
+		assert.Equal(t, headerID, *actualID)
+	})
+}

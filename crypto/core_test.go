@@ -7,25 +7,54 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestPRGSeeding(t *testing.T) {
+func TestDeterministicKeyGen(t *testing.T) {
 	// 2 keys generated with the same seed should be equal
 	seed := []byte{1, 2, 3, 4}
-	sk1, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	h, _ := NewHasher(SHA3_384)
+	sk1, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
 	assert.Nil(t, err)
 	pk1Bytes, _ := sk1.PublicKey().Encode()
-	sk2, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	sk2, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
 	assert.Nil(t, err)
 	pk2Bytes, _ := sk2.PublicKey().Encode()
 	assert.Equal(t, pk1Bytes, pk2Bytes)
+}
+
+// test the deterministicity of the reelic PRG (used by the DKG polynimials)
+func TestPRGseeding(t *testing.T) {
+	NewSigner(BLS_BLS12381)
+	// 2 scalars generated with the same seed should be equal
+	h, _ := NewHasher(SHA3_384)
+	seed := h.ComputeHash([]byte{1, 2, 3, 4})
+	// 1st scalar (wrapped in a private key)
+	err := seedRelic(seed)
+	require.Nil(t, err)
+	var sk1 PrKeyBLS_BLS12381
+	err = randZr(&sk1.scalar)
+	require.Nil(t, err)
+	// 2nd scalar (wrapped in a private key)
+	err = seedRelic(seed)
+	require.Nil(t, err)
+	var sk2 PrKeyBLS_BLS12381
+	err = randZr(&sk2.scalar)
+	require.Nil(t, err)
+	// compare the 2 scalars (by comparing the private keys)
+	sk1Bytes, err := sk1.Encode()
+	require.Nil(t, err)
+	sk2Bytes, err := sk2.Encode()
+	require.Nil(t, err)
+	assert.Equal(t, sk1Bytes, sk2Bytes)
 }
 
 // TestG1 helps debugging but is not a unit test
 func TestG1(t *testing.T) {
 	NewSigner(BLS_BLS12381)
 
-	seedRelic([]byte{0})
+	h, _ := NewHasher(SHA3_256)
+	seedRelic(h.ComputeHash([]byte{0}))
 	var expo scalar
 	randZr(&expo)
 	var res pointG1
@@ -36,7 +65,8 @@ func TestG1(t *testing.T) {
 // G1 bench
 func BenchmarkG1(b *testing.B) {
 	NewSigner(BLS_BLS12381)
-	seedRelic([]byte{0})
+	h, _ := NewHasher(SHA3_256)
+	seedRelic(h.ComputeHash([]byte{0}))
 	var expo scalar
 	randZr(&expo)
 	var res pointG1
@@ -64,7 +94,8 @@ func TestG2(t *testing.T) {
 // G2 bench
 func BenchmarkG2(b *testing.B) {
 	NewSigner(BLS_BLS12381)
-	seedRelic([]byte{0})
+	h, _ := NewHasher(SHA3_256)
+	seedRelic(h.ComputeHash([]byte{0}))
 	var expo scalar
 	randZr(&expo)
 	var res pointG2

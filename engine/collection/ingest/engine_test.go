@@ -61,8 +61,8 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set target cluster to the local cluster
-		localCluster, err := clusters.ByNodeID(localNode.Me.NodeID())
-		require.NoError(t, err)
+		localCluster, ok := clusters.ByNodeID(localNode.Me.NodeID())
+		require.True(t, ok)
 
 		// get a transaction that will be routed to local
 		tx := testutil.TransactionForCluster(clusters, localCluster)
@@ -93,8 +93,8 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set target cluster to remote cluster
-		remoteCluster, err := clusters.ByNodeID(remoteNode.Me.NodeID())
-		require.NoError(t, err)
+		remoteCluster, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
+		require.True(t, ok)
 
 		// get a transaction that will be routed to the target cluster
 		tx := testutil.TransactionForCluster(clusters, remoteCluster)
@@ -125,8 +125,8 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set target cluster to remote cluster
-		targetCluster, err := clusters.ByNodeID(remoteNode.Me.NodeID())
-		require.NoError(t, err)
+		targetCluster, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
+		require.True(t, ok)
 
 		// get a transaction that will be routed to remote cluster
 		tx := testutil.TransactionForCluster(clusters, targetCluster)
@@ -157,8 +157,8 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set the target cluster to local cluster
-		targetCluster, err := clusters.ByNodeID(localNode.Me.NodeID())
-		require.NoError(t, err)
+		targetCluster, ok := clusters.ByNodeID(localNode.Me.NodeID())
+		require.True(t, ok)
 
 		// get transaction for target cluster, but make it invalid
 		tx := testutil.TransactionForCluster(clusters, targetCluster)
