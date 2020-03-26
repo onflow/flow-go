@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
-	tracker2 "github.com/dapperlabs/flow-go/model/verification/tracker"
+	trackers "github.com/dapperlabs/flow-go/model/verification/tracker"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
@@ -301,26 +301,38 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		Hex("collection_id", logging.Entity(coll)).
 		Msg("collection received")
 
-	// extracts list of verifier nodes id
-	//
-	// TODO tracking request feature
-	// https://github.com/dapperlabs/flow-go/issues/2970
-	origin, err := e.state.Final().Identity(originID)
+	// checks if this event is a reply of a prior request extracts the tracker
+	collID := coll.ID()
+	tracker, err := e.collectionTrackers.ByCollectionID(collID)
 	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", origin, err)
+		// collections with no tracker add to the pending collections mempool
+		err = e.pendingCollections.Add(coll)
+		if err != nil && err != mempool.ErrEntityAlreadyExists {
+			return fmt.Errorf("could not store collection in pending pool: %w", err)
+		}
+	} else {
+		// a tracker exists for the requesting collection
+		// verifies identity of origin
+		origin, err := e.state.AtBlockID(tracker.BlockID).Identity(originID)
+		if err != nil {
+			return fmt.Errorf("invalid origin id (%s): %w", origin, err)
+		}
+
+		if origin.Role != flow.RoleCollection {
+			return fmt.Errorf("invalid role for receiving collection: %s", origin.Role)
+		}
+
+		// adds collection to authenticated mempool
+		err = e.authCollections.Add(coll)
+		if err != nil {
+			return fmt.Errorf("could not add collection to mempool: %w", err)
+		}
+
+		// removes tracker
+		e.collectionTrackers.Rem(collID)
+
+		e.checkPendingChunks()
 	}
-
-	if origin.Role != flow.RoleCollection {
-		return fmt.Errorf("invalid role for receiving collection: %s", origin.Role)
-	}
-
-	err = e.authCollections.Add(coll)
-	if err != nil {
-		return fmt.Errorf("could not add collection to mempool: %w", err)
-	}
-
-	e.checkPendingChunks()
-
 	return nil
 }
 
@@ -364,7 +376,24 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 }
 
 // requestCollection submits a request for the given collection to collection nodes.
-func (e *Engine) requestCollection(collID flow.Identifier) error {
+func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifier) error {
+	// checks collection does not have a tracker yet
+	if e.collectionTrackers.Has(collID) {
+		// collection has been already requested
+		// request is dropped
+		// TODO trackers should expire after a while for liveness
+		// https://github.com/dapperlabs/flow-go/issues/3054
+		return nil
+	}
+	// requesting the collection if it has not yet been requested
+	tracker := &trackers.CollectionTracker{
+		BlockID:      blockID,
+		CollectionID: collID,
+	}
+	err := e.collectionTrackers.Add(tracker)
+	if err != nil {
+		return fmt.Errorf("could not add a tracker for collection to mempool: %w", err)
+	}
 
 	// extracts list of verifier nodes id
 	//
@@ -407,7 +436,7 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier, blockID flow.Ide
 	}
 
 	// caches a tracker for successfully submitted requests
-	tracker := &tracker2.ChunkStateTracker{
+	tracker := &trackers.ChunkStateTracker{
 		ChunkID: chunkID,
 		BlockID: blockID,
 	}
@@ -440,7 +469,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Iden
 	}
 
 	// caches a tracker for successfully submitted requests
-	tracker := &tracker2.ChunkDataPackTracker{
+	tracker := &trackers.ChunkDataPackTracker{
 		ChunkID: chunkID,
 		BlockID: blockID,
 	}
@@ -554,8 +583,6 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		Hex("receipt_id", logging.Entity(receipt)).
 		Logger()
 
-	// whether all collections for the receipt are available locally
-
 	collIndex := int(chunk.CollectionIndex)
 
 	// ensure the collection index specified by the ER is valid
@@ -571,30 +598,58 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 	// request the collection if we don't already have it
 	collID := block.Guarantees[collIndex].ID()
 
-	if !e.authCollections.Has(collID) {
-		// a collection is missing, the receipt cannot yet be verified
-		// TODO rate limit these requests
-		err := e.requestCollection(collID)
-		if err != nil && err != mempool.ErrEntityAlreadyExists {
+	// checks authenticated collections
+	if e.authCollections.Has(collID) {
+		coll, err := e.authCollections.ByID(collID)
+		if err != nil {
+			// couldn't get the collection from mempool
 			log.Error().
 				Err(err).
 				Hex("collection_id", logging.ID(collID)).
-				Msg("could not request collection")
+				Msg("could not get collection from authenticated pool")
+			return nil, false
 		}
-		return nil, false
+		return coll, true
 	}
 
-	coll, err := e.authCollections.ByID(collID)
-	if err != nil {
-		// couldn't get the collection from mempool, the receipt cannot be verified
+	// checks pending collections
+	if e.pendingCollections.Has(collID) {
+		// moves collection from pending to authenticated collections
+		coll, err := e.pendingCollections.ByID(collID)
+		if err != nil {
+			// couldn't get the collection from mempool
+			log.Error().
+				Err(err).
+				Hex("collection_id", logging.ID(collID)).
+				Msg("could not get collection from pending pool")
+			return nil, false
+		}
+
+		err = e.authCollections.Add(coll)
+		if err != nil {
+			// couldn't add collection from to authenticated mempool
+			log.Error().
+				Err(err).
+				Hex("collection_id", logging.ID(collID)).
+				Msg("could not add collection to authenticated mempool")
+			return nil, false
+		}
+
+		e.pendingCollections.Rem(collID)
+		return coll, true
+	}
+
+	// the collection is missing, the receipt cannot yet be verified
+	// TODO rate limit these requests
+	err := e.requestCollection(collID, block.ID())
+	if err != nil && err != mempool.ErrEntityAlreadyExists {
 		log.Error().
 			Err(err).
 			Hex("collection_id", logging.ID(collID)).
-			Msg("could not get collection")
-		return nil, false
+			Msg("could not request collection")
 	}
+	return nil, false
 
-	return coll, true
 }
 
 // checkPendingChunks checks all pending chunks of receipts in the mempool and verifies

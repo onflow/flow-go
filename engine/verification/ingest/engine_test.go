@@ -69,6 +69,7 @@ type TestSuite struct {
 	chunkState    *flow.ChunkState
 	chunkDataPack *flow.ChunkDataPack
 	assigner      *module.ChunkAssigner // mocks chunk assigner
+	collTracker   *tracker.CollectionTracker
 }
 
 // Invoking this method executes all TestSuite tests.
@@ -107,6 +108,10 @@ func (suite *TestSuite) SetupTest() {
 	suite.receipt = completeER.Receipt
 	suite.chunkState = completeER.ChunkStates[0]
 	suite.chunkDataPack = completeER.ChunkDataPacks[0]
+	suite.collTracker = &tracker.CollectionTracker{
+		BlockID:      suite.block.ID(),
+		CollectionID: suite.collection.ID(),
+	}
 
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
@@ -479,7 +484,8 @@ func (suite *TestSuite) TestChunkStateTracker_UntrackedChunkState() {
 	suite.chunkDataPackTracker.AssertExpectations(suite.T())
 }
 
-// the verifier engine should be called when the receipt is ready regardless of
+// TestVerifyReady evaluates that the verifier engine should be called
+// when the receipt is ready regardless of
 // the order in which dependent resources are received.
 // TODO add mempool cleanup check after the functionality gets back
 // https://github.com/dapperlabs/flow-go/issues/2750
@@ -529,32 +535,38 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			suite.state.On("Final", testifymock.Anything).Return(suite.ss, nil)
 			suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
-			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil).Once()
-			suite.ss.On("Identities", testifymock.Anything).Return(flow.IdentityList{verIdentity}, nil).Once()
+			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil)
+			suite.ss.On("Identities", testifymock.Anything).Return(flow.IdentityList{verIdentity}, nil)
 			suite.me.On("NodeID").Return(verIdentity.NodeID)
 
 			// allow adding the received resource to mempool
-			suite.authReceipts.On("Add", suite.receipt).Return(nil)
 			suite.authCollections.On("Add", suite.collection).Return(nil)
 			suite.blockStorage.On("Store", suite.block).Return(nil)
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
 			// we have all dependencies
 			suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
+
 			suite.authCollections.On("Has", suite.collection.ID()).Return(true)
 			suite.authCollections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
+			suite.authCollections.On("Rem", suite.collection.ID()).Return(true)
+
+			suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
+			suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true)
+
 			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
 			suite.chunkStates.On("ByID", suite.chunkState.ID()).Return(suite.chunkState, nil)
+
 			suite.chunkStateTracker.On("ByChunkID", suite.chunkState.ID()).Return(stateTracker, nil)
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
+
+			suite.authReceipts.On("Add", suite.receipt).Return(nil)
 			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+
 			suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
 			suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true)
-			suite.chunkStateTracker.On("Rem", suite.chunkState.ID()).Return(true).Once()
+			suite.chunkStateTracker.On("Rem", suite.chunkState.ID()).Return(true)
 			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
-
-			// removing the resources for a chunk
-			suite.authCollections.On("Rem", suite.collection.ID()).Return(true).Once()
 
 			// we have the assignment of chunk
 			a := chunkassignment.NewAssignment()
