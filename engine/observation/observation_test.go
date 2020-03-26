@@ -21,12 +21,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -103,12 +103,13 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		// test block1 get by ID
-		block1 := unittest.BlockHeaderFixture()
+		block1 := unittest.BlockFixture()
 		// test block2 get by height
-		block2 := unittest.BlockHeaderFixture()
+		block2 := unittest.BlockFixture()
 		block2.Height = 2
 
-		blocks := bstorage.NewHeaders(db)
+		blocks := bstorage.NewBlocks(db)
+		headers := bstorage.NewHeaders(db)
 		require.NoError(suite.T(), blocks.Store(&block1))
 		require.NoError(suite.T(), blocks.Store(&block2))
 
@@ -116,35 +117,60 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		err := db.Update(operation.InsertNumber(block2.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, blocks, nil, nil)
+		handler := rpc.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil)
 
-		// get by ID
+		// get header by ID
 		id := block1.ID()
-		req1 := &observation.GetBlockHeaderByIDRequest{
+		hReq1 := &observation.GetBlockHeaderByIDRequest{
 			Id: id[:],
 		}
 
-		resp, err := handler.GetBlockHeaderByID(context.Background(), req1)
+		hResp, err := handler.GetBlockHeaderByID(context.Background(), hReq1)
 
 		// assert it is indeed block1
 		require.NoError(suite.T(), err)
-		require.NotNil(suite.T(), resp)
-		actual := resp.Block
-		expected, _ := convert.BlockHeaderToMessage(&block1)
-		require.Equal(suite.T(), expected, *actual)
+		require.NotNil(suite.T(), hResp)
+		hActual := hResp.Block
+		hExpected, _ := convert.BlockHeaderToMessage(&block1.Header)
+		require.Equal(suite.T(), hExpected, *hActual)
 
-		// get by height
-		req2 := &observation.GetBlockHeaderByHeightRequest{
+		// get block details by ID
+		bReq1 := &observation.GetBlockByIDRequest{
+			Id: id[:],
+		}
+
+		bResp, err := handler.GetBlockByID(context.Background(), bReq1)
+
+		require.NoError(suite.T(), err)
+		require.NotNil(suite.T(), bResp)
+		bActual := bResp.Block
+		bExpected, _ := convert.BlockToMessage(&block1)
+		require.Equal(suite.T(), bExpected, bActual)
+
+		// get header by height
+		hReq2 := &observation.GetBlockHeaderByHeightRequest{
 			Height: block2.Height,
 		}
 
-		// assert it is indeed block2
-		resp, err = handler.GetBlockHeaderByHeight(context.Background(), req2)
+		hResp, err = handler.GetBlockHeaderByHeight(context.Background(), hReq2)
 		require.NoError(suite.T(), err)
-		require.NotNil(suite.T(), resp)
-		actual = resp.Block
-		expected, _ = convert.BlockHeaderToMessage(&block2)
-		require.Equal(suite.T(), expected, *actual)
+		require.NotNil(suite.T(), hResp)
+		hActual = hResp.Block
+		hExpected, _ = convert.BlockHeaderToMessage(&block2.Header)
+		require.Equal(suite.T(), hExpected, *hActual)
+
+		// get block details by height
+		bReq2 := &observation.GetBlockByHeightRequest{
+			Height: block2.Height,
+		}
+
+		bResp, err = handler.GetBlockByHeight(context.Background(), bReq2)
+
+		require.NoError(suite.T(), err)
+		require.NotNil(suite.T(), bResp)
+		bActual = bResp.Block
+		bExpected, _ = convert.BlockToMessage(&block2)
+		require.Equal(suite.T(), bExpected, bActual)
 	})
 }
 
