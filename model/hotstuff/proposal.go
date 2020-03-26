@@ -30,34 +30,21 @@ func (p *Proposal) ProposerVote() *Vote {
 
 // ProposalFromFlow turns a flow header into a hotstuff block type.
 func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
-	sig := AggregatedSignature{
-		StakingSignatures:     header.ParentStakingSigs,
-		RandomBeaconSignature: header.ParentRandomBeaconSig,
-		SignerIDs:             header.ParentSigners,
-	}
-	qc := QuorumCertificate{
-		BlockID:             header.ParentID,
-		View:                parentView,
-		AggregatedSignature: &sig,
-	}
-	block := Block{
-		BlockID:     header.ID(),
-		View:        header.View,
-		QC:          &qc,
-		ProposerID:  header.ProposerID,
-		PayloadHash: header.PayloadHash,
-		Timestamp:   header.Timestamp,
-	}
+
+	block := BlockFromFlow(header, parentView)
+
 	proposal := Proposal{
-		Block:                 &block,
+		Block:                 block,
 		StakingSignature:      header.ProposerStakingSig,
 		RandomBeaconSignature: header.ProposerRandomBeaconSig,
 	}
+
 	return &proposal
 }
 
 // ProposalToFlow turns a block proposal into a flow header.
 func ProposalToFlow(proposal *Proposal) *flow.Header {
+
 	block := proposal.Block
 	header := flow.Header{
 		ParentID:                block.QC.BlockID,
@@ -71,5 +58,6 @@ func ProposalToFlow(proposal *Proposal) *flow.Header {
 		ProposerStakingSig:      proposal.StakingSignature,
 		ProposerRandomBeaconSig: proposal.RandomBeaconSignature,
 	}
+
 	return &header
 }
