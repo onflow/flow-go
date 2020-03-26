@@ -16,12 +16,6 @@ type PendingReceipts interface {
 	// Rem will remove a receipt by ID.
 	Rem(receiptID flow.Identifier) bool
 
-	// ByBlockID will return all execution receipts for the given block.
-	ByBlockID(blockID flow.Identifier) []*flow.ExecutionReceipt
-
-	// DropForBlock will drop all receipts for the given block ID.
-	DropForBlock(blockID flow.Identifier)
-
 	// All will return a list of all receipts in the memory pool.
 	All() []*flow.ExecutionReceipt
 }
