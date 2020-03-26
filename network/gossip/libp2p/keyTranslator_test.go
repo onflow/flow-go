@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -80,6 +81,39 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 		require.NoError(k.T(), err)
 
 		require.Equal(k.T(), fbytes, lbytes)
+	}
+}
+
+// TestLibP2PIDGenerationIsConsistent tests that a LibP2P peer ID generated using Flow ECDSA key is deterministic
+func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
+	// generate a seed which will be used for both - Flow keys and Libp2p keys
+	seed := k.createSeed()
+
+	// generate a Flow private key
+	fpk, err := fcrypto.GeneratePrivateKey(fcrypto.ECDSA_P256, seed)
+	require.NoError(k.T(), err)
+
+	// get the Flow public key
+	fpublic := fpk.PublicKey()
+
+	// convert it to the Libp2p Public key
+	lconverted, err := PublicKey(fpublic)
+	require.NoError(k.T(), err)
+
+	// check that the LibP2P Id generation is deterministic
+	var prev peer.ID
+	for i := 0; i < 100; i++ {
+
+		// generate a Libp2p Peer ID from the converted public key
+		fpeerID, err := peer.IDFromPublicKey(lconverted)
+		require.NoError(k.T(), err)
+
+		if i > 0 {
+			err = prev.Validate()
+			require.NoError(k.T(), err)
+			require.Equal(k.T(), prev, fpeerID, "peer ID generation is not deterministic")
+		}
+		prev = fpeerID
 	}
 }
 
