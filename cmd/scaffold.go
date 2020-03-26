@@ -17,10 +17,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
-	model "github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
