@@ -293,8 +293,9 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 	}
 }
 
-// receive a collection without any other receipt-dependent resources
-func (suite *TestSuite) TestHandleCollection() {
+// TestHandleCollection_Tracked evaluates receiving a tracked collection without any other receipt-dependent resources
+// the collection should be added to the authenticate collection pool, and tracker should be removed
+func (suite *TestSuite) TestHandleCollection_Tracked() {
 	eng := suite.TestNewEngine()
 
 	// mock the collection coming from an collection node
@@ -302,6 +303,7 @@ func (suite *TestSuite) TestHandleCollection() {
 
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", collIdentity.NodeID).Return(collIdentity, nil).Once()
@@ -309,10 +311,14 @@ func (suite *TestSuite) TestHandleCollection() {
 	// expect that the collection be added to the mempool
 	suite.authCollections.On("Add", suite.collection).Return(nil).Once()
 
+	// expect that the collection tracker is removed
+	suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true).Once()
+
 	err := eng.Process(collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
 	suite.authCollections.AssertExpectations(suite.T())
+	suite.collectionTrackers.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
