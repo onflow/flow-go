@@ -8,8 +8,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 )
 
@@ -50,7 +50,7 @@ func (c *Client) Ping(ctx context.Context) error {
 
 // SendTransaction submits a transaction to the network.
 func (c *Client) SendTransaction(ctx context.Context, tx flow.TransactionBody) error {
-	txMsg := ingress.TransactionToMessage(tx)
+	txMsg := convert.TransactionToMessage(tx)
 
 	_, err := c.rpcClient.SendTransaction(
 		ctx,

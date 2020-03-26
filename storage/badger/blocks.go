@@ -62,3 +62,18 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 
 	return &block, err
 }
+
+func (b *Blocks) ByCollectionID(collectionID flow.Identifier) (*flow.Block, error) {
+	var block flow.Block
+	err := b.db.View(func(tx *badger.Txn) error {
+		return procedure.RetrieveBlockByCollectionID(collectionID, &block)(tx)
+	})
+	return &block, err
+}
+
+func (b *Blocks) IndexByGuarantees(blockID flow.Identifier) error {
+	err := b.db.Update(func(tx *badger.Txn) error {
+		return procedure.IndexBlockByGuarantees(blockID)(tx)
+	})
+	return err
+}

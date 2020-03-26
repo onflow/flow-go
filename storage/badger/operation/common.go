@@ -157,6 +157,9 @@ type createFunc func() interface{}
 // and the entity was decoded.
 type handleFunc func() error
 
+// handleKeyFunc is a function that process the current key during a badger iteration.
+type handleKeyFunc func(key []byte)
+
 // iterationFunc is a function provided to our low-level iteration function that
 // allows us to pass badger efficiencies across badger boundaries. By calling it
 // for each iteration step, we can inject a function to check the key, a
@@ -446,6 +449,63 @@ func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, i
 					(*invalidIDs)[entityID] = struct{}{}
 				}
 			}
+			return nil
+		}
+
+		return check, create, handle
+	}
+}
+
+// finddescendant returns an handleKey function for iteration. It iterates keys in badger
+// and find the descendants blocks (blocks with higher view) that connected to the block
+// by the given blockID.
+func finddescendant(blockID flow.Identifier, descendants *[]flow.Identifier) handleKeyFunc {
+	incorporated := make(map[flow.Identifier]struct{})
+
+	// set the input block as incorporated. (The scenario for the input block is usually the
+	// finalized block)
+	incorporated[blockID] = struct{}{}
+
+	return func(key []byte) {
+		_, blockID, parentID := fromPayloadIndex(key)
+
+		_, ok := incorporated[parentID]
+		if ok {
+			// if parent is incorporated, then this block is incorporated too.
+			// adding it to the descendants list.
+			(*descendants) = append((*descendants), blockID)
+			incorporated[blockID] = struct{}{}
+		}
+
+		// if a block's parent isn't found in the incorporated list, then it's not incorporated.
+		// And it will never be incorporated, because we are traversing blocks with height in
+		// the increasing order. So future blocks will have higher height, and is not possible
+		// to fill the gap between this block and any existing incorporated block. Even if there is,
+		// that block must be an invalid block anyway, which is fine not being included in the
+		// descendants list.
+	}
+}
+
+// keyonly returns an iterationFunc that only iterate keys of the index.
+// It is useful to traverse through the index when the data needed are all included in the
+// key itself without reading the value.
+func keyonly(handleKey handleKeyFunc) iterationFunc {
+	return func() (checkFunc, createFunc, handleFunc) {
+		// the check function has side effect which passes the key to the handleKey function
+		// for processing
+		check := func(key []byte) bool {
+			handleKey(key)
+
+			// return false to stop parsing the value of the key
+			return false
+		}
+
+		// create and handle won't be called in the iteration, simply return nil
+		create := func() interface{} {
+			return nil
+		}
+
+		handle := func() error {
 			return nil
 		}
 
