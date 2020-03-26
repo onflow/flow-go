@@ -129,4 +129,11 @@ go run -tags relic ./cmd/bootstrap finalize -c ./cmd/bootstrap/example_files/nod
 * file `dkg-data.pub.json`
    - REQUIRED at NODE START by all nodes
 
-
+* file `<ClusterID>-genesis-cluster-block.json`
+   - genesis `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
+   - REQUIRED at NODE START by all collectors of the respective cluster
+   - file can be made accessible to all nodes at boot up (or recovery after crash)
+* file `<ClusterID>-genesis-cluster-qc.json`
+   - genesis Quorum Certificate for `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
+   - REQUIRED at NODE START by all collectors of the respective cluster
+   - file can be made accessible to all nodes at boot up (or recovery after crash)
