@@ -1,8 +1,9 @@
 package cmd
 
 const (
-	randomSeedBytes = 64
-	minSeedBytes    = 64
+	randomSeedBytes           = 64
+	minSeedBytes              = 64
+	minNodesPerCluster uint16 = 3
 
 	dirnameExecutionState         = "execution-state"
 	filenameGenesisBlock          = "genesis-block.json"

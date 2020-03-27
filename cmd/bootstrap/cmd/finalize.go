@@ -11,9 +11,12 @@ import (
 )
 
 var (
-	flagConfig             string
-	flagPartnerNodeInfoDir string
-	flagPartnerStakes      string
+	flagConfig                            string
+	flagCollectionClusters                uint16
+	flagGeneratedCollectorAddressTemplate string
+	flagGeneratedCollectorStake           uint64
+	flagPartnerNodeInfoDir                string
+	flagPartnerStakes                     string
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -25,8 +28,12 @@ var finalizeCmd = &cobra.Command{
 	Long: `Finalize the bootstrapping process, which includes generating of internal networking and staking keys,
 running the DKG for generating the random beacon keys, generating genesis execution state, seal, block and QC.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Info().Msg("✨ generating private networking and staking keys")
-		internalNodesPub, internalNodesPriv := genNetworkAndStakingKeys()
+		log.Info().Msg("✨ collecting partner network and staking keys")
+		partnerNodes := assemblePartnerNodes()
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ generating internal private networking and staking keys")
+		internalNodesPub, internalNodesPriv := genNetworkAndStakingKeys(partnerNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ assembling network and staking keys")
@@ -62,6 +69,13 @@ func init() {
 	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
 	_ = finalizeCmd.MarkFlagRequired("config")
+	finalizeCmd.Flags().Uint16Var(&flagCollectionClusters, "collection-clusters", 2,
+		"number of collection clusters")
+	finalizeCmd.Flags().StringVar(&flagGeneratedCollectorAddressTemplate, "generated-collector-address-template",
+		"collector-%v.example.com", "address template for collector nodes that will be generated (%v "+
+			"will be replaced by an index)")
+	finalizeCmd.Flags().Uint64Var(&flagGeneratedCollectorStake, "generated-collector-stake", 100,
+		"stake for collector nodes that will be generated")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
 		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
 		"NetworkPubKey, StakingPubKey)", filenamePartnerNodeInfoSuffix))
