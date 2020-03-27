@@ -37,7 +37,6 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ assembling network and staking keys")
-		partnerNodes := assemblePartnerNodes()
 		stakingNodes := mergeNodeInfos(internalNodesPub, partnerNodes)
 		writeJSON(filenameNodeInfosPub, stakingNodes)
 		log.Info().Msg("")
