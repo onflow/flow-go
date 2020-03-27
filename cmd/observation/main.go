@@ -23,6 +23,7 @@ func main() {
 		collectionRPC   observation.ObserveServiceClient
 		executionRPC    observation.ObserveServiceClient
 		err             error
+		blocks          *storage.Blocks
 		headers         *storage.Headers
 		collections     *storage.Collections
 		transactions    *storage.Transactions
@@ -54,6 +55,7 @@ func main() {
 			return nil
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
+			blocks = storage.NewBlocks(node.DB)
 			headers = storage.NewHeaders(node.DB)
 			collections = storage.NewCollections(node.DB)
 			transactions = storage.NewTransactions(node.DB)
@@ -69,11 +71,11 @@ func main() {
 		//	return followEng, err
 		//}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, collections, transactions)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, blocks, headers, collections, transactions)
 			return ingestEng, err
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, collectionRPC, executionRPC, headers)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, collectionRPC, executionRPC, blocks, headers, collections, transactions)
 			return rpcEng, nil
 		}).
 		Run()

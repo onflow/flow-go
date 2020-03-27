@@ -7,7 +7,10 @@ package crypto
 // #include "bls_include.h"
 import "C"
 
-// TODO: remove -wall after reaching a stable version
+import (
+	"fmt"
+)
+
 // TODO: enable QUIET in relic
 
 // Go wrappers to C types
@@ -71,18 +74,30 @@ func _G2scalarGenMult(res *pointG2, expo *scalar) {
 // TEST/DEBUG
 
 // seeds the internal relic random function
-func seedRelic(seed []byte) {
-	// TODO: define the length of seed
-	C._seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
+func seedRelic(seed []byte) error {
+	if len(seed) < (securityBits / 8) {
+		return cryptoError{fmt.Sprintf("seed length needs to be larger than %d",
+			securityBits/8)}
+	}
+	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
+	return nil
 }
 
-// returns a random number in Z/Z.r
+// returns a random number in Zr
 func randZr(x *scalar) error {
-	C._bn_randZr((*C.bn_st)(x))
+	C.bn_randZr((*C.bn_st)(x))
 	if x == nil {
 		return cryptoError{"the memory allocation of the random number has failed"}
 	}
 	return nil
+}
+
+// mapKeyZr reads a private key from a slice of bytes and maps it to Zr
+// the resulting scalar is in the range 0 < k < r
+func mapKeyZr(x *scalar, src []byte) {
+	C.bn_privateKey_mod_r((*C.bn_st)(x),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src)))
 }
 
 // TEST/DEBUG/BENCH
@@ -133,11 +148,14 @@ func writePointG2(dest []byte, a *pointG2) {
 }
 
 // readVerifVector reads a G2 point from a slice of bytes
-func readPointG2(a *pointG2, src []byte) {
-	C._ep2_read_bin_compact((*C.ep2_st)(a),
+func readPointG2(a *pointG2, src []byte) error {
+	if C.ep2_read_bin_compact((*C.ep2_st)(a),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)),
-	)
+	) != valid {
+		return cryptoError{"reading a G2 point has failed"}
+	}
+	return nil
 }
 
 // computes a bls signature
@@ -153,12 +171,21 @@ func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 
 // Checks the validity of a bls signature
 func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
+	if len(s) != signatureLengthBLS_BLS12381 {
+		return false
+	}
 	verif := C._blsVerify((*C.ep2_st)(pk),
 		(*C.uchar)(&s[0]),
 		(*C.uchar)(&data[0]),
 		(C.int)(len(data)))
 
 	return (verif == valid)
+}
+
+// checkMembershipZr checks a scalar is less than the groups order (r)
+func (sk *scalar) checkMembershipZr() bool {
+	verif := C.checkMembership_Zr((*C.bn_st)(sk))
+	return verif == valid
 }
 
 // membershipCheckG2 runs a membership check of BLS public keys on BLS12-381 curve.

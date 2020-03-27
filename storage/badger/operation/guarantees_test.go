@@ -131,3 +131,158 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		})
 	})
 }
+
+func TestFindDecendants(t *testing.T) {
+	t.Run("should find all descendants", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			finalizedHeight := 3
+			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
+
+			err := db.Update(func(tx *badger.Txn) error {
+				// add finalized block
+				require.Nil(t, addIndex(tx, finalizedHeight, finalizedHeight, finalizedHeight-1))
+
+				// add unfinalized blocks
+				require.Nil(t, addIndex(tx, 4, 4, 3))
+				require.Nil(t, addIndex(tx, 5, 5, 4))
+				require.Nil(t, addIndex(tx, 6, 6, 5))
+				require.Nil(t, addIndex(tx, 7, 7, 6))
+				require.Nil(t, addIndex(tx, 8, 8, 7))
+				require.Nil(t, addIndex(tx, 9, 9, 8))
+				return nil
+			})
+			require.Nil(t, err)
+
+			var descendants []flow.Identifier
+			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
+			require.Nil(t, err)
+
+			assert.Equal(t, toFlowIDs(4, 5, 6, 7, 8, 9), descendants)
+		})
+	})
+
+	t.Run("should exclude disconnected blocks", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			finalizedHeight := 3
+			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
+
+			err := db.Update(func(tx *badger.Txn) error {
+				// add finalized block
+				require.Nil(t, addIndex(tx, finalizedHeight, finalizedHeight, finalizedHeight-1))
+
+				// add unfinalized blocks
+				require.Nil(t, addIndex(tx, 4, 4, 3))
+				require.Nil(t, addIndex(tx, 5, 5, 4))
+				require.Nil(t, addIndex(tx, 6, 6, 10)) // block 6 connects to a unknown block
+				require.Nil(t, addIndex(tx, 7, 7, 5))
+				require.Nil(t, addIndex(tx, 8, 8, 7))
+				require.Nil(t, addIndex(tx, 11, 11, 10)) // block 11 connects to a unknown block
+				require.Nil(t, addIndex(tx, 12, 12, 11)) // block 12 connects to 11 which connects to a unknown block
+				require.Nil(t, addIndex(tx, 13, 13, 8))
+				return nil
+			})
+			require.Nil(t, err)
+
+			var descendants []flow.Identifier
+			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
+			require.Nil(t, err)
+
+			assert.Equal(t, toFlowIDs(4, 5, 7, 8, 13), descendants)
+		})
+	})
+
+	t.Run("should include conflicting blocks", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			finalizedHeight := 3
+			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
+
+			err := db.Update(func(tx *badger.Txn) error {
+				// add finalized block
+				require.Nil(t, addIndex(tx, finalizedHeight, finalizedHeight, finalizedHeight-1))
+
+				// add unfinalized blocks
+				require.Nil(t, addIndex(tx, 4, 4, 3))
+				require.Nil(t, addIndex(tx, 5, 5, 4))
+				require.Nil(t, addIndex(tx, 5, 10, 4))  // a different block 5 that also connects to block 4
+				require.Nil(t, addIndex(tx, 6, 11, 10)) // a different block 6 that connects to a different block 5
+				require.Nil(t, addIndex(tx, 6, 6, 5))
+				return nil
+			})
+			require.Nil(t, err)
+
+			var descendants []flow.Identifier
+			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
+			require.Nil(t, err)
+
+			assert.Equal(t, toFlowIDs(4, 5, 10, 6, 11), descendants)
+		})
+	})
+
+	t.Run("should not include old finalized blocks", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			finalizedHeight := 3
+			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
+
+			err := db.Update(func(tx *badger.Txn) error {
+				require.Nil(t, addIndex(tx, 2, 2, 3)) // add an old finalized block
+				// add finalized block
+				require.Nil(t, addIndex(tx, finalizedHeight, finalizedHeight, finalizedHeight-1))
+
+				// add unfinalized blocks
+				require.Nil(t, addIndex(tx, 4, 4, 3))
+				require.Nil(t, addIndex(tx, 5, 5, 4))
+				require.Nil(t, addIndex(tx, 6, 6, 5))
+				return nil
+			})
+			require.Nil(t, err)
+
+			var descendants []flow.Identifier
+			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
+			require.Nil(t, err)
+
+			assert.Equal(t, toFlowIDs(4, 5, 6), descendants)
+		})
+	})
+
+	t.Run("should not include the finalized block itself", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			finalizedHeight := 3
+			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
+
+			err := db.Update(func(tx *badger.Txn) error {
+				// this test case verifies that when iterating through the keys,
+				// keys as the same height as the finalized block should be ignored
+				require.Nil(t, addIndex(tx, finalizedHeight, 1, finalizedHeight))
+
+				// add finalized block
+				require.Nil(t, addIndex(tx, finalizedHeight, finalizedHeight, finalizedHeight-1))
+
+				// add unfinalized blocks
+				require.Nil(t, addIndex(tx, 4, 4, 3))
+				require.Nil(t, addIndex(tx, 5, 5, 4))
+				require.Nil(t, addIndex(tx, 6, 6, 5))
+				return nil
+			})
+			require.Nil(t, err)
+
+			var descendants []flow.Identifier
+			err = db.View(FindDescendants(uint64(finalizedHeight), finalizedBlockID, &descendants))
+			require.Nil(t, err)
+
+			assert.Equal(t, toFlowIDs(4, 5, 6), descendants)
+		})
+	})
+}
+
+// helper to create a list Identifier from numbers
+func toFlowIDs(ns ...int) []flow.Identifier {
+	ids := make([]flow.Identifier, len(ns))
+	for i, n := range ns {
+		ids[i] = flow.Identifier{byte(n)}
+	}
+	return ids
+}
+
+func addIndex(tx *badger.Txn, height int, blockID int, parentID int) error {
+	return IndexGuaranteePayload(uint64(height), flow.Identifier{byte(blockID)}, flow.Identifier{byte(parentID)}, make([]flow.Identifier, 0))(tx)
+}

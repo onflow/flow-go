@@ -3,8 +3,11 @@ package crypto
 import (
 	"testing"
 
+	"math/rand"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ECDSA tests
@@ -22,9 +25,7 @@ func TestECDSA(t *testing.T) {
 
 		halg := NewSHA3_256()
 		seed := make([]byte, ECDSAseedLen[i])
-		for j := 0; j < len(seed); j++ {
-			seed[j] = byte(j)
-		}
+		rand.Read(seed)
 		sk, err := GeneratePrivateKey(curve, seed)
 		if err != nil {
 			log.Error(err.Error())
@@ -74,29 +75,27 @@ func TestECDSAEncodeDecode(t *testing.T) {
 		t.Logf("Testing encode/decode for curve %s", curve)
 		// Key generation seed
 		seed := make([]byte, ECDSAseedLen[i])
-		for j := 0; j < len(seed); j++ {
-			seed[j] = byte(j)
-		}
+		rand.Read(seed)
 		sk, err := GeneratePrivateKey(curve, seed)
 		assert.Nil(t, err, "the key generation has failed")
 
 		skBytes, err := sk.Encode()
-		assert.Nil(t, err, "the key encoding has failed")
+		require.Nil(t, err, "the key encoding has failed")
 		skCheck, err := DecodePrivateKey(curve, skBytes)
+		require.Nil(t, err, "the key decoding has failed")
 		assert.True(t, sk.Equals(skCheck), "key equality check failed")
-		assert.Nil(t, err, "the key decoding has failed")
 		skCheckBytes, err := skCheck.Encode()
-		assert.Nil(t, err, "the key encoding has failed")
+		require.Nil(t, err, "the key encoding has failed")
 		assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
 
 		pk := sk.PublicKey()
 		pkBytes, err := pk.Encode()
-		assert.Nil(t, err, "the key encoding has failed")
+		require.Nil(t, err, "the key encoding has failed")
 		pkCheck, err := DecodePublicKey(curve, pkBytes)
+		require.Nil(t, err, "the key decoding has failed")
 		assert.True(t, pk.Equals(pkCheck), "key equality check failed")
-		assert.Nil(t, err, "the key decoding has failed")
 		pkCheckBytes, err := pkCheck.Encode()
-		assert.Nil(t, err, "the key encoding has failed")
+		require.Nil(t, err, "the key encoding has failed")
 		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
 	}
 }

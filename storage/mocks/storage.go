@@ -33,6 +33,21 @@ func (m *MockBlocks) EXPECT() *MockBlocksMockRecorder {
 	return m.recorder
 }
 
+// ByCollectionID mocks base method
+func (m *MockBlocks) ByCollectionID(arg0 flow.Identifier) (*flow.Block, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ByCollectionID", arg0)
+	ret0, _ := ret[0].(*flow.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ByCollectionID indicates an expected call of ByCollectionID
+func (mr *MockBlocksMockRecorder) ByCollectionID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByCollectionID", reflect.TypeOf((*MockBlocks)(nil).ByCollectionID), arg0)
+}
+
 // ByHeight mocks base method
 func (m *MockBlocks) ByHeight(arg0 uint64) (*flow.Block, error) {
 	m.ctrl.T.Helper()
@@ -61,6 +76,20 @@ func (m *MockBlocks) ByID(arg0 flow.Identifier) (*flow.Block, error) {
 func (mr *MockBlocksMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockBlocks)(nil).ByID), arg0)
+}
+
+// IndexByGuarantees mocks base method
+func (m *MockBlocks) IndexByGuarantees(arg0 flow.Identifier) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IndexByGuarantees", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IndexByGuarantees indicates an expected call of IndexByGuarantees
+func (mr *MockBlocksMockRecorder) IndexByGuarantees(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexByGuarantees", reflect.TypeOf((*MockBlocks)(nil).IndexByGuarantees), arg0)
 }
 
 // Store mocks base method
@@ -167,21 +196,6 @@ func (mr *MockCollectionsMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockCollections)(nil).ByID), arg0)
 }
 
-// CollectionIDByTransactionID mocks base method
-func (m *MockCollections) CollectionIDByTransactionID(arg0 flow.Identifier) (*flow.Identifier, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CollectionIDByTransactionID", arg0)
-	ret0, _ := ret[0].(*flow.Identifier)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CollectionIDByTransactionID indicates an expected call of CollectionIDByTransactionID
-func (mr *MockCollectionsMockRecorder) CollectionIDByTransactionID(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CollectionIDByTransactionID", reflect.TypeOf((*MockCollections)(nil).CollectionIDByTransactionID), arg0)
-}
-
 // LightByID mocks base method
 func (m *MockCollections) LightByID(arg0 flow.Identifier) (*flow.LightCollection, error) {
 	m.ctrl.T.Helper()
@@ -195,6 +209,21 @@ func (m *MockCollections) LightByID(arg0 flow.Identifier) (*flow.LightCollection
 func (mr *MockCollectionsMockRecorder) LightByID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LightByID", reflect.TypeOf((*MockCollections)(nil).LightByID), arg0)
+}
+
+// LightByTransactionID mocks base method
+func (m *MockCollections) LightByTransactionID(arg0 flow.Identifier) (*flow.LightCollection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LightByTransactionID", arg0)
+	ret0, _ := ret[0].(*flow.LightCollection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LightByTransactionID indicates an expected call of LightByTransactionID
+func (mr *MockCollectionsMockRecorder) LightByTransactionID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LightByTransactionID", reflect.TypeOf((*MockCollections)(nil).LightByTransactionID), arg0)
 }
 
 // Remove mocks base method

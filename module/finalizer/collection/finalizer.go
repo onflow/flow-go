@@ -117,11 +117,26 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize block: %w", err)
 			}
 
-			// TODO add signatures here
+			// don't bother submitting empty collections
+			if payload.Collection.Len() == 0 {
+				continue
+			}
+
+			// NOTE: when we incorporate HotStuff AND require BFT, the consensus
+			// node will need to be able ensure finalization by checking a
+			// 3-chain of children for this block. Probably it will be simplest
+			// to have a follower engine configured for the cluster chain
+			// running on consensus nodes, rather than pushing finalized blocks
+			// explicitly.
+			// For now, we just use the parent signers as the guarantors of this
+			// collection.
+
+			// TODO add real signatures here
 			// https://github.com/dapperlabs/flow-go/issues/2711
 			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: payload.Collection.ID(),
+					SignerIDs:    header.ParentSigners,
 					Signatures:   nil,
 				},
 			})

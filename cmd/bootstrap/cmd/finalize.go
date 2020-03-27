@@ -31,7 +31,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 
 		log.Info().Msg("✨ assembling network and staking keys")
 		partnerNodes := assemblePartnerNodes()
-		stakingNodes := append(internalNodesPub, partnerNodes...)
+		stakingNodes := mergeNodeInfos(internalNodesPub, partnerNodes)
 		writeJSON(filenameNodeInfosPub, stakingNodes)
 		log.Info().Msg("")
 
@@ -146,4 +146,26 @@ func readPartnerNodes() []PartnerNodeInfoPub {
 		partners = append(partners, p)
 	}
 	return partners
+}
+
+func mergeNodeInfos(internalNodesPub, partnerNodes []NodeInfoPub) []NodeInfoPub {
+	nodes := append(internalNodesPub, partnerNodes...)
+
+	// test for duplicate Addresses
+	addressLookup := make(map[string]struct{})
+	for _, node := range nodes {
+		if _, ok := addressLookup[node.Address]; ok {
+			log.Fatal().Str("address", node.Address).Msg("duplicate node address")
+		}
+	}
+
+	// test for duplicate node IDs
+	idLookup := make(map[flow.Identifier]struct{})
+	for _, node := range nodes {
+		if _, ok := idLookup[node.NodeID]; ok {
+			log.Fatal().Str("NodeID", node.NodeID.String()).Msg("duplicate node ID")
+		}
+	}
+
+	return nodes
 }
