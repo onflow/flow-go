@@ -6,10 +6,12 @@ import (
 	"io/ioutil"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/dapperlabs/testingdock"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/go-multierror"
@@ -21,8 +23,15 @@ import (
 )
 
 const (
-	// DefaultDataDir is the default directory for the node database.
-	DefaultDataDir          = "/flowdb"
+	// TmpRoot is the default root directory to create temporary data
+	// directories for containers. We use /tmp because $TMPDIR is not exposed
+	// to docker by default on macOS
+	TmpRoot = "/tmp"
+
+	// DefaultFlowDBDir is the default directory for the node database.
+	DefaultFlowDBDir = "/flowdb"
+	// DefaultExecutionRootDir is the default directory for the execution node
+	// state database.
 	DefaultExecutionRootDir = "/exedb"
 	DefaultExecutionTrieDir = DefaultExecutionRootDir + "/triedb"
 	DefaultExecutionDataDir = DefaultExecutionRootDir + "/valuedb"
@@ -37,7 +46,7 @@ const (
 type FlowNetwork struct {
 	suite      *testingdock.Suite
 	Network    *testingdock.Network
-	Containers []*FlowContainer
+	Containers []*NodeContainer
 }
 
 func (n *FlowNetwork) Identities() flow.IdentityList {
@@ -100,7 +109,7 @@ func (n *FlowNetwork) Cleanup() error {
 
 // ContainerByID returns the container with the given node ID. If such a
 // container exists, returns true. Otherwise returns false.
-func (n *FlowNetwork) ContainerByID(id flow.Identifier) (*FlowContainer, bool) {
+func (n *FlowNetwork) ContainerByID(id flow.Identifier) (*NodeContainer, bool) {
 	for _, c := range n.Containers {
 		if c.Identity.NodeID == id {
 			return c, true
@@ -109,12 +118,19 @@ func (n *FlowNetwork) ContainerByID(id flow.Identifier) (*FlowContainer, bool) {
 	return nil, false
 }
 
-// FlowContainer represents a test Docker container for a generic Flow node.
-type FlowContainer struct {
+// NodeContainer represents a test Docker container for a generic Flow node.
+type NodeContainer struct {
 	*testingdock.Container
 	Identity flow.Identity     // the node identity
 	Ports    map[string]string // port mapping
 	DataDir  string            // host directory bound to container's database
+}
+
+// DB returns the node's database.
+func (c *NodeContainer) DB() (*badger.DB, error) {
+	dbPath := filepath.Join(c.DataDir, DefaultFlowDBDir)
+	db, err := badger.Open(badger.DefaultOptions(dbPath).WithLogger(nil))
+	return db, err
 }
 
 // NodeConfig defines the config for a single node. This is used to start a
@@ -139,46 +155,34 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) *NodeConfig {
 	return c
 }
 
-type rolesCounts map[flow.Role]uint
+// healthcheckGRPC returns a Docker healthcheck function that pings the GRPC
+// service exposed at the given port.
+func healthcheckGRPC(apiPort string) func() error {
+	return func() error {
+		fmt.Println("healthchecking...")
+		c, err := client.New(fmt.Sprintf(":%s", apiPort))
+		if err != nil {
+			return err
+		}
 
-// countRoles counts how many times each role occurs
-func countRoles(identities []*NodeConfig) rolesCounts {
-	ret := make(rolesCounts)
-
-	for _, identity := range identities {
-		ret[identity.Role] = ret[identity.Role] + 1
+		return c.Ping(context.Background())
 	}
-
-	return ret
 }
 
-func healthcheckGRPC(context context.Context, apiPort string) error {
-	fmt.Printf("healthchecking...\n")
-	c, err := client.New("localhost:" + apiPort)
-	if err != nil {
-		return err
-	}
-	return c.Ping(context)
-}
+func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNetwork, error) {
 
-// imageName returns the canonical image name for the given role.
-func imageName(role flow.Role) string {
-	return fmt.Sprintf("gcr.io/dl-flow/%s:latest", role.String())
-}
-
-func PrepareFlowNetwork(context context.Context, t *testing.T, name string, nodes []*NodeConfig) (*FlowNetwork, error) {
+	// get the current user so we can run the Docker container under the same
+	// user and avoid permission conflicts
 	currentUser, _ := user.Current()
 
-	// count each role occurence
-	identitiesCounts := countRoles(nodes)
-
-	// counters for every role containers
-	rolesCounters := rolesCounts{}
+	// keep track of how many role we have assigned so we can number containers
+	// correctly (consensus_1, consensus_2, etc.)
+	roleCounter := make(map[flow.Role]uint)
 
 	opts := make([]*testingdock.ContainerOpts, len(nodes))
 	identities := make([]*flow.Identity, len(nodes))
 	identitiesStr := make([]string, len(nodes))
-	containers := make([]*FlowContainer, len(nodes))
+	containers := make([]*NodeContainer, len(nodes))
 	var networkIdentities string
 
 	suite, _ := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{})
@@ -188,26 +192,14 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		Name: name,
 	})
 
-	// containerName assigns a name to a container - if there are multiple instances of the same role, suffix is added
-	containerName := func(role flow.Role) string {
-		identitiesCount := identitiesCounts[role]
-
-		if identitiesCount == 1 {
-			return role.String()
-		}
-
-		counter := rolesCounters[role]
-		defer func() {
-			rolesCounters[role] = rolesCounters[role] + 1
-		}()
-
-		return fmt.Sprintf("%s_%d", role.String(), counter)
-	}
-
+	// Assigns a configured node to a container name and returns options
+	// to start the container
 	assign := func(node *NodeConfig) (*testingdock.ContainerOpts, *flow.Identity) {
 
-		name := containerName(node.Role)
-		imageName := imageName(node.Role)
+		n := roleCounter[node.Role] + 1
+		name := fmt.Sprintf("%s_%d", node.Role.String(), n)
+		imageName := fmt.Sprintf("gcr.io/dl-flow/%s:latest", node.Role.String())
+		roleCounter[node.Role]++
 
 		opts := &testingdock.ContainerOpts{
 			ForcePull: false,
@@ -229,9 +221,9 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		return opts, &identity
 	}
 
-	add := func(opts *testingdock.ContainerOpts, identity *flow.Identity) *FlowContainer {
+	add := func(opts *testingdock.ContainerOpts, identity *flow.Identity) *NodeContainer {
 
-		flowContainer := &FlowContainer{
+		container := &NodeContainer{
 			Identity: *identity,
 			Ports:    make(map[string]string),
 		}
@@ -239,35 +231,34 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		opts.Config.Cmd = []string{
 			fmt.Sprintf("--entries=%s", networkIdentities),
 			fmt.Sprintf("--nodeid=%s", identity.NodeID.String()),
-			fmt.Sprintf("--datadir=%s", DefaultDataDir),
+			fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
 			"--loglevel=debug",
 			"--nclusters=1",
 		}
 
 		// get a temporary directory in the host. On macOS the default tmp
 		// directory is NOT accessible to Docker by default, so we use /tmp
-		// instead. On Teamcity, we use $TMP (which is not set on macOS).
-		tmproot := os.Getenv("TMP")
-		if tmproot == "" {
-			tmproot = "/tmp"
-		}
-		tmpdir, err := ioutil.TempDir(tmproot, "flow-integration")
+		// instead.
+		tmpdir, err := ioutil.TempDir(TmpRoot, "flow-integration")
 		require.Nil(t, err)
-		flowContainer.DataDir = tmpdir
+		container.DataDir = tmpdir
+
+		// create a directory for the node database
+		flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
+		err = os.Mkdir(flowDBDir, 0700)
+		require.Nil(t, err)
 
 		// Bind the host directory to the container's database directory
 		// NOTE: I did this using the approach from:
 		// https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
 		opts.HostConfig.Binds = append(
 			opts.HostConfig.Binds,
-			fmt.Sprintf("%s:%s:rw", tmpdir, DefaultDataDir),
+			fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
 		)
 
 		switch identity.Role {
-		// enhance with extras for collection node
 		case flow.RoleCollection:
 
-			// get a free host port for the collection node ingress grpc service
 			apiPort := testingdock.RandomPort(t)
 
 			opts.Config.ExposedPorts = nat.PortSet{
@@ -283,24 +274,26 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 				},
 			}
 
-			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
-				return healthcheckGRPC(context, apiPort)
-			})
-
-			flowContainer.Ports[ColNodeAPIPort] = apiPort
+			opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(apiPort))
+			container.Ports[ColNodeAPIPort] = apiPort
 
 		case flow.RoleExecution:
 
 			apiPort := testingdock.RandomPort(t)
-
 			opts.Config.ExposedPorts = nat.PortSet{
 				"9000/tcp": {},
 			}
-			// TODO clean these up in Cleanup
-			tmpTrieDir, err := ioutil.TempDir(tmproot, "flow-integration-trie")
+
+			// create directories for execution state trie and values in the tmp
+			// host directory.
+			exeDBTrieDir := filepath.Join(tmpdir, DefaultExecutionTrieDir)
+			err = os.MkdirAll(exeDBTrieDir, 0700)
 			require.Nil(t, err)
-			tmpValueDir, err := ioutil.TempDir(tmproot, "flow-integration-value")
+
+			exeDBValueDir := filepath.Join(tmpdir, DefaultExecutionDataDir)
+			err = os.MkdirAll(exeDBValueDir, 0700)
 			require.Nil(t, err)
+
 			opts.Config.Cmd = append(opts.Config.Cmd,
 				fmt.Sprintf("--rpc-addr=%s:9000", opts.Name),
 				fmt.Sprintf("--triedir=%s", DefaultExecutionRootDir),
@@ -315,22 +308,19 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			}
 			opts.HostConfig.Binds = append(
 				opts.HostConfig.Binds,
-				fmt.Sprintf("%s:%s:rw", tmpTrieDir, DefaultExecutionTrieDir),
-				fmt.Sprintf("%s:%s:rw", tmpValueDir, DefaultExecutionDataDir),
+				fmt.Sprintf("%s:%s:rw", exeDBTrieDir, DefaultExecutionTrieDir),
+				fmt.Sprintf("%s:%s:rw", exeDBValueDir, DefaultExecutionDataDir),
 			)
-			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
-				return healthcheckGRPC(context, apiPort)
-			})
-
-			flowContainer.Ports[ExeNodeAPIPort] = apiPort
+			opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(apiPort))
+			container.Ports[ExeNodeAPIPort] = apiPort
 		}
 
 		c := suite.Container(*opts)
 
 		network.After(c)
-		flowContainer.Container = c
+		container.Container = c
 
-		return flowContainer
+		return container
 	}
 
 	// assigns names and addresses, those depends on numbers of each service

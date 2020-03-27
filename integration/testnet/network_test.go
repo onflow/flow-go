@@ -1,7 +1,6 @@
 package testnet_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,18 +27,19 @@ func TestNetworkSetupBasic(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleVerification),
 	}
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(context.Background(), t, "testing", net)
+	flowNetwork, err := testnet.PrepareFlowNetwork(t, "testing", net)
 	require.NoError(t, err)
+	defer flowNetwork.Cleanup()
 
 	assert.Len(t, flowNetwork.Containers, len(net))
 
 	realData := getNodeInfos(flowNetwork)
 
 	expectedData := []nodeInfo{
-		{image: "gcr.io/dl-flow/collection:latest", name: "collection", address: "collection:2137"},
-		{image: "gcr.io/dl-flow/consensus:latest", name: "consensus", address: "consensus:2137"},
-		{image: "gcr.io/dl-flow/execution:latest", name: "execution", address: "execution:2137"},
-		{image: "gcr.io/dl-flow/verification:latest", name: "verification", address: "verification:2137"},
+		{image: "gcr.io/dl-flow/collection:latest", name: "collection_1", address: "collection_1:2137"},
+		{image: "gcr.io/dl-flow/consensus:latest", name: "consensus_1", address: "consensus_1:2137"},
+		{image: "gcr.io/dl-flow/execution:latest", name: "execution_1", address: "execution_1:2137"},
+		{image: "gcr.io/dl-flow/verification:latest", name: "verification_1", address: "verification_1:2137"},
 	}
 
 	assert.Subset(t, realData, expectedData)
@@ -57,21 +57,22 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleExecution),
 	}
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(context.Background(), t, "testing", net)
+	flowNetwork, err := testnet.PrepareFlowNetwork(t, "testing", net)
 	require.NoError(t, err)
+	defer flowNetwork.Cleanup()
 
 	assert.Len(t, flowNetwork.Containers, len(net))
 
 	realData := getNodeInfos(flowNetwork)
 
 	expectedData := []nodeInfo{
-		{image: "gcr.io/dl-flow/collection:latest", name: "collection_0", address: "collection_0:2137"},
 		{image: "gcr.io/dl-flow/collection:latest", name: "collection_1", address: "collection_1:2137"},
 		{image: "gcr.io/dl-flow/collection:latest", name: "collection_2", address: "collection_2:2137"},
-		{image: "gcr.io/dl-flow/verification:latest", name: "verification_0", address: "verification_0:2137"},
+		{image: "gcr.io/dl-flow/collection:latest", name: "collection_3", address: "collection_3:2137"},
 		{image: "gcr.io/dl-flow/verification:latest", name: "verification_1", address: "verification_1:2137"},
 		{image: "gcr.io/dl-flow/verification:latest", name: "verification_2", address: "verification_2:2137"},
-		{image: "gcr.io/dl-flow/execution:latest", name: "execution", address: "execution:2137"},
+		{image: "gcr.io/dl-flow/verification:latest", name: "verification_3", address: "verification_3:2137"},
+		{image: "gcr.io/dl-flow/execution:latest", name: "execution_1", address: "execution_1:2137"},
 	}
 
 	assert.Subset(t, realData, expectedData)
