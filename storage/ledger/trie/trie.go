@@ -648,10 +648,13 @@ func (s *SMT) updateHistoricalStates(root []byte) error {
 // them into the trie, and if that is successful updates the databases.
 func (s *SMT) Update(keys [][]byte, values [][]byte) error {
 	s.database.NewBatch()
-	res, err := s.UpdateAtomically(s.GetRoot(), keys, values, s.height-1)
+	fmt.Printf("before update - %x\n", s.GetRoot().value)
+	newRoot, err := s.UpdateAtomically(s.GetRoot(), keys, values, s.height-1)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("new root      - %x\n", newRoot.value)
+
 
 	err = s.updateHistoricalStates(s.GetRoot().value)
 	if err != nil {
@@ -668,7 +671,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte) error {
 		return err
 	}
 
-	s.root = res
+	s.root = newRoot
 
 	s.invalidateCache(keys)
 

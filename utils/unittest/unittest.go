@@ -43,12 +43,12 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	}
 }
 
-func tempDBDir() (string, error) {
+func TempDBDir() (string, error) {
 	return ioutil.TempDir("", "flow-test-db")
 }
 
 func TempBadgerDB(t *testing.T) *badger.DB {
-	dir, err := tempDBDir()
+	dir, err := TempDBDir()
 	require.Nil(t, err)
 
 	// Ref: https://github.com/dgraph-io/badger#memory-usage
@@ -58,17 +58,21 @@ func TempBadgerDB(t *testing.T) *badger.DB {
 	return db
 }
 
-func TempLevelDB(t *testing.T) *leveldb.LevelDB {
-	dir, err := tempDBDir()
-	require.Nil(t, err)
-
+func LevelDBInDir(t *testing.T, dir string) *leveldb.LevelDB {
 	kvdbPath := filepath.Join(dir, "kvdb")
 	tdbPath := filepath.Join(dir, "tdb")
 
 	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	return db
+}
+
+func TempLevelDB(t *testing.T) *leveldb.LevelDB {
+	dir, err := TempDBDir()
+	require.Nil(t, err)
+
+	return LevelDBInDir(t, dir)
 }
 
 func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
@@ -87,8 +91,8 @@ func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {
 
 	defer func() {
 		err1, err2 := db.SafeClose()
-		require.Nil(t, err1)
-		require.Nil(t, err2)
+		require.NoError(t, err1)
+		require.NoError(t, err2)
 	}()
 
 	f(db)
