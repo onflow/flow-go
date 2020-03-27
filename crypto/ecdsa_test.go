@@ -99,3 +99,27 @@ func TestECDSAEncodeDecode(t *testing.T) {
 		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
 	}
 }
+
+func TestECDSAEquals(t *testing.T) {
+	// generate a key pair
+	h, err := NewHasher(SHA3_384)
+	require.NoError(t, err)
+	seed := h.ComputeHash([]byte{1, 2, 3, 4})
+	// first pair
+	sk1, err := GeneratePrivateKey(ECDSA_P256, seed)
+	require.NoError(t, err)
+	pk1 := sk1.PublicKey()
+	// second pair
+	sk2, err := GeneratePrivateKey(ECDSA_P256, seed)
+	require.NoError(t, err)
+	pk2 := sk2.PublicKey()
+	// unrelated algo pair
+	sk3, err := GeneratePrivateKey(ECDSA_SECp256k1, seed)
+	require.NoError(t, err)
+	pk3 := sk3.PublicKey()
+	// tests
+	assert.True(t, sk1.Equals(sk2))
+	assert.True(t, pk1.Equals(pk2))
+	assert.False(t, sk1.Equals(sk3))
+	assert.False(t, pk1.Equals(pk3))
+}

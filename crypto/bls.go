@@ -148,7 +148,12 @@ func (a *PrKeyBLS_BLS12381) Encode() ([]byte, error) {
 }
 
 func (sk *PrKeyBLS_BLS12381) Equals(other PrivateKey) bool {
-	return KeysEqual(sk, other)
+	otherBLS, ok := other.(*PrKeyBLS_BLS12381)
+	if !ok {
+		fmt.Println("euh")
+		return false
+	}
+	return sk.scalar.equals(&otherBLS.scalar)
 }
 
 // PubKeyBLS_BLS12381 is the public key of BLS using BLS12_381,
@@ -174,6 +179,10 @@ func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {
 	return dest, nil
 }
 
-func (sk *PubKeyBLS_BLS12381) Equals(other PublicKey) bool {
-	return KeysEqual(sk, other)
+func (pk *PubKeyBLS_BLS12381) Equals(other PublicKey) bool {
+	otherBLS, ok := other.(*PubKeyBLS_BLS12381)
+	if !ok {
+		return false
+	}
+	return pk.point.equals(&otherBLS.point)
 }
