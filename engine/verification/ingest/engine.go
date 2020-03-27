@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
+	verification2 "github.com/dapperlabs/flow-go/model/verification"
 	trackers "github.com/dapperlabs/flow-go/model/verification/tracker"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -36,9 +37,9 @@ type Engine struct {
 	state                protocol.State
 	verifierEng          network.Engine                // for submitting ERs that are ready to be verified
 	authReceipts         mempool.Receipts              // keeps receipts with authenticated origin IDs
-	pendingReceipts      mempool.Receipts              // keeps receipts pending for their originID to be authenticated
+	pendingReceipts      mempool.PendingReceipts       // keeps receipts pending for their originID to be authenticated
 	authCollections      mempool.Collections           // keeps collections with authenticated origin IDs
-	pendingCollections   mempool.Collections           // keeps collections pending for their origin IDs to be authenticated
+	pendingCollections   mempool.PendingCollections    // keeps collections pending for their origin IDs to be authenticated
 	collectionTrackers   mempool.CollectionTrackers    // keeps track of collection requests that this engine made
 	chunkDataPacks       mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
 	chunkDataPackTackers mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
@@ -57,9 +58,9 @@ func New(
 	me module.Local,
 	verifierEng network.Engine,
 	authReceipts mempool.Receipts,
-	pendingReceipts mempool.Receipts,
+	pendingReceipts mempool.PendingReceipts,
 	authCollections mempool.Collections,
-	pendingCollections mempool.Collections,
+	pendingCollections mempool.PendingCollections,
 	collectionTrackers mempool.CollectionTrackers,
 	chunkStates mempool.ChunkStates,
 	chunkStateTrackers mempool.ChunkStateTrackers,
@@ -191,7 +192,11 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	if err != nil {
 		// TODO: potential attack on authenticity
 		// stores ER in pending receipts till a block arrives authenticating this
-		err = e.pendingReceipts.Add(receipt)
+		preceipt := &verification2.PendingReceipt{
+			Receipt:  receipt,
+			OriginID: originID,
+		}
+		err = e.pendingReceipts.Add(preceipt)
 		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
 		}
@@ -271,10 +276,10 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not store block: %w", err)
 	}
-
+	// TODO move this authentication to a single place
 	blockID := block.ID()
-	for _, receipt := range e.pendingReceipts.All() {
-		if receipt.ExecutionResult.BlockID == blockID {
+	for _, preceipt := range e.pendingReceipts.All() {
+		if preceipt.Receipt.ExecutionResult.BlockID == blockID {
 			// adds receipt to authenticated receipts pool
 			err := e.authReceipts.Add(receipt)
 			if err != nil {
@@ -306,7 +311,11 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 	tracker, err := e.collectionTrackers.ByCollectionID(collID)
 	if err != nil {
 		// collections with no tracker add to the pending collections mempool
-		err = e.pendingCollections.Add(coll)
+		pcoll := &verification2.PendingCollection{
+			Collection: coll,
+			OriginID:   originID,
+		}
+		err = e.pendingCollections.Add(pcoll)
 		if err != nil && err != mempool.ErrEntityAlreadyExists {
 			return fmt.Errorf("could not store collection in pending pool: %w", err)
 		}
@@ -481,12 +490,64 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Iden
 	return nil
 }
 
-// getBlockForReceipt checks the block referenced by the given receipt. If the
+// getBlockForPendingReceipt checks the block referenced by the given pending receipt. If the
+// block is available locally, it evaluates the receipt origin based on block.
+// If origin authentication passes, it returns block and true, and also moves the receipt from pending
+// to authenticated. Otherwise, it returns nil, and false and drops the receipt.
+// Otherwise, returns false and requests the block.
+// TODO does not yet request block
+func (e *Engine) getBlockForPendingReceipt(preceipt *verification2.PendingReceipt) (*flow.Block, bool) {
+	// ensure we have the block corresponding to this pending execution receipt
+	block, err := e.blockStorage.ByID(preceipt.Receipt.ExecutionResult.BlockID)
+	if err != nil {
+		// TODO should request the block here. For now, we require that we
+		// have received the block at this point as there is no way to request it
+		return nil, false
+	}
+
+	// since block is available, removes receipt from pending ones
+	e.pendingReceipts.Rem(preceipt.Receipt.ID())
+
+	// validates origin of execution receipt
+	origin, err := e.state.AtBlockID(block.ID()).Identity(preceipt.OriginID)
+	if err != nil {
+		e.log.Error().Err(err).
+			Hex("receipt_id", logging.ID(preceipt.Receipt.ID())).
+			Hex("origin_id", logging.ID(origin.ID())).
+			Msg("invalid id for origin ID of pending execution receipts")
+		return nil, false
+	}
+	// execution results are only valid from execution nodes
+	if origin.Role != flow.RoleExecution {
+		// TODO: potential attack on integrity
+		e.log.Error().Err(err).
+			Hex("receipt_id", logging.ID(preceipt.Receipt.ID())).
+			Hex("origin_id", logging.ID(origin.ID())).
+			Uint8("origin_role", uint8(origin.Role)).
+			Msg("invalid role for origin ID of pending execution receipts")
+		return nil, false
+	}
+
+	// store the execution receipt in the store of the engine
+	// this will fail if the receipt already exists in the store
+	err = e.authReceipts.Add(preceipt.Receipt)
+	if err != nil && err != mempool.ErrEntityAlreadyExists {
+		// TODO this is a leakage edge case that should be handled
+		e.log.Error().Err(err).
+			Hex("receipt_id", logging.ID(preceipt.Receipt.ID())).
+			Hex("origin_id", logging.ID(origin.ID())).
+			Msg("invalid role for origin ID of pending execution receipts")
+	}
+
+	return block, true
+}
+
+// getBlockForAuthenticatedReceipt checks the block referenced by the given authenticated receipt. If the
 // block is available locally, returns true and the block. Otherwise, returns
 // false and requests the block.
 // TODO does not yet request block
-func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
-	// ensure we have the block corresponding to this execution
+func (e *Engine) getBlockForAuthenticatedReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
+	// ensure we have the block corresponding to this pending execution receipt
 	block, err := e.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		// TODO should request the block here. For now, we require that we
@@ -615,7 +676,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 	// checks pending collections
 	if e.pendingCollections.Has(collID) {
 		// moves collection from pending to authenticated collections
-		coll, err := e.pendingCollections.ByID(collID)
+		pcoll, err := e.pendingCollections.ByID(collID)
 		if err != nil {
 			// couldn't get the collection from mempool
 			log.Error().
@@ -625,7 +686,29 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 			return nil, false
 		}
 
-		err = e.authCollections.Add(coll)
+		// verifies pending collection origin
+		origin, err := e.state.AtBlockID(block.ID()).Identity(pcoll.OriginID)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Hex("collection_id", logging.ID(pcoll.OriginID)).
+				Hex("origin_id", logging.ID(pcoll.OriginID)).
+				Msg("could not get collection from pending pool")
+			return nil, false
+		}
+
+		if origin.Role != flow.RoleCollection {
+			// origin has an invalid role
+			log.Error().
+				Err(err).
+				Hex("collection_id", logging.ID(pcoll.OriginID)).
+				Hex("origin_id", logging.ID(pcoll.OriginID)).
+				Uint8("origin_role", uint8(origin.Role)).
+				Msg("invalid role for receiving collection")
+			return nil, false
+		}
+
+		err = e.authCollections.Add(pcoll.Collection)
 		if err != nil {
 			// couldn't add collection from to authenticated mempool
 			log.Error().
@@ -636,7 +719,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		}
 
 		e.pendingCollections.Rem(collID)
-		return coll, true
+		return pcoll.Collection, true
 	}
 
 	// the collection is missing, the receipt cannot yet be verified
@@ -649,7 +732,6 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 			Msg("could not request collection")
 	}
 	return nil, false
-
 }
 
 // checkPendingChunks checks all pending chunks of receipts in the mempool and verifies
@@ -663,24 +745,15 @@ func (e *Engine) checkPendingChunks() {
 	// asks for missing blocks
 	pending := e.pendingReceipts.All()
 	for _, receipt := range pending {
-		_, blockReady := e.getBlockForReceipt(receipt)
+		_, blockReady := e.getBlockForPendingReceipt(receipt)
 		if !blockReady {
 			continue
 		}
-		err := e.authReceipts.Add(receipt)
-		if err != nil && err != mempool.ErrEntityAlreadyExists {
-			e.log.Error().Err(err).
-				Hex("receipt_id", logging.ID(receipt.ID())).
-				Msg("could not add receipt to the authenticated receipts pool")
-		}
-
-		e.pendingReceipts.Rem(receipt.ID())
 	}
 
 	receipts := e.authReceipts.All()
-
 	for _, receipt := range receipts {
-		block, blockReady := e.getBlockForReceipt(receipt)
+		block, blockReady := e.getBlockForAuthenticatedReceipt(receipt)
 		// we can't get collections without the block
 		if !blockReady {
 			continue
