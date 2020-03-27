@@ -1,3 +1,6 @@
+// Package client implements a GRPC client to the Flow network API. This
+// matches the client exposed by the SDK is intended to be replaced by the SDK
+// once its protobuf definitions are up-to-date.
 package client
 
 import (

@@ -272,6 +272,38 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	return seed, nil
 }
 
+func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
+	var unfinalizedBlockIDs []flow.Identifier
+	err := s.state.db.View(func(tx *badger.Txn) error {
+		var boundary uint64
+		// retrieve the current finalized view
+		err := operation.RetrieveBoundary(&boundary)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve boundary: %w", err)
+		}
+
+		// retrieve the block ID of the last finalized block
+		var headID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &headID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve head: %w", err)
+		}
+
+		// find all the unfinalized blocks that connect to the finalized block
+		// the order guarantees that if a block requires certain blocks to connect to the
+		// finalized block, those connecting blocks must appear before this block.
+		operation.FindDescendants(boundary, headID, &unfinalizedBlockIDs)
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not find unfinalized block IDs: %w", err)
+	}
+
+	return unfinalizedBlockIDs, nil
+}
+
 func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, filters []flow.IdentityFilter) (map[flow.Identifier]int64, error) {
 
 	// define start and end prefixes for the range scan

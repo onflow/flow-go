@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -11,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -28,6 +30,8 @@ import (
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
+	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 const (
@@ -192,7 +196,8 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
 
-	db, err := badger.Open(badger.DefaultOptions(fnb.BaseConfig.datadir).WithLogger(nil))
+	opts := badger.DefaultOptions(fnb.BaseConfig.datadir).WithLogger(nil)
+	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 	fnb.DB = db
 }
@@ -208,10 +213,8 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	// check if database is initialized
-	lsm, vlog := fnb.DB.Size()
-	if vlog > 0 || lsm > 0 {
-		fnb.Logger.Debug().Msg("using existing database")
-	} else {
+	head, err := state.Final().Head()
+	if errors.Is(err, storage.ErrNotFound) {
 		// Bootstrap!
 
 		fnb.Logger.Info().Msg("bootstrapping empty database")
@@ -263,6 +266,13 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
+	} else if err != nil {
+		fnb.Logger.Fatal().Err(err).Msg("could not check database")
+	} else {
+		fnb.Logger.Info().
+			Hex("final_id", logging.ID(head.ID())).
+			Uint64("final_height", head.Height).
+			Msg("using existing database")
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.NodeID)
@@ -411,7 +421,7 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	// initialize signal catcher
 	fnb.sig = make(chan os.Signal, 1)
-	signal.Notify(fnb.sig, os.Interrupt)
+	signal.Notify(fnb.sig, os.Interrupt, syscall.SIGTERM)
 
 	// parse configuration parameters
 	pflag.Parse()
@@ -459,6 +469,8 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handleDoneObject(doneObject)
 	}
 
+	fnb.closeDatabase()
+
 	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.name)
 
 	os.Exit(0)
@@ -467,6 +479,15 @@ func (fnb *FlowNodeBuilder) Run() {
 
 func (fnb *FlowNodeBuilder) handlePostInit(f func(node *FlowNodeBuilder)) {
 	f(fnb)
+}
+
+func (fnb *FlowNodeBuilder) closeDatabase() {
+	err := fnb.DB.Close()
+	if err != nil {
+		fnb.Logger.Error().
+			Err(err).
+			Msg("could not close database")
+	}
 }
 
 // load private key loads the private key of the node, e.g., from disk

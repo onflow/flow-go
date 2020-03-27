@@ -29,6 +29,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/protocol"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 func main() {
@@ -93,6 +94,11 @@ func main() {
 			// create genesis block for cluster consensus
 			genesis := model.Genesis()
 			genesis.ChainID = clusterID
+
+			node.Logger.Info().
+				Hex("genesis_id", logging.ID(genesis.ID())).
+				Str("cluster_id", clusterID).
+				Msg("bootstrapped cluster state")
 
 			// bootstrap cluster consensus state
 			err = clusterState.Mutate().Bootstrap(genesis)
