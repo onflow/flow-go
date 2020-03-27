@@ -6,9 +6,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -18,14 +17,13 @@ import (
 func Recover(
 	log zerolog.Logger,
 	f hotstuff.Forks,
+	validator hotstuff.Validator,
 	headers storage.Headers,
-	me module.Local,
 	ps protocol.State,
-	dkgPubData *hotstuff.DKGPublicData,
-	trustedRoot *forks.BlockQC) error {
+) error {
 
 	// create the recovery component
-	recovery, err := forks.NewForksRecovery(log, f, me, ps, dkgPubData, trustedRoot)
+	recovery, err := forks.NewForksRecovery(log, f, validator)
 	if err != nil {
 		return fmt.Errorf("can't create ForksRecovery instance: %w", err)
 	}
