@@ -79,10 +79,10 @@ func (en ExecutionNode) Done() {
 type VerificationNode struct {
 	GenericNode
 	AuthReceipts          mempool.Receipts
-	PendingReceipts       mempool.Receipts
+	PendingReceipts       mempool.PendingReceipts
 	BlockStorage          storage.Blocks
 	AuthCollections       mempool.Collections
-	PendingCollections    mempool.Collections
+	PendingCollections    mempool.PendingCollections
 	CollectionTrackers    mempool.CollectionTrackers
 	ChunkStates           mempool.ChunkStates
 	ChunkStateTracker     mempool.ChunkStateTrackers

@@ -261,7 +261,7 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.PendingReceipts == nil {
-		node.PendingReceipts, err = stdmap.NewReceipts(1000)
+		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
 		require.Nil(t, err)
 	}
 
@@ -271,7 +271,7 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.PendingCollections == nil {
-		node.PendingCollections, err = stdmap.NewCollections(1000)
+		node.PendingCollections, err = stdmap.NewPendingCollections(1000)
 		require.Nil(t, err)
 	}
 
