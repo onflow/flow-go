@@ -239,20 +239,25 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.GenesisBlock = flow.Genesis(ids)
 
 		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadRootBlockSignatures(fnb.BaseConfig.genesisDir + "/" + rootBlockSignatures)
+		fnb.GenesisQC, err = loadRootBlockSignatures(fnb.BaseConfig.genesisDir)
 		if err != nil {
 			// TODO ignore this error until integration tests are updated to include this file
 			// ref https://github.com/dapperlabs/flow-go/issues/3057
 			//fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 			fnb.Logger.Warn().Err(err).Msg("ignoring failure to read root block sigs")
 		}
-		fnb.DKGPubData, err = loadDKGPublicData(fnb.BaseConfig.genesisDir + "/" + dkgPublicData)
+		fnb.DKGPubData, err = loadDKGPublicData(fnb.BaseConfig.genesisDir)
 		if err != nil {
 			// TODO ignore this error until integration tests are updated to include this file
 			// ref https://github.com/dapperlabs/flow-go/issues/3057
 			//fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 			fnb.Logger.Warn().Err(err).Msg("ignoring failure to read dkg pub data")
 		}
+
+		// TODO handle unused function lint errors
+		// ref https://github.com/dapperlabs/flow-go/issues/3057
+		_, _ = loadIdentityList(fnb.BaseConfig.genesisDir)
+		_, _ = loadTrustedRootBlock(fnb.BaseConfig.genesisDir)
 
 		err = state.Mutate().Bootstrap(fnb.GenesisBlock)
 		if err != nil {
@@ -529,7 +534,7 @@ func generatePublicNetworkKey(ids flow.IdentityList) error {
 }
 
 func loadIdentityList(path string) (flow.IdentityList, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := ioutil.ReadFile(filepath.Join(path, identityList))
 	if err != nil {
 		return nil, err
 	}
@@ -539,7 +544,7 @@ func loadIdentityList(path string) (flow.IdentityList, error) {
 }
 
 func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := ioutil.ReadFile(filepath.Join(path, dkgPublicData))
 	if err != nil {
 		return nil, err
 	}
@@ -549,7 +554,7 @@ func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
 }
 
 func loadTrustedRootBlock(path string) (*flow.Block, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := ioutil.ReadFile(filepath.Join(path, trustedRootBlock))
 	if err != nil {
 		return nil, err
 	}
@@ -560,7 +565,7 @@ func loadTrustedRootBlock(path string) (*flow.Block, error) {
 }
 
 func loadRootBlockSignatures(path string) (*model.AggregatedSignature, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := ioutil.ReadFile(filepath.Join(path, rootBlockSignatures))
 	if err != nil {
 		return nil, err
 	}
