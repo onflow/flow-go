@@ -22,6 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	verificationmodel "github.com/dapperlabs/flow-go/model/verification"
 	"github.com/dapperlabs/flow-go/model/verification/tracker"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -165,7 +166,9 @@ func (suite *TestSuite) TestHandleBlock() {
 
 	// expects that checkPendingChunks is executed checking for pending and authenticated receipts
 	// pendingReceipts iteration on All happens twice one at handlingBlocks and one at checkPendingChunks
-	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil).Twice()
+
+	// receipt should go to the pending receipts mempool
+	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}, nil).Twice()
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil).Once()
@@ -207,7 +210,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// expect that we already have the receipt in the authenticated receipts mempool
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
-	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
+	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 
 	// expect that the collection is requested
@@ -251,7 +254,17 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 
 	// receipt should go to the pending receipts mempool
 	suite.pendingReceipts.On("Add", suite.receipt).Return(nil).Once()
-	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}).Once()
+
+	// creates and mocks a pending receipt for the unstaked node
+	p := &verificationmodel.PendingReceipt{
+		Receipt:  suite.receipt,
+		OriginID: unstakedIdentity,
+	}
+	preceipts := []*verificationmodel.PendingReceipt{p}
+
+	// receipt should go to the pending receipts mempool
+	suite.pendingReceipts.On("Add", p).Return(nil).Once()
+	suite.pendingReceipts.On("All").Return(preceipts).Once()
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("block does not exist")).Once()
 
@@ -308,7 +321,7 @@ func (suite *TestSuite) TestHandleCollection_Tracked() {
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
-	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}, nil)
 	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
@@ -339,8 +352,13 @@ func (suite *TestSuite) TestHandleCollection_Untracked() {
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).
 		Return(nil, fmt.Errorf("does not exit")).Once()
+	// mocks a pending collection
+	pcoll := &verificationmodel.PendingCollection{
+		Collection: suite.collection,
+		OriginID:   collIdentity.NodeID,
+	}
 	// expects the the collection to be added to pending receipts
-	suite.pendingCollections.On("Add", suite.collection).Return(nil).Once()
+	suite.pendingCollections.On("Add", pcoll).Return(nil).Once()
 
 	err := eng.Process(collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
@@ -419,7 +437,7 @@ func (suite *TestSuite) TestHandleExecutionState_TrackedExecutionState() {
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
-	suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}, nil)
 
 	// mocks a tracker for this chunk state
 	suite.chunkStateTracker.On("ByChunkID", suite.chunkState.ChunkID).Return(stateTracker, nil).Once()
@@ -611,7 +629,15 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.authReceipts.On("Add", suite.receipt).Return(nil)
 			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
 
-			suite.pendingReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+			// creates and mocks a pending receipt for the testcase
+			p := &verificationmodel.PendingReceipt{
+				Receipt:  suite.receipt,
+				OriginID: testcase.from.NodeID,
+			}
+			preceipts := []*verificationmodel.PendingReceipt{p}
+
+			// receipt should go to the pending receipts mempool
+			suite.pendingReceipts.On("All").Return(preceipts)
 			suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true)
 			suite.chunkStateTracker.On("Rem", suite.chunkState.ID()).Return(true)
 			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
