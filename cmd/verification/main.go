@@ -24,10 +24,10 @@ func main() {
 		chunkLimit           uint
 		err                  error
 		authReceipts         *stdmap.Receipts
-		pendingReceipts      *stdmap.Receipts
+		pendingReceipts      *stdmap.PendingReceipts
 		blockStorage         *storage.Blocks
 		authCollections      *stdmap.Collections
-		pendingCollections   *stdmap.Collections
+		pendingCollections   *stdmap.PendingCollections
 		collectionTrackers   *stdmap.CollectionTrackers
 		chunkStates          *stdmap.ChunkStates
 		chunkDataPacks       *stdmap.ChunkDataPacks
@@ -48,7 +48,7 @@ func main() {
 			return err
 		}).
 		Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts, err = stdmap.NewReceipts(receiptLimit)
+			pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
 			return err
 		}).
 		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -56,7 +56,7 @@ func main() {
 			return err
 		}).
 		Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingCollections, err = stdmap.NewCollections(collectionLimit)
+			pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
 			return err
 		}).
 		Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
