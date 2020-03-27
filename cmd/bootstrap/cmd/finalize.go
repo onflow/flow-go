@@ -59,14 +59,14 @@ running the DKG for generating the random beacon keys, generating genesis execut
 func init() {
 	rootCmd.AddCommand(finalizeCmd)
 
-	finalizeCmd.Flags().StringVarP(&flagConfig, "config", "c", "",
+	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
 	_ = finalizeCmd.MarkFlagRequired("config")
-	finalizeCmd.Flags().StringVarP(&flagPartnerNodeInfoDir, "partner-dir", "p", "", fmt.Sprintf("path to directory "+
+	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
 		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
 		"NetworkPubKey, StakingPubKey)", filenamePartnerNodeInfoSuffix))
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
-	finalizeCmd.Flags().StringVarP(&flagPartnerStakes, "partner-stakes", "s", "", "path to a JSON file containing "+
+	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
 }
