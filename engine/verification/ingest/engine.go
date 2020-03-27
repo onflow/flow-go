@@ -266,7 +266,6 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 // handleBlock handles an incoming block.
 func (e *Engine) handleBlock(block *flow.Block) error {
-
 	e.log.Info().
 		Hex("block_id", logging.Entity(block)).
 		Uint64("block_view", block.View).
@@ -276,21 +275,11 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not store block: %w", err)
 	}
-	// TODO move this authentication to a single place
-	blockID := block.ID()
-	for _, preceipt := range e.pendingReceipts.All() {
-		if preceipt.Receipt.ExecutionResult.BlockID == blockID {
-			// adds receipt to authenticated receipts pool
-			err := e.authReceipts.Add(receipt)
-			if err != nil {
-				return fmt.Errorf("could not move receipt to authenticated receipts pool: %w", err)
-			}
 
-			// removes receipt from pending receipts pool
-			e.pendingReceipts.Rem(receipt.ID())
-		}
-	}
+	// checks pending receipts based on this block
+	e.checkPendingReceipts(block.ID())
 
+	// checks pending chunks that
 	e.checkPendingChunks()
 
 	return nil
@@ -427,8 +416,15 @@ func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifi
 // requestExecutionState submits a request for the state required by the
 // given chunk to execution nodes.
 func (e *Engine) requestExecutionState(chunkID flow.Identifier, blockID flow.Identifier) error {
-
-	// extracts list of verifier nodes id
+	// checks chunk state does not have a tracker yet
+	if e.chunkStateTrackers.Has(chunkID) {
+		// chunk state has been already requested
+		// request is dropped
+		// TODO trackers should expire after a while for liveness
+		// https://github.com/dapperlabs/flow-go/issues/3054
+		return nil
+	}
+	// extracts list of execution node ids
 	//
 	exeNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
@@ -460,7 +456,16 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier, blockID flow.Ide
 
 // requestChunkDataPack submits a request for the given chunk ID to the execution nodes.
 func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Identifier) error {
-	// extracts list of verifier nodes id
+	// checks chunk data pack does not have a tracker yet
+	if e.chunkDataPackTackers.Has(chunkID) {
+		// chunk data pack has been already requested
+		// request is dropped
+		// TODO trackers should expire after a while for liveness
+		// https://github.com/dapperlabs/flow-go/issues/3054
+		return nil
+	}
+
+	// extracts list of execution nodes
 	//
 	execNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
@@ -490,63 +495,11 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Iden
 	return nil
 }
 
-// getBlockForPendingReceipt checks the block referenced by the given pending receipt. If the
-// block is available locally, it evaluates the receipt origin based on block.
-// If origin authentication passes, it returns block and true, and also moves the receipt from pending
-// to authenticated. Otherwise, it returns nil, and false and drops the receipt.
-// Otherwise, returns false and requests the block.
-// TODO does not yet request block
-func (e *Engine) getBlockForPendingReceipt(preceipt *verification2.PendingReceipt) (*flow.Block, bool) {
-	// ensure we have the block corresponding to this pending execution receipt
-	block, err := e.blockStorage.ByID(preceipt.Receipt.ExecutionResult.BlockID)
-	if err != nil {
-		// TODO should request the block here. For now, we require that we
-		// have received the block at this point as there is no way to request it
-		return nil, false
-	}
-
-	// since block is available, removes receipt from pending ones
-	e.pendingReceipts.Rem(preceipt.Receipt.ID())
-
-	// validates origin of execution receipt
-	origin, err := e.state.AtBlockID(block.ID()).Identity(preceipt.OriginID)
-	if err != nil {
-		e.log.Error().Err(err).
-			Hex("receipt_id", logging.ID(preceipt.Receipt.ID())).
-			Hex("origin_id", logging.ID(origin.ID())).
-			Msg("invalid id for origin ID of pending execution receipts")
-		return nil, false
-	}
-	// execution results are only valid from execution nodes
-	if origin.Role != flow.RoleExecution {
-		// TODO: potential attack on integrity
-		e.log.Error().Err(err).
-			Hex("receipt_id", logging.ID(preceipt.Receipt.ID())).
-			Hex("origin_id", logging.ID(origin.ID())).
-			Uint8("origin_role", uint8(origin.Role)).
-			Msg("invalid role for origin ID of pending execution receipts")
-		return nil, false
-	}
-
-	// store the execution receipt in the store of the engine
-	// this will fail if the receipt already exists in the store
-	err = e.authReceipts.Add(preceipt.Receipt)
-	if err != nil && err != mempool.ErrEntityAlreadyExists {
-		// TODO this is a leakage edge case that should be handled
-		e.log.Error().Err(err).
-			Hex("receipt_id", logging.ID(preceipt.Receipt.ID())).
-			Hex("origin_id", logging.ID(origin.ID())).
-			Msg("invalid role for origin ID of pending execution receipts")
-	}
-
-	return block, true
-}
-
-// getBlockForAuthenticatedReceipt checks the block referenced by the given authenticated receipt. If the
+// getBlockForReceipt checks the block referenced by the given receipt. If the
 // block is available locally, returns true and the block. Otherwise, returns
 // false and requests the block.
 // TODO does not yet request block
-func (e *Engine) getBlockForAuthenticatedReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
+func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this pending execution receipt
 	block, err := e.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
@@ -673,55 +626,6 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		return coll, true
 	}
 
-	// checks pending collections
-	if e.pendingCollections.Has(collID) {
-		// moves collection from pending to authenticated collections
-		pcoll, err := e.pendingCollections.ByID(collID)
-		if err != nil {
-			// couldn't get the collection from mempool
-			log.Error().
-				Err(err).
-				Hex("collection_id", logging.ID(collID)).
-				Msg("could not get collection from pending pool")
-			return nil, false
-		}
-
-		// verifies pending collection origin
-		origin, err := e.state.AtBlockID(block.ID()).Identity(pcoll.OriginID)
-		if err != nil {
-			log.Error().
-				Err(err).
-				Hex("collection_id", logging.ID(pcoll.OriginID)).
-				Hex("origin_id", logging.ID(pcoll.OriginID)).
-				Msg("could not get collection from pending pool")
-			return nil, false
-		}
-
-		if origin.Role != flow.RoleCollection {
-			// origin has an invalid role
-			log.Error().
-				Err(err).
-				Hex("collection_id", logging.ID(pcoll.OriginID)).
-				Hex("origin_id", logging.ID(pcoll.OriginID)).
-				Uint8("origin_role", uint8(origin.Role)).
-				Msg("invalid role for receiving collection")
-			return nil, false
-		}
-
-		err = e.authCollections.Add(pcoll.Collection)
-		if err != nil {
-			// couldn't add collection from to authenticated mempool
-			log.Error().
-				Err(err).
-				Hex("collection_id", logging.ID(collID)).
-				Msg("could not add collection to authenticated mempool")
-			return nil, false
-		}
-
-		e.pendingCollections.Rem(collID)
-		return pcoll.Collection, true
-	}
-
 	// the collection is missing, the receipt cannot yet be verified
 	// TODO rate limit these requests
 	err := e.requestCollection(collID, block.ID())
@@ -742,18 +646,16 @@ func (e *Engine) checkPendingChunks() {
 	e.checkChunksLock.Lock()
 	defer e.checkChunksLock.Unlock()
 
-	// asks for missing blocks
-	pending := e.pendingReceipts.All()
-	for _, receipt := range pending {
-		_, blockReady := e.getBlockForPendingReceipt(receipt)
-		if !blockReady {
-			continue
-		}
+	// re-sends the requests for pending receipts
+	for _, p := range e.pendingReceipts.All() {
+		e.getBlockForReceipt(p.Receipt)
 	}
 
+	// checks the current authenticated receipts for their resources
+	// ready for verification
 	receipts := e.authReceipts.All()
 	for _, receipt := range receipts {
-		block, blockReady := e.getBlockForAuthenticatedReceipt(receipt)
+		block, blockReady := e.getBlockForReceipt(receipt)
 		// we can't get collections without the block
 		if !blockReady {
 			continue
@@ -869,4 +771,51 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 	}
 
 	return mine, nil
+}
+
+// checkPendingReceipts iterates over all pending receipts
+// if any receipt has the `blockID`, it evaluates the receipt's origin ID
+// if originID is evaluated successfully, the receipt is added to authenticated receipts mempool
+// Otherwise it is dropped completely
+func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
+	for _, p := range e.pendingReceipts.All() {
+		if p.Receipt.ExecutionResult.BlockID == blockID {
+			// removes receipt from pending receipts pool
+			e.pendingReceipts.Rem(p.Receipt.ID())
+			// adds receipt to authenticated receipts pool
+			origin, err := e.state.AtBlockID(blockID).Identity(p.OriginID)
+			if err != nil {
+				// could not verify origin Id of pending receipt based on its referenced block
+				// drops it
+				// TODO: potential attack on authenticity
+				e.log.Error().
+					Err(err).
+					Hex("receipt_id", logging.ID(p.Receipt.ID())).
+					Hex("origin_id", logging.ID(origin.NodeID)).
+					Msg("could not verify origin ID of pending receipt")
+			} else {
+				// execution results are only valid from execution nodes
+				if origin.Role != flow.RoleExecution {
+					// TODO: potential attack on integrity
+					e.log.Error().
+						Err(err).
+						Hex("receipt_id", logging.ID(p.Receipt.ID())).
+						Hex("origin_id", logging.ID(origin.NodeID)).
+						Uint8("origin_role", uint8(origin.Role)).
+						Msg("invalid role for pending execution receipt")
+				}
+				// store the execution receipt in the store of the engine
+				// this will fail if the receipt already exists in the store
+				err = e.authReceipts.Add(p.Receipt)
+				if err != nil && err != mempool.ErrEntityAlreadyExists {
+					// TODO potential memory leakage
+					e.log.Error().
+						Err(err).
+						Hex("receipt_id", logging.ID(p.Receipt.ID())).
+						Hex("origin_id", logging.ID(origin.NodeID)).
+						Msg("could not store authenticated receipt in mempool")
+				}
+			}
+		}
+	}
 }

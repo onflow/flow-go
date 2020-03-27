@@ -27,5 +27,5 @@ type PendingCollections interface {
 
 	// All will retrieve all pending collections that are currently in the memory pool
 	// as a slice.
-	All() []*flow.Collection
+	All() []*verification.PendingCollection
 }
