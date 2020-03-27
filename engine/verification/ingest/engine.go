@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
-	verification2 "github.com/dapperlabs/flow-go/model/verification"
+	verificationmodel "github.com/dapperlabs/flow-go/model/verification"
 	trackers "github.com/dapperlabs/flow-go/model/verification/tracker"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -192,7 +192,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	if err != nil {
 		// TODO: potential attack on authenticity
 		// stores ER in pending receipts till a block arrives authenticating this
-		preceipt := &verification2.PendingReceipt{
+		preceipt := &verificationmodel.PendingReceipt{
 			Receipt:  receipt,
 			OriginID: originID,
 		}
@@ -300,7 +300,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 	tracker, err := e.collectionTrackers.ByCollectionID(collID)
 	if err != nil {
 		// collections with no tracker add to the pending collections mempool
-		pcoll := &verification2.PendingCollection{
+		pcoll := &verificationmodel.PendingCollection{
 			Collection: coll,
 			OriginID:   originID,
 		}
