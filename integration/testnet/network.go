@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"strings"
 	"testing"
 
@@ -23,7 +24,10 @@ import (
 
 const (
 	// DefaultDataDir is the default directory for the node database.
-	DefaultDataDir = "/flow"
+	DefaultDataDir          = "/flow"
+	DefaultExecutionRootDir = "/db"
+	DefaultExecutionTrieDir = DefaultExecutionRootDir + "/triedb"
+	DefaultExecutionDataDir = DefaultExecutionRootDir + "/valuedb"
 
 	// ColNodeAPIPort is the name used for the collection node API port.
 	ColNodeAPIPort = "col-ingress-port"
@@ -165,6 +169,7 @@ func imageName(role flow.Role) string {
 }
 
 func PrepareFlowNetwork(context context.Context, t *testing.T, name string, nodes []*NodeConfig) (*FlowNetwork, error) {
+	currentUser, _ := user.Current()
 
 	// count each role occurence
 	identitiesCounts := countRoles(nodes)
@@ -211,6 +216,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			Name:      name,
 			Config: &container.Config{
 				Image: imageName,
+				User:  fmt.Sprintf("%s:%s", currentUser.Uid, currentUser.Gid),
 			},
 			HostConfig: &container.HostConfig{},
 		}
@@ -252,14 +258,14 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		flowContainer.DataDir = tmpdir
 		// TODO checking and setting permissions
 		{
-			fmt.Println(tmpdir)
-			stat, err := os.Stat(tmpdir)
-			require.Nil(t, err)
-			fmt.Println(stat.Mode().String())
-			err = os.Chmod(tmpdir, 0777)
-			assert.Nil(t, err)
-			stat, err = os.Stat(tmpdir)
-			assert.Nil(t, err)
+			// fmt.Println(tmpdir)
+			// stat, err := os.Stat(tmpdir)
+			// require.Nil(t, err)
+			// fmt.Println(stat.Mode().String())
+			// err = os.Chmod(tmpdir, 0777)
+			// assert.Nil(t, err)
+			// stat, err = os.Stat(tmpdir)
+			// assert.Nil(t, err)
 
 			// TODO creating badger db here
 			db, err := badger.Open(badger.DefaultOptions(tmpdir).WithLogger(nil))
@@ -313,17 +319,27 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			opts.Config.ExposedPorts = nat.PortSet{
 				"9000/tcp": {},
 			}
-			opts.Config.Cmd = append(opts.Config.Cmd, fmt.Sprintf("--rpc-addr=%s:9000", opts.Name))
-			opts.HostConfig = &container.HostConfig{
-				PortBindings: nat.PortMap{
-					"9000/tcp": []nat.PortBinding{
-						{
-							HostIP:   "0.0.0.0",
-							HostPort: apiPort,
-						},
+			tmpTrieDir, err := ioutil.TempDir(tmproot, "flow-integration-trie")
+			require.Nil(t, err)
+			tmpValueDir, err := ioutil.TempDir(tmproot, "flow-integration-value")
+			require.Nil(t, err)
+			opts.Config.Cmd = append(opts.Config.Cmd,
+				fmt.Sprintf("--rpc-addr=%s:9000", opts.Name),
+				fmt.Sprintf("--triedir=%s", DefaultExecutionRootDir),
+			)
+			opts.HostConfig.PortBindings = nat.PortMap{
+				"9000/tcp": []nat.PortBinding{
+					{
+						HostIP:   "0.0.0.0",
+						HostPort: apiPort,
 					},
 				},
 			}
+			opts.HostConfig.Binds = append(
+				opts.HostConfig.Binds,
+				fmt.Sprintf("%s:%s:rw", tmpTrieDir, DefaultExecutionTrieDir),
+				fmt.Sprintf("%s:%s:rw", tmpValueDir, DefaultExecutionDataDir),
+			)
 			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
 				return healthcheckGRPC(context, apiPort)
 			})

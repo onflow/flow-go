@@ -121,5 +121,5 @@ func TestCollection(t *testing.T) {
 
 	// should be able to read a valid latest block
 	assert.Equal(t, chainID, head.ChainID)
-	t.Fail()
+	// t.Fail()
 }
