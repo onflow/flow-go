@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -18,16 +19,32 @@ import (
 // SendTransaction forwards the transaction to the collection node
 func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
 
-	// send the transaction to the collection node
-	resp, err := h.collectionRPC.SendTransaction(ctx, req)
-	if err != nil {
-		return resp, err
-	}
-
 	// convert the request message to a transaction
 	tx, err := convert.MessageToTransaction(req.Transaction)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
+	}
+
+	// TODO: add transaction validation here
+
+	// find the right collection node to send the transaction to
+	targetCollNode, err := h.findCollectionNode(tx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to find collection node for the transacton: %v", err))
+	}
+
+	// dial the collection node
+	collectionConn, err := grpc.Dial(targetCollNode.Address, h.dialOptions...)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to dial the collection node for the transaction: %v", err))
+	}
+
+	collectionRPC := observation.NewObserveServiceClient(collectionConn)
+
+	// send the transaction to the collection node
+	resp, err := collectionRPC.SendTransaction(ctx, req)
+	if err != nil {
+		return resp, err
 	}
 
 	// store the transaction locally
@@ -106,4 +123,18 @@ func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.Tr
 	// otherwise, the finalized block of the transaction has not yet been sealed
 	// hence the transaction is finalized but not sealed
 	return entities.TransactionStatus_STATUS_FINALIZED, nil
+}
+
+// findCollectionNode finds the collection node that the given transaction should be sent to
+func (h *Handler) findCollectionNode(tx flow.TransactionBody) (*flow.Identity, error) {
+	// cluster the collection nodes into the configured amount of clusters
+	clusters, err := h.state.Final().Clusters()
+	if err != nil {
+		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
+	}
+
+	// get the cluster responsible for the transaction
+	txCluster := clusters.ByTxID(tx.ID())
+	targetID := txCluster.Sample(1)[0]
+	return targetID, nil
 }

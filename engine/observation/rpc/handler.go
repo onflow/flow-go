@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -34,6 +35,9 @@ type Handler struct {
 	headers      storage.Headers
 	collections  storage.Collections
 	transactions storage.Transactions
+
+	// optional grpc dial options used when dialing out to the execution and collection nodes
+	dialOptions []grpc.DialOption
 }
 
 func NewHandler(log zerolog.Logger,
@@ -43,7 +47,8 @@ func NewHandler(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) *Handler {
+	transactions storage.Transactions,
+	dialOptions ...grpc.DialOption) *Handler {
 	return &Handler{
 		executionRPC:                      e,
 		collectionRPC:                     c,
@@ -53,6 +58,7 @@ func NewHandler(log zerolog.Logger,
 		transactions:                      transactions,
 		state:                             s,
 		log:                               log,
+		dialOptions:                       dialOptions,
 		UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
 	}
 }
