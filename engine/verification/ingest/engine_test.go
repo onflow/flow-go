@@ -53,9 +53,9 @@ type TestSuite struct {
 	// mock mempools used by the ingest engine, valid resources should be added
 	// to these when they are received from an appropriate node role.
 	authReceipts         *mempool.Receipts
-	pendingReceipts      *mempool.Receipts
+	pendingReceipts      *mempool.PendingReceipts
 	authCollections      *mempool.Collections
-	pendingCollections   *mempool.Collections
+	pendingCollections   *mempool.PendingCollections
 	collectionTrackers   *mempool.CollectionTrackers
 	chunkStates          *mempool.ChunkStates
 	chunkStateTracker    *mempool.ChunkStateTrackers
@@ -68,7 +68,7 @@ type TestSuite struct {
 	receipt       *flow.ExecutionReceipt
 	chunkState    *flow.ChunkState
 	chunkDataPack *flow.ChunkDataPack
-	assigner      *module.ChunkAssigner // mocks chunk assigner
+	assigner      *module.ChunkAssigner
 	collTracker   *tracker.CollectionTracker
 }
 
@@ -92,9 +92,9 @@ func (suite *TestSuite) SetupTest() {
 	suite.ss = &protocol.Snapshot{}
 	suite.blockStorage = &storage.Blocks{}
 	suite.authReceipts = &mempool.Receipts{}
-	suite.pendingReceipts = &mempool.Receipts{}
+	suite.pendingReceipts = &mempool.PendingReceipts{}
 	suite.authCollections = &mempool.Collections{}
-	suite.pendingCollections = &mempool.Collections{}
+	suite.pendingCollections = &mempool.PendingCollections{}
 	suite.collectionTrackers = &mempool.CollectionTrackers{}
 	suite.chunkStates = &mempool.ChunkStates{}
 	suite.chunkStateTracker = &mempool.ChunkStateTrackers{}
