@@ -14,7 +14,6 @@ import (
 type PendingReceipts struct {
 	sync.Mutex
 	*Backend
-	byBlock map[flow.Identifier](map[flow.Identifier]struct{})
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
