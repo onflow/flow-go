@@ -241,13 +241,17 @@ func (fnb *FlowNodeBuilder) initState() {
 		// load genesis QC and DKG data from bootstrap files
 		fnb.GenesisQC, err = loadRootBlockSignatures(fnb.BaseConfig.genesisDir + "/" + rootBlockSignatures)
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
+			// TODO ignore this error until integration tests are updated to include this file
+			// ref https://github.com/dapperlabs/flow-go/issues/3057
+			//fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
+			fnb.Logger.Warn().Err(err).Msg("ignoring failure to read root block sigs")
 		}
 		fnb.DKGPubData, err = loadDKGPublicData(fnb.BaseConfig.genesisDir + "/" + dkgPublicData)
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-		} else {
-			fmt.Println(fnb.DKGPubData)
+			// TODO ignore this error until integration tests are updated to include this file
+			// ref https://github.com/dapperlabs/flow-go/issues/3057
+			//fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
+			fnb.Logger.Warn().Err(err).Msg("ignoring failure to read dkg pub data")
 		}
 
 		err = state.Mutate().Bootstrap(fnb.GenesisBlock)
