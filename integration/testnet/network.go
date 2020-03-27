@@ -10,11 +10,9 @@ import (
 	"testing"
 
 	"github.com/dapperlabs/testingdock"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/go-multierror"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/integration/client"
@@ -24,8 +22,8 @@ import (
 
 const (
 	// DefaultDataDir is the default directory for the node database.
-	DefaultDataDir          = "/flow"
-	DefaultExecutionRootDir = "/db"
+	DefaultDataDir          = "/flowdb"
+	DefaultExecutionRootDir = "/exedb"
 	DefaultExecutionTrieDir = DefaultExecutionRootDir + "/triedb"
 	DefaultExecutionDataDir = DefaultExecutionRootDir + "/valuedb"
 
@@ -256,27 +254,6 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		tmpdir, err := ioutil.TempDir(tmproot, "flow-integration")
 		require.Nil(t, err)
 		flowContainer.DataDir = tmpdir
-		// TODO checking and setting permissions
-		{
-			// fmt.Println(tmpdir)
-			// stat, err := os.Stat(tmpdir)
-			// require.Nil(t, err)
-			// fmt.Println(stat.Mode().String())
-			// err = os.Chmod(tmpdir, 0777)
-			// assert.Nil(t, err)
-			// stat, err = os.Stat(tmpdir)
-			// assert.Nil(t, err)
-
-			// TODO creating badger db here
-			db, err := badger.Open(badger.DefaultOptions(tmpdir).WithLogger(nil))
-			assert.Nil(t, err)
-			err = db.Update(func(tx *badger.Txn) error {
-				return tx.Set([]byte{1, 2}, []byte{3, 4})
-			})
-			assert.Nil(t, err)
-			err = db.Close()
-			assert.Nil(t, err)
-		}
 
 		// Bind the host directory to the container's database directory
 		// NOTE: I did this using the approach from:
@@ -319,6 +296,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			opts.Config.ExposedPorts = nat.PortSet{
 				"9000/tcp": {},
 			}
+			// TODO clean these up in Cleanup
 			tmpTrieDir, err := ioutil.TempDir(tmproot, "flow-integration-trie")
 			require.Nil(t, err)
 			tmpValueDir, err := ioutil.TempDir(tmproot, "flow-integration-value")
