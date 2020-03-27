@@ -108,6 +108,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e",
 		[]string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
+	fnb.flags.StringVarP(&fnb.BaseConfig.genesisDir, "genesispath", "g", "./bootstrap", "path to the genesisblock")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
@@ -215,25 +216,32 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		fnb.Logger.Info().Msg("bootstrapping empty database")
 
-		ids, err := loadIdentityList(fnb.BaseConfig.genesisDir + "/" + identityList)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading identity list")
-		} else {
-			fmt.Println(ids)
+		// TODO for now, use identities from CLI flag and build block dynamically
+		//ids, err := loadIdentityList(fnb.BaseConfig.genesisDir + "/" + identityList)
+		//if err != nil {
+		//	fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading identity list")
+		//}
+		//// Load the rest of the genesis info, eventually needed for the consensus follower
+		//fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.genesisDir + "/" + trustedRootBlock)
+		//if err != nil {
+		//	fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
+		//}
+
+		var ids flow.IdentityList
+		for _, entry := range fnb.BaseConfig.Entries {
+			id, err := flow.ParseIdentity(entry)
+			if err != nil {
+				fnb.Logger.Fatal().Err(err).Str("entry", entry).Msg("could not parse identity")
+			}
+			ids = append(ids, id)
 		}
 
-		// Load the rest of the genesis info, eventually needed for the consensus follower
-		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.genesisDir + "/" + trustedRootBlock)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
-		} else {
-			fmt.Println(fnb.GenesisBlock)
-		}
+		fnb.GenesisBlock = flow.Genesis(ids)
+
+		// load genesis QC and DKG data from bootstrap files
 		fnb.GenesisQC, err = loadRootBlockSignatures(fnb.BaseConfig.genesisDir + "/" + rootBlockSignatures)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
-		} else {
-			fmt.Println(fnb.GenesisQC)
 		}
 		fnb.DKGPubData, err = loadDKGPublicData(fnb.BaseConfig.genesisDir + "/" + dkgPublicData)
 		if err != nil {
