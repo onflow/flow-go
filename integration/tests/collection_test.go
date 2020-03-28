@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dapperlabs/testingdock"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,7 +37,7 @@ func TestCollection(t *testing.T) {
 
 	ctx := context.Background()
 
-	net, err := testnet.PrepareFlowNetwork(ctx, t, "col", nodes)
+	net, err := testnet.PrepareFlowNetwork(t, "col", nodes)
 	require.Nil(t, err)
 
 	net.Start(ctx)
@@ -69,7 +68,7 @@ func TestCollection(t *testing.T) {
 
 	// create a database
 	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
-	db, err := badger.Open(badger.DefaultOptions(colContainer.DataDir).WithLogger(nil))
+	db, err := colContainer.DB()
 	require.Nil(t, err)
 
 	state, err := clusterstate.NewState(db, chainID)

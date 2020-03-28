@@ -32,7 +32,7 @@ func TestMVP_Network(t *testing.T) {
 
 	ctx := context.Background()
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(ctx, t, "mvp", net)
+	flowNetwork, err := testnet.PrepareFlowNetwork(t, "mvp", net)
 	require.NoError(t, err)
 
 	flowNetwork.Start(ctx)

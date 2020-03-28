@@ -61,7 +61,7 @@ func noopTransaction() dsl.Transaction {
 }
 
 func generateRandomKey() (*flow.AccountPrivateKey, error) {
-	seed := make([]byte, 40)
+	seed := make([]byte, 48)
 	_, _ = rand.Read(seed)
 	key, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
 	if err != nil {
