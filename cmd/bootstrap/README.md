@@ -18,9 +18,9 @@ Code structure:
 The bootstrapping will generate the following information:
 
 #### Per node
-* staking key (BLS key with curve BLS12381)
-* networking key (ECDSA key)
-* Random Beacon Key; _only_ for consensus nodes (BLS based on Joint-Feldman DKG for threshold signatures)
+* Staking key (BLS key with curve BLS12381)
+* Networking key (ECDSA key)
+* Random beacon key; _only_ for consensus nodes (BLS based on Joint-Feldman DKG for threshold signatures)
 
 #### Execution state
 * Key for Account-Zero, i.e. the first account on Flow (ECDSA key)
@@ -55,7 +55,7 @@ _Each cluster_ of collector nodes needs to have its own genesis Block and genesi
 This step will generate the staking and networking keys for a _single partner node_.
 
 #### Required Inputs
-values directly specified as command line parameters:
+Values directly specified as command line parameters:
   - node network address
   - node role
   - seed for generating staking key (min 64 bytes in hex encoding)
@@ -83,10 +83,10 @@ go run -tags relic ./cmd/bootstrap key -a "example.com" -r "consensus" --network
 This step will generate the entire genesis information for all nodes (incl. keys for all Dapper-controlled nodes).
 
 #### Required Inputs
-each input is a config file specified as a command line parameter:
-* `json` containing configuration for all Dapper-Controlled nodes (see `/example_files/node-config.json`)
-* folder containing the `<NodeID>.node-info.pub.json` files for _all_ partner nodes
-* `json` containing the stake value for all partner nodes (see `/example_files/partner-stakes.json`). 
+Each input is a config file specified as a command line parameter:
+* `json` containing configuration for all Dapper-Controlled nodes (see `./example_files/node-config.json`)
+* folder containing the `<NodeID>.node-info.pub.json` files for _all_ partner nodes (see `.example_files/partner-node-infos`)
+* `json` containing the stake value for all partner nodes (see `./example_files/partner-stakes.json`). 
   Format: ```<NodeID>: <stake value>```
 
 #### Example
@@ -113,7 +113,7 @@ go run -tags relic ./cmd/bootstrap finalize -c ./cmd/bootstrap/example_files/nod
      file needs to be available to all nodes at boot up (or recovery after crash) 
 
 
-* files `account-0.priv.json`
+* file `account-0.priv.json`
    - strictly CONFIDENTIAL (only for Dapper Labs; not available to any node)
    - contains Account-Zero's private key!
    - file is _not_ required at node start by any node (and should not be accessible)
