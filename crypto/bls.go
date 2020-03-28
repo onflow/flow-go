@@ -150,7 +150,6 @@ func (a *PrKeyBLS_BLS12381) Encode() ([]byte, error) {
 func (sk *PrKeyBLS_BLS12381) Equals(other PrivateKey) bool {
 	otherBLS, ok := other.(*PrKeyBLS_BLS12381)
 	if !ok {
-		fmt.Println("euh")
 		return false
 	}
 	return sk.scalar.equals(&otherBLS.scalar)
