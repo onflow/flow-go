@@ -53,7 +53,7 @@ func (suite *Suite) TestPing() {
 	suite.checkResponse(pong, err)
 }
 
-func (suite *Suite) TestGetLatestFinalizedBlock() {
+func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	// setup the mocks
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(&block, nil).Once()
@@ -72,7 +72,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	suite.assertAllExpectations()
 }
 
-func (suite *Suite) TestGetLatestSealedBlock() {
+func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	//setup the mocks
 	block := unittest.BlockHeaderFixture()
 	seal := unittest.SealFixture()
@@ -194,6 +194,26 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	// status should be sealed since the sealed blocks is greater in height
 	suite.Assert().Equal(entities.TransactionStatus_STATUS_SEALED, resp.Transaction.Status)
 
+	suite.assertAllExpectations()
+}
+
+func (suite *Suite) TestGetLatestFinalizedBlock() {
+	// setup the mocks
+	block := unittest.BlockFixture()
+	header := block.Header
+	suite.snapshot.On("Head").Return(&header, nil).Once()
+	suite.blocks.On("ByID", header.ID()).Return(&block, nil).Once()
+	handler := NewHandler(suite.log, suite.state, nil, nil, suite.blocks, nil, nil, nil)
+
+	// query the handler for the latest finalized header
+	req := &observation.GetLatestBlockRequest{IsSealed: false}
+	resp, err := handler.GetLatestBlock(context.Background(), req)
+	suite.checkResponse(resp, err)
+
+	// make sure we got the latest header
+	expected, err := convert.BlockToMessage(&block)
+	suite.Require().NoError(err)
+	suite.Require().Equal(expected, resp.Block)
 	suite.assertAllExpectations()
 }
 
