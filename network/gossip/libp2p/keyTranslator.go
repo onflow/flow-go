@@ -53,6 +53,8 @@ func keyType(sa fcrypto.SigningAlgorithm) (lcrypto_pb.KeyType, error) {
 	switch sa {
 	case fcrypto.ECDSA_P256:
 		return lcrypto_pb.KeyType_ECDSA, nil
+	case fcrypto.ECDSA_SECp256k1:
+		return lcrypto_pb.KeyType_Secp256k1, nil
 	default:
 		return -1, lcrypto.ErrBadKeyType
 	}
