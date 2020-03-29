@@ -18,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	protocol "github.com/dapperlabs/flow-go/protocol/mocks"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 

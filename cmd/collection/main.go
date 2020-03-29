@@ -6,8 +6,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cluster"
-	badgercluster "github.com/dapperlabs/flow-go/cluster/badger"
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
@@ -27,7 +25,8 @@ import (
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/protocol"
+	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -48,8 +47,8 @@ func main() {
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
 
-		clusterID    string        // chain ID for the cluster
-		clusterState cluster.State // chain state for the cluster
+		clusterID    string         // chain ID for the cluster
+		clusterState *cluster.State // chain state for the cluster
 
 		prov *provider.Engine
 		ing  *ingest.Engine
@@ -86,7 +85,7 @@ func main() {
 
 			// determine the chain ID for my cluster and create cluster state
 			clusterID = protocol.ChainIDForCluster(myCluster)
-			clusterState, err = badgercluster.NewState(node.DB, clusterID)
+			clusterState, err = cluster.NewState(node.DB, clusterID)
 			if err != nil {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}

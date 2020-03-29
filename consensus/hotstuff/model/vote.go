@@ -9,6 +9,8 @@ type Vote struct {
 	BlockID   flow.Identifier
 	View      uint64
 	Signature *SingleSignature
+	SignerID  flow.Identifier // to be used in the new verification component
+	SigData   []byte          // to be used in the new verification component
 }
 
 func (uv *Vote) ID() flow.Identifier {

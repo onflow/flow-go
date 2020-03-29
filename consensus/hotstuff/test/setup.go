@@ -18,8 +18,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/protocol"
-	mockProtocol "github.com/dapperlabs/flow-go/protocol/mocks"
+	"github.com/dapperlabs/flow-go/state/protocol"
+	mockProtocol "github.com/dapperlabs/flow-go/state/protocol/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
