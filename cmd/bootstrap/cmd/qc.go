@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 )
 
 func constructGenesisQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
@@ -54,7 +55,8 @@ func GenerateQCSignerData(allNodes, internalNodes []model.NodeInfo, dkg model.DK
 		})
 	}
 
-	sd.DkgPubData = dkg.ForHotStuff()
+	dkgPubData := dkg.ForHotStuff()
+	sd.DKGState = wrapper.NewState(dkgPubData)
 
 	return sd
 }

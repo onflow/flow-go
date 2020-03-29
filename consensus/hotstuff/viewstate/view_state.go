@@ -3,9 +3,9 @@ package viewstate
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
@@ -17,11 +17,11 @@ type ViewState struct {
 	consensusMembersFilter flow.IdentityFilter // identityFilter to find only the consensus members for the cluster
 	allNodes               flow.IdentityList   // the cached all consensus members for finding leaders for a certain view
 
-	dkgPublicData *hotstuff.DKGPublicData
+	dkgState dkg.State
 }
 
 // New creates a new ViewState instance
-func New(protocolState protocol.State, dkgPublicData *hotstuff.DKGPublicData, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
+func New(protocolState protocol.State, dkgState dkg.State, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
 	// finding all consensus members
 	allNodes, err := protocolState.Final().Identities(consensusMembersFilter)
 	if err != nil {
@@ -37,7 +37,7 @@ func New(protocolState protocol.State, dkgPublicData *hotstuff.DKGPublicData, my
 		myID:                   myID,
 		consensusMembersFilter: consensusMembersFilter,
 		allNodes:               allNodes,
-		dkgPublicData:          dkgPublicData,
+		dkgState:               dkgState,
 	}, nil
 }
 
@@ -56,9 +56,9 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 	return v.IsSelf(v.LeaderForView(view).ID())
 }
 
-// DKGPublicData returns the public DKG data for block
-func (v *ViewState) DKGPublicData() *hotstuff.DKGPublicData {
-	return v.dkgPublicData
+// DKGState returns the public DKG data for block
+func (v *ViewState) DKGState() dkg.State {
+	return v.dkgState
 }
 
 // ConsensusParticipants returns all _staked_ consensus participants at block with blockID.

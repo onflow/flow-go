@@ -6,12 +6,12 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -29,7 +29,7 @@ type HotStuffFollower struct {
 func New(
 	me module.Local,
 	protocolState protocol.State,
-	dkgPubData *hotstuff.DKGPublicData,
+	dkgState dkg.State,
 	trustedRootBlock *flow.Header,
 	rootBlockSigs *model.AggregatedSignature,
 	finalizationCallback module.Finalizer,
@@ -37,7 +37,7 @@ func New(
 	log zerolog.Logger,
 ) (*HotStuffFollower, error) {
 	trustedRoot := unsafeToBlockQC(trustedRootBlock, rootBlockSigs)
-	followerLogic, err := NewFollowerLogic(me, protocolState, dkgPubData, trustedRoot, finalizationCallback, notifier, log)
+	followerLogic, err := NewFollowerLogic(me, protocolState, dkgState, trustedRoot, finalizationCallback, notifier, log)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
 	}

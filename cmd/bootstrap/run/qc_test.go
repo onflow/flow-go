@@ -42,12 +42,12 @@ func createSignerData(t *testing.T, n int) SignerData {
 	stakingKeys, err := unittest.StakingKeys(n)
 	require.NoError(t, err)
 
-	randomBKeys, dkgPubData, err := test.AddRandomBeaconPrivateKeys(t, ids)
+	randomBKeys, dkgState, err := test.AddRandomBeaconPrivateKeys(t, ids)
 	require.NoError(t, err)
 
 	signerData := SignerData{
-		DkgPubData: dkgPubData,
-		Signers:    make([]Signer, n),
+		DKGState: dkgState,
+		Signers:  make([]Signer, n),
 	}
 
 	for i, id := range ids {

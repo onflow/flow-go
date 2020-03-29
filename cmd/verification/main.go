@@ -150,7 +150,7 @@ func main() {
 			// so that it gets notified upon each new finalized block
 			core, err := follower.New(node.Me,
 				node.State,
-				node.DKGPubData,
+				node.DKGState,
 				&node.GenesisBlock.Header,
 				node.GenesisQC,
 				final,

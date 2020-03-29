@@ -17,10 +17,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -28,6 +28,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/trace"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -93,7 +94,7 @@ type FlowNodeBuilder struct {
 	// genesis information
 	GenesisBlock *flow.Block
 	GenesisQC    *model.AggregatedSignature
-	DKGPubData   *hotstuff.DKGPublicData
+	DKGState     *wrapper.State
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -220,10 +221,11 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
-		fnb.DKGPubData, err = loadDKGPublicData(fnb.BaseConfig.bootstrapDir)
+		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.bootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 		}
+		fnb.DKGState = wrapper.NewState(dkgPubData)
 
 		err = state.Mutate().Bootstrap(fnb.GenesisBlock)
 		if err != nil {
@@ -451,12 +453,12 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
+func loadDKGPublicData(path string) (*dkg.PublicData, error) {
 	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameDKGDataPub))
 	if err != nil {
 		return nil, err
 	}
-	dkg := &hotstuff.DKGPublicData{}
+	dkg := &dkg.PublicData{}
 	err = json.Unmarshal(data, dkg)
 	return dkg, err
 }

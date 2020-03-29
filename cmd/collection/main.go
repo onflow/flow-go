@@ -115,7 +115,7 @@ func main() {
 			// TODO use a noop notification consumer for now
 			noop := notifications.NoopConsumer{}
 
-			core, err := follower.New(node.Me, node.State, node.DKGPubData, &node.GenesisBlock.Header, node.GenesisQC, final, noop, node.Logger)
+			core, err := follower.New(node.Me, node.State, node.DKGState, &node.GenesisBlock.Header, node.GenesisQC, final, noop, node.Logger)
 			if err != nil {
 				//return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower

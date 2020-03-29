@@ -1,8 +1,8 @@
 package bootstrap
 
 import (
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -62,14 +62,14 @@ type DKGDataPub struct {
 }
 
 // Public returns the canonical public structure.
-func (dkg *DKGData) Public() DKGDataPub {
+func (dd *DKGData) Public() DKGDataPub {
 
 	pub := DKGDataPub{
-		PubGroupKey:  EncodableRandomBeaconPubKey{PublicKey: dkg.PubGroupKey},
-		Participants: make([]DKGParticipantPub, 0, len(dkg.Participants)),
+		PubGroupKey:  EncodableRandomBeaconPubKey{PublicKey: dd.PubGroupKey},
+		Participants: make([]DKGParticipantPub, 0, len(dd.Participants)),
 	}
 
-	for _, part := range dkg.Participants {
+	for _, part := range dd.Participants {
 		pub.Participants = append(pub.Participants, part.Public())
 	}
 
@@ -77,19 +77,18 @@ func (dkg *DKGData) Public() DKGDataPub {
 }
 
 // ForHotStuff converts DKG data for use in HotStuff.
-func (dkg *DKGData) ForHotStuff() *hotstuff.DKGPublicData {
+func (dd *DKGData) ForHotStuff() *dkg.PublicData {
 
-	participantLookup := make(map[flow.Identifier]*hotstuff.DKGParticipant)
-	for _, part := range dkg.Participants {
-		participantLookup[part.NodeID] = &hotstuff.DKGParticipant{
-			Id:             part.NodeID,
+	participantLookup := make(map[flow.Identifier]*dkg.Participant)
+	for _, part := range dd.Participants {
+		participantLookup[part.NodeID] = &dkg.Participant{
 			PublicKeyShare: part.KeyShare.PublicKey(),
-			DKGIndex:       part.GroupIndex,
+			Index:          uint(part.GroupIndex),
 		}
 	}
 
-	return &hotstuff.DKGPublicData{
-		GroupPubKey:           dkg.PubGroupKey,
-		IdToDKGParticipantMap: participantLookup,
+	return &dkg.PublicData{
+		GroupPubKey:     dd.PubGroupKey,
+		IDToParticipant: participantLookup,
 	}
 }
