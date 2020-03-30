@@ -25,8 +25,8 @@ func (s *ChunkVerifierTestSuite) SetupTest() {
 	s.verifier = NewChunkVerifier(newVirtualMachineMock())
 }
 
-// TestVerification invokes all the tests in this test suite
-func TestVerification(t *testing.T) {
+// TestChunkVerifier invokes all the tests in this test suite
+func TestChunkVerifier(t *testing.T) {
 	suite.Run(t, new(ChunkVerifierTestSuite))
 }
 
@@ -38,7 +38,7 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	assert.Nil(s.T(), err)
 }
 
-// TestMissingRegisterTouchForUpdate tests verification of the a chunkdatapack missing a register touch (update)
+// TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
 	assert.NotNil(s.T(), vch)
@@ -46,15 +46,26 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
 	err := s.verifier.Verify(vch)
 	assert.NotNil(s.T(), err)
+	assert.IsType(s.T(), err, ErrMissingRegisterTouch{})
 }
 
-// TODO TestMissingRegisterTouchForRead
+// TestMissingRegisterTouchForRead tests verification given a chunkdatapack missing a register touch (read)
+func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
+	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
+	assert.NotNil(s.T(), vch)
+	// remove the second register touch
+	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
+	err := s.verifier.Verify(vch)
+	assert.NotNil(s.T(), err)
+	assert.IsType(s.T(), err, ErrMissingRegisterTouch{})
+}
 
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("wrongEndState"))
 	assert.NotNil(s.T(), vch)
 	err := s.verifier.Verify(vch)
 	assert.NotNil(s.T(), err)
+	assert.IsType(s.T(), err, ErrNonMatchingFinalState{})
 }
 
 func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunk {
