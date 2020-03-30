@@ -436,19 +436,14 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		collections = append(collections, &coll)
 		guarantees = append(guarantees, &guarantee)
 
-		var randomValue = make([]byte, 1)
-		_, _ = rand.Read(randomValue[:])
 		// registerTouch and State setup
 		id1 := make([]byte, 32)
-		_, _ = rand.Read(randomValue[:])
-		value1 := randomValue
+		value1 := []byte{'a'}
 
 		id2 := make([]byte, 32)
-		id2[0] = byte(i)
-		_, _ = rand.Read(randomValue[:])
-		value2 := randomValue
-		_, _ = rand.Read(randomValue[:])
-		UpdatedValue2 := randomValue
+		id2[0] = byte(5)
+		value2 := []byte{'b'}
+		UpdatedValue2 := []byte{'B'}
 
 		ids := make([][]byte, 0)
 		values := make([][]byte, 0)
@@ -463,13 +458,12 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 
 		ids = [][]byte{id2}
 		values = [][]byte{UpdatedValue2}
-		f.UpdateRegisters(ids, values)
 
-		// creates a chunk
 		chunk := &flow.Chunk{
 			ChunkBody: flow.ChunkBody{
 				CollectionIndex: uint(i),
-				StartState:      StateCommitmentFixture(),
+				StartState:      startState,
+				EventCollection: IdentifierFixture(),
 			},
 			Index: uint64(i),
 		}
