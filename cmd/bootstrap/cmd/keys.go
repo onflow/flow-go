@@ -67,7 +67,7 @@ func genNetworkAndStakingKeys(partnerNodes []NodeInfoPub) ([]NodeInfoPub, []Node
 	}
 
 	log.Debug().Msgf("will calculated additionally needed collector nodes to have majority in each cluster")
-	additionalCollectorNodes := calcAdditionalCollectorNodes(int(flagCollectionClusters), int(minNodesPerCluster),
+	additionalCollectorNodes := calcAdditionalCollectorNodes(uint(flagCollectionClusters), int(minNodesPerCluster),
 		nodeInfosPub, partnerNodes)
 
 	// for each cluster
@@ -77,7 +77,7 @@ func genNetworkAndStakingKeys(partnerNodes []NodeInfoPub) ([]NodeInfoPub, []Node
 			clusterIndex)
 		// for each node
 		for n := 0; n < nAdditionalNodes; n++ {
-			stakingKey, err := generateStakingKeyInCluster(clusterIndex, int(flagCollectionClusters))
+			stakingKey, err := generateStakingKeyInCluster(uint(clusterIndex), uint(flagCollectionClusters))
 			if err != nil {
 				log.Fatal().Err(err).Msg("cannot generate staking key")
 			}
@@ -149,7 +149,7 @@ func validateAddressesUnique(ns []NodeConfig) {
 // calcAdditionalCollectorNodes calculates how many additional internal collector nodes need to be generated based on
 // the number of clusters and the number of existing nodes. Returns a slice of integers, where each element represents
 // one cluster and the value represents how many nodes are needed in that cluster
-func calcAdditionalCollectorNodes(nClusters int, minPerCluster int, internalNodes, partnerNodes []NodeInfoPub) []int {
+func calcAdditionalCollectorNodes(nClusters uint, minPerCluster int, internalNodes, partnerNodes []NodeInfoPub) []int {
 	partnerNodesByCluster := make([]map[flow.Identifier]struct{}, nClusters)
 	for i := range partnerNodesByCluster {
 		partnerNodesByCluster[i] = make(map[flow.Identifier]struct{})
@@ -181,7 +181,7 @@ func calcAdditionalCollectorNodes(nClusters int, minPerCluster int, internalNode
 	}
 
 	res := make([]int, nClusters)
-	for i := 0; i < nClusters; i++ {
+	for i := uint(0); i < nClusters; i++ {
 		nPartner := len(partnerNodesByCluster[i])
 		nRequiredInternal := nPartner * 2
 		if nPartner+nRequiredInternal < minPerCluster {
@@ -201,19 +201,19 @@ func calcAdditionalCollectorNodes(nClusters int, minPerCluster int, internalNode
 
 // clusterFor returns the cluster index for the given node
 // TODO replace with actual logic
-func clusterFor(nodeID flow.Identifier, nClusters int) int {
+func clusterFor(nodeID flow.Identifier, nClusters uint) uint {
 	cluster := big.NewInt(0).Mod(big.NewInt(0).SetBytes(nodeID[:]), big.NewInt(int64(nClusters)))
 	const maxUint = ^uint(0)
 	const maxInt = int(maxUint >> 1)
 	if !cluster.IsInt64() || cluster.Int64() > int64(maxInt) {
-		log.Fatal().Str("NodeID", nodeID.String()).Int("nClusters", nClusters).Msg("unable to assign cluster")
+		log.Fatal().Str("NodeID", nodeID.String()).Uint("nClusters", nClusters).Msg("unable to assign cluster")
 	}
-	return int(cluster.Int64())
+	return uint(cluster.Int64())
 }
 
 // generateStakingKeyInCluster creates staking keys until it finds one that belongs to the given clusterIndex
 // TODO add timeout?
-func generateStakingKeyInCluster(clusterIndex, nClusters int) (crypto.PrivateKey, error) {
+func generateStakingKeyInCluster(clusterIndex, nClusters uint) (crypto.PrivateKey, error) {
 	for {
 		k, err := run.GenerateStakingKey(generateRandomSeed())
 		if err != nil {

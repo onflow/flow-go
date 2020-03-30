@@ -53,9 +53,21 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgDataPub)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis seal and genesis block")
+		log.Info().Msg("✨ constructing genesis QC")
 		constructGenesisQC(&block, filterConsensusNodes(stakingNodes), filterConsensusNodesPriv(internalNodesPriv),
 			dkgDataPriv)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ computing collector clusters")
+		clusters := computeCollectorClusters(stakingNodes)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ constructing genesis blocks for collector clusters")
+		clusterBlocks := constructGenesisBlocksForCollectorClusters()
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ constructing genesis QCs for collector clusters")
+		constructGenesisQCsForCollectorClusters(clusters, internalNodesPriv, block, clusterBlocks)
 		log.Info().Msg("")
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
