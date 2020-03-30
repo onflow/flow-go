@@ -679,7 +679,7 @@ func (e *Engine) checkPendingChunks() {
 			}
 
 			// TODO replace chunk state with chunk data pack
-			_, chunkDataPackReady := e.getChunkDataPackForReceipt(receipt, chunk.ID())
+			chunkDatapack, chunkDataPackReady := e.getChunkDataPackForReceipt(receipt, chunk.ID())
 			if !chunkDataPackReady {
 				// can not verify a chunk without its chunk data, moves to the next chunk
 				continue
@@ -704,12 +704,13 @@ func (e *Engine) checkPendingChunks() {
 
 			// creates a verifiable chunk for assigned chunk
 			vchunk := &verification.VerifiableChunk{
-				ChunkIndex: chunk.Index,
-				Receipt:    receipt,
-				EndState:   endState,
-				Block:      block,
-				Collection: collection,
-				ChunkState: chunkState,
+				ChunkIndex:    chunk.Index,
+				Receipt:       receipt,
+				EndState:      endState,
+				Block:         block,
+				Collection:    collection,
+				ChunkState:    chunkState,
+				ChunkDataPack: chunkDatapack,
 			}
 
 			// verify the receipt

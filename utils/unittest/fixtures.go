@@ -552,7 +552,7 @@ func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 	return flow.ChunkDataPack{
 		ChunkID:         identifier,
 		StartState:      StateCommitmentFixture(),
-		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
+		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p', 'p', 'p'}}},
 	}
 }
 

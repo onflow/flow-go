@@ -28,10 +28,6 @@ import (
 // - broadcast of a matching result approval to consensus nodes fo each assigned chunk
 func TestHappyPath(t *testing.T) {
 	// number of chunks in an ER
-	// TODO: broken test needs to be fixed
-	// https://github.com/dapperlabs/flow-go/issues/2935
-	t.Skip()
-
 	chunkNum := 10
 	hub := stub.NewNetworkHub()
 
