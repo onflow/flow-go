@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff/round"
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -19,8 +18,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// internal implementation of ColdStuff
-type coldStuff struct {
+// ColdStuff implements coldstuff.
+type ColdStuff struct {
 	log       zerolog.Logger
 	state     protocol.State
 	me        module.Local
@@ -53,14 +52,14 @@ func New(
 	interval time.Duration,
 	timeout time.Duration,
 	head func() (*flow.Header, error),
-) (module.ColdStuff, error) {
+) (*ColdStuff, error) {
 
 	participants, err := state.Final().Identities(memberFilter)
 	if err != nil {
 		return nil, fmt.Errorf("could not get consensus participants: %w", err)
 	}
 
-	cold := coldStuff{
+	cold := &ColdStuff{
 		log:          log,
 		me:           me,
 		state:        state,
@@ -77,10 +76,10 @@ func New(
 		commits:      make(chan *model.Commit, 1),
 	}
 
-	return &cold, nil
+	return cold, nil
 }
 
-func (e *coldStuff) Ready() <-chan struct{} {
+func (e *ColdStuff) Ready() <-chan struct{} {
 	e.unit.Launch(func() {
 		err := e.loop()
 		if err != nil {
@@ -90,22 +89,21 @@ func (e *coldStuff) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
 
-func (e *coldStuff) Done() <-chan struct{} {
+func (e *ColdStuff) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-func (e *coldStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
+func (e *ColdStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
 	// Ignore HotStuff-only values
 	_ = parentView
 
 	e.proposals <- proposal
 }
 
-func (e *coldStuff) SubmitVote(originID, blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature) {
+func (e *ColdStuff) SubmitVote(originID, blockID flow.Identifier, view uint64, sigData []byte) {
 	// Ignore HotStuff-only values
 	_ = view
-	_ = stakingSig
-	_ = randomBeaconSig
+	_ = sigData
 
 	e.votes <- &model.Vote{
 		VoterID: originID,
@@ -113,11 +111,11 @@ func (e *coldStuff) SubmitVote(originID, blockID flow.Identifier, view uint64, s
 	}
 }
 
-func (e *coldStuff) SubmitCommit(commit *model.Commit) {
+func (e *ColdStuff) SubmitCommit(commit *model.Commit) {
 	e.commits <- commit
 }
 
-func (e *coldStuff) loop() error {
+func (e *ColdStuff) loop() error {
 
 	localID := e.me.NodeID()
 	log := e.log.With().Hex("local_id", logging.ID(localID)).Logger()
@@ -210,7 +208,7 @@ ConsentLoop:
 	}
 }
 
-func (e *coldStuff) sendProposal() error {
+func (e *ColdStuff) sendProposal() error {
 	log := e.log.With().
 		Str("action", "send_proposal").
 		Logger()
@@ -225,7 +223,7 @@ func (e *coldStuff) sendProposal() error {
 	setProposer := func(header *flow.Header) {
 		header.ProposerID = myIdentity.NodeID
 		header.View = e.round.Parent().View + 1
-		header.ParentSigners = e.participants.NodeIDs()
+		header.ParentVoterIDs = e.participants.NodeIDs()
 	}
 
 	// define payload and build next block
@@ -260,7 +258,7 @@ func (e *coldStuff) sendProposal() error {
 // waitForVotes will wait for received votes and validate them until we have
 // reached a quorum on the currently cached block candidate. It assumes we are
 // the leader and will timeout after the configured timeout.
-func (e *coldStuff) waitForVotes() error {
+func (e *ColdStuff) waitForVotes() error {
 
 	candidate := e.round.Candidate()
 
@@ -338,7 +336,7 @@ func (e *coldStuff) waitForVotes() error {
 // sendCommit is called after we have successfully waited for a vote quorum. It
 // will send a block commit message with the block hash that instructs all nodes
 // to forward their blockchain and start a new consensus round.
-func (e *coldStuff) sendCommit() error {
+func (e *ColdStuff) sendCommit() error {
 
 	candidate := e.round.Candidate()
 
@@ -367,7 +365,7 @@ func (e *coldStuff) sendCommit() error {
 // a number of ways. It should be called at the beginning of a round if we are
 // not the leader. It will timeout if no proposal was received by the leader
 // after the configured timeout.
-func (e *coldStuff) waitForProposal() error {
+func (e *ColdStuff) waitForProposal() error {
 	log := e.log.With().
 		Str("action", "wait_proposal").
 		Logger()
@@ -426,7 +424,7 @@ func (e *coldStuff) waitForProposal() error {
 // voteOnProposal is called after we have received a new block proposal as
 // non-leader. It assumes that all checks were already done and simply sends a
 // vote to the leader of the current round that accepts the candidate block.
-func (e *coldStuff) voteOnProposal() error {
+func (e *ColdStuff) voteOnProposal() error {
 
 	candidate := e.round.Candidate()
 
@@ -444,7 +442,7 @@ func (e *coldStuff) voteOnProposal() error {
 	}
 
 	// send vote for proposal to leader
-	err = e.comms.SendVote(candidate.ID(), candidate.View, sig, sig, e.round.Leader().NodeID)
+	err = e.comms.SendVote(candidate.ID(), candidate.View, sig, e.round.Leader().NodeID)
 	if err != nil {
 		return fmt.Errorf("could not submit vote: %w", err)
 	}
@@ -457,7 +455,7 @@ func (e *coldStuff) voteOnProposal() error {
 // waitForCommit is called after we have submitted our vote for the leader and
 // awaits his confirmation that we can commit the block. The confirmation is
 // only sent once a quorum of votes was received by the leader.
-func (e *coldStuff) waitForCommit() error {
+func (e *ColdStuff) waitForCommit() error {
 
 	candidate := e.round.Candidate()
 
@@ -497,7 +495,7 @@ func (e *coldStuff) waitForCommit() error {
 
 // commitCandidate commits the current block candidate to the blockchain and
 // starts the next consensus round.
-func (e *coldStuff) commitCandidate() error {
+func (e *ColdStuff) commitCandidate() error {
 
 	candidate := e.round.Candidate()
 

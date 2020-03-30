@@ -279,9 +279,6 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 		if err != nil {
 			return fmt.Errorf("could not get block's ancestor from state (%x): %w", ancestorID, err)
 		}
-		if err != nil {
-			return fmt.Errorf("could not retrieve parent header: %w", err)
-		}
 
 		// check that the parent is one less in height than previous block; this
 		// is redundant for all but the first check, but cheap, and makes the

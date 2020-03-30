@@ -9,8 +9,8 @@ import (
 // Block is the HotStuff algorithm's concept of a block, which - in the bigger picture - corresponds
 // to the block header.
 type Block struct {
-	BlockID     flow.Identifier
 	View        uint64
+	BlockID     flow.Identifier
 	ProposerID  flow.Identifier
 	QC          *QuorumCertificate
 	PayloadHash flow.Identifier
@@ -20,16 +20,11 @@ type Block struct {
 // BlockFromFlow converts a flow header to a hotstuff block.
 func BlockFromFlow(header *flow.Header, parentView uint64) *Block {
 
-	sig := AggregatedSignature{
-		StakingSignatures:     header.ParentStakingSigs,
-		RandomBeaconSignature: header.ParentRandomBeaconSig,
-		SignerIDs:             header.ParentSigners,
-	}
-
 	qc := QuorumCertificate{
-		BlockID:             header.ParentID,
-		View:                parentView,
-		AggregatedSignature: &sig,
+		BlockID:   header.ParentID,
+		View:      parentView,
+		SignerIDs: header.ParentVoterIDs,
+		SigData:   header.ParentVoterSig,
 	}
 
 	block := Block{

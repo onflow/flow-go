@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/test"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -13,7 +12,7 @@ import (
 )
 
 func TestGenerateClusterGenesisQC(t *testing.T) {
-	signers := createClusterSigners(t, 3)
+	participants := createClusterParticipants(t, 3)
 
 	block := unittest.BlockFixture()
 	block.Identities = flow.IdentityList{
@@ -21,9 +20,8 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 	}
-
-	for _, signer := range signers {
-		block.Identities = append(block.Identities, signer.Identity())
+	for _, participant := range participants {
+		block.Identities = append(block.Identities, participant.Identity())
 	}
 
 	block.ParentID = flow.ZeroID
@@ -43,23 +41,22 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 	}
 	clusterBlock.PayloadHash = clusterBlock.Payload.Hash()
 
-	_, err := GenerateClusterGenesisQC(signers, &block, &clusterBlock)
+	_, err := GenerateClusterGenesisQC(participants, &block, &clusterBlock)
 	require.NoError(t, err)
 }
 
-func createClusterSigners(t *testing.T, n int) []model.NodeInfo {
-	_, ids := test.NewProtocolState(t, n)
+func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
+	ids := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleCollection))
 
-	stakingKeys, err := test.AddStakingPrivateKeys(ids)
-	require.Nil(t, err)
+	networkKeys, err := unittest.NetworkingKeys(n)
+	require.NoError(t, err)
 
-	networkKeys, err := unittest.NetworkingKeys(len(ids))
-	require.Nil(t, err)
+	stakingKeys, err := unittest.StakingKeys(n)
+	require.NoError(t, err)
 
-	signers := make([]model.NodeInfo, n)
-
+	participants := make([]model.NodeInfo, n)
 	for i, id := range ids {
-		signers[i] = model.NewPrivateNodeInfo(
+		participants[i] = model.NewPrivateNodeInfo(
 			id.NodeID,
 			id.Role,
 			id.Address,
@@ -69,5 +66,5 @@ func createClusterSigners(t *testing.T, n int) []model.NodeInfo {
 		)
 	}
 
-	return signers
+	return participants
 }

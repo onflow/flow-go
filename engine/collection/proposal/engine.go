@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
 	coldstuffmodel "github.com/dapperlabs/flow-go/model/coldstuff"
@@ -178,13 +177,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // SendVote will send a vote to the desired node.
-func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, _ crypto.Signature, recipientID flow.Identifier) error {
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
 	// build the vote message
 	vote := &messages.ClusterBlockVote{
 		BlockID:   blockID,
 		View:      view,
-		Signature: sig,
+		Signature: sigData,
 	}
 
 	err := e.con.Submit(vote, recipientID)
@@ -370,7 +369,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 // onBlockVote handles votes for blocks by passing them to the core consensus
 // algorithm
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature, nil)
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature)
 	return nil
 }
 

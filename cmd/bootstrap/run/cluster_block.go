@@ -19,18 +19,16 @@ func GenerateGenesisClusterBlock(identities flow.IdentityList) cluster.Block {
 		Collection: flow.LightCollection{Transactions: nil},
 	}
 	header := flow.Header{
-		ChainID:                 protocol.ChainIDForCluster(identities),
-		ParentID:                flow.ZeroID,
-		Height:                  0,
-		PayloadHash:             payload.Hash(),
-		Timestamp:               flow.GenesisTime(),
-		View:                    0,
-		ParentSigners:           nil,
-		ParentStakingSigs:       nil,
-		ParentRandomBeaconSig:   nil,
-		ProposerID:              flow.ZeroID,
-		ProposerStakingSig:      nil,
-		ProposerRandomBeaconSig: nil,
+		ChainID:        protocol.ChainIDForCluster(identities),
+		ParentID:       flow.ZeroID,
+		Height:         0,
+		PayloadHash:    payload.Hash(),
+		Timestamp:      flow.GenesisTime(),
+		View:           0,
+		ParentVoterIDs: nil,
+		ParentVoterSig: nil,
+		ProposerID:     flow.ZeroID,
+		ProposerSig:    nil,
 	}
 
 	return cluster.Block{

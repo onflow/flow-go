@@ -127,7 +127,7 @@ func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
 	return &flow.CollectionGuarantee{
 		CollectionID: IdentifierFixture(),
 		SignerIDs:    IdentifierListFixture(16),
-		Signatures:   SignaturesFixture(16),
+		Signature:    SignatureFixture(),
 	}
 }
 
@@ -136,7 +136,7 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 	for i := 1; i <= n; i++ {
 		cg := flow.CollectionGuarantee{
 			CollectionID: flow.Identifier{byte(i)},
-			Signatures:   []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
+			Signature:    SignatureFixture(),
 		}
 		ret = append(ret, &cg)
 	}
@@ -174,7 +174,7 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
 			CollectionID: flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
-			Signatures:   SignaturesFixture(16),
+			Signature:    SignatureFixture(),
 		},
 		Transactions: []*flow.TransactionBody{&txBody},
 	}
@@ -303,8 +303,14 @@ func IdentifierFixture() flow.Identifier {
 
 // WithRole adds a role to an identity fixture.
 func WithRole(role flow.Role) func(*flow.Identity) {
-	return func(id *flow.Identity) {
-		id.Role = role
+	return func(identity *flow.Identity) {
+		identity.Role = role
+	}
+}
+
+func WithStake(stake uint64) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.Stake = stake
 	}
 }
 

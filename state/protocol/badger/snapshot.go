@@ -267,7 +267,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("could not create kmac: %w", err)
 	}
 
-	seed := kmac.ComputeHash(header.ParentRandomBeaconSig)
+	seed := kmac.ComputeHash(header.ParentVoterSig)
 
 	return seed, nil
 }

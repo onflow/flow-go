@@ -1,7 +1,6 @@
 package messages
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -15,8 +14,7 @@ type BlockProposal struct {
 // BlockVote is part of the consensus protocol and represents a consensus node
 // voting on the proposal of the leader of a given round.
 type BlockVote struct {
-	BlockID               flow.Identifier
-	View                  uint64
-	StakingSignature      crypto.Signature
-	RandomBeaconSignature crypto.Signature
+	BlockID flow.Identifier
+	View    uint64
+	SigData []byte
 }

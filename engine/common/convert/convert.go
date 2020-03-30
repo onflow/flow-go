@@ -95,18 +95,13 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 		seals[i] = blockSealToMessage(s)
 	}
 
-	signs := make([][]byte, len(h.ParentStakingSigs))
-	for i, s := range h.ParentStakingSigs {
-		signs[i] = s.Bytes()
-	}
-
 	bh := entities.Block{
 		Height:               h.Height,
 		ParentId:             parentID[:],
 		Timestamp:            t,
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
-		Signatures:           signs,
+		Signatures:           [][]byte{h.ParentVoterSig},
 	}
 	return &bh, nil
 }
@@ -114,13 +109,9 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
 	id := g.ID()
 
-	signs := make([][]byte, len(g.Signatures))
-	for i, g := range g.Signatures {
-		signs[i] = g.Bytes()
-	}
 	return &entities.CollectionGuarantee{
 		CollectionId: id[:],
-		Signatures:   signs,
+		Signatures:   [][]byte{g.Signature},
 	}
 }
 

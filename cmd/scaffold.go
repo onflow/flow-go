@@ -81,6 +81,7 @@ type FlowNodeBuilder struct {
 	DB             *badger.DB
 	Me             *local.Local
 	State          *protocol.State
+	DKGState       *wrapper.State
 	modules        []namedModuleFunc
 	components     []namedComponentFunc
 	doneObject     []namedDoneObject
@@ -93,8 +94,7 @@ type FlowNodeBuilder struct {
 
 	// genesis information
 	GenesisBlock *flow.Block
-	GenesisQC    *model.AggregatedSignature
-	DKGState     *wrapper.State
+	GenesisQC    *model.QuorumCertificate
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -217,7 +217,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 
 		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadRootBlockSignatures(fnb.BaseConfig.bootstrapDir)
+		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.bootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
@@ -474,12 +474,12 @@ func loadTrustedRootBlock(path string) (*flow.Block, error) {
 
 }
 
-func loadRootBlockSignatures(path string) (*model.AggregatedSignature, error) {
+func loadRootBlockQC(path string) (*model.QuorumCertificate, error) {
 	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisQC))
 	if err != nil {
 		return nil, err
 	}
-	qc := &model.AggregatedSignature{}
+	qc := &model.QuorumCertificate{}
 	err = json.Unmarshal(data, qc)
 	return qc, err
 }

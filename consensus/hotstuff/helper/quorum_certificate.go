@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -19,6 +20,19 @@ func MakeQC(t *testing.T, options ...func(*model.QuorumCertificate)) *model.Quor
 		option(&qc)
 	}
 	return &qc
+}
+
+func WithQCBlock(block *model.Block) func(*model.QuorumCertificate) {
+	return func(qc *model.QuorumCertificate) {
+		qc.View = block.View
+		qc.BlockID = block.BlockID
+	}
+}
+
+func WithQCSigners(signerIDs []flow.Identifier) func(*model.QuorumCertificate) {
+	return func(qc *model.QuorumCertificate) {
+		qc.SignerIDs = signerIDs
+	}
 }
 
 func WithQCView(view uint64) func(*model.QuorumCertificate) {

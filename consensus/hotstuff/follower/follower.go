@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -41,6 +40,7 @@ func NewFollowerLogic(
 	protocolState protocol.State,
 	dkgState dkg.State,
 	trustedRoot *forks.BlockQC,
+	verifier hotstuff.Verifier,
 	finalizationCallback module.Finalizer,
 	notifier notifications.FinalizationConsumer,
 	log zerolog.Logger,
@@ -53,7 +53,7 @@ func NewFollowerLogic(
 	if err != nil {
 		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
 	}
-	validator := validator.New(viewState, finalizationLogic, signature.NewRandomBeaconAwareSigVerifier())
+	validator := validator.New(viewState, finalizationLogic, verifier)
 
 	err = validator.ValidateQC(trustedRoot.QC, trustedRoot.Block)
 	if err != nil {

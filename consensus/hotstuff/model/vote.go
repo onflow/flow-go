@@ -6,11 +6,10 @@ import (
 )
 
 type Vote struct {
-	BlockID   flow.Identifier
-	View      uint64
-	Signature *SingleSignature
-	SignerID  flow.Identifier // to be used in the new verification component
-	SigData   []byte          // to be used in the new verification component
+	View     uint64
+	BlockID  flow.Identifier
+	SignerID flow.Identifier
+	SigData  []byte
 }
 
 func (uv *Vote) ID() flow.Identifier {
@@ -18,16 +17,12 @@ func (uv *Vote) ID() flow.Identifier {
 }
 
 // VoteFromFlow turns the vote parameters into a vote struct.
-func VoteFromFlow(signerID flow.Identifier, blockID flow.Identifier, view uint64, stakingSignature crypto.Signature, randomBeaconSignature crypto.Signature) *Vote {
-	sig := SingleSignature{
-		StakingSignature:      stakingSignature,
-		RandomBeaconSignature: randomBeaconSignature,
-		SignerID:              signerID,
-	}
+func VoteFromFlow(signerID flow.Identifier, blockID flow.Identifier, view uint64, sig crypto.Signature) *Vote {
 	vote := Vote{
-		BlockID:   blockID,
-		View:      view,
-		Signature: &sig,
+		View:     view,
+		BlockID:  blockID,
+		SignerID: signerID,
+		SigData:  sig,
 	}
 	return &vote
 }

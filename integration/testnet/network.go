@@ -183,7 +183,7 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
-	signerData := bootstrapcmd.GenerateQCSignerData(nodeInfos, nodeInfos, dkg)
+	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
 	qc, err := bootstraprun.GenerateGenesisQC(signerData, &genesis)
 	require.Nil(t, err)
 

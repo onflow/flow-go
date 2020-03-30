@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/module/buffer"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
@@ -84,8 +85,11 @@ func main() {
 			// state when the follower detects newly finalized blocks
 			final := followerfinalizer.NewFinalizer(node.DB)
 
+			// TODO: initialize hotstuff verifier
+			var verifier hotstuff.Verifier
+
 			// create a follower with the ingestEng as the finalization notification consumer
-			core, err := follower.New(node.Me, node.State, node.DKGState, &node.GenesisBlock.Header, node.GenesisQC, final, ingestEng, node.Logger)
+			core, err := follower.New(node.Me, node.State, node.DKGState, &node.GenesisBlock.Header, node.GenesisQC, verifier, final, ingestEng, node.Logger)
 			if err != nil {
 				// TODO for now we ignore failures in follower
 				// this is necessary for integration tests to run, until they are

@@ -58,44 +58,40 @@ func (b Block) Valid() bool {
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	ChainID                 string     // ChainID is a chain-specific value to prevent replay attacks.
-	ParentID                Identifier // ParentID is the ID of this block's parent.
-	Height                  uint64
-	PayloadHash             Identifier // PayloadHash is a hash of the payload of this block.
-	Timestamp               time.Time  // Timestamp is the time at which this block was proposed. The proposing node can choose any time, so this should not be trusted as accurate.
-	View                    uint64     // View is the view number at which this block was proposed.
-	ParentSigners           []Identifier
-	ParentStakingSigs       []crypto.Signature // ParentStakingSigs is an aggregated staking signature for the parent block.
-	ParentRandomBeaconSig   crypto.Signature   // ParentRandomBeaconSig is a reconstructed signature for random beacon for the parent block.
-	ProposerID              Identifier
-	ProposerStakingSig      crypto.Signature // ProposerStakingSig is the signature of the proposer over the header body with the staking key.
-	ProposerRandomBeaconSig crypto.Signature // ProposerRandomBeaconSig is the signature of the proposer over the header body with the random beacon key share.
+	ChainID        string     // ChainID is a chain-specific value to prevent replay attacks.
+	ParentID       Identifier // ParentID is the ID of this block's parent.
+	Height         uint64
+	PayloadHash    Identifier       // PayloadHash is a hash of the payload of this block.
+	Timestamp      time.Time        // Timestamp is the time at which this block was proposed. The proposing node can choose any time, so this should not be trusted as accurate.
+	View           uint64           // View is the view number at which this block was proposed.
+	ParentVoterIDs []Identifier     // list of voters who signed the parent block
+	ParentVoterSig crypto.Signature // aggregated signature over the parent block
+	ProposerID     Identifier       // proposer identifier for the block
+	ProposerSig    crypto.Signature // signature of the proposer over the new block
 }
 
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {
-		ChainID               string
-		ParentID              Identifier
-		Height                uint64
-		PayloadHash           Identifier
-		Timestamp             time.Time
-		View                  uint64
-		ProposerID            Identifier
-		ParentSigners         []Identifier
-		ParentStakingSigs     []crypto.Signature
-		ParentRandomBeaconSig crypto.Signature
+		ChainID        string
+		ParentID       Identifier
+		Height         uint64
+		PayloadHash    Identifier
+		Timestamp      time.Time
+		View           uint64
+		ParentVoterIDs []Identifier
+		ParentVoterSig crypto.Signature
+		ProposerID     Identifier
 	}{
-		ChainID:               h.ChainID,
-		ParentID:              h.ParentID,
-		Height:                h.Height,
-		PayloadHash:           h.PayloadHash,
-		Timestamp:             h.Timestamp,
-		View:                  h.View,
-		ProposerID:            h.ProposerID,
-		ParentSigners:         h.ParentSigners,
-		ParentStakingSigs:     h.ParentStakingSigs,
-		ParentRandomBeaconSig: h.ParentRandomBeaconSig,
+		ChainID:        h.ChainID,
+		ParentID:       h.ParentID,
+		Height:         h.Height,
+		PayloadHash:    h.PayloadHash,
+		Timestamp:      h.Timestamp,
+		View:           h.View,
+		ParentVoterIDs: h.ParentVoterIDs,
+		ParentVoterSig: h.ParentVoterSig,
+		ProposerID:     h.ProposerID,
 	}
 }
 

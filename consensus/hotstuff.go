@@ -15,12 +15,10 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/forkchoice"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/dkg"
@@ -65,11 +63,6 @@ func NewHotstuff(log zerolog.Logger, state protocol.State, me module.Local, buil
 		return nil, fmt.Errorf("could not initialize fork choice: %w", err)
 	}
 
-	// initialize staking signer
-	// TODO: inject real random beacon private key
-	var randomBeaconPrivateKey crypto.PrivateKey
-	sigProvider := signature.NewRandomBeaconAwareSigProvider(viewState, me, randomBeaconPrivateKey)
-
 	// initialize timeout config
 	// TODO: move into consistent config approach for all components
 	timeoutConfig, err := timeout.NewConfig(
@@ -92,8 +85,11 @@ func NewHotstuff(log zerolog.Logger, state protocol.State, me module.Local, buil
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
 
+	// TODO: initialize signer
+	var signer hotstuff.Signer
+
 	// initialize block producer
-	producer, err := blockproducer.New(sigProvider, viewState, builder)
+	producer, err := blockproducer.New(signer, viewState, builder)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize block producer: %w", err)
 	}
@@ -103,13 +99,13 @@ func NewHotstuff(log zerolog.Logger, state protocol.State, me module.Local, buil
 
 	// initialize the voter
 	// TODO: load last voted view
-	voter := voter.New(sigProvider, forks, lastVotedView)
+	voter := voter.New(signer, forks, lastVotedView)
 
 	// initialize the validator
-	validator := validator.New(viewState, forks, sigProvider)
+	validator := validator.New(viewState, forks, signer)
 
 	// initialize the vote aggregator
-	aggregator := voteaggregator.New(notifier, highestPrunedView, viewState, validator, sigProvider)
+	aggregator := voteaggregator.New(notifier, highestPrunedView, viewState, validator, signer)
 
 	// initialize the event handler
 	handler, err := eventhandler.New(log, pacemaker, producer, forks, communicator, viewState, aggregator, voter, validator)

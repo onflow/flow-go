@@ -14,9 +14,8 @@ import (
 
 func TestBlockEncodingJSON(t *testing.T) {
 	block := unittest.BlockFixture()
-	block.ParentSigners = []flow.Identifier{}
-	block.ParentStakingSigs = []crypto.Signature{}
-	block.ParentRandomBeaconSig = crypto.Signature{}
+	block.ParentVoterIDs = []flow.Identifier{}
+	block.ParentVoterSig = crypto.Signature{}
 	block.Seals = []*flow.Seal{}
 	bz, err := json.Marshal(block)
 	assert.NoError(t, err)

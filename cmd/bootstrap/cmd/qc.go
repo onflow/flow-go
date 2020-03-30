@@ -10,9 +10,9 @@ import (
 )
 
 func constructGenesisQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
-	signerData := GenerateQCSignerData(allNodes, internalNodes, dkgData)
+	participantData := GenerateQCParticipantData(allNodes, internalNodes, dkgData)
 
-	qc, err := run.GenerateGenesisQC(signerData, block)
+	qc, err := run.GenerateGenesisQC(participantData, block)
 	if err != nil {
 		log.Fatal().Err(err).Msg("generating genesis QC failed")
 	}
@@ -20,7 +20,7 @@ func constructGenesisQC(block *flow.Block, allNodes, internalNodes []model.NodeI
 	writeJSON(model.FilenameGenesisQC, qc)
 }
 
-func GenerateQCSignerData(allNodes, internalNodes []model.NodeInfo, dkg model.DKGData) run.SignerData {
+func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkg model.DKGData) run.ParticipantData {
 
 	// stakingNodes can include external validators, so it can be longer than internalNodes
 	if len(allNodes) < len(internalNodes) {
@@ -34,7 +34,7 @@ func GenerateQCSignerData(allNodes, internalNodes []model.NodeInfo, dkg model.DK
 			Msg("need exactly the same number of staking public keys as DKG private participants")
 	}
 
-	sd := run.SignerData{}
+	sd := run.ParticipantData{}
 
 	// the QC will be signed by everyone in internalNodes
 	for _, node := range internalNodes {
@@ -49,7 +49,7 @@ func GenerateQCSignerData(allNodes, internalNodes []model.NodeInfo, dkg model.DK
 			log.Fatal().Str("NodeID", node.NodeID.String()).Msg("Stake must not be 0")
 		}
 
-		sd.Signers = append(sd.Signers, run.Signer{
+		sd.Participants = append(sd.Participants, run.Participant{
 			NodeInfo:            node,
 			RandomBeaconPrivKey: part.KeyShare,
 		})

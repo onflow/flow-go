@@ -10,13 +10,16 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/state/dkg"
+	dkgmock "github.com/dapperlabs/flow-go/state/dkg/mocks"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	protomock "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func MakeSigners(t *testing.T, state protocol.State, signerIDs []flow.Identifier, stakingKeys []crypto.PrivateKey, beaconKeys []crypto.PrivateKey) []hotstuff.Signer {
+func MakeSigners(t *testing.T, proto protocol.State, dkg dkg.State, signerIDs []flow.Identifier, stakingKeys []crypto.PrivateKey, beaconKeys []crypto.PrivateKey) []hotstuff.Signer {
 
 	// generate our consensus node identities
 	require.NotEmpty(t, signerIDs)
@@ -24,12 +27,12 @@ func MakeSigners(t *testing.T, state protocol.State, signerIDs []flow.Identifier
 	var signers []hotstuff.Signer
 	if len(beaconKeys) != len(stakingKeys) {
 		for i, signerID := range signerIDs {
-			signer := MakeStakingSigner(state, signerID, stakingKeys[i])
+			signer := MakeStakingSigner(proto, signerID, stakingKeys[i])
 			signers = append(signers, signer)
 		}
 	} else {
 		for i, signerID := range signerIDs {
-			signer := MakeBeaconSigner(state, signerID, stakingKeys[i], beaconKeys[i])
+			signer := MakeBeaconSigner(proto, dkg, signerID, stakingKeys[i], beaconKeys[i])
 			signers = append(signers, signer)
 		}
 	}
@@ -40,20 +43,23 @@ func MakeSigners(t *testing.T, state protocol.State, signerIDs []flow.Identifier
 func MakeStakingSigner(state protocol.State, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSigner {
 	hasher := crypto.NewBLS_KMAC("only_testing")
 	staking := signature.NewBLS(hasher, priv)
-	signer := NewSingleSigner(state, signerID, staking)
+	signer := NewSingleSigner(state, staking, signerID)
 	return signer
 }
 
-func MakeBeaconSigner(state protocol.State, signerID flow.Identifier, stakingPriv crypto.PrivateKey, beaconPriv crypto.PrivateKey) *CombinedSigner {
+func MakeBeaconSigner(proto protocol.State, dkg dkg.State, signerID flow.Identifier, stakingPriv crypto.PrivateKey, beaconPriv crypto.PrivateKey) *CombinedSigner {
 	hasher := crypto.NewBLS_KMAC("only_testing")
 	staking := signature.NewBLS(hasher, stakingPriv)
 	beacon := signature.NewDKG(hasher, beaconPriv)
 	combiner := signature.NewCombiner()
-	signer := NewCombinedSigner(state, signerID, staking, beacon, combiner, combiner)
+	signer := NewCombinedSigner(proto, dkg, staking, beacon, combiner, filter.Any, signerID)
 	return signer
 }
 
-func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled bool) (protocol.State, []crypto.PrivateKey, []crypto.PrivateKey) {
+func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled bool) (protocol.State, dkg.State, []crypto.PrivateKey, []crypto.PrivateKey) {
+
+	// initialize the dkg snapshot
+	dkg := &dkgmock.State{}
 
 	// program the state snapshot
 	snapshot := &protomock.Snapshot{}
@@ -77,10 +83,11 @@ func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled
 	var dkgKey crypto.PublicKey
 	if beaconEnabled {
 		beaconKeys, dkgKey, _ = unittest.RunDKGKeys(t, len(identities))
-		snapshot.On("DKGKey").Return(dkgKey, nil)
+		dkg.On("GroupSize").Return(uint(len(beaconKeys)), nil)
+		dkg.On("GroupKey").Return(dkgKey, nil)
 		for i, identity := range identities {
-			snapshot.On("DKGIndex", identity.NodeID).Return(uint(i), nil)
-			snapshot.On("DKGShare", identity.NodeID).Return(beaconKeys[i].PublicKey(), nil)
+			dkg.On("ShareIndex", identity.NodeID).Return(uint(i), nil)
+			dkg.On("ShareKey", identity.NodeID).Return(beaconKeys[i].PublicKey(), nil)
 		}
 	}
 
@@ -89,5 +96,5 @@ func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled
 	state.On("AtBlockID", mock.Anything).Return(snapshot)
 	state.On("Final").Return(snapshot)
 
-	return state, stakingKeys, beaconKeys
+	return state, dkg, stakingKeys, beaconKeys
 }
