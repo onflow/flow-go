@@ -335,7 +335,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 }
 
 // handleExecutionStateResponse handles responses to our requests for execution
-// states for particular chunks. It adds the state to the mempool and checks for
+// states for make install-toolsparticular chunks. It adds the state to the mempool and checks for
 // pending receipts that are ready for verification.
 func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *messages.ExecutionStateResponse) error {
 	e.log.Info().
