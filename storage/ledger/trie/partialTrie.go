@@ -28,17 +28,23 @@ func (p *PSMT) GetRootHash() []byte {
 }
 
 // Update updates the register values and returns rootValue after updates
-func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, error) {
+// in case of error, it returns a list of keys for which update failed
+func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, error) {
+	var failedKeys []string
 	for i, key := range registerIDs {
 		value := values[i]
 
 		node, found := p.keyLookUp[string(key)]
 		if !found {
-			return nil, fmt.Errorf("key doesn't exist: %x", key)
+			failedKeys = append(failedKeys, string(key))
+			continue
 		}
 		node.value = ComputeCompactValue(key, value, node.height, p.height)
 	}
-	return p.root.ComputeValue(), nil
+	if len(failedKeys) > 0 {
+		return nil, failedKeys, fmt.Errorf("key(s) doesn't exist")
+	}
+	return p.root.ComputeValue(), failedKeys, nil
 }
 
 // NewPSMT builds a PSMT given chunkdatapack registertouches
