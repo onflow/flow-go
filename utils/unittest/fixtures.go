@@ -302,7 +302,7 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 }
 
 func generateRandomSeed() []byte {
-	seed := make([]byte, 64)
+	seed := make([]byte, 48)
 	if _, err := crand.Read(seed); err != nil {
 		panic(err)
 	}
