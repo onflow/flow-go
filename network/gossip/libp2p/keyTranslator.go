@@ -4,6 +4,7 @@ import (
 	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	lcrypto_pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	fcrypto "github.com/dapperlabs/flow-go/crypto"
 )
 
@@ -41,11 +42,22 @@ func PublicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 	if !ok {
 		return nil, lcrypto.ErrBadKeyType
 	}
-	byte, err := fpk.Encode()
+
+	var bytes []byte
+	if keyType == lcrypto_pb.KeyType_ECDSA {
+		bytes, err = fpk.Encode()
+	} else if keyType == lcrypto_pb.KeyType_Secp256k1 {
+		bytes = make([]byte, crypto.PubKeyLenECDSA_SECp256k1+1) // libp2p requires an extra byte
+		bytes[0] = 4                                            // magic number in libp2p to refer to an uncompressed key
+		var tempBytes []byte
+		tempBytes, err = fpk.Encode()
+		copy(bytes[1:], tempBytes)
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	return um(byte)
+	return um(bytes)
 }
 
 // keyType translates Flow signing algorithm constants to the corresponding LibP2P constants
