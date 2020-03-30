@@ -3,6 +3,8 @@ package convert
 import (
 	"fmt"
 
+	"github.com/golang/protobuf/ptypes"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 )
@@ -73,6 +75,63 @@ func BlockHeaderToMessage(h *flow.Header) (entities.BlockHeader, error) {
 		Height:   h.Height,
 	}
 	return bh, nil
+}
+
+func BlockToMessage(h *flow.Block) (*entities.Block, error) {
+
+	parentID := h.ParentID
+	t, err := ptypes.TimestampProto(h.Timestamp)
+	if err != nil {
+		return nil, err
+	}
+
+	cg := make([]*entities.CollectionGuarantee, len(h.Guarantees))
+	for i, g := range h.Guarantees {
+		cg[i] = collectionGuaranteeToMessage(g)
+	}
+
+	seals := make([]*entities.BlockSeal, len(h.Seals))
+	for i, s := range h.Seals {
+		seals[i] = blockSealToMessage(s)
+	}
+
+	signs := make([][]byte, len(h.ParentStakingSigs))
+	for i, s := range h.ParentStakingSigs {
+		signs[i] = s.Bytes()
+	}
+
+	bh := entities.Block{
+		Height:               h.Height,
+		ParentId:             parentID[:],
+		Timestamp:            t,
+		CollectionGuarantees: cg,
+		BlockSeals:           seals,
+		Signatures:           signs,
+	}
+	return &bh, nil
+}
+
+func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
+	id := g.ID()
+
+	signs := make([][]byte, len(g.Signatures))
+	for i, g := range g.Signatures {
+		signs[i] = g.Bytes()
+	}
+	return &entities.CollectionGuarantee{
+		CollectionHash: id[:],
+		Signatures:     signs,
+	}
+}
+
+func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
+	id := s.BlockID
+	result := s.ExecutionResultID
+	return &entities.BlockSeal{
+		BlockId:                    id[:],
+		ExecutionReceiptId:         result[:],
+		ExecutionReceiptSignatures: [][]byte{s.Signature.Bytes()},
+	}
 }
 
 func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
