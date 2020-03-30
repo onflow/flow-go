@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
+	"testing"
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -13,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 func AddressFixture() flow.Address {
@@ -420,7 +422,7 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
 // chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecutionResult {
+func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.CompleteExecutionResult {
 	chunks := make([]*flow.Chunk, 0)
 	chunkStates := make([]*flow.ChunkState, 0, chunkCount)
 	collections := make([]*flow.Collection, 0, chunkCount)
@@ -433,6 +435,35 @@ func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecuti
 		guarantee := coll.Guarantee()
 		collections = append(collections, &coll)
 		guarantees = append(guarantees, &guarantee)
+
+		var randomValue = make([]byte, 1)
+		_, _ = rand.Read(randomValue[:])
+		// registerTouch and State setup
+		id1 := make([]byte, 32)
+		_, _ = rand.Read(randomValue[:])
+		value1 := randomValue
+
+		id2 := make([]byte, 32)
+		id2[0] = byte(i)
+		_, _ = rand.Read(randomValue[:])
+		value2 := randomValue
+		_, _ = rand.Read(randomValue[:])
+		UpdatedValue2 := randomValue
+
+		ids := make([][]byte, 0)
+		values := make([][]byte, 0)
+		ids = append(ids, id1, id2)
+		values = append(values, value1, value2)
+
+		db := TempLevelDB(t)
+
+		f, _ := ledger.NewTrieStorage(db)
+		startState, _ := f.UpdateRegisters(ids, values)
+		regTs, _ := f.GetRegisterTouches(ids, startState)
+
+		ids = [][]byte{id2}
+		values = [][]byte{UpdatedValue2}
+		f.UpdateRegisters(ids, values)
 
 		// creates a chunk
 		chunk := &flow.Chunk{
@@ -452,7 +483,11 @@ func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecuti
 		chunkStates = append(chunkStates, chunkState)
 
 		// creates a chunk data pack for the chunk
-		chunkDataPack := ChunkDataPackFixture(chunk.ID())
+		chunkDataPack := flow.ChunkDataPack{
+			ChunkID:         chunk.ID(),
+			StartState:      startState,
+			RegisterTouches: regTs,
+		}
 		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
 	}
 

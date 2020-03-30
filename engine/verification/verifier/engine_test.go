@@ -91,7 +91,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := unittest.CompleteExecutionResultFixture(1)
+	completeRA := unittest.CompleteExecutionResultFixture(suite.T(), 1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)

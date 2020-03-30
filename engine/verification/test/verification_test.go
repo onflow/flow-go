@@ -43,7 +43,7 @@ func TestHappyPath(t *testing.T) {
 	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 
-	completeER := unittest.CompleteExecutionResultFixture(chunkNum)
+	completeER := unittest.CompleteExecutionResultFixture(t, chunkNum)
 
 	// assigns half of the chunks to this verifier
 	a := chunkassignment.NewAssignment()
