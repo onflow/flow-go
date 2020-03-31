@@ -19,6 +19,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
@@ -34,15 +35,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-const (
-	notSet = "not set"
-
-	// Genesis Filenames
-	dkgPublicData       = "dkg-data.pub.json"
-	trustedRootBlock    = "genesis-block.json"
-	rootBlockSignatures = "genesis-qc.json"
-	identityList        = "node-infos.pub.json"
-)
+const notSet = "not set"
 
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
@@ -555,7 +548,7 @@ func generatePublicNetworkKey(ids flow.IdentityList) error {
 }
 
 func loadIdentityList(path string) (flow.IdentityList, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, identityList))
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameNodeInfosPub))
 	if err != nil {
 		return nil, err
 	}
@@ -565,7 +558,7 @@ func loadIdentityList(path string) (flow.IdentityList, error) {
 }
 
 func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, dkgPublicData))
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameDKGDataPub))
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +568,7 @@ func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
 }
 
 func loadTrustedRootBlock(path string) (*flow.Block, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, trustedRootBlock))
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameGenesisBlock))
 	if err != nil {
 		return nil, err
 	}
@@ -586,7 +579,7 @@ func loadTrustedRootBlock(path string) (*flow.Block, error) {
 }
 
 func loadRootBlockSignatures(path string) (*model.AggregatedSignature, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, rootBlockSignatures))
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameGenesisQC))
 	if err != nil {
 		return nil, err
 	}

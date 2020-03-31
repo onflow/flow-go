@@ -3,6 +3,7 @@ package testnet
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -18,7 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
+	bootstrap "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/client"
@@ -243,12 +245,12 @@ func getSeeds(n int) ([][]byte, error) {
 //
 // The input list of node configs and identities must have the same node at
 // each index.
-func getQCSignerData(groupPubKey crypto.PublicKey, nodes []*NodeConfig, identities flow.IdentityList) *run.SignerData {
+func getQCSignerData(groupPubKey crypto.PublicKey, nodes []*NodeConfig, identities flow.IdentityList) *bootstrap.SignerData {
 
 	// we need the DKG group index and signer info for each consensus node
 	n := len(identities.Filter(filter.HasRole(flow.RoleConsensus)))
 	dkgIndices := make([]int, 0, n)
-	signers := make([]run.Signer, 0, n)
+	signers := make([]bootstrap.Signer, 0, n)
 
 	for i := 0; i < len(nodes); i++ {
 
@@ -258,7 +260,7 @@ func getQCSignerData(groupPubKey crypto.PublicKey, nodes []*NodeConfig, identiti
 			continue
 		}
 
-		signer := run.Signer{
+		signer := bootstrap.Signer{
 			Identity:            *identity,
 			StakingPrivKey:      conf.StakingKey,
 			RandomBeaconPrivKey: conf.RandomBeaconKey,
@@ -283,7 +285,7 @@ func getQCSignerData(groupPubKey crypto.PublicKey, nodes []*NodeConfig, identiti
 		}
 	}
 
-	signerData := &run.SignerData{
+	signerData := &bootstrap.SignerData{
 		DkgPubData: dkgPubData,
 		Signers:    signers,
 	}
@@ -323,13 +325,13 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 	// get networking keys for all nodes
 	networkKeySeeds, err := getSeeds(len(nodes))
 	require.Nil(t, err)
-	networkKeys, err := run.GenerateNetworkingKeys(len(nodes), networkKeySeeds)
+	networkKeys, err := bootstrap.GenerateNetworkingKeys(len(nodes), networkKeySeeds)
 	require.Nil(t, err)
 
 	// get staking keys for all nodes
 	stakingKeySeeds, err := getSeeds(len(nodes))
 	require.Nil(t, err)
-	stakingKeys, err := run.GenerateStakingKeys(len(nodes), stakingKeySeeds)
+	stakingKeys, err := bootstrap.GenerateStakingKeys(len(nodes), stakingKeySeeds)
 	require.Nil(t, err)
 
 	// create an identity for each specified node
@@ -361,7 +363,7 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 
 	// run DKG for all consensus nodes
 	dkgSeeds, err := getSeeds(len(conIdentities))
-	dkg, err := run.RunDKG(len(conIdentities), dkgSeeds)
+	dkg, err := bootstrap.RunDKG(len(conIdentities), dkgSeeds)
 	require.Nil(t, err)
 
 	// add the public key to the identity and the private key to the node config
@@ -378,115 +380,41 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 		i++
 	}
 
-	seal := run.GenerateRootSeal(flow.GenesisStateCommitment)
-	genesis := run.GenerateRootBlock(identities, seal)
+	seal := bootstrap.GenerateRootSeal(flow.GenesisStateCommitment)
+	genesis := bootstrap.GenerateRootBlock(identities, seal)
 
 	signerData := getQCSignerData(dkg.PubGroupKey, nodes, identities)
-	qc, err := run.GenerateGenesisQC(*signerData, &genesis)
+	qc, err := bootstrap.GenerateGenesisQC(*signerData, &genesis)
 	require.Nil(t, err)
 
 	// TODO create config files
 	// (private keyfiles, dkg pubdata, genesis block, genesis qc)
 	_ = qc
 
+	// create a temporary directory to store all bootstrapping files, these
+	// will be shared between all nodes
+	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
+	require.Nil(t, err)
+
+	// write genesis bootstrap files
+	err = writeJSON(filepath.Join(tmpdir, bootstrapcmd.FilenameGenesisBlock), genesis)
+	require.Nil(t, err)
+	err = writeJSON(filepath.Join(tmpdir, bootstrapcmd.FilenameGenesisQC), qc)
+	require.Nil(t, err)
+	err = writeJSON(filepath.Join(tmpdir, bootstrapcmd.FilenameDKGDataPub), signerData.DkgPubData)
+
 	// STEP 2 - CREATE CONTAINERS
 
 	containers := make([]*NodeContainer, len(nodes))
 	for i := 0; i < len(nodes); i++ {
-
 		conf := nodes[i]
 		identity := identities[i]
 
-		opts := &testingdock.ContainerOpts{
-			ForcePull: false,
-			Name:      conf.ContainerName,
-			Config: &container.Config{
-				Image: conf.ImageName(),
-				User:  currentUser(),
-				Cmd: []string{
-					fmt.Sprintf("--entries=%s"), // TODO
-					fmt.Sprintf("--nodeid=%s", identity.NodeID.String()),
-					fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
-					"--loglevel=debug",
-					"--nclusters=1",
-				},
-			},
-			HostConfig: &container.HostConfig{},
-		}
-
-		// get a temporary directory in the host. On macOS the default tmp
-		// directory is NOT accessible to Docker by default, so we use /tmp
-		// instead.
-		tmpdir, err := ioutil.TempDir(TmpRoot, "flow-integration")
+		nodeContainer, err := createContainer(t, suite, conf, identity)
 		require.Nil(t, err)
+		network.After(nodeContainer.Container)
 
-		nodeContainer := &NodeContainer{
-			Identity: identity,
-			Ports:    make(map[string]string),
-			DataDir:  tmpdir,
-			Opts:     opts,
-		}
 		containers[i] = nodeContainer
-
-		// create a directory for the node database
-		flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
-		err = os.Mkdir(flowDBDir, 0700)
-		require.Nil(t, err)
-
-		// Bind the host directory to the container's database directory
-		// NOTE: I did this using the approach from:
-		// https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
-		opts.HostConfig.Binds = append(
-			opts.HostConfig.Binds,
-			fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
-		)
-
-		switch identity.Role {
-		case flow.RoleCollection:
-
-			hostPort := testingdock.RandomPort(t)
-			containerPort := "9000/tcp"
-
-			nodeContainer.bindPort(hostPort, containerPort)
-
-			nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(hostPort))
-			nodeContainer.Ports[ColNodeAPIPort] = hostPort
-
-		case flow.RoleExecution:
-
-			hostPort := testingdock.RandomPort(t)
-			containerPort := "9000/tcp"
-
-			nodeContainer.bindPort(hostPort, containerPort)
-
-			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(hostPort))
-			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
-
-			// create directories for execution state trie and values in the tmp
-			// host directory.
-			exeDBTrieDir := filepath.Join(tmpdir, DefaultExecutionTrieDir)
-			err = os.MkdirAll(exeDBTrieDir, 0700)
-			require.Nil(t, err)
-
-			exeDBValueDir := filepath.Join(tmpdir, DefaultExecutionDataDir)
-			err = os.MkdirAll(exeDBValueDir, 0700)
-			require.Nil(t, err)
-
-			opts.HostConfig.Binds = append(
-				opts.HostConfig.Binds,
-				fmt.Sprintf("%s:%s:rw", exeDBTrieDir, DefaultExecutionTrieDir),
-				fmt.Sprintf("%s:%s:rw", exeDBValueDir, DefaultExecutionDataDir),
-			)
-
-			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
-		}
-
-		// add the container to the network
-		suiteContainer := suite.Container(*opts)
-		network.After(suiteContainer)
-		nodeContainer.Container = suiteContainer
 	}
 
 	return &FlowNetwork{
@@ -494,4 +422,110 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 		Network:    network,
 		Containers: containers,
 	}, nil
+}
+
+// createContainer ...
+func createContainer(t *testing.T, suite *testingdock.Suite, conf *NodeConfig, identity *flow.Identity) (*NodeContainer, error) {
+	opts := &testingdock.ContainerOpts{
+		ForcePull: false,
+		Name:      conf.ContainerName,
+		Config: &container.Config{
+			Image: conf.ImageName(),
+			User:  currentUser(),
+			Cmd: []string{
+				fmt.Sprintf("--entries=%s"), // TODO this should be from genesis
+				fmt.Sprintf("--nodeid=%s", identity.NodeID.String()),
+				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
+				"--loglevel=debug",
+				"--nclusters=1",
+			},
+		},
+		HostConfig: &container.HostConfig{},
+	}
+
+	// get a temporary directory in the host. On macOS the default tmp
+	// directory is NOT accessible to Docker by default, so we use /tmp
+	// instead.
+	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-integration-node")
+	if err != nil {
+		return nil, fmt.Errorf("could not get tmp dir: %w", err)
+	}
+
+	nodeContainer := &NodeContainer{
+		Identity: identity,
+		Ports:    make(map[string]string),
+		DataDir:  tmpdir,
+		Opts:     opts,
+	}
+
+	// create a directory for the node database
+	flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
+	err = os.Mkdir(flowDBDir, 0700)
+	require.Nil(t, err)
+
+	// Bind the host directory to the container's database directory
+	// NOTE: I did this using the approach from:
+	// https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
+	opts.HostConfig.Binds = append(
+		opts.HostConfig.Binds,
+		fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
+	)
+
+	switch identity.Role {
+	case flow.RoleCollection:
+
+		hostPort := testingdock.RandomPort(t)
+		containerPort := "9000/tcp"
+
+		nodeContainer.bindPort(hostPort, containerPort)
+
+		nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(hostPort))
+		nodeContainer.Ports[ColNodeAPIPort] = hostPort
+
+	case flow.RoleExecution:
+
+		hostPort := testingdock.RandomPort(t)
+		containerPort := "9000/tcp"
+
+		nodeContainer.bindPort(hostPort, containerPort)
+
+		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(hostPort))
+		nodeContainer.Ports[ExeNodeAPIPort] = hostPort
+
+		// create directories for execution state trie and values in the tmp
+		// host directory.
+		exeDBTrieDir := filepath.Join(tmpdir, DefaultExecutionTrieDir)
+		err = os.MkdirAll(exeDBTrieDir, 0700)
+		require.Nil(t, err)
+
+		exeDBValueDir := filepath.Join(tmpdir, DefaultExecutionDataDir)
+		err = os.MkdirAll(exeDBValueDir, 0700)
+		if err != nil {
+			return nil, fmt.Errorf("could not create exe value dir: %w", err)
+		}
+
+		opts.HostConfig.Binds = append(
+			opts.HostConfig.Binds,
+			fmt.Sprintf("%s:%s:rw", exeDBTrieDir, DefaultExecutionTrieDir),
+			fmt.Sprintf("%s:%s:rw", exeDBValueDir, DefaultExecutionDataDir),
+		)
+
+		nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+	}
+
+	suiteContainer := suite.Container(*opts)
+	nodeContainer.Container = suiteContainer
+	return nodeContainer, nil
+}
+
+func writeJSON(path string, data interface{}) error {
+	marshaled, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(path, marshaled, 0644)
+	return err
 }

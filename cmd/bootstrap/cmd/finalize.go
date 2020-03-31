@@ -32,7 +32,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("✨ assembling network and staking keys")
 		partnerNodes := assemblePartnerNodes()
 		stakingNodes := mergeNodeInfos(internalNodesPub, partnerNodes)
-		writeJSON(filenameNodeInfosPub, stakingNodes)
+		writeJSON(FilenameNodeInfosPub, stakingNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ running DKG for consensus nodes")
@@ -64,7 +64,7 @@ func init() {
 	_ = finalizeCmd.MarkFlagRequired("config")
 	finalizeCmd.Flags().StringVarP(&flagPartnerNodeInfoDir, "partner-dir", "p", "", fmt.Sprintf("path to directory "+
 		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
-		"NetworkPubKey, StakingPubKey)", filenamePartnerNodeInfoSuffix))
+		"NetworkPubKey, StakingPubKey)", FilenamePartnerNodeInfoSuffix))
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
 	finalizeCmd.Flags().StringVarP(&flagPartnerStakes, "partner-stakes", "s", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
@@ -136,7 +136,7 @@ func readPartnerNodes() []PartnerNodeInfoPub {
 	}
 	for _, f := range files {
 		// skip files that do not include node-infos
-		if !strings.HasSuffix(f, filenamePartnerNodeInfoSuffix) {
+		if !strings.HasSuffix(f, FilenamePartnerNodeInfoSuffix) {
 			continue
 		}
 

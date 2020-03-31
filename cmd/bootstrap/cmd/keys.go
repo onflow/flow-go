@@ -63,7 +63,7 @@ func genNetworkAndStakingKeys() ([]NodeInfoPub, []NodeInfoPriv) {
 		nodeInfoPriv, nodeInfoPub := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
 		nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
 		nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
-		writeJSON(fmt.Sprintf(filenameNodeInfoPriv, nodeInfoPriv.NodeID), nodeInfoPriv)
+		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfoPriv.NodeID), nodeInfoPriv)
 	}
 
 	return nodeInfosPub, nodeInfosPriv
