@@ -144,40 +144,39 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	chunkID := chunk.Receipt.ExecutionResult.Chunks.ByIndex(chunk.ChunkIndex).ID()
 
 	// execute the assigned chunk
-	chFaults, verifErr := e.chVerif.Verify(chunk)
-
+	chFault, verifErr := e.chVerif.Verify(chunk)
 	if verifErr != nil {
 		return verifErr
 	}
 
-	if chFaults != nil {
-		switch chFaults.(type) {
-		case chmodels.CFMissingRegisterTouch:
+	if chFault != nil {
+		switch chFault.(type) {
+		case *chmodels.CFMissingRegisterTouch:
 			// TODO raise challenge
 			e.log.Info().
 				Timestamp().
 				Hex("origin", logging.ID(originID)).
 				Uint64("chunkIndex", chunk.ChunkIndex).
 				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(err.Error())
-		case chmodels.CFNonMatchingFinalState:
+				Msg(chFault.String())
+		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Info().
 				Timestamp().
 				Hex("origin", logging.ID(originID)).
 				Uint64("chunkIndex", chunk.ChunkIndex).
 				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(err.Error())
-		case chmodels.CFInvalidVerifiableChunk:
+				Msg(chFault.String())
+		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
 			e.log.Info().
 				Timestamp().
 				Hex("origin", logging.ID(originID)).
 				Uint64("chunkIndex", chunk.ChunkIndex).
 				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(err.Error())
+				Msg(chFault.String())
 		default:
-			return fmt.Errorf("unknown type of chunk fault is recieved %v", chFaults.String())
+			return fmt.Errorf("unknown type of chunk fault is recieved (type: %T) : %v", chFault, chFault.String())
 		}
 		// don't do anything else, but skip generating result approvals
 		return nil

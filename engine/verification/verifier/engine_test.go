@@ -1,6 +1,7 @@
 package verifier_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -135,35 +136,38 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 }
 
-// func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
+func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
+	eng := suite.TestNewEngine()
+	myID := unittest.IdentifierFixture()
+	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
 
-// 	eng := suite.TestNewEngine()
-// 	myID := unittest.IdentifierFixture()
-// 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
+	// mocking node ID using the LocalMock
+	suite.me.MockNodeID(myID)
+	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
 
-// 	// mocking node ID using the LocalMock
-// 	suite.me.MockNodeID(myID)
-// 	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
+	// we shouldn't receive any result approval
+	suite.conduit.
+		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
+		Return(nil).
+		Run(func(args testifymock.Arguments) {
+			// TODO change this to check challeneges
+			_, ok := args[0].(*flow.ResultApproval)
+			suite.Assert().False(ok)
+		})
 
-// 	suite.conduit.
-// 		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
-// 		Return(nil)
-
-// 	var tests = []struct {
-// 		vc          *verification.VerifiableChunk
-// 		expectedErr error
-// 	}{
-// 		{unittest.VerifiableChunkFixture(uint64(400)), nil},
-// 		{unittest.VerifiableChunkFixture(uint64(401)), nil},
-// 		{unittest.VerifiableChunkFixture(uint64(402)), nil},
-// 		{unittest.VerifiableChunkFixture(uint64(403)), nil},
-// 	}
-
-// 	for _, test := range tests {
-// 		err := eng.Process(myID, test.vc)
-// 		suite.Assert().Error(err)
-// 	}
-// }
+	var tests = []struct {
+		vc          *verification.VerifiableChunk
+		expectedErr error
+	}{
+		{unittest.VerifiableChunkFixture(uint64(1)), nil},
+		{unittest.VerifiableChunkFixture(uint64(2)), nil},
+		{unittest.VerifiableChunkFixture(uint64(3)), nil},
+	}
+	for _, test := range tests {
+		err := eng.Process(myID, test.vc)
+		suite.Assert().NoError(err)
+	}
+}
 
 // MockLocal represents a mock of Local
 // We needed to develop a separate mock for Local as we could not mock
@@ -204,15 +208,28 @@ type ChunkVerifierMock struct {
 
 func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) (chmodel.ChunkFault, error) {
 	switch ch.ChunkIndex {
+	case 0:
+		return nil, nil
 	// return error
-	// case 400:
-	// 	return chmodel.NewErrIncompleteVerifiableChunk{}, nil
-	// case 401:
-	// 	return chunks.ErrInvalidVerifiableChunk{}, nil
-	// case 402:
-	// 	return chunks.ErrMissingRegisterTouch{}, nil
-	// case 403:
-	// 	return chunks.ErrNonMatchingFinalState{}, nil
+	case 1:
+		return chmodel.NewCFMissingRegisterTouch(
+			[]string{"test missing register touch"},
+			ch.ChunkIndex,
+			ch.Receipt.ExecutionResult.ID()), nil
+
+	case 2:
+		return chmodel.NewCFInvalidVerifiableChunk(
+			"test",
+			errors.New("test invalid verifiable chunk"),
+			ch.ChunkIndex,
+			ch.Receipt.ExecutionResult.ID()), nil
+
+	case 3:
+		return chmodel.NewCFNonMatchingFinalState(
+			unittest.StateCommitmentFixture(),
+			unittest.StateCommitmentFixture(),
+			ch.ChunkIndex,
+			ch.Receipt.ExecutionResult.ID()), nil
 
 	// TODO add cases for challenges
 	// return successful by default
