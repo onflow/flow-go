@@ -31,7 +31,7 @@ func DecodeGenesisQC(raw []byte, qc *GenesisQC) error {
 type DKGParticipant struct {
 	ID          flow.Identifier
 	PubKeyShare EncodableRandomBeaconPubKey
-	GroupIndex  uint
+	GroupIndex  int
 }
 
 type DKGPubData struct {
@@ -48,5 +48,18 @@ func DecodeDKGPubData(raw []byte, dkgPubData *DKGPubData) error {
 }
 
 func (data *DKGPubData) ForHotStuff() *hotstuff.DKGPublicData {
-	panic("TODO")
+
+	participantLookup := make(map[flow.Identifier]*hotstuff.DKGParticipant)
+	for _, part := range data.Participants {
+		participantLookup[part.ID] = &hotstuff.DKGParticipant{
+			Id:             part.ID,
+			PublicKeyShare: part.PubKeyShare.PublicKey,
+			DKGIndex:       part.GroupIndex,
+		}
+	}
+
+	return &hotstuff.DKGPublicData{
+		GroupPubKey:           data.GroupPubKey.PublicKey,
+		IdToDKGParticipantMap: participantLookup,
+	}
 }

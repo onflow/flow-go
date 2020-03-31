@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -31,7 +32,7 @@ type SignerData struct {
 	Signers    []Signer
 }
 
-func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*model.QuorumCertificate, error) {
+func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*bootstrap.GenesisQC, error) {
 	ps, db, err := NewProtocolState(block)
 	if err != nil {
 		return nil, err
@@ -68,16 +69,16 @@ func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*model.QuorumC
 	}
 
 	// make QC
-	qc := &model.QuorumCertificate{
+	qc := model.QuorumCertificate{
 		View:                hotBlock.View,
 		BlockID:             hotBlock.BlockID,
 		AggregatedSignature: aggsig,
 	}
 
 	// validate QC
-	err = validators[0].ValidateQC(qc, &hotBlock)
+	err = validators[0].ValidateQC(&qc, &hotBlock)
 
-	return qc, err
+	return bootstrap.GenesisQC(qc), err
 }
 
 func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.Block) ([]*validator.Validator, []*signature.RandomBeaconAwareSigProvider, error) {

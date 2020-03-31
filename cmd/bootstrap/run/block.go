@@ -1,10 +1,11 @@
 package run
 
 import (
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func GenerateRootBlock(identityList flow.IdentityList, seal flow.Seal) flow.Block {
+func GenerateRootBlock(identityList flow.IdentityList, seal flow.Seal) bootstrap.GenesisBlock {
 	payload := flow.Payload{
 		Identities: identityList,
 		Guarantees: nil,
@@ -25,7 +26,7 @@ func GenerateRootBlock(identityList flow.IdentityList, seal flow.Seal) flow.Bloc
 		ProposerRandomBeaconSig: nil,
 	}
 
-	return flow.Block{
+	return bootstrap.GenesisBlock{
 		Header:  header,
 		Payload: payload,
 	}

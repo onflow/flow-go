@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
-	bootstrap "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/client"
@@ -245,12 +245,12 @@ func getSeeds(n int) ([][]byte, error) {
 //
 // The input list of node configs and identities must have the same node at
 // each index.
-func getQCSignerData(groupPubKey crypto.PublicKey, nodes []*NodeConfig, identities flow.IdentityList) *bootstrap.SignerData {
+func getQCSignerData(groupPubKey crypto.PublicKey, nodes []*NodeConfig, identities flow.IdentityList) *bootstraprun.SignerData {
 
 	// we need the DKG group index and signer info for each consensus node
 	n := len(identities.Filter(filter.HasRole(flow.RoleConsensus)))
 	dkgIndices := make([]int, 0, n)
-	signers := make([]bootstrap.Signer, 0, n)
+	signers := make([]bootstraprun.Signer, 0, n)
 
 	for i := 0; i < len(nodes); i++ {
 
@@ -260,7 +260,7 @@ func getQCSignerData(groupPubKey crypto.PublicKey, nodes []*NodeConfig, identiti
 			continue
 		}
 
-		signer := bootstrap.Signer{
+		signer := bootstraprun.Signer{
 			Identity:            *identity,
 			StakingPrivKey:      conf.StakingKey,
 			RandomBeaconPrivKey: conf.RandomBeaconKey,
@@ -285,7 +285,7 @@ func getQCSignerData(groupPubKey crypto.PublicKey, nodes []*NodeConfig, identiti
 		}
 	}
 
-	signerData := &bootstrap.SignerData{
+	signerData := &bootstraprun.SignerData{
 		DkgPubData: dkgPubData,
 		Signers:    signers,
 	}
@@ -325,13 +325,13 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 	// get networking keys for all nodes
 	networkKeySeeds, err := getSeeds(len(nodes))
 	require.Nil(t, err)
-	networkKeys, err := bootstrap.GenerateNetworkingKeys(len(nodes), networkKeySeeds)
+	networkKeys, err := bootstraprun.GenerateNetworkingKeys(len(nodes), networkKeySeeds)
 	require.Nil(t, err)
 
 	// get staking keys for all nodes
 	stakingKeySeeds, err := getSeeds(len(nodes))
 	require.Nil(t, err)
-	stakingKeys, err := bootstrap.GenerateStakingKeys(len(nodes), stakingKeySeeds)
+	stakingKeys, err := bootstraprun.GenerateStakingKeys(len(nodes), stakingKeySeeds)
 	require.Nil(t, err)
 
 	// create an identity for each specified node
@@ -363,7 +363,7 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 
 	// run DKG for all consensus nodes
 	dkgSeeds, err := getSeeds(len(conIdentities))
-	dkg, err := bootstrap.RunDKG(len(conIdentities), dkgSeeds)
+	dkg, err := bootstraprun.RunDKG(len(conIdentities), dkgSeeds)
 	require.Nil(t, err)
 
 	// add the public key to the identity and the private key to the node config
@@ -380,16 +380,15 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 		i++
 	}
 
-	seal := bootstrap.GenerateRootSeal(flow.GenesisStateCommitment)
-	genesis := bootstrap.GenerateRootBlock(identities, seal)
+	seal := bootstraprun.GenerateRootSeal(flow.GenesisStateCommitment)
+	genesis := bootstraprun.GenerateRootBlock(identities, seal)
 
 	signerData := getQCSignerData(dkg.PubGroupKey, nodes, identities)
-	qc, err := bootstrap.GenerateGenesisQC(*signerData, &genesis)
+	qc, err := bootstraprun.GenerateGenesisQC(*signerData, &genesis)
 	require.Nil(t, err)
 
 	// TODO create config files
 	// (private keyfiles, dkg pubdata, genesis block, genesis qc)
-	_ = qc
 
 	// create a temporary directory to store all bootstrapping files, these
 	// will be shared between all nodes
