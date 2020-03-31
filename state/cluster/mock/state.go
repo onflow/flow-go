@@ -2,7 +2,7 @@
 
 package mock
 
-import cluster "github.com/dapperlabs/flow-go/cluster"
+import cluster "github.com/dapperlabs/flow-go/state/cluster"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 

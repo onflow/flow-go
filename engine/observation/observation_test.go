@@ -25,7 +25,7 @@ import (
 
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )

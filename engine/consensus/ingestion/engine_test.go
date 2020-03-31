@@ -10,7 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
-	mockprotocol "github.com/dapperlabs/flow-go/protocol/mock"
+	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 

@@ -16,8 +16,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/protocol"
-	protoBadger "github.com/dapperlabs/flow-go/protocol/badger"
+	"github.com/dapperlabs/flow-go/state/protocol"
+	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 )
 
 type Signer struct {

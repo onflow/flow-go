@@ -11,6 +11,7 @@ type Proposal struct {
 	Block                 *Block
 	StakingSignature      crypto.Signature
 	RandomBeaconSignature crypto.Signature
+	SigData               []byte // to be used in the new verification component
 }
 
 // ProposerVote extracts the proposer vote from the proposal
