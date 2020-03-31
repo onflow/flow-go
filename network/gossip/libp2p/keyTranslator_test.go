@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec"
+	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	fcrypto "github.com/dapperlabs/flow-go/crypto"
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 )
 
 // KeyTranslatorTestSuite tests key conversion from Flow keys to LibP2P keys
