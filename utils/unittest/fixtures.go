@@ -4,7 +4,6 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
-	"testing"
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -14,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 func AddressFixture() flow.Address {
@@ -417,104 +415,6 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	}
 
 	return tb
-}
-
-// CompleteExecutionResultFixture returns complete execution result with an
-// execution receipt referencing the block/collections.
-// chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.CompleteExecutionResult {
-	chunks := make([]*flow.Chunk, 0)
-	chunkStates := make([]*flow.ChunkState, 0, chunkCount)
-	collections := make([]*flow.Collection, 0, chunkCount)
-	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
-
-	for i := 0; i < chunkCount; i++ {
-		// creates one guaranteed collection per chunk
-		coll := CollectionFixture(3)
-		guarantee := coll.Guarantee()
-		collections = append(collections, &coll)
-		guarantees = append(guarantees, &guarantee)
-
-		// registerTouch and State setup
-		id1 := make([]byte, 32)
-		value1 := []byte{'a'}
-
-		id2 := make([]byte, 32)
-		id2[0] = byte(5)
-		value2 := []byte{'b'}
-		UpdatedValue2 := []byte{'B'}
-
-		ids := make([][]byte, 0)
-		values := make([][]byte, 0)
-		ids = append(ids, id1, id2)
-		values = append(values, value1, value2)
-
-		db := TempLevelDB(t)
-
-		f, _ := ledger.NewTrieStorage(db)
-		startState, _ := f.UpdateRegisters(ids, values)
-		regTs, _ := f.GetRegisterTouches(ids, startState)
-
-		ids = [][]byte{id2}
-		values = [][]byte{UpdatedValue2}
-
-		chunk := &flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: uint(i),
-				StartState:      startState,
-				EventCollection: IdentifierFixture(),
-			},
-			Index: uint64(i),
-		}
-		chunks = append(chunks, chunk)
-
-		// creates a chunk state
-		chunkState := &flow.ChunkState{
-			ChunkID:   chunk.ID(),
-			Registers: flow.Ledger{},
-		}
-		chunkStates = append(chunkStates, chunkState)
-
-		// creates a chunk data pack for the chunk
-		chunkDataPack := flow.ChunkDataPack{
-			ChunkID:         chunk.ID(),
-			StartState:      startState,
-			RegisterTouches: regTs,
-		}
-		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
-	}
-
-	payload := flow.Payload{
-		Identities: IdentityListFixture(32),
-		Guarantees: guarantees,
-	}
-	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Hash()
-
-	block := flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
-
-	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  chunks,
-		},
-	}
-
-	receipt := flow.ExecutionReceipt{
-		ExecutionResult: result,
-	}
-
-	return verification.CompleteExecutionResult{
-		Receipt:        &receipt,
-		Block:          &block,
-		Collections:    collections,
-		ChunkStates:    chunkStates,
-		ChunkDataPacks: chunkDataPacks,
-	}
 }
 
 // VerifiableChunk returns a complete verifiable chunk with an
