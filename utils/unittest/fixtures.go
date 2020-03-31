@@ -244,14 +244,21 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
-		ra.ResultApprovalBody.ExecutionResultID = id
+		ra.Body.ExecutionResultID = id
 	}
 }
 
 func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultApproval {
+	attestation := flow.Attestation{
+		BlockID:           IdentifierFixture(),
+		ExecutionResultID: IdentifierFixture(),
+		ChunkIndex:        uint64(0),
+	}
+
 	approval := flow.ResultApproval{
-		ResultApprovalBody: flow.ResultApprovalBody{
-			ExecutionResultID:    IdentifierFixture(),
+		Body: flow.ResultApprovalBody{
+			Attestation:          attestation,
+			ApproverID:           IdentifierFixture(),
 			AttestationSignature: SignatureFixture(),
 			Spock:                nil,
 		},
@@ -481,7 +488,7 @@ func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecuti
 
 // VerifiableChunk returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkFixture() *verification.VerifiableChunk {
+func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 	coll := CollectionFixture(3)
 	guarantee := coll.Guarantee()
 
@@ -502,7 +509,7 @@ func VerifiableChunkFixture() *verification.VerifiableChunk {
 			CollectionIndex: 0,
 			StartState:      StateCommitmentFixture(),
 		},
-		Index: 0,
+		Index: chunkIndex,
 	}
 
 	chunkState := flow.ChunkState{
