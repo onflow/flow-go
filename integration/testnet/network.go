@@ -35,6 +35,9 @@ const (
 	// to docker by default on macOS
 	TmpRoot = "/tmp"
 
+	// DefaultBootstrapDir is the default directory for bootstrap files
+	DefaultBootstrapDir = "/bootstrap"
+
 	// DefaultFlowDBDir is the default directory for the node database.
 	DefaultFlowDBDir = "/flowdb"
 	// DefaultExecutionRootDir is the default directory for the execution node
@@ -338,8 +341,11 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 	identities := make(flow.IdentityList, 0, len(nodes))
 	for i, conf := range nodes {
 
-		// define the node's address
-		addr := fmt.Sprintf("%s_%d", conf.Role.String(), roleCounter[conf.Role]+1)
+		// define the node's name <role>_<n> and address <name>:<port>
+		name := fmt.Sprintf("%s_%d", conf.Role.String(), roleCounter[conf.Role]+1)
+		conf.ContainerName = name
+
+		addr := fmt.Sprintf("%s:%d", name, 2137)
 		roleCounter[conf.Role]++
 
 		// add the public key to the node identity
@@ -380,27 +386,79 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 		i++
 	}
 
+	// generate genesis block
 	seal := bootstraprun.GenerateRootSeal(flow.GenesisStateCommitment)
 	genesis := bootstraprun.GenerateRootBlock(identities, seal)
 
+	// generate QC
 	signerData := getQCSignerData(dkg.PubGroupKey, nodes, identities)
 	qc, err := bootstraprun.GenerateGenesisQC(*signerData, &genesis)
 	require.Nil(t, err)
 
-	// TODO create config files
-	// (private keyfiles, dkg pubdata, genesis block, genesis qc)
+	// generate encodable DKG public data
+	// TODO clean this up. There is a lot of duplication between this, DKG logic
+	// in HotStuff, and DKG logic in cmd/bootstrap
+	dkgPubData := bootstrapcmd.DKGDataPub{
+		PubGroupKey: bootstrapcmd.EncodableRandomBeaconPubKey{
+			PublicKey: dkg.PubGroupKey,
+		},
+	}
+
+	// TODO duplicated from above, clean this up :(
+	i = 0
+	for _, conf := range nodes {
+		if conf.Role != flow.RoleConsensus {
+			continue
+		}
+		identity, ok := conIdentities.ByNodeID(conf.Identifier)
+		assert.True(t, ok)
+
+		// add the node to the DKG public data
+		dkgPubData.Participants = append(dkgPubData.Participants,
+			bootstrapcmd.DKGParticipantPub{
+				NodeID: identity.NodeID,
+				RandomBeaconPubKey: bootstrapcmd.EncodableRandomBeaconPubKey{
+					PublicKey: identity.RandomBeaconPubKey,
+				},
+				GroupIndex: conf.RandomBeaconGroupIndex,
+			})
+	}
+
+	// TODO private random beacon key files
 
 	// create a temporary directory to store all bootstrapping files, these
 	// will be shared between all nodes
-	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
+	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
 	require.Nil(t, err)
 
-	// write genesis bootstrap files
-	err = writeJSON(filepath.Join(tmpdir, bootstrapcmd.FilenameGenesisBlock), genesis)
+	// write common genesis bootstrap files
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrapcmd.FilenameGenesisBlock), genesis)
 	require.Nil(t, err)
-	err = writeJSON(filepath.Join(tmpdir, bootstrapcmd.FilenameGenesisQC), qc)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrapcmd.FilenameGenesisQC), qc)
 	require.Nil(t, err)
-	err = writeJSON(filepath.Join(tmpdir, bootstrapcmd.FilenameDKGDataPub), signerData.DkgPubData)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrapcmd.FilenameDKGDataPub), dkgPubData)
+	require.Nil(t, err)
+
+	// write keyfiles for each node
+	for i := range nodes {
+		conf := nodes[i]
+		identity := identities[i]
+
+		// TODO consolidate models
+		writeable := bootstrapcmd.NodeInfoPriv{
+			Role:           identity.Role,
+			Address:        identity.Address,
+			NodeID:         identity.NodeID,
+			NetworkPrivKey: bootstrapcmd.EncodableNetworkPrivKey{conf.NetworkKey},
+			StakingPrivKey: bootstrapcmd.EncodableStakingPrivKey{conf.StakingKey},
+		}
+
+		err = writeJSON(filepath.Join(bootstrapDir, fmt.Sprintf(bootstrapcmd.FilenameNodeInfoPriv, identity.NodeID)), writeable)
+		require.Nil(t, err)
+	}
+
+	// TODO manually checking the result
+	fmt.Println(">>%%<<: ", bootstrapDir)
 
 	// STEP 2 - CREATE CONTAINERS
 
@@ -409,7 +467,7 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 		conf := nodes[i]
 		identity := identities[i]
 
-		nodeContainer, err := createContainer(t, suite, conf, identity)
+		nodeContainer, err := createContainer(t, suite, bootstrapDir, conf, identity)
 		require.Nil(t, err)
 		network.After(nodeContainer.Container)
 
@@ -424,7 +482,7 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 }
 
 // createContainer ...
-func createContainer(t *testing.T, suite *testingdock.Suite, conf *NodeConfig, identity *flow.Identity) (*NodeContainer, error) {
+func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string, conf *NodeConfig, identity *flow.Identity) (*NodeContainer, error) {
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
 		Name:      conf.ContainerName,
@@ -432,8 +490,9 @@ func createContainer(t *testing.T, suite *testingdock.Suite, conf *NodeConfig, i
 			Image: conf.ImageName(),
 			User:  currentUser(),
 			Cmd: []string{
-				fmt.Sprintf("--entries=%s"), // TODO this should be from genesis
+				//fmt.Sprintf("--entries=%s"), // TODO this should be from genesis
 				fmt.Sprintf("--nodeid=%s", identity.NodeID.String()),
+				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
 				"--loglevel=debug",
 				"--nclusters=1",
@@ -463,11 +522,13 @@ func createContainer(t *testing.T, suite *testingdock.Suite, conf *NodeConfig, i
 	require.Nil(t, err)
 
 	// Bind the host directory to the container's database directory
+	// Bind the common bootstrap directory to the container
 	// NOTE: I did this using the approach from:
 	// https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
 	opts.HostConfig.Binds = append(
 		opts.HostConfig.Binds,
 		fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
+		fmt.Sprintf("%s:%s:ro", bootstrapDir, DefaultBootstrapDir),
 	)
 
 	switch identity.Role {
