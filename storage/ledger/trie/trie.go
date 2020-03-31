@@ -340,7 +340,6 @@ func (n node) FmtStr(prefix string, path string) string {
 func NewSMT(
 	dbDir string,
 	height int,
-//cacheSize int,
 	interval uint32,
 	numHistoricalStates int,
 	numFullStates int,
@@ -449,18 +448,6 @@ func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool,
 	k := key.String()
 	//s.lruCache.Add(k, nil)
 	t.cachedBranches[k] = holder
-}
-
-// invalidateCache removes the given keys from the cache
-func (t *tree) invalidateCache(keys []Key) {
-	for _, key := range keys {
-		k := key.String()
-		res := t.cachedBranches[k]
-		if res != nil {
-			delete(t.cachedBranches, k)
-			//s.lruCache.Remove(k)
-		}
-	}
 }
 
 func (t *tree) isSnapshot() bool {

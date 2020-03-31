@@ -36,13 +36,9 @@ type GenericNode struct {
 	DBDir  string
 }
 
-func (g *GenericNode) Done() error {
-	err := g.DB.Close()
-	if err != nil {
-		return err
-	}
-
-	return os.RemoveAll(g.DBDir)
+func (g *GenericNode) Done() {
+	_ = g.DB.Close()
+	_ = os.RemoveAll(g.DBDir)
 }
 
 // CollectionNode implements an in-process collection node for tests.

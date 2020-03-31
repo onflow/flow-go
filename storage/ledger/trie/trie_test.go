@@ -13,14 +13,8 @@ import (
 )
 
 const (
-	// kvdbPath is the path to the key-value database.
-	kvdbPath = "db/valuedb"
-	// tdbPath is the path to the trie database.
-	tdbPath = "db/triedb"
-
 	testHeight     = 256
 	testHashLength = 32
-	//cacheSize      = 50000
 )
 
 func TestSMTInitialization(t *testing.T) {
@@ -970,6 +964,7 @@ func TestGetHistoricalProofs(t *testing.T) {
 		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
 		require.NoError(t, err)
 		oldTree2, err := smt.forest.Get(oldRoot2)
+		require.NoError(t, err)
 
 		flag1, proof1, size1, inclusion1, err := smt.GetProof(key1, oldTree2.rootNode)
 		require.NoError(t, err)
@@ -2558,6 +2553,7 @@ func TestProofEncoderDecoder(t *testing.T) {
 		newRoot, err := smt.Update(keys, values, emptyTree.root)
 		require.NoError(t, err)
 		_, proofHldr, err := smt.Read(keys, false, newRoot)
+		require.NoError(t, err)
 
 		require.Equal(t, DecodeProof(EncodeProof(proofHldr)), proofHldr, "Proof Encoder has an issue")
 	})
@@ -2580,6 +2576,7 @@ func TestProofEncoderDecoder(t *testing.T) {
 		newRoot, err := smt.Update(keys, values, emptyTree.root)
 		require.NoError(t, err)
 		_, proofHldr, err := smt.Read(keys, false, newRoot)
+		require.NoError(t, err)
 
 		require.Equal(t, DecodeProof(EncodeProof(proofHldr)), proofHldr, "Proof Encoder has an issue")
 	})
@@ -2588,7 +2585,6 @@ func TestProofEncoderDecoder(t *testing.T) {
 func withSMT(
 	t *testing.T,
 	height int,
-//cacheSize int,
 	interval uint32,
 	numHistoricalStates int,
 	numFullStates int, f func(t *testing.T, smt *SMT, emptyTree *tree)) {

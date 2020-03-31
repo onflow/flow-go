@@ -89,7 +89,7 @@ func NewPSMT(
 					currentNode.rChild = newNode(nil, currentNode.height-1)
 				}
 				currentNode = currentNode.rChild
-			} else {                           // left branching
+			} else { // left branching
 				if currentNode.rChild == nil { // check right child
 					currentNode.rChild = newNode(v, currentNode.height-1)
 				} else if !bytes.Equal(currentNode.rChild.ComputeValue(), v) {
