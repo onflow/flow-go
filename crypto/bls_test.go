@@ -13,7 +13,8 @@ import (
 // BLS tests
 func TestBLS_BLS12381(t *testing.T) {
 	seed := []byte{1, 2, 3, 4}
-	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	h, _ := NewHasher(SHA3_384)
+	sk, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
 	if err != nil {
 		log.Error(err.Error())
 		return
@@ -43,7 +44,8 @@ func BenchmarkBLS_BLS12381Verify(b *testing.B) {
 func TestEncDecPrivateKey(t *testing.T) {
 	// generate a key pair
 	seed := []byte{1, 2, 3, 4}
-	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	h, _ := NewHasher(SHA3_384)
+	sk, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
 	require.NoError(t, err)
 	// encode the private key
 	skBytes, err := sk.Encode()
@@ -65,7 +67,8 @@ func TestEncDecPrivateKey(t *testing.T) {
 func TestEncDecPublicKey(t *testing.T) {
 	// generate a key pair
 	seed := []byte{1, 2, 3, 4}
-	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	h, _ := NewHasher(SHA3_384)
+	sk, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
 	require.NoError(t, err)
 	pk := sk.PublicKey()
 	// encode the publick key

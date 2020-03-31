@@ -55,7 +55,8 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	//
 	// generates signing and verification keys
 	seed := []byte{1, 2, 3, 4}
-	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	h, _ := crypto.NewHasher(crypto.SHA3_384)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, h.ComputeHash(seed))
 	require.NoError(suite.T(), err)
 	suite.sk = sk
 	// tag of hasher should be the same as the tag of engine's hasher

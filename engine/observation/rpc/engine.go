@@ -34,13 +34,17 @@ func New(log zerolog.Logger,
 	config Config,
 	collectionRPC observation.ObserveServiceClient,
 	executionRPC observation.ObserveServiceClient,
-	headers storage.Headers) *Engine {
+	blocks storage.Blocks,
+	headers storage.Headers,
+	collections storage.Collections,
+	transactions storage.Transactions) *Engine {
+
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
 		log:     log,
 		unit:    engine.NewUnit(),
-		handler: NewHandler(log, state, collectionRPC, executionRPC, headers),
+		handler: NewHandler(log, state, collectionRPC, executionRPC, blocks, headers, collections, transactions),
 		server:  grpc.NewServer(),
 		config:  config,
 	}

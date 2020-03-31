@@ -100,7 +100,11 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	}
 	// read the verification vector
 	s.A = make([]pointG2, s.threshold+1)
-	readVerifVector(s.A, data)
+	err := readVerifVector(s.A, data)
+	if err != nil {
+		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		return
+	}
 
 	s.y = make([]pointG2, s.size)
 	s.computePublicKeys()

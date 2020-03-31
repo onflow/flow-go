@@ -33,29 +33,6 @@ func (_m *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	return r0, r1
 }
 
-// CollectionIDByTransactionID provides a mock function with given fields: txID
-func (_m *Collections) CollectionIDByTransactionID(txID flow.Identifier) (*flow.Identifier, error) {
-	ret := _m.Called(txID)
-
-	var r0 *flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Identifier); ok {
-		r0 = rf(txID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Identifier)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(txID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // LightByID provides a mock function with given fields: collID
 func (_m *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection, error) {
 	ret := _m.Called(collID)
@@ -72,6 +49,29 @@ func (_m *Collections) LightByID(collID flow.Identifier) (*flow.LightCollection,
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
 		r1 = rf(collID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// LightByTransactionID provides a mock function with given fields: txID
+func (_m *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
+	ret := _m.Called(txID)
+
+	var r0 *flow.LightCollection
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.LightCollection); ok {
+		r0 = rf(txID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.LightCollection)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(txID)
 	} else {
 		r1 = ret.Error(1)
 	}

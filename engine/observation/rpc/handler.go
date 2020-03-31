@@ -2,17 +2,25 @@ package rpc
 
 import (
 	"context"
+	"errors"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow-go/engine/observation/rpc/convert"
+	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-// Handler implements a subset of the Observation API
+// Handler implements a subset of the Observation API. It spans multiple files
+// Transaction related calls are handled in handler handler_transaction
+// Block Header related calls are handled in handler handler_block_header
+// Block details related calls are handled in handler handler_block_details
+// All remaining calls are handled in this file (or not implemented yet)
 type Handler struct {
 	observation.UnimplementedObserveServiceServer
 	executionRPC  observation.ObserveServiceClient
@@ -21,18 +29,27 @@ type Handler struct {
 	state         protocol.State
 
 	// storage
-	headers storage.Headers
+	blocks       storage.Blocks
+	headers      storage.Headers
+	collections  storage.Collections
+	transactions storage.Transactions
 }
 
 func NewHandler(log zerolog.Logger,
 	s protocol.State,
 	e observation.ObserveServiceClient,
 	c observation.ObserveServiceClient,
-	headers storage.Headers) *Handler {
+	blocks storage.Blocks,
+	headers storage.Headers,
+	collections storage.Collections,
+	transactions storage.Transactions) *Handler {
 	return &Handler{
 		executionRPC:                      e,
 		collectionRPC:                     c,
+		blocks:                            blocks,
 		headers:                           headers,
+		collections:                       collections,
+		transactions:                      transactions,
 		state:                             s,
 		log:                               log,
 		UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
@@ -48,42 +65,59 @@ func (h *Handler) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 	return h.executionRPC.ExecuteScript(ctx, req)
 }
 
-// SendTransaction forwards the transaction to the collection node
-func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
-
-	return h.collectionRPC.SendTransaction(ctx, req)
+func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {
+	// lookup the latest seal to get latest blockid
+	seal, err := h.state.Final().Seal()
+	if err != nil {
+		return nil, err
+	}
+	// query header storage for that blockid
+	return h.headers.ByBlockID(seal.BlockID)
 }
 
-func (h *Handler) GetLatestBlockHeader(ctx context.Context, req *observation.GetLatestBlockHeaderRequest) (*observation.BlockHeaderResponse, error) {
+func (h *Handler) GetCollectionByID(_ context.Context, req *observation.GetCollectionByIDRequest) (*observation.CollectionResponse, error) {
 
-	header, err := h.getLatestBlockHeader(req.IsSealed)
+	id := flow.HashToID(req.Id)
 
+	// retrieve the collection from the collection storage
+	cl, err := h.collections.LightByID(id)
 	if err != nil {
+		err = convertStorageError(err)
 		return nil, err
 	}
 
-	msg, err := convert.BlockHeaderToMessage(header)
+	transactions := make([]*flow.TransactionBody, len(cl.Transactions))
+
+	// retrieve all transactions from the transaction storage
+	for i, txID := range cl.Transactions {
+		tx, err := h.transactions.ByID(txID)
+		if err != nil {
+			err = convertStorageError(err)
+			return nil, err
+		}
+		transactions[i] = tx
+	}
+
+	// create a flow collection object
+	collection := &flow.Collection{Transactions: transactions}
+
+	// convert flow collection object to protobuf entity
+	ce, err := convert.CollectionToMessage(collection)
 	if err != nil {
+		err = convertStorageError(err)
 		return nil, err
 	}
 
-	resp := &observation.BlockHeaderResponse{
-		Block: &msg,
+	// return the collection entity
+	resp := &observation.CollectionResponse{
+		Collection: ce,
 	}
 	return resp, nil
 }
 
-func (h *Handler) getLatestBlockHeader(isSealed bool) (*flow.Header, error) {
-	// If latest Sealed block is needed, lookup the latest seal to get latest blockid
-	// then query storage for that blockid
-	if isSealed {
-		seal, err := h.state.Final().Seal()
-		if err != nil {
-			return nil, err
-		}
-		return h.headers.ByBlockID(seal.BlockID)
+func convertStorageError(err error) error {
+	if errors.Is(err, storage.ErrNotFound) {
+		return status.Errorf(codes.NotFound, "not found: %v", err)
 	}
-	// Otherwise, for the latest finalized block, just query the state
-	return h.state.Final().Head()
-
+	return status.Errorf(codes.Internal, "failed to find: %v", err)
 }

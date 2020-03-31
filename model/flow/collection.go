@@ -54,6 +54,10 @@ func (lc LightCollection) Checksum() Identifier {
 	return MakeID(lc)
 }
 
+func (lc LightCollection) Len() int {
+	return len(lc.Transactions)
+}
+
 // Note that this is the basic version of the List, we need to substitute it with something like Merkle tree at some point
 type CollectionList struct {
 	collections []*Collection

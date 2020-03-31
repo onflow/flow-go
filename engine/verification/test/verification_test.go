@@ -214,7 +214,7 @@ func TestHappyPath(t *testing.T) {
 
 	// associated resources should be removed from the mempool
 	for i := 0; i < chunkNum; i++ {
-		assert.False(t, verNode.Collections.Has(completeER.Collections[i].ID()))
+		assert.False(t, verNode.AuthCollections.Has(completeER.Collections[i].ID()))
 	}
 	// TODO adding complementary tests for claning other resources like the execution receipt
 	// https://github.com/dapperlabs/flow-go/issues/2750
