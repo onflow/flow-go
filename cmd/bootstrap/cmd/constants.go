@@ -1,8 +1,8 @@
 package cmd
 
 const (
-	randomSeedBytes           = 64
-	minSeedBytes              = 64
+	randomSeedBytes           = 48
+	minSeedBytes              = 48
 	minNodesPerCluster uint16 = 3
 
 	dirnameExecutionState         = "execution-state"

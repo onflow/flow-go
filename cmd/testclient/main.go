@@ -32,7 +32,7 @@ func main() {
 	}
 
 	// Generate key
-	seed := make([]byte, 40)
+	seed := make([]byte, 48)
 	_, _ = rand.Read(seed)
 	key, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA2_256, seed)
 	if err != nil {

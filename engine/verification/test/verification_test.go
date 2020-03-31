@@ -28,10 +28,6 @@ import (
 // - broadcast of a matching result approval to consensus nodes fo each assigned chunk
 func TestHappyPath(t *testing.T) {
 	// number of chunks in an ER
-	// TODO: broken test needs to be fixed
-	// https://github.com/dapperlabs/flow-go/issues/2935
-	t.Skip()
-
 	chunkNum := 10
 	hub := stub.NewNetworkHub()
 
@@ -47,7 +43,7 @@ func TestHappyPath(t *testing.T) {
 	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 
-	completeER := unittest.CompleteExecutionResultFixture(chunkNum)
+	completeER := CompleteExecutionResultFixture(t, chunkNum)
 
 	// assigns half of the chunks to this verifier
 	a := chunkassignment.NewAssignment()
@@ -214,7 +210,7 @@ func TestHappyPath(t *testing.T) {
 
 	// associated resources should be removed from the mempool
 	for i := 0; i < chunkNum; i++ {
-		assert.False(t, verNode.Collections.Has(completeER.Collections[i].ID()))
+		assert.False(t, verNode.AuthCollections.Has(completeER.Collections[i].ID()))
 	}
 	// TODO adding complementary tests for claning other resources like the execution receipt
 	// https://github.com/dapperlabs/flow-go/issues/2750
