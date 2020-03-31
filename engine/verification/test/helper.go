@@ -44,6 +44,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 
 		f, _ := ledger.NewTrieStorage(db)
 		startState, _ := f.UpdateRegisters(ids, values)
+		regTs, _ := f.GetRegisterTouches(ids, startState)
 
 		chunk := &flow.Chunk{
 			ChunkBody: flow.ChunkBody{
