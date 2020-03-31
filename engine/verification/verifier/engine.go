@@ -10,11 +10,11 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
+	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -144,12 +144,15 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	chunkID := chunk.Receipt.ExecutionResult.Chunks.ByIndex(chunk.ChunkIndex).ID()
 
 	// execute the assigned chunk
-	err = e.chVerif.Verify(chunk)
+	chFaults, verifErr := e.chVerif.Verify(chunk)
 
-	if err != nil {
-		switch err.(type) {
+	if verifErr != nil {
+		return verifErr
+	}
 
-		case chunks.ErrInvalidVerifiableChunk:
+	if chFaults != nil {
+		switch chFaults.(type) {
+		case chmodels.CFMissingRegisterTouch:
 			// TODO raise challenge
 			e.log.Info().
 				Timestamp().
@@ -157,7 +160,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 				Uint64("chunkIndex", chunk.ChunkIndex).
 				Hex("execution receipt", logging.Entity(chunk.Receipt)).
 				Msg(err.Error())
-		case chunks.ErrMissingRegisterTouch:
+		case chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Info().
 				Timestamp().
@@ -165,16 +168,8 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 				Uint64("chunkIndex", chunk.ChunkIndex).
 				Hex("execution receipt", logging.Entity(chunk.Receipt)).
 				Msg(err.Error())
-		case chunks.ErrNonMatchingFinalState:
+		case chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
-			e.log.Info().
-				Timestamp().
-				Hex("origin", logging.ID(originID)).
-				Uint64("chunkIndex", chunk.ChunkIndex).
-				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(err.Error())
-		case chunks.ErrIncompleteVerifiableChunk:
-			// TODO probably we should fix something
 			e.log.Info().
 				Timestamp().
 				Hex("origin", logging.ID(originID)).
@@ -182,7 +177,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 				Hex("execution receipt", logging.Entity(chunk.Receipt)).
 				Msg(err.Error())
 		default:
-			return fmt.Errorf("chunk verification failed for verifiable chunk [%d] of receipt [%x], error: %v", chunk.ChunkIndex, chunk.Receipt.ID(), err)
+			return fmt.Errorf("unknown type of chunk fault is recieved %v", chFaults.String())
 		}
 		// don't do anything else, but skip generating result approvals
 		return nil

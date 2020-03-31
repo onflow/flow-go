@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
@@ -26,20 +27,21 @@ func NewChunkVerifier(vm virtualmachine.VirtualMachine) *ChunkVerifier {
 }
 
 // Verify verifies the given VerifiableChunk by executing it and checking the final statecommitment
-func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
+func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.ChunkFault, error) {
 
 	// TODO check collection hash to match
 	// TODO check the number of transactions and computation used
 
 	if ch.ChunkDataPack == nil {
-		return ErrIncompleteVerifiableChunk{[]string{"chunk data pack is empty"}}
+		return nil, fmt.Errorf("missing chunk data pack")
 	}
 	if ch.Block == nil {
-		return ErrIncompleteVerifiableChunk{[]string{"block is empty"}}
+		return nil, fmt.Errorf("missing block")
 	}
 
+	chIndex := ch.ChunkIndex
+	execResID := ch.Receipt.ExecutionResult.ID()
 	blockCtx := fcv.vm.NewBlockContext(&ch.Block.Header)
-
 	ptrie, err := trie.NewPSMT(ch.ChunkDataPack.StartState,
 		fcv.trieDepth,
 		ch.ChunkDataPack.Registers(),
@@ -47,7 +49,8 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 		ch.ChunkDataPack.Proofs(),
 	)
 	if err != nil {
-		return ErrInvalidVerifiableChunk{"error constructing partial trie", err}
+		// TODO more analysis on the error reason
+		return chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie", err, chIndex, execResID), nil
 	}
 
 	regMap := ch.ChunkDataPack.GetRegisterValues()
@@ -87,7 +90,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 		for key := range unAuthRegTouch {
 			missingRegs = append(missingRegs, key)
 		}
-		return ErrMissingRegisterTouch{missingRegs}
+		return chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
 	}
 
 	// applying chunk delta (register updates at chunk level) to the partial trie
@@ -95,14 +98,13 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 	regs, values := chunkView.Delta().RegisterUpdates()
 	expEndStateComm, failedKeys, err := ptrie.Update(regs, values)
 	if err != nil {
-		return ErrMissingRegisterTouch{failedKeys}
+		return chmodels.NewCFMissingRegisterTouch(failedKeys, chIndex, execResID), nil
 	}
 
 	// check if the end state commitment mentioned in the chunk matches
 	// what the partial trie is providing.
 	if !bytes.Equal(expEndStateComm, ch.EndState) {
-		return ErrNonMatchingFinalState{expEndStateComm, ch.EndState}
+		return chmodels.NewCFNonMatchingFinalState(expEndStateComm, ch.EndState, chIndex, execResID), nil
 	}
-	return nil
-
+	return nil, nil
 }

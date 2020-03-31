@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	chModels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -34,8 +35,9 @@ func TestChunkVerifier(t *testing.T) {
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
 	assert.NotNil(s.T(), vch)
-	err := s.verifier.Verify(vch)
+	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
+	assert.Nil(s.T(), chFaults)
 }
 
 // TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
@@ -44,9 +46,11 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
-	err := s.verifier.Verify(vch)
-	assert.NotNil(s.T(), err)
-	assert.IsType(s.T(), err, ErrMissingRegisterTouch{})
+	chFaults, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	_, ok := chFaults.(chModels.CFMissingRegisterTouch)
+	assert.True(s.T(), ok)
 }
 
 // TestMissingRegisterTouchForRead tests verification given a chunkdatapack missing a register touch (read)
@@ -55,17 +59,21 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
-	err := s.verifier.Verify(vch)
-	assert.NotNil(s.T(), err)
-	assert.IsType(s.T(), err, ErrMissingRegisterTouch{})
+	chFaults, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	_, ok := chFaults.(chModels.CFMissingRegisterTouch)
+	assert.True(s.T(), ok)
 }
 
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("wrongEndState"))
 	assert.NotNil(s.T(), vch)
-	err := s.verifier.Verify(vch)
-	assert.NotNil(s.T(), err)
-	assert.IsType(s.T(), err, ErrNonMatchingFinalState{})
+	chFaults, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	_, ok := chFaults.(chModels.CFNonMatchingFinalState)
+	assert.True(s.T(), ok)
 }
 
 func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunk {

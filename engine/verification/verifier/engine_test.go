@@ -15,9 +15,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/test"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
+	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/chunks"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -202,22 +202,22 @@ func (m *MockLocal) MockNodeID(id flow.Identifier) {
 type ChunkVerifierMock struct {
 }
 
-func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) error {
+func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) (chmodel.ChunkFault, error) {
 	switch ch.ChunkIndex {
 	// return error
-	case 400:
-		return chunks.ErrIncompleteVerifiableChunk{}
-	case 401:
-		return chunks.ErrInvalidVerifiableChunk{}
-	case 402:
-		return chunks.ErrMissingRegisterTouch{}
-	case 403:
-		return chunks.ErrNonMatchingFinalState{}
+	// case 400:
+	// 	return chmodel.NewErrIncompleteVerifiableChunk{}, nil
+	// case 401:
+	// 	return chunks.ErrInvalidVerifiableChunk{}, nil
+	// case 402:
+	// 	return chunks.ErrMissingRegisterTouch{}, nil
+	// case 403:
+	// 	return chunks.ErrNonMatchingFinalState{}, nil
 
 	// TODO add cases for challenges
 	// return successful by default
 	default:
-		return nil
+		return nil, nil
 	}
 
 }
