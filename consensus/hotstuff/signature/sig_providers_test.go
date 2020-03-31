@@ -365,7 +365,8 @@ func testAggregateRBEnabled(t *testing.T) {
 	assert.True(t, valid)
 
 	// verify aggregated random beacon sig
-	valid, err = verifier.VerifyRandomBeaconThresholdSig(aggsig.RandomBeaconSignature, block, dkg.GroupPubKey)
+	groupPubKey, _ := dkg.GroupKey()
+	valid, err = verifier.VerifyRandomBeaconThresholdSig(aggsig.RandomBeaconSignature, block, groupPubKey)
 	require.NoError(t, err)
 	assert.True(t, valid)
 }
@@ -416,7 +417,8 @@ func testAggregateWithWrongSignerRBEnabled(t *testing.T) {
 	// create a different dkg group with 5 nodes
 	_, _, _, _, _, _, dkg2 := test.MakeSignerAndVerifier(t, 5, true)
 	// verify aggregated random beacon sig
-	valid, err = verifier.VerifyRandomBeaconThresholdSig(aggsig.RandomBeaconSignature, block, dkg2.GroupPubKey)
+	groupPubKey, _ := dkg2.GroupKey()
+	valid, err = verifier.VerifyRandomBeaconThresholdSig(aggsig.RandomBeaconSignature, block, groupPubKey)
 	// fail because the group public key was wrong
 	require.NoError(t, err)
 	assert.Equal(t, false, valid)

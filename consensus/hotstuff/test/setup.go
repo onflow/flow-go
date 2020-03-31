@@ -14,12 +14,20 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/local"
+<<<<<<< HEAD
 	"github.com/dapperlabs/flow-go/state/protocol"
 	mockProtocol "github.com/dapperlabs/flow-go/state/protocol/mocks"
+=======
+	"github.com/dapperlabs/flow-go/protocol"
+	mockProtocol "github.com/dapperlabs/flow-go/protocol/mocks"
+	dkgint "github.com/dapperlabs/flow-go/state/dkg"
+	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
+>>>>>>> implemented isolated DKG state API
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -82,31 +90,31 @@ func AddStakingPrivateKeys(ids flow.IdentityList) ([]crypto.PrivateKey, error) {
 }
 
 // create N private keys and assign them to identities' RandomBeaconPubKey
-func AddRandomBeaconPrivateKeys(t *testing.T, ids flow.IdentityList) ([]crypto.PrivateKey, *hotstuff.DKGPublicData, error) {
+func AddRandomBeaconPrivateKeys(t *testing.T, ids flow.IdentityList) ([]crypto.PrivateKey, *wrapper.State, error) {
 	sks, groupPubKey, keyShares := unittest.RunDKGKeys(t, len(ids))
 	for i := 0; i < len(ids); i++ {
 		sk := sks[i]
 		ids[i].RandomBeaconPubKey = sk.PublicKey()
 	}
 
-	dkgMap := make(map[flow.Identifier]*hotstuff.DKGParticipant)
+	dkgMap := make(map[flow.Identifier]*dkg.Participant)
 	for i, id := range ids {
-		dkgMap[id.NodeID] = &hotstuff.DKGParticipant{
-			Id:             id.NodeID,
+		dkgMap[id.NodeID] = &dkg.Participant{
 			PublicKeyShare: keyShares[i],
-			DKGIndex:       i,
+			Index:          uint(i),
 		}
 	}
-	dkgPubData := hotstuff.DKGPublicData{
-		GroupPubKey:           groupPubKey,
-		IdToDKGParticipantMap: dkgMap,
+	dkgPubData := dkg.PublicData{
+		GroupPubKey:     groupPubKey,
+		IDToParticipant: dkgMap,
 	}
-	return sks, &dkgPubData, nil
+	dkgState := wrapper.NewState(&dkgPubData)
+	return sks, dkgState, nil
 }
 
 // fake N private keys and assign them to identities' RandomBeaconPubKey
 // useful for meansure signing random beacon sigs without verifying the reconstructed sigs
-func AddFakeRandomBeaconPrivateKeys(t *testing.T, ids flow.IdentityList) ([]crypto.PrivateKey, *hotstuff.DKGPublicData, error) {
+func AddFakeRandomBeaconPrivateKeys(t *testing.T, ids flow.IdentityList) ([]crypto.PrivateKey, *wrapper.State, error) {
 	sks := []crypto.PrivateKey{}
 	for i := 0; i < len(ids); i++ {
 		sk, err := NextBLSKey()
@@ -117,23 +125,23 @@ func AddFakeRandomBeaconPrivateKeys(t *testing.T, ids flow.IdentityList) ([]cryp
 		sks = append(sks, sk)
 	}
 
-	dkgMap := make(map[flow.Identifier]*hotstuff.DKGParticipant)
+	dkgMap := make(map[flow.Identifier]*dkg.Participant)
 	for i, id := range ids {
-		dkgMap[id.NodeID] = &hotstuff.DKGParticipant{
-			Id:             id.NodeID,
+		dkgMap[id.NodeID] = &dkg.Participant{
 			PublicKeyShare: sks[i].PublicKey(),
-			DKGIndex:       i,
+			Index:          uint(i),
 		}
 	}
 
 	// fake the group pub key as the first pub key
 	groupPubKey := sks[0].PublicKey()
 
-	dkgPubData := hotstuff.DKGPublicData{
-		GroupPubKey:           groupPubKey,
-		IdToDKGParticipantMap: dkgMap,
+	dkgPubData := dkg.PublicData{
+		GroupPubKey:     groupPubKey,
+		IDToParticipant: dkgMap,
 	}
-	return sks, &dkgPubData, nil
+	dkgState := wrapper.NewState(&dkgPubData)
+	return sks, dkgState, nil
 }
 
 // create a new StakingSigProvider
@@ -152,8 +160,8 @@ func NewStakingProvider(ps protocol.State, tag string, id *flow.Identity, sk cry
 }
 
 // create a new RandomBeaconAwareSigProvider
-func NewRandomBeaconSigProvider(ps protocol.State, dkgPubData *hotstuff.DKGPublicData, id *flow.Identity, stakingKey crypto.PrivateKey, randomBeaconKey crypto.PrivateKey) (*signature.RandomBeaconAwareSigProvider, error) {
-	vs, err := viewstate.New(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
+func NewRandomBeaconSigProvider(ps protocol.State, dkgState dkgint.State, id *flow.Identity, stakingKey crypto.PrivateKey, randomBeaconKey crypto.PrivateKey) (*signature.RandomBeaconAwareSigProvider, error) {
+	vs, err := viewstate.New(ps, dkgState, id.NodeID, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create view state: %w", err)
 	}
@@ -174,7 +182,7 @@ func MakeSignerAndVerifier(t *testing.T, n int, enableRandomBeacon bool) (
 	hotstuff.SigAggregator,
 	[]crypto.PrivateKey, // stakingKeys
 	[]crypto.PrivateKey, // randomBKeys
-	*hotstuff.DKGPublicData,
+	dkgint.State,
 ) {
 
 	assert.NotEqual(t, n, 0)
@@ -224,7 +232,7 @@ func MakeSignerAndVerifierWithFakeDKG(t *testing.T, n int) (
 	hotstuff.SigAggregator,
 	[]crypto.PrivateKey, // stakingKeys
 	[]crypto.PrivateKey, // randomBKeys
-	*hotstuff.DKGPublicData,
+	dkgint.State,
 ) {
 	assert.NotEqual(t, n, 0)
 

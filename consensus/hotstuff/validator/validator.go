@@ -69,8 +69,13 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 		return newInvalidBlockError(block, "aggregated staking signature in QC is invalid")
 	}
 
+	// get the DKG public group key
+	groupPubKey, err := v.viewState.DKGState().GroupKey()
+	if err != nil {
+		return fmt.Errorf("could not get DKG public group key: %w", err)
+	}
+
 	// validate qc's random beacon signature (reconstructed threshold signature)
-	groupPubKey := v.viewState.DKGPublicData().GroupPubKey
 	valid, err = v.sigVerifier.VerifyRandomBeaconThresholdSig(qc.AggregatedSignature.RandomBeaconSignature, block, groupPubKey)
 	if err != nil {
 		return fmt.Errorf("cannot verify reconstructed random beacon sig from qc: %w", err)

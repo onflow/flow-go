@@ -60,14 +60,14 @@ func (s *RandomBeaconSigner) Reconstruct(block *model.Block, signatures []*model
 	// collect random beacon sig share and dkg index for each signer
 	sigShares := make([]crypto.Signature, 0, len(signatures))
 	dkgIndices := make([]int, 0, len(signatures))
-	dkgParticipantForID := s.viewState.DKGPublicData().IdToDKGParticipantMap
+	dkgState := s.viewState.DKGState()
 	for _, sig := range signatures {
 		sigShares = append(sigShares, sig.RandomBeaconSignature)
-		participant, found := dkgParticipantForID[sig.SignerID]
-		if !found {
-			return nil, fmt.Errorf("no DKG Participant info for id %s", sig.SignerID)
+		index, err := dkgState.ShareIndex(sig.SignerID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get DKG index (signer: %x): %w", sig.SignerID, err)
 		}
-		dkgIndices = append(dkgIndices, participant.DKGIndex)
+		dkgIndices = append(dkgIndices, int(index))
 	}
 	// reconstruct the threshold sig
 	reconstructedSig, err := crypto.ReconstructThresholdSignature(s.dkgGroupSize(), sigShares, dkgIndices)
@@ -75,8 +75,13 @@ func (s *RandomBeaconSigner) Reconstruct(block *model.Block, signatures []*model
 		return nil, fmt.Errorf("reconstructing threshold sig failed: %w", err)
 	}
 
+	// get the DKG public group key
+	publicGroupKey, err := dkgState.GroupKey()
+	if err != nil {
+		return nil, fmt.Errorf("could not get the DKG public group key: %w", err)
+	}
+
 	// sanity check: verify the reconstruct signature is valid
-	publicGroupKey := s.viewState.DKGPublicData().GroupPubKey
 	valid, err := s.VerifyRandomBeaconThresholdSig(reconstructedSig, block, publicGroupKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot verify the reconstructed signature, %w", err)
@@ -89,5 +94,6 @@ func (s *RandomBeaconSigner) Reconstruct(block *model.Block, signatures []*model
 }
 
 func (s *RandomBeaconSigner) dkgGroupSize() int {
-	return len(s.viewState.DKGPublicData().IdToDKGParticipantMap)
+	groupSize, _ := s.viewState.DKGState().GroupSize()
+	return int(groupSize)
 }

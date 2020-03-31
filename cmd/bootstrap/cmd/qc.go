@@ -4,8 +4,9 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 )
 
 func constructGenesisQC(block *flow.Block, nodeInfosPub []NodeInfoPub, nodeInfosPriv []NodeInfoPriv, dkgDataPriv DKGDataPriv) {
@@ -64,7 +65,7 @@ func generateQCSignerData(nsPub []NodeInfoPub, nsPriv []NodeInfoPriv, dkg DKGDat
 		})
 	}
 
-	sd.DkgPubData = generateDKGPublicData(dkg)
+	sd.DKGState = generateDKGState(dkg)
 
 	return sd
 }
@@ -89,19 +90,20 @@ func findDKGParticipantPriv(dkg DKGDataPriv, nodeID flow.Identifier) DKGParticip
 	return DKGParticipantPriv{}
 }
 
-func generateDKGPublicData(dkg DKGDataPriv) *hotstuff.DKGPublicData {
-	dat := hotstuff.DKGPublicData{
-		GroupPubKey:           dkg.PubGroupKey,
-		IdToDKGParticipantMap: make(map[flow.Identifier]*hotstuff.DKGParticipant, len(dkg.Participants)),
+func generateDKGState(priv DKGDataPriv) *wrapper.State {
+	dat := dkg.PublicData{
+		GroupPubKey:     priv.PubGroupKey,
+		IDToParticipant: make(map[flow.Identifier]*dkg.Participant, len(priv.Participants)),
 	}
 
-	for _, part := range dkg.Participants {
-		dat.IdToDKGParticipantMap[part.NodeID] = &hotstuff.DKGParticipant{
-			Id:             part.NodeID,
+	for _, part := range priv.Participants {
+		dat.IDToParticipant[part.NodeID] = &dkg.Participant{
 			PublicKeyShare: part.RandomBeaconPrivKey.PublicKey(),
-			DKGIndex:       part.GroupIndex,
+			Index:          uint(part.GroupIndex),
 		}
 	}
 
-	return &dat
+	state := wrapper.NewState(&dat)
+
+	return state
 }

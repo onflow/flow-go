@@ -6,7 +6,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mock"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/signature"
@@ -16,8 +15,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/local"
+	protoBadger "github.com/dapperlabs/flow-go/protocol/badger"
+	"github.com/dapperlabs/flow-go/state/dkg"
+	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 )
 
 type Signer struct {
@@ -27,8 +28,8 @@ type Signer struct {
 }
 
 type SignerData struct {
-	DkgPubData *hotstuff.DKGPublicData
-	Signers    []Signer
+	DKGState *wrapper.State
+	Signers  []Signer
 }
 
 func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*model.QuorumCertificate, error) {
@@ -83,9 +84,12 @@ func GenerateGenesisQC(signerData SignerData, block *flow.Block) (*model.QuorumC
 func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.Block) ([]*validator.Validator, []*signature.RandomBeaconAwareSigProvider, error) {
 	n := len(signerData.Signers)
 
-	if len(signerData.DkgPubData.IdToDKGParticipantMap) < n {
-		return nil, nil, fmt.Errorf("need at least as many signers as DKG participants, got %v and %v",
-			len(signerData.DkgPubData.IdToDKGParticipantMap), n)
+	groupSize, err := signerData.DKGState.GroupSize()
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get DKG group size: %w", err)
+	}
+	if groupSize < uint(n) {
+		return nil, nil, fmt.Errorf("need at least as many signers as DKG participants, got %v and %v", groupSize, n)
 	}
 
 	signers := make([]*signature.RandomBeaconAwareSigProvider, n)
@@ -96,7 +100,7 @@ func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.
 	for i, signer := range signerData.Signers {
 		// create signer
 		signerId := signer.Identity
-		s, err := NewRandomBeaconSigProvider(ps, signerData.DkgPubData, &signerId,
+		s, err := NewRandomBeaconSigProvider(ps, signerData.DKGState, &signerId,
 			signer.StakingPrivKey, signer.RandomBeaconPrivKey)
 		if err != nil {
 			return nil, nil, err
@@ -104,7 +108,7 @@ func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.
 		signers[i] = s
 
 		// create view state
-		vs, err := viewstate.New(ps, signerData.DkgPubData, signer.Identity.NodeID, filter.HasRole(flow.RoleConsensus))
+		vs, err := viewstate.New(ps, signerData.DKGState, signer.Identity.NodeID, filter.HasRole(flow.RoleConsensus))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -141,9 +145,9 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 }
 
 // create a new RandomBeaconAwareSigProvider
-func NewRandomBeaconSigProvider(ps protocol.State, dkgPubData *hotstuff.DKGPublicData, id *flow.Identity,
+func NewRandomBeaconSigProvider(ps protocol.State, dkgState dkg.State, id *flow.Identity,
 	stakingKey crypto.PrivateKey, randomBeaconKey crypto.PrivateKey) (*signature.RandomBeaconAwareSigProvider, error) {
-	vs, err := viewstate.New(ps, dkgPubData, id.NodeID, filter.HasRole(flow.RoleConsensus))
+	vs, err := viewstate.New(ps, dkgState, id.NodeID, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create view state: %w", err)
 	}
