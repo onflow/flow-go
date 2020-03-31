@@ -137,7 +137,7 @@ func TestHappyPath(t *testing.T) {
 		Run(func(args testifymock.Arguments) {
 			_, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
-			// assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+			// assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.Body.ExecutionResultID)
 		}).
 		// half of the chunks are assigned to the verification node
 		// for each chunk there is one result approval emitted from verification node
