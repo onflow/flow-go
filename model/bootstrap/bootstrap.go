@@ -3,48 +3,34 @@ package bootstrap
 
 import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type GenesisBlock flow.Block
-
-func (b *GenesisBlock) Encode() ([]byte, error) {
-	return encoding.DefaultEncoder.Encode(b)
+// TODO consolidate with bootstrap model and integration NodeConfig
+type NodeConfig struct {
+	Role           flow.Role
+	Address        string
+	NodeID         flow.Identifier
+	NetworkPrivKey EncodableNetworkPrivKey
+	StakingPrivKey EncodableStakingPrivKey
 }
 
-func DecodeGenesisBlock(raw []byte, block *GenesisBlock) error {
-	return encoding.DefaultEncoder.Decode(raw, block)
-}
-
-type GenesisQC model.QuorumCertificate
-
-func (qc *GenesisQC) Encode() ([]byte, error) {
-	return encoding.DefaultEncoder.Encode(qc)
-}
-
-func DecodeGenesisQC(raw []byte, qc *GenesisQC) error {
-	return encoding.DefaultEncoder.Decode(raw, qc)
-}
-
-type DKGParticipant struct {
+// TODO consolidate with bootstrap model ( and maybe hotstuff dkg )
+type DKGParticipantPub struct {
 	ID          flow.Identifier
 	PubKeyShare EncodableRandomBeaconPubKey
 	GroupIndex  int
 }
 
+type DKGParticipantPriv struct {
+	ID           flow.Identifier
+	PrivKeyShare EncodableRandomBeaconPrivKey
+	GroupIndex   int
+}
+
 type DKGPubData struct {
 	GroupPubKey  EncodableRandomBeaconPubKey
-	Participants []DKGParticipant
-}
-
-func (pub *DKGPubData) Encode() ([]byte, error) {
-	return encoding.DefaultEncoder.Encode(pub)
-}
-
-func DecodeDKGPubData(raw []byte, dkgPubData *DKGPubData) error {
-	return encoding.DefaultEncoder.Decode(raw, dkgPubData)
+	Participants []DKGParticipantPub
 }
 
 func (pub *DKGPubData) ForHotStuff() *hotstuff.DKGPublicData {
