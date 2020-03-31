@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
@@ -49,7 +48,6 @@ type Engine struct {
 	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
 	chunkStates          mempool.ChunkStates
 	chunkStateTrackers   mempool.ChunkStateTrackers // keeps track of chunk state requests that this engine made
-	consensusFollower    follower.HotStuffFollower
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -70,7 +68,6 @@ func New(
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
-	follower follower.HotStuffFollower,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -164,8 +161,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
-	case *flow.Block:
-		return e.handleBlock(resource)
 	case *flow.ExecutionReceipt:
 		return e.handleExecutionReceipt(originID, resource)
 	case *flow.Collection:
@@ -262,27 +257,6 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	// removes chunk data pack tracker from  mempool
 	e.chunkDataPackTackers.Rem(chunkDataPack.ChunkID)
 
-	e.checkPendingChunks()
-
-	return nil
-}
-
-// handleBlock handles an incoming block.
-func (e *Engine) handleBlock(block *flow.Block) error {
-	e.log.Info().
-		Hex("block_id", logging.Entity(block)).
-		Uint64("block_view", block.View).
-		Msg("received block")
-
-	err := e.blockStorage.Store(block)
-	if err != nil {
-		return fmt.Errorf("could not store block: %w", err)
-	}
-
-	// checks pending receipts based on this block
-	e.checkPendingReceipts(block.ID())
-
-	// checks pending chunks that
 	e.checkPendingChunks()
 
 	return nil
@@ -781,9 +755,10 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 // if any receipt has the `blockID`, it evaluates the receipt's origin ID
 // if originID is evaluated successfully, the receipt is added to authenticated receipts mempool
 // Otherwise it is dropped completely
-func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
+func (e *Engine) checkPendingReceipts() {
 	for _, p := range e.pendingReceipts.All() {
-		if p.Receipt.ExecutionResult.BlockID == blockID {
+		blockID := p.Receipt.ExecutionResult.BlockID
+		if e.blockStorage.Has(blockID) {
 			// removes receipt from pending receipts pool
 			e.pendingReceipts.Rem(p.Receipt.ID())
 			// adds receipt to authenticated receipts pool
