@@ -2,7 +2,6 @@ package unittest
 
 import (
 	"io/ioutil"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -43,13 +42,14 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	}
 }
 
-func TempDBDir() (string, error) {
-	return ioutil.TempDir("", "flow-test-db")
+func TempDBDir(t *testing.T) string {
+	dir, err := ioutil.TempDir(".", "flow-test-db") //TODO go back to real tmp dir
+	require.NoError(t, err)
+	return dir
 }
 
 func TempBadgerDB(t *testing.T) *badger.DB {
-	dir, err := TempDBDir()
-	require.Nil(t, err)
+	dir := TempDBDir(t)
 
 	// Ref: https://github.com/dgraph-io/badger#memory-usage
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
@@ -59,18 +59,14 @@ func TempBadgerDB(t *testing.T) *badger.DB {
 }
 
 func LevelDBInDir(t *testing.T, dir string) *leveldb.LevelDB {
-	kvdbPath := filepath.Join(dir, "kvdb")
-	tdbPath := filepath.Join(dir, "tdb")
-
-	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
+	db, err := leveldb.NewLevelDB(dir)
 	require.NoError(t, err)
 
 	return db
 }
 
 func TempLevelDB(t *testing.T) *leveldb.LevelDB {
-	dir, err := TempDBDir()
-	require.Nil(t, err)
+	dir := TempDBDir(t)
 
 	return LevelDBInDir(t, dir)
 }
