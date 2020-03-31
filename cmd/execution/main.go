@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/dapperlabs/cadence/runtime"
 
@@ -34,14 +36,19 @@ func main() {
 		rpcConf            rpc.Config
 		err                error
 		executionState     state.ExecutionState
+		triedir            string
 	)
 
 	cmd.FlowNode("execution").
 		ExtraFlags(func(flags *pflag.FlagSet) {
+			homedir, _ := os.UserHomeDir()
+			datadir := filepath.Join(homedir, ".flow", "execution")
+
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
+			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 		}).
 		Module("execution state ledger", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewTrieStorage("db")
+			ledgerStorage, err = ledger.NewTrieStorage(triedir)
 			return err
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {

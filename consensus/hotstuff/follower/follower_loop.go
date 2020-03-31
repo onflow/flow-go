@@ -25,7 +25,7 @@ type HotStuffFollower struct {
 	runner SingleRunner // lock for preventing concurrent state transitions
 }
 
-// HotStuffFollower creates an instance of EventLoop
+// New creates an instance of EventLoop
 func New(
 	me module.Local,
 	protocolState protocol.State,
@@ -80,14 +80,14 @@ func unsafeToBlockQC(trustedRootBlock *flow.Header, rootBlockSigs *model.Aggrega
 //
 // Block proposals must be submitted in order, i.e. a proposal's parent must
 // have been previously processed by the HotStuffFollower.
-func (el *HotStuffFollower) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
+func (fl *HotStuffFollower) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
 	received := time.Now()
 	proposal := model.ProposalFromFlow(proposalHeader, parentView)
-	el.proposals <- proposal
+	fl.proposals <- proposal
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
 	busyDuration := time.Now().Sub(received)
-	el.log.Debug().Hex("block_ID", logging.ID(proposal.Block.BlockID)).
+	fl.log.Debug().Hex("block_ID", logging.ID(proposal.Block.BlockID)).
 		Uint64("view", proposal.Block.View).
 		Dur("busy_duration", busyDuration).
 		Msg("busy duration to handle a proposal")
@@ -97,8 +97,8 @@ func (el *HotStuffFollower) SubmitProposal(proposalHeader *flow.Header, parentVi
 // All errors from FollowerLogic are fatal:
 //   * known critical error: some prerequisites of the HotStuff follower have been broken
 //   * unknown critical error: bug-related
-func (el *HotStuffFollower) loop() {
-	shutdownSignal := el.runner.ShutdownSignal()
+func (fl *HotStuffFollower) loop() {
+	shutdownSignal := fl.runner.ShutdownSignal()
 	for {
 		select { // to ensure we are not skipping over a termination signal
 		case <-shutdownSignal:
@@ -107,13 +107,13 @@ func (el *HotStuffFollower) loop() {
 		}
 
 		select {
-		case p := <-el.proposals:
-			err := el.followerLogic.AddBlock(p)
+		case p := <-fl.proposals:
+			err := fl.followerLogic.AddBlock(p)
 			if err != nil { // all errors are fatal
-				el.log.Error().Hex("block_ID", logging.ID(p.Block.BlockID)).
+				fl.log.Error().Hex("block_ID", logging.ID(p.Block.BlockID)).
 					Uint64("view", p.Block.View).
 					Msg("fatal error processing proposal")
-				el.log.Error().Msgf("terminating HotStuffFollower: %s", err.Error())
+				fl.log.Error().Msgf("terminating HotStuffFollower: %s", err.Error())
 				return
 			}
 		case <-shutdownSignal:
@@ -125,11 +125,11 @@ func (el *HotStuffFollower) loop() {
 // Ready implements interface module.ReadyDoneAware
 // Method call will starts the HotStuffFollower's internal processing loop.
 // Multiple calls are handled gracefully and the follower will only start once.
-func (s *HotStuffFollower) Ready() <-chan struct{} {
-	return s.runner.Start(s.loop)
+func (fl *HotStuffFollower) Ready() <-chan struct{} {
+	return fl.runner.Start(fl.loop)
 }
 
 // Done implements interface module.ReadyDoneAware
-func (s *HotStuffFollower) Done() <-chan struct{} {
-	return s.runner.Abort()
+func (fl *HotStuffFollower) Done() <-chan struct{} {
+	return fl.runner.Abort()
 }

@@ -111,3 +111,18 @@ func (mr *MockSnapshotMockRecorder) Seal() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Seal", reflect.TypeOf((*MockSnapshot)(nil).Seal))
 }
+
+// Unfinalized mocks base method
+func (m *MockSnapshot) Unfinalized() ([]flow.Identifier, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Unfinalized")
+	ret0, _ := ret[0].([]flow.Identifier)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Unfinalized indicates an expected call of Unfinalized
+func (mr *MockSnapshotMockRecorder) Unfinalized() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unfinalized", reflect.TypeOf((*MockSnapshot)(nil).Unfinalized))
+}

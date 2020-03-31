@@ -81,12 +81,16 @@ func (en ExecutionNode) Done() {
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
 	GenericNode
-	AuthReceipts    mempool.Receipts
-	PendingReceipts mempool.Receipts
-	BlockStorage    storage.Blocks
-	Collections     mempool.Collections
-	ChunkStates     mempool.ChunkStates
-	ChunkDataPacks  mempool.ChunkDataPacks
-	IngestEngine    network.Engine
-	VerifierEngine  network.Engine
+	AuthReceipts          mempool.Receipts
+	PendingReceipts       mempool.PendingReceipts
+	BlockStorage          storage.Blocks
+	AuthCollections       mempool.Collections
+	PendingCollections    mempool.PendingCollections
+	CollectionTrackers    mempool.CollectionTrackers
+	ChunkStates           mempool.ChunkStates
+	ChunkStateTracker     mempool.ChunkStateTrackers
+	ChunkDataPacks        mempool.ChunkDataPacks
+	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
+	IngestEngine          network.Engine
+	VerifierEngine        network.Engine
 }

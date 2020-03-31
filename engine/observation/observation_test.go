@@ -21,12 +21,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -95,6 +95,8 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 		actual := gResp.Transaction
 
+		// the transaction should be reported as pending
+		expected.Status = entities.TransactionStatus_STATUS_PENDING
 		require.Equal(suite.T(), expected, actual)
 	})
 }
@@ -103,12 +105,13 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 	unittest.RunWithBadgerDB(suite.T(), func(t *testing.T, db *badger.DB) {
 		// test block1 get by ID
-		block1 := unittest.BlockHeaderFixture()
+		block1 := unittest.BlockFixture()
 		// test block2 get by height
-		block2 := unittest.BlockHeaderFixture()
+		block2 := unittest.BlockFixture()
 		block2.Height = 2
 
-		blocks := bstorage.NewHeaders(db)
+		blocks := bstorage.NewBlocks(db)
+		headers := bstorage.NewHeaders(db)
 		require.NoError(suite.T(), blocks.Store(&block1))
 		require.NoError(suite.T(), blocks.Store(&block2))
 
@@ -116,35 +119,71 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		err := db.Update(operation.InsertNumber(block2.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, blocks, nil, nil)
+		handler := rpc.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil)
 
-		// get by ID
-		id := block1.ID()
-		req1 := &observation.GetBlockHeaderByIDRequest{
-			Id: id[:],
+		assertHeaderResp := func(resp *observation.BlockHeaderResponse, err error, header *flow.Header) {
+			require.NoError(suite.T(), err)
+			require.NotNil(suite.T(), resp)
+			actual := *resp.Block
+			expected, _ := convert.BlockHeaderToMessage(header)
+			require.Equal(suite.T(), expected, actual)
 		}
 
-		resp, err := handler.GetBlockHeaderByID(context.Background(), req1)
-
-		// assert it is indeed block1
-		require.NoError(suite.T(), err)
-		require.NotNil(suite.T(), resp)
-		actual := resp.Block
-		expected, _ := convert.BlockHeaderToMessage(&block1)
-		require.Equal(suite.T(), expected, *actual)
-
-		// get by height
-		req2 := &observation.GetBlockHeaderByHeightRequest{
-			Height: block2.Height,
+		assertBlockResp := func(resp *observation.BlockResponse, err error, block *flow.Block) {
+			require.NoError(suite.T(), err)
+			require.NotNil(suite.T(), resp)
+			actual := resp.Block
+			expected, _ := convert.BlockToMessage(block)
+			require.Equal(suite.T(), expected, actual)
 		}
 
-		// assert it is indeed block2
-		resp, err = handler.GetBlockHeaderByHeight(context.Background(), req2)
-		require.NoError(suite.T(), err)
-		require.NotNil(suite.T(), resp)
-		actual = resp.Block
-		expected, _ = convert.BlockHeaderToMessage(&block2)
-		require.Equal(suite.T(), expected, *actual)
+		suite.Run("get header 1 by ID", func() {
+			// get header by ID
+			id := block1.ID()
+			req := &observation.GetBlockHeaderByIDRequest{
+				Id: id[:],
+			}
+
+			resp, err := handler.GetBlockHeaderByID(context.Background(), req)
+
+			// assert it is indeed block1
+			assertHeaderResp(resp, err, &block1.Header)
+		})
+
+		suite.Run("get block 1 by ID", func() {
+			id := block1.ID()
+			// get block details by ID
+			req := &observation.GetBlockByIDRequest{
+				Id: id[:],
+			}
+
+			resp, err := handler.GetBlockByID(context.Background(), req)
+
+			assertBlockResp(resp, err, &block1)
+		})
+
+		suite.Run("get header 2 by height", func() {
+
+			// get header by height
+			req := &observation.GetBlockHeaderByHeightRequest{
+				Height: block2.Height,
+			}
+
+			resp, err := handler.GetBlockHeaderByHeight(context.Background(), req)
+
+			assertHeaderResp(resp, err, &block2.Header)
+		})
+
+		suite.Run("get block 2 by height", func() {
+			// get block details by height
+			req := &observation.GetBlockByHeightRequest{
+				Height: block2.Height,
+			}
+
+			resp, err := handler.GetBlockByHeight(context.Background(), req)
+
+			assertBlockResp(resp, err, &block2)
+		})
 	})
 }
 

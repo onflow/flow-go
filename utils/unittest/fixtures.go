@@ -302,7 +302,7 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 }
 
 func generateRandomSeed() []byte {
-	seed := make([]byte, 64)
+	seed := make([]byte, 48)
 	if _, err := crand.Read(seed); err != nil {
 		panic(err)
 	}
@@ -415,77 +415,6 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	}
 
 	return tb
-}
-
-// CompleteExecutionResultFixture returns complete execution result with an
-// execution receipt referencing the block/collections.
-// chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecutionResult {
-	chunks := make([]*flow.Chunk, 0)
-	chunkStates := make([]*flow.ChunkState, 0, chunkCount)
-	collections := make([]*flow.Collection, 0, chunkCount)
-	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
-
-	for i := 0; i < chunkCount; i++ {
-		// creates one guaranteed collection per chunk
-		coll := CollectionFixture(3)
-		guarantee := coll.Guarantee()
-		collections = append(collections, &coll)
-		guarantees = append(guarantees, &guarantee)
-
-		// creates a chunk
-		chunk := &flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: uint(i),
-				StartState:      StateCommitmentFixture(),
-			},
-			Index: uint64(i),
-		}
-		chunks = append(chunks, chunk)
-
-		// creates a chunk state
-		chunkState := &flow.ChunkState{
-			ChunkID:   chunk.ID(),
-			Registers: flow.Ledger{},
-		}
-		chunkStates = append(chunkStates, chunkState)
-
-		// creates a chunk data pack for the chunk
-		chunkDataPack := ChunkDataPackFixture(chunk.ID())
-		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
-	}
-
-	payload := flow.Payload{
-		Identities: IdentityListFixture(32),
-		Guarantees: guarantees,
-	}
-	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Hash()
-
-	block := flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
-
-	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  chunks,
-		},
-	}
-
-	receipt := flow.ExecutionReceipt{
-		ExecutionResult: result,
-	}
-
-	return verification.CompleteExecutionResult{
-		Receipt:        &receipt,
-		Block:          &block,
-		Collections:    collections,
-		ChunkStates:    chunkStates,
-		ChunkDataPacks: chunkDataPacks,
-	}
 }
 
 // VerifiableChunk returns a complete verifiable chunk with an
