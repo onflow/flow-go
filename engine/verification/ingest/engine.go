@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
@@ -48,6 +49,7 @@ type Engine struct {
 	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
 	chunkStates          mempool.ChunkStates
 	chunkStateTrackers   mempool.ChunkStateTrackers // keeps track of chunk state requests that this engine made
+	consensusFollower    follower.HotStuffFollower
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -68,6 +70,7 @@ func New(
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
+	follower follower.HotStuffFollower,
 ) (*Engine, error) {
 
 	e := &Engine{
