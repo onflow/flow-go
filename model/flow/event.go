@@ -5,25 +5,28 @@ package flow
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 // List of built-in account event types.
 const (
-	EventAccountCreated string = "flow.AccountCreated"
-	EventAccountUpdated string = "flow.AccountUpdated"
+	EventAccountCreated EventType = "flow.AccountCreated"
+	EventAccountUpdated EventType = "flow.AccountUpdated"
 )
+
+type EventType string
 
 type Event struct {
 	// Type is the qualified event type.
-	Type string
-	// TxHash is the hash of the transaction this event was emitted from.
-	TxHash crypto.Hash
-	// Index defines the ordering of events in a transaction. The first event
-	// emitted has index 0, the second has index 1, and so on.
-	Index uint
+	Type EventType
+	// TransactionID is the ID of the transaction this event was emitted from.
+	TransactionID Identifier
+	// TransactionIndex defines the index of the transaction this event was emitted from within the block.
+	// The first transaction has index 0, the second has index 1, and so on.
+	TransactionIndex uint32
+	// EventIndex defines the ordering of events in a transaction.
+	// The first event emitted has index 0, the second has index 1, and so on.
+	EventIndex uint32
 	// Payload contains the encoded event data.
 	Payload []byte
 }
@@ -34,8 +37,13 @@ func (e Event) String() string {
 }
 
 // ID returns a canonical identifier that is guaranteed to be unique.
-func (e Event) ID() string {
-	return hash.DefaultHasher.ComputeHash(e.Encode()).Hex()
+func (e Event) ID() Identifier {
+	return MakeID(e.Body())
+}
+
+// Body returns the body of the execution receipt.
+func (e *Event) Body() interface{} {
+	return wrapEvent(*e)
 }
 
 // Encode returns the canonical encoding of the event, containing only the
@@ -47,13 +55,13 @@ func (e Event) Encode() []byte {
 
 // Defines only the fields needed to uniquely identify an event.
 type eventWrapper struct {
-	TxHash []byte
-	Index  uint
+	TxID  []byte
+	Index uint32
 }
 
 func wrapEvent(e Event) eventWrapper {
 	return eventWrapper{
-		TxHash: e.TxHash,
-		Index:  e.Index,
+		TxID:  e.TransactionID[:],
+		Index: e.EventIndex,
 	}
 }
