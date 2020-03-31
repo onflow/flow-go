@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
@@ -475,13 +476,11 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Iden
 // getBlockForReceipt checks the block referenced by the given receipt. If the
 // block is available locally, returns true and the block. Otherwise, returns
 // false and requests the block.
-// TODO does not yet request block
 func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this pending execution receipt
 	block, err := e.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
-		// TODO should request the block here. For now, we require that we
-		// have received the block at this point as there is no way to request it
+		// block is not ready for retrieval. Should wait for the consensus follower.
 		return nil, false
 	}
 
@@ -623,11 +622,6 @@ func (e *Engine) checkPendingChunks() {
 	e.checkChunksLock.Lock()
 	defer e.checkChunksLock.Unlock()
 
-	// re-sends the requests for pending receipts
-	for _, p := range e.pendingReceipts.All() {
-		e.getBlockForReceipt(p.Receipt)
-	}
-
 	// checks the current authenticated receipts for their resources
 	// ready for verification
 	receipts := e.authReceipts.All()
@@ -755,10 +749,9 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 // if any receipt has the `blockID`, it evaluates the receipt's origin ID
 // if originID is evaluated successfully, the receipt is added to authenticated receipts mempool
 // Otherwise it is dropped completely
-func (e *Engine) checkPendingReceipts() {
+func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 	for _, p := range e.pendingReceipts.All() {
-		blockID := p.Receipt.ExecutionResult.BlockID
-		if e.blockStorage.Has(blockID) {
+		if blockID == p.Receipt.ExecutionResult.BlockID {
 			// removes receipt from pending receipts pool
 			e.pendingReceipts.Rem(p.Receipt.ID())
 			// adds receipt to authenticated receipts pool
@@ -797,4 +790,55 @@ func (e *Engine) checkPendingReceipts() {
 			}
 		}
 	}
+}
+
+// OnBlockIncorporated is part of implementing FinalizationConsumer interface
+//
+// OnBlockIncorporated notifications are produced by the Finalization Logic
+// whenever a block is incorporated into the consensus state.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+func (e *Engine) OnBlockIncorporated(*model.Block) {
+
+}
+
+// OnFinalizedBlock is part of implementing FinalizationConsumer interface
+//
+// OnFinalizedBlock notifications are produced by the Finalization Logic whenever
+// a block has been finalized. They are emitted in the order the blocks are finalized.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	// block should be in the storage
+	if !e.blockStorage.Has(block.BlockID) {
+		e.log.Error().
+			Err(storage.ErrNotFound).
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("expected block is not available in the storage")
+		return
+	}
+
+	// checks pending receipts in parallel and non-blocking based on new block ID
+	// currently error is
+	err := e.unit.Do(func() error {
+		e.checkPendingReceipts(block.BlockID)
+		return nil
+	})
+
+	if err != nil {
+		// currently error is always nil
+	}
+}
+
+// OnDoubleProposeDetected is part of implementing FinalizationConsumer interface
+//
+// OnDoubleProposeDetected notifications are produced by the Finalization Logic
+// whenever a double block proposal (equivocation) was detected.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
+
 }
