@@ -3,6 +3,8 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -33,7 +35,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		id2 := make([]byte, 32)
 		id2[0] = byte(5)
 		value2 := []byte{'b'}
-		UpdatedValue2 := []byte{'B'}
 
 		ids := make([][]byte, 0)
 		values := make([][]byte, 0)
@@ -42,9 +43,12 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 
 		db := unittest.TempLevelDB(t)
 
-		f, _ := ledger.NewTrieStorage(db)
-		startState, _ := f.UpdateRegisters(ids, values)
-		regTs, _ := f.GetRegisterTouches(ids, startState)
+		f, err := ledger.NewTrieStorage(db)
+		require.NoError(t, err)
+		startState, err := f.UpdateRegisters(ids, values)
+		require.NoError(t, err)
+		regTs, err := f.GetRegisterTouches(ids, startState)
+		require.NoError(t, err)
 
 		chunk := &flow.Chunk{
 			ChunkBody: flow.ChunkBody{
