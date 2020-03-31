@@ -18,24 +18,28 @@ import (
 func main() {
 
 	var (
-		receiptLimit    uint
-		collectionLimit uint
-		blockLimit      uint
-		chunkLimit      uint
-		err             error
-		authReceipts    *stdmap.Receipts
-		pendingReceipts *stdmap.Receipts
-		blockStorage    *storage.Blocks
-		collections     *stdmap.Collections
-		chunkStates     *stdmap.ChunkStates
-		chunkDataPacks  *stdmap.ChunkDataPacks
-		verifierEng     *verifier.Engine
+		receiptLimit         uint
+		collectionLimit      uint
+		blockLimit           uint
+		chunkLimit           uint
+		err                  error
+		authReceipts         *stdmap.Receipts
+		pendingReceipts      *stdmap.PendingReceipts
+		blockStorage         *storage.Blocks
+		authCollections      *stdmap.Collections
+		pendingCollections   *stdmap.PendingCollections
+		collectionTrackers   *stdmap.CollectionTrackers
+		chunkStates          *stdmap.ChunkStates
+		chunkDataPacks       *stdmap.ChunkDataPacks
+		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
+		chunkStateTracker    *stdmap.ChunkStateTrackers
+		verifierEng          *verifier.Engine
 	)
 
 	cmd.FlowNode("verification").
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of collections in the memory pool")
+			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of authCollections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 100000, "maximum number of chunk states in the memory pool")
 		}).
@@ -44,11 +48,19 @@ func main() {
 			return err
 		}).
 		Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts, err = stdmap.NewReceipts(receiptLimit)
+			pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
 			return err
 		}).
-		Module("collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			collections, err = stdmap.NewCollections(collectionLimit)
+		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
+			authCollections, err = stdmap.NewCollections(collectionLimit)
+			return err
+		}).
+		Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
+			return err
+		}).
+		Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
+			collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
 			return err
 		}).
 		Module("blocks storage", func(node *cmd.FlowNodeBuilder) error {
@@ -61,8 +73,16 @@ func main() {
 			chunkStates, err = stdmap.NewChunkStates(chunkLimit)
 			return err
 		}).
+		Module("chunk state tracker mempool", func(node *cmd.FlowNodeBuilder) error {
+			chunkStateTracker, err = stdmap.NewChunkStateTrackers(chunkLimit)
+			return err
+		}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
+			return err
+		}).
+		Module("chunk data pack tracker mempool", func(node *cmd.FlowNodeBuilder) error {
+			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit)
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -91,9 +111,13 @@ func main() {
 				verifierEng,
 				authReceipts,
 				pendingReceipts,
-				collections,
+				authCollections,
+				pendingCollections,
+				collectionTrackers,
 				chunkStates,
+				chunkStateTracker,
 				chunkDataPacks,
+				chunkDataPackTracker,
 				blockStorage,
 				assigner)
 			return eng, err

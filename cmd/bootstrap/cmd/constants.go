@@ -1,8 +1,8 @@
 package cmd
 
 const (
-	randomSeedBytes = 64
-	minSeedBytes    = 64
+	randomSeedBytes = 48
+	minSeedBytes    = 48
 
 	dirnameExecutionState         = "execution-state"
 	filenameGenesisBlock          = "genesis-block.json"
