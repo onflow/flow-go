@@ -39,18 +39,18 @@ type DKGPubData struct {
 	Participants []DKGParticipant
 }
 
-func (qc *DKGPubData) Encode() ([]byte, error) {
-	return encoding.DefaultEncoder.Encode(qc)
+func (pub *DKGPubData) Encode() ([]byte, error) {
+	return encoding.DefaultEncoder.Encode(pub)
 }
 
 func DecodeDKGPubData(raw []byte, dkgPubData *DKGPubData) error {
 	return encoding.DefaultEncoder.Decode(raw, dkgPubData)
 }
 
-func (data *DKGPubData) ForHotStuff() *hotstuff.DKGPublicData {
+func (pub *DKGPubData) ForHotStuff() *hotstuff.DKGPublicData {
 
 	participantLookup := make(map[flow.Identifier]*hotstuff.DKGParticipant)
-	for _, part := range data.Participants {
+	for _, part := range pub.Participants {
 		participantLookup[part.ID] = &hotstuff.DKGParticipant{
 			Id:             part.ID,
 			PublicKeyShare: part.PubKeyShare.PublicKey,
@@ -59,7 +59,7 @@ func (data *DKGPubData) ForHotStuff() *hotstuff.DKGPublicData {
 	}
 
 	return &hotstuff.DKGPublicData{
-		GroupPubKey:           data.GroupPubKey.PublicKey,
+		GroupPubKey:           pub.GroupPubKey.PublicKey,
 		IdToDKGParticipantMap: participantLookup,
 	}
 }
