@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
+	"github.com/dapperlabs/flow-go/engine/verification/test"
 	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -103,7 +104,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.chunkDataPackTracker = &mempool.ChunkDataPackTrackers{}
 	suite.assigner = &module.ChunkAssigner{}
 
-	completeER := unittest.CompleteExecutionResultFixture(1)
+	completeER := test.CompleteExecutionResultFixture(suite.T(), 1)
 	suite.collection = completeER.Collections[0]
 	suite.block = completeER.Block
 	suite.receipt = completeER.Receipt
@@ -816,7 +817,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// ingest only sends the assigned chunks to verifier
 
 	for i := 0; i < erCount; i++ {
-		er := unittest.CompleteExecutionResultFixture(chunksNum)
+		er := test.CompleteExecutionResultFixture(t, chunksNum)
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
 		for j, chunk := range er.Receipt.ExecutionResult.Chunks {

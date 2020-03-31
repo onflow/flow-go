@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/engine/verification/test"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/encoding"
@@ -82,7 +83,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := unittest.CompleteExecutionResultFixture(1)
+	completeRA := test.CompleteExecutionResultFixture(suite.T(), 1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
