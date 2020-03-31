@@ -91,51 +91,55 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	ids = append(ids, id1, id2)
 	values = append(values, value1, value2)
 
-	dbDir := unittest.TempDBDir(t)
+	var verifiableChunk verification.VerifiableChunk
 
-	f, _ := ledger.NewTrieStorage(dbDir)
-	startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
-	regTs, _ := f.GetRegisterTouches(ids, startState)
+	unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+		f, _ := ledger.NewTrieStorage(dbDir)
+		startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
+		regTs, _ := f.GetRegisterTouches(ids, startState)
 
-	ids = [][]byte{id2}
-	values = [][]byte{UpdatedValue2}
-	endState, _ := f.UpdateRegisters(ids, values, startState)
+		ids = [][]byte{id2}
+		values = [][]byte{UpdatedValue2}
+		endState, _ := f.UpdateRegisters(ids, values, startState)
 
-	// Chunk setup
-	chunk := flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: 0,
+		// Chunk setup
+		chunk := flow.Chunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex: 0,
+				StartState:      startState,
+			},
+			Index: 0,
+		}
+
+		chunkDataPack := flow.ChunkDataPack{
+			ChunkID:         chunk.ID(),
 			StartState:      startState,
-		},
-		Index: 0,
-	}
+			RegisterTouches: regTs,
+		}
 
-	chunkDataPack := flow.ChunkDataPack{
-		ChunkID:         chunk.ID(),
-		StartState:      startState,
-		RegisterTouches: regTs,
-	}
+		// ExecutionResult setup
+		result := flow.ExecutionResult{
+			ExecutionResultBody: flow.ExecutionResultBody{
+				BlockID: block.ID(),
+				Chunks:  flow.ChunkList{&chunk},
+			},
+		}
 
-	// ExecutionResult setup
-	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  flow.ChunkList{&chunk},
-		},
-	}
+		receipt := flow.ExecutionReceipt{
+			ExecutionResult: result,
+		}
 
-	receipt := flow.ExecutionReceipt{
-		ExecutionResult: result,
-	}
+		verifiableChunk = verification.VerifiableChunk{
+			ChunkIndex:    chunk.Index,
+			EndState:      endState,
+			Block:         &block,
+			Receipt:       &receipt,
+			Collection:    &coll,
+			ChunkDataPack: &chunkDataPack,
+		}
+	})
 
-	return &verification.VerifiableChunk{
-		ChunkIndex:    chunk.Index,
-		EndState:      endState,
-		Block:         &block,
-		Receipt:       &receipt,
-		Collection:    &coll,
-		ChunkDataPack: &chunkDataPack,
-	}
+	return &verifiableChunk
 
 }
 

@@ -25,7 +25,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 	//trie := newTestSMT(t, trieHeight, 10, 100, 5)
 	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
-		defaultHash := GetDefaultHashForHeight(trieHeight-1)
+		defaultHash := GetDefaultHashForHeight(trieHeight - 1)
 
 		retvalues, proofHldr, err := smt.Read(keys, false, defaultHash)
 		require.NoError(t, err)
@@ -68,7 +68,6 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 
 	trieHeight := 9 // should be key size (in bits) + 1
 
-
 	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
 		// add key1 and value1 to the empty trie
@@ -110,13 +109,11 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		}
 	})
 
-
-
 }
 func TestPartialTrieMiddleBranching(t *testing.T) {
 	trieHeight := 9 // should be key size (in bits) + 1
 
-	withSMT(t, trieHeight,  10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1) // 00000000 (0)
 		value1 := []byte{'a'}
 		updatedValue1 := []byte{'A'}
@@ -168,7 +165,6 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		}
 	})
 
-
 }
 
 func TestPartialTrieRootUpdates(t *testing.T) {
@@ -219,7 +215,6 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 			t.Fatal("rootNode hash doesn't match [after update]")
 		}
 	})
-
 
 }
 

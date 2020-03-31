@@ -9,6 +9,22 @@ type Ledger struct {
 	mock.Mock
 }
 
+// Done provides a mock function with given fields:
+func (_m *Ledger) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
 // EmptyStateCommitment provides a mock function with given fields:
 func (_m *Ledger) EmptyStateCommitment() []byte {
 	ret := _m.Called()
@@ -78,6 +94,22 @@ func (_m *Ledger) GetRegistersWithProof(registerIDs [][]byte, stateCommitment []
 	}
 
 	return r0, r1, r2
+}
+
+// Ready provides a mock function with given fields:
+func (_m *Ledger) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
 }
 
 // UpdateRegisters provides a mock function with given fields: registerIDs, values, stateCommitment

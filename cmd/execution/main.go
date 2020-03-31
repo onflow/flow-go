@@ -47,10 +47,6 @@ func main() {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 		}).
-		Module("execution state ledger", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewTrieStorage(triedir)
-			return err
-		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
@@ -74,6 +70,9 @@ func main() {
 			if !bytes.Equal(flow.GenesisStateCommitment, block.Seals[0].FinalState) {
 				panic("genesis seal state commitment different from precalculated")
 			}
+		}).
+		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			return ledger.NewTrieStorage(triedir)
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkHeaders := badger.NewChunkHeaders(node.DB)

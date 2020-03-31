@@ -233,6 +233,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		BadgerDB:        node.DB,
 		VM:              vm,
 		State:           execState,
+		Ledger:          ls,
+		LevelDbDir:      dbDir,
 	}
 }
 

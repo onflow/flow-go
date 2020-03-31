@@ -488,7 +488,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 	if !trusted {
 		if tree.isSnapshot() {
 
-		//if bytes.Equal(root, currRoot) {
+			//if bytes.Equal(root, currRoot) {
 			for i, key := range keys {
 				k := hex.EncodeToString(key)
 				res := tree.cachedBranches[k]
@@ -512,17 +512,17 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 			}
 		} else {
 
-		for i, key := range keys {
-			flag, proof, size, inclusion, err := s.GetHistoricalProof(key, root, tree.database)
-			if err != nil {
-				return nil, nil, err
-			}
+			for i, key := range keys {
+				flag, proof, size, inclusion, err := s.GetHistoricalProof(key, root, tree.database)
+				if err != nil {
+					return nil, nil, err
+				}
 
-			flags[i] = flag
-			proofs[i] = proof
-			inclusions[i] = inclusion
-			sizes[i] = size
-		}
+				flags[i] = flag
+				proofs[i] = proof
+				inclusions[i] = inclusion
+				sizes[i] = size
+			}
 		}
 	}
 

@@ -910,6 +910,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	verNet.DeliverAll(false)
 	unittest.AssertReturnsBefore(t, verifierEngWG.Wait, 3*time.Second)
 	verNet.DeliverAll(false)
+
+	exeNode.Done()
+	colNode.Done()
+	verNode.Done()
 }
 
 // setupMockExeNode sets up a mocked execution node that responds to requests for

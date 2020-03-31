@@ -18,8 +18,6 @@ var (
 	triePrefix = "trie"
 )
 
-
-
 // LevelDB is a levelDB implementation of the DAL interface
 type LevelDB struct {
 	//kvdbPath string

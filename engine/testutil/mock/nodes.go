@@ -36,6 +36,15 @@ type GenericNode struct {
 	DBDir  string
 }
 
+func (g *GenericNode) Done() error {
+	err := g.DB.Close()
+	if err != nil {
+		return err
+	}
+
+	return os.RemoveAll(g.DBDir)
+}
+
 // CollectionNode implements an in-process collection node for tests.
 type CollectionNode struct {
 	GenericNode
@@ -67,15 +76,16 @@ type ExecutionNode struct {
 	BadgerDB        *badger.DB
 	VM              virtualmachine.VirtualMachine
 	State           state.ExecutionState
-	dbDir           string
+	Ledger          storage.Ledger
+	LevelDbDir      string
 }
 
 func (en ExecutionNode) Done() {
 	<-en.IngestionEngine.Done()
 	<-en.ReceiptsEngine.Done()
-	en.BadgerDB.Close()
-	defer os.RemoveAll(en.dbDir)
-
+	<-en.Ledger.Done()
+	os.RemoveAll(en.LevelDbDir)
+	en.GenericNode.Done()
 }
 
 // VerificationNode implements an in-process verification node for tests.

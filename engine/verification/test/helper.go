@@ -41,39 +41,39 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		ids = append(ids, id1, id2)
 		values = append(values, value1, value2)
 
-		db := unittest.TempLevelDB(t)
+		unittest.RunWithTempDBDir(t, func(t *testing.T, dir string) {
+			f, err := ledger.NewTrieStorage(dir)
+			require.NoError(t, err)
+			startState, err := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
+			require.NoError(t, err)
+			regTs, err := f.GetRegisterTouches(ids, startState)
+			require.NoError(t, err)
 
-		f, err := ledger.NewTrieStorage(db)
-		require.NoError(t, err)
-		startState, err := f.UpdateRegisters(ids, values)
-		require.NoError(t, err)
-		regTs, err := f.GetRegisterTouches(ids, startState)
-		require.NoError(t, err)
+			chunk := &flow.Chunk{
+				ChunkBody: flow.ChunkBody{
+					CollectionIndex: uint(i),
+					StartState:      startState,
+					EventCollection: unittest.IdentifierFixture(),
+				},
+				Index: uint64(i),
+			}
+			chunks = append(chunks, chunk)
 
-		chunk := &flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: uint(i),
+			// creates a chunk state
+			chunkState := &flow.ChunkState{
+				ChunkID:   chunk.ID(),
+				Registers: flow.Ledger{},
+			}
+			chunkStates = append(chunkStates, chunkState)
+
+			// creates a chunk data pack for the chunk
+			chunkDataPack := flow.ChunkDataPack{
+				ChunkID:         chunk.ID(),
 				StartState:      startState,
-				EventCollection: unittest.IdentifierFixture(),
-			},
-			Index: uint64(i),
-		}
-		chunks = append(chunks, chunk)
-
-		// creates a chunk state
-		chunkState := &flow.ChunkState{
-			ChunkID:   chunk.ID(),
-			Registers: flow.Ledger{},
-		}
-		chunkStates = append(chunkStates, chunkState)
-
-		// creates a chunk data pack for the chunk
-		chunkDataPack := flow.ChunkDataPack{
-			ChunkID:         chunk.ID(),
-			StartState:      startState,
-			RegisterTouches: regTs,
-		}
-		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
+				RegisterTouches: regTs,
+			}
+			chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
+		})
 	}
 
 	payload := flow.Payload{

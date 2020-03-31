@@ -2153,14 +2153,12 @@ func TestKVDB_Pruned(t *testing.T) {
 		val4, err = db.GetKVDB(key4)
 		require.NoError(t, err)
 
-
 		if !bytes.Equal(val4, expectedValues1[3]) {
 			t.Errorf("Got wrong value from db!")
 		}
 
 		val5, err = db.GetKVDB(key5)
 		require.NoError(t, err)
-
 
 		if !bytes.Equal(val5, expectedValues1[4]) {
 			t.Errorf("Got wrong value from db!")

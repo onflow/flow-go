@@ -29,8 +29,21 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 	}, nil
 }
 
+func (f *TrieStorage) Ready() <-chan struct{} {
+	ready := make(chan struct{})
+	close(ready)
+	return ready
+}
+
+func (f *TrieStorage) Done() <-chan struct{} {
+	f.tree.SafeClose()
+	done := make(chan struct{})
+	close(done)
+	return done
+}
+
 func (f *TrieStorage) EmptyStateCommitment() flow.StateCommitment {
-	return trie.GetDefaultHashForHeight(f.tree.GetHeight()-1)
+	return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
 }
 
 // GetRegisters read the values at the given registers at the given flow.StateCommitment

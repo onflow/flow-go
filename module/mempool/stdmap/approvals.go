@@ -14,7 +14,7 @@ type Approvals struct {
 	sync.Mutex
 	*Backend
 	byResult map[flow.Identifier](map[flow.Identifier]struct{})
-	byBlock  map[flow.Identifier](map[flow.Identifier]struct{})
+	byBlock map[flow.Identifier](map[flow.Identifier]struct{})
 }
 
 // NewApprovals creates a new memory pool for result approvals.
@@ -23,7 +23,7 @@ func NewApprovals(limit uint) (*Approvals, error) {
 	// initialize the approval memory pool with the lookups
 	a := &Approvals{
 		byResult: make(map[flow.Identifier](map[flow.Identifier]struct{})),
-		byBlock:  make(map[flow.Identifier](map[flow.Identifier]struct{})),
+		byBlock: make(map[flow.Identifier](map[flow.Identifier]struct{})),
 	}
 
 	// create a hook that will clean up lookups on removal of an entity
