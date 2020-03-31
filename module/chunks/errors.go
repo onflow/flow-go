@@ -43,7 +43,7 @@ type ErrMissingRegisterTouch struct {
 }
 
 func (e ErrMissingRegisterTouch) Error() string {
-	return fmt.Sprint("atleast one register touch missing inside the chunk data package that was needed while running transactions: ", e.regsterIDs)
+	return fmt.Sprint("atleast one register touch was missing inside the chunk data package that was needed while running transactions: ", e.regsterIDs)
 }
 
 // Is return true if the error type matches

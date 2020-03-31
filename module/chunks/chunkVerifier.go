@@ -34,6 +34,9 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 	if ch.ChunkDataPack == nil {
 		return ErrIncompleteVerifiableChunk{[]string{"chunk data pack is empty"}}
 	}
+	if ch.Block == nil {
+		return ErrIncompleteVerifiableChunk{[]string{"block is empty"}}
+	}
 
 	blockCtx := fcv.vm.NewBlockContext(&ch.Block.Header)
 
@@ -61,13 +64,15 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 	chunkView := state.NewView(getRegister)
 
 	// executes all transactions in this chunk
-	for i, tx := range ch.Collection.Transactions {
+	for _, tx := range ch.Collection.Transactions {
 		txView := chunkView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
-			// TODO: we shouldn't return this error, we need to act differently based on error type
-			return fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+			// TODO: at this point we don't care about the tx errors,
+			// we might have to actually care about this later
+			// return fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+			continue
 		}
 		if result.Succeeded() {
 			// Delta captures all register updates and only
