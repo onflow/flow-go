@@ -61,6 +61,8 @@ func BenchmarkECDSA_SECp256k1Verify(b *testing.B) {
 }
 
 // ECDSA tests
+
+// TestBLSEncodeDecode tests encoding and decoding of ECDSA keys
 func TestECDSAEncodeDecode(t *testing.T) {
 	ECDSAcurves := []SigningAlgorithm{
 		ECDSA_P256,
@@ -100,26 +102,44 @@ func TestECDSAEncodeDecode(t *testing.T) {
 	}
 }
 
+// TestECDSAEquals tests equal for ECDSA keys
 func TestECDSAEquals(t *testing.T) {
-	// generate a key pair
-	h, err := NewHasher(SHA3_384)
-	require.NoError(t, err)
-	seed := h.ComputeHash([]byte{1, 2, 3, 4})
-	// first pair
-	sk1, err := GeneratePrivateKey(ECDSA_P256, seed)
-	require.NoError(t, err)
-	pk1 := sk1.PublicKey()
-	// second pair
-	sk2, err := GeneratePrivateKey(ECDSA_P256, seed)
-	require.NoError(t, err)
-	pk2 := sk2.PublicKey()
-	// unrelated algo pair
-	sk3, err := GeneratePrivateKey(ECDSA_SECp256k1, seed)
-	require.NoError(t, err)
-	pk3 := sk3.PublicKey()
-	// tests
-	assert.True(t, sk1.Equals(sk2))
-	assert.True(t, pk1.Equals(pk2))
-	assert.False(t, sk1.Equals(sk3))
-	assert.False(t, pk1.Equals(pk3))
+	ECDSAcurves := []SigningAlgorithm{
+		ECDSA_P256,
+		ECDSA_SECp256k1,
+	}
+	ECDSAseedLen := []int{
+		KeyGenSeedMinLenECDSA_P256,
+		KeyGenSeedMinLenECDSA_SECp256k1,
+	}
+
+	for i, curve := range ECDSAcurves {
+		// generate a key pair
+		seed := make([]byte, ECDSAseedLen[i])
+		rand.Read(seed)
+		// first pair
+		sk1, err := GeneratePrivateKey(curve, seed)
+		require.NoError(t, err)
+		pk1 := sk1.PublicKey()
+		// second pair
+		sk2, err := GeneratePrivateKey(curve, seed)
+		require.NoError(t, err)
+		pk2 := sk2.PublicKey()
+		// third pair of a  different curve
+		sk3, err := GeneratePrivateKey(ECDSAcurves[i]^1, seed)
+		require.NoError(t, err)
+		pk3 := sk3.PublicKey()
+		// fourth pair after changing the seed
+		rand.Read(seed)
+		sk4, err := GeneratePrivateKey(curve, seed)
+		require.NoError(t, err)
+		pk4 := sk4.PublicKey()
+		// tests
+		assert.True(t, sk1.Equals(sk2), "key equality should return true")
+		assert.True(t, pk1.Equals(pk2), "key equality should return true")
+		assert.False(t, sk1.Equals(sk3), "key equality should return false")
+		assert.False(t, pk1.Equals(pk3), "key equality should return false")
+		assert.False(t, sk1.Equals(sk4), "key equality should return false")
+		assert.False(t, pk1.Equals(pk4), "key equality should return false")
+	}
 }
