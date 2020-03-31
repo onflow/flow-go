@@ -1,6 +1,8 @@
 package mock
 
 import (
+	"os"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
@@ -21,7 +23,6 @@ import (
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 )
 
 // GenericNode implements a generic in-process node for tests.
@@ -32,6 +33,7 @@ type GenericNode struct {
 	State  protocol.State
 	Me     module.Local
 	Net    *stub.Network
+	DBDir  string
 }
 
 // CollectionNode implements an in-process collection node for tests.
@@ -63,16 +65,17 @@ type ExecutionNode struct {
 	ExecutionEngine *computation.Manager
 	ReceiptsEngine  *executionprovider.Engine
 	BadgerDB        *badger.DB
-	LevelDB         *leveldb.LevelDB
 	VM              virtualmachine.VirtualMachine
 	State           state.ExecutionState
+	dbDir           string
 }
 
 func (en ExecutionNode) Done() {
 	<-en.IngestionEngine.Done()
 	<-en.ReceiptsEngine.Done()
 	en.BadgerDB.Close()
-	en.LevelDB.SafeClose()
+	defer os.RemoveAll(en.dbDir)
+
 }
 
 // VerificationNode implements an in-process verification node for tests.

@@ -29,6 +29,10 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 	}, nil
 }
 
+func (f *TrieStorage) EmptyStateCommitment() flow.StateCommitment {
+	return trie.GetDefaultHashForHeight(f.tree.GetHeight()-1)
+}
+
 // GetRegisters read the values at the given registers at the given flow.StateCommitment
 // This is trusted so no proof is generated
 func (f *TrieStorage) GetRegisters(

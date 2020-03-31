@@ -7,6 +7,7 @@ import "github.com/dapperlabs/flow-go/model/flow"
 type Ledger interface {
 	// LatestStateCommitment returns the latest state commitment for this ledger.
 	//LatestStateCommitment() flow.StateCommitment
+	EmptyStateCommitment() flow.StateCommitment
 
 	// Trusted methods (without proof)
 	// Get registers at specific StateCommitment by a list of register ids

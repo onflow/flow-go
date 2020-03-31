@@ -32,7 +32,7 @@ var identities = flow.IdentityList{
 var genesis = flow.Genesis(identities)
 
 func testWithBootstraped(t *testing.T, f func(t *testing.T, mutator *Mutator, db *badger.DB)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 		err := mutator.Bootstrap(genesis)
 		require.Nil(t, err)
@@ -144,7 +144,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 }
 
 func TestBootstrapDuplicateID(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
 		identities := flow.IdentityList{
@@ -163,7 +163,7 @@ func TestBootstrapDuplicateID(t *testing.T) {
 }
 
 func TestBootstrapZeroStake(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
 		identities := flow.IdentityList{
@@ -181,7 +181,7 @@ func TestBootstrapZeroStake(t *testing.T) {
 }
 
 func TestBootstrapNoCollection(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
 		identities := flow.IdentityList{
@@ -197,7 +197,7 @@ func TestBootstrapNoCollection(t *testing.T) {
 }
 
 func TestBootstrapNoConsensus(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
 		identities := flow.IdentityList{
@@ -213,7 +213,7 @@ func TestBootstrapNoConsensus(t *testing.T) {
 }
 
 func TestBootstrapNoExecution(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
 		identities := flow.IdentityList{
@@ -229,7 +229,7 @@ func TestBootstrapNoExecution(t *testing.T) {
 }
 
 func TestBootstrapNoVerification(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
 		identities := flow.IdentityList{
@@ -245,7 +245,7 @@ func TestBootstrapNoVerification(t *testing.T) {
 }
 
 func TestBootstrapExistingAddress(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
 		identities := flow.IdentityList{
@@ -262,7 +262,7 @@ func TestBootstrapExistingAddress(t *testing.T) {
 }
 
 func TestBootstrapNonZeroHeight(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 		genesis := flow.Genesis(identities)
 		genesis.Height = 42
@@ -273,7 +273,7 @@ func TestBootstrapNonZeroHeight(t *testing.T) {
 }
 
 func TestBootstrapNonZeroParent(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 		genesis := flow.Genesis(identities)
 		genesis.ParentID = unittest.BlockFixture().ID()
@@ -284,7 +284,7 @@ func TestBootstrapNonZeroParent(t *testing.T) {
 }
 
 func TestBootstrapNonEmptyCollections(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 		genesis := flow.Genesis(identities)
 		genesis.Guarantees = unittest.CollectionGuaranteesFixture(1)
@@ -296,7 +296,7 @@ func TestBootstrapNonEmptyCollections(t *testing.T) {
 }
 
 func TestBootstrapNoSeal(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 		genesis := flow.Genesis(identities)
 		genesis.Seals = nil
@@ -308,7 +308,7 @@ func TestBootstrapNoSeal(t *testing.T) {
 }
 
 func TestBootstrapInvalidSeal(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 		genesis := flow.Genesis(identities)
 		genesis.Seals[0].BlockID = unittest.IdentifierFixture()
@@ -320,7 +320,7 @@ func TestBootstrapInvalidSeal(t *testing.T) {
 }
 
 func TestBootstrapInvalidSealPrevState(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 		genesis := flow.Genesis(identities)
 		genesis.Seals[0].PreviousState = unittest.SealFixture().PreviousState

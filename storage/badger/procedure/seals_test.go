@@ -39,7 +39,7 @@ func check(t *testing.T, db *badger.DB, header *flow.Header, payload *flow.Paylo
 }
 
 func TestPayloadNilSeals(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 		block.Payload.Seals = nil
@@ -49,7 +49,7 @@ func TestPayloadNilSeals(t *testing.T) {
 }
 
 func TestPayloadEmptySeals(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 		block.Payload.Seals = make([]*flow.Seal, 0)
@@ -64,7 +64,7 @@ func TestPayloadEmptySeals(t *testing.T) {
 }
 
 func TestPayloadOrderedSeals(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 
@@ -81,7 +81,7 @@ func TestPayloadOrderedSeals(t *testing.T) {
 }
 
 func TestPayloadNilGuarantees(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 		block.Payload.Guarantees = nil
@@ -91,7 +91,7 @@ func TestPayloadNilGuarantees(t *testing.T) {
 }
 
 func TestPayloadEmptyGuarantees(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 		block.Payload.Guarantees = make([]*flow.CollectionGuarantee, 0)
@@ -106,7 +106,7 @@ func TestPayloadEmptyGuarantees(t *testing.T) {
 }
 
 func TestPayloadOrderedGuarantees(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 		block.Payload.Guarantees = unittest.CollectionGuaranteesFixture(5)
@@ -116,7 +116,7 @@ func TestPayloadOrderedGuarantees(t *testing.T) {
 }
 
 func TestPayloadNilIdentities(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
@@ -126,7 +126,7 @@ func TestPayloadNilIdentities(t *testing.T) {
 }
 
 func TestPayloadEmptyIdentities(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 		block.Payload.Identities = make([]*flow.Identity, 0)
@@ -141,7 +141,7 @@ func TestPayloadEmptyIdentities(t *testing.T) {
 }
 
 func TestPayloadOrderedIdentities(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 		block.Payload.Identities = unittest.IdentityListFixture(5)

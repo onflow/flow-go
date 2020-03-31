@@ -14,7 +14,7 @@ import (
 )
 
 func TestSealInsertCheckRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		expected := unittest.SealFixture()
 
 		err := db.Update(InsertSeal(&expected))
@@ -34,7 +34,7 @@ func TestSealInsertCheckRetrieve(t *testing.T) {
 }
 
 func TestSealIndexAndLookup(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		seal1 := unittest.SealFixture()
 		seal2 := unittest.SealFixture()
 
@@ -68,7 +68,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 }
 
 func TestSealIDByBlockIndexLookup(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		sealID := unittest.IdentifierFixture()
 		blockID := unittest.IdentifierFixture()
 

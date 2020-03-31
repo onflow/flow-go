@@ -12,7 +12,7 @@ import (
 )
 
 func TestTransactions(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		store := bstorage.NewTransactions(db)
 
 		expected := unittest.TransactionFixture()

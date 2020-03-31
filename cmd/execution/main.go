@@ -21,14 +21,12 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 )
 
 func main() {
 
 	var (
 		stateCommitments   storage.Commits
-		levelDB            *leveldb.LevelDB
 		ledgerStorage      storage.Ledger
 		providerEngine     *provider.Engine
 		computationManager *computation.Manager
@@ -42,12 +40,8 @@ func main() {
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 		}).
-		Module("leveldb key-value store", func(node *cmd.FlowNodeBuilder) error {
-			levelDB, err = leveldb.NewLevelDB("db/valuedb", "db/triedb")
-			return err
-		}).
 		Module("execution state ledger", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewTrieStorage(levelDB)
+			ledgerStorage, err = ledger.NewTrieStorage("db")
 			return err
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {

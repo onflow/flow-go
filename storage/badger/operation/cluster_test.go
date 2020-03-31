@@ -15,7 +15,7 @@ import (
 )
 
 func TestClusterNumbers(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		var (
 			clusterID        = "cluster"
 			number    uint64 = 42
@@ -62,7 +62,7 @@ func TestClusterNumbers(t *testing.T) {
 }
 
 func TestClusterBoundaries(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		var (
 			clusterID        = "cluster"
 			expected  uint64 = 42

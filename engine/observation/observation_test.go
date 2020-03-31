@@ -60,7 +60,7 @@ func (suite *Suite) SetupTest() {
 
 func (suite *Suite) TestSendAndGetTransaction() {
 
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithBadgerDB(suite.T(), func(t *testing.T, db *badger.DB) {
 		transaction := unittest.TransactionFixture(func(t *flow.Transaction) {
 			t.Nonce = 0
 			t.ComputeLimit = 0
@@ -101,7 +101,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
 
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithBadgerDB(suite.T(), func(t *testing.T, db *badger.DB) {
 		// test block1 get by ID
 		block1 := unittest.BlockHeaderFixture()
 		// test block2 get by height
@@ -151,7 +151,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 // TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed blocked
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithBadgerDB(suite.T(), func(t *testing.T, db *badger.DB) {
 		// create block -> collection -> transactions and seal
 		block, collection, seal := suite.createChain()
 

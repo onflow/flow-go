@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -48,14 +49,33 @@ func TempDBDir(t *testing.T) string {
 	return dir
 }
 
-func TempBadgerDB(t *testing.T) *badger.DB {
+func RunWithTempDBDir(t *testing.T, f func (*testing.T, string)) {
+	dbDir := TempDBDir(t)
+	defer os.RemoveAll(dbDir)
+
+	f(t, dbDir)
+}
+
+func TempBadgerDB(t *testing.T) (*badger.DB, string) {
+
 	dir := TempDBDir(t)
 
-	// Ref: https://github.com/dgraph-io/badger#memory-usage
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
 	require.Nil(t, err)
 
-	return db
+	return db, dir
+}
+
+func RunWithBadgerDB(t *testing.T, f func (*testing.T, *badger.DB)) {
+	RunWithTempDBDir(t, func(t *testing.T, dir string) {
+		// Ref: https://github.com/dgraph-io/badger#memory-usage
+		db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
+		require.Nil(t, err)
+
+		f(t, db)
+
+		db.Close()
+	})
 }
 
 func LevelDBInDir(t *testing.T, dir string) *leveldb.LevelDB {
@@ -69,17 +89,6 @@ func TempLevelDB(t *testing.T) *leveldb.LevelDB {
 	dir := TempDBDir(t)
 
 	return LevelDBInDir(t, dir)
-}
-
-func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
-	db := TempBadgerDB(t)
-
-	defer func() {
-		err := db.Close()
-		require.Nil(t, err)
-	}()
-
-	f(db)
 }
 
 func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {

@@ -14,7 +14,7 @@ import (
 )
 
 func TestCollections(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		expected := unittest.CollectionFixture(2).Light()
 
 		t.Run("Retrieve nonexistant", func(t *testing.T) {

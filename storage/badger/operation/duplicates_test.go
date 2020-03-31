@@ -13,7 +13,7 @@ import (
 )
 
 func TestSkipDuplicates(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)

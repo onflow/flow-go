@@ -12,7 +12,7 @@ import (
 )
 
 func TestChunkHeaders(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		expected := unittest.ChunkHeaderFixture()
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {

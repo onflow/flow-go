@@ -461,7 +461,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		// TODO - Should the deltas be applied to a particular state?
 		// Not important now, but might become important once we produce proofs
 		var err error
-		endState, err = e.execState.CommitDelta(view.Delta())
+		endState, err = e.execState.CommitDelta(view.Delta(), startState)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 		}

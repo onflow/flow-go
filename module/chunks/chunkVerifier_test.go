@@ -91,15 +91,15 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	ids = append(ids, id1, id2)
 	values = append(values, value1, value2)
 
-	db := unittest.TempLevelDB(t)
+	dbDir := unittest.TempDBDir(t)
 
-	f, _ := ledger.NewTrieStorage(db)
-	startState, _ := f.UpdateRegisters(ids, values)
+	f, _ := ledger.NewTrieStorage(dbDir)
+	startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
 	regTs, _ := f.GetRegisterTouches(ids, startState)
 
 	ids = [][]byte{id2}
 	values = [][]byte{UpdatedValue2}
-	endState, _ := f.UpdateRegisters(ids, values)
+	endState, _ := f.UpdateRegisters(ids, values, startState)
 
 	// Chunk setup
 	chunk := flow.Chunk{

@@ -14,7 +14,7 @@ import (
 )
 
 func TestIdentitiesInsertCheckRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		expected := unittest.IdentityFixture()
 
 		err := db.Update(InsertIdentity(expected))
@@ -34,7 +34,7 @@ func TestIdentitiesInsertCheckRetrieve(t *testing.T) {
 }
 
 func TestIdentitiesIndexAndLookup(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		identities := unittest.IdentityListFixture(4)
 		height := uint64(1337)
 		blockID := flow.MakeID([]byte{0x42})

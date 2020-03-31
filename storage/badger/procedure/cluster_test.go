@@ -13,7 +13,7 @@ import (
 )
 
 func TestInsertRetrieveClusterBlock(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		block := unittest.ClusterBlockFixture()
 
 		err := db.Update(operation.InsertCollection(&block.Collection))
@@ -31,7 +31,7 @@ func TestInsertRetrieveClusterBlock(t *testing.T) {
 }
 
 func TestFinalizeClusterBlock(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		parent := unittest.ClusterBlockFixture()
 		block := unittest.ClusterBlockWithParent(&parent)
 

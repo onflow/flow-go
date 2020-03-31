@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -19,16 +18,15 @@ import (
 
 func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T) {
 	return func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-
-			ls, err := ledger.NewTrieStorage(db)
+		unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+			ls, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			ctrl := gomock.NewController(t)
 
 			stateCommitments := mocks.NewMockCommits(ctrl)
 
-			stateCommitment := unittest.StateCommitmentFixture()
+			stateCommitment := ls.EmptyStateCommitment()
 
 			stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
 
@@ -62,7 +60,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view1.Set(registerID1, flow.RegisterValue("apple"))
 		view1.Set(registerID2, flow.RegisterValue("carrot"))
 
-		sc2, err := es.CommitDelta(view1.Delta())
+		sc2, err := es.CommitDelta(view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		view2 := es.NewView(sc2)
@@ -85,14 +83,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1.Set(registerID1, flow.RegisterValue("apple"))
 
-		sc2, err := es.CommitDelta(view1.Delta())
+		sc2, err := es.CommitDelta(view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
 		view2.Set(registerID1, flow.RegisterValue("orange"))
 
-		sc3, err := es.CommitDelta(view2.Delta())
+		sc3, err := es.CommitDelta(view2.Delta(), sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -121,14 +119,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view1 := es.NewView(sc1)
 		view1.Set(registerID1, flow.RegisterValue("apple"))
 
-		sc2, err := es.CommitDelta(view1.Delta())
+		sc2, err := es.CommitDelta(view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
 		view2.Delete(registerID1)
 
-		sc3, err := es.CommitDelta(view2.Delta())
+		sc3, err := es.CommitDelta(view2.Delta(), sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version

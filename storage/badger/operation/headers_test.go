@@ -16,7 +16,7 @@ import (
 )
 
 func TestHeaderInsertCheckRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 		expected := flow.Header{
 			View:                  1337,
 			Timestamp:             time.Now().UTC(),
@@ -46,7 +46,7 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 }
 
 func TestHeaderIDIndexByCollectionID(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
 
 		headerID := unittest.IdentifierFixture()
 		collectionID := unittest.IdentifierFixture()
