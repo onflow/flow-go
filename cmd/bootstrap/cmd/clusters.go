@@ -33,8 +33,8 @@ func computeCollectorClusters(stakingNodes []NodeInfoPub) *flow.ClusterList {
 	return clusters
 }
 
-func constructGenesisBlocksForCollectorClusters() []cluster.Block {
-	clusterBlocks := run.GenerateGenesisClusterBlocks(int(flagCollectionClusters))
+func constructGenesisBlocksForCollectorClusters(clusters *flow.ClusterList) []cluster.Block {
+	clusterBlocks := run.GenerateGenesisClusterBlocks(clusters)
 
 	for i, clusterBlock := range clusterBlocks {
 		writeJSON(fmt.Sprintf(filenameGenesisClusterBlock, i), clusterBlock)

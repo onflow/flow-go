@@ -1,26 +1,25 @@
 package run
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/protocol"
 )
 
-func GenerateGenesisClusterBlocks(n int) []cluster.Block {
-	clusterBlocks := make([]cluster.Block, n)
+func GenerateGenesisClusterBlocks(clusters *flow.ClusterList) []cluster.Block {
+	clusterBlocks := make([]cluster.Block, clusters.Size())
 	for i := range clusterBlocks {
-		clusterBlocks[i] = GenerateGenesisClusterBlock(i)
+		clusterBlocks[i] = GenerateGenesisClusterBlock(clusters.ByIndex(uint(i)))
 	}
 	return clusterBlocks
 }
 
-func GenerateGenesisClusterBlock(index int) cluster.Block {
+func GenerateGenesisClusterBlock(identities flow.IdentityList) cluster.Block {
 	payload := cluster.Payload{
 		Collection: flow.LightCollection{Transactions: nil},
 	}
 	header := flow.Header{
-		ChainID:                 fmt.Sprintf("collector cluster %v", index),
+		ChainID:                 protocol.ChainIDForCluster(identities),
 		ParentID:                flow.ZeroID,
 		Height:                  0,
 		PayloadHash:             payload.Hash(),

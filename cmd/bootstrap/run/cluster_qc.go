@@ -25,6 +25,7 @@ type ClusterSigner struct {
 
 func GenerateClusterGenesisQC(ccSigners []ClusterSigner, block *flow.Block, clusterBlock *cluster.Block) (
 	*model.QuorumCertificate, error) {
+
 	ps, db, err := NewProtocolState(block)
 	if err != nil {
 		return nil, err

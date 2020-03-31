@@ -63,7 +63,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis blocks for collector clusters")
-		clusterBlocks := constructGenesisBlocksForCollectorClusters()
+		clusterBlocks := constructGenesisBlocksForCollectorClusters(clusters)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis QCs for collector clusters")
