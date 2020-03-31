@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -303,9 +302,8 @@ func (suite *Suite) TestReceiveVote() {
 		View:      0,
 		Signature: nil,
 	}
-	var randomBeaconSig crypto.Signature
 
-	suite.coldstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.Signature, randomBeaconSig).Once()
+	suite.coldstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.Signature).Once()
 
 	err := suite.eng.Process(originID, vote)
 	suite.Assert().Nil(err)

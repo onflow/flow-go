@@ -31,12 +31,12 @@ func New(
 	protocolState protocol.State,
 	dkgState dkg.State,
 	trustedRootBlock *flow.Header,
-	rootBlockSigs *model.AggregatedSignature,
+	rootBlockQC *model.QuorumCertificate,
 	finalizationCallback module.Finalizer,
 	notifier notifications.FinalizationConsumer,
 	log zerolog.Logger,
 ) (*HotStuffFollower, error) {
-	trustedRoot := unsafeToBlockQC(trustedRootBlock, rootBlockSigs)
+	trustedRoot := unsafeToBlockQC(trustedRootBlock, rootBlockQC)
 	followerLogic, err := NewFollowerLogic(me, protocolState, dkgState, trustedRoot, finalizationCallback, notifier, log)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
@@ -54,7 +54,7 @@ func New(
 // The returned block does not contain a qc to its parent as, per precondition of the initialization,
 // we do not consider ancestors of the trusted root block. (if trustedRootBlock is the genesis block, it
 // will not even have a QC as there is no parent).
-func unsafeToBlockQC(trustedRootBlock *flow.Header, rootBlockSigs *model.AggregatedSignature) *forks.BlockQC {
+func unsafeToBlockQC(trustedRootBlock *flow.Header, rootBlockQC *model.QuorumCertificate) *forks.BlockQC {
 	rootBlockID := trustedRootBlock.ID()
 	block := &model.Block{
 		BlockID:     rootBlockID,
@@ -64,14 +64,9 @@ func unsafeToBlockQC(trustedRootBlock *flow.Header, rootBlockSigs *model.Aggrega
 		PayloadHash: trustedRootBlock.PayloadHash,
 		Timestamp:   trustedRootBlock.Timestamp,
 	}
-	qc := &model.QuorumCertificate{
-		BlockID:             rootBlockID,
-		View:                trustedRootBlock.View,
-		AggregatedSignature: rootBlockSigs,
-	}
 	return &forks.BlockQC{
 		Block: block,
-		QC:    qc,
+		QC:    rootBlockQC,
 	}
 }
 
@@ -86,7 +81,7 @@ func (fl *HotStuffFollower) SubmitProposal(proposalHeader *flow.Header, parentVi
 	fl.proposals <- proposal
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
-	busyDuration := time.Now().Sub(received)
+	busyDuration := time.Since(received)
 	fl.log.Debug().Hex("block_ID", logging.ID(proposal.Block.BlockID)).
 		Uint64("view", proposal.Block.View).
 		Dur("busy_duration", busyDuration).

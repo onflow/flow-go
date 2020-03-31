@@ -250,7 +250,7 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection, flow.Seal) {
 	collection := unittest.CollectionFixture(10)
 	cg := &flow.CollectionGuarantee{
 		CollectionID: collection.ID(),
-		Signatures:   []crypto.Signature{[]byte("signature A")},
+		Signature:    crypto.Signature([]byte("signature A")),
 	}
 	block := unittest.BlockFixture()
 	block.Guarantees = []*flow.CollectionGuarantee{cg}

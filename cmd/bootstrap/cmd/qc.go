@@ -51,7 +51,7 @@ func generateQCSignerData(nsPub []NodeInfoPub, nsPriv []NodeInfoPriv, dkg DKGDat
 		}
 
 		sd.Signers = append(sd.Signers, run.Signer{
-			Identity: flow.Identity{
+			Identity: &flow.Identity{
 				NodeID:             nPub.NodeID,
 				Address:            nPub.Address,
 				Role:               nPub.Role,

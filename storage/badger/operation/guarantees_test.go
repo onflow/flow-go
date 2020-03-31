@@ -40,8 +40,8 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		collID1 := flow.Identifier{0x01}
 		collID2 := flow.Identifier{0x02}
 		collections := []*flow.CollectionGuarantee{
-			{CollectionID: collID1, Signatures: []crypto.Signature{{0x10}}},
-			{CollectionID: collID2, Signatures: []crypto.Signature{{0x20}}},
+			{CollectionID: collID1, Signature: crypto.Signature{0x10}},
+			{CollectionID: collID2, Signature: crypto.Signature{0x20}},
 		}
 		expected := flow.GetIDs(collections)
 
@@ -79,12 +79,12 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		collID3 := flow.Identifier{0x03}
 		collID4 := flow.Identifier{0x04}
 		set1 := []*flow.CollectionGuarantee{
-			{CollectionID: collID1, Signatures: []crypto.Signature{{0x1}}},
+			{CollectionID: collID1, Signature: crypto.Signature{0x1}},
 		}
 		set2 := []*flow.CollectionGuarantee{
-			{CollectionID: collID2, Signatures: []crypto.Signature{{0x2}}},
-			{CollectionID: collID3, Signatures: []crypto.Signature{{0x3}}},
-			{CollectionID: collID4, Signatures: []crypto.Signature{{0x1}}},
+			{CollectionID: collID2, Signature: crypto.Signature{0x2}},
+			{CollectionID: collID3, Signature: crypto.Signature{0x3}},
+			{CollectionID: collID4, Signature: crypto.Signature{0x1}},
 		}
 		ids1 := flow.GetIDs(set1)
 		ids2 := flow.GetIDs(set2)

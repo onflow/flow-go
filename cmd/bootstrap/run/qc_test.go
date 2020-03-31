@@ -5,8 +5,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/test"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -20,8 +23,8 @@ func TestGenerateGenesisQC(t *testing.T) {
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 	}
 	for _, signer := range signerData.Signers {
-		id := signer.Identity
-		block.Identities = append(block.Identities, &id)
+		identity := signer.Identity
+		block.Identities = append(block.Identities, identity)
 	}
 	block.ParentID = flow.ZeroID
 	block.View = 3
@@ -34,21 +37,36 @@ func TestGenerateGenesisQC(t *testing.T) {
 }
 
 func createSignerData(t *testing.T, n int) SignerData {
-	_, ids := test.NewProtocolState(t, n)
+	identities := unittest.IdentityListFixture(n)
 
-	stakingKeys, err := test.AddStakingPrivateKeys(ids)
-	require.NoError(t, err)
+	stakingKeys := make([]crypto.PrivateKey, 0, len(identities))
+	for _, identity := range identities {
+		stakingKey := helper.MakeBLSKey(t)
+		identity.StakingPubKey = stakingKey.PublicKey()
+		stakingKeys = append(stakingKeys, stakingKey)
+	}
 
-	randomBKeys, dkgState, err := test.AddRandomBeaconPrivateKeys(t, ids)
-	require.NoError(t, err)
+	randomBKeys, groupKey, _ := unittest.RunDKGKeys(t, n)
+
+	pubData := dkg.PublicData{
+		GroupPubKey:     groupKey,
+		IDToParticipant: make(map[flow.Identifier]*dkg.Participant),
+	}
+	for i, identity := range identities {
+		participant := dkg.Participant{
+			Index:          uint(i),
+			PublicKeyShare: randomBKeys[i].PublicKey(),
+		}
+		pubData.IDToParticipant[identity.NodeID] = &participant
+	}
 
 	signerData := SignerData{
-		DKGState: dkgState,
+		DKGState: wrapper.NewState(&pubData),
 		Signers:  make([]Signer, n),
 	}
 
-	for i, id := range ids {
-		signerData.Signers[i].Identity = *id
+	for i, identity := range identities {
+		signerData.Signers[i].Identity = identity
 		signerData.Signers[i].RandomBeaconPrivKey = randomBKeys[i]
 		signerData.Signers[i].StakingPrivKey = stakingKeys[i]
 	}

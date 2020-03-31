@@ -13,7 +13,7 @@ import (
 func MakeBlock(t *testing.T, options ...func(*model.Block)) *model.Block {
 	view := rand.Uint64()
 	block := model.Block{
-		View:        rand.Uint64(),
+		View:        view,
 		BlockID:     unittest.IdentifierFixture(),
 		PayloadHash: unittest.IdentifierFixture(),
 		ProposerID:  unittest.IdentifierFixture(),
@@ -32,20 +32,20 @@ func WithBlockView(view uint64) func(*model.Block) {
 	}
 }
 
-func WithBlockProposerID(proposerID flow.Identifier) func(*model.Block) {
+func WithBlockProposer(proposerID flow.Identifier) func(*model.Block) {
 	return func(block *model.Block) {
 		block.ProposerID = proposerID
 	}
 }
 
-func WithQCBlock(parent *model.Block) func(*model.Block) {
+func WithParentBlock(parent *model.Block) func(*model.Block) {
 	return func(block *model.Block) {
 		block.QC.BlockID = parent.BlockID
 		block.QC.View = parent.View
 	}
 }
 
-func WithQCSignerIDs(signerIDs []flow.Identifier) func(*model.Block) {
+func WithParentSigners(signerIDs []flow.Identifier) func(*model.Block) {
 	return func(block *model.Block) {
 		block.QC.SignerIDs = signerIDs
 	}

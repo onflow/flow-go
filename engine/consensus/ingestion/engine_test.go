@@ -28,7 +28,7 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{originID}
-	guarantee.Signatures = unittest.SignaturesFixture(1)
+	guarantee.Signature = unittest.SignatureFixture()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	identity.NodeID = originID
@@ -62,7 +62,7 @@ func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{originID}
-	guarantee.Signatures = unittest.SignaturesFixture(1)
+	guarantee.Signature = unittest.SignatureFixture()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	identity.NodeID = originID
@@ -95,7 +95,7 @@ func TestOnCollectionGuaranteeInvalidRole(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{originID}
-	guarantee.Signatures = unittest.SignaturesFixture(1)
+	guarantee.Signature = unittest.SignatureFixture()
 
 	// origin node has wrong role (consensus)
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))

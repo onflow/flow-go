@@ -9,9 +9,9 @@ import (
 // CollectionGuarantee is a signed hash for a collection, which is used
 // to announce collections to consensus nodes.
 type CollectionGuarantee struct {
-	CollectionID Identifier         // ID of the collection being guaranteed
-	SignerIDs    []Identifier       // list of guarantors
-	Signatures   []crypto.Signature // guarantor signatures
+	CollectionID Identifier       // ID of the collection being guaranteed
+	SignerIDs    []Identifier     // list of guarantors
+	Signature    crypto.Signature // guarantor signatures
 }
 
 // ID returns the fingerprint of the collection guarantee.

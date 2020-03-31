@@ -375,8 +375,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 		err := e.communicator.SendVote(
 			ownVote.BlockID,
 			ownVote.View,
-			ownVote.Signature.StakingSignature,
-			ownVote.Signature.RandomBeaconSignature,
+			ownVote.SigData,
 			nextLeader.NodeID,
 		)
 		if err != nil {

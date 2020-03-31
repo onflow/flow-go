@@ -14,11 +14,11 @@ import (
 func TestCombinedProposal(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	state, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
-	signers := MakeSigners(t, state, identities.NodeIDs(), stakingKeys, beaconKeys)
+	proto, dkg, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
+	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposerID(identities[0].NodeID))
+	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
 	proposal, err := signers[0].CreateProposal(block)
 	require.NoError(t, err)
 
@@ -49,23 +49,21 @@ func TestCombinedProposal(t *testing.T) {
 	proposal.Block.ProposerID = identities[0].NodeID
 
 	// proposal with invalid signature should be invalid
-	// NOTE: don't use first 4 bytes, they might contain joined signature length
-	// information
-	proposal.Signature[5]++
+	proposal.SigData[5]++
 	valid, err = signers[0].VerifyProposal(proposal)
 	require.NoError(t, err)
 	assert.False(t, valid, "proposal with changed signature should be invalid")
-	proposal.Signature[5]--
+	proposal.SigData[5]--
 }
 
 func TestCombinedVote(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	state, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
-	signers := MakeSigners(t, state, identities.NodeIDs(), stakingKeys, beaconKeys)
+	proto, dkg, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
+	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposerID(identities[2].NodeID))
+	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[2].NodeID))
 	vote, err := signers[0].CreateVote(block)
 	require.NoError(t, err)
 
@@ -96,13 +94,11 @@ func TestCombinedVote(t *testing.T) {
 	vote.SignerID = identities[0].NodeID
 
 	// vote with changed signature should be invalid
-	// NOTE: don't use first 4 bytes, they might contain joined signature length
-	// information
-	vote.Signature[5]++
+	vote.SigData[5]++
 	valid, err = signers[0].VerifyVote(vote)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed signature should be invalid")
-	vote.Signature[5]--
+	vote.SigData[5]--
 }
 
 func TestCombinedProposalIsVote(t *testing.T) {
@@ -110,27 +106,27 @@ func TestCombinedProposalIsVote(t *testing.T) {
 	// NOTE: I don't think this is true for every signature scheme
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	state, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
-	signers := MakeSigners(t, state, identities.NodeIDs(), stakingKeys, beaconKeys)
+	proto, dkg, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
+	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposerID(identities[0].NodeID))
+	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
 	proposal, err := signers[0].CreateProposal(block)
 	require.NoError(t, err)
 	vote, err := signers[0].CreateVote(block)
 	require.NoError(t, err)
 
-	assert.Equal(t, proposal.Signature, vote.Signature)
+	assert.Equal(t, proposal.SigData, vote.SigData)
 }
 
 func TestCombinedQC(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
-	state, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
-	signers := MakeSigners(t, state, identities.NodeIDs(), stakingKeys, beaconKeys)
+	proto, dkg, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
+	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposerID(identities[0].NodeID))
+	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
 	var votes []*model.Vote
 	for _, signer := range signers {
 		vote, err := signer.CreateVote(block)

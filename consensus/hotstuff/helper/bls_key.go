@@ -4,8 +4,9 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 func MakeBLSKey(t *testing.T) crypto.PrivateKey {

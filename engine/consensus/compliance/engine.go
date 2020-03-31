@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/events"
@@ -138,14 +137,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // SendVote will send a vote to the desired node.
-func (e *Engine) SendVote(blockID flow.Identifier, view uint64, stakingSig crypto.Signature, randomBeaconSig crypto.Signature, recipientID flow.Identifier) error {
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
 	// build the vote message
 	vote := &messages.BlockVote{
-		BlockID:               blockID,
-		View:                  view,
-		StakingSignature:      stakingSig,
-		RandomBeaconSignature: randomBeaconSig,
+		BlockID: blockID,
+		View:    view,
+		SigData: sigData,
 	}
 
 	// send the vote the desired recipient
@@ -321,7 +319,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
 	// forward the vote to coldstuff for processing
-	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.StakingSignature, vote.RandomBeaconSignature)
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
 
 	return nil
 }

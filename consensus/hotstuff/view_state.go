@@ -34,7 +34,7 @@ type ViewState interface {
 	// IdentitiesForConsensusParticipants returns the identities for the nodes
 	// of the given node identifiers at the given block, including the up-to-date
 	// staked amounts.
-	IdentitiesForConsensusParticipants(blockID flow.Identifier, consensusNodeIDs ...flow.Identifier) (flow.IdentityList, error)
+	IdentitiesForConsensusParticipants(blockID flow.Identifier, consensusNodeIDs []flow.Identifier) (flow.IdentityList, error)
 
 	// LeaderForView returns the identity of the leader for the given view.
 	LeaderForView(view uint64) *flow.Identity

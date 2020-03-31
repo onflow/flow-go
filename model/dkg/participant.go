@@ -6,6 +6,6 @@ import (
 
 // Participant contains an individual participant's DKG data
 type Participant struct {
-	PublicKeyShare crypto.PublicKey
 	Index          uint
+	PublicKeyShare crypto.PublicKey
 }

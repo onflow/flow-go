@@ -15,11 +15,11 @@ import (
 func TestSingleProposal(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	state, stakingKeys, _ := MakeProtocolState(t, identities, false)
-	signers := MakeSigners(t, state, identities.NodeIDs(), stakingKeys, nil)
+	proto, dkg, stakingKeys, _ := MakeProtocolState(t, identities, false)
+	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposerID(identities[0].NodeID))
+	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
 	proposal, err := signers[0].CreateProposal(block)
 	require.NoError(t, err)
 
@@ -50,21 +50,21 @@ func TestSingleProposal(t *testing.T) {
 	proposal.Block.ProposerID = identities[0].NodeID
 
 	// proposal with invalid signature should be invalid
-	proposal.Signature[0]++
+	proposal.SigData[0]++
 	valid, err = signers[0].VerifyProposal(proposal)
 	require.NoError(t, err)
 	assert.False(t, valid, "proposal with changed signature should be invalid")
-	proposal.Signature[0]--
+	proposal.SigData[0]--
 }
 
 func TestSingleVote(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	state, stakingKeys, _ := MakeProtocolState(t, identities, false)
-	signers := MakeSigners(t, state, identities.NodeIDs(), stakingKeys, nil)
+	proto, dkg, stakingKeys, _ := MakeProtocolState(t, identities, false)
+	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposerID(identities[2].NodeID))
+	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[2].NodeID))
 	vote, err := signers[0].CreateVote(block)
 	require.NoError(t, err)
 
@@ -95,11 +95,11 @@ func TestSingleVote(t *testing.T) {
 	vote.SignerID = identities[0].NodeID
 
 	// vote with changed signature should be invalid
-	vote.Signature[0]++
+	vote.SigData[0]++
 	valid, err = signers[0].VerifyVote(vote)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed signature should be invalid")
-	vote.Signature[0]--
+	vote.SigData[0]--
 }
 
 func TestSingleProposalIsVote(t *testing.T) {
@@ -107,27 +107,27 @@ func TestSingleProposalIsVote(t *testing.T) {
 	// NOTE: I don't think this is true for every signature scheme
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	state, stakingKeys, _ := MakeProtocolState(t, identities, false)
-	signers := MakeSigners(t, state, identities.NodeIDs(), stakingKeys, nil)
+	proto, dkg, stakingKeys, _ := MakeProtocolState(t, identities, false)
+	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposerID(identities[0].NodeID))
+	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
 	proposal, err := signers[0].CreateProposal(block)
 	require.NoError(t, err)
 	vote, err := signers[0].CreateVote(block)
 	require.NoError(t, err)
 
-	assert.Equal(t, proposal.Signature, vote.Signature)
+	assert.Equal(t, proposal.SigData, vote.SigData)
 }
 
 func TestSingleQC(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	state, stakingKeys, _ := MakeProtocolState(t, identities, false)
-	signers := MakeSigners(t, state, identities.NodeIDs(), stakingKeys, nil)
+	proto, dkg, stakingKeys, _ := MakeProtocolState(t, identities, false)
+	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposerID(identities[0].NodeID))
+	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
 	var votes []*model.Vote
 	for _, signer := range signers {
 		vote, err := signer.CreateVote(block)

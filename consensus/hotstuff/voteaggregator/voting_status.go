@@ -5,25 +5,28 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // VotingStatus keeps track of incorporated votes for the same block
 type VotingStatus struct {
-	sigAggregator    hotstuff.SigAggregator
+	signer           hotstuff.Signer
 	block            *model.Block
 	stakeThreshold   uint64
+	groupSize        uint
 	accumulatedStake uint64
 	// assume votes are all valid to build QC
 	votes map[flow.Identifier]*model.Vote
 }
 
 // NewVotingStatus creates a new Voting Status instance
-func NewVotingStatus(block *model.Block, stakeThreshold uint64, sigAggregator hotstuff.SigAggregator) *VotingStatus {
+func NewVotingStatus(block *model.Block, stakeThreshold uint64, groupSize uint, signer hotstuff.Signer) *VotingStatus {
 	return &VotingStatus{
-		sigAggregator:    sigAggregator,
+		signer:           signer,
 		block:            block,
 		stakeThreshold:   stakeThreshold,
+		groupSize:        groupSize,
 		accumulatedStake: 0,
 		votes:            make(map[flow.Identifier]*model.Vote),
 	}
@@ -64,17 +67,10 @@ func (vs *VotingStatus) TryBuildQC() (*model.QuorumCertificate, bool, error) {
 	}
 
 	// build the aggregated signature
-	sigs := getSigsSliceFromVotes(vs.votes)
-	aggregatedSig, err := vs.sigAggregator.Aggregate(vs.block, sigs)
+	votes := getSliceForVotes(vs.votes)
+	qc, err := vs.signer.CreateQC(votes)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not build aggregate signatures for building QC: %w", err)
-	}
-
-	// build the QC
-	qc := &model.QuorumCertificate{
-		View:                vs.block.View,
-		BlockID:             vs.block.BlockID,
-		AggregatedSignature: aggregatedSig,
+		return nil, false, fmt.Errorf("could not create QC from votes: %w", err)
 	}
 
 	return qc, true, nil
@@ -85,15 +81,15 @@ func (vs *VotingStatus) hasEnoughStake() bool {
 }
 
 func (vs *VotingStatus) hasEnoughSigShares() bool {
-	return vs.sigAggregator.CanReconstruct(len(vs.votes))
+	return crypto.EnoughShares(int(vs.groupSize), len(vs.votes))
 }
 
-func getSigsSliceFromVotes(votes map[flow.Identifier]*model.Vote) []*model.SingleSignature {
-	var signatures = make([]*model.SingleSignature, 0, len(votes))
+func getSliceForVotes(votes map[flow.Identifier]*model.Vote) []*model.Vote {
+	var voteSlice = make([]*model.Vote, 0, len(votes))
 
 	for _, vote := range votes {
-		signatures = append(signatures, vote.Signature)
+		voteSlice = append(voteSlice, vote)
 	}
 
-	return signatures
+	return voteSlice
 }

@@ -5,23 +5,22 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
-	viewState   hotstuff.ViewState
-	forks       hotstuff.ForksReader
-	sigVerifier hotstuff.SigVerifier
+	viewState hotstuff.ViewState
+	forks     hotstuff.ForksReader
+	verifier  hotstuff.Verifier
 }
 
 // New creates a new Validator instance
-func New(viewState hotstuff.ViewState, forks hotstuff.ForksReader, sigVerifier hotstuff.SigVerifier) *Validator {
+func New(viewState hotstuff.ViewState, forks hotstuff.ForksReader, verifier hotstuff.Verifier) *Validator {
 	return &Validator{
-		viewState:   viewState,
-		forks:       forks,
-		sigVerifier: sigVerifier,
+		viewState: viewState,
+		forks:     forks,
+		verifier:  verifier,
 	}
 }
 
@@ -36,9 +35,9 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 		return newInvalidBlockError(block, fmt.Sprintf("qc.View (%d) doesn't match with block's View (%d)", qc.View, block.View))
 	}
 
-	stakedSigners, err := v.viewState.IdentitiesForConsensusParticipants(qc.BlockID, qc.AggregatedSignature.SignerIDs...)
+	stakedSigners, err := v.viewState.IdentitiesForConsensusParticipants(qc.BlockID, qc.SignerIDs)
 	if err != nil {
-		return fmt.Errorf("invalid signer identities in qc of blockID %s: %w", qc.BlockID, err)
+		return fmt.Errorf("invalid verifier identities in qc of blockID %s: %w", qc.BlockID, err)
 	}
 	// method IdentitiesForConsensusParticipants guarantees that there are no duplicated signers
 	// and all signers are valid, staked consensus nodes
@@ -55,33 +54,13 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 	}
 
 	// validate signature:
-	// collect staking keys for for nodes that contributed to qc's aggregated sig:
-	stakingPubKeys := make([]crypto.PublicKey, 0, len(stakedSigners))
-	for _, signer := range stakedSigners {
-		stakingPubKeys = append(stakingPubKeys, signer.StakingPubKey)
-	}
-	// validate qc's aggregated staking signature using staking keys
-	valid, err := v.sigVerifier.VerifyStakingAggregatedSig(qc.AggregatedSignature.StakingSignatures, block, stakingPubKeys)
+	// validate qc's aggregated staking signature using the internal protocol state
+	valid, err := v.verifier.VerifyQC(qc)
 	if err != nil {
 		return fmt.Errorf("cannot verify qc's aggregated signature, qc.BlockID: %s", qc.BlockID)
 	}
 	if !valid {
 		return newInvalidBlockError(block, "aggregated staking signature in QC is invalid")
-	}
-
-	// get the DKG public group key
-	groupPubKey, err := v.viewState.DKGState().GroupKey()
-	if err != nil {
-		return fmt.Errorf("could not get DKG public group key: %w", err)
-	}
-
-	// validate qc's random beacon signature (reconstructed threshold signature)
-	valid, err = v.sigVerifier.VerifyRandomBeaconThresholdSig(qc.AggregatedSignature.RandomBeaconSignature, block, groupPubKey)
-	if err != nil {
-		return fmt.Errorf("cannot verify reconstructed random beacon sig from qc: %w", err)
-	}
-	if !valid {
-		return newInvalidBlockError(block, "reconstructed random beacon signature in QC is invalid")
 	}
 
 	return nil
@@ -96,14 +75,14 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	blockID := proposal.Block.BlockID
 
 	// Validate Proposer's signatures and ensure that proposer is leader for respective view
-	signer, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
+	verifier, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
 	if err != nil {
 		return newInvalidBlockError(block, fmt.Sprintf("invalid proposer for block %s: %s", blockID, err.Error()))
 	}
-	// check the signer is the leader for that block
+	// check the verifier is the leader for that block
 	leader := v.viewState.LeaderForView(proposal.Block.View)
-	if leader.ID() != signer.ID() {
-		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%s), expected leader: (%s)", signer.ID(), leader.ID()))
+	if leader.ID() != verifier.ID() {
+		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%s), expected leader: (%s)", verifier.ID(), leader.ID()))
 	}
 
 	// check proposal's parent
@@ -127,7 +106,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	return v.ValidateQC(qc, parent)
 }
 
-// ValidateVote validates the vote and returns the signer identity who signed the vote
+// ValidateVote validates the vote and returns the verifier identity who signed the vote
 // vote - the vote to be validated
 // block - the voting block. Assuming the block has been validated.
 func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Identity, error) {
@@ -141,27 +120,18 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	}
 
 	// get voter's Identity (will error if voter is not a staked consensus participant at block)
-	voter, err := v.viewState.IdentityForConsensusParticipant(block.BlockID, vote.Signature.SignerID)
+	voter, err := v.viewState.IdentityForConsensusParticipant(block.BlockID, vote.SignerID)
 	if err != nil {
 		return nil, newInvalidVoteError(vote, fmt.Sprintf("invalid voter identity: %s", err.Error()))
 	}
 
 	// check staking signature
-	valid, err := v.sigVerifier.VerifyStakingSig(vote.Signature.StakingSignature, block, voter.StakingPubKey)
+	valid, err := v.verifier.VerifyVote(vote)
 	if err != nil {
 		return nil, fmt.Errorf("cannot verify signature for vote (%s): %w", vote.ID(), err)
 	}
 	if !valid {
 		return nil, newInvalidVoteError(vote, "invalid staking signature")
-	}
-
-	// check random beacon signature
-	valid, err = v.sigVerifier.VerifyRandomBeaconSig(vote.Signature.RandomBeaconSignature, block, voter.RandomBeaconPubKey)
-	if err != nil {
-		return nil, fmt.Errorf("cannot verify vote %s 's random beacon signature: %w", vote.ID(), err)
-	}
-	if !valid {
-		return nil, newInvalidVoteError(vote, "invalid random beacon signature")
 	}
 
 	return voter, nil
