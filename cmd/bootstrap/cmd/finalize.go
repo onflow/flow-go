@@ -11,9 +11,12 @@ import (
 )
 
 var (
-	flagConfig             string
-	flagPartnerNodeInfoDir string
-	flagPartnerStakes      string
+	flagConfig                            string
+	flagCollectionClusters                uint16
+	flagGeneratedCollectorAddressTemplate string
+	flagGeneratedCollectorStake           uint64
+	flagPartnerNodeInfoDir                string
+	flagPartnerStakes                     string
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -25,12 +28,15 @@ var finalizeCmd = &cobra.Command{
 	Long: `Finalize the bootstrapping process, which includes generating of internal networking and staking keys,
 running the DKG for generating the random beacon keys, generating genesis execution state, seal, block and QC.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Info().Msg("✨ generating private networking and staking keys")
-		internalNodesPub, internalNodesPriv := genNetworkAndStakingKeys()
+		log.Info().Msg("✨ collecting partner network and staking keys")
+		partnerNodes := assemblePartnerNodes()
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ generating internal private networking and staking keys")
+		internalNodesPub, internalNodesPriv := genNetworkAndStakingKeys(partnerNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ assembling network and staking keys")
-		partnerNodes := assemblePartnerNodes()
 		stakingNodes := mergeNodeInfos(internalNodesPub, partnerNodes)
 		writeJSON(FilenameNodeInfosPub, stakingNodes)
 		log.Info().Msg("")
@@ -47,9 +53,21 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgDataPub)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis seal and genesis block")
+		log.Info().Msg("✨ constructing genesis QC")
 		constructGenesisQC(&block, filterConsensusNodes(stakingNodes), filterConsensusNodesPriv(internalNodesPriv),
 			dkgDataPriv)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ computing collector clusters")
+		clusters := computeCollectorClusters(stakingNodes)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ constructing genesis blocks for collector clusters")
+		clusterBlocks := constructGenesisBlocksForCollectorClusters(clusters)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ constructing genesis QCs for collector clusters")
+		constructGenesisQCsForCollectorClusters(clusters, internalNodesPriv, block, clusterBlocks)
 		log.Info().Msg("")
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
@@ -59,14 +77,21 @@ running the DKG for generating the random beacon keys, generating genesis execut
 func init() {
 	rootCmd.AddCommand(finalizeCmd)
 
-	finalizeCmd.Flags().StringVarP(&flagConfig, "config", "c", "",
+	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
 	_ = finalizeCmd.MarkFlagRequired("config")
-	finalizeCmd.Flags().StringVarP(&flagPartnerNodeInfoDir, "partner-dir", "p", "", fmt.Sprintf("path to directory "+
+	finalizeCmd.Flags().Uint16Var(&flagCollectionClusters, "collection-clusters", 2,
+		"number of collection clusters")
+	finalizeCmd.Flags().StringVar(&flagGeneratedCollectorAddressTemplate, "generated-collector-address-template",
+		"collector-%v.example.com", "address template for collector nodes that will be generated (%v "+
+			"will be replaced by an index)")
+	finalizeCmd.Flags().Uint64Var(&flagGeneratedCollectorStake, "generated-collector-stake", 100,
+		"stake for collector nodes that will be generated")
+	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
 		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
 		"NetworkPubKey, StakingPubKey)", FilenamePartnerNodeInfoSuffix))
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
-	finalizeCmd.Flags().StringVarP(&flagPartnerStakes, "partner-stakes", "s", "", "path to a JSON file containing "+
+	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
 }

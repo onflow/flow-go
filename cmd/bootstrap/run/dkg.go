@@ -152,7 +152,7 @@ func dkgRunChan(proc *LocalDKGProcessor, sync *sync.WaitGroup, phase int) {
 				log.Fatal().Err(err).Msg("failed to receive DKG mst")
 			}
 		// if timeout, stop and finalize
-		case <-time.After(200 * time.Millisecond):
+		case <-time.After(1 * time.Second):
 			switch phase {
 			case 0:
 				log.Debug().Msgf("%d shares phase ended", proc.current)

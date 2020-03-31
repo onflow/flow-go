@@ -51,7 +51,6 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 		}
 
 		// retrieve the block by block ID
-		var block flow.Block
 		err = procedure.RetrieveBlock(blockID, &block)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
