@@ -49,7 +49,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(chModels.CFMissingRegisterTouch)
+	_, ok := chFaults.(*chModels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
 
@@ -62,7 +62,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(chModels.CFMissingRegisterTouch)
+	_, ok := chFaults.(*chModels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
 
@@ -72,7 +72,7 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(chModels.CFNonMatchingFinalState)
+	_, ok := chFaults.(*chModels.CFNonMatchingFinalState)
 	assert.True(s.T(), ok)
 }
 
