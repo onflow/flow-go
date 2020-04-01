@@ -159,25 +159,11 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 }
 
 // TestHandleBlock passes a block to ingest engine and evaluates internal path
+// as ingest engine only accepts a block through consensus follower, it should return an error
 func (suite *TestSuite) TestHandleBlock() {
 	eng := suite.TestNewEngine()
-
-	// expects that the block be added to the mempool and block storage
-	suite.blockStorage.On("Store", suite.block).Return(nil).Once()
-
-	// expects that checkPendingChunks is executed checking for pending and authenticated receipts
-	// pendingReceipts iteration on All happens twice one at handlingBlocks and one at checkPendingChunks
-
-	// receipt should go to the pending receipts mempool
-	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}, nil).Twice()
-	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
-	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
-	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil).Once()
-
 	err := eng.Process(unittest.IdentifierFixture(), suite.block)
-	suite.Assert().Nil(err)
-
-	suite.blockStorage.AssertExpectations(suite.T())
+	assert.Equal(suite.T(), err, ingest.ErrInvType)
 }
 
 // TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block

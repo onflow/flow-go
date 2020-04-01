@@ -173,7 +173,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *messages.ChunkDataPackResponse:
 		return e.handleChunkDataPack(originID, &resource.Data)
 	default:
-		return errors.Errorf("invalid event type (%T)", event)
+		return ErrInvType
 	}
 }
 
