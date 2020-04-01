@@ -45,6 +45,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 
 		f, err := ledger.NewTrieStorage(db)
 		require.NoError(t, err)
+
 		startState, err := f.UpdateRegisters(ids, values)
 		require.NoError(t, err)
 		regTs, err := f.GetRegisterTouches(ids, startState)
@@ -74,6 +75,11 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 			RegisterTouches: regTs,
 		}
 		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
+
+		// safely closes database
+		err1, err2 := db.SafeClose()
+		require.NoError(t, err1)
+		require.NoError(t, err2)
 	}
 
 	payload := flow.Payload{
