@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dapperlabs/cadence"
+	"github.com/dapperlabs/cadence/encoding"
 	"github.com/dapperlabs/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -122,4 +124,40 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 		Value:    value,
 		Logs:     ctx.Logs(),
 	}, nil
+}
+
+// ConvertEvents creates flow.Events from runtime.events
+func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) {
+
+	flowEvents := make([]flow.Event, len(tr.Events))
+
+	for i, event := range tr.Events {
+		fields := make([]cadence.Value, len(event.Fields))
+
+		for j, field := range event.Fields {
+			convertedField, err := cadence.ConvertValue(field)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert event field: %w", err)
+			}
+
+			fields[j] = convertedField
+		}
+
+		eventValue := cadence.NewComposite(fields)
+
+		payload, err := encoding.Encode(eventValue)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode event: %w", err)
+		}
+
+		flowEvents[i] = flow.Event{
+			Type:             flow.EventType(event.Type.ID()),
+			TransactionID:    tr.TransactionID,
+			TransactionIndex: txIndex,
+			EventIndex:       uint32(i),
+			Payload:          payload,
+		}
+	}
+
+	return flowEvents, nil
 }
