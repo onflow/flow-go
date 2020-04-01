@@ -47,7 +47,7 @@ func (s *SingleVerifier) VerifyProposal(proposal *model.Proposal) (bool, error) 
 	}
 
 	// create the message we verify against and check signature
-	msg := messageFromParams(proposal.Block.View, proposal.Block.BlockID)
+	msg := makeVoteMessage(proposal.Block.View, proposal.Block.BlockID)
 	valid, err := s.verifier.Verify(msg, proposal.SigData, proposer.StakingPubKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)
@@ -72,7 +72,7 @@ func (s *SingleVerifier) VerifyVote(vote *model.Vote) (bool, error) {
 	}
 
 	// create the message we verify against and check signature
-	msg := messageFromParams(vote.View, vote.BlockID)
+	msg := makeVoteMessage(vote.View, vote.BlockID)
 	valid, err := s.verifier.Verify(msg, vote.SigData, voter.StakingPubKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)
@@ -98,7 +98,7 @@ func (s *SingleVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
 
 	// create the message we verify against and check signature
 	signers = signers.Order(order.ByReferenceOrder(qc.SignerIDs))
-	msg := messageFromParams(qc.View, qc.BlockID)
+	msg := makeVoteMessage(qc.View, qc.BlockID)
 	valid, err := s.verifier.VerifyMany(msg, qc.SigData, signers.StakingKeys())
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)

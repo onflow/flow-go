@@ -49,7 +49,7 @@ func NewCombinedVerifier(state protocol.State, dkg dkg.State, staking module.Agg
 func (c *CombinedVerifier) VerifyVote(vote *model.Vote) (bool, error) {
 
 	// verify the signature data
-	msg := messageFromParams(vote.View, vote.BlockID)
+	msg := makeVoteMessage(vote.View, vote.BlockID)
 	valid, err := c.verifySigData(vote.BlockID, msg, vote.SigData, vote.SignerID)
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)
@@ -62,7 +62,7 @@ func (c *CombinedVerifier) VerifyVote(vote *model.Vote) (bool, error) {
 func (c *CombinedVerifier) VerifyProposal(proposal *model.Proposal) (bool, error) {
 
 	// verify the signature data
-	msg := messageFromParams(proposal.Block.View, proposal.Block.BlockID)
+	msg := makeVoteMessage(proposal.Block.View, proposal.Block.BlockID)
 	valid, err := c.verifySigData(proposal.Block.BlockID, msg, proposal.SigData, proposal.Block.ProposerID)
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)
@@ -109,7 +109,7 @@ func (c *CombinedVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
 
 	// verify the aggregated staking signature first
 	signers = signers.Order(order.ByReferenceOrder(qc.SignerIDs))
-	msg := messageFromParams(qc.View, qc.BlockID)
+	msg := makeVoteMessage(qc.View, qc.BlockID)
 	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
 	if err != nil {
 		return false, fmt.Errorf("could not verify staking signature: %w", err)

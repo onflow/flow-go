@@ -42,7 +42,7 @@ func (s *SingleSigner) CreateProposal(block *model.Block) (*model.Proposal, erro
 	}
 
 	// create the message to be signed and generate signature
-	msg := messageFromParams(block.View, block.BlockID)
+	msg := makeVoteMessage(block.View, block.BlockID)
 	sig, err := s.signer.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
@@ -61,7 +61,7 @@ func (s *SingleSigner) CreateProposal(block *model.Block) (*model.Proposal, erro
 func (s *SingleSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 
 	// create the message to be signed and generate signature
-	msg := messageFromParams(block.View, block.BlockID)
+	msg := makeVoteMessage(block.View, block.BlockID)
 	sig, err := s.signer.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
