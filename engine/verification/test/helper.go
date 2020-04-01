@@ -80,6 +80,12 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		err1, err2 := db.SafeClose()
 		require.NoError(t, err1)
 		require.NoError(t, err2)
+
+		// closing historical states of tries
+		err1, err2 = f.CloseStorage()
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+
 	}
 
 	payload := flow.Payload{
