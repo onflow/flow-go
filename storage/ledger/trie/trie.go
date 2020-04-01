@@ -943,11 +943,6 @@ func (s *SMT) GetHeight() int {
 	return s.height
 }
 
-//// GetRoot returns the Root of the SMT
-//func (s *SMT) GetRoot() *node {
-//	return s.root
-//}
-
 func (s *SMT) insertIntoKeys(database databases.DAL, insert []byte, keys [][]byte, values [][]byte) ([][]byte, [][]byte, error) {
 	// Initialize new slices, with capacity accounting for the inserted value
 	newKeys := make([][]byte, 0, len(keys)+1)
