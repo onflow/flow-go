@@ -73,7 +73,7 @@ func createClusterSigners(identities flow.IdentityList, nodeInfosPriv []NodeInfo
 			continue
 		}
 		clusterSigners = append(clusterSigners, run.ClusterSigner{
-			Identity:       *identity,
+			Identity:       identity,
 			StakingPrivKey: pk.StakingPrivKey,
 		})
 	}

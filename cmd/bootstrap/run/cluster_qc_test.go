@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/test"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -22,7 +22,7 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 	}
 	for _, signer := range signers {
 		id := signer.Identity
-		block.Identities = append(block.Identities, &id)
+		block.Identities = append(block.Identities, id)
 	}
 	block.ParentID = flow.ZeroID
 	block.View = 3
@@ -46,16 +46,11 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 }
 
 func createClusterSigners(t *testing.T, n int) []ClusterSigner {
-	_, ids := test.NewProtocolState(t, n)
-
-	stakingKeys, err := test.AddStakingPrivateKeys(ids)
-	require.NoError(t, err)
-
+	participants := unittest.IdentityListFixture(n)
 	signers := make([]ClusterSigner, n)
-
-	for i, id := range ids {
-		signers[i].Identity = *id
-		signers[i].StakingPrivKey = stakingKeys[i]
+	for i, participant := range participants {
+		signers[i].Identity = participant
+		signers[i].StakingPrivKey = helper.MakeBLSKey(t)
 	}
 
 	return signers
