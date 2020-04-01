@@ -102,7 +102,6 @@ func (s *LevelDB) UpdateKVDB(keys [][]byte, values [][]byte) error {
 	kvBatcher := new(leveldb.Batch)
 	for i := 0; i < len(keys); i++ {
 		kvBatcher.Put(keys[i], values[i])
-		fmt.Printf("KPUT %x = %x\n", keys[i], values[i])
 	}
 
 	err := s.kvdb.Write(kvBatcher, nil)

@@ -19,6 +19,10 @@ func TestRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to initialize SMT instance: %s", err)
 	}
+	defer func() {
+		trie.SafeClose()
+		os.RemoveAll(dir)
+	}()
 
 	key1 := make([]byte, 1)
 	value1 := []byte{'a'}
@@ -39,6 +43,7 @@ func TestRestart(t *testing.T) {
 	require.NoError(t, err)
 
 	rootB, err := trie.Update(keysA, valuesB, rootA)
+	require.NoError(t, err)
 
 	// check values
 	readEmpty, _, err := trie.Read(keysA, true, rootEmpty)
@@ -58,8 +63,6 @@ func TestRestart(t *testing.T) {
 
 	assert.Len(t, readB, 1)
 	assert.Equal(t, value2, readB[0])
-
-	//fmt.Println(trie.GetRoot().FmtStr("", ""))
 
 	// close and start SMT with the same DB again
 	trie.SafeClose()
@@ -87,46 +90,51 @@ func TestRestart(t *testing.T) {
 	assert.Len(t, readB, 1)
 	assert.Equal(t, value2, readB[0])
 
-	trie.SafeClose()
-	os.RemoveAll(dir)
 }
-//func TestRestartMultipleKeys(t *testing.T) {
-//
-//	dir, err := unittest.TempDBDir()
-//	require.Nil(t, err)
-//
-//	db := unittest.LevelDBInDir(t, dir)
-//
-//	trie, err := NewSMT(db, 9, 10, 100, 5)
-//	if err != nil {
-//		t.Fatalf("failed to initialize SMT instance: %s", err)
-//	}
-//
-//	trie.database.NewBatch()
-//
-//	numKeys := 10
-//	keys := make([][]byte, numKeys)
-//	values := make([][]byte, numKeys)
-//	valuesStart := byte('a')
-//
-//	for i := 0; i < numKeys; i++ {
-//		keys[i] = make([]byte, 1)
-//		keys[i][0] = byte(i)
-//
-//		values[i] = []byte{valuesStart}
-//		valuesStart++
-//	}
-//
-//	//rootNode := trie.GetRoot().value
-//
-//	err = trie.Update(keys, values)
-//	require.NoError(t, err)
-//
-//
-//	fmt.Println(trie.GetRoot().FmtStr("", ""))
-//
-//	closeAllDBs(t, trie)
-//}
+
+func TestRestartMultipleKeys(t *testing.T) {
+
+	dir := unittest.TempDBDir(t)
+
+	trie, err := NewSMT(dir, 9, 10, 100, 5)
+	if err != nil {
+		t.Fatalf("failed to initialize SMT instance: %s", err)
+	}
+	defer func() {
+		trie.SafeClose()
+		os.RemoveAll(dir)
+	}()
+
+	rootEmpty := GetDefaultHashForHeight(9 - 1)
+
+	numKeys := 10
+	keys := make([][]byte, numKeys)
+	values := make([][]byte, numKeys)
+	valuesStart := byte('a')
+
+	for i := 0; i < numKeys; i++ {
+		keys[i] = make([]byte, 1)
+		keys[i][0] = byte(i)
+
+		values[i] = []byte{valuesStart}
+		valuesStart++
+	}
+
+	newRoot, err := trie.Update(keys, values, rootEmpty)
+	require.NoError(t, err)
+
+	// close and start SMT with the same DB again
+	trie.SafeClose()
+
+	trie, err = NewSMT(dir, 9, 10, 100, 5)
+	if err != nil {
+		t.Fatalf("failed to initialize SMT instance for second time: %s", err)
+	}
+
+	readValues, _, err := trie.Read(keys, false, newRoot)
+	require.NoError(t, err)
+	assert.Equal(t, values, readValues)
+}
 
 //func closeAllDBs(t *testing.T, smt *SMT) {
 //	err1, err2 := smt.database.SafeClose()

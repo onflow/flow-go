@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -23,8 +24,8 @@ var childHashLen = hashLength + 1
 var bothChildrenHashLen = 2 * 32
 
 // as long as those are not 32 bytes there is no collision risk
-var metadataKeyPrevious = []byte("metadata_previous")     //hash of previous state
-var metadataDeltaNumber = []byte("metadata_delta_number") //how many deltas since last full snapshot
+var metadataKeyPrevious = []byte("metadata_previous") //hash of previous state
+var metadataHeight = []byte("metadata_height")        //how many deltas since last full snapshot
 
 type Root []byte
 
@@ -54,7 +55,11 @@ type tree struct {
 	previous       Root
 	cachedBranches map[string]*proofHolder // Map of string representations of keys to proofs
 	forest         *forest
-	numDeltas      uint32 //how far is this DB from a snapshot (0 == is snapshot)
+	height         uint64 //similar to block height, useful for snapshotting
+	// FIFO queue of ordered historical State Roots
+	// In-memory only, used for tracking snapshots. Can be reconstructed from disk if needed
+	// Frequent eviction of a tree/restarting might mean database not gets pruned as frequent
+	historicalStateRoots deque.Deque
 }
 
 func (t *tree) Root() (*node, error) {
@@ -128,7 +133,7 @@ func LoadNode(value Root, height int, db databases.DAL) (*node, error) {
 
 func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
 
-	deltaNumber, err := db.GetTrieDB(metadataDeltaNumber)
+	deltaNumber, err := db.GetTrieDB(metadataHeight)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get delta number: %w", err)
 	}
@@ -143,17 +148,16 @@ func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
 		root:           root,
 		database:       db,
 		previous:       previousRoot,
-		numDeltas:      binary.BigEndian.Uint32(deltaNumber),
+		height:         binary.BigEndian.Uint64(deltaNumber),
 		cachedBranches: make(map[string]*proofHolder),
 		forest:         f,
 	}, nil
 }
 
 type forest struct {
-	dbDir     string
-	cache     *lru.Cache
-	fullCache *lru.Cache
-	height    int
+	dbDir  string
+	cache  *lru.Cache
+	height int
 }
 
 func NewForest(dbDir string, maxSize int, maxFullSize int, height int) (*forest, error) {
@@ -168,31 +172,31 @@ func NewForest(dbDir string, maxSize int, maxFullSize int, height int) (*forest,
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
-	fullCache, err := lru.NewWithEvict(maxFullSize, evict)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create forest full cache: %w", err)
-	}
+	//fullCache, err := lru.NewWithEvict(maxFullSize, evict)
+	//if err != nil {
+	//	return nil, fmt.Errorf("cannot create forest full cache: %w", err)
+	//}
 	return &forest{
-		dbDir:     dbDir,
-		cache:     cache,
-		fullCache: fullCache,
-		height:    height,
+		dbDir: dbDir,
+		cache: cache,
+		//fullCache: fullCache,
+		height: height,
 	}, nil
 }
 
 func (f *forest) Add(tree *tree) {
-	if tree.numDeltas == 0 {
-		f.fullCache.Add(tree.root.String(), tree)
-		return
-	}
+	//if tree.numDeltas == 0 {
+	//	f.fullCache.Add(tree.root.String(), tree)
+	//	return
+	//}
 	f.cache.Add(tree.root.String(), tree)
 }
 
 func (f *forest) Get(root Root) (*tree, error) {
 
-	if foundFullTree, ok := f.fullCache.Get(root.String()); ok {
-		return foundFullTree.(*tree), nil
-	}
+	//if foundFullTree, ok := f.fullCache.Get(root.String()); ok {
+	//	return foundFullTree.(*tree), nil
+	//}
 
 	if foundTree, ok := f.cache.Get(root.String()); ok {
 		return foundTree.(*tree), nil
@@ -231,7 +235,7 @@ type SMT struct {
 	//cachedBranches       map[string]*proofHolder  // Map of string representations of keys to proofs
 	//historicalStateRoots deque.Deque              // FIFO queue of historical State Roots in historicalStates map
 	numHistoricalStates int    // Number of states to keep in historicalStates
-	snapshotInterval    uint32 // When removing full states from historical states interval between full states
+	snapshotInterval    uint64 // When removing full states from historical states interval between full states
 	numFullStates       int    // Number of Full States to keep in historicalStates
 	//lruCache             *lru.Cache               // LRU cache of stringified keys to proofs
 }
@@ -340,7 +344,7 @@ func (n node) FmtStr(prefix string, path string) string {
 func NewSMT(
 	dbDir string,
 	height int,
-	interval uint32,
+	interval uint64,
 	numHistoricalStates int,
 	numFullStates int,
 ) (*SMT, error) {
@@ -390,7 +394,7 @@ func NewSMT(
 		root:           emptyHash,
 		database:       emptyDB,
 		previous:       nil,
-		numDeltas:      0,
+		height:         0,
 		cachedBranches: make(map[string]*proofHolder),
 		forest:         forest,
 	}
@@ -450,9 +454,9 @@ func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool,
 	t.cachedBranches[k] = holder
 }
 
-func (t *tree) isSnapshot() bool {
-	return t.numDeltas == 0
-}
+//func (t *tree) isSnapshot() bool {
+//	return t.height == 0
+//}
 
 // Read takes the keys given and return the values from the database
 // If the trusted flag is true, it is just a read from the database
@@ -473,7 +477,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 	}
 
 	if !trusted {
-		if tree.isSnapshot() {
+		if s.IsSnapshot(tree) {
 
 			//if bytes.Equal(root, currRoot) {
 			for i, key := range keys {
@@ -530,7 +534,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 				if err == nil {
 					break
 				}
-				if tree.isSnapshot() {
+				if s.IsSnapshot(tree) {
 					break
 				}
 				localRoot = tree.previous
@@ -682,7 +686,7 @@ func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) 
 				if err == nil {
 					break
 				}
-				if tree.isSnapshot() {
+				if s.IsSnapshot(tree) {
 					break
 				}
 				localRoot = tree.previous
@@ -829,31 +833,46 @@ func VerifyNonInclusionProof(key []byte, value []byte, flag []byte, proof [][]by
 }
 
 func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher databases.Batcher) error {
-	// Make a copy of the historical state and link it to the old state rootNode
-	// get string representation of the current rootNode of the trie
 
 	err := oldTree.database.CopyTo(newTree.database)
 	if err != nil {
 		return fmt.Errorf("error while copying DB: %s", err)
 	}
 
-	if newTree.numDeltas < s.snapshotInterval {
-		err := newTree.database.PruneDB(oldTree.database)
-		if err != nil {
-			return fmt.Errorf("error while pruning DB: %s", err)
+	numStates := newTree.historicalStateRoots.Len()
+	switch {
+	case numStates > s.numHistoricalStates:
+		return errors.New("We have more Historical States stored than the Maximum Allowed Amount!")
+
+	case numStates >= int(s.snapshotInterval):
+		if newTree.height%s.snapshotInterval != 0 {
+			stateToPrune := newTree.historicalStateRoots.At(int(s.snapshotInterval)).(Root)
+			referenceState := newTree.historicalStateRoots.At(int(s.snapshotInterval - 1)).(Root)
+			dbToPrune, err := s.forest.Get(stateToPrune)
+			if err != nil {
+				return fmt.Errorf("cannot get tree referenced in history: %w", err)
+			}
+			dbReference, err := s.forest.Get(referenceState)
+			if err != nil {
+				return fmt.Errorf("cannot get tree referenced in history: %w", err)
+			}
+
+			err = dbToPrune.database.PruneDB(dbReference.database)
+			if err != nil {
+				return err
+			}
+			_ = newTree.historicalStateRoots.PopFront()
+
 		}
-	} else {
-		newTree.numDeltas = 0
 	}
 
-	delta := make([]byte, 4)
-	binary.BigEndian.PutUint32(delta, newTree.numDeltas)
+	height := make([]byte, 8)
+	binary.BigEndian.PutUint64(height, newTree.height)
 
 	batcher.Put(metadataKeyPrevious, oldTree.root)
-	batcher.Put(metadataDeltaNumber, delta)
+	batcher.Put(metadataHeight, height)
 
 	return nil
-
 }
 
 // Update takes a sorted list of keys and associated values and inserts
@@ -867,8 +886,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 
 	batcher := t.database.NewBatcher()
 
-	fmt.Printf("before update - %x\n", root)
-
 	treeRoot, err := t.Root()
 	if err != nil {
 		return nil, fmt.Errorf("cannot load tree root: %w", err)
@@ -877,21 +894,28 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("new rootNode      - %x\n", newRootNode.value)
 
 	db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create new DB: %w", err)
 	}
 
+	var newHistoricalStatRoots deque.Deque
+
+	for i := 0; i < t.historicalStateRoots.Len(); i++ {
+		newHistoricalStatRoots.PushBack(t.historicalStateRoots.At(i))
+	}
+	newHistoricalStatRoots.PushBack(root)
+
 	newTree := &tree{
-		root:           newRootNode.value,
-		rootNode:       newRootNode,
-		database:       db,
-		previous:       root,
-		cachedBranches: make(map[string]*proofHolder),
-		forest:         s.forest,
-		numDeltas:      t.numDeltas + 1,
+		root:                 newRootNode.value,
+		rootNode:             newRootNode,
+		database:             db,
+		previous:             root,
+		cachedBranches:       make(map[string]*proofHolder),
+		forest:               s.forest,
+		height:               t.height + 1,
+		historicalStateRoots: newHistoricalStatRoots,
 	}
 
 	err = s.updateHistoricalStates(t, newTree, batcher)
@@ -1121,7 +1145,11 @@ func (s *SMT) SafeClose() {
 
 	// Purge calls eviction method, which closes the DB
 	s.forest.cache.Purge()
-	s.forest.fullCache.Purge()
+	//s.forest.fullCache.Purge()
+}
+
+func (s *SMT) IsSnapshot(t *tree) bool {
+	return t.height%s.snapshotInterval == 0
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.

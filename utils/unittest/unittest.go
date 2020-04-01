@@ -44,7 +44,7 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 }
 
 func TempDBDir(t *testing.T) string {
-	dir, err := ioutil.TempDir(".", "flow-test-db") //TODO go back to real tmp dir
+	dir, err := ioutil.TempDir("", "flow-test-db")
 	require.NoError(t, err)
 	return dir
 }

@@ -1935,7 +1935,7 @@ func TestTrustedRead_Pruned(t *testing.T) {
 
 func TestKVDB_Pruned(t *testing.T) {
 
-	withSMT(t, 8, 6, 6, 2, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 8, 2, 6, 6, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -2585,7 +2585,7 @@ func TestProofEncoderDecoder(t *testing.T) {
 func withSMT(
 	t *testing.T,
 	height int,
-	interval uint32,
+	interval uint64,
 	numHistoricalStates int,
 	numFullStates int, f func(t *testing.T, smt *SMT, emptyTree *tree)) {
 
