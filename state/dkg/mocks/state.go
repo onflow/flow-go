@@ -56,8 +56,8 @@ func (_m *State) GroupSize() (uint, error) {
 	return r0, r1
 }
 
-// ShareIndex provides a mock function with given fields: nodeID
-func (_m *State) ShareIndex(nodeID flow.Identifier) (uint, error) {
+// ParticipantIndex provides a mock function with given fields: nodeID
+func (_m *State) ParticipantIndex(nodeID flow.Identifier) (uint, error) {
 	ret := _m.Called(nodeID)
 
 	var r0 uint
@@ -77,8 +77,8 @@ func (_m *State) ShareIndex(nodeID flow.Identifier) (uint, error) {
 	return r0, r1
 }
 
-// ShareKey provides a mock function with given fields: nodeID
-func (_m *State) ShareKey(nodeID flow.Identifier) (crypto.PublicKey, error) {
+// ParticipantKey provides a mock function with given fields: nodeID
+func (_m *State) ParticipantKey(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	ret := _m.Called(nodeID)
 
 	var r0 crypto.PublicKey

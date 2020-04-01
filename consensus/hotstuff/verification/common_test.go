@@ -86,8 +86,8 @@ func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled
 		dkg.On("GroupSize").Return(uint(len(beaconKeys)), nil)
 		dkg.On("GroupKey").Return(dkgKey, nil)
 		for i, identity := range identities {
-			dkg.On("ShareIndex", identity.NodeID).Return(uint(i), nil)
-			dkg.On("ShareKey", identity.NodeID).Return(beaconKeys[i].PublicKey(), nil)
+			dkg.On("ParticipantIndex", identity.NodeID).Return(uint(i), nil)
+			dkg.On("ParticipantKey", identity.NodeID).Return(beaconKeys[i].PublicKey(), nil)
 		}
 	}
 

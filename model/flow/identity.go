@@ -157,18 +157,13 @@ IDLoop:
 }
 
 // Order will sort the list using the given sort function.
-func (il IdentityList) Order(orders ...IdentityOrder) IdentityList {
+func (il IdentityList) Order(less IdentityOrder) IdentityList {
 	dup := make(IdentityList, 0, len(il))
 	for _, identity := range il {
 		dup = append(dup, identity)
 	}
 	sort.Slice(dup, func(i int, j int) bool {
-		for _, order := range orders {
-			if order(dup[i], dup[j]) {
-				return true
-			}
-		}
-		return false
+		return less(dup[i], dup[j])
 	})
 	return dup
 }

@@ -125,7 +125,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate
 		beaconShare := splitSigs[1]
 
 		// get the dkg index from the dkg state
-		dkgIndex, err := c.dkg.ShareIndex(vote.SignerID)
+		dkgIndex, err := c.dkg.ParticipantIndex(vote.SignerID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get dkg index (signer: %x): %w", vote.SignerID, err)
 		}

@@ -32,8 +32,8 @@ func (s *State) GroupKey() (crypto.PublicKey, error) {
 	return s.data.GroupPubKey, nil
 }
 
-// ShareIndex returns the index of the DKG share for the given node.
-func (s *State) ShareIndex(nodeID flow.Identifier) (uint, error) {
+// ParticipantIndex returns the index of the DKG share for the given node.
+func (s *State) ParticipantIndex(nodeID flow.Identifier) (uint, error) {
 	participant, found := s.data.IDToParticipant[nodeID]
 	if !found {
 		return 0, fmt.Errorf("DKG participant not found (node: %x)", nodeID)
@@ -41,8 +41,8 @@ func (s *State) ShareIndex(nodeID flow.Identifier) (uint, error) {
 	return participant.Index, nil
 }
 
-// ShareKey returns the key share for the given node.
-func (s *State) ShareKey(nodeID flow.Identifier) (crypto.PublicKey, error) {
+// ParticipantKey returns the key share for the given node.
+func (s *State) ParticipantKey(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	participant, found := s.data.IDToParticipant[nodeID]
 	if !found {
 		return nil, fmt.Errorf("DKG participant not found (node: %x)", nodeID)

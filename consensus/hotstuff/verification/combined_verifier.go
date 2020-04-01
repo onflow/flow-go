@@ -154,7 +154,7 @@ func (c *CombinedVerifier) verifySigData(blockID flow.Identifier, msg []byte, co
 	beaconShare := splitSigs[1]
 
 	// get the signer dkg key share
-	beaconPubKey, err := c.dkg.ShareKey(signerID)
+	beaconPubKey, err := c.dkg.ParticipantKey(signerID)
 	if err != nil {
 		return false, fmt.Errorf("could not get signer beacon share: %w", err)
 	}
