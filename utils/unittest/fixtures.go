@@ -500,3 +500,14 @@ func SeedFixtures(m int, n int) [][]byte {
 	}
 	return seeds
 }
+
+// EventFixture returns an event
+func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier) flow.Event {
+	return flow.Event{
+		Type:             eType,
+		TransactionIndex: transactionIndex,
+		EventIndex:       eventIndex,
+		Payload:          []byte{},
+		TransactionID:    txID,
+	}
+}

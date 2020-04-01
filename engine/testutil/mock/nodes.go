@@ -34,6 +34,11 @@ type GenericNode struct {
 	Net    *stub.Network
 }
 
+// Closes closes the badger database of the node
+func (g *GenericNode) CloseDB() error {
+	return g.DB.Close()
+}
+
 // CollectionNode implements an in-process collection node for tests.
 type CollectionNode struct {
 	GenericNode

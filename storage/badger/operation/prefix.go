@@ -31,6 +31,7 @@ const (
 	// codeApproval      = 26
 	codeChunkHeader   = 27
 	codeChunkDataPack = 28
+	codeEvent         = 29
 
 	codeIndexIdentity                = 100
 	codeIndexGuarantee               = 101

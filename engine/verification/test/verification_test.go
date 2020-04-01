@@ -214,6 +214,12 @@ func TestHappyPath(t *testing.T) {
 	}
 	// TODO adding complementary tests for claning other resources like the execution receipt
 	// https://github.com/dapperlabs/flow-go/issues/2750
+
+	// closes nodes database
+	assert.NoError(t, verNode.CloseDB())
+	assert.NoError(t, exeNode.CloseDB())
+	assert.NoError(t, colNode.CloseDB())
+	assert.NoError(t, conNode.CloseDB())
 }
 
 // isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
