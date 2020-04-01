@@ -477,10 +477,9 @@ func loadPrivateNetworkKey(id flow.Identifier) (crypto.PrivateKey, error) {
 	// todo: https://github.com/dapperlabs/flow-go/issues/2693
 	// generates a seed solely for sake of integration tests
 	// seed should be replaced by a secure functionality as part of the mentioned issue
-	seed := make([]byte, 48)
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_SECp256k1)
 	copy(seed, id[:])
-	// currently we only support ECDSA 256 keys (TODO: issue #2740)
-	nk, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
+	nk, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, seed)
 	return nk, err
 }
 
