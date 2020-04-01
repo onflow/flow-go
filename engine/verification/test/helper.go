@@ -76,13 +76,9 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		}
 		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
 
-		// safely closes database
-		err1, err2 := db.SafeClose()
-		require.NoError(t, err1)
-		require.NoError(t, err2)
-
 		// closing historical states of tries
-		err1, err2 = f.CloseStorage()
+		// also closes level db storage internally
+		err1, err2 := f.CloseStorage()
 		require.NoError(t, err1)
 		require.NoError(t, err2)
 
