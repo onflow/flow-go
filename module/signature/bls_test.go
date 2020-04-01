@@ -28,7 +28,7 @@ func createBLSB(b *testing.B) *BLS {
 }
 
 func createBLS() (*BLS, error) {
-	seed := make([]byte, 48)
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLS_BLS12381)
 	n, err := rand.Read(seed)
 	if err != nil {
 		return nil, err
@@ -36,12 +36,11 @@ func createBLS() (*BLS, error) {
 	if n < len(seed) {
 		return nil, fmt.Errorf("insufficient random bytes")
 	}
-	hasher := crypto.NewBLS_KMAC("only_testing")
 	priv, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
 	if err != nil {
 		return nil, err
 	}
-	return NewBLS(hasher, priv), nil
+	return NewBLS("only_testing", priv), nil
 }
 
 func TestBLSSignVerify(t *testing.T) {
@@ -128,16 +127,11 @@ func BenchmarkBLSAggregation(b *testing.B) {
 	b.ResetTimer()
 
 	// create the desired number of signers
-	signers := make([]*BLS, 0, NUM_BLS_BENCH)
-	for i := 0; i < NUM_BLS_BENCH; i++ {
-		signer := createBLSB(b)
-		signers = append(signers, signer)
-	}
-
-	// generate the desired number of signatures
+	var signer *BLS
 	msg := createMSGB(b)
-	sigs := make([]crypto.Signature, 0, len(msg))
-	for _, signer := range signers {
+	sigs := make([]crypto.Signature, 0, NUM_BLS_BENCH)
+	for i := 0; i < NUM_BLS_BENCH; i++ {
+		signer = createBLSB(b)
 		sig, err := signer.Sign(msg)
 		if err != nil {
 			b.Fatal(err)
@@ -148,7 +142,7 @@ func BenchmarkBLSAggregation(b *testing.B) {
 	// start the timer and benchmark the aggregation
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		_, err := signers[0].Aggregate(sigs)
+		_, err := signer.Aggregate(sigs)
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -13,23 +13,26 @@ import (
 const NUM_DKG_TEST = 3
 const NUM_DKG_BENCH = 254
 
+// createDKGsB creates a set of DKG keys for benchmarking; as we might generate
+// many of them, we don't run a real DKG here, but instead use randomly generated
+// keys. The performance of the algorithm remains the same, even if the resulting
+// signature will not be valid for any group key we know.
 func createDKGsB(b *testing.B, n uint) []*DKG {
-	hasher := crypto.NewBLS_KMAC("only_testing")
 	signers := make([]*DKG, 0, int(n))
 	for i := 0; i < int(n); i++ {
 		bls := createBLSB(b)
-		signer := NewDKG(hasher, bls.priv)
+		signer := NewDKG("only_testing", bls.priv)
 		signers = append(signers, signer)
 	}
 	return signers
 }
 
+// createKDGsT creates a set of DKGs with real key shares and a real group key.
 func createDKGsT(t *testing.T, n uint) ([]*DKG, crypto.PublicKey) {
-	beaconKeys, groupKey, _ := unittest.RunDKGKeys(t, int(n))
-	hasher := crypto.NewBLS_KMAC("only_testing")
+	beaconKeys, groupKey, _ := unittest.RunDKG(t, int(n))
 	signers := make([]*DKG, 0, int(n))
 	for i := 0; i < int(n); i++ {
-		signer := NewDKG(hasher, beaconKeys[i])
+		signer := NewDKG("only_testing", beaconKeys[i])
 		signers = append(signers, signer)
 	}
 	return signers, groupKey

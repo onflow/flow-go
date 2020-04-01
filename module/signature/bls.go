@@ -15,9 +15,9 @@ type BLS struct {
 
 // NewBLS creates a new BLS signer and verifier, using the given hasher and the
 // provided private key for creating signatures.
-func NewBLS(hasher crypto.Hasher, priv crypto.PrivateKey) *BLS {
+func NewBLS(tag string, priv crypto.PrivateKey) *BLS {
 	b := &BLS{
-		hasher: hasher,
+		hasher: crypto.NewBLS_KMAC(tag),
 		priv:   priv,
 	}
 	return b

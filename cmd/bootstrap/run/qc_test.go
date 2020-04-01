@@ -46,7 +46,7 @@ func createSignerData(t *testing.T, n int) SignerData {
 		stakingKeys = append(stakingKeys, stakingKey)
 	}
 
-	randomBKeys, groupKey, _ := unittest.RunDKGKeys(t, n)
+	randomBKeys, groupKey, _ := unittest.RunDKG(t, n)
 
 	pubData := dkg.PublicData{
 		GroupPubKey:     groupKey,

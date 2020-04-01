@@ -82,7 +82,7 @@ func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled
 	var beaconKeys []crypto.PrivateKey
 	var dkgKey crypto.PublicKey
 	if beaconEnabled {
-		beaconKeys, dkgKey, _ = unittest.RunDKGKeys(t, len(identities))
+		beaconKeys, dkgKey, _ = unittest.RunDKG(t, len(identities))
 		dkg.On("GroupSize").Return(uint(len(beaconKeys)), nil)
 		dkg.On("GroupKey").Return(dkgKey, nil)
 		for i, identity := range identities {

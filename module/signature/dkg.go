@@ -16,9 +16,9 @@ type DKG struct {
 
 // NewDKG creates new DKG signer & verifier, using the given hasher and the
 // provided private key to generate signature shares.
-func NewDKG(hasher crypto.Hasher, priv crypto.PrivateKey) *DKG {
+func NewDKG(tag string, priv crypto.PrivateKey) *DKG {
 	d := &DKG{
-		hasher: hasher,
+		hasher: crypto.NewBLS_KMAC(tag),
 		priv:   priv,
 	}
 	return d
@@ -40,11 +40,6 @@ func (d *DKG) Verify(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bo
 // signature for the group of the given size. The indices represent the index for ech signature share
 // within the DKG algorithm.
 func (d *DKG) Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
-
-	// check that we have an index for each share
-	if len(shares) != len(indices) {
-		return nil, fmt.Errorf("mismatching number of shares and indices (shares: %d, indices: %d)", len(shares), len(indices))
-	}
 
 	// check that we have sufficient shares to reconstruct the threshold signature
 	if !crypto.EnoughShares(int(size), len(shares)) {
