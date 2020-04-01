@@ -33,7 +33,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -86,8 +86,8 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	pool, err := stdmap.NewTransactions(1000)
 	require.NoError(t, err)
 
-	collections := storage.NewCollections(node.DB)
-	transactions := storage.NewTransactions(node.DB)
+	collections := bstorage.NewCollections(node.DB)
+	transactions := bstorage.NewTransactions(node.DB)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool)
 	require.Nil(t, err)
@@ -123,7 +123,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node := GenericNode(t, hub, identity, identities)
 
-	results := storage.NewExecutionResults(node.DB)
+	results := bstorage.NewExecutionResults(node.DB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -177,13 +177,13 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity) mock.ExecutionNode {
 	node := GenericNode(t, hub, identity, identities)
 
-	blocksStorage := storage.NewBlocks(node.DB)
-	payloadsStorage := storage.NewPayloads(node.DB)
-	collectionsStorage := storage.NewCollections(node.DB)
-	commitsStorage := storage.NewCommits(node.DB)
-	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
-	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
-	executionResults := storage.NewExecutionResults(node.DB)
+	blocksStorage := bstorage.NewBlocks(node.DB)
+	payloadsStorage := bstorage.NewPayloads(node.DB)
+	collectionsStorage := bstorage.NewCollections(node.DB)
+	commitsStorage := bstorage.NewCommits(node.DB)
+	chunkHeadersStorage := bstorage.NewChunkHeaders(node.DB)
+	chunkDataPackStorage := bstorage.NewChunkDataPacks(node.DB)
+	executionResults := bstorage.NewExecutionResults(node.DB)
 
 	levelDB := unittest.TempLevelDB(t)
 
@@ -301,7 +301,7 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.BlockStorage == nil {
-		node.BlockStorage = storage.NewBlocks(node.DB)
+		node.BlockStorage = bstorage.NewBlocks(node.DB)
 	}
 
 	if node.VerifierEngine == nil {

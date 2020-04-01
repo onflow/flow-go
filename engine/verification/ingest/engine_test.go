@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
@@ -826,7 +827,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// to the verifier exactly once.
 	verifierEng, verifierEngWG := setupMockVerifierEng(t, vChunks)
 	assigner := NewMockAssigner(verID.NodeID)
-	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, testutil.WithVerifierEngine(verifierEng))
+	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner,
+		testutil.WithVerifierEngine(verifierEng))
 
 	colNode := testutil.CollectionNode(t, hub, colID, identities)
 
@@ -842,6 +844,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	var senderWG sync.WaitGroup
 	senderWG.Add(erCount * senderCount)
 
+	var blockStorageLock sync.Mutex
+
 	for _, completeER := range ers {
 		for _, coll := range completeER.Collections {
 			err := colNode.Collections.Store(coll)
@@ -854,11 +858,33 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 			go func(j int, id flow.Identifier, block *flow.Block, receipt *flow.ExecutionReceipt) {
 
 				sendBlock := func() {
-					_ = verNode.IngestEngine.Process(conID.NodeID, block)
+					// adds the block to the storage of the node
+					// Note: this is done by the follower
+					// this block should be done in a thread-safe way
+					func(b *flow.Block) {
+						blockStorageLock.Lock()
+						defer blockStorageLock.Unlock()
+						// we don't check for error as it definitely
+						// returns error when we have duplicate blocks
+						// however, this is not the concern for this test
+						_ = verNode.BlockStorage.Store(b)
+					}(block)
+
+					// casts block into a Hotstuff block for notifier
+					hotstuffBlock := &model.Block{
+						BlockID:     block.ID(),
+						View:        block.View,
+						ProposerID:  block.ProposerID,
+						QC:          nil,
+						PayloadHash: block.Hash(),
+						Timestamp:   block.Timestamp,
+					}
+					verNode.IngestEngine.OnFinalizedBlock(hotstuffBlock)
 				}
 
 				sendReceipt := func() {
-					_ = verNode.IngestEngine.Process(exeID.NodeID, receipt)
+					err := verNode.IngestEngine.Process(exeID.NodeID, receipt)
+					require.NoError(t, err)
 				}
 
 				switch j % 2 {
