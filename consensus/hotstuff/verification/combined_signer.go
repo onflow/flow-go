@@ -24,26 +24,25 @@ type CombinedSigner struct {
 	staking  module.AggregatingSigner
 	beacon   module.ThresholdSigner
 	merger   module.Merger
-	filter   flow.IdentityFilter
+	selector flow.IdentityFilter
 	signerID flow.Identifier
 }
 
 // NewCombinedSigner creates a new combined signer with the given dependencies:
 // - the protocol state is used to retrieve public keys for signers;
-// - the filter is used to select the set of valid signers from the protocol state;
+// - the selector is used to select the set of valid signers from the protocol state;
 // - the signer ID is used as the identity when creating signatures;
 // - the staking signer is used to create aggregatable signatures for the first signature part;
 // - the threshold signer is used to create threshold signture shres for the second signature part; and
 // - the merger is used to join and split the two signature parts on our models.
-func NewCombinedSigner(state protocol.State, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, filter flow.IdentityFilter, signerID flow.Identifier) *CombinedSigner {
+func NewCombinedSigner(state protocol.State, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, selector flow.IdentityFilter, signerID flow.Identifier) *CombinedSigner {
 	sc := &CombinedSigner{
-		CombinedVerifier: NewCombinedVerifier(state, dkg, staking, beacon, merger, filter),
+		CombinedVerifier: NewCombinedVerifier(state, dkg, staking, beacon, merger, selector),
 		state:            state,
 		dkg:              dkg,
 		staking:          staking,
 		beacon:           beacon,
 		merger:           merger,
-		filter:           filter,
 		signerID:         signerID,
 	}
 	return sc
@@ -102,6 +101,17 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate
 		return nil, fmt.Errorf("votes are not valid: %w", err)
 	}
 
+	// get the DKG group size
+	groupSize, err := c.dkg.GroupSize()
+	if err != nil {
+		return nil, fmt.Errorf("could not get DKG group size: %w", err)
+	}
+
+	// check if we have sufficient threshold signature shares
+	if !crypto.EnoughShares(int(groupSize), len(votes)) {
+		return nil, ErrInsufficientShares
+	}
+
 	// collect signers, staking signatures, beacon signatures and dkg indices separately
 	signerIDs := make([]flow.Identifier, 0, len(votes))
 	stakingSigs := make([]crypto.Signature, 0, len(votes))
@@ -125,7 +135,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate
 		beaconShare := splitSigs[1]
 
 		// get the dkg index from the dkg state
-		dkgIndex, err := c.dkg.ShareIndex(vote.SignerID)
+		dkgIndex, err := c.dkg.ParticipantIndex(vote.SignerID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get dkg index (signer: %x): %w", vote.SignerID, err)
 		}
@@ -143,33 +153,10 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate
 		return nil, fmt.Errorf("could not aggregate staking signatures: %w", err)
 	}
 
-	// get the DKG group size
-	groupSize, err := c.dkg.GroupSize()
-	if err != nil {
-		return nil, fmt.Errorf("could not get DKG group size: %w", err)
-	}
-
 	// construct the threshold signature from the shares
 	beaconThresSig, err := c.beacon.Combine(groupSize, beaconShares, dkgIndices)
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate second signatures: %w", err)
-	}
-
-	// get the public DKG key so we can validate the threshold signature after creation
-	dkgKey, err := c.dkg.GroupKey()
-	if err != nil {
-		return nil, fmt.Errorf("could not get DKG key from state: %w", err)
-	}
-
-	// we can build an invalid threshold signature without being able to tell;
-	// we thus have to check if the signature is actually valid
-	msg := messageFromParams(votes[0].View, votes[0].BlockID)
-	beaconValid, err := c.beacon.VerifyThreshold(msg, beaconThresSig, dkgKey)
-	if err != nil {
-		return nil, fmt.Errorf("could not validate threshold signature: %w", err)
-	}
-	if !beaconValid {
-		return nil, fmt.Errorf("resulting threshold signature not valid")
 	}
 
 	// combine the aggregated staking signature with the threshold beacon signature
@@ -193,7 +180,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate
 func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 
 	// create the message to be signed and generate signatures
-	msg := messageFromParams(block.View, block.BlockID)
+	msg := makeVoteMessage(block.View, block.BlockID)
 	stakingSig, err := c.staking.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate first signature: %w", err)

@@ -1,11 +1,12 @@
 package voteaggregator
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -14,19 +15,17 @@ type VotingStatus struct {
 	signer           hotstuff.Signer
 	block            *model.Block
 	stakeThreshold   uint64
-	groupSize        uint
 	accumulatedStake uint64
 	// assume votes are all valid to build QC
 	votes map[flow.Identifier]*model.Vote
 }
 
 // NewVotingStatus creates a new Voting Status instance
-func NewVotingStatus(block *model.Block, stakeThreshold uint64, groupSize uint, signer hotstuff.Signer) *VotingStatus {
+func NewVotingStatus(block *model.Block, stakeThreshold uint64, signer hotstuff.Signer) *VotingStatus {
 	return &VotingStatus{
 		signer:           signer,
 		block:            block,
 		stakeThreshold:   stakeThreshold,
-		groupSize:        groupSize,
 		accumulatedStake: 0,
 		votes:            make(map[flow.Identifier]*model.Vote),
 	}
@@ -53,14 +52,15 @@ func (vs *VotingStatus) AddVote(vote *model.Vote, voter *flow.Identity) {
 	vs.accumulatedStake += voter.Stake
 }
 
-// CanBuildQC check whether it has collected enough signatures from the votes to build a QC
+// HasReachedThreshold check whether the
 func (vs *VotingStatus) CanBuildQC() bool {
-	return vs.hasEnoughStake() && vs.hasEnoughSigShares()
+	return vs.hasEnoughStake()
 }
 
 // TryBuildQC returns a QC if the existing votes are enought to build a QC, otherwise
 // an error will be returned.
 func (vs *VotingStatus) TryBuildQC() (*model.QuorumCertificate, bool, error) {
+
 	// check if there are enough votes to build QC
 	if !vs.CanBuildQC() {
 		return nil, false, nil
@@ -69,6 +69,9 @@ func (vs *VotingStatus) TryBuildQC() (*model.QuorumCertificate, bool, error) {
 	// build the aggregated signature
 	votes := getSliceForVotes(vs.votes)
 	qc, err := vs.signer.CreateQC(votes)
+	if errors.Is(err, verification.ErrInsufficientShares) {
+		return nil, false, nil
+	}
 	if err != nil {
 		return nil, false, fmt.Errorf("could not create QC from votes: %w", err)
 	}
@@ -78,10 +81,6 @@ func (vs *VotingStatus) TryBuildQC() (*model.QuorumCertificate, bool, error) {
 
 func (vs *VotingStatus) hasEnoughStake() bool {
 	return vs.accumulatedStake >= vs.stakeThreshold
-}
-
-func (vs *VotingStatus) hasEnoughSigShares() bool {
-	return crypto.EnoughShares(int(vs.groupSize), len(vs.votes))
 }
 
 func getSliceForVotes(votes map[flow.Identifier]*model.Vote) []*model.Vote {

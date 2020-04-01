@@ -50,9 +50,9 @@ type ClusterBlockProposal struct {
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
 // consensus; effectively a vote for a particular collection.
 type ClusterBlockVote struct {
-	BlockID   flow.Identifier
-	View      uint64
-	Signature []byte
+	BlockID flow.Identifier
+	View    uint64
+	SigData []byte
 }
 
 // ClusterBlockRequest is a request for a block in collection node cluster

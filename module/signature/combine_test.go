@@ -11,6 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
+// TODO: make tests more robust by testing unhappy paths of splitter
+
 const NUM_SIGS = 10
 
 func TestCombinerJoinSplitEven(t *testing.T) {

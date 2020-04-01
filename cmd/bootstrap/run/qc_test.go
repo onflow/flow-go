@@ -43,7 +43,7 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 	stakingKeys, err := unittest.StakingKeys(n)
 	require.NoError(t, err)
 
-	randomBKeys, groupKey, _ := unittest.RunDKGKeys(t, n)
+	randomBKeys, groupKey, _ := unittest.RunDKG(t, n)
 
 	pubData := dkg.PublicData{
 		GroupPubKey:     groupKey,

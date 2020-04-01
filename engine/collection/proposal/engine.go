@@ -181,9 +181,9 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 
 	// build the vote message
 	vote := &messages.ClusterBlockVote{
-		BlockID:   blockID,
-		View:      view,
-		Signature: sigData,
+		BlockID: blockID,
+		View:    view,
+		SigData: sigData,
 	}
 
 	err := e.con.Submit(vote, recipientID)
@@ -369,7 +369,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 // onBlockVote handles votes for blocks by passing them to the core consensus
 // algorithm
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature)
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
 	return nil
 }
 

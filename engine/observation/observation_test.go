@@ -5,12 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-
-	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
@@ -22,13 +21,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
+	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	access "github.com/dapperlabs/flow-go/protobuf/services/access"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-
-	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 

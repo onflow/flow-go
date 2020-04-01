@@ -14,19 +14,21 @@ import (
 // aggregated to data structures.
 type SingleSigner struct {
 	*SingleVerifier
-	signerID flow.Identifier
 	signer   module.AggregatingSigner
+	selector flow.IdentityFilter
+	signerID flow.Identifier
 }
 
 // NewSingleSigner initializes a single signer with the given dependencies:
 // - the given protocol state is used to retrieve public keys for the verifier;
 // - the given signer is used to generate signatures for the local node; and
 // - the given signer ID is used as identifier for our signatures.
-func NewSingleSigner(state protocol.State, signer module.AggregatingSigner, signerID flow.Identifier) *SingleSigner {
+func NewSingleSigner(state protocol.State, signer module.AggregatingSigner, selector flow.IdentityFilter, signerID flow.Identifier) *SingleSigner {
 	sc := &SingleSigner{
-		SingleVerifier: NewSingleVerifier(state, signer),
-		signerID:       signerID,
+		SingleVerifier: NewSingleVerifier(state, signer, selector),
 		signer:         signer,
+		selector:       selector,
+		signerID:       signerID,
 	}
 	return sc
 }
@@ -40,7 +42,7 @@ func (s *SingleSigner) CreateProposal(block *model.Block) (*model.Proposal, erro
 	}
 
 	// create the message to be signed and generate signature
-	msg := messageFromParams(block.View, block.BlockID)
+	msg := makeVoteMessage(block.View, block.BlockID)
 	sig, err := s.signer.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
@@ -59,7 +61,7 @@ func (s *SingleSigner) CreateProposal(block *model.Block) (*model.Proposal, erro
 func (s *SingleSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 
 	// create the message to be signed and generate signature
-	msg := messageFromParams(block.View, block.BlockID)
+	msg := makeVoteMessage(block.View, block.BlockID)
 	sig, err := s.signer.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
@@ -87,10 +89,10 @@ func (s *SingleSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate, 
 	}
 
 	// collect all the vote signatures
-	signerIDs := make([]flow.Identifier, len(votes))
+	voterIDs := make([]flow.Identifier, 0, len(votes))
 	sigs := make([]crypto.Signature, 0, len(votes))
 	for _, vote := range votes {
-		signerIDs = append(signerIDs, vote.SignerID)
+		voterIDs = append(voterIDs, vote.SignerID)
 		sigs = append(sigs, vote.SigData)
 	}
 
@@ -104,7 +106,7 @@ func (s *SingleSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate, 
 	qc := &model.QuorumCertificate{
 		View:      votes[0].View,
 		BlockID:   votes[0].BlockID,
-		SignerIDs: signerIDs,
+		SignerIDs: voterIDs,
 		SigData:   aggSig,
 	}
 

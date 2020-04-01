@@ -49,8 +49,13 @@ func BlockHeaderFixture() flow.Header {
 
 func BlockHeaderWithParentFixture(parentID flow.Identifier) flow.Header {
 	return flow.Header{
-		ParentID: parentID,
-		View:     rand.Uint64(),
+		ChainID:        "chain",
+		ParentID:       parentID,
+		View:           rand.Uint64(),
+		ParentVoterIDs: IdentifierListFixture(4),
+		ParentVoterSig: SignatureFixture(),
+		ProposerID:     IdentifierFixture(),
+		ProposerSig:    SignatureFixture(),
 	}
 }
 
@@ -135,7 +140,7 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 	ret := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 1; i <= n; i++ {
 		cg := flow.CollectionGuarantee{
-			CollectionID: flow.Identifier{byte(i)},
+			CollectionID: IdentifierFixture(),
 			Signature:    SignatureFixture(),
 		}
 		ret = append(ret, &cg)

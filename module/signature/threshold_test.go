@@ -10,35 +10,38 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const NUM_DKG_TEST = 3
-const NUM_DKG_BENCH = 254
+const NUM_THRES_TEST = 3
+const NUM_THRES_BENCH = 254
 
-func createDKGsB(b *testing.B, n uint) []*DKG {
-	hasher := crypto.NewBLS_KMAC("only_testing")
-	signers := make([]*DKG, 0, int(n))
+// createThresholdsB creates a set of Threshold keys for benchmarking; as we might generate
+// many of them, we don't run a real Threshold here, but instead use randomly generated
+// keys. The performance of the algorithm remains the same, even if the resulting
+// signature will not be valid for any group key we know.
+func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
+	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
-		bls := createBLSB(b)
-		signer := NewDKG(hasher, bls.priv)
-		signers = append(signers, signer)
+		agg := createAggregationB(b)
+		thres := NewThresholdProvider("test_beacon", agg.priv)
+		signers = append(signers, thres)
 	}
 	return signers
 }
 
-func createDKGsT(t *testing.T, n uint) ([]*DKG, crypto.PublicKey) {
-	beaconKeys, groupKey, _ := unittest.RunDKGKeys(t, int(n))
-	hasher := crypto.NewBLS_KMAC("only_testing")
-	signers := make([]*DKG, 0, int(n))
+// createKDGsT creates a set of Thresholds with real key shares and a real group key.
+func createThresholdsT(t *testing.T, n uint) ([]*ThresholdProvider, crypto.PublicKey) {
+	beaconKeys, groupKey, _ := unittest.RunDKG(t, int(n))
+	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
-		signer := NewDKG(hasher, beaconKeys[i])
-		signers = append(signers, signer)
+		thres := NewThresholdProvider("test_beacon", beaconKeys[i])
+		signers = append(signers, thres)
 	}
 	return signers, groupKey
 }
 
-func TestDKGSignVerify(t *testing.T) {
+func TestThresholdSignVerify(t *testing.T) {
 
 	// create signer and message to be signed
-	signers, _ := createDKGsT(t, 3)
+	signers, _ := createThresholdsT(t, 3)
 	signer := signers[0]
 	altSigner := signers[1]
 	msg := createMSGT(t)
@@ -65,11 +68,11 @@ func TestDKGSignVerify(t *testing.T) {
 	sig[0]--
 }
 
-func TestDKGCombineVerifyThreshold(t *testing.T) {
+func TestThresholdCombineVerifyThreshold(t *testing.T) {
 
 	// create signers and message to be signed
-	signers, groupKey := createDKGsT(t, NUM_DKG_TEST)
-	_, altGroupKey := createDKGsT(t, NUM_DKG_TEST)
+	signers, groupKey := createThresholdsT(t, NUM_THRES_TEST)
+	_, altGroupKey := createThresholdsT(t, NUM_THRES_TEST)
 	msg := createMSGT(t)
 
 	// create a signature share for each signer and store index
@@ -82,25 +85,25 @@ func TestDKGCombineVerifyThreshold(t *testing.T) {
 		indices = append(indices, uint(index))
 	}
 
-	// should not generate valid signature with insufficient signers
-	var insufficient int
-	for insufficient = len(shares); crypto.EnoughShares(len(signers), insufficient); insufficient-- {
-		// just count down insufficient until it's no longer enough shares
-	}
-	threshold, err := signers[0].Combine(uint(len(signers)), shares[:insufficient], indices[:insufficient])
-	require.Error(t, err, "should not be able to create threshold signature with insufficient shares")
-
-	// should not be able to generate signature with missing indices
-	threshold, err = signers[0].Combine(uint(len(signers)), shares, indices[:len(indices)-1])
-	require.Error(t, err, "should not be able to create threshold signature with missing indices")
-
 	// should generate valid signature with sufficient signers
 	var sufficient int
 	for sufficient = 0; !crypto.EnoughShares(len(signers), sufficient); sufficient++ {
 		// just count up sufficient until we have enough shares
 	}
-	threshold, err = signers[0].Combine(uint(len(signers)), shares[:sufficient], indices[:sufficient])
+	threshold, err := signers[0].Combine(uint(len(signers)), shares[:sufficient], indices[:sufficient])
 	require.NoError(t, err, "should be able to create threshold signature with sufficient shares")
+
+	// should not generate valid signature with insufficient signers
+	var insufficient int
+	for insufficient = len(shares); crypto.EnoughShares(len(signers), insufficient); insufficient-- {
+		// just count down insufficient until it's no longer enough shares
+	}
+	_, err = signers[0].Combine(uint(len(signers)), shares[:insufficient], indices[:insufficient])
+	require.Error(t, err, "should not be able to create threshold signature with insufficient shares")
+
+	// should not be able to generate signature with missing indices
+	_, err = signers[0].Combine(uint(len(signers)), shares, indices[:len(indices)-1])
+	require.Error(t, err, "should not be able to create threshold signature with missing indices")
 
 	// threshold signature should be valid for the group public key
 	valid, err := signers[0].VerifyThreshold(msg, threshold, groupKey)
@@ -128,14 +131,14 @@ func TestDKGCombineVerifyThreshold(t *testing.T) {
 
 	// should not generate valid signature with swapped indices
 	indices[0], indices[1] = indices[1], indices[0]
-	threshold, err = signers[0].Combine(NUM_DKG_TEST, shares, indices)
+	threshold, err = signers[0].Combine(NUM_THRES_TEST, shares, indices)
 	require.NoError(t, err)
 	valid, err = signers[0].VerifyThreshold(msg, threshold, groupKey)
 	require.NoError(t, err)
 	assert.False(t, valid, "threshold signature should not be valid with swapped indices")
 }
 
-func BenchmarkDKGCombination(b *testing.B) {
+func BenchmarkThresholdCombination(b *testing.B) {
 
 	// stop timer and reset to zero
 	b.StopTimer()
@@ -143,7 +146,7 @@ func BenchmarkDKGCombination(b *testing.B) {
 
 	// generate the desired fake DKG participants and create signatures
 	msg := createMSGB(b)
-	signers := createDKGsB(b, NUM_DKG_BENCH)
+	signers := createThresholdsB(b, NUM_THRES_BENCH)
 	sigs := make([]crypto.Signature, 0, len(signers))
 	indices := make([]uint, 0, len(signers))
 	for index, signer := range signers {

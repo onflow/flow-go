@@ -7,6 +7,9 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
+// lengthSize is how many bytes we use to encode the length of each signature.
+const lengthSize = 4
+
 // Combiner creates a simple implementation for joining and splitting signatures
 // on a level above the cryptographic implementation. It simply concatenates
 // signatures together with their length information and uses this information
@@ -42,7 +45,7 @@ func (c *Combiner) Split(combined []byte) ([]crypto.Signature, error) {
 
 		// check that we have at least 4 bytes of length information
 		remaining := len(combined) - next
-		if remaining < 4 {
+		if remaining < lengthSize {
 			return nil, fmt.Errorf("insufficient remaining bytes for length information (remaining: %d, min: %d)", remaining, 4)
 		}
 
@@ -50,7 +53,7 @@ func (c *Combiner) Split(combined []byte) ([]crypto.Signature, error) {
 		length := int(binary.LittleEndian.Uint32(combined[next : next+4]))
 
 		// create the beginning marker for the signature
-		from := next + 4
+		from := next + lengthSize
 		if from >= len(combined) {
 			return nil, fmt.Errorf("invalid from marker for next signature (from: %d, max: %d)", from, len(combined)-1)
 		}
@@ -65,7 +68,7 @@ func (c *Combiner) Split(combined []byte) ([]crypto.Signature, error) {
 		sig := make([]byte, length)
 		copy(sig[:], combined[from:to])
 		sigs = append(sigs, sig)
-		next = next + 4 + length
+		next = next + lengthSize + length
 	}
 
 	return sigs, nil

@@ -243,15 +243,9 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *model.Vote, blo
 			return false, fmt.Errorf("error retrieving consensus participants: %w", err)
 		}
 
-		// get the DKG group size
-		groupSize, err := va.viewState.DKGState().GroupSize()
-		if err != nil {
-			return false, fmt.Errorf("could not get DKG group size: %w", err)
-		}
-
 		// create VotingStatus for block
 		stakeThreshold := hotstuff.ComputeStakeThresholdForBuildingQC(identities.TotalStake()) // stake threshold for building valid qc
-		votingStatus = NewVotingStatus(block, stakeThreshold, groupSize, va.signer)
+		votingStatus = NewVotingStatus(block, stakeThreshold, va.signer)
 		va.blockIDToVotingStatus[vote.BlockID] = votingStatus
 	}
 	votingStatus.AddVote(vote, voter)

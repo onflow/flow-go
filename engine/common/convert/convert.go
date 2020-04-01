@@ -121,7 +121,7 @@ func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 	return &entities.BlockSeal{
 		BlockId:                    id[:],
 		ExecutionReceiptId:         result[:],
-		ExecutionReceiptSignatures: [][]byte{s.Signature.Bytes()},
+		ExecutionReceiptSignatures: [][]byte{s.Signature},
 	}
 }
 

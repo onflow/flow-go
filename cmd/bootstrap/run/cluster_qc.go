@@ -9,14 +9,12 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/protocol"
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 )
 
@@ -76,6 +74,7 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 	validators := make([]hotstuff.Validator, n)
 
 	forks := &mocks.ForksReader{}
+	selector := filter.And(filter.HasRole(flow.RoleCollection), filter.HasStake(true))
 
 	for i, participant := range participants {
 		// get the participant keys
@@ -84,11 +83,9 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 			return nil, nil, fmt.Errorf("could not retrieve private keys for participant: %w", err)
 		}
 
-		// create signer
-		signer, err := newStakingProvider(ps, participants, encoding.CollectorVoteTag, participant.Identity(), keys.StakingKey)
-		if err != nil {
-			return nil, nil, err
-		}
+		// create signer for participant
+		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, keys.StakingKey)
+		signer := verification.NewSingleSigner(ps, provider, selector, participant.NodeID)
 		signers[i] = signer
 
 		// create view state
@@ -102,15 +99,6 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 		validators[i] = v
 	}
 	return validators, signers, nil
-}
-
-// create a new StakingSigProvider
-func newStakingProvider(ps protocol.State, participants []bootstrap.NodeInfo, tag string, id *flow.Identity, sk crypto.PrivateKey) (
-	*verification.SingleSigner, error) {
-	hasher := crypto.NewBLS_KMAC(encoding.CollectorVoteTag)
-	provider := signature.NewBLS(hasher, sk)
-	signer := verification.NewSingleSigner(ps, provider, id.NodeID)
-	return signer, nil
 }
 
 func signersToIdentityList(participants []bootstrap.NodeInfo) flow.IdentityList {

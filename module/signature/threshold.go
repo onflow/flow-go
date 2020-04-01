@@ -6,45 +6,43 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
-// DKG is a signer capable of generating and verifying signature shares, as well
-// as reconstructing a threshold signature from shares and verifying it against
-// the group public key.
-type DKG struct {
+// ThresholdProvider is a signer capable of generating and verifying signature
+// shares, as well as reconstructing a threshold signature from shares and
+// verifying it against a group public key.
+// *Important*: the threshold provider can only create and verify signatures in
+// the context of the provided KMAC tag.
+type ThresholdProvider struct {
 	hasher crypto.Hasher
 	priv   crypto.PrivateKey
 }
 
-// NewDKG creates new DKG signer & verifier, using the given hasher and the
-// provided private key to generate signature shares.
-func NewDKG(hasher crypto.Hasher, priv crypto.PrivateKey) *DKG {
-	d := &DKG{
-		hasher: hasher,
+// NewThresholdProvider creates new threshold provider, using the gien private
+// key share to generate signature shares. *Important*: the threshold provider
+// can only create and verify signatures in the context of the provided KMAC tag.
+func NewThresholdProvider(tag string, priv crypto.PrivateKey) *ThresholdProvider {
+	tp := &ThresholdProvider{
+		hasher: crypto.NewBLS_KMAC(tag),
 		priv:   priv,
 	}
-	return d
+	return tp
 }
 
 // Sign will use the internal private key share to generate a threshold signature
 // share.
-func (d *DKG) Sign(msg []byte) (crypto.Signature, error) {
-	return d.priv.Sign(msg, d.hasher)
+func (tp *ThresholdProvider) Sign(msg []byte) (crypto.Signature, error) {
+	return tp.priv.Sign(msg, tp.hasher)
 }
 
 // Verify will verify the provided signture share against the message and the provided
 // public key share.
-func (d *DKG) Verify(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
-	return key.Verify(sig, msg, d.hasher)
+func (tp *ThresholdProvider) Verify(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
+	return key.Verify(sig, msg, tp.hasher)
 }
 
 // Combine will combine the provided public signature shares to attempt and reconstruct a threshold
 // signature for the group of the given size. The indices represent the index for ech signature share
 // within the DKG algorithm.
-func (d *DKG) Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
-
-	// check that we have an index for each share
-	if len(shares) != len(indices) {
-		return nil, fmt.Errorf("mismatching number of shares and indices (shares: %d, indices: %d)", len(shares), len(indices))
-	}
+func (tp *ThresholdProvider) Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
 
 	// check that we have sufficient shares to reconstruct the threshold signature
 	if !crypto.EnoughShares(int(size), len(shares)) {
@@ -68,6 +66,6 @@ func (d *DKG) Combine(size uint, shares []crypto.Signature, indices []uint) (cry
 
 // VerifyThreshold will verify the given threshold signature against the given message and the given
 // group public key.
-func (d *DKG) VerifyThreshold(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
-	return key.Verify(sig, msg, d.hasher)
+func (tp *ThresholdProvider) VerifyThreshold(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
+	return key.Verify(sig, msg, tp.hasher)
 }

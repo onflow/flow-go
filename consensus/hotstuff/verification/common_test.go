@@ -41,16 +41,14 @@ func MakeSigners(t *testing.T, proto protocol.State, dkg dkg.State, signerIDs []
 }
 
 func MakeStakingSigner(state protocol.State, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSigner {
-	hasher := crypto.NewBLS_KMAC("only_testing")
-	staking := signature.NewBLS(hasher, priv)
-	signer := NewSingleSigner(state, staking, signerID)
+	staking := signature.NewAggregationProvider("test_staking", priv)
+	signer := NewSingleSigner(state, staking, filter.Any, signerID)
 	return signer
 }
 
 func MakeBeaconSigner(proto protocol.State, dkg dkg.State, signerID flow.Identifier, stakingPriv crypto.PrivateKey, beaconPriv crypto.PrivateKey) *CombinedSigner {
-	hasher := crypto.NewBLS_KMAC("only_testing")
-	staking := signature.NewBLS(hasher, stakingPriv)
-	beacon := signature.NewDKG(hasher, beaconPriv)
+	staking := signature.NewAggregationProvider("test_staking", stakingPriv)
+	beacon := signature.NewThresholdProvider("test_beacon", beaconPriv)
 	combiner := signature.NewCombiner()
 	signer := NewCombinedSigner(proto, dkg, staking, beacon, combiner, filter.Any, signerID)
 	return signer
@@ -82,12 +80,13 @@ func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled
 	var beaconKeys []crypto.PrivateKey
 	var dkgKey crypto.PublicKey
 	if beaconEnabled {
-		beaconKeys, dkgKey, _ = unittest.RunDKGKeys(t, len(identities))
+		beaconKeys, dkgKey, _ = unittest.RunDKG(t, len(identities))
 		dkg.On("GroupSize").Return(uint(len(beaconKeys)), nil)
 		dkg.On("GroupKey").Return(dkgKey, nil)
 		for i, identity := range identities {
-			dkg.On("ShareIndex", identity.NodeID).Return(uint(i), nil)
-			dkg.On("ShareKey", identity.NodeID).Return(beaconKeys[i].PublicKey(), nil)
+			dkg.On("HasParticipant", identity.NodeID).Return(true, nil)
+			dkg.On("ParticipantIndex", identity.NodeID).Return(uint(i), nil)
+			dkg.On("ParticipantKey", identity.NodeID).Return(beaconKeys[i].PublicKey(), nil)
 		}
 	}
 

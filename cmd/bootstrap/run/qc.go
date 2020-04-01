@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/signature"
@@ -88,7 +89,7 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 	signers := make([]hotstuff.Signer, n)
 	validators := make([]hotstuff.Validator, n)
 
-	f := &mocks.ForksReader{}
+	forks := &mocks.ForksReader{}
 
 	for i, participant := range participantData.Participants {
 		// get the participant private keys
@@ -98,24 +99,21 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 		}
 
 		// create signer
-		signerIdentity := participant.Identity()
-		stakingHasher := crypto.NewBLS_KMAC("staking_tag")
-		stakingSigner := signature.NewBLS(stakingHasher, keys.StakingKey)
-		beaconHasher := crypto.NewBLS_KMAC("beacon_tag")
-		beaconSigner := signature.NewDKG(beaconHasher, participant.RandomBeaconPrivKey)
+		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, keys.StakingKey)
+		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
 		merger := signature.NewCombiner()
 		selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
-		signer := verification.NewCombinedSigner(ps, participantData.DKGState, stakingSigner, beaconSigner, merger, selector, signerIdentity.NodeID)
+		signer := verification.NewCombinedSigner(ps, participantData.DKGState, stakingSigner, beaconSigner, merger, selector, participant.NodeID)
 		signers[i] = signer
 
 		// create view state
-		vs, err := viewstate.New(ps, participantData.DKGState, signerIdentity.NodeID, selector)
+		vs, err := viewstate.New(ps, participantData.DKGState, participant.NodeID, selector)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		// create validator
-		v := validator.New(vs, f, signer)
+		v := validator.New(vs, forks, signer)
 		validators[i] = v
 	}
 

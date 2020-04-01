@@ -68,7 +68,7 @@ func (proc *TestDKGProcessor) Blacklist(node int) {
 func (proc *TestDKGProcessor) FlagMisbehavior(node int, logData string) {
 }
 
-func RunDKGKeys(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey) {
+func RunDKG(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey) {
 	lead := 0
 	var wg sync.WaitGroup
 	chans := make([]chan *message, n)
