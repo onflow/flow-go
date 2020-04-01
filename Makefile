@@ -166,6 +166,7 @@ docker-ci-team-city:
 docker-ci-integration:
 	docker run \
 		--env DOCKER_API_VERSION='1.39' \
+		--network host \
 		-v /tmp:/tmp \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-v /var/run/docker.sock:/var/run/docker.sock \
@@ -177,6 +178,8 @@ docker-ci-integration:
 .PHONY: docker-ci-integration-team-city
 docker-ci-integration-team-city:
 	docker run \
+		--env DOCKER_API_VERSION='1.39' \
+		--network host \
 		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
 		-v /tmp:/tmp \
 		-v /var/run/docker.sock:/var/run/docker.sock \
