@@ -10,38 +10,38 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const NUM_DKG_TEST = 3
-const NUM_DKG_BENCH = 254
+const NUM_Threshold_TEST = 3
+const NUM_Threshold_BENCH = 254
 
-// createDKGsB creates a set of DKG keys for benchmarking; as we might generate
-// many of them, we don't run a real DKG here, but instead use randomly generated
+// createThresholdsB creates a set of Threshold keys for benchmarking; as we might generate
+// many of them, we don't run a real Threshold here, but instead use randomly generated
 // keys. The performance of the algorithm remains the same, even if the resulting
 // signature will not be valid for any group key we know.
-func createDKGsB(b *testing.B, n uint) []*DKG {
-	signers := make([]*DKG, 0, int(n))
+func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
+	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
-		bls := createBLSB(b)
-		signer := NewDKG("only_testing", bls.priv)
+		bls := createAggregationB(b)
+		signer := NewThresholdProvider("only_testing", bls.priv)
 		signers = append(signers, signer)
 	}
 	return signers
 }
 
-// createKDGsT creates a set of DKGs with real key shares and a real group key.
-func createDKGsT(t *testing.T, n uint) ([]*DKG, crypto.PublicKey) {
+// createKDGsT creates a set of Thresholds with real key shares and a real group key.
+func createThresholdsT(t *testing.T, n uint) ([]*ThresholdProvider, crypto.PublicKey) {
 	beaconKeys, groupKey, _ := unittest.RunDKG(t, int(n))
-	signers := make([]*DKG, 0, int(n))
+	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
-		signer := NewDKG("only_testing", beaconKeys[i])
+		signer := NewThresholdProvider("only_testing", beaconKeys[i])
 		signers = append(signers, signer)
 	}
 	return signers, groupKey
 }
 
-func TestDKGSignVerify(t *testing.T) {
+func TestThresholdSignVerify(t *testing.T) {
 
 	// create signer and message to be signed
-	signers, _ := createDKGsT(t, 3)
+	signers, _ := createThresholdsT(t, 3)
 	signer := signers[0]
 	altSigner := signers[1]
 	msg := createMSGT(t)
@@ -68,11 +68,11 @@ func TestDKGSignVerify(t *testing.T) {
 	sig[0]--
 }
 
-func TestDKGCombineVerifyThreshold(t *testing.T) {
+func TestThresholdCombineVerifyThreshold(t *testing.T) {
 
 	// create signers and message to be signed
-	signers, groupKey := createDKGsT(t, NUM_DKG_TEST)
-	_, altGroupKey := createDKGsT(t, NUM_DKG_TEST)
+	signers, groupKey := createThresholdsT(t, NUM_Threshold_TEST)
+	_, altGroupKey := createThresholdsT(t, NUM_Threshold_TEST)
 	msg := createMSGT(t)
 
 	// create a signature share for each signer and store index
@@ -131,22 +131,22 @@ func TestDKGCombineVerifyThreshold(t *testing.T) {
 
 	// should not generate valid signature with swapped indices
 	indices[0], indices[1] = indices[1], indices[0]
-	threshold, err = signers[0].Combine(NUM_DKG_TEST, shares, indices)
+	threshold, err = signers[0].Combine(NUM_Threshold_TEST, shares, indices)
 	require.NoError(t, err)
 	valid, err = signers[0].VerifyThreshold(msg, threshold, groupKey)
 	require.NoError(t, err)
 	assert.False(t, valid, "threshold signature should not be valid with swapped indices")
 }
 
-func BenchmarkDKGCombination(b *testing.B) {
+func BenchmarkThresholdCombination(b *testing.B) {
 
 	// stop timer and reset to zero
 	b.StopTimer()
 	b.ResetTimer()
 
-	// generate the desired fake DKG participants and create signatures
+	// generate the desired fake Threshold participants and create signatures
 	msg := createMSGB(b)
-	signers := createDKGsB(b, NUM_DKG_BENCH)
+	signers := createThresholdsB(b, NUM_Threshold_BENCH)
 	sigs := make([]crypto.Signature, 0, len(signers))
 	indices := make([]uint, 0, len(signers))
 	for index, signer := range signers {

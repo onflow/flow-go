@@ -10,24 +10,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const NUM_BLS_TEST = 7
-const NUM_BLS_BENCH = 1000
+const NUM_AggregationProvider_TEST = 7
+const NUM_AggregationProvider_BENCH = 1000
 
-func createBLST(t *testing.T) *BLS {
-	bls, err := createBLS()
+func createAggregationT(t *testing.T) *AggregationProvider {
+	bls, err := createAggregation()
 	require.NoError(t, err)
 	return bls
 }
 
-func createBLSB(b *testing.B) *BLS {
-	bls, err := createBLS()
+func createAggregationB(b *testing.B) *AggregationProvider {
+	bls, err := createAggregation()
 	if err != nil {
 		b.Fatal(err)
 	}
 	return bls
 }
 
-func createBLS() (*BLS, error) {
+func createAggregation() (*AggregationProvider, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLS_BLS12381)
 	n, err := rand.Read(seed)
 	if err != nil {
@@ -40,12 +40,12 @@ func createBLS() (*BLS, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewBLS("only_testing", priv), nil
+	return NewAggregationProvider("only_testing", priv), nil
 }
 
-func TestBLSSignVerify(t *testing.T) {
+func TestAggregationSignVerify(t *testing.T) {
 
-	signer := createBLST(t)
+	signer := createAggregationT(t)
 	msg := createMSGT(t)
 
 	// create the signature
@@ -58,7 +58,7 @@ func TestBLSSignVerify(t *testing.T) {
 	assert.True(t, valid)
 
 	// signature should not be valid for another signer
-	valid, err = signer.Verify(msg, sig, createBLST(t).priv.PublicKey())
+	valid, err = signer.Verify(msg, sig, createAggregationT(t).priv.PublicKey())
 	require.NoError(t, err)
 	assert.False(t, valid)
 
@@ -70,14 +70,14 @@ func TestBLSSignVerify(t *testing.T) {
 	sig[0]--
 }
 
-func TestBLSAggregateVerifyMany(t *testing.T) {
+func TestAggregationAggregateVerifyMany(t *testing.T) {
 
 	// create a certain amount of signers & signatures
-	var signers []*BLS
+	var signers []*AggregationProvider
 	var sigs []crypto.Signature
 	msg := createMSGT(t)
-	for i := 0; i < NUM_BLS_TEST; i++ {
-		signer := createBLST(t)
+	for i := 0; i < NUM_AggregationProvider_TEST; i++ {
+		signer := createAggregationT(t)
 		sig, err := signer.Sign(msg)
 		require.NoError(t, err)
 		signers = append(signers, signer)
@@ -85,7 +85,7 @@ func TestBLSAggregateVerifyMany(t *testing.T) {
 	}
 
 	// aggregate the signatures
-	bls := createBLST(t)
+	bls := createAggregationT(t)
 	aggSig, err := bls.Aggregate(sigs)
 	require.NoError(t, err)
 
@@ -106,7 +106,7 @@ func TestBLSAggregateVerifyMany(t *testing.T) {
 
 	// signature should be invalid with one key swapped
 	temp := keys[0]
-	keys[0] = createBLST(t).priv.PublicKey()
+	keys[0] = createAggregationT(t).priv.PublicKey()
 	valid, err = bls.VerifyMany(msg, aggSig, keys)
 	require.NoError(t, err)
 	require.False(t, valid)
@@ -120,18 +120,18 @@ func TestBLSAggregateVerifyMany(t *testing.T) {
 	msg[0]--
 }
 
-func BenchmarkBLSAggregation(b *testing.B) {
+func BenchmarkAggregationProviderAggregation(b *testing.B) {
 
 	// stop timer and reset to zero
 	b.StopTimer()
 	b.ResetTimer()
 
 	// create the desired number of signers
-	var signer *BLS
+	var signer *AggregationProvider
 	msg := createMSGB(b)
-	sigs := make([]crypto.Signature, 0, NUM_BLS_BENCH)
-	for i := 0; i < NUM_BLS_BENCH; i++ {
-		signer = createBLSB(b)
+	sigs := make([]crypto.Signature, 0, NUM_AggregationProvider_BENCH)
+	for i := 0; i < NUM_AggregationProvider_BENCH; i++ {
+		signer = createAggregationB(b)
 		sig, err := signer.Sign(msg)
 		if err != nil {
 			b.Fatal(err)

@@ -6,39 +6,40 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
-// BLS is an aggregating signer and verifier that can create/verify BLS
-// signatures, as well as aggregating & verifying aggregated BLS signatures.
-type BLS struct {
+// AggregationProvider is an aggregating signer and verifier that can create/verify
+// signatures, as well as aggregating & verifying aggregated signatures.
+type AggregationProvider struct {
 	hasher crypto.Hasher
 	priv   crypto.PrivateKey
 }
 
-// NewBLS creates a new BLS signer and verifier, using the given hasher and the
-// provided private key for creating signatures.
-func NewBLS(tag string, priv crypto.PrivateKey) *BLS {
-	b := &BLS{
+// NewAggregationProvider creates a new aggregation provider using the given private
+// key to generate signatures. *Important*: the aggregation provider can only
+// create and verify signatures in the context of the provided HMAC tag.
+func NewAggregationProvider(tag string, priv crypto.PrivateKey) *AggregationProvider {
+	ap := &AggregationProvider{
 		hasher: crypto.NewBLS_KMAC(tag),
 		priv:   priv,
 	}
-	return b
+	return ap
 }
 
 // Sign will sign the given message bytes with the internal private key and
 // return the signature on success.
-func (b *BLS) Sign(msg []byte) (crypto.Signature, error) {
-	return b.priv.Sign(msg, b.hasher)
+func (ap *AggregationProvider) Sign(msg []byte) (crypto.Signature, error) {
+	return ap.priv.Sign(msg, ap.hasher)
 }
 
 // Verify will verify the given signature against the given message and public key.
-func (b *BLS) Verify(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
-	return key.Verify(sig, msg, b.hasher)
+func (ap *AggregationProvider) Verify(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
+	return key.Verify(sig, msg, ap.hasher)
 }
 
 // Aggregate will aggregate the given signatures into one aggregated signature.
-func (b *BLS) Aggregate(sigs []crypto.Signature) (crypto.Signature, error) {
+func (ap *AggregationProvider) Aggregate(sigs []crypto.Signature) (crypto.Signature, error) {
 
 	// NOTE: the current implementation simply concatenates all signatures; this
-	// will be replace by real BLS signature aggregation once available
+	// will be replace by real AggregationProvider signature aggregation once available
 	c := &Combiner{}
 	sig, err := c.Join(sigs...)
 	if err != nil {
@@ -50,7 +51,7 @@ func (b *BLS) Aggregate(sigs []crypto.Signature) (crypto.Signature, error) {
 
 // VerifyMany will verify the given aggregated signature against the given message and the
 // provided public keys.
-func (b *BLS) VerifyMany(msg []byte, sig crypto.Signature, keys []crypto.PublicKey) (bool, error) {
+func (ap *AggregationProvider) VerifyMany(msg []byte, sig crypto.Signature, keys []crypto.PublicKey) (bool, error) {
 
 	// NOTE: for now, we simply split the concatenated signature into its parts and verify each
 	// of them separately; in the future, this will be replaced by real aggregated signature verification
@@ -63,7 +64,7 @@ func (b *BLS) VerifyMany(msg []byte, sig crypto.Signature, keys []crypto.PublicK
 		return false, fmt.Errorf("invalid number of public keys (signatures: %d, keys: %d)", len(sigs), len(keys))
 	}
 	for i, sig := range sigs {
-		valid, err := b.Verify(msg, sig, keys[i])
+		valid, err := ap.Verify(msg, sig, keys[i])
 		if err != nil {
 			return false, fmt.Errorf("could not verify signature (index: %d): %w", i, err)
 		}
