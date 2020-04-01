@@ -92,14 +92,14 @@ func createClusterValidators(ps *protoBadger.State, ccSigners []ClusterSigner, b
 	for i, signer := range ccSigners {
 		// create signer
 		signerId := signer.Identity
-		s, err := NewStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, &signerId, signer.StakingPrivKey)
+		s, err := newStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, &signerId, signer.StakingPrivKey)
 		if err != nil {
 			return nil, nil, err
 		}
 		signers[i] = s
 
 		// create view state
-		vs, err := viewstate.New(ps, nil, signer.Identity.NodeID, filter.In(signersToIdentityList(ccSigners))) // TODO need to filter per cluster
+		vs, err := viewstate.New(ps, nil, signer.Identity.NodeID, filter.In(signersToIdentityList(ccSigners)))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -112,9 +112,9 @@ func createClusterValidators(ps *protoBadger.State, ccSigners []ClusterSigner, b
 }
 
 // create a new StakingSigProvider
-func NewStakingProvider(ps protocol.State, signers []ClusterSigner, tag string, id *flow.Identity, sk crypto.PrivateKey) (
+func newStakingProvider(ps protocol.State, signers []ClusterSigner, tag string, id *flow.Identity, sk crypto.PrivateKey) (
 	*signature.StakingSigProvider, error) {
-	vs, err := viewstate.New(ps, nil, id.NodeID, filter.In(signersToIdentityList(signers))) // TODO need to filter per cluster
+	vs, err := viewstate.New(ps, nil, id.NodeID, filter.In(signersToIdentityList(signers)))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create view state: %w", err)
 	}
