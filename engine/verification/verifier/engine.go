@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine (verifier engine) verifies chunks, generates result approvals and raises challeneges.
+// Engine (verifier engine) verifies chunks, generates result approvals and raises challenges.
 // as input it accepts verifiable chunks (chunk + all data needed) and perform verification by
 // constructing a partial trie, executing transactions and check the final state commitment and
 // other chunk meta data (e.g. tx count)
@@ -153,7 +153,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
 			// TODO raise challenge
-			e.log.Info().
+			e.log.Warn().
 				Timestamp().
 				Hex("origin", logging.ID(originID)).
 				Uint64("chunkIndex", chunk.ChunkIndex).
@@ -161,7 +161,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 				Msg(chFault.String())
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
-			e.log.Info().
+			e.log.Warn().
 				Timestamp().
 				Hex("origin", logging.ID(originID)).
 				Uint64("chunkIndex", chunk.ChunkIndex).
@@ -169,7 +169,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 				Msg(chFault.String())
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
-			e.log.Info().
+			e.log.Error().
 				Timestamp().
 				Hex("origin", logging.ID(originID)).
 				Uint64("chunkIndex", chunk.ChunkIndex).
@@ -185,10 +185,6 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	// Generate result approval
 	approval, err := e.GenerateResultApproval(chunk.ChunkIndex, chunk.Receipt.ExecutionResult.ID(), chunk.Block.ID())
 	if err != nil {
-		e.log.Error().
-			Hex("chunk_id", logging.ID(chunkID)).
-			Msg("couldn't generate a result approval")
-
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
 

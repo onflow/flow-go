@@ -30,6 +30,7 @@ func NewChunkVerifier(vm virtualmachine.VirtualMachine) *ChunkVerifier {
 func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.ChunkFault, error) {
 
 	// TODO check collection hash to match
+	// TODO check datapack hash to match
 	// TODO check the number of transactions and computation used
 
 	if ch.ChunkDataPack == nil {
