@@ -178,6 +178,7 @@ docker-ci-integration:
 docker-ci-integration-team-city:
 	docker run \
 		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
+		-v /tmp:/tmp \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
