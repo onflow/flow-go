@@ -92,14 +92,11 @@ func createValidators(ps protocol.State, signerData SignerData, block *flow.Bloc
 
 	for i, signer := range signerData.Signers {
 		// create signer
-		signerIdentity := signer.Identity
-		stakingHasher := crypto.NewBLS_KMAC("staking_tag")
-		stakingSigner := signature.NewBLS(stakingHasher, signer.StakingPrivKey)
-		beaconHasher := crypto.NewBLS_KMAC("beacon_tag")
-		beaconSigner := signature.NewDKG(beaconHasher, signer.RandomBeaconPrivKey)
+		stakingSigner := signature.NewAggregationProvider("staking_tag", signer.StakingPrivKey)
+		beaconSigner := signature.NewThresholdProvider("beacon_tag", signer.RandomBeaconPrivKey)
 		merger := signature.NewCombiner()
 		selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
-		provider := verification.NewCombinedSigner(ps, signerData.DKGState, stakingSigner, beaconSigner, merger, selector, signerIdentity.NodeID)
+		provider := verification.NewCombinedSigner(ps, signerData.DKGState, stakingSigner, beaconSigner, merger, selector, signer.Identity.NodeID)
 		providers[i] = provider
 
 		// create view state

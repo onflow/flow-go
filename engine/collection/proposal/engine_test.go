@@ -298,12 +298,12 @@ func (suite *Suite) TestReceiveVote() {
 
 	originID := unittest.IdentifierFixture()
 	vote := &messages.ClusterBlockVote{
-		BlockID:   unittest.IdentifierFixture(),
-		View:      0,
-		Signature: nil,
+		BlockID: unittest.IdentifierFixture(),
+		View:    0,
+		SigData: nil,
 	}
 
-	suite.coldstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.Signature).Once()
+	suite.coldstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Once()
 
 	err := suite.eng.Process(originID, vote)
 	suite.Assert().Nil(err)

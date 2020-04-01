@@ -9,6 +9,7 @@ import (
 type State interface {
 	GroupSize() (uint, error)
 	GroupKey() (crypto.PublicKey, error)
+	HasParticipant(nodeID flow.Identifier) (bool, error)
 	ParticipantIndex(nodeID flow.Identifier) (uint, error)
 	ParticipantKey(nodeID flow.Identifier) (crypto.PublicKey, error)
 }

@@ -41,16 +41,14 @@ func MakeSigners(t *testing.T, proto protocol.State, dkg dkg.State, signerIDs []
 }
 
 func MakeStakingSigner(state protocol.State, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSigner {
-	hasher := crypto.NewBLS_KMAC("only_testing")
-	staking := signature.NewBLS(hasher, priv)
+	staking := signature.NewAggregationProvider("only_testing", priv)
 	signer := NewSingleSigner(state, staking, filter.Any, signerID)
 	return signer
 }
 
 func MakeBeaconSigner(proto protocol.State, dkg dkg.State, signerID flow.Identifier, stakingPriv crypto.PrivateKey, beaconPriv crypto.PrivateKey) *CombinedSigner {
-	hasher := crypto.NewBLS_KMAC("only_testing")
-	staking := signature.NewBLS(hasher, stakingPriv)
-	beacon := signature.NewDKG(hasher, beaconPriv)
+	staking := signature.NewAggregationProvider("only_testing", stakingPriv)
+	beacon := signature.NewThresholdProvider("only_testing", beaconPriv)
 	combiner := signature.NewCombiner()
 	signer := NewCombinedSigner(proto, dkg, staking, beacon, combiner, filter.Any, signerID)
 	return signer

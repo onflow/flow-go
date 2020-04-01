@@ -32,6 +32,12 @@ func (s *State) GroupKey() (crypto.PublicKey, error) {
 	return s.data.GroupPubKey, nil
 }
 
+// HasParticipant checks if the given node is part of the DKG participants.
+func (s *State) HasParticipant(nodeID flow.Identifier) (bool, error) {
+	_, exists := s.data.IDToParticipant[nodeID]
+	return exists, nil
+}
+
 // ParticipantIndex returns the index of the DKG share for the given node.
 func (s *State) ParticipantIndex(nodeID flow.Identifier) (uint, error) {
 	participant, found := s.data.IDToParticipant[nodeID]

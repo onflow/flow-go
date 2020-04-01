@@ -39,7 +39,7 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 
 	stakedSigners, err := v.viewState.IdentitiesForConsensusParticipants(qc.BlockID, qc.SignerIDs)
 	if err != nil {
-		return fmt.Errorf("invalid verifier identities in qc of blockID %s: %w", qc.BlockID, err)
+		return fmt.Errorf("invalid signer identities in qc of blockID %s: %w", qc.BlockID, err)
 	}
 	// method IdentitiesForConsensusParticipants guarantees that there are no duplicated signers
 	// and all signers are valid, staked consensus nodes
@@ -80,14 +80,14 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	blockID := proposal.Block.BlockID
 
 	// Validate Proposer's signatures and ensure that proposer is leader for respective view
-	verifier, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
+	signer, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
 	if err != nil {
 		return newInvalidBlockError(block, fmt.Sprintf("invalid proposer for block %s: %s", blockID, err.Error()))
 	}
-	// check the verifier is the leader for that block
+	// check the signer is the leader for that block
 	leader := v.viewState.LeaderForView(proposal.Block.View)
-	if leader.ID() != verifier.ID() {
-		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%s), expected leader: (%s)", verifier.ID(), leader.ID()))
+	if leader.ID() != signer.ID() {
+		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%s), expected leader: (%s)", signer.ID(), leader.ID()))
 	}
 
 	// check proposal's parent
