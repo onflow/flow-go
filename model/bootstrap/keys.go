@@ -5,7 +5,6 @@ package bootstrap
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
 )
@@ -13,17 +12,15 @@ import (
 func pubKeyToBytes(key crypto.PublicKey) []byte {
 	enc, err := key.Encode()
 	if err != nil {
+		panic(err)
 	}
 	return enc
-}
-
-func pubKeyToString(key crypto.PublicKey) string {
-	return fmt.Sprintf("%x", pubKeyToBytes(key))
 }
 
 func privKeyToBytes(key crypto.PrivateKey) []byte {
 	enc, err := key.Encode()
 	if err != nil {
+		panic(err)
 	}
 	return enc
 }
