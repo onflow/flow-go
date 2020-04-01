@@ -135,6 +135,12 @@ lint:
 .PHONY: ci
 ci: install-tools tidy lint test coverage
 
+# Runs integration tests
+# NOTE: we do not need `docker-build-flow` as this is run as a separate step
+# on Teamcity
+.PHONY: ci-integration
+ci-integration: install-tools
+	$(MAKE) -C integration integration-test
 
 # Runs unit tests, test coverage, lint in Docker
 .PHONY: docker-ci
@@ -162,7 +168,7 @@ docker-ci-integration:
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
-		make -C integration integration-test
+		make ci-integration
 
 # This command is should only be used by Team City
 # Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
@@ -173,8 +179,7 @@ docker-ci-integration-team-city:
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
-		make -C integration integration-test
-
+		make ci-integration
 
 .PHONY: docker-build-collection
 docker-build-collection:
