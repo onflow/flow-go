@@ -546,7 +546,6 @@ func (suite *TestSuite) TestVerifyReady() {
 
 	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	consIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 	testcases := []struct {
@@ -562,10 +561,6 @@ func (suite *TestSuite) TestVerifyReady() {
 			getResource: func(s *TestSuite) interface{} { return s.collection },
 			from:        collIdentity,
 			label:       "received collection",
-		}, {
-			getResource: func(s *TestSuite) interface{} { return s.block },
-			from:        consIdentity,
-			label:       "received block",
 		}, {
 			getResource: func(s *TestSuite) interface{} {
 				return &messages.ExecutionStateResponse{
@@ -711,7 +706,6 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.chunkDataPackTracker.On("Rem", chunkDataPack.ChunkID).Return(true).Once()
 
 	// terminates call to checkPendingChunks as it is out of this test's scope
-	suite.pendingReceipts.On("All").Return(nil).Once()
 	suite.authReceipts.On("All").Return(nil).Once()
 
 	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
@@ -722,7 +716,6 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.chunkDataPacks.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
-	suite.pendingReceipts.AssertExpectations(suite.T())
 	suite.authReceipts.AssertExpectations(suite.T())
 }
 
