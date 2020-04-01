@@ -16,6 +16,8 @@ import (
 
 func TestMVP_Network(t *testing.T) {
 
+	t.Skip()
+
 	colNode := testnet.NewNodeConfig(flow.RoleCollection)
 	exeNode := testnet.NewNodeConfig(flow.RoleExecution)
 
