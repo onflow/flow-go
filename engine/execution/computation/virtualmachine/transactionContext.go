@@ -72,6 +72,10 @@ func CreateAccountInLedger(ledger Ledger, publicKeys [][]byte) (runtime.Address,
 
 	accountID := accountAddress[:]
 
+	// mark that account with this ID exists
+	ledger.Set(fullKeyHash(string(accountID), "", KeyExists), []byte{1})
+
+	// set account balance to 0
 	ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 
 	err := setAccountPublicKeys(ledger, accountID, publicKeys)
@@ -105,11 +109,11 @@ func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	accountID := address[:]
 
-	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", KeyExists))
 	if err != nil {
 		return err
 	}
-	if bal == nil {
+	if len(exists) == 0 {
 		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
@@ -130,11 +134,11 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	accountID := address[:]
 
-	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", KeyExists))
 	if err != nil {
 		return nil, err
 	}
-	if bal == nil {
+	if len(exists) == 0 {
 		return nil, fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
@@ -247,12 +251,12 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return fmt.Errorf("not permitted to update account with ID %s", address)
 	}
 
-	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", KeyExists))
 	if err != nil {
 		return err
 	}
-	if bal == nil {
-		return fmt.Errorf("account with ID %s does not exist", address)
+	if len(exists) == 0 {
+		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	r.ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
@@ -319,6 +323,7 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 
 const (
 	keyLatestAccount  = "latest_account"
+	KeyExists         = "exists"
 	keyBalance        = "balance"
 	keyCode           = "code"
 	keyPublicKeyCount = "public_key_count"
