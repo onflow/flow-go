@@ -26,12 +26,14 @@ func TestCollection(t *testing.T) {
 		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
 			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
 		})
-		conNode = testnet.NewNodeConfig(flow.RoleConsensus)
-		exeNode = testnet.NewNodeConfig(flow.RoleExecution)
-		verNode = testnet.NewNodeConfig(flow.RoleVerification)
+		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus)
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus)
+		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus)
+		exeNode  = testnet.NewNodeConfig(flow.RoleExecution)
+		verNode  = testnet.NewNodeConfig(flow.RoleVerification)
 	)
 
-	nodes := []*testnet.NodeConfig{colNode1, colNode2, conNode, exeNode, verNode}
+	nodes := []*testnet.NodeConfig{colNode1, colNode2, conNode1, conNode2, conNode3, exeNode, verNode}
 
 	testingdock.Verbose = true
 
