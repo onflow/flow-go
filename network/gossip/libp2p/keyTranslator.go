@@ -43,6 +43,8 @@ func PublicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 		return nil, lcrypto.ErrBadKeyType
 	}
 
+	// at this point, keytype is either KeyType_ECDSA or KeyType_Secp256k1
+	// and can't hold another value
 	var bytes []byte
 	if keyType == lcrypto_pb.KeyType_ECDSA {
 		bytes, err = fpk.Encode()
