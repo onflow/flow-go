@@ -1,3 +1,5 @@
+# gcr.io/dl-flow/golang-cmake
+
 FROM golang:1.13
 RUN apt-get update
 RUN apt-get -y install cmake zip sudo
