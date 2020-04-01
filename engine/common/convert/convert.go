@@ -101,7 +101,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 		Timestamp:            t,
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
-		Signatures:           [][]byte{h.ParentVoterSig},
+		Signatures:           [][]byte{h.ParentVoterSig.Bytes()},
 	}
 	return &bh, nil
 }
@@ -111,7 +111,7 @@ func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 
 	return &entities.CollectionGuarantee{
 		CollectionHash: id[:],
-		Signatures:     [][]byte{g.Signature},
+		Signatures:     [][]byte{g.Signature.Bytes()},
 	}
 }
 

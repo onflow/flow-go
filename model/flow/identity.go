@@ -159,9 +159,7 @@ IDLoop:
 // Order will sort the list using the given sort function.
 func (il IdentityList) Order(less IdentityOrder) IdentityList {
 	dup := make(IdentityList, 0, len(il))
-	for _, identity := range il {
-		dup = append(dup, identity)
-	}
+	dup = append(dup, il...)
 	sort.Slice(dup, func(i int, j int) bool {
 		return less(dup[i], dup[j])
 	})

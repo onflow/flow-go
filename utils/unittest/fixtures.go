@@ -49,8 +49,13 @@ func BlockHeaderFixture() flow.Header {
 
 func BlockHeaderWithParentFixture(parentID flow.Identifier) flow.Header {
 	return flow.Header{
-		ParentID: parentID,
-		View:     rand.Uint64(),
+		ChainID:        "chain",
+		ParentID:       parentID,
+		View:           rand.Uint64(),
+		ParentVoterIDs: IdentifierListFixture(16),
+		ParentVoterSig: SignatureFixture(),
+		ProposerID:     IdentifierFixture(),
+		ProposerSig:    SignatureFixture(),
 	}
 }
 

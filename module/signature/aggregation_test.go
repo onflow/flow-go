@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 const NUM_AggregationProvider_TEST = 7
@@ -101,7 +102,7 @@ func TestAggregationAggregateVerifyMany(t *testing.T) {
 	require.True(t, valid)
 
 	// signature should fail with one key missing
-	valid, err = bls.VerifyMany(msg, aggSig, keys[1:])
+	_, err = bls.VerifyMany(msg, aggSig, keys[1:])
 	require.Error(t, err)
 
 	// signature should be invalid with one key swapped

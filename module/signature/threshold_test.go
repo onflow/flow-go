@@ -85,25 +85,25 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 		indices = append(indices, uint(index))
 	}
 
-	// should not generate valid signature with insufficient signers
-	var insufficient int
-	for insufficient = len(shares); crypto.EnoughShares(len(signers), insufficient); insufficient-- {
-		// just count down insufficient until it's no longer enough shares
-	}
-	threshold, err := signers[0].Combine(uint(len(signers)), shares[:insufficient], indices[:insufficient])
-	require.Error(t, err, "should not be able to create threshold signature with insufficient shares")
-
-	// should not be able to generate signature with missing indices
-	threshold, err = signers[0].Combine(uint(len(signers)), shares, indices[:len(indices)-1])
-	require.Error(t, err, "should not be able to create threshold signature with missing indices")
-
 	// should generate valid signature with sufficient signers
 	var sufficient int
 	for sufficient = 0; !crypto.EnoughShares(len(signers), sufficient); sufficient++ {
 		// just count up sufficient until we have enough shares
 	}
-	threshold, err = signers[0].Combine(uint(len(signers)), shares[:sufficient], indices[:sufficient])
+	threshold, err := signers[0].Combine(uint(len(signers)), shares[:sufficient], indices[:sufficient])
 	require.NoError(t, err, "should be able to create threshold signature with sufficient shares")
+
+	// should not generate valid signature with insufficient signers
+	var insufficient int
+	for insufficient = len(shares); crypto.EnoughShares(len(signers), insufficient); insufficient-- {
+		// just count down insufficient until it's no longer enough shares
+	}
+	_, err = signers[0].Combine(uint(len(signers)), shares[:insufficient], indices[:insufficient])
+	require.Error(t, err, "should not be able to create threshold signature with insufficient shares")
+
+	// should not be able to generate signature with missing indices
+	_, err = signers[0].Combine(uint(len(signers)), shares, indices[:len(indices)-1])
+	require.Error(t, err, "should not be able to create threshold signature with missing indices")
 
 	// threshold signature should be valid for the group public key
 	valid, err := signers[0].VerifyThreshold(msg, threshold, groupKey)
