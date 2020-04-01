@@ -11,7 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/model/chunkassignment"
+	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mock"
@@ -46,7 +46,7 @@ func TestHappyPath(t *testing.T) {
 	completeER := CompleteExecutionResultFixture(t, chunkNum)
 
 	// assigns half of the chunks to this verifier
-	a := chunkassignment.NewAssignment()
+	a := chmodel.NewAssignment()
 	for i := 0; i < chunkNum; i++ {
 		if isAssigned(i, chunkNum) {
 			a.Add(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
