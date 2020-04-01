@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
@@ -42,7 +43,7 @@ func (s *SingleVerifier) VerifyProposal(proposal *model.Proposal) (bool, error) 
 	// get the identity of the proposer
 	proposer, ok := participants.ByNodeID(proposal.Block.ProposerID)
 	if !ok {
-		return false, fmt.Errorf("proposer is not part of selector set (proposer: %x)", proposal.Block.ProposerID)
+		return false, fmt.Errorf("proposer is not part of selector set (proposer: %x): %w", proposal.Block.ProposerID, ErrInvalidSigner)
 	}
 
 	// create the message we verify against and check signature
@@ -67,7 +68,7 @@ func (s *SingleVerifier) VerifyVote(vote *model.Vote) (bool, error) {
 	// get the identity of the voter
 	voter, ok := participants.ByNodeID(vote.SignerID)
 	if !ok {
-		return false, fmt.Errorf("voter is not part of selector set (voter: %x)", vote.SignerID)
+		return false, fmt.Errorf("voter is not part of selector set (voter: %x): %w", vote.SignerID, ErrInvalidSigner)
 	}
 
 	// create the message we verify against and check signature
@@ -92,10 +93,11 @@ func (s *SingleVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
 
 	// check they were all in the selector set
 	if len(signers) < len(qc.SignerIDs) {
-		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d)", len(qc.SignerIDs), len(signers))
+		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d): %w", len(qc.SignerIDs), len(signers), ErrInvalidSigner)
 	}
 
 	// create the message we verify against and check signature
+	signers = signers.Order(order.ByReferenceOrder(qc.SignerIDs))
 	msg := messageFromParams(qc.View, qc.BlockID)
 	valid, err := s.verifier.VerifyMany(msg, qc.SigData, signers.StakingKeys())
 	if err != nil {

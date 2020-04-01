@@ -74,16 +74,16 @@ func (c *CombinedVerifier) VerifyProposal(proposal *model.Proposal) (bool, error
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
 func (c *CombinedVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
 
-	// get the participants of the signature scheme
-	participants, err := c.state.AtBlockID(qc.BlockID).Identities(c.selector)
+	// get the signers from the selector set
+	selector := filter.And(c.selector, filter.HasNodeID(qc.SignerIDs...))
+	signers, err := c.state.AtBlockID(qc.BlockID).Identities(selector)
 	if err != nil {
-		return false, fmt.Errorf("could not get signing participants: %w", err)
+		return false, fmt.Errorf("could not get signers from protocol state: %w", err)
 	}
 
-	// get the signers from the selector set
-	signers := participants.Filter(filter.HasNodeID(qc.SignerIDs...)).Order(order.ByReferenceOrder(qc.SignerIDs))
+	// check if we have sufficient signers
 	if len(signers) < len(qc.SignerIDs) {
-		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d)", len(qc.SignerIDs), len(signers))
+		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d): %w", len(qc.SignerIDs), len(signers), ErrInvalidSigner)
 	}
 
 	// get the DKG group key from the DKG state
@@ -95,12 +95,12 @@ func (c *CombinedVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
 	// split the aggregated staking & beacon signatures
 	splitSigs, err := c.merger.Split(qc.SigData)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", err)
+		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
 	}
 
 	// check we have the right amount of split sigs
 	if len(splitSigs) != 2 {
-		return false, fmt.Errorf("wrong amount of split sigs (count: %d, expected: 2)", len(splitSigs))
+		return false, fmt.Errorf("invalid number of split signatures: %w", ErrInvalidFormat)
 	}
 
 	// assign the signatures
@@ -108,6 +108,7 @@ func (c *CombinedVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
 	beaconThresSig := splitSigs[1]
 
 	// verify the aggregated staking signature first
+	signers = signers.Order(order.ByReferenceOrder(qc.SignerIDs))
 	msg := messageFromParams(qc.View, qc.BlockID)
 	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
 	if err != nil {
@@ -134,18 +135,18 @@ func (c *CombinedVerifier) verifySigData(blockID flow.Identifier, msg []byte, co
 	// get the specific identity
 	signer, ok := participants.ByNodeID(signerID)
 	if !ok {
-		return false, fmt.Errorf("signer is not part of participants (signer: %x)", signerID)
+		return false, fmt.Errorf("signer is not part of participants (signer: %x): %w", signerID, ErrInvalidSigner)
 	}
 
 	// split the two signatures from the vote
 	splitSigs, err := c.merger.Split(combined)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", err)
+		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
 	}
 
 	// check if we have two signature
 	if len(splitSigs) != 2 {
-		return false, fmt.Errorf("wrong number of combined signatures: %w", err)
+		return false, fmt.Errorf("wrong number of combined signatures: %w", ErrInvalidFormat)
 	}
 
 	// assign the signtures
@@ -161,11 +162,11 @@ func (c *CombinedVerifier) verifySigData(blockID flow.Identifier, msg []byte, co
 	// verify each signature against the message
 	stakingValid, err := c.staking.Verify(msg, stakingSig, signer.StakingPubKey)
 	if err != nil {
-		return false, fmt.Errorf("could not verify first signature: %w", err)
+		return false, fmt.Errorf("could not verify staking signature: %w", err)
 	}
 	beaconValid, err := c.beacon.Verify(msg, beaconShare, beaconPubKey)
 	if err != nil {
-		return false, fmt.Errorf("could not verify second signature: %w", err)
+		return false, fmt.Errorf("could not verify beacon signature: %w", err)
 	}
 
 	return stakingValid && beaconValid, nil

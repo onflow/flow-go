@@ -1,10 +1,12 @@
 package validator
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -56,11 +58,14 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 	// validate signature:
 	// validate qc's aggregated staking signature using the internal protocol state
 	valid, err := v.verifier.VerifyQC(qc)
+	if errors.Is(err, verification.ErrInvalidFormat) {
+		return newInvalidBlockError(block, fmt.Sprintf("QC signature has bad format (%s)", err))
+	}
 	if err != nil {
 		return fmt.Errorf("cannot verify qc's aggregated signature, qc.BlockID: %s", qc.BlockID)
 	}
 	if !valid {
-		return newInvalidBlockError(block, "aggregated staking signature in QC is invalid")
+		return newInvalidBlockError(block, "QC signature is invalid")
 	}
 
 	return nil
@@ -127,11 +132,14 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 
 	// check staking signature
 	valid, err := v.verifier.VerifyVote(vote)
+	if errors.Is(err, verification.ErrInvalidFormat) {
+		return nil, newInvalidVoteError(vote, fmt.Sprintf("vote signature has bad format (%s)", err))
+	}
 	if err != nil {
 		return nil, fmt.Errorf("cannot verify signature for vote (%s): %w", vote.ID(), err)
 	}
 	if !valid {
-		return nil, newInvalidVoteError(vote, "invalid staking signature")
+		return nil, newInvalidVoteError(vote, "vote signature is invalid")
 	}
 
 	return voter, nil
