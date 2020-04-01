@@ -227,6 +227,7 @@ func healthcheckGRPC(apiPort string) func() error {
 	}
 }
 
+// TODO consolidate with dupe from cmd/bootstrap
 // getSeeds returns a list of n random seeds of 48 bytes each. This is used in
 // conjunction with bootstrap key generation functions.
 func getSeeds(n int) ([][]byte, error) {
@@ -243,6 +244,7 @@ func getSeeds(n int) ([][]byte, error) {
 	return seeds, nil
 }
 
+// TODO consolidate with dupe from cmd/bootstrap
 // getQCSignerData packages up all the keys necessary in order to generate a
 // quorum certificate for the genesis block.
 //
@@ -456,9 +458,6 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 		err = writeJSON(filepath.Join(bootstrapDir, fmt.Sprintf(bootstrapcmd.FilenameNodeInfoPriv, identity.NodeID)), writeable)
 		require.Nil(t, err)
 	}
-
-	// TODO manually checking the result
-	fmt.Println(">>%%<<: ", bootstrapDir)
 
 	// STEP 2 - CREATE CONTAINERS
 
