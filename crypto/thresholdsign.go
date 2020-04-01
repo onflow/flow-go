@@ -49,8 +49,8 @@ func NewThresholdSigner(size int, currentIndex int, hashAlgo Hasher) (*Threshold
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)}
 	}
-	if size <= currentIndex {
-		return nil, cryptoError{"The current index is larger than the group size"}
+	if size <= currentIndex || currentIndex < 0 {
+		return nil, cryptoError{"The current index must be between 0 and the group size"}
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
@@ -112,7 +112,7 @@ func (s *ThresholdSigner) SignShare() (Signature, error) {
 // VerifyShare verifies a signature share using the signer's public key
 func (s *ThresholdSigner) verifyShare(share Signature, signerIndex index) (bool, error) {
 	if len(s.publicKeyShares)-1 < int(signerIndex) {
-		return false, cryptoError{"The node public keys are not set"}
+		return false, cryptoError{"The node public key is not set"}
 	}
 
 	return s.publicKeyShares[signerIndex].Verify(share, s.messageToSign, s.hashAlgo)
@@ -146,6 +146,10 @@ func (s *ThresholdSigner) enoughShares() bool {
 //  - first bool: true if the share is valid, false otherwise
 //  - second bool: true if thereshold is reached, false otherwise
 func (s *ThresholdSigner) AddSignatureShare(orig int, share Signature) (bool, bool, error) {
+	if orig >= s.size || orig < 0 {
+		return false, s.enoughShares(), cryptoError{"orig input is invalid"}
+	}
+
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
 		return false, s.enoughShares(), err
@@ -224,13 +228,18 @@ func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // ReconstructThresholdSignature returns:
 // - Signature: the threshold signature if the threshold was reached, nil otherwise
 func ReconstructThresholdSignature(size int, shares []Signature, signers []int) (Signature, error) {
+	if size < ThresholdMinSize || size > ThresholdMaxSize {
+		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d",
+			ThresholdMinSize, ThresholdMaxSize)}
+	}
+
 	if len(shares) != len(signers) {
 		return nil, cryptoError{"The number of signature shares is not matching the number of signers"}
 	}
 	// check if the threshold was not reached
 	threshold := optimalThreshold(size)
 	if len(shares) < threshold+1 {
-		return nil, nil
+		return nil, cryptoError{"The number of signatures does not reach the threshold"}
 	}
 
 	// flatten the shares (required by the C layer)
@@ -238,6 +247,9 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 	indexSigners := make([]index, 0, threshold+1)
 	for i, share := range shares {
 		flatShares = append(flatShares, share...)
+		if signers[i] >= size || signers[i] < 0 {
+			return nil, cryptoError{fmt.Sprintf("signer index #%d is invalid", i)}
+		}
 		indexSigners = append(indexSigners, index(signers[i]))
 	}
 

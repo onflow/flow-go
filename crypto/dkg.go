@@ -63,8 +63,9 @@ func NewDKG(dkg DKGType, size int, currentIndex int,
 		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d", DKGMinSize, DKGMaxSize)}
 	}
 
-	if currentIndex >= size || leaderIndex >= size {
-		return nil, cryptoError{fmt.Sprintf("indices of current and leader nodes must be in the correct range")}
+	if currentIndex >= size || leaderIndex >= size || currentIndex < 0 || leaderIndex < 0 {
+		return nil, cryptoError{fmt.Sprintf(
+			"indices of current and leader nodes must be between 0 and %d", size-1)}
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)

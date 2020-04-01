@@ -94,7 +94,7 @@ func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg []byte) error {
 	if !s.running {
 		return cryptoError{"dkg is not running"}
 	}
-	if orig >= s.Size() {
+	if orig >= s.Size() || orig < 0 {
 		return cryptoError{"wrong input"}
 	}
 
