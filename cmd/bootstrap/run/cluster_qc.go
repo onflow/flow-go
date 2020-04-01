@@ -130,7 +130,7 @@ func NewStakingProvider(ps protocol.State, signers []ClusterSigner, tag string, 
 // aggregateSigs function is a temporary workaround for the StakigSigner.Aggregate function. It is used here since the
 // current implementation of StakigSigner.Aggregate assumes that the block that is signed is also the anchor for the
 // identity list in the protocol state, which is not the case for cluster blocks.
-// TODO: Replace this function ones the sig aggregation logic has been adjusted to refer to a consensus block with to
+// TODO: Replace this function once the sig aggregation logic has been adjusted to refer to a consensus block with to
 // get the identity list.
 func aggregateSigs(block *model.Block, sigs []*model.SingleSignature) (*model.AggregatedSignature, error) {
 	if len(sigs) == 0 { // ensure that sigs is not empty
