@@ -3,22 +3,20 @@
 package crypto
 
 import (
+	"crypto/rand"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // BLS tests
 func TestBLS_BLS12381(t *testing.T) {
-	seed := []byte{1, 2, 3, 4}
-	h, _ := NewHasher(SHA3_384)
-	sk, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
+	h, err := NewHasher(SHA3_384)
+	require.Nil(t, err)
+	seed := h.ComputeHash([]byte{1, 2, 3, 4})
+	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	require.Nil(t, err)
 	halg := NewBLS_KMAC("test tag")
 	input := []byte("test input")
 	// test the consistency with different inputs
@@ -40,51 +38,60 @@ func BenchmarkBLS_BLS12381Verify(b *testing.B) {
 	benchVerify(b, BLS_BLS12381, halg)
 }
 
-// TestEncDecPrivateKey tests encoding and decoding of BLS private keys
-func TestEncDecPrivateKey(t *testing.T) {
-	// generate a key pair
-	seed := []byte{1, 2, 3, 4}
-	h, _ := NewHasher(SHA3_384)
-	sk, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
-	require.NoError(t, err)
-	// encode the private key
+// TestBLSEncodeDecode tests encoding and decoding of BLS keys
+func TestBLSEncodeDecode(t *testing.T) {
+	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
+	rand.Read(seed)
+	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	assert.Nil(t, err, "the key generation has failed")
+
 	skBytes, err := sk.Encode()
-	require.NoError(t, err)
-	// decode the private key
-	skCopy, err := DecodePrivateKey(BLS_BLS12381, skBytes)
-	require.Nil(t, err)
-	assert.True(t, sk.Equals(skCopy), "key equality check failed")
-	// check the encode and decode are consistent
-	skCopyBytes, err := skCopy.Encode()
-	require.NoError(t, err)
-	assert.Equal(t, skBytes, skCopyBytes)
+	require.Nil(t, err, "the key encoding has failed")
+	skCheck, err := DecodePrivateKey(BLS_BLS12381, skBytes)
+	require.Nil(t, err, "the key decoding has failed")
+	assert.True(t, sk.Equals(skCheck), "key equality check failed")
+	skCheckBytes, err := skCheck.Encode()
+	require.Nil(t, err, "the key encoding has failed")
+	assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
+
+	pk := sk.PublicKey()
+	pkBytes, err := pk.Encode()
+	require.Nil(t, err, "the key encoding has failed")
+	pkCheck, err := DecodePublicKey(BLS_BLS12381, pkBytes)
+	require.Nil(t, err, "the key decoding has failed")
+	assert.True(t, pk.Equals(pkCheck), "key equality check failed")
+	pkCheckBytes, err := pkCheck.Encode()
+	require.Nil(t, err, "the key encoding has failed")
+	assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
 }
 
-// TestEncDecPublicKey checks:
-// - the consistency of encode/decode of BLS public keys
-// - the validity of membership checks of BLS public keys on BLS12-381
-//    when decoding a public key
-func TestEncDecPublicKey(t *testing.T) {
+// TestBLSEquals tests equal for BLS keys
+func TestBLSEquals(t *testing.T) {
 	// generate a key pair
-	seed := []byte{1, 2, 3, 4}
-	h, _ := NewHasher(SHA3_384)
-	sk, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
+	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
+	rand.Read(seed)
+	// first pair
+	sk1, err := GeneratePrivateKey(BLS_BLS12381, seed)
 	require.NoError(t, err)
-	pk := sk.PublicKey()
-	// encode the publick key
-	pkBytes, err := pk.Encode()
+	pk1 := sk1.PublicKey()
+	// second pair without changing the seed
+	sk2, err := GeneratePrivateKey(BLS_BLS12381, seed)
 	require.NoError(t, err)
-	// decode the public key including a membership check
-	pkCopy, err := DecodePublicKey(BLS_BLS12381, pkBytes)
-	// membership check should be valid
-	assert.Nil(t, err)
-	assert.True(t, pk.Equals(pkCopy), "key equality check failed")
-	// check the encode and decode are consistent
-	pkCopyBytes, err := pkCopy.Encode()
+	pk2 := sk2.PublicKey()
+	// unrelated algo pair
+	sk3, err := GeneratePrivateKey(ECDSA_P256, seed)
 	require.NoError(t, err)
-	assert.Equal(t, pkBytes, pkCopyBytes)
-	// check an invalid membership check
-	pkBytes[5] ^= 1 // alter one bit
-	pkCopy, err = DecodePublicKey(BLS_BLS12381, pkBytes)
-	assert.NotNil(t, err)
+	pk3 := sk3.PublicKey()
+	// fourth pair after changing the seed
+	rand.Read(seed)
+	sk4, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	require.NoError(t, err)
+	pk4 := sk4.PublicKey()
+	// tests
+	assert.True(t, sk1.Equals(sk2), "key equality should return true")
+	assert.True(t, pk1.Equals(pk2), "key equality should return true")
+	assert.False(t, sk1.Equals(sk3), "key equality should return false")
+	assert.False(t, pk1.Equals(pk3), "key equality should return false")
+	assert.False(t, sk1.Equals(sk4), "key equality should return false")
+	assert.False(t, pk1.Equals(pk4), "key equality should return false")
 }

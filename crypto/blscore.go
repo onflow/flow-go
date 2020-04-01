@@ -71,7 +71,15 @@ func _G2scalarGenMult(res *pointG2, expo *scalar) {
 	C._G2scalarGenMult((*C.ep2_st)(res), (*C.bn_st)(expo))
 }
 
-// TEST/DEBUG
+// comparison in Zp (both scalars are reduced mod p)
+func (x *scalar) equals(other *scalar) bool {
+	return C.bn_cmp((*C.bn_st)(x), (*C.bn_st)(other)) == valid
+}
+
+// comparison in G2
+func (p *pointG2) equals(other *pointG2) bool {
+	return C.ep2_cmp((*C.ep2_st)(p), (*C.ep2_st)(other)) == valid
+}
 
 // seeds the internal relic random function
 func seedRelic(seed []byte) error {

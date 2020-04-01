@@ -70,10 +70,10 @@ var keyCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(keyCmd)
 
-	keyCmd.Flags().StringVarP(&flagRole, "role", "r", "",
+	keyCmd.Flags().StringVar(&flagRole, "role", "",
 		"node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"observation\")")
 	_ = keyCmd.MarkFlagRequired("role")
-	keyCmd.Flags().StringVarP(&flagAddress, "address", "a", "", "network address")
+	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
 	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", []byte{}, "networking seed")
 	_ = keyCmd.MarkFlagRequired("networking-seed")
