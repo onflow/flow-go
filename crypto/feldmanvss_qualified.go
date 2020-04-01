@@ -119,7 +119,7 @@ const (
 	complainAnswerSize = 1 + PrKeyLenBLS_BLS12381
 )
 
-func (s *feldmanVSSQualState) ReceiveDKGMsg(orig int, msg []byte) error {
+func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {
 	if !s.running {
 		return cryptoError{"dkg is not running"}
 	}

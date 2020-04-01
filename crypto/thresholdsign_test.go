@@ -206,7 +206,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving DKG from %d:", proc.current, newMsg.orig)
-			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.data)
+			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
 			assert.Nil(t, err)
 
 		// if timeout, finalize DKG and sign the share

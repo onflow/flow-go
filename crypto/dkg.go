@@ -27,9 +27,9 @@ type DKGstate interface {
 	Threshold() int
 	// StartDKG starts running a DKG
 	StartDKG(seed []byte) error
-	// ReceiveDKGMsg processes a new DKG message received by the current node
+	// HandleMsg processes a new DKG message received by the current node
 	// orig is the message origin index
-	ReceiveDKGMsg(orig int, msg []byte) error
+	HandleMsg(orig int, msg []byte) error
 	// EndDKG ends a DKG protocol, the public data and node private key are finalized
 	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	// NextTimeout set the next timeout of the protocol if any timeout applies

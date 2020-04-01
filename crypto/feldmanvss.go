@@ -90,7 +90,7 @@ const (
 	verifVectorSize = PubKeyLenBLS_BLS12381
 )
 
-func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg []byte) error {
+func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	if !s.running {
 		return cryptoError{"dkg is not running"}
 	}
