@@ -43,7 +43,7 @@ func MakeSigners(t *testing.T, proto protocol.State, dkg dkg.State, signerIDs []
 func MakeStakingSigner(state protocol.State, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSigner {
 	hasher := crypto.NewBLS_KMAC("only_testing")
 	staking := signature.NewBLS(hasher, priv)
-	signer := NewSingleSigner(state, staking, signerID)
+	signer := NewSingleSigner(state, staking, filter.Any, signerID)
 	return signer
 }
 

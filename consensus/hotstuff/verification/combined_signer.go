@@ -24,26 +24,26 @@ type CombinedSigner struct {
 	staking  module.AggregatingSigner
 	beacon   module.ThresholdSigner
 	merger   module.Merger
-	filter   flow.IdentityFilter
+	selector flow.IdentityFilter
 	signerID flow.Identifier
 }
 
 // NewCombinedSigner creates a new combined signer with the given dependencies:
 // - the protocol state is used to retrieve public keys for signers;
-// - the filter is used to select the set of valid signers from the protocol state;
+// - the selector is used to select the set of valid signers from the protocol state;
 // - the signer ID is used as the identity when creating signatures;
 // - the staking signer is used to create aggregatable signatures for the first signature part;
 // - the threshold signer is used to create threshold signture shres for the second signature part; and
 // - the merger is used to join and split the two signature parts on our models.
-func NewCombinedSigner(state protocol.State, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, filter flow.IdentityFilter, signerID flow.Identifier) *CombinedSigner {
+func NewCombinedSigner(state protocol.State, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, selector flow.IdentityFilter, signerID flow.Identifier) *CombinedSigner {
 	sc := &CombinedSigner{
-		CombinedVerifier: NewCombinedVerifier(state, dkg, staking, beacon, merger, filter),
+		CombinedVerifier: NewCombinedVerifier(state, dkg, staking, beacon, merger, selector),
 		state:            state,
 		dkg:              dkg,
 		staking:          staking,
 		beacon:           beacon,
 		merger:           merger,
-		filter:           filter,
+		selector:         selector,
 		signerID:         signerID,
 	}
 	return sc

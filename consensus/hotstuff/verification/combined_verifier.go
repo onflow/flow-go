@@ -18,12 +18,12 @@ import (
 // a signature from a threshold signer, which verifies either the signature share or
 // the reconstructed threshold signature.
 type CombinedVerifier struct {
-	state   protocol.State
-	dkg     dkg.State
-	staking module.AggregatingVerifier
-	beacon  module.ThresholdVerifier
-	merger  module.Merger
-	filter  flow.IdentityFilter
+	state    protocol.State
+	dkg      dkg.State
+	staking  module.AggregatingVerifier
+	beacon   module.ThresholdVerifier
+	merger   module.Merger
+	selector flow.IdentityFilter
 }
 
 // NewCombinedVerifier creates a new combined verifier with the given dependencies.
@@ -33,14 +33,14 @@ type CombinedVerifier struct {
 // - the beacon verifier is used to verify signature shares & threshold signatures;
 // - the merger is used to combined & split staking & random beacon signatures; and
 // - the filter is used to select the set of scheme participants from the protocol state.
-func NewCombinedVerifier(state protocol.State, dkg dkg.State, staking module.AggregatingVerifier, beacon module.ThresholdVerifier, merger module.Merger, filter flow.IdentityFilter) *CombinedVerifier {
+func NewCombinedVerifier(state protocol.State, dkg dkg.State, staking module.AggregatingVerifier, beacon module.ThresholdVerifier, merger module.Merger, selector flow.IdentityFilter) *CombinedVerifier {
 	c := &CombinedVerifier{
-		state:   state,
-		dkg:     dkg,
-		staking: staking,
-		beacon:  beacon,
-		merger:  merger,
-		filter:  filter,
+		state:    state,
+		dkg:      dkg,
+		staking:  staking,
+		beacon:   beacon,
+		merger:   merger,
+		selector: selector,
 	}
 	return c
 }
@@ -75,9 +75,15 @@ func (c *CombinedVerifier) VerifyProposal(proposal *model.Proposal) (bool, error
 func (c *CombinedVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
 
 	// get the participants of the signature scheme
-	participants, err := c.state.AtBlockID(qc.BlockID).Identities(c.filter)
+	participants, err := c.state.AtBlockID(qc.BlockID).Identities(c.selector)
 	if err != nil {
-		return false, fmt.Errorf("could not get signer identities: %w", err)
+		return false, fmt.Errorf("could not get signing participants: %w", err)
+	}
+
+	// get the signers from the selector set
+	signers := participants.Filter(filter.HasNodeID(qc.SignerIDs...)).Order(order.ByReferenceOrder(qc.SignerIDs))
+	if len(signers) < len(qc.SignerIDs) {
+		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d)", len(qc.SignerIDs), len(signers))
 	}
 
 	// get the DKG group key from the DKG state
@@ -103,7 +109,6 @@ func (c *CombinedVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
 
 	// verify the aggregated staking signature first
 	msg := messageFromParams(qc.View, qc.BlockID)
-	signers := participants.Filter(filter.HasNodeID(qc.SignerIDs...)).Order(order.ByReferenceOrder(qc.SignerIDs))
 	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
 	if err != nil {
 		return false, fmt.Errorf("could not verify staking signature: %w", err)
@@ -120,6 +125,18 @@ func (c *CombinedVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
 // the context of the given protocol state.
 func (c *CombinedVerifier) verifySigData(blockID flow.Identifier, msg []byte, combined []byte, signerID flow.Identifier) (bool, error) {
 
+	// get the set of signing participants
+	participants, err := c.state.AtBlockID(blockID).Identities(c.selector)
+	if err != nil {
+		return false, fmt.Errorf("could not get signer participants: %w", err)
+	}
+
+	// get the specific identity
+	signer, ok := participants.ByNodeID(signerID)
+	if !ok {
+		return false, fmt.Errorf("signer is not part of participants (signer: %x)", signerID)
+	}
+
 	// split the two signatures from the vote
 	splitSigs, err := c.merger.Split(combined)
 	if err != nil {
@@ -134,12 +151,6 @@ func (c *CombinedVerifier) verifySigData(blockID flow.Identifier, msg []byte, co
 	// assign the signtures
 	stakingSig := splitSigs[0]
 	beaconShare := splitSigs[1]
-
-	// get the signer identity to get his staking key
-	signer, err := c.state.AtBlockID(blockID).Identity(signerID)
-	if err != nil {
-		return false, fmt.Errorf("could not get signer identity: %w", err)
-	}
 
 	// get the signer dkg key share
 	beaconPubKey, err := c.dkg.ShareKey(signerID)
