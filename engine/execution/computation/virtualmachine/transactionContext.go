@@ -73,7 +73,7 @@ func CreateAccountInLedger(ledger Ledger, publicKeys [][]byte) (runtime.Address,
 	accountID := accountAddress[:]
 
 	// mark that account with this ID exists
-	ledger.Set(fullKeyHash(string(accountID), "", KeyExists), []byte{1})
+	ledger.Set(fullKeyHash(string(accountID), "", keyExists), []byte{1})
 
 	// set account balance to 0
 	ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
@@ -109,7 +109,7 @@ func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	accountID := address[:]
 
-	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", KeyExists))
+	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	accountID := address[:]
 
-	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", KeyExists))
+	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return fmt.Errorf("not permitted to update account with ID %s", address)
 	}
 
-	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", KeyExists))
+	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
 	if err != nil {
 		return err
 	}
@@ -323,7 +323,7 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 
 const (
 	keyLatestAccount  = "latest_account"
-	KeyExists         = "exists"
+	keyExists         = "exists"
 	keyBalance        = "balance"
 	keyCode           = "code"
 	keyPublicKeyCount = "public_key_count"
