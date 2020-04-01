@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/dkg"
 	dkgmock "github.com/dapperlabs/flow-go/state/dkg/mocks"
@@ -27,12 +28,12 @@ func MakeSigners(t *testing.T, proto protocol.State, dkg dkg.State, signerIDs []
 	var signers []hotstuff.Signer
 	if len(beaconKeys) != len(stakingKeys) {
 		for i, signerID := range signerIDs {
-			signer := MakeStakingSigner(proto, signerID, stakingKeys[i])
+			signer := MakeStakingSigner(t, proto, signerID, stakingKeys[i])
 			signers = append(signers, signer)
 		}
 	} else {
 		for i, signerID := range signerIDs {
-			signer := MakeBeaconSigner(proto, dkg, signerID, stakingKeys[i], beaconKeys[i])
+			signer := MakeBeaconSigner(t, proto, dkg, signerID, stakingKeys[i], beaconKeys[i])
 			signers = append(signers, signer)
 		}
 	}
@@ -40,14 +41,18 @@ func MakeSigners(t *testing.T, proto protocol.State, dkg dkg.State, signerIDs []
 	return signers
 }
 
-func MakeStakingSigner(state protocol.State, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSigner {
-	staking := signature.NewAggregationProvider("test_staking", priv)
+func MakeStakingSigner(t *testing.T, state protocol.State, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSigner {
+	local, err := local.New(nil, priv)
+	require.NoError(t, err)
+	staking := signature.NewAggregationProvider("test_staking", local)
 	signer := NewSingleSigner(state, staking, filter.Any, signerID)
 	return signer
 }
 
-func MakeBeaconSigner(proto protocol.State, dkg dkg.State, signerID flow.Identifier, stakingPriv crypto.PrivateKey, beaconPriv crypto.PrivateKey) *CombinedSigner {
-	staking := signature.NewAggregationProvider("test_staking", stakingPriv)
+func MakeBeaconSigner(t *testing.T, proto protocol.State, dkg dkg.State, signerID flow.Identifier, stakingPriv crypto.PrivateKey, beaconPriv crypto.PrivateKey) *CombinedSigner {
+	local, err := local.New(nil, stakingPriv)
+	require.NoError(t, err)
+	staking := signature.NewAggregationProvider("test_staking", local)
 	beacon := signature.NewThresholdProvider("test_beacon", beaconPriv)
 	combiner := signature.NewCombiner()
 	signer := NewCombinedSigner(proto, dkg, staking, beacon, combiner, filter.Any, signerID)

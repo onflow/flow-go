@@ -52,7 +52,7 @@ func (vs *VotingStatus) AddVote(vote *model.Vote, voter *flow.Identity) {
 	vs.accumulatedStake += voter.Stake
 }
 
-// HasReachedThreshold check whether the
+// CanBuildQC check whether the
 func (vs *VotingStatus) CanBuildQC() bool {
 	return vs.hasEnoughStake()
 }

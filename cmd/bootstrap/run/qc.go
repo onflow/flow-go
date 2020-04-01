@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -91,6 +92,13 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 
 	forks := &mocks.ForksReader{}
 
+	// create selector
+	nodeIDs := make([]flow.Identifier, 0, len(participantData.Participants))
+	for _, participant := range participantData.Participants {
+		nodeIDs = append(nodeIDs, participant.NodeID)
+	}
+	selector := filter.HasNodeID(nodeIDs...)
+
 	for i, participant := range participantData.Participants {
 		// get the participant private keys
 		keys, err := participant.PrivateKeys()
@@ -98,11 +106,15 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 			return nil, nil, fmt.Errorf("could not get private keys for participant: %w", err)
 		}
 
+		local, err := local.New(participant.Identity(), keys.StakingKey)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		// create signer
-		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, keys.StakingKey)
+		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
 		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
 		merger := signature.NewCombiner()
-		selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
 		signer := verification.NewCombinedSigner(ps, participantData.DKGState, stakingSigner, beaconSigner, merger, selector, participant.NodeID)
 		signers[i] = signer
 

@@ -40,6 +40,8 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 	// get the identities of the QC's voters
 	// NOTE: the function guarantees that there are no duplicate voters and that all signers
 	// are valid, staked consensus nodes
+	// TODO IdentitiesForConsensusParticipants should generate different errors depending on whether
+	// we have an application-internal (fatal) disfunction or the `SignerIDs` are not valid consensus members
 	voters, err := v.viewState.IdentitiesForConsensusParticipants(qc.BlockID, qc.SignerIDs)
 	if err != nil {
 		return fmt.Errorf("invalid signer identities in qc of blockID %s: %w", qc.BlockID, err)
@@ -57,7 +59,7 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
-	valid, err := v.verifier.VerifyQC(qc)
+	valid, err := v.verifier.VerifyQC(qc.SignerIDs, qc.SigData, block)
 	if errors.Is(err, verification.ErrInvalidFormat) {
 		return newInvalidBlockError(block, fmt.Sprintf("QC signature has bad format (%s)", err))
 	}
@@ -132,7 +134,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	}
 
 	// check whether the signature data is valid for the vote in the hotstuff context
-	valid, err := v.verifier.VerifyVote(vote)
+	valid, err := v.verifier.VerifyVote(vote.SignerID, vote.SigData, block)
 	if errors.Is(err, verification.ErrInvalidFormat) {
 		return nil, newInvalidVoteError(vote, fmt.Sprintf("vote signature has bad format (%s)", err))
 	}

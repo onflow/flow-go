@@ -12,13 +12,12 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/eventhandler"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mock"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	nmock "github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/test"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -129,7 +128,7 @@ func (v *VoteAggregator) PruneByView(view uint64) {
 }
 
 type ViewState struct {
-	mock.ViewState
+	mocks.ViewState
 	// to mock I'm the leader of a certain view, add the view into the keys of leaders field
 	leaders map[uint64]struct{}
 }

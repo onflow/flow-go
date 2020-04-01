@@ -20,8 +20,8 @@ const NUM_THRES_BENCH = 254
 func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
 	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
-		agg := createAggregationB(b)
-		thres := NewThresholdProvider("test_beacon", agg.priv)
+		_, priv := createAggregationB(b)
+		thres := NewThresholdProvider("test_beacon", priv)
 		signers = append(signers, thres)
 	}
 	return signers

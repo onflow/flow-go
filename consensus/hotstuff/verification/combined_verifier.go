@@ -32,7 +32,7 @@ type CombinedVerifier struct {
 // - the staking verifier is used to verify single & aggregated staking signatures;
 // - the beacon verifier is used to verify signature shares & threshold signatures;
 // - the merger is used to combined & split staking & random beacon signatures; and
-// - the filter is used to select the set of scheme participants from the protocol state.
+// - the selector is used to select the set of scheme participants from the protocol state.
 func NewCombinedVerifier(state protocol.State, dkg dkg.State, staking module.AggregatingVerifier, beacon module.ThresholdVerifier, merger module.Merger, selector flow.IdentityFilter) *CombinedVerifier {
 	c := &CombinedVerifier{
 		state:    state,
@@ -46,100 +46,25 @@ func NewCombinedVerifier(state protocol.State, dkg dkg.State, staking module.Agg
 }
 
 // VerifyVote verifies the validity of a combined signature on a vote.
-func (c *CombinedVerifier) VerifyVote(vote *model.Vote) (bool, error) {
+func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
 
-	// verify the signature data
-	msg := makeVoteMessage(vote.View, vote.BlockID)
-	valid, err := c.verifySigData(vote.BlockID, msg, vote.SigData, vote.SignerID)
-	if err != nil {
-		return false, fmt.Errorf("could not verify signature: %w", err)
-	}
-
-	return valid, nil
-}
-
-// VerifyProposal verifies the validity of a combined signature on a proposal.
-func (c *CombinedVerifier) VerifyProposal(proposal *model.Proposal) (bool, error) {
-
-	// verify the signature data
-	msg := makeVoteMessage(proposal.Block.View, proposal.Block.BlockID)
-	valid, err := c.verifySigData(proposal.Block.BlockID, msg, proposal.SigData, proposal.Block.ProposerID)
-	if err != nil {
-		return false, fmt.Errorf("could not verify signature: %w", err)
-	}
-
-	return valid, nil
-}
-
-// VerifyQC verifies the validity of a combined signature on a quorum certificate.
-func (c *CombinedVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
-
-	// get the signers from the selector set
-	selector := filter.And(c.selector, filter.HasNodeID(qc.SignerIDs...))
-	signers, err := c.state.AtBlockID(qc.BlockID).Identities(selector)
-	if err != nil {
-		return false, fmt.Errorf("could not get signers from protocol state: %w", err)
-	}
-
-	// check if we have sufficient signers
-	if len(signers) < len(qc.SignerIDs) {
-		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d): %w", len(qc.SignerIDs), len(signers), ErrInvalidSigner)
-	}
-
-	// get the DKG group key from the DKG state
-	dkgKey, err := c.dkg.GroupKey()
-	if err != nil {
-		return false, fmt.Errorf("could not get dkg key: %w", err)
-	}
-
-	// split the aggregated staking & beacon signatures
-	splitSigs, err := c.merger.Split(qc.SigData)
-	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
-	}
-
-	// check we have the right amount of split sigs
-	if len(splitSigs) != 2 {
-		return false, fmt.Errorf("invalid number of split signatures: %w", ErrInvalidFormat)
-	}
-
-	// assign the signatures
-	stakingAggSig := splitSigs[0]
-	beaconThresSig := splitSigs[1]
-
-	// verify the aggregated staking signature first
-	signers = signers.Order(order.ByReferenceOrder(qc.SignerIDs))
-	msg := makeVoteMessage(qc.View, qc.BlockID)
-	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
-	if err != nil {
-		return false, fmt.Errorf("could not verify staking signature: %w", err)
-	}
-	beaconValid, err := c.beacon.VerifyThreshold(msg, beaconThresSig, dkgKey)
-	if err != nil {
-		return false, fmt.Errorf("could not verify beacon signature: %w", err)
-	}
-
-	return stakingValid && beaconValid, nil
-}
-
-// verifySigData verifies the combined signature data against a message within
-// the context of the given protocol state.
-func (c *CombinedVerifier) verifySigData(blockID flow.Identifier, msg []byte, combined []byte, signerID flow.Identifier) (bool, error) {
+	// create the to-be-signed message
+	msg := makeVoteMessage(block.View, block.BlockID)
 
 	// get the set of signing participants
-	participants, err := c.state.AtBlockID(blockID).Identities(c.selector)
+	participants, err := c.state.AtBlockID(block.BlockID).Identities(c.selector)
 	if err != nil {
-		return false, fmt.Errorf("could not get signer participants: %w", err)
+		return false, fmt.Errorf("could not get participants: %w", err)
 	}
 
 	// get the specific identity
-	signer, ok := participants.ByNodeID(signerID)
+	signer, ok := participants.ByNodeID(voterID)
 	if !ok {
-		return false, fmt.Errorf("signer is not part of participants (signer: %x): %w", signerID, ErrInvalidSigner)
+		return false, fmt.Errorf("signer is not part of participants (signer: %x): %w", voterID, ErrInvalidSigner)
 	}
 
 	// split the two signatures from the vote
-	splitSigs, err := c.merger.Split(combined)
+	splitSigs, err := c.merger.Split(sigData)
 	if err != nil {
 		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
 	}
@@ -154,7 +79,7 @@ func (c *CombinedVerifier) verifySigData(blockID flow.Identifier, msg []byte, co
 	beaconShare := splitSigs[1]
 
 	// get the signer dkg key share
-	beaconPubKey, err := c.dkg.ParticipantKey(signerID)
+	beaconPubKey, err := c.dkg.ParticipantKey(voterID)
 	if err != nil {
 		return false, fmt.Errorf("could not get signer beacon share: %w", err)
 	}
@@ -165,6 +90,57 @@ func (c *CombinedVerifier) verifySigData(blockID flow.Identifier, msg []byte, co
 		return false, fmt.Errorf("could not verify staking signature: %w", err)
 	}
 	beaconValid, err := c.beacon.Verify(msg, beaconShare, beaconPubKey)
+	if err != nil {
+		return false, fmt.Errorf("could not verify beacon signature: %w", err)
+	}
+
+	return stakingValid && beaconValid, nil
+}
+
+// VerifyQC verifies the validity of a combined signature on a quorum certificate.
+func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+
+	// get the signers from the selector set
+	selector := filter.And(c.selector, filter.HasNodeID(voterIDs...))
+	signers, err := c.state.AtBlockID(block.BlockID).Identities(selector)
+	if err != nil {
+		return false, fmt.Errorf("could not get signers from protocol state: %w", err)
+	}
+
+	// check if we have sufficient signers
+	if len(signers) < len(voterIDs) {
+		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d): %w", len(voterIDs), len(signers), ErrInvalidSigner)
+	}
+
+	// get the DKG group key from the DKG state
+	dkgKey, err := c.dkg.GroupKey()
+	if err != nil {
+		return false, fmt.Errorf("could not get dkg key: %w", err)
+	}
+
+	// split the aggregated staking & beacon signatures
+	splitSigs, err := c.merger.Split(sigData)
+	if err != nil {
+		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
+	}
+
+	// check we have the right amount of split sigs
+	if len(splitSigs) != 2 {
+		return false, fmt.Errorf("invalid number of split signatures: %w", ErrInvalidFormat)
+	}
+
+	// assign the signatures
+	stakingAggSig := splitSigs[0]
+	beaconThresSig := splitSigs[1]
+
+	// verify the aggregated staking signature first
+	signers = signers.Order(order.ByReferenceOrder(voterIDs))
+	msg := makeVoteMessage(block.View, block.BlockID)
+	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
+	if err != nil {
+		return false, fmt.Errorf("could not verify staking signature: %w", err)
+	}
+	beaconValid, err := c.beacon.VerifyThreshold(msg, beaconThresSig, dkgKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify beacon signature: %w", err)
 	}

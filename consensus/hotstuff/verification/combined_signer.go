@@ -33,8 +33,9 @@ type CombinedSigner struct {
 // - the selector is used to select the set of valid signers from the protocol state;
 // - the signer ID is used as the identity when creating signatures;
 // - the staking signer is used to create aggregatable signatures for the first signature part;
-// - the threshold signer is used to create threshold signture shres for the second signature part; and
-// - the merger is used to join and split the two signature parts on our models.
+// - the threshold signer is used to create threshold signture shres for the second signature part;
+// - the merger is used to join and split the two signature parts on our models;
+// - the selector is used to select the set of scheme participants from the protocol state.
 func NewCombinedSigner(state protocol.State, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, selector flow.IdentityFilter, signerID flow.Identifier) *CombinedSigner {
 	sc := &CombinedSigner{
 		CombinedVerifier: NewCombinedVerifier(state, dkg, staking, beacon, merger, selector),
@@ -158,6 +159,10 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate second signatures: %w", err)
 	}
+
+	// TODO: once true BLS signature aggregation has been implemented, the performance
+	// impact of verifying the aggregated signature and the threshold signature should
+	// be minor and we can consider adding a sanity check
 
 	// combine the aggregated staking signature with the threshold beacon signature
 	combinedMultiSig, err := c.merger.Join(stakingAggSig, beaconThresSig)

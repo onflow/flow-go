@@ -75,8 +75,8 @@ func (as *AggregatorSuite) SetupTest() {
 
 	// created a mocked signer that can sign proposals
 	as.signer = &mocks.Signer{}
-	as.signer.On("VerifyVote", mock.Anything).Return(true, nil)
-	as.signer.On("VerifyQC", mock.Anything).Return(true, nil)
+	as.signer.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	as.signer.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	as.signer.On("CreateQC", mock.AnythingOfType("[]*model.Vote")).Return(
 		func(votes []*model.Vote) *model.QuorumCertificate {
 			qc, _ := as.qcs[votes[0].BlockID]

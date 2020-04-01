@@ -21,7 +21,8 @@ type SingleSigner struct {
 
 // NewSingleSigner initializes a single signer with the given dependencies:
 // - the given protocol state is used to retrieve public keys for the verifier;
-// - the given signer is used to generate signatures for the local node; and
+// - the given signer is used to generate signatures for the local node;
+// - the selector is used to select the set of valid signers from the protocol state;
 // - the given signer ID is used as identifier for our signatures.
 func NewSingleSigner(state protocol.State, signer module.AggregatingSigner, selector flow.IdentityFilter, signerID flow.Identifier) *SingleSigner {
 	sc := &SingleSigner{

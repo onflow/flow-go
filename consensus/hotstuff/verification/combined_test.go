@@ -11,51 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCombinedProposal(t *testing.T) {
-
-	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	proto, dkg, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
-	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
-
-	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
-	proposal, err := signers[0].CreateProposal(block)
-	require.NoError(t, err)
-
-	// proposal should be valid
-	valid, err := signers[0].VerifyProposal(proposal)
-	require.NoError(t, err)
-	assert.True(t, valid, "original proposal should be valid")
-
-	// proposal with different block ID should be invalid
-	proposal.Block.BlockID[0]++
-	valid, err = signers[0].VerifyProposal(proposal)
-	require.NoError(t, err)
-	assert.False(t, valid, "proposal with changed block ID should be invalid")
-	proposal.Block.BlockID[0]--
-
-	// proposal with different view should be invalid
-	proposal.Block.View++
-	valid, err = signers[0].VerifyProposal(proposal)
-	require.NoError(t, err)
-	assert.False(t, valid, "proposal with changed view should be invalid")
-	proposal.Block.View--
-
-	// proposal from a different proposer should be invalid
-	proposal.Block.ProposerID = identities[1].NodeID
-	valid, err = signers[0].VerifyProposal(proposal)
-	require.NoError(t, err)
-	assert.False(t, valid, "proposal with changed proposer ID should be invalid")
-	proposal.Block.ProposerID = identities[0].NodeID
-
-	// proposal with invalid signature should be invalid
-	proposal.SigData[5]++
-	valid, err = signers[0].VerifyProposal(proposal)
-	require.NoError(t, err)
-	assert.False(t, valid, "proposal with changed signature should be invalid")
-	proposal.SigData[5]--
-}
-
 func TestCombinedVote(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
@@ -68,37 +23,39 @@ func TestCombinedVote(t *testing.T) {
 	require.NoError(t, err)
 
 	// vote should be valid
-	valid, err := signers[0].VerifyVote(vote)
+	valid, err := signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
 	require.NoError(t, err)
 	assert.True(t, valid, "original vote should be valid")
 
 	// vote on different block should be invalid
-	vote.BlockID[0]++
-	valid, err = signers[0].VerifyVote(vote)
+	block.BlockID[0]++
+	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed block ID should be invalid")
-	vote.BlockID[0]--
+	block.BlockID[0]--
 
 	// vote with changed view should be invalid
-	vote.View++
-	valid, err = signers[0].VerifyVote(vote)
+	block.View++
+	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed view should be invalid")
-	vote.View--
+	block.View--
 
 	// vote by different signer should be invalid
 	vote.SignerID = identities[1].NodeID
-	valid, err = signers[0].VerifyVote(vote)
+	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed identity should be invalid")
 	vote.SignerID = identities[0].NodeID
 
 	// vote with changed signature should be invalid
-	vote.SigData[5]++
-	valid, err = signers[0].VerifyVote(vote)
+	// TODO: change error handling so split failure and invalid signature is
+	// treated the same
+	vote.SigData[4]++
+	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed signature should be invalid")
-	vote.SigData[5]--
+	vote.SigData[4]--
 }
 
 func TestCombinedProposalIsVote(t *testing.T) {
@@ -122,6 +79,8 @@ func TestCombinedProposalIsVote(t *testing.T) {
 func TestCombinedQC(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
+	voterIDs := identities.NodeIDs()
+	minShares := len(voterIDs) / 2
 	proto, dkg, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
 	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 
@@ -135,11 +94,12 @@ func TestCombinedQC(t *testing.T) {
 	}
 
 	// should be able to create QC from 4 votes and verify
-	qc, err := signers[0].CreateQC(votes[:4])
-	require.NoError(t, err)
-	valid, err := signers[0].VerifyQC(qc)
-	require.NoError(t, err)
-	assert.True(t, valid, "original QC should be valid")
+	qc, err := signers[0].CreateQC(votes[:minShares])
+	require.NoError(t, err, "should be able to create QC from valid votes")
+
+	// creation with insufficient threshold should fail
+	_, err = signers[0].CreateQC(votes[:3])
+	assert.Error(t, err, "creating QC with insufficient shares should fail")
 
 	// creation from different views should fail
 	votes[0].View++
@@ -153,7 +113,34 @@ func TestCombinedQC(t *testing.T) {
 	assert.Error(t, err, "creating QC with mismatching block ID should fail")
 	votes[0].BlockID[0]--
 
-	// creation with insufficient threshold should fail
-	_, err = signers[0].CreateQC(votes[:3])
-	assert.Error(t, err, "creating QC with insufficient random beacon shares should fail")
+	valid, err := signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	require.NoError(t, err)
+	assert.True(t, valid, "original QC should be valid")
+
+	// verification with missing identity should be invalid
+	_, err = signers[0].VerifyQC(voterIDs[:minShares-1], qc.SigData, block)
+	assert.Error(t, err, "verification of QC should fail with missing voter ID")
+
+	// verification with changed signature should fail
+	// TODO: change error handling so split failure & invalid signature is
+	// treated the same
+	qc.SigData[8]++
+	valid, err = signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	require.NoError(t, err)
+	assert.False(t, valid, "QC with changed signature data should be invalid")
+	qc.SigData[8]--
+
+	// verification with changed block ID should fail
+	block.BlockID[0]++
+	valid, err = signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	require.NoError(t, err)
+	assert.False(t, valid, "QC with changed block ID should be invalid")
+	block.BlockID[0]--
+
+	// verification with changed view should fail
+	block.View++
+	valid, err = signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	require.NoError(t, err)
+	assert.False(t, valid, "QC with changed block view should be invalid")
+	block.View--
 }

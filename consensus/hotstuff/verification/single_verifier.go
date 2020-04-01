@@ -20,8 +20,9 @@ type SingleVerifier struct {
 }
 
 // NewSingleVerifier creates a new single verifier with the given dependencies:
-// - the protocol state is used to get the public staking key for signers; and
-// - the verifier is used to verify the signatures against the message.
+// - the protocol state is used to get the public staking key for signers;
+// - the verifier is used to verify the signatures against the message;
+// - the selector is used to select the set of valid signers from the protocol state.
 func NewSingleVerifier(state protocol.State, verifier module.AggregatingVerifier, selector flow.IdentityFilter) *SingleVerifier {
 	s := &SingleVerifier{
 		state:    state,
@@ -31,49 +32,24 @@ func NewSingleVerifier(state protocol.State, verifier module.AggregatingVerifier
 	return s
 }
 
-// VerifyProposal verifies a proposal with a single signature as signature data.
-func (s *SingleVerifier) VerifyProposal(proposal *model.Proposal) (bool, error) {
-
-	// get the participants from the selector set
-	participants, err := s.state.AtBlockID(proposal.Block.BlockID).Identities(s.selector)
-	if err != nil {
-		return false, fmt.Errorf("could not get participants selector set: %w", err)
-	}
-
-	// get the identity of the proposer
-	proposer, ok := participants.ByNodeID(proposal.Block.ProposerID)
-	if !ok {
-		return false, fmt.Errorf("proposer is not part of selector set (proposer: %x): %w", proposal.Block.ProposerID, ErrInvalidSigner)
-	}
-
-	// create the message we verify against and check signature
-	msg := makeVoteMessage(proposal.Block.View, proposal.Block.BlockID)
-	valid, err := s.verifier.Verify(msg, proposal.SigData, proposer.StakingPubKey)
-	if err != nil {
-		return false, fmt.Errorf("could not verify signature: %w", err)
-	}
-
-	return valid, nil
-}
-
 // VerifyVote verifies a vote with a single signature as signature data.
-func (s *SingleVerifier) VerifyVote(vote *model.Vote) (bool, error) {
+func (s *SingleVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
 
 	// get the participants from the selector set
-	participants, err := s.state.AtBlockID(vote.BlockID).Identities(s.selector)
+	participants, err := s.state.AtBlockID(block.BlockID).Identities(s.selector)
 	if err != nil {
 		return false, fmt.Errorf("could not get participants selector set: %w", err)
 	}
 
 	// get the identity of the voter
-	voter, ok := participants.ByNodeID(vote.SignerID)
+	voter, ok := participants.ByNodeID(voterID)
 	if !ok {
-		return false, fmt.Errorf("voter is not part of selector set (voter: %x): %w", vote.SignerID, ErrInvalidSigner)
+		return false, fmt.Errorf("voter is not part of selector set (voter: %x): %w", voterID, ErrInvalidSigner)
 	}
 
 	// create the message we verify against and check signature
-	msg := makeVoteMessage(vote.View, vote.BlockID)
-	valid, err := s.verifier.Verify(msg, vote.SigData, voter.StakingPubKey)
+	msg := makeVoteMessage(block.View, block.BlockID)
+	valid, err := s.verifier.Verify(msg, sigData, voter.StakingPubKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)
 	}
@@ -82,24 +58,24 @@ func (s *SingleVerifier) VerifyVote(vote *model.Vote) (bool, error) {
 }
 
 // VerifyQC verifies a QC with a single aggregated signature as signature data.
-func (s *SingleVerifier) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
+func (s *SingleVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
 
 	// get the signers of the QC
-	selector := filter.And(s.selector, filter.HasNodeID(qc.SignerIDs...))
-	signers, err := s.state.AtBlockID(qc.BlockID).Identities(selector)
+	selector := filter.And(s.selector, filter.HasNodeID(voterIDs...))
+	signers, err := s.state.AtBlockID(block.BlockID).Identities(selector)
 	if err != nil {
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
 
 	// check they were all in the selector set
-	if len(signers) < len(qc.SignerIDs) {
-		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d): %w", len(qc.SignerIDs), len(signers), ErrInvalidSigner)
+	if len(signers) < len(voterIDs) {
+		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d): %w", len(voterIDs), len(signers), ErrInvalidSigner)
 	}
 
 	// create the message we verify against and check signature
-	signers = signers.Order(order.ByReferenceOrder(qc.SignerIDs))
-	msg := makeVoteMessage(qc.View, qc.BlockID)
-	valid, err := s.verifier.VerifyMany(msg, qc.SigData, signers.StakingKeys())
+	signers = signers.Order(order.ByReferenceOrder(voterIDs))
+	msg := makeVoteMessage(block.View, block.BlockID)
+	valid, err := s.verifier.VerifyMany(msg, sigData, signers.StakingKeys())
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)
 	}

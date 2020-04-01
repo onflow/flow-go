@@ -256,6 +256,10 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}
 
+	// TODO: apparently, we need to get a child of the block here in order to
+	// use the parent signatures contained within it; this is non-trivial, so
+	// I will defer that to a different task
+
 	// create the key used for the KMAC by concatenating all indices
 	key := make([]byte, 4*len(indices))
 	for i, index := range indices {

@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/signature"
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 )
@@ -74,7 +75,12 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 	validators := make([]hotstuff.Validator, n)
 
 	forks := &mocks.ForksReader{}
-	selector := filter.And(filter.HasRole(flow.RoleCollection), filter.HasStake(true))
+
+	nodeIDs := make([]flow.Identifier, 0, len(participants))
+	for _, participant := range participants {
+		nodeIDs = append(nodeIDs, participant.NodeID)
+	}
+	selector := filter.HasNodeID(nodeIDs...)
 
 	for i, participant := range participants {
 		// get the participant keys
@@ -83,13 +89,19 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 			return nil, nil, fmt.Errorf("could not retrieve private keys for participant: %w", err)
 		}
 
+		// create local module
+		local, err := local.New(participant.Identity(), keys.StakingKey)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		// create signer for participant
-		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, keys.StakingKey)
+		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, local)
 		signer := verification.NewSingleSigner(ps, provider, selector, participant.NodeID)
 		signers[i] = signer
 
 		// create view state
-		vs, err := viewstate.New(ps, nil, participant.NodeID, filter.In(signersToIdentityList(participants)))
+		vs, err := viewstate.New(ps, nil, participant.NodeID, selector)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -99,12 +111,4 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 		validators[i] = v
 	}
 	return validators, signers, nil
-}
-
-func signersToIdentityList(participants []bootstrap.NodeInfo) flow.IdentityList {
-	identities := make([]*flow.Identity, len(participants))
-	for i, participant := range participants {
-		identities[i] = participant.Identity()
-	}
-	return identities
 }

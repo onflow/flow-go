@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/module"
 )
 
 // AggregationProvider is an aggregating signer and verifier that can create/verify
@@ -12,16 +13,16 @@ import (
 // in the context of the provided KMAC tag.
 type AggregationProvider struct {
 	hasher crypto.Hasher
-	priv   crypto.PrivateKey
+	local  module.Local
 }
 
 // NewAggregationProvider creates a new aggregation provider using the given private
 // key to generate signatures. *Important*: the aggregation provider can only
 // create and verify signatures in the context of the provided KMAC tag.
-func NewAggregationProvider(tag string, priv crypto.PrivateKey) *AggregationProvider {
+func NewAggregationProvider(tag string, local module.Local) *AggregationProvider {
 	ap := &AggregationProvider{
 		hasher: crypto.NewBLS_KMAC(tag),
-		priv:   priv,
+		local:  local,
 	}
 	return ap
 }
@@ -29,7 +30,7 @@ func NewAggregationProvider(tag string, priv crypto.PrivateKey) *AggregationProv
 // Sign will sign the given message bytes with the internal private key and
 // return the signature on success.
 func (ap *AggregationProvider) Sign(msg []byte) (crypto.Signature, error) {
-	return ap.priv.Sign(msg, ap.hasher)
+	return ap.local.Sign(msg, ap.hasher)
 }
 
 // Verify will verify the given signature against the given message and public key.

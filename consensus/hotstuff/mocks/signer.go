@@ -2,6 +2,8 @@
 
 package mocks
 
+import flow "github.com/dapperlabs/flow-go/model/flow"
+
 import mock "github.com/stretchr/testify/mock"
 import model "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 
@@ -79,20 +81,20 @@ func (_m *Signer) CreateVote(block *model.Block) (*model.Vote, error) {
 	return r0, r1
 }
 
-// VerifyProposal provides a mock function with given fields: proposal
-func (_m *Signer) VerifyProposal(proposal *model.Proposal) (bool, error) {
-	ret := _m.Called(proposal)
+// VerifyQC provides a mock function with given fields: voterIDs, sigData, block
+func (_m *Signer) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+	ret := _m.Called(voterIDs, sigData, block)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*model.Proposal) bool); ok {
-		r0 = rf(proposal)
+	if rf, ok := ret.Get(0).(func([]flow.Identifier, []byte, *model.Block) bool); ok {
+		r0 = rf(voterIDs, sigData, block)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*model.Proposal) error); ok {
-		r1 = rf(proposal)
+	if rf, ok := ret.Get(1).(func([]flow.Identifier, []byte, *model.Block) error); ok {
+		r1 = rf(voterIDs, sigData, block)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -100,41 +102,20 @@ func (_m *Signer) VerifyProposal(proposal *model.Proposal) (bool, error) {
 	return r0, r1
 }
 
-// VerifyQC provides a mock function with given fields: qc
-func (_m *Signer) VerifyQC(qc *model.QuorumCertificate) (bool, error) {
-	ret := _m.Called(qc)
+// VerifyVote provides a mock function with given fields: voterID, sigData, block
+func (_m *Signer) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+	ret := _m.Called(voterID, sigData, block)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*model.QuorumCertificate) bool); ok {
-		r0 = rf(qc)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []byte, *model.Block) bool); ok {
+		r0 = rf(voterID, sigData, block)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*model.QuorumCertificate) error); ok {
-		r1 = rf(qc)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// VerifyVote provides a mock function with given fields: vote
-func (_m *Signer) VerifyVote(vote *model.Vote) (bool, error) {
-	ret := _m.Called(vote)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(*model.Vote) bool); ok {
-		r0 = rf(vote)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(*model.Vote) error); ok {
-		r1 = rf(vote)
+	if rf, ok := ret.Get(1).(func(flow.Identifier, []byte, *model.Block) error); ok {
+		r1 = rf(voterID, sigData, block)
 	} else {
 		r1 = ret.Error(1)
 	}

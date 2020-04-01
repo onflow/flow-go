@@ -16,7 +16,7 @@ type ThresholdProvider struct {
 	priv   crypto.PrivateKey
 }
 
-// NewThresholdProvider creates new threshold provider, using the gien private
+// NewThresholdProvider creates new threshold provider, using the given private
 // key share to generate signature shares. *Important*: the threshold provider
 // can only create and verify signatures in the context of the provided KMAC tag.
 func NewThresholdProvider(tag string, priv crypto.PrivateKey) *ThresholdProvider {
