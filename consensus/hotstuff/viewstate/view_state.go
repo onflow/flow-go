@@ -79,6 +79,8 @@ func (v *ViewState) AllConsensusParticipants(blockID flow.Identifier) (flow.Iden
 // with ID `participantID`. Errors, if participantID is not a valid and staked consensus participant
 // at blockID, this method error. Which node is considered an eligible consensus participant is
 // determined by `ViewState.consensusMembersFilter` (defined at construction time).
+// ERROR conditions:
+//   * INVALID CONSENSUS MEMBER: participantID does NOT correspond to staked consensus participant
 func (v *ViewState) IdentityForConsensusParticipant(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
 	identity, err := v.protocolState.AtBlockID(blockID).Identity(participantID)
 	if err != nil {
@@ -108,6 +110,11 @@ func (v *ViewState) IdentityForConsensusParticipant(blockID flow.Identifier, par
 // ERROR conditions:
 //   * DUPLICATES: consensusNodeIDs contains duplicates
 //   * DUPLICATES: an element in consensusNodeIDs does NOT correspond to staked consensus node
+// Properties
+//   * PRESERVES ORDER of `consensusNodeIDs`, i.e. for the returned list L, we have L[k] is the flow.Identity for consensusNodeIDs[k]
+// ERROR conditions:
+//   * DUPLICATES: consensusNodeIDs contains duplicates
+//   * INVALID CONSENSUS MEMBER: an element in consensusNodeIDs does NOT correspond to staked consensus participant
 func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, consensusNodeIDs []flow.Identifier) (flow.IdentityList, error) {
 	if len(consensusNodeIDs) == 0 { // Special case: consensusNodeIDs is empty
 		// _no_ filter will be applied and all consensus participants are returned.

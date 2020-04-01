@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
+	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -267,7 +268,19 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("could not create kmac: %w", err)
 	}
 
-	seed := kmac.ComputeHash(header.ParentVoterSig)
+	// split the parent voter sig into staking & beacon parts
+	combiner := signature.NewCombiner()
+	sigs, err := combiner.Split(header.ParentVoterSig)
+	if err != nil {
+		return nil, fmt.Errorf("could not split block signature: %w", err)
+	}
+	if len(sigs) != 2 {
+		return nil, fmt.Errorf("invalid block signature split")
+	}
+
+	// generate the seed by hashing the random beacon threshold signature
+	beaconSig := sigs[1]
+	seed := kmac.ComputeHash(beaconSig)
 
 	return seed, nil
 }

@@ -87,7 +87,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	// check the signer is the leader for that block
 	leader := v.viewState.LeaderForView(proposal.Block.View)
 	if leader.ID() != signer.ID() {
-		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%s), expected leader: (%s)", signer.ID(), leader.ID()))
+		return newInvalidBlockError(block, fmt.Sprintf("proposed by  wrong leader (%s), expected leader: (%s)", signer.ID(), leader.ID()))
 	}
 
 	// check proposal's parent
@@ -111,7 +111,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	return v.ValidateQC(qc, parent)
 }
 
-// ValidateVote validates the vote and returns the verifier identity who signed the vote
+// ValidateVote validates the vote and returns the signer identity who signed the vote
 // vote - the vote to be validated
 // block - the voting block. Assuming the block has been validated.
 func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Identity, error) {

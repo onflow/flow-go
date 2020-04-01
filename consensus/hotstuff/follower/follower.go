@@ -53,8 +53,8 @@ func NewFollowerLogic(
 		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
 	}
 	// TODO: initialize signer
-	var signer hotstuff.Signer
-	validator := validator.New(viewState, finalizationLogic, signer)
+	var verifier hotstuff.Verifier
+	validator := validator.New(viewState, finalizationLogic, verifier)
 
 	err = validator.ValidateQC(trustedRoot.QC, trustedRoot.Block)
 	if err != nil {
