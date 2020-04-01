@@ -160,8 +160,6 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 	fnb.NodeID = nodeID
 	fnb.stakingKey = info.StakingPrivKey.PrivateKey
 	fnb.networkKey = info.NetworkPrivKey.PrivateKey
-	fnb.Logger.Info().Msg("stakekey: " + fnb.stakingKey.Algorithm().String())
-	fnb.Logger.Info().Msg("netwkey: " + fnb.networkKey.Algorithm().String())
 }
 
 func (fnb *FlowNodeBuilder) initLogger() {
