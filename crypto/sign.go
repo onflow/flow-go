@@ -2,7 +2,6 @@
 package crypto
 
 import (
-	"bytes"
 	"crypto/elliptic"
 	"fmt"
 	"strconv"
@@ -154,28 +153,4 @@ type PublicKey interface {
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
 	Equals(PublicKey) bool
-}
-
-type Key interface {
-	// Algorithm returns the signing algorithm related to the public key.
-	Algorithm() SigningAlgorithm
-	// Encode returns a bytes representation of the public key.
-	Encode() ([]byte, error)
-}
-
-// KeysEqual returns true if the given Keys are equal. Keys are considered unequal if their algorithms are unequal or if
-// their encoded representations are unequal. If the encoding of either key fails, they are considered unequal as well.
-func KeysEqual(one, two Key) bool {
-	if one.Algorithm() != two.Algorithm() {
-		return false
-	}
-	oneEnc, err := one.Encode()
-	if err != nil {
-		return false
-	}
-	twoEnc, err := two.Encode()
-	if err != nil {
-		return false
-	}
-	return bytes.Equal(oneEnc, twoEnc)
 }
