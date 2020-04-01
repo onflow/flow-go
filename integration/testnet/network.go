@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types/container"
+	dockerclient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
@@ -315,7 +316,16 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 	// correctly (consensus_1, consensus_2, etc.)
 	roleCounter := make(map[flow.Role]uint)
 
-	suite, _ := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{})
+	// set up docker client
+	dockerClient, err := dockerclient.NewClientWithOpts(
+		dockerclient.FromEnv,
+		dockerclient.WithAPIVersionNegotiation(),
+	)
+	require.Nil(t, err)
+
+	suite, _ := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{
+		Client: dockerClient,
+	})
 	network := suite.Network(testingdock.NetworkOpts{
 		Name: name,
 	})
