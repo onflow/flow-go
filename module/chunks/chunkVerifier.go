@@ -55,11 +55,11 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	}
 
 	regMap := ch.ChunkDataPack.GetRegisterValues()
-	unAuthRegTouch := make(map[string]bool)
+	unknownRegTouch := make(map[string]bool)
 	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
 		val, ok := regMap[string(key)]
 		if !ok {
-			unAuthRegTouch[string(key)] = true
+			unknownRegTouch[string(key)] = true
 			return nil, fmt.Errorf("missing register")
 		}
 		return val, nil
@@ -85,9 +85,9 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	}
 
 	// check read access to register touches
-	if len(unAuthRegTouch) > 0 {
+	if len(unknownRegTouch) > 0 {
 		var missingRegs []string
-		for key := range unAuthRegTouch {
+		for key := range unknownRegTouch {
 			missingRegs = append(missingRegs, key)
 		}
 		return chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil

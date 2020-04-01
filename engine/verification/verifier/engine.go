@@ -105,12 +105,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *verification.VerifiableChunk:
-		e.log.Info().
-			Timestamp().
-			Hex("origin", logging.ID(originID)).
-			Uint64("chunkIndex", resource.ChunkIndex).
-			Hex("execution receipt", logging.Entity(resource.Receipt)).
-			Msg("a verifiable chunk received by verifier engine")
 		return e.verify(originID, resource)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
@@ -124,6 +118,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // If any part of verification fails, an error is returned, indicating to the
 // initiating engine that the verification must be re-tried.
 func (e *Engine) verify(originID flow.Identifier, chunk *verification.VerifiableChunk) error {
+	// log it first
+	e.log.Info().
+		Timestamp().
+		Hex("origin", logging.ID(originID)).
+		Uint64("chunkIndex", chunk.ChunkIndex).
+		Hex("execution receipt", logging.Entity(chunk.Receipt)).
+		Msg("a verifiable chunk received by verifier engine")
 
 	// only accept internal calls
 	if originID != e.me.NodeID() {
@@ -144,11 +145,14 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	chunkID := chunk.Receipt.ExecutionResult.Chunks.ByIndex(chunk.ChunkIndex).ID()
 
 	// execute the assigned chunk
-	chFault, verifErr := e.chVerif.Verify(chunk)
-	if verifErr != nil {
-		return verifErr
+	chFault, err := e.chVerif.Verify(chunk)
+	// Any err means that something went wrong when verify the chunk
+	// the outcome of the verification is captured inside the chFault and not the err
+	if err != nil {
+		return err
 	}
 
+	// if any fault found with the chunk
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
