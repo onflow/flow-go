@@ -68,15 +68,14 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	chunkView := state.NewView(getRegister)
 
 	// executes all transactions in this chunk
-	for _, tx := range ch.Collection.Transactions {
+	for i, tx := range ch.Collection.Transactions {
 		txView := chunkView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
 			// TODO: at this point we don't care about the tx errors,
 			// we might have to actually care about this later
-			// return fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
-			continue
+			return nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 		if result.Succeeded() {
 			// Delta captures all register updates and only
