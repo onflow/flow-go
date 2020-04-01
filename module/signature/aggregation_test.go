@@ -15,17 +15,17 @@ const NUM_AggregationProvider_TEST = 7
 const NUM_AggregationProvider_BENCH = 1000
 
 func createAggregationT(t *testing.T) *AggregationProvider {
-	bls, err := createAggregation()
+	agg, err := createAggregation()
 	require.NoError(t, err)
-	return bls
+	return agg
 }
 
 func createAggregationB(b *testing.B) *AggregationProvider {
-	bls, err := createAggregation()
+	agg, err := createAggregation()
 	if err != nil {
 		b.Fatal(err)
 	}
-	return bls
+	return agg
 }
 
 func createAggregation() (*AggregationProvider, error) {
@@ -86,8 +86,8 @@ func TestAggregationAggregateVerifyMany(t *testing.T) {
 	}
 
 	// aggregate the signatures
-	bls := createAggregationT(t)
-	aggSig, err := bls.Aggregate(sigs)
+	agg := createAggregationT(t)
+	aggSig, err := agg.Aggregate(sigs)
 	require.NoError(t, err)
 
 	// collect all the public keys
@@ -97,25 +97,25 @@ func TestAggregationAggregateVerifyMany(t *testing.T) {
 	}
 
 	// signature should be valid for the given keys
-	valid, err := bls.VerifyMany(msg, aggSig, keys)
+	valid, err := agg.VerifyMany(msg, aggSig, keys)
 	require.NoError(t, err)
 	require.True(t, valid)
 
 	// signature should fail with one key missing
-	_, err = bls.VerifyMany(msg, aggSig, keys[1:])
+	_, err = agg.VerifyMany(msg, aggSig, keys[1:])
 	require.Error(t, err)
 
 	// signature should be invalid with one key swapped
 	temp := keys[0]
 	keys[0] = createAggregationT(t).priv.PublicKey()
-	valid, err = bls.VerifyMany(msg, aggSig, keys)
+	valid, err = agg.VerifyMany(msg, aggSig, keys)
 	require.NoError(t, err)
 	require.False(t, valid)
 	keys[0] = temp
 
 	// signature should be invalid with one byte changed
 	msg[0]++
-	valid, err = bls.VerifyMany(msg, aggSig, keys)
+	valid, err = agg.VerifyMany(msg, aggSig, keys)
 	require.NoError(t, err)
 	require.False(t, valid)
 	msg[0]--

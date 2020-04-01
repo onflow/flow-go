@@ -20,9 +20,9 @@ const NUM_Threshold_BENCH = 254
 func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
 	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
-		bls := createAggregationB(b)
-		signer := NewThresholdProvider("only_testing", bls.priv)
-		signers = append(signers, signer)
+		agg := createAggregationB(b)
+		thres := NewThresholdProvider("only_testing", agg.priv)
+		signers = append(signers, thres)
 	}
 	return signers
 }
@@ -32,8 +32,8 @@ func createThresholdsT(t *testing.T, n uint) ([]*ThresholdProvider, crypto.Publi
 	beaconKeys, groupKey, _ := unittest.RunDKG(t, int(n))
 	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
-		signer := NewThresholdProvider("only_testing", beaconKeys[i])
-		signers = append(signers, signer)
+		thres := NewThresholdProvider("only_testing", beaconKeys[i])
+		signers = append(signers, thres)
 	}
 	return signers, groupKey
 }
@@ -144,7 +144,7 @@ func BenchmarkThresholdCombination(b *testing.B) {
 	b.StopTimer()
 	b.ResetTimer()
 
-	// generate the desired fake Threshold participants and create signatures
+	// generate the desired fake DKG participants and create signatures
 	msg := createMSGB(b)
 	signers := createThresholdsB(b, NUM_Threshold_BENCH)
 	sigs := make([]crypto.Signature, 0, len(signers))
