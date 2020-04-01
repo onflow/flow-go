@@ -170,7 +170,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 func (fnb *FlowNodeBuilder) initLogger() {
 	// configure logger with standard level, node ID and UTC timestamp
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(os.Stderr).With().Timestamp().Str("node_id", fnb.BaseConfig.nodeIDHex).Logger()
+	log := fnb.Logger.With().Timestamp().Str("node_id", fnb.BaseConfig.nodeIDHex).Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.name)
 
@@ -366,6 +366,7 @@ func FlowNode(name string) *FlowNodeBuilder {
 
 	builder := &FlowNodeBuilder{
 		BaseConfig: BaseConfig{},
+		Logger:     zerolog.New(os.Stderr),
 		flags:      pflag.CommandLine,
 		name:       name,
 	}
