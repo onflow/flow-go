@@ -108,6 +108,18 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		block2 := unittest.BlockFixture()
 		block2.Height = 2
 
+		// explicitly set unique guarantees on both block
+		// (BlockFixture generates the same collection id within a guarantee)
+		block1.Guarantees = unittest.CollectionGuaranteesFixture(2)
+		for _, g := range block1.Guarantees {
+			g.CollectionID = unittest.IdentifierFixture()
+		}
+
+		block2.Guarantees = unittest.CollectionGuaranteesFixture(2)
+		for _, g := range block2.Guarantees {
+			g.CollectionID = unittest.IdentifierFixture()
+		}
+
 		blocks := bstorage.NewBlocks(db)
 		headers := bstorage.NewHeaders(db)
 		require.NoError(suite.T(), blocks.Store(&block1))
