@@ -28,7 +28,7 @@ import (
 // responsible for receiving and handling new execution receipts. It requests
 // all dependent resources for each execution receipt and relays a complete
 // execution result to the verifier engine when all dependencies are ready.
-type IngestEngine struct {
+type Engine struct {
 	unit                 *engine.Unit
 	log                  zerolog.Logger
 	collectionsConduit   network.Conduit
@@ -69,9 +69,9 @@ func New(
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
-) (*IngestEngine, error) {
+) (*Engine, error) {
 
-	e := &IngestEngine{
+	e := &Engine{
 		unit:                 engine.NewUnit(),
 		log:                  log,
 		state:                state,
@@ -116,24 +116,24 @@ func New(
 }
 
 // Ready returns a channel that is closed when the verifier engine is ready.
-func (e *IngestEngine) Ready() <-chan struct{} {
+func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
 
 // Done returns a channel that is closed when the verifier engine is done.
-func (e *IngestEngine) Done() <-chan struct{} {
+func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *IngestEngine) SubmitLocal(event interface{}) {
+func (e *Engine) SubmitLocal(event interface{}) {
 	e.Submit(e.me.NodeID(), event)
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *IngestEngine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
@@ -143,13 +143,13 @@ func (e *IngestEngine) Submit(originID flow.Identifier, event interface{}) {
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *IngestEngine) ProcessLocal(event interface{}) error {
+func (e *Engine) ProcessLocal(event interface{}) error {
 	return e.Process(e.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *IngestEngine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -160,7 +160,7 @@ func (e *IngestEngine) Process(originID flow.Identifier, event interface{}) erro
 // it is successfully processed by the engine.
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
-func (e *IngestEngine) process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *flow.ExecutionReceipt:
 		return e.handleExecutionReceipt(originID, resource)
@@ -179,7 +179,7 @@ func (e *IngestEngine) process(originID flow.Identifier, event interface{}) erro
 
 // handleExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
 // a result approval upon successful verification
-func (e *IngestEngine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.Entity(receipt)).
@@ -222,7 +222,7 @@ func (e *IngestEngine) handleExecutionReceipt(originID flow.Identifier, receipt 
 }
 
 // handleChunkDataPack receives a chunk data pack and stores that in the mempool
-func (e *IngestEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) error {
+func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) error {
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
@@ -266,7 +266,7 @@ func (e *IngestEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPa
 // handleCollection handles receipt of a new collection, either via push or
 // after a request. It adds the collection to the mempool and checks for
 // pending receipts that are ready for verification.
-func (e *IngestEngine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
+func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
 
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
@@ -315,7 +315,7 @@ func (e *IngestEngine) handleCollection(originID flow.Identifier, coll *flow.Col
 // handleExecutionStateResponse handles responses to our requests for execution
 // states for particular chunks. It adds the state to the mempool and checks for
 // pending receipts that are ready for verification.
-func (e *IngestEngine) handleExecutionStateResponse(originID flow.Identifier, res *messages.ExecutionStateResponse) error {
+func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *messages.ExecutionStateResponse) error {
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(res.State.ChunkID)).
@@ -352,7 +352,7 @@ func (e *IngestEngine) handleExecutionStateResponse(originID flow.Identifier, re
 }
 
 // requestCollection submits a request for the given collection to collection nodes.
-func (e *IngestEngine) requestCollection(collID flow.Identifier, blockID flow.Identifier) error {
+func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifier) error {
 	// checks collection does not have a tracker yet
 	if e.collectionTrackers.Has(collID) {
 		// collection has been already requested
@@ -393,7 +393,7 @@ func (e *IngestEngine) requestCollection(collID flow.Identifier, blockID flow.Id
 
 // requestExecutionState submits a request for the state required by the
 // given chunk to execution nodes.
-func (e *IngestEngine) requestExecutionState(chunkID flow.Identifier, blockID flow.Identifier) error {
+func (e *Engine) requestExecutionState(chunkID flow.Identifier, blockID flow.Identifier) error {
 	// checks chunk state does not have a tracker yet
 	if e.chunkStateTrackers.Has(chunkID) {
 		// chunk state has been already requested
@@ -433,7 +433,7 @@ func (e *IngestEngine) requestExecutionState(chunkID flow.Identifier, blockID fl
 }
 
 // requestChunkDataPack submits a request for the given chunk ID to the execution nodes.
-func (e *IngestEngine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Identifier) error {
+func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Identifier) error {
 	// checks chunk data pack does not have a tracker yet
 	if e.chunkDataPackTackers.Has(chunkID) {
 		// chunk data pack has been already requested
@@ -476,7 +476,7 @@ func (e *IngestEngine) requestChunkDataPack(chunkID flow.Identifier, blockID flo
 // getBlockForReceipt checks the block referenced by the given receipt. If the
 // block is available locally, returns true and the block. Otherwise, returns
 // false and requests the block.
-func (e *IngestEngine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
+func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this pending execution receipt
 	block, err := e.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
@@ -491,7 +491,7 @@ func (e *IngestEngine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow
 // execution receipt. If the chunk state is available locally, returns true
 // as well as the chunk data itself.
 // Otherwise, returns false and requests the chunk state
-func (e *IngestEngine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkState, bool) {
+func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkState, bool) {
 
 	log := e.log.With().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
@@ -529,7 +529,7 @@ func (e *IngestEngine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, c
 // execution receipt. If the chunk data pack is available locally, returns true
 // as well as the chunk data pack itself.
 // Otherwise, returns false and requests the chunk data pack
-func (e *IngestEngine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
+func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
 
 	log := e.log.With().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
@@ -566,7 +566,7 @@ func (e *IngestEngine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt
 // getCollectionForChunk checks the collection depended on the
 // given execution receipt and chunk. Returns true if the collections is available
 // locally. If the collections is not available locally, it is requested.
-func (e *IngestEngine) getCollectionForChunk(block *flow.Block, receipt *flow.ExecutionReceipt, chunk *flow.Chunk) (*flow.Collection, bool) {
+func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.ExecutionReceipt, chunk *flow.Chunk) (*flow.Collection, bool) {
 
 	log := e.log.With().
 		Hex("block_id", logging.ID(block.ID())).
@@ -618,7 +618,7 @@ func (e *IngestEngine) getCollectionForChunk(block *flow.Block, receipt *flow.Ex
 // any that are ready for verification.
 //
 // NOTE: this method is protected by mutex to prevent double-verifying ERs.
-func (e *IngestEngine) checkPendingChunks() {
+func (e *Engine) checkPendingChunks() {
 	e.checkChunksLock.Lock()
 	defer e.checkChunksLock.Unlock()
 
@@ -711,7 +711,7 @@ func (e *IngestEngine) checkPendingChunks() {
 
 // myChunks returns the list of chunks in the chunk list that this verifier node
 // is assigned to
-func (e *IngestEngine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
+func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 
 	// extracts list of verifier nodes id
 	//
@@ -749,7 +749,7 @@ func (e *IngestEngine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, erro
 // if any receipt has the `blockID`, it evaluates the receipt's origin ID
 // if originID is evaluated successfully, the receipt is added to authenticated receipts mempool
 // Otherwise it is dropped completely
-func (e *IngestEngine) checkPendingReceipts(blockID flow.Identifier) {
+func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 	for _, p := range e.pendingReceipts.All() {
 		if blockID == p.Receipt.ExecutionResult.BlockID {
 			// removes receipt from pending receipts pool
@@ -799,7 +799,7 @@ func (e *IngestEngine) checkPendingReceipts(blockID flow.Identifier) {
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-func (e *IngestEngine) OnBlockIncorporated(*model.Block) {
+func (e *Engine) OnBlockIncorporated(*model.Block) {
 
 }
 
@@ -810,7 +810,7 @@ func (e *IngestEngine) OnBlockIncorporated(*model.Block) {
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-func (e *IngestEngine) OnFinalizedBlock(block *model.Block) {
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	// block should be in the storage
 	if !e.blockStorage.Has(block.BlockID) {
 		e.log.Error().
@@ -839,6 +839,6 @@ func (e *IngestEngine) OnFinalizedBlock(block *model.Block) {
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-func (e *IngestEngine) OnDoubleProposeDetected(*model.Block, *model.Block) {
+func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
 
 }
