@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -32,8 +32,8 @@ type Engine struct {
 func New(log zerolog.Logger,
 	state protocol.State,
 	config Config,
-	collectionRPC observation.ObserveServiceClient,
-	executionRPC observation.ObserveServiceClient,
+	collectionRPC access.AccessAPIClient,
+	executionRPC access.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -49,7 +49,7 @@ func New(log zerolog.Logger,
 		config:  config,
 	}
 
-	observation.RegisterObserveServiceServer(eng.server, eng.handler)
+	access.RegisterAccessAPIServer(eng.server, eng.handler)
 
 	return eng
 }
