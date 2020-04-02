@@ -40,6 +40,7 @@ func New(config Config, e *ingest.Engine) *Ingress {
 		unit: engine.NewUnit(),
 		handler: &handler{
 			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+			engine:                       e,
 		},
 		server: grpc.NewServer(),
 		config: config,
