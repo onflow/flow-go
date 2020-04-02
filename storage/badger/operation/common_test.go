@@ -43,7 +43,7 @@ func (a *UnencodeableEntity) UnmarshalJSON(b []byte) error {
 }
 
 func TestInsertValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
@@ -65,7 +65,7 @@ func TestInsertValid(t *testing.T) {
 }
 
 func TestInsertDuplicate(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
@@ -96,7 +96,7 @@ func TestInsertDuplicate(t *testing.T) {
 }
 
 func TestInsertEncodingError(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 
 		err := db.Update(insert(key, UnencodeableEntity(true)))
@@ -106,7 +106,7 @@ func TestInsertEncodingError(t *testing.T) {
 }
 
 func TestCheckTrue(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
 
@@ -124,7 +124,7 @@ func TestCheckTrue(t *testing.T) {
 }
 
 func TestCheckFalse(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 
 		var exists bool
@@ -135,7 +135,7 @@ func TestCheckFalse(t *testing.T) {
 }
 
 func TestUpdateValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
@@ -163,7 +163,7 @@ func TestUpdateValid(t *testing.T) {
 }
 
 func TestUpdateMissing(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 
@@ -180,7 +180,7 @@ func TestUpdateMissing(t *testing.T) {
 }
 
 func TestUpdateEncodingError(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
 
@@ -208,7 +208,7 @@ func TestUpdateEncodingError(t *testing.T) {
 }
 
 func TestRetrieveValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
@@ -228,7 +228,7 @@ func TestRetrieveValid(t *testing.T) {
 }
 
 func TestRetrieveMissing(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 
 		var act Entity
@@ -238,7 +238,7 @@ func TestRetrieveMissing(t *testing.T) {
 }
 
 func TestRetrieveUnencodeable(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
 
@@ -281,7 +281,7 @@ func TestLookup(t *testing.T) {
 }
 
 func TestIterate(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		keys := [][]byte{[]byte{0x00}, []byte{0x12}, []byte{0xf0}, []byte{0xff}}
 		vals := []bool{false, false, true, false}
 		expected := []bool{false, true}
@@ -320,7 +320,7 @@ func TestIterate(t *testing.T) {
 }
 
 func TestTraverse(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		keys := [][]byte{[]byte{0x42, 0x00}, []byte{0xff}, []byte{0x42, 0x56}, []byte{0x00}, []byte{0x42, 0xff}}
 		vals := []bool{false, false, true, false, true}
 		expected := []bool{false, true}
@@ -359,7 +359,7 @@ func TestTraverse(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
 

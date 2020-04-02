@@ -12,7 +12,7 @@ import (
 )
 
 func TestCollections(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		store := bstorage.NewCollections(db)
 
 		// create a light collection with three transactions

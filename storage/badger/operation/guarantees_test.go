@@ -13,7 +13,7 @@ import (
 )
 
 func TestGuaranteeInsertCheckRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		g := unittest.CollectionGuaranteeFixture()
 
 		err := db.Update(InsertGuarantee(g))
@@ -33,7 +33,7 @@ func TestGuaranteeInsertCheckRetrieve(t *testing.T) {
 }
 
 func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		height := uint64(1)
 		blockID := flow.Identifier{0x10}
 		parentID := flow.Identifier{0x20}
@@ -67,7 +67,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 }
 
 func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		height1 := uint64(1)
 		height2 := uint64(2)
 		blockID1 := flow.Identifier{0x10}
@@ -134,7 +134,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 
 func TestFindDecendants(t *testing.T) {
 	t.Run("should find all descendants", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			finalizedHeight := 3
 			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
 
@@ -162,7 +162,7 @@ func TestFindDecendants(t *testing.T) {
 	})
 
 	t.Run("should exclude disconnected blocks", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			finalizedHeight := 3
 			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
 
@@ -192,7 +192,7 @@ func TestFindDecendants(t *testing.T) {
 	})
 
 	t.Run("should include conflicting blocks", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			finalizedHeight := 3
 			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
 
@@ -219,7 +219,7 @@ func TestFindDecendants(t *testing.T) {
 	})
 
 	t.Run("should not include old finalized blocks", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			finalizedHeight := 3
 			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
 
@@ -245,7 +245,7 @@ func TestFindDecendants(t *testing.T) {
 	})
 
 	t.Run("should not include the finalized block itself", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			finalizedHeight := 3
 			finalizedBlockID := flow.Identifier{byte(finalizedHeight)}
 

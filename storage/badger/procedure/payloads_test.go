@@ -12,7 +12,7 @@ import (
 )
 
 func TestInsertIndexRetreivePayload(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.BlockFixture()
 
 		err := db.Update(operation.InsertHeader(&block.Header))

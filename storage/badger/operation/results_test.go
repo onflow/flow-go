@@ -14,7 +14,7 @@ import (
 )
 
 func TestResultsInsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.ExecutionResultFixture()
 
 		err := db.Update(InsertExecutionResult(expected))

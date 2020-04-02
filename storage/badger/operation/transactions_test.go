@@ -13,7 +13,7 @@ import (
 
 func TestTransactions(t *testing.T) {
 
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.TransactionFixture()
 		err := db.Update(InsertTransaction(&expected.TransactionBody))
 		require.Nil(t, err)

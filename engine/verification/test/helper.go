@@ -41,7 +41,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		ids = append(ids, id1, id2)
 		values = append(values, value1, value2)
 
-		unittest.RunWithTempDBDir(t, func(t *testing.T, dir string) {
+		unittest.RunWithTempDBDir(t, func(dir string) {
 			f, err := ledger.NewTrieStorage(dir)
 			require.NoError(t, err)
 			startState, err := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())

@@ -18,7 +18,7 @@ import (
 )
 
 func TestBootstrap(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		chainID := cluster.Genesis().ChainID
 
@@ -128,7 +128,7 @@ func TestBootstrap(t *testing.T) {
 }
 
 func TestExtend(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		genesis := cluster.Genesis()
 		chainID := genesis.ChainID

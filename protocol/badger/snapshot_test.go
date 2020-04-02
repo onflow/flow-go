@@ -22,7 +22,7 @@ func init() {
 }
 
 func TestHead(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// setup
 		block := unittest.BlockFixture()
 		block.Height = 42
@@ -62,7 +62,7 @@ func TestHead(t *testing.T) {
 }
 
 func TestIdentity(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// setup
 
 		ids := flow.IdentityList{
@@ -169,7 +169,7 @@ func TestIdentity(t *testing.T) {
 }
 
 func TestIdentities(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// setup
 
 		ids := flow.IdentityList{
@@ -232,7 +232,7 @@ func TestIdentities(t *testing.T) {
 }
 
 func TestClusters(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// setup
 
 		ids := flow.IdentityList{

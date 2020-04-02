@@ -15,7 +15,7 @@ import (
 
 func TestDeltaInsertRetrieve(t *testing.T) {
 
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		number := uint64(9)
 		id := flow.Identity{
 			NodeID:  flow.Identifier{0x01},
@@ -37,7 +37,7 @@ func TestDeltaInsertRetrieve(t *testing.T) {
 
 func TestDeltasTraverse(t *testing.T) {
 
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		ids := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Role: flow.Role(1), Address: "a1"},
 			{NodeID: flow.Identifier{0x02}, Role: flow.Role(2), Address: "a2"},

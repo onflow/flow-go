@@ -18,7 +18,7 @@ import (
 
 func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T) {
 	return func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
 			ls, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 

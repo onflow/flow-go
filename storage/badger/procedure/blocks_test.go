@@ -12,7 +12,7 @@ import (
 )
 
 func TestInsertRetrieveBlock(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.BlockFixture()
 
 		err := db.Update(InsertBlock(&block))
@@ -27,7 +27,7 @@ func TestInsertRetrieveBlock(t *testing.T) {
 }
 
 func TestFinalizeBlock(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		parent := unittest.BlockFixture()
 		block := unittest.BlockWithParent(&parent)
 
@@ -56,7 +56,7 @@ func TestFinalizeBlock(t *testing.T) {
 }
 
 func TestInsertRetrieveBlockByCollectionGuarantee(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.BlockFixture()
 
 		err := db.Update(InsertBlock(&block))

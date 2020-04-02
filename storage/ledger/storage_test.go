@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewTrieStorage(t *testing.T) {
-	unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+	unittest.RunWithTempDBDir(t, func(dbDir string) {
 		_, err := NewTrieStorage(dbDir)
 		assert.NoError(t, err)
 	})
@@ -20,7 +20,7 @@ func TestNewTrieStorage(t *testing.T) {
 
 func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	t.Run("mismatched IDs and values", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
 			f, err := NewTrieStorage(dbDir)
 			require.NoError(t, err)
@@ -38,7 +38,7 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	})
 
 	t.Run("empty update", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
 			f, err := NewTrieStorage(dbDir)
 			require.NoError(t, err)
@@ -58,7 +58,7 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	})
 
 	t.Run("non-empty update", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
 			f, err := NewTrieStorage(dbDir)
 			require.NoError(t, err)
@@ -81,7 +81,7 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 
 func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	t.Run("mismatched IDs and values", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
 			f, err := NewTrieStorage(dbDir)
 			require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	})
 
 	t.Run("empty update", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
 			f, err := NewTrieStorage(dbDir)
 			require.NoError(t, err)
@@ -119,7 +119,7 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	})
 
 	t.Run("non-empty update", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(t *testing.T, dbDir string) {
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
 			f, err := NewTrieStorage(dbDir)
 			require.NoError(t, err)

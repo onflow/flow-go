@@ -14,7 +14,7 @@ import (
 )
 
 func TestNumberInsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		number := uint64(1337)
 		expected := flow.Identifier{0x01, 0x02, 0x03}

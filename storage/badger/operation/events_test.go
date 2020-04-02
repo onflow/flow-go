@@ -15,7 +15,7 @@ import (
 // TestRetrieveEventByBlockIDTxID tests event insertion, event retrieval by block id, block id and transaction id,
 // and block id and event type
 func TestRetrieveEventByBlockIDTxID(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		// create block ids, transaction ids and event types slices
 		blockIDs := []flow.Identifier{flow.HashToID([]byte{0x01}), flow.HashToID([]byte{0x02})}

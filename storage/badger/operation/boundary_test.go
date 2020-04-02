@@ -13,7 +13,7 @@ import (
 )
 
 func TestBoundaryInsertUpdateRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(t *testing.T, db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		boundary := uint64(1337)
 
 		err := db.Update(InsertBoundary(boundary))

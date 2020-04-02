@@ -49,11 +49,11 @@ func TempDBDir(t *testing.T) string {
 	return dir
 }
 
-func RunWithTempDBDir(t *testing.T, f func(*testing.T, string)) {
+func RunWithTempDBDir(t *testing.T, f func(string)) {
 	dbDir := TempDBDir(t)
 	defer os.RemoveAll(dbDir)
 
-	f(t, dbDir)
+	f(dbDir)
 }
 
 func TempBadgerDB(t *testing.T) (*badger.DB, string) {
@@ -66,13 +66,13 @@ func TempBadgerDB(t *testing.T) (*badger.DB, string) {
 	return db, dir
 }
 
-func RunWithBadgerDB(t *testing.T, f func(*testing.T, *badger.DB)) {
-	RunWithTempDBDir(t, func(t *testing.T, dir string) {
+func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
+	RunWithTempDBDir(t, func(dir string) {
 		// Ref: https://github.com/dgraph-io/badger#memory-usage
 		db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
 		require.Nil(t, err)
 
-		f(t, db)
+		f(db)
 
 		db.Close()
 	})
