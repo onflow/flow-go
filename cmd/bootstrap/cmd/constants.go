@@ -5,16 +5,16 @@ const (
 	minSeedBytes              = 48
 	minNodesPerCluster uint16 = 3
 
-	dirnameExecutionState         = "execution-state"
-	filenameGenesisBlock          = "genesis-block.json"
-	filenameGenesisClusterBlock   = "%v.genesis-cluster-block.json"
-	filenameNodeInfosPub          = "node-infos.pub.json"
-	filenameNodeInfoPriv          = "%v.node-info.priv.json"     // %v will be replaced by NodeID
-	filenameNodeInfoPub           = "%v.node-info.pub.json"      // %v will be replaced by NodeID
-	filenamePartnerNodeInfoSuffix = ".node-info.pub.json"        // %v will be replaced by NodeID
-	filenameRandomBeaconPriv      = "%v.random-beacon.priv.json" // %v will be replaced by NodeID
-	filenameDKGDataPub            = "dkg-data.pub.json"
-	filenameAccount0Priv          = "account-0.priv.json"
-	filenameGenesisQC             = "genesis-qc.json"
-	filenameGenesisClusterQC      = "%v.genesis-cluster-qc.json"
+	DirnameExecutionState         = "execution-state"
+	FilenameGenesisBlock          = "genesis-block.json"
+	FilenameGenesisClusterBlock   = "%v.genesis-cluster-block.json" // %v will be replaced by cluster ID
+	FilenameNodeInfosPub          = "node-infos.pub.json"
+	FilenameNodeInfoPriv          = "%v.node-info.priv.json"     // %v will be replaced by NodeID
+	FilenameNodeInfoPub           = "%v.node-info.pub.json"      // %v will be replaced by NodeID
+	FilenamePartnerNodeInfoSuffix = ".node-info.pub.json"        // %v will be replaced by NodeID
+	FilenameRandomBeaconPriv      = "%v.random-beacon.priv.json" // %v will be replaced by NodeID
+	FilenameDKGDataPub            = "dkg-data.pub.json"
+	FilenameAccount0Priv          = "account-0.priv.json"
+	FilenameGenesisQC             = "genesis-qc.json"
+	FilenameGenesisClusterQC      = "%v.genesis-cluster-qc.json" // %v will be replaced by cluster ID
 )

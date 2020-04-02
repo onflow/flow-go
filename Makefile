@@ -131,9 +131,18 @@ lint:
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	 golangci-lint run -v --build-tags relic ./...
 
+# Runs unit tests, coverage, linter
 .PHONY: ci
 ci: install-tools tidy lint test coverage
 
+# Runs integration tests
+# NOTE: we do not need `docker-build-flow` as this is run as a separate step
+# on Teamcity
+.PHONY: ci-integration
+ci-integration: install-tools
+	$(MAKE) -C integration integration-test
+
+# Runs unit tests, test coverage, lint in Docker
 .PHONY: docker-ci
 docker-ci:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
@@ -151,6 +160,33 @@ docker-ci-team-city:
 		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci
+
+# Runs integration tests in Docker
+.PHONY: docker-ci-integration
+docker-ci-integration:
+	docker run \
+		--env DOCKER_API_VERSION='1.39' \
+		--network host \
+		-v /tmp:/tmp \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
+		make ci-integration
+
+# This command is should only be used by Team City
+# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
+.PHONY: docker-ci-integration-team-city
+docker-ci-integration-team-city:
+	docker run \
+		--env DOCKER_API_VERSION='1.39' \
+		--network host \
+		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
+		-v /tmp:/tmp \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
+		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
+		make ci-integration
 
 .PHONY: docker-build-collection
 docker-build-collection:
