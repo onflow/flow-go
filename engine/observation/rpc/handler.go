@@ -11,20 +11,20 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-// Handler implements a subset of the Observation API. It spans multiple files
+// Handler implements a subset of the Access API. It spans multiple files
 // Transaction related calls are handled in handler handler_transaction
 // Block Header related calls are handled in handler handler_block_header
 // Block details related calls are handled in handler handler_block_details
 // All remaining calls are handled in this file (or not implemented yet)
 type Handler struct {
-	observation.UnimplementedObserveServiceServer
-	executionRPC  observation.ObserveServiceClient
-	collectionRPC observation.ObserveServiceClient
+	access.UnimplementedAccessAPIServer
+	executionRPC  access.AccessAPIClient
+	collectionRPC access.AccessAPIClient
 	log           zerolog.Logger
 	state         protocol.State
 
@@ -37,32 +37,32 @@ type Handler struct {
 
 func NewHandler(log zerolog.Logger,
 	s protocol.State,
-	e observation.ObserveServiceClient,
-	c observation.ObserveServiceClient,
+	e access.AccessAPIClient,
+	c access.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions) *Handler {
 	return &Handler{
-		executionRPC:                      e,
-		collectionRPC:                     c,
-		blocks:                            blocks,
-		headers:                           headers,
-		collections:                       collections,
-		transactions:                      transactions,
-		state:                             s,
-		log:                               log,
-		UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
+		executionRPC:                 e,
+		collectionRPC:                c,
+		blocks:                       blocks,
+		headers:                      headers,
+		collections:                  collections,
+		transactions:                 transactions,
+		state:                        s,
+		log:                          log,
+		UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
 	}
 }
 
 // Ping responds to requests when the server is up.
-func (h *Handler) Ping(ctx context.Context, req *observation.PingRequest) (*observation.PingResponse, error) {
-	return &observation.PingResponse{}, nil
+func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
+	return &access.PingResponse{}, nil
 }
 
-func (h *Handler) ExecuteScript(ctx context.Context, req *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
-	return h.executionRPC.ExecuteScript(ctx, req)
+func (h *Handler) ExecuteScriptAtLatestBlock(ctx context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
+	return h.executionRPC.ExecuteScriptAtLatestBlock(ctx, req)
 }
 
 func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {
@@ -75,7 +75,7 @@ func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {
 	return h.headers.ByBlockID(seal.BlockID)
 }
 
-func (h *Handler) GetCollectionByID(_ context.Context, req *observation.GetCollectionByIDRequest) (*observation.CollectionResponse, error) {
+func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
 
 	id := flow.HashToID(req.Id)
 
@@ -109,7 +109,7 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *observation.GetColle
 	}
 
 	// return the collection entity
-	resp := &observation.CollectionResponse{
+	resp := &access.CollectionResponse{
 		Collection: ce,
 	}
 	return resp, nil

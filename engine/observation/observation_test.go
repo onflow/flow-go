@@ -1,4 +1,4 @@
-package observation
+package access
 
 import (
 	"context"
@@ -20,11 +20,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -36,14 +36,14 @@ type Suite struct {
 	snapshot           *protocol.Snapshot
 	log                zerolog.Logger
 	net                *mockmodule.Network
-	collClient         *obs.ObserveServiceClient
-	execClient         *obs.ObserveServiceClient
+	collClient         *obs.AccessAPIClient
+	execClient         *obs.AccessAPIClient
 	collectionsConduit *networkmock.Conduit
 }
 
-// TestObservation tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
+// TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
 // and using a real badger storage.
-func TestObservation(t *testing.T) {
+func TestAccess(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
@@ -52,8 +52,8 @@ func (suite *Suite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.collClient = new(obs.ObserveServiceClient)
-	suite.execClient = new(obs.ObserveServiceClient)
+	suite.collClient = new(obs.AccessAPIClient)
+	suite.execClient = new(obs.AccessAPIClient)
 	suite.net = new(mockmodule.Network)
 	suite.collectionsConduit = &networkmock.Conduit{}
 }
@@ -72,10 +72,10 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		handler := rpc.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions)
 
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
-		sendReq := &observation.SendTransactionRequest{
+		sendReq := &access.SendTransactionRequest{
 			Transaction: expected,
 		}
-		sendResp := observation.SendTransactionResponse{}
+		sendResp := access.SendTransactionResponse{}
 		suite.collClient.On("SendTransaction", mock.Anything, mock.Anything).Return(&sendResp, nil).Once()
 
 		// Send transaction
@@ -84,7 +84,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		require.NotNil(suite.T(), resp)
 
 		id := transaction.ID()
-		getReq := &observation.GetTransactionRequest{
+		getReq := &access.GetTransactionRequest{
 			Id: id[:],
 		}
 
@@ -121,7 +121,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 		handler := rpc.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil)
 
-		assertHeaderResp := func(resp *observation.BlockHeaderResponse, err error, header *flow.Header) {
+		assertHeaderResp := func(resp *access.BlockHeaderResponse, err error, header *flow.Header) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := *resp.Block
@@ -129,7 +129,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expected, actual)
 		}
 
-		assertBlockResp := func(resp *observation.BlockResponse, err error, block *flow.Block) {
+		assertBlockResp := func(resp *access.BlockResponse, err error, block *flow.Block) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
@@ -140,7 +140,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
 			id := block1.ID()
-			req := &observation.GetBlockHeaderByIDRequest{
+			req := &access.GetBlockHeaderByIDRequest{
 				Id: id[:],
 			}
 
@@ -153,7 +153,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get block 1 by ID", func() {
 			id := block1.ID()
 			// get block details by ID
-			req := &observation.GetBlockByIDRequest{
+			req := &access.GetBlockByIDRequest{
 				Id: id[:],
 			}
 
@@ -165,7 +165,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get header 2 by height", func() {
 
 			// get header by height
-			req := &observation.GetBlockHeaderByHeightRequest{
+			req := &access.GetBlockHeaderByHeightRequest{
 				Height: block2.Height,
 			}
 
@@ -176,7 +176,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 		suite.Run("get block 2 by height", func() {
 			// get block details by height
-			req := &observation.GetBlockByHeightRequest{
+			req := &access.GetBlockByHeightRequest{
 				Height: block2.Height,
 			}
 
@@ -236,7 +236,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 5. client requests a transaction
 		tx := collection.Transactions[0]
 		id := tx.ID()
-		getReq := &observation.GetTransactionRequest{
+		getReq := &access.GetTransactionRequest{
 			Id: id[:],
 		}
 		gResp, err := handler.GetTransaction(context.Background(), getReq)
