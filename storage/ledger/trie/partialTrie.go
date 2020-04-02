@@ -57,8 +57,11 @@ func NewPSMT(
 ) (*PSMT, error) {
 
 	psmt := PSMT{newNode(nil, height-1), height, make(map[string]*node)}
-	// TODO add checks for decode proof
-	proofholder := DecodeProof(proofs)
+
+	proofholder, err := DecodeProof(proofs)
+	if err != nil {
+		return nil, fmt.Errorf("decoding proof failed: %w", err)
+	}
 
 	// iterating over proofs
 	for i, proofSize := range proofholder.sizes {

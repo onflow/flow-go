@@ -2555,7 +2555,9 @@ func TestProofEncoderDecoder(t *testing.T) {
 		_, proofHldr, err := smt.Read(keys, false, newRoot)
 		require.NoError(t, err)
 
-		require.Equal(t, DecodeProof(EncodeProof(proofHldr)), proofHldr, "Proof Encoder has an issue")
+		p, err := DecodeProof(EncodeProof(proofHldr))
+		require.NoError(t, err)
+		require.Equal(t, p, proofHldr, "Proof Encoder has an issue")
 	})
 
 	trieHeight = 257
@@ -2578,7 +2580,9 @@ func TestProofEncoderDecoder(t *testing.T) {
 		_, proofHldr, err := smt.Read(keys, false, newRoot)
 		require.NoError(t, err)
 
-		require.Equal(t, DecodeProof(EncodeProof(proofHldr)), proofHldr, "Proof Encoder has an issue")
+		p, err := DecodeProof(EncodeProof(proofHldr))
+		require.NoError(t, err)
+		require.Equal(t, p, proofHldr, "Proof Encoder has an issue")
 	})
 }
 
