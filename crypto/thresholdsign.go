@@ -223,10 +223,12 @@ func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // signatures and their signers's indices and returns the threshold signature
 // size is the size of the threshold signature group
 // The function does not check the validity of the shares, and does not check
-// the validity of the resulting signature.
+// the validity of the resulting signature. It also does not check the signatures signers
+// are distinct.
 // The function assumes the threshold value is equal to floor((n-1)/2)
 // ReconstructThresholdSignature returns:
-// - Signature: the threshold signature if the threshold was reached, nil otherwise
+// - error if the inputs are not in the correct range or if the threshold is not reached
+// - Signature: the threshold signature if there is no returned error, nil otherwise
 func ReconstructThresholdSignature(size int, shares []Signature, signers []int) (Signature, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d",
