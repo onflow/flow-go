@@ -18,11 +18,9 @@ func TestGenerateGenesisStateCommitment(t *testing.T) {
 		ls, err := ledger.NewTrieStorage(db)
 		require.NoError(t, err)
 
-		//emptyStateCommitment := ls.LatestStateCommitment()
-
 		newStateCommitment, err := BootstrapLedger(ls)
 		require.NoError(t, err)
 
-		assert.Equal(t, newStateCommitment, flow.GenesisStateCommitment)
+		assert.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
 	})
 }
