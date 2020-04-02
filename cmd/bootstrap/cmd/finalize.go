@@ -39,7 +39,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 
 		log.Info().Msg("✨ assembling network and staking keys")
 		stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-		writeJSON(FilenameNodeInfosPub, stakingNodes)
+		writeJSON(FilenameNodeInfosPub, publicNodeInfos(stakingNodes))
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ running DKG for consensus nodes")
@@ -67,7 +67,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis QCs for collector clusters")
-		constructGenesisQCsForCollectorClusters(clusters, internalNodesPriv, block, clusterBlocks)
+		constructGenesisQCsForCollectorClusters(clusters, internalNodes, block, clusterBlocks)
 		log.Info().Msg("")
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
@@ -96,7 +96,8 @@ func init() {
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
 }
 
-func assemblePartnerNodes() []model.NodeInfoPub {
+func assemblePartnerNodes() []model.NodeInfo {
+
 	partners := readPartnerNodes()
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
 
@@ -104,7 +105,7 @@ func assemblePartnerNodes() []model.NodeInfoPub {
 	readJSON(flagPartnerStakes, &stakes)
 	log.Info().Msgf("read %v stakes for partner nodes", len(stakes))
 
-	var nodes []model.NodeInfoPub
+	var nodes []model.NodeInfo
 	for _, partner := range partners {
 		// validate every single partner node
 		nodeID := validateNodeID(partner.NodeID)
@@ -112,14 +113,16 @@ func assemblePartnerNodes() []model.NodeInfoPub {
 		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
 		stake := validateStake(stakes[partner.NodeID])
 
-		nodes = append(nodes, NodeInfoPub{
-			Role:          partner.Role,
-			Address:       partner.Address,
-			NodeID:        nodeID,
-			NetworkPubKey: networkPubKey,
-			StakingPubKey: stakingPubKey,
-			Stake:         stake,
-		})
+		node := model.NewNodeInfoWithPublicKeys(
+			nodeID,
+			partner.Role,
+			partner.Address,
+			stake,
+			networkPubKey,
+			stakingPubKey,
+		)
+
+		nodes = append(nodes, node)
 	}
 
 	return nodes
@@ -132,14 +135,14 @@ func validateNodeID(nodeID flow.Identifier) flow.Identifier {
 	return nodeID
 }
 
-func validateNetworkPubKey(key EncodableNetworkPubKey) EncodableNetworkPubKey {
+func validateNetworkPubKey(key model.EncodableNetworkPubKey) model.EncodableNetworkPubKey {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("NetworkPubKey must not be nil")
 	}
 	return key
 }
 
-func validateStakingPubKey(key EncodableStakingPubKey) EncodableStakingPubKey {
+func validateStakingPubKey(key model.EncodableStakingPubKey) model.EncodableStakingPubKey {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("StakingPubKey must not be nil")
 	}
@@ -193,4 +196,12 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	return nodes
+}
+
+func publicNodeInfos(nodeInfos []model.NodeInfo) []model.NodeInfoPub {
+	pub := make([]model.NodeInfoPub, 0, len(nodeInfos))
+	for _, node := range nodeInfos {
+		pub = append(pub, node.Public())
+	}
+	return pub
 }

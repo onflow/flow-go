@@ -11,19 +11,6 @@ import (
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 )
 
-/*TODO remove
-type DKGParticipant struct {
-	Priv       crypto.PrivateKey
-	GroupIndex int
-}
-
-type DKGData struct {
-	PubGroupKey  crypto.PublicKey
-	PubKeys      []crypto.PublicKey
-	Participants []DKGParticipant
-}
-*/
-
 func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 
 	if n != len(seeds) {

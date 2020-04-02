@@ -25,9 +25,9 @@ func computeCollectorClusters(stakingNodes []model.NodeInfo) *flow.ClusterList {
 			Address:            node.Address,
 			Role:               node.Role,
 			Stake:              node.Stake,
-			StakingPubKey:      node.StakingPrivKey.PublicKey(),
+			StakingPubKey:      node.StakingPubKey(),
+			NetworkPubKey:      node.NetworkPubKey(),
 			RandomBeaconPubKey: nil,
-			NetworkPubKey:      node.NetworkPrivKey.PublicKey(),
 		})
 	}
 
@@ -52,9 +52,9 @@ func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, node
 	}
 
 	for i := 0; i < clusterList.Size(); i++ {
-		signerData := filterClusterSigners(nodeInfos)
+		signers := filterClusterSigners(nodeInfos)
 
-		qc, err := run.GenerateClusterGenesisQC(signerData, &block, &clusterBlocks[i])
+		qc, err := run.GenerateClusterGenesisQC(signers, &block, &clusterBlocks[i])
 		if err != nil {
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster genesis QC failed")
 		}

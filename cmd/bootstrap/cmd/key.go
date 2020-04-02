@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -17,7 +18,21 @@ var (
 	flagStakingSeed []byte
 )
 
-// TODO can these be replaced by just NodeInfo?
+type PartnerNodeInfoPriv struct {
+	Role           flow.Role
+	Address        string
+	NodeID         flow.Identifier
+	NetworkPrivKey model.EncodableNetworkPrivKey
+	StakingPrivKey model.EncodableStakingPrivKey
+}
+
+type PartnerNodeInfoPub struct {
+	Role          flow.Role
+	Address       string
+	NodeID        flow.Identifier
+	NetworkPubKey model.EncodableNetworkPubKey
+	StakingPubKey model.EncodableStakingPubKey
+}
 
 // keyCmd represents the key command
 var keyCmd = &cobra.Command{
@@ -44,7 +59,7 @@ var keyCmd = &cobra.Command{
 		log.Info().Msg("generated staking key")
 
 		log.Debug().Str("address", flagAddress).Msg("assembling node information")
-		nodeInfo := assembleNodeInfo(NodeConfig{role, flagAddress, 0}, networkKeys[0],
+		nodeInfo := assembleNodeInfo(model.NodeConfig{role, flagAddress, 0}, networkKeys[0],
 			stakingKeys[0])
 
 		//TODO is this ok to not have partner-specific models? seems they are the same

@@ -95,14 +95,14 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 		Str("stakingPubKey", pubKeyToString(stakingKey.PublicKey())).
 		Msg("encoded public staking and network keys")
 
-	nodeInfo := model.NodeInfo{
-		NodeID:         nodeID,
-		Role:           nodeConfig.Role,
-		Address:        nodeConfig.Address,
-		Stake:          nodeConfig.Stake,
-		NetworkPrivKey: networkKey,
-		StakingPrivKey: stakingKey,
-	}
+	nodeInfo := model.NewNodeInfoWithPrivateKeys(
+		nodeID,
+		nodeConfig.Role,
+		nodeConfig.Address,
+		nodeConfig.Stake,
+		networkKey,
+		stakingKey,
+	)
 
 	return nodeInfo
 }

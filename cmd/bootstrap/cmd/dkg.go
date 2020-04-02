@@ -7,31 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
-
-//TODO remove all these in favour of model/bootstrap
-type DKGParticipantPriv struct {
-	NodeID              flow.Identifier
-	RandomBeaconPrivKey EncodableRandomBeaconPrivKey
-	GroupIndex          int
-}
-
-type DKGParticipantPub struct {
-	NodeID             flow.Identifier
-	RandomBeaconPubKey EncodableRandomBeaconPubKey
-	GroupIndex         int
-}
-
-type DKGDataPriv struct {
-	PubGroupKey  EncodableRandomBeaconPubKey
-	Participants []DKGParticipantPriv
-}
-
-type DKGDataPub struct {
-	PubGroupKey  EncodableRandomBeaconPubKey
-	Participants []DKGParticipantPub
-}
 
 func runDKG(nodes []model.NodeInfo) model.DKGData {
 	n := len(nodes)

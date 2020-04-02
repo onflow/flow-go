@@ -51,12 +51,17 @@ func createSignerData(t *testing.T, n int) SignerData {
 	}
 
 	for i, id := range ids {
-		signerData.Signers[i].NodeInfo = bootstrap.NodeInfoFromIdentity(id)
+		signerData.Signers[i].NodeInfo = bootstrap.NewNodeInfoWithPrivateKeys(
+			id.NodeID,
+			id.Role,
+			id.Address,
+			id.Stake,
+			networkingKeys[i],
+			stakingKeys[i],
+		)
 
-		// add private keys
+		// add random beacon private key
 		signerData.Signers[i].RandomBeaconPrivKey = randomBKeys[i]
-		signerData.Signers[i].StakingPrivKey = stakingKeys[i]
-		signerData.Signers[i].NetworkPrivKey = networkingKeys[i]
 	}
 
 	return signerData

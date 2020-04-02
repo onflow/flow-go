@@ -76,7 +76,7 @@ func GenerateClusterGenesisQC(ccSigners []bootstrap.NodeInfo, block *flow.Block,
 	return qc, err
 }
 
-func createClusterValidators(ps *protoBadger.State, ccSigners []ClusterSigner, block *flow.Block) (
+func createClusterValidators(ps *protoBadger.State, ccSigners []bootstrap.NodeInfo, block *flow.Block) (
 	[]*validator.Validator, []*signature.StakingSigProvider, error) {
 	n := len(ccSigners)
 
@@ -87,15 +87,14 @@ func createClusterValidators(ps *protoBadger.State, ccSigners []ClusterSigner, b
 
 	for i, signer := range ccSigners {
 		// create signer
-		signerId := signer.Identity
-		s, err := NewStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, &signerId, signer.StakingPrivKey)
+		s, err := NewStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, signer.Identity(), signer.StakingPrivKey())
 		if err != nil {
 			return nil, nil, err
 		}
 		signers[i] = s
 
 		// create view state
-		vs, err := viewstate.New(ps, nil, signer.Identity.NodeID, filter.In(signersToIdentityList(ccSigners))) // TODO need to filter per cluster
+		vs, err := viewstate.New(ps, nil, signer.NodeID, filter.In(signersToIdentityList(ccSigners))) // TODO need to filter per cluster
 		if err != nil {
 			return nil, nil, err
 		}
@@ -108,7 +107,7 @@ func createClusterValidators(ps *protoBadger.State, ccSigners []ClusterSigner, b
 }
 
 // create a new StakingSigProvider
-func NewStakingProvider(ps protocol.State, signers []ClusterSigner, tag string, id *flow.Identity, sk crypto.PrivateKey) (
+func NewStakingProvider(ps protocol.State, signers []bootstrap.NodeInfo, tag string, id *flow.Identity, sk crypto.PrivateKey) (
 	*signature.StakingSigProvider, error) {
 	vs, err := viewstate.New(ps, nil, id.NodeID, filter.In(signersToIdentityList(signers))) // TODO need to filter per cluster
 	if err != nil {
@@ -156,10 +155,10 @@ func unsafeAggregate(sigs []*model.SingleSignature) ([]crypto.Signature, []flow.
 	return aggStakingSig, signerIDs
 }
 
-func signersToIdentityList(signers []ClusterSigner) flow.IdentityList {
+func signersToIdentityList(signers []bootstrap.NodeInfo) flow.IdentityList {
 	identities := make([]*flow.Identity, len(signers))
 	for i, signer := range signers {
-		identities[i] = &signer.Identity
+		identities[i] = signer.Identity()
 	}
 	return identities
 }
