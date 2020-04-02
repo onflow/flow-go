@@ -11,6 +11,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
@@ -39,6 +40,7 @@ type Suite struct {
 	collClient         *obs.ObserveServiceClient
 	execClient         *obs.ObserveServiceClient
 	collectionsConduit *networkmock.Conduit
+	me                 *mockmodule.Local
 }
 
 // TestObservation tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -56,6 +58,9 @@ func (suite *Suite) SetupTest() {
 	suite.execClient = new(obs.ObserveServiceClient)
 	suite.net = new(mockmodule.Network)
 	suite.collectionsConduit = &networkmock.Conduit{}
+	suite.me = new(mockmodule.Local)
+	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleObservation))
+	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
@@ -210,7 +215,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		transactions := bstorage.NewTransactions(db)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, nil, nil, blocks, headers, collections, transactions)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, nil, suite.me, blocks, headers, collections, transactions)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
@@ -221,9 +226,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Seal").Return(seal, nil).Once()
 
-		// 2. Ingest engine was notified by the follower engine with a new block
-		err = ingestEng.Process(originID, &block)
-		require.NoError(suite.T(), err)
+		// 2. FinalizerSubscriber was notified by the follower engine about a new block.
+		// Follower engine --> FinalizerSubscriber --> Ingest engine
+		fs := ingestion.NewFinalizerSubscriber(suite.log, ingestEng, blocks)
+		mb := &model.Block{
+			BlockID: block.ID(),
+		}
+		fs.OnFinalizedBlock(mb) // FinalizerSubscriber should call the ingest engine at this point
 
 		// 3. Ingest engine requests all collections of the block
 		suite.collectionsConduit.AssertExpectations(suite.T())
