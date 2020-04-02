@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/observation/rpc"
 	"github.com/dapperlabs/flow-go/module"
 	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -90,7 +89,6 @@ func main() {
 
 			core, err := follower.New(node.Me, node.State, node.DKGPubData, &node.GenesisBlock.Header, node.GenesisQC, final, fs, node.Logger)
 			if err != nil {
-				//return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower
 				// this is necessary for integration tests to run, until they are
 				// updated to generate/use valid genesis QC and DKG files.
