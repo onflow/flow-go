@@ -25,5 +25,5 @@ type VerifiableChunk struct {
 	Receipt       *flow.ExecutionReceipt // execution receipt of this block
 	Collection    *flow.Collection       // collection corresponding to the chunk
 	ChunkState    *flow.ChunkState       // state of registers corresponding to the chunk
-	ChunkDataPack *flow.ChunkDataPack
+	ChunkDataPack *flow.ChunkDataPack    // chunk data package needed to verify this chunk
 }

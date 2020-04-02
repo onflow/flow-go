@@ -177,13 +177,14 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity) mock.ExecutionNode {
 	node := GenericNode(t, hub, identity, identities)
 
-	blocksStorage := bstorage.NewBlocks(node.DB)
-	payloadsStorage := bstorage.NewPayloads(node.DB)
-	collectionsStorage := bstorage.NewCollections(node.DB)
-	commitsStorage := bstorage.NewCommits(node.DB)
-	chunkHeadersStorage := bstorage.NewChunkHeaders(node.DB)
-	chunkDataPackStorage := bstorage.NewChunkDataPacks(node.DB)
-	executionResults := bstorage.NewExecutionResults(node.DB)
+	blocksStorage := storage.NewBlocks(node.DB)
+	payloadsStorage := storage.NewPayloads(node.DB)
+	collectionsStorage := storage.NewCollections(node.DB)
+	eventsStorage := storage.NewEvents(node.DB)
+	commitsStorage := storage.NewCommits(node.DB)
+	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
+	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
+	executionResults := storage.NewExecutionResults(node.DB)
 
 	levelDB := unittest.TempLevelDB(t)
 
@@ -218,6 +219,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		blocksStorage,
 		payloadsStorage,
 		collectionsStorage,
+		eventsStorage,
 		computationEngine,
 		providerEngine,
 		execState,
