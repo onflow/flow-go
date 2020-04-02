@@ -822,14 +822,10 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 
 	// checks pending receipts in parallel and non-blocking based on new block ID
 	// currently error is
-	err := e.unit.Do(func() error {
+	_ = e.unit.Do(func() error {
 		e.checkPendingReceipts(block.BlockID)
 		return nil
 	})
-
-	if err != nil {
-		// currently error is always nil
-	}
 }
 
 // OnDoubleProposeDetected is part of implementing FinalizationConsumer interface
