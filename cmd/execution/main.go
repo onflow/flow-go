@@ -101,6 +101,7 @@ func main() {
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 			payloads := badger.NewPayloads(node.DB)
+			events := badger.NewEvents(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
@@ -109,6 +110,7 @@ func main() {
 				blocks,
 				payloads,
 				collections,
+				events,
 				computationManager,
 				providerEngine,
 				executionState,
