@@ -109,12 +109,9 @@ func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	accountID := address[:]
 
-	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
+	err := r.checkAccountExists(accountID)
 	if err != nil {
 		return err
-	}
-	if len(exists) == 0 {
-		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	publicKeys, err := r.getAccountPublicKeys(accountID)
@@ -134,12 +131,9 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	accountID := address[:]
 
-	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
+	err = r.checkAccountExists(accountID)
 	if err != nil {
 		return nil, err
-	}
-	if len(exists) == 0 {
-		return nil, fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	publicKeys, err := r.getAccountPublicKeys(accountID)
@@ -251,12 +245,9 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return fmt.Errorf("not permitted to update account with ID %s", address)
 	}
 
-	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
+	err = r.checkAccountExists(accountID)
 	if err != nil {
 		return err
-	}
-	if len(exists) == 0 {
-		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	r.ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
@@ -340,4 +331,22 @@ func fullKeyHash(owner, controller, key string) flow.RegisterID {
 
 func keyPublicKey(index int) string {
 	return fmt.Sprintf("public_key_%d", index)
+}
+
+func (r *TransactionContext) checkAccountExists(accountID []byte) error {
+	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
+	if err != nil {
+		return err
+	}
+
+	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	if err != nil {
+		return err
+	}
+
+	if len(exists) != 0 || bal != nil {
+		return nil
+	}
+
+	return fmt.Errorf("account with ID %s does not exist", accountID)
 }
