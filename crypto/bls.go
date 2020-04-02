@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -19,7 +20,7 @@ type BLS_BLS12381Algo struct {
 // If the hasher used is KMAC128, it is not modified by the function, even temporarily
 func (sk *PrKeyBLS_BLS12381) Sign(data []byte, kmac Hasher) (Signature, error) {
 	if kmac == nil {
-		return nil, cryptoError{"Sign requires a Hasher"}
+		return nil, errors.New("Sign requires a Hasher")
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
@@ -44,7 +45,7 @@ func NewBLS_KMAC(tag string) Hasher {
 // If the hasher used is KMAC128, it is not modified by the function, even temporarily
 func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac Hasher) (bool, error) {
 	if kmac == nil {
-		return false, cryptoError{"VerifyBytes requires a Hasher"}
+		return false, errors.New("VerifyBytes requires a Hasher")
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
@@ -56,8 +57,8 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac Hasher) (boo
 // The minimum size of the input seed is 48 bytes (for a sceurity of 128 bits)
 func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	if len(seed) < KeyGenSeedMinLenBLS_BLS12381 {
-		return nil, cryptoError{fmt.Sprintf("seed should be at least %d bytes",
-			KeyGenSeedMinLenBLS_BLS12381)}
+		return nil, fmt.Errorf("seed should be at least %d bytes",
+			KeyGenSeedMinLenBLS_BLS12381)
 	}
 
 	sk := &PrKeyBLS_BLS12381{
@@ -73,7 +74,7 @@ func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 
 func (a *BLS_BLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
 	if len(privateKeyBytes) != prKeyLengthBLS_BLS12381 {
-		return nil, cryptoError{fmt.Sprintf("the input length has to be equal to %d", prKeyLengthBLS_BLS12381)}
+		return nil, fmt.Errorf("the input length has to be equal to %d", prKeyLengthBLS_BLS12381)
 	}
 	sk := &PrKeyBLS_BLS12381{
 		alg: a,
@@ -83,23 +84,23 @@ func (a *BLS_BLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey,
 	if sk.scalar.checkMembershipZr() {
 		return sk, nil
 	}
-	return nil, cryptoError{"the private key is not a valid BLS12-381 curve key"}
+	return nil, errors.New("the private key is not a valid BLS12-381 curve key")
 }
 
 func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
 	if len(publicKeyBytes) != pubKeyLengthBLS_BLS12381 {
-		return nil, cryptoError{fmt.Sprintf("the input length has to be equal to %d", pubKeyLengthBLS_BLS12381)}
+		return nil, fmt.Errorf("the input length has to be equal to %d", pubKeyLengthBLS_BLS12381)
 	}
 	pk := &PubKeyBLS_BLS12381{
 		alg: a,
 	}
 	if readPointG2(&pk.point, publicKeyBytes) != nil {
-		return nil, cryptoError{"the input slice does not encode a public key"}
+		return nil, errors.New("the input slice does not encode a public key")
 	}
 	if pk.point.checkMembershipG2() {
 		return pk, nil
 	}
-	return nil, cryptoError{"the public key is not a valid BLS12-381 curve key"}
+	return nil, errors.New("the public key is not a valid BLS12-381 curve key")
 
 }
 

@@ -9,6 +9,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"math/big"
 )
@@ -29,7 +30,7 @@ func bitsToBytes(bits int) int {
 func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
 	r, s, err := goecdsa.Sign(rand.Reader, sk.goPrKey, h)
 	if err != nil {
-		return nil, cryptoError{"ECDSA Signature has failed"}
+		return nil, errors.New("ECDSA Signature has failed")
 	}
 	rBytes := r.Bytes()
 	sBytes := s.Bytes()
@@ -47,7 +48,7 @@ func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
 // is modified temporarily
 func (sk *PrKeyECDSA) Sign(data []byte, alg Hasher) (Signature, error) {
 	if alg == nil {
-		return nil, cryptoError{"Sign requires a Hasher"}
+		return nil, errors.New("Sign requires a Hasher")
 	}
 	h := alg.ComputeHash(data)
 	return sk.signHash(h)
@@ -69,7 +70,7 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h Hash) (bool, error) {
 // is modified temporarily
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, error) {
 	if alg == nil {
-		return false, cryptoError{"Verify requires a Hasher"}
+		return false, errors.New("Verify requires a Hasher")
 	}
 	h := alg.ComputeHash(data)
 	return pk.verifyHash(sig, h)
@@ -99,7 +100,7 @@ func (a *ECDSAalgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	// extra 128 bits to reduce the modular reduction bias
 	minSeedLen := Nlen + (securityBits / 8)
 	if len(seed) < minSeedLen {
-		return nil, cryptoError{fmt.Sprintf("seed should be at least %d bytes", minSeedLen)}
+		return nil, fmt.Errorf("seed should be at least %d bytes", minSeedLen)
 	}
 	sk := goecdsaGenerateKey(a.curve, seed)
 	return &PrKeyECDSA{a, sk}, nil
@@ -108,7 +109,7 @@ func (a *ECDSAalgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 func (a *ECDSAalgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
 	if len(der) != Nlen {
-		return nil, cryptoError{"raw private key is not valid"}
+		return nil, errors.New("raw private key is not valid")
 	}
 	var d big.Int
 	d.SetBytes(der)
@@ -134,13 +135,13 @@ func (a *ECDSAalgo) decodePrivateKey(der []byte) (PrivateKey, error) {
 	if a.algo == ECDSA_SECp256k1 {
 		return a.rawDecodePrivateKey(der)
 	}
-	return nil, cryptoError{"curve is not supported"}
+	return nil, errors.New("curve is not supported")
 }
 
 func (a *ECDSAalgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	Plen := bitsToBytes((a.curve.Params().P).BitLen())
 	if len(der) != 2*Plen {
-		return nil, cryptoError{"raw public key is not valid"}
+		return nil, errors.New("raw public key is not valid")
 	}
 	var x, y big.Int
 	x.SetBytes(der[:Plen])
@@ -171,7 +172,7 @@ func (a *ECDSAalgo) decodePublicKey(der []byte) (PublicKey, error) {
 	if a.algo == ECDSA_SECp256k1 {
 		return a.rawDecodePublicKey(der)
 	}
-	return nil, cryptoError{"curve is not supported"}
+	return nil, errors.New("curve is not supported")
 }
 
 // PrKeyECDSA is the private key of ECDSA, it implements PrivateKey
@@ -222,7 +223,7 @@ func (sk *PrKeyECDSA) Encode() ([]byte, error) {
 	if sk.Algorithm() == ECDSA_SECp256k1 {
 		return sk.rawEncode()
 	}
-	return nil, cryptoError{"curve is not supported"}
+	return nil, errors.New("curve is not supported")
 }
 
 func (sk *PrKeyECDSA) Equals(other PrivateKey) bool {
@@ -280,7 +281,7 @@ func (pk *PubKeyECDSA) Encode() ([]byte, error) {
 	if pk.Algorithm() == ECDSA_SECp256k1 {
 		return pk.rawEncode()
 	}
-	return nil, cryptoError{"curve is not supported"}
+	return nil, errors.New("curve is not supported")
 }
 
 func (pk *PubKeyECDSA) Equals(other PublicKey) bool {

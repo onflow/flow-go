@@ -69,7 +69,7 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 		})
 		return ECDSA_SECp256k1Instance, nil
 	}
-	return nil, cryptoError{fmt.Sprintf("the signature scheme %s is not supported.", algo)}
+	return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
 }
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed

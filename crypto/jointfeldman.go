@@ -2,6 +2,10 @@
 
 package crypto
 
+import (
+	"errors"
+)
+
 // Implements Joint Feldman protocol using BLS set up on BLS381 curve.
 // the protocol runs (n) parallel instances of Feldman vss with the complaints system
 // Private keys are Zr elements while public keys are G2 elements
@@ -38,7 +42,7 @@ func (s *JointFeldmanState) init() {
 // StartDKG starts running a DKG
 func (s *JointFeldmanState) StartDKG(seed []byte) error {
 	if s.jointRunning {
-		return cryptoError{"dkg is already running"}
+		return errors.New("dkg is already running")
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
@@ -46,7 +50,7 @@ func (s *JointFeldmanState) StartDKG(seed []byte) error {
 			s.fvss[i].running = false
 			err := s.fvss[i].StartDKG(seed)
 			if err != nil {
-				return cryptoError{"error when starting dkg"}
+				return errors.New("error when starting dkg")
 			}
 		}
 	}
@@ -62,13 +66,13 @@ func (s *JointFeldmanState) StartDKG(seed []byte) error {
 // NextTimeout sets the next timeout of the protocol if any timeout applies
 func (s *JointFeldmanState) NextTimeout() error {
 	if !s.jointRunning {
-		return cryptoError{"dkg protocol is not running"}
+		return errors.New("dkg protocol is not running")
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].NextTimeout()
 		if err != nil {
-			return cryptoError{"next timeout has failed"}
+			return errors.New("next timeout has failed")
 		}
 	}
 	return nil
@@ -77,7 +81,7 @@ func (s *JointFeldmanState) NextTimeout() error {
 // EndDKG ends a DKG protocol, the public data and node private key are finalized
 func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.jointRunning {
-		return nil, nil, nil, cryptoError{"dkg protocol is not running"}
+		return nil, nil, nil, errors.New("dkg protocol is not running")
 	}
 
 	disqualifiedTotal := 0
@@ -85,7 +89,7 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 		// check previous timeouts were called
 		if !s.fvss[i].sharesTimeout || !s.fvss[i].complaintsTimeout {
 			return nil, nil, nil,
-				cryptoError{"two timeouts should be set before ending dkg"}
+				errors.New("two timeouts should be set before ending dkg")
 		}
 
 		// check if a complaint has remained without an answer
@@ -108,7 +112,7 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	// check failing dkg
 	if disqualifiedTotal > s.threshold || s.size-disqualifiedTotal <= s.threshold {
 		return nil, nil, nil,
-			cryptoError{"DKG has failed because the diqualified nodes number is high"}
+			errors.New("DKG has failed because the diqualified nodes number is high")
 	}
 
 	// wrap up the keys from qualified leaders
@@ -138,12 +142,12 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 // ReceiveDKGMsg processes a new DKG message received by the current node
 func (s *JointFeldmanState) ReceiveDKGMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return cryptoError{"dkg protocol is not running"}
+		return errors.New("dkg protocol is not running")
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].ReceiveDKGMsg(orig, msg)
 		if err != nil {
-			return cryptoError{"receive dkg message has failed"}
+			return errors.New("receive dkg message has failed")
 		}
 	}
 	return nil
@@ -157,12 +161,12 @@ func (s *JointFeldmanState) Running() bool {
 
 func (s *JointFeldmanState) Disqualify(node int) error {
 	if !s.jointRunning {
-		return cryptoError{"dkg is not running"}
+		return errors.New("dkg is not running")
 	}
 	for i := 0; i < s.size; i++ {
 		err := s.fvss[i].Disqualify(node)
 		if err != nil {
-			return cryptoError{"disqualif has failed"}
+			return errors.New("disqualif has failed")
 		}
 	}
 	return nil
