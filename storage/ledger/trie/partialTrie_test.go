@@ -39,7 +39,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		_, err = smt.Update(keys, values, defaultHash)
 		require.NoError(t, err, "error updating trie")
 
-		newHash, err := psmt.Update(keys, values)
+		newHash, _, err := psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(newHash, psmt.root.ComputeValue()) {
@@ -54,7 +54,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		_, err = smt.Update(keys, values, newHash)
 		require.NoError(t, err, "error updating trie")
 
-		newerHash, err := psmt.Update(keys, values)
+		newerHash, _, err := psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(newerHash, psmt.root.ComputeValue()) {
@@ -101,7 +101,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		newRoot2, err := smt.Update(keys, values, newRoot)
 		require.NoError(t, err, "error updating trie")
 
-		_, err = psmt.Update(keys, values)
+		_,_, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
@@ -144,7 +144,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		newRoot, err := smt.Update(keys, values, emptyTree.root)
 		require.NoError(t, err, "error updating trie")
 
-		_, err = psmt.Update(keys, values)
+		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
@@ -157,7 +157,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		newRoot2, err := smt.Update(keys, values, newRoot)
 		require.NoError(t, err, "error updating trie")
 
-		_, err = psmt.Update(keys, values)
+		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
@@ -197,7 +197,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		newRoot, err := smt.Update(keys, values, emptyTree.root)
 		require.NoError(t, err, "error updating trie")
 
-		_, err = psmt.Update(keys, values)
+		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [before update]")
@@ -209,7 +209,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		newRoot2, err := smt.Update(keys, values, newRoot)
 		require.NoError(t, err, "error updating trie")
 
-		_, err = psmt.Update(keys, values)
+		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [after update]")

@@ -41,6 +41,11 @@ func (g *GenericNode) Done() {
 	_ = os.RemoveAll(g.DBDir)
 }
 
+// Closes closes the badger database of the node
+func (g *GenericNode) CloseDB() error {
+	return g.DB.Close()
+}
+
 // CollectionNode implements an in-process collection node for tests.
 type CollectionNode struct {
 	GenericNode

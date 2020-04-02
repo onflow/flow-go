@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/test"
-	"github.com/dapperlabs/flow-go/model/chunkassignment"
+	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	verificationmodel "github.com/dapperlabs/flow-go/model/verification"
@@ -218,7 +218,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
 
 	// assigns all chunks in the receipt to this node through mocking
-	a := chunkassignment.NewAssignment()
+	a := chmodel.NewAssignment()
 	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
 		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
 	}
@@ -644,7 +644,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
 
 			// we have the assignment of chunk
-			a := chunkassignment.NewAssignment()
+			a := chmodel.NewAssignment()
 			a.Add(suite.receipt.ExecutionResult.Chunks.ByIndex(0), flow.IdentifierList{verIdentity.NodeID})
 			suite.assigner.On("Assign",
 				testifymock.Anything,
@@ -807,7 +807,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// new chunk assignment
-	a := chunkassignment.NewAssignment()
+	a := chmodel.NewAssignment()
 
 	// create `erCount` ER fixtures that will be concurrently delivered
 	ers := make([]verification.CompleteExecutionResult, 0)
@@ -1022,11 +1022,11 @@ func NewMockAssigner(id flow.Identifier) *MockAssigner {
 }
 
 // Assign assigns all input chunks to the verifer node
-func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
+func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chmodel.Assignment, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("assigner called with empty chunk list")
 	}
-	a := chunkassignment.NewAssignment()
+	a := chmodel.NewAssignment()
 	for _, c := range chunks {
 		a.Add(c, flow.IdentifierList{m.me})
 	}

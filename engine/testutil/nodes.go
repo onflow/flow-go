@@ -181,6 +181,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	blocksStorage := storage.NewBlocks(node.DB)
 	payloadsStorage := storage.NewPayloads(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
+	eventsStorage := storage.NewEvents(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
@@ -219,6 +220,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		blocksStorage,
 		payloadsStorage,
 		collectionsStorage,
+		eventsStorage,
 		computationEngine,
 		providerEngine,
 		execState,
