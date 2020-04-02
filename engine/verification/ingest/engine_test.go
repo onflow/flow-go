@@ -590,7 +590,6 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			// allow adding the received resource to mempool
 			suite.authCollections.On("Add", suite.collection).Return(nil)
-			suite.blockStorage.On("Store", suite.block).Return(nil)
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
 			// we have all dependencies
