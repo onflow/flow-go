@@ -2,7 +2,7 @@
 
 package mock
 
-import chunkassignment "github.com/dapperlabs/flow-go/model/chunkassignment"
+import chunks "github.com/dapperlabs/flow-go/model/chunks"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -13,22 +13,22 @@ type ChunkAssigner struct {
 	mock.Mock
 }
 
-// Assign provides a mock function with given fields: ids, chunks, rng
-func (_m *ChunkAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
-	ret := _m.Called(ids, chunks, rng)
+// Assign provides a mock function with given fields: ids, _a1, rng
+func (_m *ChunkAssigner) Assign(ids flow.IdentityList, _a1 flow.ChunkList, rng random.Rand) (*chunks.Assignment, error) {
+	ret := _m.Called(ids, _a1, rng)
 
-	var r0 *chunkassignment.Assignment
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, flow.ChunkList, random.Rand) *chunkassignment.Assignment); ok {
-		r0 = rf(ids, chunks, rng)
+	var r0 *chunks.Assignment
+	if rf, ok := ret.Get(0).(func(flow.IdentityList, flow.ChunkList, random.Rand) *chunks.Assignment); ok {
+		r0 = rf(ids, _a1, rng)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*chunkassignment.Assignment)
+			r0 = ret.Get(0).(*chunks.Assignment)
 		}
 	}
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.IdentityList, flow.ChunkList, random.Rand) error); ok {
-		r1 = rf(ids, chunks, rng)
+		r1 = rf(ids, _a1, rng)
 	} else {
 		r1 = ret.Error(1)
 	}

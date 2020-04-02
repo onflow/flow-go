@@ -3,6 +3,8 @@ package computer_test
 import (
 	"testing"
 
+	"github.com/dapperlabs/cadence/runtime"
+	"github.com/dapperlabs/cadence/runtime/sema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -51,15 +53,20 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		collectionCount := 2
 		transactionsPerCollection := 2
+		eventsPerTransaction := 2
 		totalTransactionCount := collectionCount * transactionsPerCollection
+		totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection)
 
+		// create dummy events
+		events := generateEvents(eventsPerTransaction)
+
 		vm.On("NewBlockContext", &block.Block.Header).Return(bc)
 
 		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
-			Return(&virtualmachine.TransactionResult{}, nil).
+			Return(&virtualmachine.TransactionResult{Events: events}, nil).
 			Times(totalTransactionCount)
 
 		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
@@ -71,6 +78,20 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		//chunk count should match collection count
 		assert.Len(t, result.StateViews, collectionCount)
+
+		// all events should have been collected
+		assert.Len(t, result.Events, totalEventCount)
+
+		//events should have been indexed by transaction and event
+		k := 0
+		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
+			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
+				e := result.Events[k]
+				assert.EqualValues(t, expectedEventIndex, e.EventIndex)
+				assert.EqualValues(t, expectedTxIndex, e.TransactionIndex)
+				k++
+			}
+		}
 
 		vm.AssertExpectations(t)
 		bc.AssertExpectations(t)
@@ -121,4 +142,14 @@ func generateCollection(transactionCount int) *entity.CompleteCollection {
 		Guarantee:    guarantee,
 		Transactions: transactions,
 	}
+}
+
+func generateEvents(eventCount int) []runtime.Event {
+	events := make([]runtime.Event, eventCount)
+	for i := 0; i < eventCount; i++ {
+		// creating some dummy event
+		event := runtime.Event{Type: &sema.StringType{}}
+		events[i] = event
+	}
+	return events
 }

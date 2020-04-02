@@ -9,8 +9,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 
 	realstorage "github.com/dapperlabs/flow-go/storage"
@@ -48,7 +48,7 @@ func (suite *Suite) SetupTest() {
 
 func (suite *Suite) TestPing() {
 	handler := NewHandler(suite.log, nil, nil, nil, nil, nil, nil, nil)
-	ping := &observation.PingRequest{}
+	ping := &access.PingRequest{}
 	pong, err := handler.Ping(context.Background(), ping)
 	suite.checkResponse(pong, err)
 }
@@ -60,7 +60,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, nil, nil)
 
 	// query the handler for the latest finalized block
-	req := &observation.GetLatestBlockHeaderRequest{IsSealed: false}
+	req := &access.GetLatestBlockHeaderRequest{IsSealed: false}
 	resp, err := handler.GetLatestBlockHeader(context.Background(), req)
 	suite.checkResponse(resp, err)
 
@@ -82,7 +82,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	handler := NewHandler(suite.log, suite.state, nil, nil, nil, suite.headers, nil, nil)
 
 	// query the handler for the latest sealed block
-	req := &observation.GetLatestBlockHeaderRequest{IsSealed: true}
+	req := &access.GetLatestBlockHeaderRequest{IsSealed: true}
 	resp, err := handler.GetLatestBlockHeader(context.Background(), req)
 	suite.checkResponse(resp, err)
 
@@ -104,7 +104,7 @@ func (suite *Suite) TestGetTransaction() {
 	suite.collections.On("LightByTransactionID", transaction.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, suite.collections, suite.transactions)
 	id := transaction.ID()
-	req := &observation.GetTransactionRequest{
+	req := &access.GetTransactionRequest{
 		Id: id[:],
 	}
 
@@ -118,12 +118,16 @@ func (suite *Suite) TestGetTransaction() {
 }
 
 func (suite *Suite) TestGetCollection() {
-	collection := unittest.CollectionFixture(2)
-	// obs api doesn't exposes nonce and compute limit as part of a transaction
-	for _, t := range collection.Transactions {
-		t.Nonce = 0
+	collection := unittest.CollectionFixture(1)
+
+	expectedIDs := make([]flow.Identifier, len(collection.Transactions))
+
+	for i, t := range collection.Transactions {
+		t.Nonce = 0 // obs api doesn't exposes nonce and compute limit as part of a transaction
 		t.ComputeLimit = 0
+		expectedIDs[i] = t.ID()
 	}
+
 	light := collection.Light()
 	suite.collections.On("LightByID", collection.ID()).Return(&light, nil).Once()
 	for _, t := range collection.Transactions {
@@ -131,21 +135,21 @@ func (suite *Suite) TestGetCollection() {
 	}
 	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, suite.collections, suite.transactions)
 	id := collection.ID()
-	req := &observation.GetCollectionByIDRequest{
+	req := &access.GetCollectionByIDRequest{
 		Id: id[:],
 	}
 
 	resp, err := handler.GetCollectionByID(context.Background(), req)
+	suite.transactions.AssertExpectations(suite.T())
 	suite.checkResponse(resp, err)
 
 	actualColl := resp.Collection
-	for i, t := range actualColl.Transactions {
-		actual, err := convert.MessageToTransaction(t)
-		suite.Require().NoError(err)
-		expected := collection.Transactions[i] //technically the order shouldn't matter
-		suite.Require().Equal(*expected, actual)
+	actualIDs := make([]flow.Identifier, len(actualColl.TransactionIds))
+	for i, t := range actualColl.TransactionIds {
+		actualIDs[i] = flow.HashToID(t)
 	}
 
+	suite.ElementsMatch(expectedIDs, actualIDs)
 	suite.assertAllExpectations()
 }
 
@@ -175,7 +179,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	handler := NewHandler(suite.log, suite.state, nil, nil, suite.blocks, suite.headers, suite.collections, suite.transactions)
 	id := transactionBody.ID()
-	req := &observation.GetTransactionRequest{
+	req := &access.GetTransactionRequest{
 		Id: id[:],
 	}
 
@@ -206,7 +210,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	handler := NewHandler(suite.log, suite.state, nil, nil, suite.blocks, nil, nil, nil)
 
 	// query the handler for the latest finalized header
-	req := &observation.GetLatestBlockRequest{IsSealed: false}
+	req := &access.GetLatestBlockRequest{IsSealed: false}
 	resp, err := handler.GetLatestBlock(context.Background(), req)
 	suite.checkResponse(resp, err)
 

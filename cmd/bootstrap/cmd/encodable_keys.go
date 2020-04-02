@@ -56,7 +56,7 @@ func (priv *EncodableNetworkPrivKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var err error
-	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.ECDSA_SECp256k1, bz)
+	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.ECDSA_P256, bz)
 	return err
 }
 

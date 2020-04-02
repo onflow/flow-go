@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dapperlabs/testingdock"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -27,18 +26,20 @@ func TestCollection(t *testing.T) {
 		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
 			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
 		})
-		conNode = testnet.NewNodeConfig(flow.RoleConsensus)
-		exeNode = testnet.NewNodeConfig(flow.RoleExecution)
-		verNode = testnet.NewNodeConfig(flow.RoleVerification)
+		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus)
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus)
+		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus)
+		exeNode  = testnet.NewNodeConfig(flow.RoleExecution)
+		verNode  = testnet.NewNodeConfig(flow.RoleVerification)
 	)
 
-	nodes := []*testnet.NodeConfig{colNode1, colNode2, conNode, exeNode, verNode}
+	nodes := []*testnet.NodeConfig{colNode1, colNode2, conNode1, conNode2, conNode3, exeNode, verNode}
 
 	testingdock.Verbose = true
 
 	ctx := context.Background()
 
-	net, err := testnet.PrepareFlowNetwork(ctx, t, "col", nodes)
+	net, err := testnet.PrepareFlowNetwork(t, "col", nodes)
 	require.Nil(t, err)
 
 	net.Start(ctx)
@@ -69,7 +70,7 @@ func TestCollection(t *testing.T) {
 
 	// create a database
 	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
-	db, err := badger.Open(badger.DefaultOptions(colContainer.DataDir).WithLogger(nil))
+	db, err := colContainer.DB()
 	require.Nil(t, err)
 
 	state, err := clusterstate.NewState(db, chainID)

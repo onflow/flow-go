@@ -146,6 +146,15 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
+		//TODO currently it is possible for network messages to be received
+		// and passed to the engine before the engine has been setup
+		// (ie had Ready called). This is a quickfix to get around the issue
+		// but ultimately we should start receiving over the network only
+		// once all the engines are ready.
+
+		if e.coldstuff == nil {
+			return fmt.Errorf("missing coldstuff dependency")
+		}
 		return e.process(originID, event)
 	})
 }

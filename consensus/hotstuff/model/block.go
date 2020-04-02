@@ -16,3 +16,30 @@ type Block struct {
 	PayloadHash flow.Identifier
 	Timestamp   time.Time
 }
+
+// BlockFromFlow converts a flow header to a hotstuff block.
+func BlockFromFlow(header *flow.Header, parentView uint64) *Block {
+
+	sig := AggregatedSignature{
+		StakingSignatures:     header.ParentStakingSigs,
+		RandomBeaconSignature: header.ParentRandomBeaconSig,
+		SignerIDs:             header.ParentSigners,
+	}
+
+	qc := QuorumCertificate{
+		BlockID:             header.ParentID,
+		View:                parentView,
+		AggregatedSignature: &sig,
+	}
+
+	block := Block{
+		BlockID:     header.ID(),
+		View:        header.View,
+		QC:          &qc,
+		ProposerID:  header.ProposerID,
+		PayloadHash: header.PayloadHash,
+		Timestamp:   header.Timestamp,
+	}
+
+	return &block
+}
