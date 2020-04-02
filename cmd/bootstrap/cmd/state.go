@@ -22,9 +22,7 @@ func genGenesisExecutionState() flow.StateCommitment {
 	writeJSON(FilenameAccount0Priv, enc)
 
 	dbpath := filepath.Join(flagOutdir, DirnameExecutionState)
-	db := createLevelDB(dbpath)
-	defer db.SafeClose()
-	stateCommitment, err := run.GenerateExecutionState(db, account0Priv)
+	stateCommitment, err := run.GenerateExecutionState(dbpath, account0Priv)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}

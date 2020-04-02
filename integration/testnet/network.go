@@ -44,8 +44,6 @@ const (
 	// DefaultExecutionRootDir is the default directory for the execution node
 	// state database.
 	DefaultExecutionRootDir = "/exedb"
-	DefaultExecutionTrieDir = DefaultExecutionRootDir + "/triedb"
-	DefaultExecutionDataDir = DefaultExecutionRootDir + "/valuedb"
 
 	// ColNodeAPIPort is the name used for the collection node API port.
 	ColNodeAPIPort = "col-ingress-port"
@@ -565,20 +563,12 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 
 		// create directories for execution state trie and values in the tmp
 		// host directory.
-		exeDBTrieDir := filepath.Join(tmpdir, DefaultExecutionTrieDir)
-		err = os.MkdirAll(exeDBTrieDir, 0700)
+		tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
 		require.Nil(t, err)
-
-		exeDBValueDir := filepath.Join(tmpdir, DefaultExecutionDataDir)
-		err = os.MkdirAll(exeDBValueDir, 0700)
-		if err != nil {
-			return nil, fmt.Errorf("could not create exe value dir: %w", err)
-		}
 
 		opts.HostConfig.Binds = append(
 			opts.HostConfig.Binds,
-			fmt.Sprintf("%s:%s:rw", exeDBTrieDir, DefaultExecutionTrieDir),
-			fmt.Sprintf("%s:%s:rw", exeDBValueDir, DefaultExecutionDataDir),
+			fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
 		)
 
 		nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
