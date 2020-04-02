@@ -911,10 +911,9 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	unittest.AssertReturnsBefore(t, verifierEngWG.Wait, 3*time.Second)
 	verNet.DeliverAll(false)
 
-	// closes nodes databases
-	assert.NoError(t, verNode.CloseDB())
-	assert.NoError(t, exeNode.CloseDB())
-	assert.NoError(t, colNode.CloseDB())
+	exeNode.Done()
+	colNode.Done()
+	verNode.Done()
 }
 
 // setupMockExeNode sets up a mocked execution node that responds to requests for
