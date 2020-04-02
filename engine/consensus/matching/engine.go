@@ -174,7 +174,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		Msg("result approval received")
 
 	// check approver matches the origin ID
-	if approval.ResultApprovalBody.ApproverID != originID {
+	if approval.Body.ApproverID != originID {
 		return fmt.Errorf("invalid origin for approval: %x", originID)
 	}
 
@@ -205,7 +205,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	// NOTE: this is not super efficient, so it makes sense to integrate a step
 	// for when receipts have already been matched; however, the logic is simple
 	// now, so let's wait until we actually see a problem with performance
-	err = e.tryBuildSeal(approval.ResultApprovalBody.BlockID)
+	err = e.tryBuildSeal(approval.Body.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not match seals: %w", err)
 	}
@@ -246,12 +246,12 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 	for resultID := range votes {
 		approvals := e.approvals.ByResultID(resultID)
 		for _, approval := range approvals {
-			approver, ok := approvers.ByNodeID(approval.ResultApprovalBody.ApproverID)
+			approver, ok := approvers.ByNodeID(approval.Body.ApproverID)
 			if !ok {
 				e.log.Debug().Msg("skipping unknown approver")
 				continue
 			}
-			chunkIndex := approval.ResultApprovalBody.ChunkIndex
+			chunkIndex := approval.Body.ChunkIndex
 			votes[resultID][chunkIndex] += approver.Stake
 		}
 	}

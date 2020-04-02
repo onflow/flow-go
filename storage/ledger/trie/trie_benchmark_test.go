@@ -2,7 +2,6 @@ package trie
 
 import (
 	"bytes"
-	"encoding/hex"
 	"math/rand"
 	"os"
 	"strconv"
@@ -10,11 +9,15 @@ import (
 )
 
 var s *SMT
+var dir = "./db/"
 
 func BenchmarkSMTCreation(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		s = newTestSMT(b, 255, 50000, 100, 1000, 100)
-		s.database.SafeClose()
+		trie, _ := NewSMT(dir, 255, 100, 1000, 100)
+		defer func() {
+			trie.SafeClose()
+			os.RemoveAll(dir)
+		}()
 	}
 }
 
@@ -26,15 +29,22 @@ func BenchmarkKVGen(b *testing.B) {
 
 func BenchmarkUpdate(b *testing.B) {
 	benchmarks := []int{10, 20, 30, 40} //, 100, 1000, 5000, 10000}
+	defaultHash := GetDefaultHashForHeight(255 - 1)
 	for _, mark := range benchmarks {
 		mark := mark // Workaround for scopelint issue
 		b.Run(strconv.Itoa(mark), func(b *testing.B) {
-			s = newTestSMT(b, 255, 50000, 100, 1000, 100)
-			defer os.RemoveAll("./db/")
+
+			dir := "./db/"
+
+			trie, _ := NewSMT(dir, 255, 100, 1000, 100)
+			defer func() {
+				trie.SafeClose()
+				os.RemoveAll(dir)
+			}()
+
 			keys, values := generateRandomKVPairs(mark)
 
-			_ = s.Update(keys, values)
-			s.database.SafeClose()
+			_, _ = s.Update(keys, values, defaultHash)
 		})
 	}
 }
@@ -56,24 +66,25 @@ func BenchmarkReadSMT(b *testing.B) {
 		// {10000, false},
 	}
 
-	s = newTestSMT(b, 255, 50000, 100, 1000, 100)
+	trie, _ := NewSMT(dir, 255, 100, 1000, 100)
+	defer func() {
+		trie.SafeClose()
+		os.RemoveAll(dir)
+	}()
+	defaultHash := GetDefaultHashForHeight(255 - 1)
 
-	defer os.RemoveAll("./db/")
 	keys, values := generateRandomKVPairs(1000)
-	_ = s.Update(keys, values)
+	newRoot, _ := s.Update(keys, values, defaultHash)
 	for _, mark := range benchmarks {
 		mark := mark // Workaround for scopelint issue
 		readKeys := getRandomKeys(keys, mark.size)
 		b.Run(strconv.Itoa(mark.size), func(b *testing.B) {
-			_, _, err := s.Read(readKeys, mark.trusted, s.GetRoot().value)
+			_, _, err := s.Read(readKeys, mark.trusted, newRoot)
 			if err != nil {
 				b.Error(err)
 			}
 		})
 	}
-
-	s.database.SafeClose()
-
 }
 
 func BenchmarkVerifyProof(b *testing.B) {
@@ -87,28 +98,30 @@ func BenchmarkVerifyProof(b *testing.B) {
 		{1000, false},
 	}
 
-	s = newTestSMT(b, 255, 50000, 100, 1000, 100)
+	trie, _ := NewSMT(dir, 255, 100, 1000, 100)
+	defer func() {
+		trie.SafeClose()
+		os.RemoveAll(dir)
+	}()
+	defaultHash := GetDefaultHashForHeight(255 - 1)
 
-	defer os.RemoveAll("./db/")
 	keys, values := generateRandomKVPairs(1000)
-	_ = s.Update(keys, values)
+	newRoot, _ := s.Update(keys, values, defaultHash)
 	for _, mark := range benchmarks {
 		readKeys := getRandomKeys(keys, mark.size)
-		values, proofs, err := s.Read(readKeys, mark.trusted, s.GetRoot().value)
+		values, proofs, err := s.Read(readKeys, mark.trusted, newRoot)
 		if err != nil {
 			b.Error(err)
 		}
 		b.Run(strconv.Itoa(mark.size), func(b *testing.B) {
 			for i, key := range readKeys {
-				res := VerifyInclusionProof(key, values[i], proofs.flags[i], proofs.proofs[i], proofs.sizes[i], s.GetRoot().value, s.height)
+				res := VerifyInclusionProof(key, values[i], proofs.flags[i], proofs.proofs[i], proofs.sizes[i], newRoot, s.height)
 				if !res {
 					b.Error("Incorrect")
 				}
 			}
 		})
 	}
-
-	s.database.SafeClose()
 }
 
 func BenchmarkVerifyHistoricalStates(b *testing.B) {
@@ -122,14 +135,18 @@ func BenchmarkVerifyHistoricalStates(b *testing.B) {
 		{1000, false},
 	}
 
-	new_smt := newTestSMT(b, 255, 50000, 100, 1000, 100)
+	new_smt, _ := NewSMT(dir, 255, 100, 1000, 100)
+	defer func() {
+		new_smt.SafeClose()
+		os.RemoveAll(dir)
+	}()
+	defaultHash := GetDefaultHashForHeight(255 - 1)
 
-	defer os.RemoveAll("./db/")
 	keys, values := generateRandomKVPairs(1000)
-	_ = new_smt.Update(keys, values)
-	oldRoot := new_smt.GetRoot().value
+	oldRoot, _ := new_smt.Update(keys, values, defaultHash)
+
 	_, newvalues := generateRandomKVPairs(1000)
-	err := new_smt.Update(keys, newvalues)
+	_, err := new_smt.Update(keys, newvalues, oldRoot)
 	if err != nil {
 		b.Error(err)
 	}
@@ -148,10 +165,6 @@ func BenchmarkVerifyHistoricalStates(b *testing.B) {
 			}
 		})
 	}
-
-	new_smt.database.SafeClose()
-	new_smt.historicalStates[hex.EncodeToString(oldRoot)].SafeClose()
-
 }
 
 func generateRandomKVPairs(num int) ([][]byte, [][]byte) {

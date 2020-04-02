@@ -1,4 +1,4 @@
-package chunkassignment
+package chunks
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"

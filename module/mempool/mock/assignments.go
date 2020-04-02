@@ -2,7 +2,7 @@
 
 package mempool
 
-import chunkassignment "github.com/dapperlabs/flow-go/model/chunkassignment"
+import chunks "github.com/dapperlabs/flow-go/model/chunks"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 
 import mock "github.com/stretchr/testify/mock"
@@ -13,11 +13,11 @@ type Assignments struct {
 }
 
 // Add provides a mock function with given fields: assignmentFingerprint, assignment
-func (_m *Assignments) Add(assignmentFingerprint flow.Identifier, assignment *chunkassignment.Assignment) error {
+func (_m *Assignments) Add(assignmentFingerprint flow.Identifier, assignment *chunks.Assignment) error {
 	ret := _m.Called(assignmentFingerprint, assignment)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *chunkassignment.Assignment) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *chunks.Assignment) error); ok {
 		r0 = rf(assignmentFingerprint, assignment)
 	} else {
 		r0 = ret.Error(0)
@@ -27,15 +27,15 @@ func (_m *Assignments) Add(assignmentFingerprint flow.Identifier, assignment *ch
 }
 
 // All provides a mock function with given fields:
-func (_m *Assignments) All() []*chunkassignment.Assignment {
+func (_m *Assignments) All() []*chunks.Assignment {
 	ret := _m.Called()
 
-	var r0 []*chunkassignment.Assignment
-	if rf, ok := ret.Get(0).(func() []*chunkassignment.Assignment); ok {
+	var r0 []*chunks.Assignment
+	if rf, ok := ret.Get(0).(func() []*chunks.Assignment); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*chunkassignment.Assignment)
+			r0 = ret.Get(0).([]*chunks.Assignment)
 		}
 	}
 
@@ -43,15 +43,15 @@ func (_m *Assignments) All() []*chunkassignment.Assignment {
 }
 
 // ByID provides a mock function with given fields: assignmentID
-func (_m *Assignments) ByID(assignmentID flow.Identifier) (*chunkassignment.Assignment, error) {
+func (_m *Assignments) ByID(assignmentID flow.Identifier) (*chunks.Assignment, error) {
 	ret := _m.Called(assignmentID)
 
-	var r0 *chunkassignment.Assignment
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *chunkassignment.Assignment); ok {
+	var r0 *chunks.Assignment
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *chunks.Assignment); ok {
 		r0 = rf(assignmentID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*chunkassignment.Assignment)
+			r0 = ret.Get(0).(*chunks.Assignment)
 		}
 	}
 
