@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -21,8 +22,7 @@ import (
 )
 
 type Signer struct {
-	Identity            flow.Identity
-	StakingPrivKey      crypto.PrivateKey
+	bootstrap.NodeInfo
 	RandomBeaconPrivKey crypto.PrivateKey
 }
 
@@ -95,16 +95,14 @@ func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.
 
 	for i, signer := range signerData.Signers {
 		// create signer
-		signerId := signer.Identity
-		s, err := NewRandomBeaconSigProvider(ps, signerData.DkgPubData, &signerId,
-			signer.StakingPrivKey, signer.RandomBeaconPrivKey)
+		s, err := NewRandomBeaconSigProvider(ps, signerData.DkgPubData, signer.Identity(), signer.StakingPrivKey, signer.RandomBeaconPrivKey)
 		if err != nil {
 			return nil, nil, err
 		}
 		signers[i] = s
 
 		// create view state
-		vs, err := viewstate.New(ps, signerData.DkgPubData, signer.Identity.NodeID, filter.HasRole(flow.RoleConsensus))
+		vs, err := viewstate.New(ps, signerData.DkgPubData, signer.NodeID, filter.HasRole(flow.RoleConsensus))
 		if err != nil {
 			return nil, nil, err
 		}

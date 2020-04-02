@@ -18,20 +18,5 @@ func TestRunDKG(t *testing.T) {
 	data, err := RunDKG(4, unittest.SeedFixtures(4, 16))
 	require.NoError(t, err)
 
-	for i, p := range data.Participants {
-		expected, err := p.Priv.PublicKey().Encode()
-		require.NoError(t, err)
-
-		priv, err := p.Priv.Encode()
-		require.NoError(t, err)
-		require.NotEmpty(t, priv)
-
-		pub, err := data.PubKeys[i].Encode()
-		require.NoError(t, err)
-		require.NotEmpty(t, pub)
-
-		require.Equal(t, expected, pub)
-	}
-
 	require.Len(t, data.Participants, 4)
 }
