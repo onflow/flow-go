@@ -33,7 +33,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -86,8 +86,8 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	pool, err := stdmap.NewTransactions(1000)
 	require.NoError(t, err)
 
-	collections := bstorage.NewCollections(node.DB)
-	transactions := bstorage.NewTransactions(node.DB)
+	collections := storage.NewCollections(node.DB)
+	transactions := storage.NewTransactions(node.DB)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool)
 	require.Nil(t, err)
@@ -123,7 +123,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node := GenericNode(t, hub, identity, identities)
 
-	results := bstorage.NewExecutionResults(node.DB)
+	results := storage.NewExecutionResults(node.DB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -303,7 +303,8 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.BlockStorage == nil {
-		node.BlockStorage = bstorage.NewBlocks(node.DB)
+		node.BlockStorage =
+			storage.NewBlocks(node.DB)
 	}
 
 	if node.VerifierEngine == nil {
