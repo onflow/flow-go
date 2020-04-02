@@ -24,8 +24,6 @@ const (
 	// DefaultDataDir is the default directory for the node database.
 	DefaultDataDir          = "/flowdb"
 	DefaultExecutionRootDir = "/exedb"
-	DefaultExecutionTrieDir = DefaultExecutionRootDir + "/triedb"
-	DefaultExecutionDataDir = DefaultExecutionRootDir + "/valuedb"
 
 	// ColNodeAPIPort is the name used for the collection node API port.
 	ColNodeAPIPort = "col-ingress-port"
@@ -297,9 +295,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 				"9000/tcp": {},
 			}
 			// TODO clean these up in Cleanup
-			tmpTrieDir, err := ioutil.TempDir(tmproot, "flow-integration-trie")
-			require.Nil(t, err)
-			tmpValueDir, err := ioutil.TempDir(tmproot, "flow-integration-value")
+			tmpLedgerDir, err := ioutil.TempDir(tmproot, "flow-integration-trie")
 			require.Nil(t, err)
 			opts.Config.Cmd = append(opts.Config.Cmd,
 				fmt.Sprintf("--rpc-addr=%s:9000", opts.Name),
@@ -315,8 +311,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			}
 			opts.HostConfig.Binds = append(
 				opts.HostConfig.Binds,
-				fmt.Sprintf("%s:%s:rw", tmpTrieDir, DefaultExecutionTrieDir),
-				fmt.Sprintf("%s:%s:rw", tmpValueDir, DefaultExecutionDataDir),
+				fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
 			)
 			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
 				return healthcheckGRPC(context, apiPort)

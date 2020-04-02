@@ -59,6 +59,11 @@ func main() {
 
 			return nil
 		}).
+		//Trie storage is required to bootstrap, but also shout be handled while shutting down
+		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
+			ledgerStorage, err = ledger.NewTrieStorage(triedir)
+			return err
+		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
 			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
 			if err != nil {
@@ -72,7 +77,7 @@ func main() {
 			}
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			return ledger.NewTrieStorage(triedir)
+			return ledgerStorage, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkHeaders := badger.NewChunkHeaders(node.DB)

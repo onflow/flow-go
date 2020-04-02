@@ -101,7 +101,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		newRoot2, err := smt.Update(keys, values, newRoot)
 		require.NoError(t, err, "error updating trie")
 
-		_,_, err = psmt.Update(keys, values)
+		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
 		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {

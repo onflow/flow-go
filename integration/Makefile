@@ -9,4 +9,4 @@ test:
 # Run the integration test suite
 .PHONY: integration-test
 integration-test:
-	GO111MODULE=on go test `go list ./... | grep integration/tests`
+	GO111MODULE=on go test -count=1 `go list ./... | grep integration/tests`
