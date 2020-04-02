@@ -10,13 +10,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
 // SendTransaction forwards the transaction to the collection node
-func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
+func (h *Handler) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 
 	// send the transaction to the collection node
 	resp, err := h.collectionRPC.SendTransaction(ctx, req)
@@ -39,7 +39,7 @@ func (h *Handler) SendTransaction(ctx context.Context, req *observation.SendTran
 	return resp, nil
 }
 
-func (h *Handler) GetTransaction(_ context.Context, req *observation.GetTransactionRequest) (*observation.TransactionResponse, error) {
+func (h *Handler) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 
 	id := flow.HashToID(req.Id)
 	// look up transaction from storage
@@ -61,7 +61,7 @@ func (h *Handler) GetTransaction(_ context.Context, req *observation.GetTransact
 	transaction.Status = status
 
 	// return result
-	resp := &observation.TransactionResponse{
+	resp := &access.TransactionResponse{
 		Transaction: transaction,
 	}
 	return resp, nil
