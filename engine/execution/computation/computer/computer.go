@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
@@ -51,14 +52,21 @@ func (e *blockComputer) executeBlock(
 
 	views := make([]*delta.View, len(collections))
 
+	events := make([]flow.Event, 0)
+
+	var txIndex uint32
+
 	for i, collection := range collections {
 
 		collectionView := stateView.NewChild()
 
-		err := e.executeCollection(i, blockCtx, collectionView, collection)
+		collEvents, nextIndex, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
+
+		txIndex = nextIndex
+		events = append(events, collEvents...)
 
 		views[i] = collectionView
 
@@ -68,28 +76,36 @@ func (e *blockComputer) executeBlock(
 	return &execution.ComputationResult{
 		ExecutableBlock: block,
 		StateViews:      views,
+		Events:          events,
 	}, nil
 }
 
 func (e *blockComputer) executeCollection(
-	index int,
+	txIndex uint32,
 	blockCtx virtualmachine.BlockContext,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
-) error {
-
+) ([]flow.Event, uint32, error) {
+	var events []flow.Event
 	for _, tx := range collection.Transactions {
 		txView := collectionView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
-			return fmt.Errorf("failed to execute transaction: %w", err)
+			txIndex++
+			return nil, txIndex, fmt.Errorf("failed to execute transaction: %w", err)
 		}
+		txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
+		txIndex++
 
+		if err != nil {
+			return nil, txIndex, fmt.Errorf("failed to create flow events: %w", err)
+		}
+		events = append(events, txEvents...)
 		if result.Succeeded() {
 			collectionView.ApplyDelta(txView.Delta())
 		}
 	}
 
-	return nil
+	return events, txIndex, nil
 }

@@ -114,13 +114,13 @@ func (a *Approvals) DropForBlock(blockID flow.Identifier) {
 func (a *Approvals) register(approval *flow.ResultApproval) {
 	a.Lock()
 	defer a.Unlock()
-	resultID := approval.ResultApprovalBody.ExecutionResultID
+	resultID := approval.Body.ExecutionResultID
 	forResult, hasResult := a.byResult[resultID]
 	if !hasResult {
 		forResult = make(map[flow.Identifier]struct{})
 		a.byResult[resultID] = forResult
 	}
-	blockID := approval.ResultApprovalBody.BlockID
+	blockID := approval.Body.BlockID
 	forBlock, hasBlock := a.byBlock[blockID]
 	if !hasBlock {
 		forBlock = make(map[flow.Identifier]struct{})
@@ -135,14 +135,14 @@ func (a *Approvals) register(approval *flow.ResultApproval) {
 func (a *Approvals) cleanup(approvalID flow.Identifier, approval *flow.ResultApproval) {
 	a.Lock()
 	defer a.Unlock()
-	resultID := approval.ResultApprovalBody.ExecutionResultID
+	resultID := approval.Body.ExecutionResultID
 	forResult := a.byResult[resultID]
 	delete(forResult, approvalID)
 	if len(forResult) > 0 {
 		return
 	}
 	delete(a.byResult, resultID)
-	blockID := approval.ResultApprovalBody.BlockID
+	blockID := approval.Body.BlockID
 	forBlock := a.byBlock[blockID]
 	delete(forBlock, resultID)
 	if len(forBlock) > 0 {

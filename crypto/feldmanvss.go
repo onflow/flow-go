@@ -47,7 +47,7 @@ func (s *feldmanVSSstate) StartDKG(seed []byte) error {
 	s.running = true
 	// Generate shares if necessary
 	if s.leaderIndex == s.currentIndex {
-		s.generateShares(seed)
+		return s.generateShares(seed)
 	}
 	return nil
 }

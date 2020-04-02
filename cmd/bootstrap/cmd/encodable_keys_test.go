@@ -21,7 +21,7 @@ func TestEncodableNetworkPubKey(t *testing.T) {
 	var dec EncodableNetworkPubKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, key, dec)
+	require.True(t, key.Equals(dec.PublicKey))
 }
 
 func TestEncodableNetworkPubKeyNil(t *testing.T) {
@@ -38,7 +38,7 @@ func TestEncodableNetworkPubKeyNil(t *testing.T) {
 }
 
 func TestEncodableNetworkPrivKey(t *testing.T) {
-	netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, generateRandomSeed())
+	netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed())
 	require.NoError(t, err)
 	key := EncodableNetworkPrivKey{netw}
 
@@ -49,7 +49,7 @@ func TestEncodableNetworkPrivKey(t *testing.T) {
 	var dec EncodableNetworkPrivKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, key, dec)
+	require.True(t, key.Equals(dec.PrivateKey))
 }
 
 func TestEncodableNetworkPrivKeyNil(t *testing.T) {
@@ -77,7 +77,7 @@ func TestEncodableStakingPubKey(t *testing.T) {
 	var dec EncodableStakingPubKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, key, dec)
+	require.True(t, key.Equals(dec.PublicKey))
 }
 
 func TestEncodableStakingPubKeyNil(t *testing.T) {
@@ -106,7 +106,7 @@ func TestEncodableStakingPrivKey(t *testing.T) {
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 
-	require.True(t, key.Equals(dec), "encoded/decoded key equality check failed")
+	require.True(t, key.Equals(dec.PrivateKey), "encoded/decoded key equality check failed")
 }
 
 func TestEncodableStakingPrivKeyNil(t *testing.T) {
@@ -134,7 +134,7 @@ func TestEncodableRandomBeaconPubKey(t *testing.T) {
 	var dec EncodableRandomBeaconPubKey
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, key, dec)
+	require.True(t, key.Equals(dec.PublicKey))
 }
 
 func TestEncodableRandomBeaconPubKeyNil(t *testing.T) {
@@ -163,7 +163,7 @@ func TestEncodableRandomBeaconPrivKey(t *testing.T) {
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
 
-	require.True(t, key.Equals(dec), "encoded/decoded key equality check failed")
+	require.True(t, key.Equals(dec.PrivateKey), "encoded/decoded key equality check failed")
 }
 
 func TestEncodableRandomBeaconPrivKeyNil(t *testing.T) {

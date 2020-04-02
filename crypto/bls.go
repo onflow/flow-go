@@ -48,23 +48,26 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac Hasher) (boo
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
+
 	return pk.alg.blsVerify(&pk.point, s, h), nil
 }
 
-// GeneratePrKey generates a private key for BLS on BLS12381 curve
+// generatePrivateKey generates a private key for BLS on BLS12381 curve
+// The minimum size of the input seed is 48 bytes (for a sceurity of 128 bits)
 func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
+	if len(seed) < KeyGenSeedMinLenBLS_BLS12381 {
+		return nil, cryptoError{fmt.Sprintf("seed should be at least %d bytes",
+			KeyGenSeedMinLenBLS_BLS12381)}
+	}
+
 	sk := &PrKeyBLS_BLS12381{
 		alg: a,
 		// public key is not computed
 		pk: nil,
 	}
-	// seed the RNG
-	seedRelic(seed)
-	// Generate private key here
-	err := randZr(&(sk.scalar))
-	if err != nil {
-		return nil, err
-	}
+
+	// maps the seed to a private key
+	mapKeyZr(&(sk.scalar), seed)
 	return sk, nil
 }
 
@@ -77,7 +80,10 @@ func (a *BLS_BLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey,
 		pk:  nil,
 	}
 	readScalar(&sk.scalar, privateKeyBytes)
-	return sk, nil
+	if sk.scalar.checkMembershipZr() {
+		return sk, nil
+	}
+	return nil, cryptoError{"the private key is not a valid BLS12-381 curve key"}
 }
 
 func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
@@ -87,7 +93,9 @@ func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, er
 	pk := &PubKeyBLS_BLS12381{
 		alg: a,
 	}
-	readPointG2(&pk.point, publicKeyBytes)
+	if readPointG2(&pk.point, publicKeyBytes) != nil {
+		return nil, cryptoError{"the input slice does not encode a public key"}
+	}
 	if pk.point.checkMembershipG2() {
 		return pk, nil
 	}
@@ -140,7 +148,11 @@ func (a *PrKeyBLS_BLS12381) Encode() ([]byte, error) {
 }
 
 func (sk *PrKeyBLS_BLS12381) Equals(other PrivateKey) bool {
-	return KeysEqual(sk, other)
+	otherBLS, ok := other.(*PrKeyBLS_BLS12381)
+	if !ok {
+		return false
+	}
+	return sk.scalar.equals(&otherBLS.scalar)
 }
 
 // PubKeyBLS_BLS12381 is the public key of BLS using BLS12_381,
@@ -166,6 +178,10 @@ func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {
 	return dest, nil
 }
 
-func (sk *PubKeyBLS_BLS12381) Equals(other PublicKey) bool {
-	return KeysEqual(sk, other)
+func (pk *PubKeyBLS_BLS12381) Equals(other PublicKey) bool {
+	otherBLS, ok := other.(*PubKeyBLS_BLS12381)
+	if !ok {
+		return false
+	}
+	return pk.point.equals(&otherBLS.point)
 }

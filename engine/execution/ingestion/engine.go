@@ -43,6 +43,7 @@ type Engine struct {
 	blocks             storage.Blocks
 	payloads           storage.Payloads
 	collections        storage.Collections
+	events             storage.Events
 	computationManager computation.ComputationManager
 	providerEngine     provider.ProviderEngine
 	mempool            *Mempool
@@ -61,6 +62,7 @@ func New(
 	blocks storage.Blocks,
 	payloads storage.Payloads,
 	collections storage.Collections,
+	events storage.Events,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
@@ -78,6 +80,7 @@ func New(
 		blocks:             blocks,
 		payloads:           payloads,
 		collections:        collections,
+		events:             events,
 		computationManager: executionEngine,
 		providerEngine:     providerEngine,
 		mempool:            mempool,
@@ -567,7 +570,7 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.Vie
 	for i, view := range stateViews {
 		// TODO - Deltas should be applied to a particular state
 		var err error
-		endState, err = e.execState.CommitDelta(view.Delta())
+		endState, err = e.execState.CommitDelta(view.Delta(), startState)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 		}
@@ -618,7 +621,24 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.Vie
 		ExecutorID:        e.me.NodeID(),
 	}
 
-	return receipt, nil
+	err = e.execState.PersistStateCommitment(result.ExecutableBlock.Block.ID(), endState)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store state commitment: %w", err)
+	}
+
+	if len(result.Events) > 0 {
+		err = e.events.Store(result.ExecutableBlock.Block.ID(), result.Events)
+		if err != nil {
+			return nil, fmt.Errorf("failed to store events: %w", err)
+		}
+	}
+
+	err = e.providerEngine.BroadcastExecutionReceipt(receipt)
+	if err != nil {
+		return nil, fmt.Errorf("could not send broadcast order: %w", err)
+	}
+
+	return endState, nil
 }
 
 // generateChunk creates a chunk from the provided computation data.

@@ -31,7 +31,8 @@ const (
 	// codeApproval      = 26
 	codeChunkHeader        = 27
 	codeChunkDataPack      = 28
-	codeExecutionStateView = 29
+	codeEvent              = 29
+	codeExecutionStateView = 30
 
 	codeIndexIdentity                = 100
 	codeIndexGuarantee               = 101
@@ -40,6 +41,7 @@ const (
 	codeIndexSealByBlock             = 105
 	codeIndexExecutionResultByBlock  = 106
 	codeIndexCollectionByTransaction = 107
+	codeIndexHeaderByCollection      = 108
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

@@ -42,7 +42,7 @@ import (
 func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 
-	db := unittest.TempBadgerDB(t)
+	db, dbDir := unittest.TempBadgerDB(t)
 
 	state, err := UncheckedState(db, identities)
 	require.NoError(t, err)
@@ -76,6 +76,7 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 		State:   state,
 		Me:      me,
 		Net:     stub,
+		DBDir:  dbDir,
 	}
 }
 
@@ -181,14 +182,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	blocksStorage := storage.NewBlocks(node.DB)
 	payloadsStorage := storage.NewPayloads(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
+	eventsStorage := storage.NewEvents(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
 
-	levelDB := unittest.TempLevelDB(t)
+	dbDir := unittest.TempDBDir(t)
 
-	ls, err := ledger.NewTrieStorage(levelDB)
+	ls, err := ledger.NewTrieStorage(dbDir)
 	require.NoError(t, err)
 
 	_, err = bootstrap.BootstrapLedger(ls)
@@ -221,6 +223,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		blocksStorage,
 		payloadsStorage,
 		collectionsStorage,
+		eventsStorage,
 		computationEngine,
 		providerEngine,
 		execState,
@@ -234,9 +237,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		ExecutionEngine: computationEngine,
 		ReceiptsEngine:  providerEngine,
 		BadgerDB:        node.DB,
-		LevelDB:         levelDB,
 		VM:              vm,
 		ExecutionState:  execState,
+		Ledger:          ls,
+		LevelDbDir:      dbDir,
 	}
 }
 
@@ -265,12 +269,22 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.PendingReceipts == nil {
-		node.PendingReceipts, err = stdmap.NewReceipts(1000)
+		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
 		require.Nil(t, err)
 	}
 
-	if node.Collections == nil {
-		node.Collections, err = stdmap.NewCollections(1000)
+	if node.AuthCollections == nil {
+		node.AuthCollections, err = stdmap.NewCollections(1000)
+		require.Nil(t, err)
+	}
+
+	if node.PendingCollections == nil {
+		node.PendingCollections, err = stdmap.NewPendingCollections(1000)
+		require.Nil(t, err)
+	}
+
+	if node.CollectionTrackers == nil {
+		node.CollectionTrackers, err = stdmap.NewCollectionTrackers(1000)
 		require.Nil(t, err)
 	}
 
@@ -279,8 +293,18 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
+	if node.ChunkStateTracker == nil {
+		node.ChunkStateTracker, err = stdmap.NewChunkStateTrackers(1000)
+		require.Nil(t, err)
+	}
+
 	if node.ChunkDataPacks == nil {
 		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
+		require.Nil(t, err)
+	}
+
+	if node.ChunkDataPackTrackers == nil {
+		node.ChunkDataPackTrackers, err = stdmap.NewChunkDataPackTrackers(1000)
 		require.Nil(t, err)
 	}
 
@@ -304,9 +328,13 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.VerifierEngine,
 			node.AuthReceipts,
 			node.PendingReceipts,
-			node.Collections,
+			node.AuthCollections,
+			node.PendingCollections,
+			node.CollectionTrackers,
 			node.ChunkStates,
+			node.ChunkStateTracker,
 			node.ChunkDataPacks,
+			node.ChunkDataPackTrackers,
 			node.BlockStorage,
 			assigner)
 		require.Nil(t, err)

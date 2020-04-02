@@ -220,7 +220,7 @@ func TestOnApprovalValid(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = identity.NodeID
+	approval.Body.ApproverID = identity.NodeID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
@@ -253,7 +253,7 @@ func TestOnApprovalWrongApprover(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = flow.ZeroID
+	approval.Body.ApproverID = flow.ZeroID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
@@ -285,7 +285,7 @@ func TestOnApprovalMissingIdentity(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = identity.NodeID
+	approval.Body.ApproverID = identity.NodeID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
@@ -316,7 +316,7 @@ func TestOnApprovalZeroStake(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = identity.NodeID
+	approval.Body.ApproverID = identity.NodeID
 	identity.Stake = 0
 
 	state := &protocol.State{}
@@ -348,7 +348,7 @@ func TestOnApprovalWrongRole(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = identity.NodeID
+	approval.Body.ApproverID = identity.NodeID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}

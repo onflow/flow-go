@@ -98,9 +98,9 @@ func TestFinalizer(t *testing.T) {
 			err := finalizer.MakeFinal(block.ID())
 			assert.Nil(t, err)
 
-			// finalize the block again - this should fail
+			// finalize the block again - this should be a no-op
 			err = finalizer.MakeFinal(block.ID())
-			assert.Error(t, err)
+			assert.Nil(t, err)
 		})
 
 		t.Run("unconnected block", func(t *testing.T) {
@@ -119,6 +119,31 @@ func TestFinalizer(t *testing.T) {
 			// try to finalize - this should fail
 			err := finalizer.MakeFinal(block.ID())
 			assert.Error(t, err)
+		})
+
+		t.Run("empty collection block", func(t *testing.T) {
+			bootstrap()
+			defer cleanup()
+
+			prov := new(networkmock.Engine)
+			finalizer := collection.NewFinalizer(db, pool, prov, tracer, chainID)
+
+			// create a block with empty payload on genesis
+			block := unittest.ClusterBlockWithParent(genesis)
+			block.SetPayload(model.PayloadFromTransactions([]flow.Identifier{}))
+			insert(block)
+
+			// finalize the block
+			err := finalizer.MakeFinal(block.ID())
+			assert.Nil(t, err)
+
+			// check finalized boundary using cluster state
+			final, err := state.Final().Head()
+			assert.Nil(t, err)
+			assert.Equal(t, block.ID(), final.ID())
+
+			// collection should not have been propagated
+			prov.AssertNotCalled(t, "SubmitLocal", mock.Anything)
 		})
 
 		t.Run("finalize single block", func(t *testing.T) {

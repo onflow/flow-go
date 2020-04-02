@@ -129,6 +129,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
 	return &flow.CollectionGuarantee{
 		CollectionID: IdentifierFixture(),
+		SignerIDs:    IdentifierListFixture(16),
 		Signatures:   SignaturesFixture(16),
 	}
 }
@@ -219,14 +220,21 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
-		ra.ResultApprovalBody.ExecutionResultID = id
+		ra.Body.ExecutionResultID = id
 	}
 }
 
 func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultApproval {
+	attestation := flow.Attestation{
+		BlockID:           IdentifierFixture(),
+		ExecutionResultID: IdentifierFixture(),
+		ChunkIndex:        uint64(0),
+	}
+
 	approval := flow.ResultApproval{
-		ResultApprovalBody: flow.ResultApprovalBody{
-			ExecutionResultID:    IdentifierFixture(),
+		Body: flow.ResultApprovalBody{
+			Attestation:          attestation,
+			ApproverID:           IdentifierFixture(),
 			AttestationSignature: SignatureFixture(),
 			Spock:                nil,
 		},
@@ -254,6 +262,14 @@ func HashFixture(size int) crypto.Hash {
 	return hash
 }
 
+func IdentifierListFixture(n int) []flow.Identifier {
+	list := make([]flow.Identifier, n)
+	for i := 0; i < n; i++ {
+		list[i] = IdentifierFixture()
+	}
+	return list
+}
+
 func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
 	_, _ = rand.Read(id[:])
@@ -268,7 +284,7 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 }
 
 func generateRandomSeed() []byte {
-	seed := make([]byte, 64)
+	seed := make([]byte, 48)
 	if _, err := crand.Read(seed); err != nil {
 		panic(err)
 	}
@@ -288,7 +304,7 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 			panic(err)
 		}
 		id.StakingPubKey = stak.PublicKey()
-		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, generateRandomSeed())
+		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed())
 		if err != nil {
 			panic(err)
 		}
@@ -383,43 +399,18 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	return tb
 }
 
-// CompleteExecutionResultFixture returns complete execution result with an
+// VerifiableChunk returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-// chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecutionResult {
-	chunks := make([]*flow.Chunk, 0)
-	chunkStates := make([]*flow.ChunkState, 0, chunkCount)
-	collections := make([]*flow.Collection, 0, chunkCount)
-	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
+func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 
-	for i := 0; i < chunkCount; i++ {
-		// creates one guaranteed collection per chunk
-		coll := CollectionFixture(3)
-		guarantee := coll.Guarantee()
-		collections = append(collections, &coll)
+	guarantees := make([]*flow.CollectionGuarantee, 0)
+
+	var col flow.Collection
+
+	for i := 0; i <= int(chunkIndex); i++ {
+		col = CollectionFixture(1)
+		guarantee := col.Guarantee()
 		guarantees = append(guarantees, &guarantee)
-
-		// creates a chunk
-		chunk := &flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: uint(i),
-				StartState:      StateCommitmentFixture(),
-			},
-			Index: uint64(i),
-		}
-		chunks = append(chunks, chunk)
-
-		// creates a chunk state
-		chunkState := &flow.ChunkState{
-			ChunkID:   chunk.ID(),
-			Registers: flow.Ledger{},
-		}
-		chunkStates = append(chunkStates, chunkState)
-
-		// creates a chunk data pack for the chunk
-		chunkDataPack := ChunkDataPackFixture(chunk.ID())
-		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
 	}
 
 	payload := flow.Payload{
@@ -434,6 +425,21 @@ func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecuti
 		Payload: payload,
 	}
 
+	chunks := make([]*flow.Chunk, 0)
+
+	var chunk flow.Chunk
+
+	for i := 0; i <= int(chunkIndex); i++ {
+		chunk = flow.Chunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex: uint(i),
+				StartState:      StateCommitmentFixture(),
+			},
+			Index: uint64(i),
+		}
+		chunks = append(chunks, &chunk)
+	}
+
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID: block.ID(),
@@ -445,64 +451,12 @@ func CompleteExecutionResultFixture(chunkCount int) verification.CompleteExecuti
 		ExecutionResult: result,
 	}
 
-	return verification.CompleteExecutionResult{
-		Receipt:        &receipt,
-		Block:          &block,
-		Collections:    collections,
-		ChunkStates:    chunkStates,
-		ChunkDataPacks: chunkDataPacks,
-	}
-}
-
-// VerifiableChunk returns a complete verifiable chunk with an
-// execution receipt referencing the block/collections.
-func VerifiableChunkFixture() *verification.VerifiableChunk {
-	coll := CollectionFixture(3)
-	guarantee := coll.Guarantee()
-
-	payload := flow.Payload{
-		Identities: IdentityListFixture(32),
-		Guarantees: []*flow.CollectionGuarantee{&guarantee},
-	}
-	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Hash()
-
-	block := flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
-
-	chunk := flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: 0,
-			StartState:      StateCommitmentFixture(),
-		},
-		Index: 0,
-	}
-
-	chunkState := flow.ChunkState{
-		ChunkID:   chunk.ID(),
-		Registers: flow.Ledger{},
-	}
-
-	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  flow.ChunkList{&chunk},
-		},
-	}
-
-	receipt := flow.ExecutionReceipt{
-		ExecutionResult: result,
-	}
-
 	return &verification.VerifiableChunk{
-		ChunkIndex: chunk.Index,
+		ChunkIndex: chunkIndex,
 		EndState:   StateCommitmentFixture(),
 		Block:      &block,
 		Receipt:    &receipt,
-		Collection: &coll,
-		ChunkState: &chunkState,
+		Collection: &col,
 	}
 }
 
@@ -536,4 +490,15 @@ func SeedFixtures(m int, n int) [][]byte {
 		seeds[i] = SeedFixture(n)
 	}
 	return seeds
+}
+
+// EventFixture returns an event
+func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier) flow.Event {
+	return flow.Event{
+		Type:             eType,
+		TransactionIndex: transactionIndex,
+		EventIndex:       eventIndex,
+		Payload:          []byte{},
+		TransactionID:    txID,
+	}
 }

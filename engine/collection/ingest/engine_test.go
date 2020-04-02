@@ -32,6 +32,8 @@ func TestInvalidTransaction(t *testing.T) {
 		if assert.Error(t, err) {
 			assert.True(t, errors.Is(err, ingest.ErrIncompleteTransaction{}))
 		}
+
+		node.Done()
 	})
 
 	t.Run("invalid signature", func(t *testing.T) {
@@ -61,8 +63,8 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set target cluster to the local cluster
-		localCluster, err := clusters.ByNodeID(localNode.Me.NodeID())
-		require.NoError(t, err)
+		localCluster, ok := clusters.ByNodeID(localNode.Me.NodeID())
+		require.True(t, ok)
 
 		// get a transaction that will be routed to local
 		tx := testutil.TransactionForCluster(clusters, localCluster)
@@ -79,6 +81,10 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 1, localNode.Pool.Size())
 		assert.EqualValues(t, 0, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
+
+		for _, node := range nodes {
+			node.Done()
+		}
 	})
 
 	t.Run("should propagate locally submitted transaction", func(t *testing.T) {
@@ -93,8 +99,8 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set target cluster to remote cluster
-		remoteCluster, err := clusters.ByNodeID(remoteNode.Me.NodeID())
-		require.NoError(t, err)
+		remoteCluster, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
+		require.True(t, ok)
 
 		// get a transaction that will be routed to the target cluster
 		tx := testutil.TransactionForCluster(clusters, remoteCluster)
@@ -111,6 +117,10 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 0, localNode.Pool.Size())
 		assert.EqualValues(t, 1, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
+
+		for _, node := range nodes {
+			node.Done()
+		}
 	})
 
 	t.Run("should not propagate remotely submitted transaction", func(t *testing.T) {
@@ -125,8 +135,8 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set target cluster to remote cluster
-		targetCluster, err := clusters.ByNodeID(remoteNode.Me.NodeID())
-		require.NoError(t, err)
+		targetCluster, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
+		require.True(t, ok)
 
 		// get a transaction that will be routed to remote cluster
 		tx := testutil.TransactionForCluster(clusters, targetCluster)
@@ -143,6 +153,10 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 0, localNode.Pool.Size())
 		assert.EqualValues(t, 0, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
+
+		for _, node := range nodes {
+			node.Done()
+		}
 	})
 
 	t.Run("should not process invalid transaction", func(t *testing.T) {
@@ -157,8 +171,8 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set the target cluster to local cluster
-		targetCluster, err := clusters.ByNodeID(localNode.Me.NodeID())
-		require.NoError(t, err)
+		targetCluster, ok := clusters.ByNodeID(localNode.Me.NodeID())
+		require.True(t, ok)
 
 		// get transaction for target cluster, but make it invalid
 		tx := testutil.TransactionForCluster(clusters, targetCluster)
@@ -176,5 +190,9 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 0, localNode.Pool.Size())
 		assert.EqualValues(t, 0, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
+
+		for _, node := range nodes {
+			node.Done()
+		}
 	})
 }

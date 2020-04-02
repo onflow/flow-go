@@ -10,20 +10,26 @@ import (
 	badgercluster "github.com/dapperlabs/flow-go/cluster/badger"
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
+	colfinalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
+	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/protocol"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 func main() {
@@ -35,12 +41,19 @@ func main() {
 		collections  *storage.Collections
 		transactions *storage.Transactions
 		headers      *storage.Headers
-		payloads     *storage.ClusterPayloads
+		blocks       *storage.Blocks
+		colPayloads  *storage.ClusterPayloads
+		conPayloads  *storage.Payloads
+
+		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
+		conCache *buffer.PendingBlocks        // pending block cache for follower
+
 		clusterID    string        // chain ID for the cluster
 		clusterState cluster.State // chain state for the cluster
-		prov         *provider.Engine
-		ing          *ingest.Engine
-		err          error
+
+		prov *provider.Engine
+		ing  *ingest.Engine
+		err  error
 	)
 
 	cmd.FlowNode("collection").
@@ -55,7 +68,14 @@ func main() {
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
 			transactions = storage.NewTransactions(node.DB)
 			headers = storage.NewHeaders(node.DB)
-			payloads = storage.NewClusterPayloads(node.DB)
+			blocks = storage.NewBlocks(node.DB)
+			colPayloads = storage.NewClusterPayloads(node.DB)
+			conPayloads = storage.NewPayloads(node.DB)
+			return nil
+		}).
+		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+			colCache = buffer.NewPendingClusterBlocks()
+			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
@@ -75,6 +95,11 @@ func main() {
 			genesis := model.Genesis()
 			genesis.ChainID = clusterID
 
+			node.Logger.Info().
+				Hex("genesis_id", logging.ID(genesis.ID())).
+				Str("cluster_id", clusterID).
+				Msg("bootstrapped cluster state")
+
 			// bootstrap cluster consensus state
 			err = clusterState.Mutate().Bootstrap(genesis)
 			if err != nil {
@@ -82,6 +107,38 @@ func main() {
 			}
 
 			return nil
+		}).
+		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// create a finalizer that will handling updating the protocol
+			// state when the follower detects newly finalized blocks
+			final := followerfinalizer.NewFinalizer(node.DB)
+
+			// TODO use a noop notification consumer for now
+			noop := notifications.NoopConsumer{}
+
+			core, err := follower.New(node.Me, node.State, node.DKGPubData, &node.GenesisBlock.Header, node.GenesisQC, final, noop, node.Logger)
+			if err != nil {
+				//return nil, fmt.Errorf("could not create follower core logic: %w", err)
+				// TODO for now we ignore failures in follower
+				// this is necessary for integration tests to run, until they are
+				// updated to generate/use valid genesis QC and DKG files.
+				// ref https://github.com/dapperlabs/flow-go/issues/3057
+				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
+			}
+
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.State, headers, conPayloads, conCache, core)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower engine: %w", err)
+			}
+
+			// create a block synchronization engine to handle follower getting
+			// out of sync
+			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, blocks, follower)
+			if err != nil {
+				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
+			}
+
+			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool)
@@ -97,11 +154,10 @@ func main() {
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			cache := buffer.NewPendingClusterBlocks()
 			build := builder.NewBuilder(node.DB, pool, clusterID)
-			final := finalizer.NewFinalizer(node.DB, pool, prov, node.Tracer, clusterID)
+			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Tracer, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Tracer, prov, pool, transactions, headers, payloads, cache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Tracer, prov, pool, transactions, headers, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}

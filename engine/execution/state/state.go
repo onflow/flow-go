@@ -49,7 +49,7 @@ type ExecutionState interface {
 	ReadOnlyExecutionState
 
 	// CommitDelta commits a register delta and returns the new state commitment.
-	CommitDelta(delta.Delta) (flow.StateCommitment, error)
+	CommitDelta(delta.Delta, flow.StateCommitment) (flow.StateCommitment, error)
 
 	// PersistStateCommitment saves a state commitment by the given block ID.
 	PersistStateCommitment(flow.Identifier, flow.StateCommitment) error
@@ -115,11 +115,11 @@ func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
 	return delta.NewView(LedgerGetRegister(s.ls, commitment))
 }
 
-func CommitDelta(ledger storage.Ledger, delta delta.Delta) (flow.StateCommitment, error) {
+func CommitDelta(ledger storage.Ledger, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
 
 	// TODO: update CommitDelta to also return proofs
-	commit, _, err := ledger.UpdateRegistersWithProof(ids, values)
+	commit, _, err := ledger.UpdateRegistersWithProof(ids, values, baseState)
 	if err != nil {
 		return nil, err
 	}
@@ -127,8 +127,8 @@ func CommitDelta(ledger storage.Ledger, delta delta.Delta) (flow.StateCommitment
 	return commit, nil
 }
 
-func (s *state) CommitDelta(delta delta.Delta) (flow.StateCommitment, error) {
-	return CommitDelta(s.ls, delta)
+func (s *state) CommitDelta(delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
+	return CommitDelta(s.ls, delta, baseState)
 }
 
 func (s *state) GetRegisters(

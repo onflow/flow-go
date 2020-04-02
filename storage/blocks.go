@@ -19,4 +19,11 @@ type Blocks interface {
 	// ByHeight returns the block at the given height. It is only available
 	// for finalized blocks.
 	ByHeight(height uint64) (*flow.Block, error)
+
+	// ByCollectionID returns the block for a given guarantee ID. It is only available
+	// for finalized blocks.
+	ByCollectionID(collectionID flow.Identifier) (*flow.Block, error)
+
+	// IndexByGuarantees indexed the block for the given ID by guarantees
+	IndexByGuarantees(blockID flow.Identifier) error
 }

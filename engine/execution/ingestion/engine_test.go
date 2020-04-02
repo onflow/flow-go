@@ -67,6 +67,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
+	events := storage.NewMockEvents(ctrl)
 	computationEngine := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
 	protocolState := new(protocol.State)
@@ -93,7 +94,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, computationEngine, providerEngine, executionState, 21)
+	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21)
 	require.NoError(t, err)
 
 	f(testingContext{

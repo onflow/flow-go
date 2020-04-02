@@ -5,7 +5,6 @@ package crypto
 // This is different from the ECDSA version implemented in some blockchains.
 
 import (
-	"bytes"
 	goecdsa "crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -76,18 +75,33 @@ func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, err
 	return pk.verifyHash(sig, h)
 }
 
+var one = new(big.Int).SetInt64(1)
+
+// goecdsaGenerateKey generates a public and private key pair
+// for the crypto/ecdsa library
+func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *goecdsa.PrivateKey {
+	k := new(big.Int).SetBytes(seed)
+	n := new(big.Int).Sub(c.Params().N, one)
+	k.Mod(k, n)
+	k.Add(k, one)
+
+	priv := new(goecdsa.PrivateKey)
+	priv.PublicKey.Curve = c
+	priv.D = k
+	priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(k.Bytes())
+	return priv
+}
+
 // GeneratePrKey generates a private key for ECDSA
 // This is only a test function!
 func (a *ECDSAalgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
-	minSeedLen := Nlen + 8
+	// extra 128 bits to reduce the modular reduction bias
+	minSeedLen := Nlen + (securityBits / 8)
 	if len(seed) < minSeedLen {
 		return nil, cryptoError{fmt.Sprintf("seed should be at least %d bytes", minSeedLen)}
 	}
-	sk, err := goecdsa.GenerateKey(a.curve, bytes.NewReader(seed))
-	if err != nil {
-		return nil, cryptoError{"ECDSA key generation has failed"}
-	}
+	sk := goecdsaGenerateKey(a.curve, seed)
 	return &PrKeyECDSA{a, sk}, nil
 }
 
@@ -212,7 +226,16 @@ func (sk *PrKeyECDSA) Encode() ([]byte, error) {
 }
 
 func (sk *PrKeyECDSA) Equals(other PrivateKey) bool {
-	return KeysEqual(sk, other)
+	// check the key type
+	otherECDSA, ok := other.(*PrKeyECDSA)
+	if !ok {
+		return false
+	}
+	// check the curve
+	if sk.alg.curve != otherECDSA.alg.curve {
+		return false
+	}
+	return sk.goPrKey.D.Cmp(otherECDSA.goPrKey.D) == 0
 }
 
 // PubKeyECDSA is the public key of ECDSA, it implements PublicKey
@@ -260,6 +283,16 @@ func (pk *PubKeyECDSA) Encode() ([]byte, error) {
 	return nil, cryptoError{"curve is not supported"}
 }
 
-func (sk *PubKeyECDSA) Equals(other PublicKey) bool {
-	return KeysEqual(sk, other)
+func (pk *PubKeyECDSA) Equals(other PublicKey) bool {
+	// check the key type
+	otherECDSA, ok := other.(*PubKeyECDSA)
+	if !ok {
+		return false
+	}
+	// check the curve
+	if pk.alg.curve != otherECDSA.alg.curve {
+		return false
+	}
+	return (pk.goPubKey.X.Cmp(otherECDSA.goPubKey.X) == 0) &&
+		(pk.goPubKey.Y.Cmp(otherECDSA.goPubKey.Y) == 0)
 }

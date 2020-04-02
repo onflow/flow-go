@@ -1,14 +1,15 @@
 package libp2p
 
 import (
-	"bytes"
-	"io"
+	"fmt"
+	"math"
 	"math/rand"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec"
 	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
-
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -28,70 +29,86 @@ func TestKeyTranslatorTestSuite(t *testing.T) {
 // TestPrivateKeyConversion tests that Private keys are successfully converted from Flow to LibP2P representation
 func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 
-	// generate seed
-	seed := k.createSeed()
-
-	// test all the algorithms that are supported by the translator for private key conversion (currently only ECDSA on P-256)
-	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSA_P256}
+	// test all the ECDSA curves that are supported by the translator for private key conversion
+	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSA_P256, fcrypto.ECDSA_SECp256k1}
+	loops := 50
 
 	for _, s := range sa {
-		// generate a Flow private key
-		fpk, err := fcrypto.GeneratePrivateKey(s, seed)
-		require.NoError(k.T(), err)
+		for i := 0; i < loops; i++ {
+			// generate seed
+			seed := k.createSeed()
+			// generate a Flow private key
+			fpk, err := fcrypto.GeneratePrivateKey(s, seed)
+			require.NoError(k.T(), err)
 
-		// convert it to a LibP2P private key
-		lpk, err := PrivKey(fpk)
-		require.NoError(k.T(), err)
+			// convert it to a LibP2P private key
+			lpk, err := PrivKey(fpk)
+			require.NoError(k.T(), err)
 
-		// get the raw bytes of both the keys
-		fbytes, err := fpk.Encode()
-		require.NoError(k.T(), err)
+			// get the raw bytes of both the keys
+			fbytes, err := fpk.Encode()
+			require.NoError(k.T(), err)
 
-		lbytes, err := lpk.Raw()
-		require.NoError(k.T(), err)
+			lbytes, err := lpk.Raw()
+			require.NoError(k.T(), err)
 
-		// compare the raw bytes
-		require.Equal(k.T(), fbytes, lbytes)
-
+			// compare the raw bytes
+			require.Equal(k.T(), fbytes, lbytes)
+		}
 	}
+}
+
+// RawUncompressed returns the bytes of the key in an uncompressed format (like Flow library)
+// This function is added to the test since Raw function from libp2p only returns the compressed format
+func rawUncompressed(key lcrypto.PubKey) ([]byte, error) {
+	k, ok := key.(*lcrypto.Secp256k1PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("libp2p public key must be of type Secp256k1PublicKey")
+	}
+	return (*btcec.PublicKey)(k).SerializeUncompressed()[1:], nil
 }
 
 // TestPublicKeyConversion tests that Public keys are successfully converted from Flow to LibP2P representation
 func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 
-	// generate seed
-	seed := k.createSeed()
-
 	// test the algorithms that are supported by the translator for public key conversion (currently only ECDSA 256)
 	// ECDSA_SECp256k1 doesn't work and throws a 'invalid pub key length 64' error
-	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSA_P256}
+	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSA_P256, fcrypto.ECDSA_SECp256k1}
+	loops := 50
 
 	for _, s := range sa {
-		fpk, err := fcrypto.GeneratePrivateKey(s, seed)
-		require.NoError(k.T(), err)
+		for i := 0; i < loops; i++ {
+			// generate seed
+			seed := k.createSeed()
+			fpk, err := fcrypto.GeneratePrivateKey(s, seed)
+			require.NoError(k.T(), err)
 
-		// get the Flow public key
-		fpublic := fpk.PublicKey()
+			// get the Flow public key
+			fpublic := fpk.PublicKey()
 
-		// convert the Flow public key to a Libp2p public key
-		lpublic, err := PublicKey(fpublic)
-		require.NoError(k.T(), err)
+			// convert the Flow public key to a Libp2p public key
+			lpublic, err := PublicKey(fpublic)
+			require.NoError(k.T(), err)
 
-		// compare raw bytes of the public keys
-		fbytes, err := fpublic.Encode()
-		require.NoError(k.T(), err)
+			// compare raw bytes of the public keys
+			fbytes, err := fpublic.Encode()
+			require.NoError(k.T(), err)
 
-		lbytes, err := lpublic.Raw()
-		require.NoError(k.T(), err)
+			var lbytes []byte
+			if s == fcrypto.ECDSA_P256 {
+				lbytes, err = lpublic.Raw()
+			} else if s == fcrypto.ECDSA_SECp256k1 {
+				lbytes, err = rawUncompressed(lpublic)
+			}
+			require.NoError(k.T(), err)
 
-		require.Equal(k.T(), fbytes, lbytes)
+			require.Equal(k.T(), fbytes, lbytes)
+		}
 	}
 }
 
-// TestLibP2PIDGenerationIsConsistent tests that a LibP2P peer ID generated using native LibP2P ECDSA key and
-// Flow ECDSA key is the same
+// TestLibP2PIDGenerationIsConsistent tests that a LibP2P peer ID generated using Flow ECDSA key is deterministic
 func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
-
 	// generate a seed which will be used for both - Flow keys and Libp2p keys
 	seed := k.createSeed()
 
@@ -106,37 +123,26 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 	lconverted, err := PublicKey(fpublic)
 	require.NoError(k.T(), err)
 
-	// generate a native Libp2p public key using the same seed
-	var r io.Reader = bytes.NewReader(seed)
-	_, lpublicKey, err := lcrypto.GenerateKeyPairWithReader(lcrypto.ECDSA, 0, r)
-	require.NoError(k.T(), err)
-
-	// check that LibP2P Ids from both key are equal and deterministic
+	// check that the LibP2P Id generation is deterministic
 	var prev peer.ID
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 
 		// generate a Libp2p Peer ID from the converted public key
 		fpeerID, err := peer.IDFromPublicKey(lconverted)
 		require.NoError(k.T(), err)
 
-		// generate a Libp2p Peer ID from it
-		lpeerID, err := peer.IDFromPublicKey(lpublicKey)
-		require.NoError(k.T(), err)
-
-		// check that the generated IDs are the same
-		require.Equal(k.T(), fpeerID, lpeerID, "peer IDs generated by Flow keys and LibP2P keys don't match")
-
-		if err = prev.Validate(); err == nil {
-			require.Equal(k.T(), prev, fpeerID, "peer ID generation is not deterministic")
+		if i > 0 {
+			err = prev.Validate()
+			require.NoError(k.T(), err)
+			assert.Equal(k.T(), prev, fpeerID, "peer ID generation is not deterministic")
 		}
 		prev = fpeerID
 	}
-
-	//rejoice
 }
 
 func (k *KeyTranslatorTestSuite) createSeed() []byte {
-	seed := make([]byte, 100)
+	seedLen := int(math.Max(fcrypto.KeyGenSeedMinLenECDSA_P256, fcrypto.KeyGenSeedMinLenECDSA_SECp256k1))
+	seed := make([]byte, seedLen)
 	_, err := rand.Read(seed)
 	require.NoError(k.T(), err)
 	return seed

@@ -11,7 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/model/chunkassignment"
+	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mock"
@@ -28,10 +28,6 @@ import (
 // - broadcast of a matching result approval to consensus nodes fo each assigned chunk
 func TestHappyPath(t *testing.T) {
 	// number of chunks in an ER
-	// TODO: broken test needs to be fixed
-	// https://github.com/dapperlabs/flow-go/issues/2935
-	t.Skip()
-
 	chunkNum := 10
 	hub := stub.NewNetworkHub()
 
@@ -47,10 +43,10 @@ func TestHappyPath(t *testing.T) {
 	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 
-	completeER := unittest.CompleteExecutionResultFixture(chunkNum)
+	completeER := CompleteExecutionResultFixture(t, chunkNum)
 
 	// assigns half of the chunks to this verifier
-	a := chunkassignment.NewAssignment()
+	a := chmodel.NewAssignment()
 	for i := 0; i < chunkNum; i++ {
 		if isAssigned(i, chunkNum) {
 			a.Add(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
@@ -137,7 +133,7 @@ func TestHappyPath(t *testing.T) {
 		Run(func(args testifymock.Arguments) {
 			_, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
-			// assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+			// assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.Body.ExecutionResultID)
 		}).
 		// half of the chunks are assigned to the verification node
 		// for each chunk there is one result approval emitted from verification node
@@ -214,10 +210,15 @@ func TestHappyPath(t *testing.T) {
 
 	// associated resources should be removed from the mempool
 	for i := 0; i < chunkNum; i++ {
-		assert.False(t, verNode.Collections.Has(completeER.Collections[i].ID()))
+		assert.False(t, verNode.AuthCollections.Has(completeER.Collections[i].ID()))
 	}
 	// TODO adding complementary tests for claning other resources like the execution receipt
 	// https://github.com/dapperlabs/flow-go/issues/2750
+
+	verNode.Done()
+	colNode.Done()
+	conNode.Done()
+	exeNode.Done()
 }
 
 // isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]

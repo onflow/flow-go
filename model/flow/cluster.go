@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"fmt"
 	"math/big"
 )
 
@@ -46,12 +45,12 @@ func (cl *ClusterList) ByTxID(txID Identifier) IdentityList {
 // ByNodeID select the cluster that the node with the given ID is part of.
 //
 // Nodes will be divided into equally sized clusters as far as possible.
-func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, error) {
+func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, bool) {
 	index, ok := cl.lookup[nodeID]
 	if !ok {
-		return nil, fmt.Errorf("node identity not part of cluster (%x)", nodeID)
+		return nil, false
 	}
-	return cl.ByIndex(index), nil
+	return cl.ByIndex(index), true
 }
 
 // Size returns the number of clusters.

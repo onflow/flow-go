@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/dapperlabs/cadence/runtime"
 	"github.com/spf13/pflag"
@@ -21,14 +23,12 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 )
 
 func main() {
 
 	var (
 		stateCommitments   storage.Commits
-		levelDB            *leveldb.LevelDB
 		ledgerStorage      storage.Ledger
 		providerEngine     *provider.Engine
 		computationManager *computation.Manager
@@ -36,19 +36,16 @@ func main() {
 		rpcConf            rpc.Config
 		err                error
 		executionState     state.ExecutionState
+		triedir            string
 	)
 
 	cmd.FlowNode("execution").
 		ExtraFlags(func(flags *pflag.FlagSet) {
+			homedir, _ := os.UserHomeDir()
+			datadir := filepath.Join(homedir, ".flow", "execution")
+
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
-		}).
-		Module("leveldb key-value store", func(node *cmd.FlowNodeBuilder) error {
-			levelDB, err = leveldb.NewLevelDB("db/valuedb", "db/triedb")
-			return err
-		}).
-		Module("execution state ledger", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewTrieStorage(levelDB)
-			return err
+			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -62,6 +59,11 @@ func main() {
 
 			return nil
 		}).
+		//Trie storage is required to bootstrap, but also shout be handled while shutting down
+		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
+			ledgerStorage, err = ledger.NewTrieStorage(triedir)
+			return err
+		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
 			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
 			if err != nil {
@@ -73,6 +75,9 @@ func main() {
 			if !bytes.Equal(flow.GenesisStateCommitment, block.Seals[0].FinalState) {
 				panic("genesis seal state commitment different from precalculated")
 			}
+		}).
+		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			return ledgerStorage, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkHeaders := badger.NewChunkHeaders(node.DB)
@@ -98,6 +103,7 @@ func main() {
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 			payloads := badger.NewPayloads(node.DB)
+			events := badger.NewEvents(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
@@ -106,6 +112,7 @@ func main() {
 				blocks,
 				payloads,
 				collections,
+				events,
 				computationManager,
 				providerEngine,
 				executionState,

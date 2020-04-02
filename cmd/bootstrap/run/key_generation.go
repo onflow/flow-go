@@ -6,8 +6,24 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
+func GenerateNetworkingKey(seed []byte) (crypto.PrivateKey, error) {
+	keys, err := GenerateKeys(crypto.ECDSA_P256, 1, [][]byte{seed})
+	if err != nil {
+		return nil, err
+	}
+	return keys[0], nil
+}
+
 func GenerateNetworkingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
-	return GenerateKeys(crypto.ECDSA_SECp256k1, n, seeds)
+	return GenerateKeys(crypto.ECDSA_P256, n, seeds)
+}
+
+func GenerateStakingKey(seed []byte) (crypto.PrivateKey, error) {
+	keys, err := GenerateKeys(crypto.BLS_BLS12381, 1, [][]byte{seed})
+	if err != nil {
+		return nil, err
+	}
+	return keys[0], nil
 }
 
 func GenerateStakingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
