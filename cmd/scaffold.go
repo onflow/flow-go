@@ -17,10 +17,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -452,7 +452,7 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 }
 
 func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameDKGDataPub))
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameDKGDataPub))
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +462,7 @@ func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
 }
 
 func loadTrustedRootBlock(path string) (*flow.Block, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameGenesisBlock))
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisBlock))
 	if err != nil {
 		return nil, err
 	}
@@ -473,7 +473,7 @@ func loadTrustedRootBlock(path string) (*flow.Block, error) {
 }
 
 func loadRootBlockSignatures(path string) (*model.AggregatedSignature, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameGenesisQC))
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisQC))
 	if err != nil {
 		return nil, err
 	}
@@ -483,12 +483,12 @@ func loadRootBlockSignatures(path string) (*model.AggregatedSignature, error) {
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
-func loadPrivateNodeInfo(path string, myID flow.Identifier) (*bootstrapcmd.NodeInfoPriv, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf(bootstrapcmd.FilenameNodeInfoPriv, myID)))
+func loadPrivateNodeInfo(path string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
+	data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, myID)))
 	if err != nil {
 		return nil, err
 	}
-	var info bootstrapcmd.NodeInfoPriv
+	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
 }

@@ -26,10 +26,10 @@ func runDKG(nodes []model.NodeInfo) model.DKGData {
 
 		log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
 
-		writeJSON(fmt.Sprintf(FilenameRandomBeaconPriv, nodeID), participant.Private())
+		writeJSON(fmt.Sprintf(model.FilenameRandomBeaconPriv, nodeID), participant.Private())
 	}
 
-	writeJSON(FilenameDKGDataPub, dkgData.Public())
+	writeJSON(model.FilenameDKGDataPub, dkgData.Public())
 
 	return dkgData
 }

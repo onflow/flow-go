@@ -42,7 +42,7 @@ func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 
 		nodeInfo := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
 		nodeInfos = append(nodeInfos, nodeInfo)
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
 	}
 
 	log.Debug().Msgf("will calculated additionally needed collector nodes to have majority in each cluster")
@@ -77,7 +77,7 @@ func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 	log.Debug().Msgf("generated %v additional internal nodes for collection clusters", i)
 
 	for _, nodeInfo := range nodeInfos {
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
 	}
 
 	return nodeInfos

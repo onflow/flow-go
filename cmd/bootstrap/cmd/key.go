@@ -64,8 +64,8 @@ var keyCmd = &cobra.Command{
 
 		//TODO is this ok to not have partner-specific models? seems they are the same
 		// only difference is partnerpublic does not have stake
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 	},
 }
 

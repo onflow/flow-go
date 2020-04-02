@@ -25,6 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/client"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -442,11 +443,11 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 	require.Nil(t, err)
 
 	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrapcmd.FilenameGenesisBlock), genesis)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisBlock), genesis)
 	require.Nil(t, err)
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrapcmd.FilenameGenesisQC), qc)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisQC), qc)
 	require.Nil(t, err)
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrapcmd.FilenameDKGDataPub), dkgPubData)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkgPubData)
 	require.Nil(t, err)
 
 	// write keyfiles for each node
@@ -463,7 +464,7 @@ func PrepareFlowNetwork(t *testing.T, name string, nodes []*NodeConfig) (*FlowNe
 			StakingPrivKey: bootstrapcmd.EncodableStakingPrivKey{conf.StakingKey},
 		}
 
-		err = writeJSON(filepath.Join(bootstrapDir, fmt.Sprintf(bootstrapcmd.FilenameNodeInfoPriv, identity.NodeID)), writeable)
+		err = writeJSON(filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, identity.NodeID)), writeable)
 		require.Nil(t, err)
 	}
 

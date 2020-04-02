@@ -18,7 +18,7 @@ func constructGenesisQC(block *flow.Block, stakingNodes, internalNodes []model.N
 		log.Fatal().Err(err).Msg("generating genesis QC failed")
 	}
 
-	writeJSON(FilenameGenesisQC, qc)
+	writeJSON(model.FilenameGenesisQC, qc)
 }
 
 // NOTE: stakingNodes is ALL staked nodes (including partners), internalNodes, is
