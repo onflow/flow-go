@@ -4,7 +4,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// TODO consolidate this with model/flow/Block.Genesis
 func GenerateRootBlock(identityList flow.IdentityList, seal flow.Seal) flow.Block {
 	payload := flow.Payload{
 		Identities: identityList,

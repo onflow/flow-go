@@ -9,38 +9,6 @@ type Ledger struct {
 	mock.Mock
 }
 
-// Done provides a mock function with given fields:
-func (_m *Ledger) Done() <-chan struct{} {
-	ret := _m.Called()
-
-	var r0 <-chan struct{}
-	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan struct{})
-		}
-	}
-
-	return r0
-}
-
-// EmptyStateCommitment provides a mock function with given fields:
-func (_m *Ledger) EmptyStateCommitment() []byte {
-	ret := _m.Called()
-
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func() []byte); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	return r0
-}
-
 // GetRegisters provides a mock function with given fields: registerIDs, stateCommitment
 func (_m *Ledger) GetRegisters(registerIDs [][]byte, stateCommitment []byte) ([][]byte, error) {
 	ret := _m.Called(registerIDs, stateCommitment)
@@ -96,29 +64,29 @@ func (_m *Ledger) GetRegistersWithProof(registerIDs [][]byte, stateCommitment []
 	return r0, r1, r2
 }
 
-// Ready provides a mock function with given fields:
-func (_m *Ledger) Ready() <-chan struct{} {
+// LatestStateCommitment provides a mock function with given fields:
+func (_m *Ledger) LatestStateCommitment() []byte {
 	ret := _m.Called()
 
-	var r0 <-chan struct{}
-	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func() []byte); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan struct{})
+			r0 = ret.Get(0).([]byte)
 		}
 	}
 
 	return r0
 }
 
-// UpdateRegisters provides a mock function with given fields: registerIDs, values, stateCommitment
-func (_m *Ledger) UpdateRegisters(registerIDs [][]byte, values [][]byte, stateCommitment []byte) ([]byte, error) {
-	ret := _m.Called(registerIDs, values, stateCommitment)
+// UpdateRegisters provides a mock function with given fields: registerIDs, values
+func (_m *Ledger) UpdateRegisters(registerIDs [][]byte, values [][]byte) ([]byte, error) {
+	ret := _m.Called(registerIDs, values)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func([][]byte, [][]byte, []byte) []byte); ok {
-		r0 = rf(registerIDs, values, stateCommitment)
+	if rf, ok := ret.Get(0).(func([][]byte, [][]byte) []byte); ok {
+		r0 = rf(registerIDs, values)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -126,8 +94,8 @@ func (_m *Ledger) UpdateRegisters(registerIDs [][]byte, values [][]byte, stateCo
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([][]byte, [][]byte, []byte) error); ok {
-		r1 = rf(registerIDs, values, stateCommitment)
+	if rf, ok := ret.Get(1).(func([][]byte, [][]byte) error); ok {
+		r1 = rf(registerIDs, values)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -135,13 +103,13 @@ func (_m *Ledger) UpdateRegisters(registerIDs [][]byte, values [][]byte, stateCo
 	return r0, r1
 }
 
-// UpdateRegistersWithProof provides a mock function with given fields: registerIDs, values, stateCommitment
-func (_m *Ledger) UpdateRegistersWithProof(registerIDs [][]byte, values [][]byte, stateCommitment []byte) ([]byte, [][]byte, error) {
-	ret := _m.Called(registerIDs, values, stateCommitment)
+// UpdateRegistersWithProof provides a mock function with given fields: registerIDs, values
+func (_m *Ledger) UpdateRegistersWithProof(registerIDs [][]byte, values [][]byte) ([]byte, [][]byte, error) {
+	ret := _m.Called(registerIDs, values)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func([][]byte, [][]byte, []byte) []byte); ok {
-		r0 = rf(registerIDs, values, stateCommitment)
+	if rf, ok := ret.Get(0).(func([][]byte, [][]byte) []byte); ok {
+		r0 = rf(registerIDs, values)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -149,8 +117,8 @@ func (_m *Ledger) UpdateRegistersWithProof(registerIDs [][]byte, values [][]byte
 	}
 
 	var r1 [][]byte
-	if rf, ok := ret.Get(1).(func([][]byte, [][]byte, []byte) [][]byte); ok {
-		r1 = rf(registerIDs, values, stateCommitment)
+	if rf, ok := ret.Get(1).(func([][]byte, [][]byte) [][]byte); ok {
+		r1 = rf(registerIDs, values)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([][]byte)
@@ -158,8 +126,8 @@ func (_m *Ledger) UpdateRegistersWithProof(registerIDs [][]byte, values [][]byte
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func([][]byte, [][]byte, []byte) error); ok {
-		r2 = rf(registerIDs, values, stateCommitment)
+	if rf, ok := ret.Get(2).(func([][]byte, [][]byte) error); ok {
+		r2 = rf(registerIDs, values)
 	} else {
 		r2 = ret.Error(2)
 	}

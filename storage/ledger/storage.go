@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
@@ -12,10 +13,11 @@ type TrieStorage struct {
 }
 
 // NewTrieStorage creates a new trie-backed ledger storage.
-func NewTrieStorage(dbDir string) (*TrieStorage, error) {
+func NewTrieStorage(db databases.DAL) (*TrieStorage, error) {
 	tree, err := trie.NewSMT(
-		dbDir,
+		db,
 		257,
+		10000000,
 		1000,
 		1000000,
 		1000,
@@ -29,21 +31,8 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 	}, nil
 }
 
-func (f *TrieStorage) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	close(ready)
-	return ready
-}
-
-func (f *TrieStorage) Done() <-chan struct{} {
-	f.tree.SafeClose()
-	done := make(chan struct{})
-	close(done)
-	return done
-}
-
-func (f *TrieStorage) EmptyStateCommitment() flow.StateCommitment {
-	return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
+func (f *TrieStorage) LatestStateCommitment() flow.StateCommitment {
+	return f.tree.GetRoot().GetValue()
 }
 
 // GetRegisters read the values at the given registers at the given flow.StateCommitment
@@ -64,7 +53,6 @@ func (f *TrieStorage) GetRegisters(
 func (f *TrieStorage) UpdateRegisters(
 	ids []flow.RegisterID,
 	values []flow.RegisterValue,
-	stateCommitment flow.StateCommitment,
 ) (
 	newStateCommitment flow.StateCommitment,
 	err error,
@@ -79,15 +67,12 @@ func (f *TrieStorage) UpdateRegisters(
 	// TODO: add test case
 	if len(ids) == 0 {
 		// return current state root unchanged
-		return stateCommitment, nil
+		return f.tree.GetRoot().GetValue(), nil
 	}
 
-	newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
-	if err != nil {
-		return nil, fmt.Errorf("cannot update state: %w", err)
-	}
+	err = f.tree.Update(ids, values)
 
-	return newStateCommitment, nil
+	return f.tree.GetRoot().GetValue(), err
 }
 
 // GetRegistersWithProof read the values at the given registers at the given flow.StateCommitment
@@ -136,13 +121,12 @@ func (f *TrieStorage) GetRegisterTouches(
 func (f *TrieStorage) UpdateRegistersWithProof(
 	ids []flow.RegisterID,
 	values []flow.RegisterValue,
-	stateCommitment flow.StateCommitment,
 ) (
 	newStateCommitment flow.StateCommitment,
 	proofs []flow.StorageProof,
 	err error,
 ) {
-	newStateCommitment, err = f.UpdateRegisters(ids, values, stateCommitment)
+	newStateCommitment, err = f.UpdateRegisters(ids, values)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -152,6 +136,6 @@ func (f *TrieStorage) UpdateRegistersWithProof(
 }
 
 // CloseStorage closes the DB
-func (f *TrieStorage) CloseStorage() {
-	f.tree.SafeClose()
+func (f *TrieStorage) CloseStorage() (error, error) {
+	return f.tree.SafeClose()
 }

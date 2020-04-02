@@ -139,11 +139,6 @@ func TestExecutionFlow(t *testing.T) {
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)
-
-	collectionNode.Done()
-	verificationNode.Done()
-	consensusNode.Done()
-	exeNode.Done()
 }
 
 func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
@@ -218,10 +213,6 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	require.Equal(t, block3.ID(), res)
 
 	consensusEngine.AssertExpectations(t)
-
-	consensus1Node.Done()
-	consensus2Node.Done()
-	exeNode.Done()
 }
 
 func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
@@ -271,10 +262,6 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	hub.Eventually(t, equal(2, &actualCalls))
 
 	verificationEngine.AssertExpectations(t)
-
-	verification1Node.Done()
-	verification2Node.Done()
-	exeNode.Done()
 }
 
 func equal(expected int, actual *int) func() bool {

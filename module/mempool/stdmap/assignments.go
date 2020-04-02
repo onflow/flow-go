@@ -3,7 +3,7 @@ package stdmap
 import (
 	"fmt"
 
-	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -28,12 +28,12 @@ func (a *Assignments) Has(assignmentID flow.Identifier) bool {
 }
 
 // ByID retrieves the chunk assignment from mempool based on provided ID
-func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkmodels.Assignment, error) {
+func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkassignment.Assignment, error) {
 	entity, err := a.Backend.ByID(assignmentID)
 	if err != nil {
 		return nil, err
 	}
-	adp, ok := entity.(*chunkmodels.AssignmentDataPack)
+	adp, ok := entity.(*chunkassignment.AssignmentDataPack)
 	if !ok {
 		return nil, fmt.Errorf("invalid entity in assignments pool (%T)", entity)
 	}
@@ -41,8 +41,8 @@ func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkmodels.Assignmen
 }
 
 // Add adds an Assignment to the mempool.
-func (a *Assignments) Add(fingerprint flow.Identifier, assignment *chunkmodels.Assignment) error {
-	return a.Backend.Add(chunkmodels.NewAssignmentDataPack(fingerprint, assignment))
+func (a *Assignments) Add(fingerprint flow.Identifier, assignment *chunkassignment.Assignment) error {
+	return a.Backend.Add(chunkassignment.NewAssignmentDataPack(fingerprint, assignment))
 }
 
 // Rem will remove the given Assignment from the memory pool; it will
@@ -57,11 +57,11 @@ func (a *Assignments) Size() uint {
 }
 
 // All returns all chunk data packs from the pool.
-func (a *Assignments) All() []*chunkmodels.Assignment {
+func (a *Assignments) All() []*chunkassignment.Assignment {
 	entities := a.Backend.All()
-	assignments := make([]*chunkmodels.Assignment, 0, len(entities))
+	assignments := make([]*chunkassignment.Assignment, 0, len(entities))
 	for _, entity := range entities {
-		assignments = append(assignments, entity.(*chunkmodels.AssignmentDataPack).Assignment())
+		assignments = append(assignments, entity.(*chunkassignment.AssignmentDataPack).Assignment())
 	}
 	return assignments
 }

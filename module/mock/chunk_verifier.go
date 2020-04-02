@@ -2,7 +2,6 @@
 
 package mock
 
-import chunks "github.com/dapperlabs/flow-go/model/chunks"
 import mock "github.com/stretchr/testify/mock"
 
 import verification "github.com/dapperlabs/flow-go/engine/verification"
@@ -13,24 +12,15 @@ type ChunkVerifier struct {
 }
 
 // Verify provides a mock function with given fields: ch
-func (_m *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chunks.ChunkFault, error) {
+func (_m *ChunkVerifier) Verify(ch *verification.VerifiableChunk) error {
 	ret := _m.Called(ch)
 
-	var r0 chunks.ChunkFault
-	if rf, ok := ret.Get(0).(func(*verification.VerifiableChunk) chunks.ChunkFault); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*verification.VerifiableChunk) error); ok {
 		r0 = rf(ch)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(chunks.ChunkFault)
-		}
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(*verification.VerifiableChunk) error); ok {
-		r1 = rf(ch)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }

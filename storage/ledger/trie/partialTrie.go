@@ -22,29 +22,23 @@ func (p *PSMT) GetHeight() int {
 	return p.height
 }
 
-// GetRootHash returns the rootNode value of the SMT
+// GetRootHash returns the root value of the SMT
 func (p *PSMT) GetRootHash() []byte {
 	return p.root.ComputeValue()
 }
 
 // Update updates the register values and returns rootValue after updates
-// in case of error, it returns a list of keys for which update failed
-func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, error) {
-	var failedKeys []string
+func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, error) {
 	for i, key := range registerIDs {
 		value := values[i]
 
 		node, found := p.keyLookUp[string(key)]
 		if !found {
-			failedKeys = append(failedKeys, string(key))
-			continue
+			return nil, fmt.Errorf("key doesn't exist: %x", key)
 		}
 		node.value = ComputeCompactValue(key, value, node.height, p.height)
 	}
-	if len(failedKeys) > 0 {
-		return nil, failedKeys, fmt.Errorf("key(s) doesn't exist")
-	}
-	return p.root.ComputeValue(), failedKeys, nil
+	return p.root.ComputeValue(), nil
 }
 
 // NewPSMT builds a PSMT given chunkdatapack registertouches
@@ -71,7 +65,7 @@ func NewPSMT(
 		// we keep track of our progress through proofs by proofIndex
 		proofIndex := 0
 
-		// start from the rootNode and walk down the tree
+		// start from the root and walk down the tree
 		currentNode := psmt.root
 
 		// we process the key bit by bit until we reach the end of the proof (due to compactness)
@@ -86,25 +80,25 @@ func NewPSMT(
 				proofIndex++
 			}
 			if utils.IsBitSet(key, j) { // right branching
-				if currentNode.lChild == nil { // check left child
-					currentNode.lChild = newNode(v, currentNode.height-1)
-				} else if !bytes.Equal(currentNode.lChild.ComputeValue(), v) {
+				if currentNode.Lchild == nil { // check left child
+					currentNode.Lchild = newNode(v, currentNode.height-1)
+				} else if !bytes.Equal(currentNode.Lchild.ComputeValue(), v) {
 					return nil, fmt.Errorf("incompatible proof (left node value doesn't match)")
 				}
-				if currentNode.rChild == nil { // create the right child if not exist
-					currentNode.rChild = newNode(nil, currentNode.height-1)
+				if currentNode.Rchild == nil { // create the right child if not exist
+					currentNode.Rchild = newNode(nil, currentNode.height-1)
 				}
-				currentNode = currentNode.rChild
+				currentNode = currentNode.Rchild
 			} else { // left branching
-				if currentNode.rChild == nil { // check right child
-					currentNode.rChild = newNode(v, currentNode.height-1)
-				} else if !bytes.Equal(currentNode.rChild.ComputeValue(), v) {
+				if currentNode.Rchild == nil { // check right child
+					currentNode.Rchild = newNode(v, currentNode.height-1)
+				} else if !bytes.Equal(currentNode.Rchild.ComputeValue(), v) {
 					return nil, fmt.Errorf("incompatible proof (right node value doesn't match)")
 				}
-				if currentNode.lChild == nil { // create the left child if not exist
-					currentNode.lChild = newNode(nil, currentNode.height-1)
+				if currentNode.Lchild == nil { // create the left child if not exist
+					currentNode.Lchild = newNode(nil, currentNode.height-1)
 				}
-				currentNode = currentNode.lChild
+				currentNode = currentNode.Lchild
 			}
 		}
 		if inclusion { // inclusion proof
@@ -118,27 +112,27 @@ func NewPSMT(
 			for j := currentNode.height; j > 0; j-- {
 				v := GetDefaultHashForHeight(j - 1)
 				if utils.IsBitSet(key, height-j-1) { // right branching
-					if currentNode.rChild == nil {
-						currentNode.rChild = newNode(nil, currentNode.height-1)
+					if currentNode.Rchild == nil {
+						currentNode.Rchild = newNode(nil, currentNode.height-1)
 					}
-					if currentNode.lChild == nil {
-						currentNode.lChild = newNode(v, currentNode.height-1)
+					if currentNode.Lchild == nil {
+						currentNode.Lchild = newNode(v, currentNode.height-1)
 					}
-					if !bytes.Equal(currentNode.lChild.ComputeValue(), v) {
+					if !bytes.Equal(currentNode.Lchild.ComputeValue(), v) {
 						return nil, fmt.Errorf("incompatible proof (left node value doesn't match)")
 					}
-					currentNode = currentNode.rChild
+					currentNode = currentNode.Rchild
 				} else { // left branching
-					if currentNode.lChild == nil {
-						currentNode.lChild = newNode(nil, currentNode.height-1)
+					if currentNode.Lchild == nil {
+						currentNode.Lchild = newNode(nil, currentNode.height-1)
 					}
-					if currentNode.rChild == nil {
-						currentNode.rChild = newNode(v, currentNode.height-1)
+					if currentNode.Rchild == nil {
+						currentNode.Rchild = newNode(v, currentNode.height-1)
 					}
-					if !bytes.Equal(currentNode.rChild.ComputeValue(), v) {
+					if !bytes.Equal(currentNode.Rchild.ComputeValue(), v) {
 						return nil, fmt.Errorf("incompatible proof (left node value doesn't match)")
 					}
-					currentNode = currentNode.lChild
+					currentNode = currentNode.Lchild
 				}
 			}
 			// set leaf
@@ -150,7 +144,7 @@ func NewPSMT(
 	// check if the state commitment matches
 	// useing computeValue instead of value for extensive checking
 	if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
-		return nil, fmt.Errorf("rootNode hash doesn't match the proofs")
+		return nil, fmt.Errorf("root hash doesn't match the proofs")
 	}
 	return &psmt, nil
 }

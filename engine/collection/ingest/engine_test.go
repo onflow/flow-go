@@ -32,8 +32,6 @@ func TestInvalidTransaction(t *testing.T) {
 		if assert.Error(t, err) {
 			assert.True(t, errors.Is(err, ingest.ErrIncompleteTransaction{}))
 		}
-
-		node.Done()
 	})
 
 	t.Run("invalid signature", func(t *testing.T) {
@@ -81,10 +79,6 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 1, localNode.Pool.Size())
 		assert.EqualValues(t, 0, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
-
-		for _, node := range nodes {
-			node.Done()
-		}
 	})
 
 	t.Run("should propagate locally submitted transaction", func(t *testing.T) {
@@ -117,10 +111,6 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 0, localNode.Pool.Size())
 		assert.EqualValues(t, 1, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
-
-		for _, node := range nodes {
-			node.Done()
-		}
 	})
 
 	t.Run("should not propagate remotely submitted transaction", func(t *testing.T) {
@@ -153,10 +143,6 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 0, localNode.Pool.Size())
 		assert.EqualValues(t, 0, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
-
-		for _, node := range nodes {
-			node.Done()
-		}
 	})
 
 	t.Run("should not process invalid transaction", func(t *testing.T) {
@@ -190,9 +176,5 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 0, localNode.Pool.Size())
 		assert.EqualValues(t, 0, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
-
-		for _, node := range nodes {
-			node.Done()
-		}
 	})
 }

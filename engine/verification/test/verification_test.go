@@ -11,7 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
-	chmodel "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mock"
@@ -46,7 +46,7 @@ func TestHappyPath(t *testing.T) {
 	completeER := CompleteExecutionResultFixture(t, chunkNum)
 
 	// assigns half of the chunks to this verifier
-	a := chmodel.NewAssignment()
+	a := chunkassignment.NewAssignment()
 	for i := 0; i < chunkNum; i++ {
 		if isAssigned(i, chunkNum) {
 			a.Add(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
@@ -133,7 +133,7 @@ func TestHappyPath(t *testing.T) {
 		Run(func(args testifymock.Arguments) {
 			_, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
-			// assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.Body.ExecutionResultID)
+			// assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
 		}).
 		// half of the chunks are assigned to the verification node
 		// for each chunk there is one result approval emitted from verification node
@@ -214,11 +214,6 @@ func TestHappyPath(t *testing.T) {
 	}
 	// TODO adding complementary tests for claning other resources like the execution receipt
 	// https://github.com/dapperlabs/flow-go/issues/2750
-
-	verNode.Done()
-	colNode.Done()
-	conNode.Done()
-	exeNode.Done()
 }
 
 // isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]

@@ -22,200 +22,188 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 	keys = append(keys, key1)
 	values = append(values, value1)
 
-	//trie := newTestSMT(t, trieHeight, 10, 100, 5)
-	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	trie := newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
+	defer trie.SafeClose()
+	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
+	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+	require.NoError(t, err, "error building partial trie")
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [before set]")
+	}
+	err = trie.Update(keys, values)
+	require.NoError(t, err, "error updating trie")
 
-		defaultHash := GetDefaultHashForHeight(trieHeight - 1)
+	_, err = psmt.Update(keys, values)
+	require.NoError(t, err, "error updating psmt")
 
-		retvalues, proofHldr, err := smt.Read(keys, false, defaultHash)
-		require.NoError(t, err)
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [after set]")
+	}
 
-		psmt, err := NewPSMT(defaultHash, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+	keys = make([][]byte, 0)
+	values = make([][]byte, 0)
+	keys = append(keys, key1)
+	values = append(values, updatedValue1)
 
-		require.NoError(t, err, "error building partial trie")
-		if !bytes.Equal(defaultHash, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before set]")
-		}
-		_, err = smt.Update(keys, values, defaultHash)
-		require.NoError(t, err, "error updating trie")
+	err = trie.Update(keys, values)
+	require.NoError(t, err, "error updating trie")
 
-		newHash, _, err := psmt.Update(keys, values)
-		require.NoError(t, err, "error updating psmt")
+	_, err = psmt.Update(keys, values)
+	require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newHash, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [after set]")
-		}
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [after update]")
+	}
 
-		keys = make([][]byte, 0)
-		values = make([][]byte, 0)
-		keys = append(keys, key1)
-		values = append(values, updatedValue1)
-
-		_, err = smt.Update(keys, values, newHash)
-		require.NoError(t, err, "error updating trie")
-
-		newerHash, _, err := psmt.Update(keys, values)
-		require.NoError(t, err, "error updating psmt")
-
-		if !bytes.Equal(newerHash, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [after update]")
-		}
-
-	})
 }
 
 func TestPartialTrieLeafUpdates(t *testing.T) {
-
 	trieHeight := 9 // should be key size (in bits) + 1
 
-	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	// add key1 and value1 to the empty trie
+	key1 := make([]byte, 1) // 00000000 (0)
+	value1 := []byte{'a'}
+	updatedValue1 := []byte{'A'}
 
-		// add key1 and value1 to the empty trie
-		key1 := make([]byte, 1) // 00000000 (0)
-		value1 := []byte{'a'}
-		updatedValue1 := []byte{'A'}
+	key2 := make([]byte, 1) // 00000001 (1)
+	utils.SetBit(key2, 7)
+	value2 := []byte{'b'}
+	updatedValue2 := []byte{'B'}
 
-		key2 := make([]byte, 1) // 00000001 (1)
-		utils.SetBit(key2, 7)
-		value2 := []byte{'b'}
-		updatedValue2 := []byte{'B'}
+	keys := make([][]byte, 0)
+	values := make([][]byte, 0)
+	keys = append(keys, key1, key2)
+	values = append(values, value1, value2)
 
-		keys := make([][]byte, 0)
-		values := make([][]byte, 0)
-		keys = append(keys, key1, key2)
-		values = append(values, value1, value2)
+	trie := newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
+	defer trie.SafeClose()
+	err := trie.Update(keys, values)
+	require.NoError(t, err, "error updating trie")
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
-		require.NoError(t, err, "error updating trie")
+	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
+	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+	require.NoError(t, err, "error building partial trie")
 
-		retvalues, proofHldr, _ := smt.Read(keys, false, newRoot)
-		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, EncodeProof(proofHldr))
-		require.NoError(t, err, "error building partial trie")
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [before update]")
+	}
 
-		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
+	values = make([][]byte, 0)
+	values = append(values, updatedValue1, updatedValue2)
+	err = trie.Update(keys, values)
+	require.NoError(t, err, "error updating trie")
 
-		values = make([][]byte, 0)
-		values = append(values, updatedValue1, updatedValue2)
-		newRoot2, err := smt.Update(keys, values, newRoot)
-		require.NoError(t, err, "error updating trie")
+	_, err = psmt.Update(keys, values)
+	require.NoError(t, err, "error updating psmt")
 
-		_, _, err = psmt.Update(keys, values)
-		require.NoError(t, err, "error updating psmt")
-
-		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [after update]")
-		}
-	})
-
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [after update]")
+	}
 }
 func TestPartialTrieMiddleBranching(t *testing.T) {
 	trieHeight := 9 // should be key size (in bits) + 1
 
-	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
-		key1 := make([]byte, 1) // 00000000 (0)
-		value1 := []byte{'a'}
-		updatedValue1 := []byte{'A'}
+	key1 := make([]byte, 1) // 00000000 (0)
+	value1 := []byte{'a'}
+	updatedValue1 := []byte{'A'}
 
-		key2 := make([]byte, 1) // 00000010 (2)
-		utils.SetBit(key2, 6)
-		value2 := []byte{'b'}
-		updatedValue2 := []byte{'B'}
+	key2 := make([]byte, 1) // 00000010 (2)
+	utils.SetBit(key2, 6)
+	value2 := []byte{'b'}
+	updatedValue2 := []byte{'B'}
 
-		key3 := make([]byte, 1) // 00001000 (8)
-		utils.SetBit(key3, 4)
-		value3 := []byte{'c'}
-		updatedValue3 := []byte{'C'}
+	key3 := make([]byte, 1) // 00001000 (8)
+	utils.SetBit(key3, 4)
+	value3 := []byte{'c'}
+	updatedValue3 := []byte{'C'}
 
-		keys := make([][]byte, 0)
-		values := make([][]byte, 0)
-		keys = append(keys, key1, key2, key3)
-		values = append(values, value1, value2, value3)
+	keys := make([][]byte, 0)
+	values := make([][]byte, 0)
+	keys = append(keys, key1, key2, key3)
+	values = append(values, value1, value2, value3)
 
-		retvalues, proofHldr, _ := smt.Read(keys, false, emptyTree.root)
-		psmt, err := NewPSMT(emptyTree.root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
-		require.NoError(t, err, "error building partial trie")
+	trie := newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
+	defer trie.SafeClose()
+	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
+	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+	require.NoError(t, err, "error building partial trie")
 
-		if !bytes.Equal(emptyTree.root, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
-		// first update
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
-		require.NoError(t, err, "error updating trie")
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [before update]")
+	}
+	// first update
+	err = trie.Update(keys, values)
+	require.NoError(t, err, "error updating trie")
 
-		_, _, err = psmt.Update(keys, values)
-		require.NoError(t, err, "error updating psmt")
+	_, err = psmt.Update(keys, values)
+	require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [before update]")
+	}
 
-		// second update
-		values = make([][]byte, 0)
-		values = append(values, updatedValue1, updatedValue2, updatedValue3)
-		newRoot2, err := smt.Update(keys, values, newRoot)
-		require.NoError(t, err, "error updating trie")
+	// second update
+	values = make([][]byte, 0)
+	values = append(values, updatedValue1, updatedValue2, updatedValue3)
+	err = trie.Update(keys, values)
+	require.NoError(t, err, "error updating trie")
 
-		_, _, err = psmt.Update(keys, values)
-		require.NoError(t, err, "error updating psmt")
+	_, err = psmt.Update(keys, values)
+	require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [after update]")
-		}
-	})
-
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [after update]")
+	}
 }
 
 func TestPartialTrieRootUpdates(t *testing.T) {
 	trieHeight := 9 // should be key size (in bits) + 1
 
-	withSMT(t, trieHeight, 10, 100, 3, func(t *testing.T, smt *SMT, emptyTree *tree) {
-		key1 := make([]byte, 1) // 00000000 (0)
-		value1 := []byte{'a'}
-		updatedValue1 := []byte{'A'}
+	key1 := make([]byte, 1) // 00000000 (0)
+	value1 := []byte{'a'}
+	updatedValue1 := []byte{'A'}
 
-		key2 := make([]byte, 1) // 10000000 (128)
-		utils.SetBit(key2, 0)
-		value2 := []byte{'b'}
-		updatedValue2 := []byte{'B'}
+	key2 := make([]byte, 1) // 10000000 (128)
+	utils.SetBit(key2, 0)
+	value2 := []byte{'b'}
+	updatedValue2 := []byte{'B'}
 
-		keys := make([][]byte, 0)
-		values := make([][]byte, 0)
-		keys = append(keys, key1, key2)
-		values = append(values, value1, value2)
+	keys := make([][]byte, 0)
+	values := make([][]byte, 0)
+	keys = append(keys, key1, key2)
+	values = append(values, value1, value2)
 
-		retvalues, proofHldr, _ := smt.Read(keys, false, emptyTree.root)
-		psmt, err := NewPSMT(emptyTree.root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
-		require.NoError(t, err, "error building partial trie")
+	trie := newTestSMT(t, trieHeight, cacheSize, 10, 100, 5)
+	defer trie.SafeClose()
+	retvalues, proofHldr, _ := trie.Read(keys, false, trie.GetRoot().value)
+	psmt, err := NewPSMT(trie.GetRoot().value, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+	require.NoError(t, err, "error building partial trie")
 
-		if !bytes.Equal(emptyTree.root, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [before update]")
+	}
 
-		// first update
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
-		require.NoError(t, err, "error updating trie")
+	// first update
+	err = trie.Update(keys, values)
+	require.NoError(t, err, "error updating trie")
 
-		_, _, err = psmt.Update(keys, values)
-		require.NoError(t, err, "error updating psmt")
-		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
+	_, err = psmt.Update(keys, values)
+	require.NoError(t, err, "error updating psmt")
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [before update]")
+	}
 
-		// second update
-		values = make([][]byte, 0)
-		values = append(values, updatedValue1, updatedValue2)
-		newRoot2, err := smt.Update(keys, values, newRoot)
-		require.NoError(t, err, "error updating trie")
+	// second update
+	values = make([][]byte, 0)
+	values = append(values, updatedValue1, updatedValue2)
+	err = trie.Update(keys, values)
+	require.NoError(t, err, "error updating trie")
 
-		_, _, err = psmt.Update(keys, values)
-		require.NoError(t, err, "error updating psmt")
-		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [after update]")
-		}
-	})
-
+	_, err = psmt.Update(keys, values)
+	require.NoError(t, err, "error updating psmt")
+	if !bytes.Equal(trie.root.ComputeValue(), psmt.root.ComputeValue()) {
+		t.Fatal("root hash doesn't match [after update]")
+	}
 }
 
 // TODO add test for incompatible proofs [Byzantine milestone]

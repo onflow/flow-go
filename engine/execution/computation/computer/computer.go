@@ -6,7 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
@@ -52,21 +51,14 @@ func (e *blockComputer) executeBlock(
 
 	views := make([]*state.View, len(collections))
 
-	events := make([]flow.Event, 0)
-
-	var txIndex uint32
-
 	for i, collection := range collections {
 
 		collectionView := stateView.NewChild()
 
-		collEvents, nextIndex, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
+		err := e.executeCollection(i, blockCtx, collectionView, collection)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
-
-		txIndex = nextIndex
-		events = append(events, collEvents...)
 
 		views[i] = collectionView
 
@@ -76,36 +68,28 @@ func (e *blockComputer) executeBlock(
 	return &execution.ComputationResult{
 		ExecutableBlock: block,
 		StateViews:      views,
-		Events:          events,
 	}, nil
 }
 
 func (e *blockComputer) executeCollection(
-	txIndex uint32,
+	index int,
 	blockCtx virtualmachine.BlockContext,
 	collectionView *state.View,
 	collection *entity.CompleteCollection,
-) ([]flow.Event, uint32, error) {
-	var events []flow.Event
+) error {
+
 	for _, tx := range collection.Transactions {
 		txView := collectionView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
-			txIndex++
-			return nil, txIndex, fmt.Errorf("failed to execute transaction: %w", err)
+			return fmt.Errorf("failed to execute transaction: %w", err)
 		}
-		txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
-		txIndex++
 
-		if err != nil {
-			return nil, txIndex, fmt.Errorf("failed to create flow events: %w", err)
-		}
-		events = append(events, txEvents...)
 		if result.Succeeded() {
 			collectionView.ApplyDelta(txView.Delta())
 		}
 	}
 
-	return events, txIndex, nil
+	return nil
 }

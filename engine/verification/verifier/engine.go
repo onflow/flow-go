@@ -10,7 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
-	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -20,10 +19,9 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine (verifier engine) verifies chunks, generates result approvals and raises challenges.
-// as input it accepts verifiable chunks (chunk + all data needed) and perform verification by
-// constructing a partial trie, executing transactions and check the final state commitment and
-// other chunk meta data (e.g. tx count)
+// Engine implements the verifier engine of the verification node,
+// responsible for reception of a execution receipt, verifying that, and
+// emitting its corresponding result approval to the entire system.
 type Engine struct {
 	unit    *engine.Unit         // used to control startup/shutdown
 	log     zerolog.Logger       // used to log relevant actions
@@ -118,15 +116,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // If any part of verification fails, an error is returned, indicating to the
 // initiating engine that the verification must be re-tried.
 func (e *Engine) verify(originID flow.Identifier, chunk *verification.VerifiableChunk) error {
-	// log it first
-	e.log.Info().
-		Timestamp().
-		Hex("origin", logging.ID(originID)).
-		Uint64("chunkIndex", chunk.ChunkIndex).
-		Hex("execution receipt", logging.Entity(chunk.Receipt)).
-		Msg("a verifiable chunk received by verifier engine")
 
-	// only accept internal calls
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote origin for verify")
 	}
@@ -143,111 +133,71 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 
 	// extracts chunk ID
 	chunkID := chunk.Receipt.ExecutionResult.Chunks.ByIndex(chunk.ChunkIndex).ID()
-
-	// execute the assigned chunk
-	chFault, err := e.chVerif.Verify(chunk)
-	// Any err means that something went wrong when verify the chunk
-	// the outcome of the verification is captured inside the chFault and not the err
+	// executes assigned chunks
+	computedEndState, err := e.executeChunk(chunk)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not execute chunk (id=%s): %w", chunkID, err)
+	}
+	// TODO for now, we discard the computed end state and approve the ER
+	_ = computedEndState
+
+	// prepares and signs result approval body part
+	body := flow.ResultApprovalBody{
+		ExecutionResultID: chunk.Receipt.ExecutionResult.ID(),
+		ChunkIndex:        chunk.ChunkIndex,
 	}
 
-	// if any fault found with the chunk
-	if chFault != nil {
-		switch chFault.(type) {
-		case *chmodels.CFMissingRegisterTouch:
-			// TODO raise challenge
-			e.log.Warn().
-				Timestamp().
-				Hex("origin", logging.ID(originID)).
-				Uint64("chunkIndex", chunk.ChunkIndex).
-				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(chFault.String())
-		case *chmodels.CFNonMatchingFinalState:
-			// TODO raise challenge
-			e.log.Warn().
-				Timestamp().
-				Hex("origin", logging.ID(originID)).
-				Uint64("chunkIndex", chunk.ChunkIndex).
-				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(chFault.String())
-		case *chmodels.CFInvalidVerifiableChunk:
-			// TODO raise challenge
-			e.log.Error().
-				Timestamp().
-				Hex("origin", logging.ID(originID)).
-				Uint64("chunkIndex", chunk.ChunkIndex).
-				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(chFault.String())
-		default:
-			return fmt.Errorf("unknown type of chunk fault is recieved (type: %T) : %v", chFault, chFault.String())
-		}
-		// don't do anything else, but skip generating result approvals
-		return nil
-	}
-
-	// Generate result approval
-	approval, err := e.GenerateResultApproval(chunk.ChunkIndex, chunk.Receipt.ExecutionResult.ID(), chunk.Block.ID())
+	// generates a signature over the attestation part of approval
+	sign, err := e.signAttestation(&body)
 	if err != nil {
-		return fmt.Errorf("couldn't generate a result approval: %w", err)
+		return fmt.Errorf("could not generate attestation signature: %w", err)
 	}
 
-	// broadcast result approval to the consensus nodes
+	approval := &flow.ResultApproval{
+		ResultApprovalBody: body,
+		VerifierSignature:  sign,
+	}
+
+	// broadcast result approval to consensus nodes
 	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
 	}
 	e.log.Info().
-		Timestamp().
 		Hex("chunk_id", logging.ID(chunkID)).
-		Uint64("chunkIndex", chunk.ChunkIndex).
-		Hex("execution receipt", logging.Entity(chunk.Receipt)).
-		Msg("result approval submitted")
+		Msg("submitted result approval")
 
 	return nil
 }
 
-// GenerateResultApproval generates result approval for specific chunk of a exec receipt
-func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Identifier, blockID flow.Identifier) (*flow.ResultApproval, error) {
-
-	// attestation
-	atst := flow.Attestation{
-		BlockID:           blockID,
-		ExecutionResultID: execResultID,
-		ChunkIndex:        chunkIndex,
+// executeChunk executes the transactions for a single chunk and returns the
+// resultant end state, or an error if execution failed.
+// TODO unit testing
+func (e *Engine) executeChunk(ch *verification.VerifiableChunk) (flow.StateCommitment, error) {
+	err := e.chVerif.Verify(ch)
+	if err != nil {
+		return nil, fmt.Errorf("chunk verification failed for verifiable chunk [%d] of receipt [%x], error: %v", ch.ChunkIndex, ch.Receipt.ID(), err)
 	}
+	return ch.EndState, nil
+}
 
-	// generates a signature over the attestation part of approval
+// signAttestation extracts, signs and returns the attestation part of the result approval
+func (e *Engine) signAttestation(body *flow.ResultApprovalBody) (crypto.Signature, error) {
+	// extracts attestation part
+	atst := body.Attestation()
+
+	// encodes attestation into bytes
 	batst, err := encoding.DefaultEncoder.Encode(atst)
 	if err != nil {
 		return nil, fmt.Errorf("could encode attestation: %w", err)
 	}
-	atstSign, err := e.me.Sign(batst, e.rah)
+
+	// signs attestation
+	signature, err := e.me.Sign(batst, e.rah)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign attestation: %w", err)
 	}
 
-	// result approval body
-	body := flow.ResultApprovalBody{
-		Attestation:          atst,
-		ApproverID:           e.me.NodeID(),
-		AttestationSignature: atstSign,
-		Spock:                nil,
-	}
-
-	// generates a signature over result approval body
-	bbody, err := encoding.DefaultEncoder.Encode(body)
-	if err != nil {
-		return nil, fmt.Errorf("could encode result approval body: %w", err)
-	}
-	bodySign, err := e.me.Sign(bbody, e.rah)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign result approval body: %w", err)
-	}
-
-	return &flow.ResultApproval{
-		Body:              body,
-		VerifierSignature: bodySign,
-	}, nil
+	return signature, nil
 }

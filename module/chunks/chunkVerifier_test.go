@@ -9,7 +9,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	chModels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -26,8 +25,8 @@ func (s *ChunkVerifierTestSuite) SetupTest() {
 	s.verifier = NewChunkVerifier(newVirtualMachineMock())
 }
 
-// TestChunkVerifier invokes all the tests in this test suite
-func TestChunkVerifier(t *testing.T) {
+// TestVerification invokes all the tests in this test suite
+func TestVerification(t *testing.T) {
 	suite.Run(t, new(ChunkVerifierTestSuite))
 }
 
@@ -35,45 +34,27 @@ func TestChunkVerifier(t *testing.T) {
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
 	assert.NotNil(s.T(), vch)
-	chFaults, err := s.verifier.Verify(vch)
+	err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
-	assert.Nil(s.T(), chFaults)
 }
 
-// TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
+// TestMissingRegisterTouchForUpdate tests verification of the a chunkdatapack missing a register touch (update)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
-	chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(*chModels.CFMissingRegisterTouch)
-	assert.True(s.T(), ok)
+	err := s.verifier.Verify(vch)
+	assert.NotNil(s.T(), err)
 }
 
-// TestMissingRegisterTouchForRead tests verification given a chunkdatapack missing a register touch (read)
-func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
-	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
-	assert.NotNil(s.T(), vch)
-	// remove the second register touch
-	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
-	chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(*chModels.CFMissingRegisterTouch)
-	assert.True(s.T(), ok)
-}
+// TODO TestMissingRegisterTouchForRead
 
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("wrongEndState"))
 	assert.NotNil(s.T(), vch)
-	chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(*chModels.CFNonMatchingFinalState)
-	assert.True(s.T(), ok)
+	err := s.verifier.Verify(vch)
+	assert.NotNil(s.T(), err)
 }
 
 func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunk {
@@ -110,55 +91,51 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	ids = append(ids, id1, id2)
 	values = append(values, value1, value2)
 
-	var verifiableChunk verification.VerifiableChunk
+	db := unittest.TempLevelDB(t)
 
-	unittest.RunWithTempDBDir(t, func(dbDir string) {
-		f, _ := ledger.NewTrieStorage(dbDir)
-		startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
-		regTs, _ := f.GetRegisterTouches(ids, startState)
+	f, _ := ledger.NewTrieStorage(db)
+	startState, _ := f.UpdateRegisters(ids, values)
+	regTs, _ := f.GetRegisterTouches(ids, startState)
 
-		ids = [][]byte{id2}
-		values = [][]byte{UpdatedValue2}
-		endState, _ := f.UpdateRegisters(ids, values, startState)
+	ids = [][]byte{id2}
+	values = [][]byte{UpdatedValue2}
+	endState, _ := f.UpdateRegisters(ids, values)
 
-		// Chunk setup
-		chunk := flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: 0,
-				StartState:      startState,
-			},
-			Index: 0,
-		}
-
-		chunkDataPack := flow.ChunkDataPack{
-			ChunkID:         chunk.ID(),
+	// Chunk setup
+	chunk := flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: 0,
 			StartState:      startState,
-			RegisterTouches: regTs,
-		}
+		},
+		Index: 0,
+	}
 
-		// ExecutionResult setup
-		result := flow.ExecutionResult{
-			ExecutionResultBody: flow.ExecutionResultBody{
-				BlockID: block.ID(),
-				Chunks:  flow.ChunkList{&chunk},
-			},
-		}
+	chunkDataPack := flow.ChunkDataPack{
+		ChunkID:         chunk.ID(),
+		StartState:      startState,
+		RegisterTouches: regTs,
+	}
 
-		receipt := flow.ExecutionReceipt{
-			ExecutionResult: result,
-		}
+	// ExecutionResult setup
+	result := flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID: block.ID(),
+			Chunks:  flow.ChunkList{&chunk},
+		},
+	}
 
-		verifiableChunk = verification.VerifiableChunk{
-			ChunkIndex:    chunk.Index,
-			EndState:      endState,
-			Block:         &block,
-			Receipt:       &receipt,
-			Collection:    &coll,
-			ChunkDataPack: &chunkDataPack,
-		}
-	})
+	receipt := flow.ExecutionReceipt{
+		ExecutionResult: result,
+	}
 
-	return &verifiableChunk
+	return &verification.VerifiableChunk{
+		ChunkIndex:    chunk.Index,
+		EndState:      endState,
+		Block:         &block,
+		Receipt:       &receipt,
+		Collection:    &coll,
+		ChunkDataPack: &chunkDataPack,
+	}
 
 }
 

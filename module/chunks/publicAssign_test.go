@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/crypto/random"
-	chmodels "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/test"
 )
@@ -36,7 +36,7 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	// creates ids and twice chunks of the ids
 	ids := test.CreateIDs(size)
 	chunks := a.CreateChunks(2*size, a.T())
-	assignment := chmodels.NewAssignment()
+	assignment := chunkassignment.NewAssignment()
 
 	// assigns two chunks to each verifier node
 	// j keeps track of chunks
@@ -70,7 +70,7 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	// creates ids and twice chunks of the ids
 	var ids flow.IdentityList = test.CreateIDs(size)
 	chunks := a.CreateChunks(2, a.T())
-	assignment := chmodels.NewAssignment()
+	assignment := chunkassignment.NewAssignment()
 
 	// assigns first chunk to non-duplicate list of verifiers
 	c := chunks.ByIndex(uint64(0))

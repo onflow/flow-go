@@ -2,242 +2,41 @@ package trie
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
 var nilChild []byte = make([]byte, 32)
 
-var hashLength = 32
-var childHashLen = hashLength + 1
-var bothChildrenHashLen = 2 * 32
-
-// as long as those are not 32 bytes there is no collision risk
-var metadataKeyPrevious = []byte("metadata_previous") //hash of previous state
-var metadataHeight = []byte("metadata_height")        //how many deltas since last full snapshot
-
-type Root []byte
-
-func (r Root) String() string {
-	return hex.EncodeToString(r)
-}
-
-type Key []byte
-
-func (k Key) String() string {
-	return hex.EncodeToString(k)
-}
-
 // node is a struct for constructing our Tree
 type node struct {
-	value  Root   // Hash
-	lChild *node  // Left Child
-	rChild *node  // Right Child
+	value  []byte // Hash
+	Lchild *node  // Left Child
+	Rchild *node  // Right Child
 	height int    // Height where the node is at
 	key    []byte // key this node is pointing at
 }
 
-type tree struct {
-	root           Root
-	rootNode       *node
-	database       databases.DAL
-	previous       Root
-	cachedBranches map[string]*proofHolder // Map of string representations of keys to proofs
-	forest         *forest
-	height         uint64 //similar to block height, useful for snapshotting
-	// FIFO queue of ordered historical State Roots
-	// In-memory only, used for tracking snapshots. Can be reconstructed from disk if needed
-	// Frequent eviction of a tree/restarting might mean database not gets pruned as frequent
-	historicalStateRoots deque.Deque
-}
-
-func (t *tree) Root() (*node, error) {
-	if t.rootNode != nil {
-		return t.rootNode, nil
-	}
-
-	rootNode, err := LoadNode(t.root, t.forest.height, t.database)
-	if err != nil {
-		return nil, fmt.Errorf("cannot load tree with root (%s): %w", t.root.String(), err)
-	}
-	t.rootNode = rootNode
-	return t.rootNode, nil
-}
-
-func LoadNode(value Root, height int, db databases.DAL) (*node, error) {
-	if height < 0 {
-		return nil, fmt.Errorf("height cannot be negative")
-	}
-	payload, err := db.GetTrieDB(value)
-	if err != nil {
-		return nil, fmt.Errorf("cannot load node (%s) from database: %w", value.String(), err)
-	}
-
-	payloadLen := len(payload)
-
-	var lChild *node = nil
-	var rChild *node = nil
-	var lChildRoot Root = nil
-	var rChildRoot Root = nil
-	var key []byte = nil
-
-	if payloadLen == childHashLen {
-		lr := utils.IsBitSet(payload, 0)
-
-		if lr {
-			// If it is set the left child is nil
-			rChildRoot = payload[1:childHashLen]
-		} else {
-			// If it is not set the right child is nil
-			lChildRoot = payload[1:childHashLen]
-		}
-	} else if payloadLen == bothChildrenHashLen {
-		lChildRoot = payload[0:hashLength]
-		rChildRoot = payload[hashLength:bothChildrenHashLen]
-	} else {
-		key = payload
-	}
-
-	if len(rChildRoot) > 0 {
-		rChild, err = LoadNode(rChildRoot, height-1, db)
-		if err != nil {
-			return nil, fmt.Errorf("cannot load right child (%s): %w", rChildRoot, err)
-		}
-	}
-	if len(lChildRoot) > 0 {
-		lChild, err = LoadNode(lChildRoot, height-1, db)
-		if err != nil {
-			return nil, fmt.Errorf("cannot load left child (%s): %w", lChildRoot, err)
-		}
-	}
-
-	return &node{
-		value:  value,
-		lChild: lChild,
-		rChild: rChild,
-		height: height,
-		key:    key,
-	}, nil
-}
-
-func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
-
-	deltaNumber, err := db.GetTrieDB(metadataHeight)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get delta number: %w", err)
-	}
-
-	previousRoot, err := db.GetTrieDB(metadataKeyPrevious)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get previous root: %w", err)
-	}
-
-	return &tree{
-		rootNode:       nil,
-		root:           root,
-		database:       db,
-		previous:       previousRoot,
-		height:         binary.BigEndian.Uint64(deltaNumber),
-		cachedBranches: make(map[string]*proofHolder),
-		forest:         f,
-	}, nil
-}
-
-type forest struct {
-	dbDir  string
-	cache  *lru.Cache
-	height int
-}
-
-func NewForest(dbDir string, maxSize int, maxFullSize int, height int) (*forest, error) {
-	evict := func(key interface{}, value interface{}) {
-		tree, ok := value.(*tree)
-		if !ok {
-			panic(fmt.Sprintf("cache contains item of type %T", value))
-		}
-		_, _ = tree.database.SafeClose()
-	}
-	cache, err := lru.NewWithEvict(maxSize, evict)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create forest cache: %w", err)
-	}
-	//fullCache, err := lru.NewWithEvict(maxFullSize, evict)
-	//if err != nil {
-	//	return nil, fmt.Errorf("cannot create forest full cache: %w", err)
-	//}
-	return &forest{
-		dbDir: dbDir,
-		cache: cache,
-		//fullCache: fullCache,
-		height: height,
-	}, nil
-}
-
-func (f *forest) Add(tree *tree) {
-	//if tree.numDeltas == 0 {
-	//	f.fullCache.Add(tree.root.String(), tree)
-	//	return
-	//}
-	f.cache.Add(tree.root.String(), tree)
-}
-
-func (f *forest) Get(root Root) (*tree, error) {
-
-	//if foundFullTree, ok := f.fullCache.Get(root.String()); ok {
-	//	return foundFullTree.(*tree), nil
-	//}
-
-	if foundTree, ok := f.cache.Get(root.String()); ok {
-		return foundTree.(*tree), nil
-	}
-
-	db, err := f.newDB(root)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create LevelDB: %w", err)
-	}
-
-	tree, err := f.newTree(root, db)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create tree: %w", err)
-	}
-
-	f.Add(tree)
-
-	return tree, nil
-}
-
-func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
-	treePath := filepath.Join(f.dbDir, root.String())
-
-	db, err := leveldb.NewLevelDB(treePath)
-	return db, err
-}
-
 // SMT is a Basic Sparse Merkle Tree struct
 type SMT struct {
-	forest *forest
-
-	//rootNode                 *node                    // Root
-	height int // Height of the tree
-	//database             databases.DAL            // The Database Interface for the trie
-	//historicalStates     map[string]databases.DAL // Map of string representations of Historical States to Historical Database references
-	//cachedBranches       map[string]*proofHolder  // Map of string representations of keys to proofs
-	//historicalStateRoots deque.Deque              // FIFO queue of historical State Roots in historicalStates map
-	numHistoricalStates int    // Number of states to keep in historicalStates
-	snapshotInterval    uint64 // When removing full states from historical states interval between full states
-	numFullStates       int    // Number of Full States to keep in historicalStates
-	//lruCache             *lru.Cache               // LRU cache of stringified keys to proofs
+	root                 *node                    // Root
+	height               int                      // Height of the tree
+	database             databases.DAL            // The Database Interface for the trie
+	historicalStates     map[string]databases.DAL // Map of string representations of Historical States to Historical Database references
+	cachedBranches       map[string]*proofHolder  // Map of string representationf of keys to proofs
+	historicalStateRoots deque.Deque              // FIFO queue of historical State Roots in historicalStates map
+	numHistoricalStates  int                      // Number of states to keep in historicalStates
+	snapshotInterval     int                      // When removing full states from historical states interval between full states
+	numFullStates        int                      // Number of Full States to keep in historicalStates
+	lruCache             *lru.Cache               // LRU cache of stringified keys to proofs
 }
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
@@ -274,8 +73,8 @@ func newNode(value []byte, height int) *node {
 	n := new(node)
 	n.value = value
 	n.height = height
-	n.lChild = nil
-	n.rChild = nil
+	n.Lchild = nil
+	n.Rchild = nil
 	n.key = nil
 
 	return n
@@ -294,17 +93,17 @@ func (n *node) GetHeight() int {
 // ComputeValue recomputes value for this node in recursive manner
 func (n *node) ComputeValue() []byte {
 	// leaf node
-	if n.lChild == nil && n.rChild == nil {
+	if n.Lchild == nil && n.Rchild == nil {
 		return n.value
 	}
 	// otherwise compute
 	h1 := GetDefaultHashForHeight(n.height - 1)
-	if n.lChild != nil {
-		h1 = n.lChild.ComputeValue()
+	if n.Lchild != nil {
+		h1 = n.Lchild.ComputeValue()
 	}
 	h2 := GetDefaultHashForHeight(n.height - 1)
-	if n.rChild != nil {
-		h2 = n.rChild.ComputeValue()
+	if n.Rchild != nil {
+		h2 = n.Rchild.ComputeValue()
 	}
 	// For debugging purpose uncomment this
 	// n.value = HashInterNode(h1, h2)
@@ -313,27 +112,27 @@ func (n *node) ComputeValue() []byte {
 
 func (n node) String() string {
 	right := ""
-	if n.rChild != nil {
-		right = n.rChild.String()
+	if n.Rchild != nil {
+		right = n.Rchild.String()
 	}
 	left := ""
-	if n.lChild != nil {
-		left = n.lChild.String()
+	if n.Lchild != nil {
+		left = n.Lchild.String()
 	}
 	return fmt.Sprintf("%v: (%v,%v) left> %v right> %v ", n.height, n.key, hex.EncodeToString(n.value), left, right)
 }
 
 // FmtStr provides formated string represntation of the node and sub tree
-func (n node) FmtStr(prefix string, path string) string {
+func (n node) FmtStr(prefix string) string {
 	right := ""
-	if n.rChild != nil {
-		right = fmt.Sprintf("\n%v", n.rChild.FmtStr(prefix+"\t", path+"1"))
+	if n.Rchild != nil {
+		right = fmt.Sprintf("\n%v", n.Rchild.FmtStr(prefix+"\t"))
 	}
 	left := ""
-	if n.lChild != nil {
-		left = fmt.Sprintf("\n%v", n.lChild.FmtStr(prefix+"\t", path+"0"))
+	if n.Lchild != nil {
+		left = fmt.Sprintf("\n%v", n.Lchild.FmtStr(prefix+"\t"))
 	}
-	return fmt.Sprintf("%v%v: (%v,%v)[%s] %v %v ", prefix, n.height, n.key, hex.EncodeToString(n.value), path, left, right)
+	return fmt.Sprintf("%v%v: (%v,%v) %v %v ", prefix, n.height, n.key, hex.EncodeToString(n.value), left, right)
 }
 
 // NewSMT creates a new Sparse Merkle Tree.
@@ -342,72 +141,36 @@ func (n node) FmtStr(prefix string, path string) string {
 //
 // Note: height must be greater than 1.
 func NewSMT(
-	dbDir string,
+	db databases.DAL,
 	height int,
-	interval uint64,
+	cacheSize int,
+	interval int,
 	numHistoricalStates int,
 	numFullStates int,
 ) (*SMT, error) {
 	if height < 1 {
-		return nil, errors.New("height of SMT must be at least 1")
-	}
-
-	// check for possible key length collisions
-	// we determine number of children of a node by length of data
-	// so those particular values can cause confusion
-	if height == childHashLen {
-		return nil, fmt.Errorf("height of SMT must not be %d", childHashLen)
-	}
-	if height == bothChildrenHashLen {
-		return nil, fmt.Errorf("height of SMT must not be %d", bothChildrenHashLen)
+		return nil, errors.New("Height of SMT must be at least 1")
 	}
 
 	s := new(SMT)
 
-	//s.database = db
+	s.database = db
 	s.height = height
 
-	// Set rootNode to the highest level default node
-	//s.rootNode = newNode(GetDefaultHashForHeight(height-1), height-1)
-	//s.historicalStates = make(map[string]databases.DAL)
+	// Set root to the highest level default node
+	s.root = newNode(GetDefaultHashForHeight(height-1), height-1)
+	s.historicalStates = make(map[string]databases.DAL)
 	s.numHistoricalStates = numHistoricalStates
 	s.numFullStates = numFullStates
 	s.snapshotInterval = interval
-	//s.cachedBranches = make(map[string]*proofHolder)
+	s.cachedBranches = make(map[string]*proofHolder)
 
-	forest, err := NewForest(dbDir, numHistoricalStates, numFullStates, height)
+	lruCache, err := lru.New(cacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create forest: %w", err)
+		return nil, err
 	}
 
-	// add empty tree
-	emptyHash := GetDefaultHashForHeight(height - 1)
-	emptyDB, err := forest.newDB(emptyHash)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create empty DB: %w", err)
-	}
-
-	emptyNode := newNode(emptyHash, height-1)
-
-	newTree := &tree{
-		rootNode:       emptyNode,
-		root:           emptyHash,
-		database:       emptyDB,
-		previous:       nil,
-		height:         0,
-		cachedBranches: make(map[string]*proofHolder),
-		forest:         forest,
-	}
-
-	forest.Add(newTree)
-
-	s.forest = forest
-	//lruCache, err := lru.New(cacheSize)
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	//s.lruCache = lruCache
+	s.lruCache = lruCache
 
 	return s, nil
 }
@@ -447,47 +210,45 @@ func (p *proofHolder) ExportWholeProof() ([][]byte, [][][]byte, []bool, []uint8)
 }
 
 // updateCache takes a key and all relevant parts of the proof and insterts in into the cache, removing values if needed
-func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool, size uint8) {
+func (s *SMT) updateCache(key []byte, flag []byte, proof [][]byte, inclusion bool, size uint8) {
 	holder := newProofHolder([][]byte{flag}, [][][]byte{proof}, []bool{inclusion}, []uint8{size})
-	k := key.String()
-	//s.lruCache.Add(k, nil)
-	t.cachedBranches[k] = holder
+	k := hex.EncodeToString(key)
+	s.lruCache.Add(k, nil)
+	s.cachedBranches[k] = holder
 }
 
-//func (t *tree) isSnapshot() bool {
-//	return t.height == 0
-//}
+// invalidateCache removes the given keys from the cache
+func (s *SMT) invalidateCache(keys [][]byte) {
+	for _, key := range keys {
+		k := hex.EncodeToString(key)
+		res := s.cachedBranches[k]
+		if res != nil {
+			delete(s.cachedBranches, k)
+			s.lruCache.Remove(k)
+		}
+	}
+}
 
 // Read takes the keys given and return the values from the database
 // If the trusted flag is true, it is just a read from the database
 // If trusted is false, then we check to see if the key exists in the trie
-func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHolder, error) {
+func (s *SMT) Read(keys [][]byte, trusted bool, root []byte) ([][]byte, *proofHolder, error) {
 
 	flags := make([][]byte, len(keys))
 	proofs := make([][][]byte, len(keys))
 	inclusions := make([]bool, len(keys))
 	sizes := make([]uint8, len(keys))
 
-	//currRoot := s.GetRoot().value
-	//stringRoot := root.String()
-
-	tree, err := s.forest.Get(root)
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid historical state: %w", err)
-	}
+	currRoot := s.GetRoot().value
+	stringRoot := hex.EncodeToString(root)
 
 	if !trusted {
-		if s.IsSnapshot(tree) {
-
-			//if bytes.Equal(root, currRoot) {
+		if bytes.Equal(root, currRoot) {
 			for i, key := range keys {
 				k := hex.EncodeToString(key)
-				res := tree.cachedBranches[k]
+				res := s.cachedBranches[k]
 				if res == nil {
-					flag, proof, size, inclusion, err := s.GetProof(key, tree.rootNode)
-					if err != nil {
-						return nil, nil, fmt.Errorf("cannot get proof: %w", err)
-					}
+					flag, proof, size, inclusion := s.GetProof(key)
 					flags[i] = flag
 					proofs[i] = proof
 					inclusions[i] = inclusion
@@ -499,12 +260,18 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 					sizes[i] = res.sizes[0]
 				}
 
-				tree.updateCache(key, flags[i], proofs[i], inclusions[i], sizes[i])
+				s.updateCache(key, flags[i], proofs[i], inclusions[i], sizes[i])
+
 			}
 		} else {
 
+			if s.historicalStates[stringRoot] == nil {
+				return nil, nil, errors.New("Invalid Historical State")
+
+			}
+
 			for i, key := range keys {
-				flag, proof, size, inclusion, err := s.GetHistoricalProof(key, root, tree.database)
+				flag, proof, size, inclusion, err := s.GetHistoricalProof(key, root, s.historicalStates[stringRoot])
 				if err != nil {
 					return nil, nil, err
 				}
@@ -518,36 +285,46 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 	}
 
 	values := make([][]byte, len(keys))
+	// the case where we are reading from current state
+	if bytes.Equal(root, currRoot) {
 
-	for i, key := range keys {
-		res, err := tree.database.GetKVDB(key)
-		if err != nil {
-
-			localRoot := root
-			for {
-				tree, err := s.forest.Get(localRoot)
-				if err != nil {
-					return nil, nil, fmt.Errorf("cannot get tree (%s): %w", localRoot, err)
-				}
-
-				res, err = tree.database.GetKVDB(key)
-				if err == nil {
-					break
-				}
-				if s.IsSnapshot(tree) {
-					break
-				}
-				localRoot = tree.previous
-			}
-
-			if res == nil && !errors.Is(err, databases.ErrNotFound) {
+		for i, key := range keys {
+			res, err := s.database.GetKVDB(key)
+			if err != nil && !errors.Is(err, databases.ErrNotFound) {
 				return nil, nil, err
 			}
+			values[i] = res
 		}
-		values[i] = res
-	}
 
-	//}
+		// the case where the root we are looking for does not match our current root
+	} else {
+		// check to see if it is historical
+		if s.historicalStates[stringRoot] == nil {
+			return nil, nil, errors.New("Invalid Historical State")
+
+		}
+
+		for i, key := range keys {
+			res, err := s.historicalStates[stringRoot].GetKVDB(key)
+			if err != nil {
+				index := s.getStateIndex(stringRoot)
+
+				for j := index; j >= 0; j-- {
+					db := s.historicalStates[fmt.Sprintf("%v", s.historicalStateRoots.At(j))]
+					res, err = db.GetKVDB(key)
+					if err == nil {
+						break
+					}
+				}
+
+				if res == nil && !errors.Is(err, databases.ErrNotFound) {
+					return nil, nil, err
+				}
+			}
+			values[i] = res
+		}
+
+	}
 
 	if trusted {
 		return values, nil, nil
@@ -557,17 +334,13 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 }
 
 // verifyInclusionFlag is used to verify a flag against the trie given the key
-func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, error) {
+func (s *SMT) verifyInclusionFlag(key []byte, flag []byte) bool {
 
 	eflag := make([]byte, s.GetHeight()/8)
 
-	tree, err := s.forest.Get(root)
-	if err != nil {
-		return false, fmt.Errorf("cannot get tree %s: %w", root, err)
-	}
-	curr := tree.rootNode
+	curr := s.GetRoot()
 	if curr == nil || bytes.Equal(curr.key, key) {
-		return bytes.Equal(eflag, flag), nil
+		return bytes.Equal(eflag, flag)
 
 	}
 
@@ -575,91 +348,91 @@ func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, err
 
 	for i := 0; i < len(flag); i++ {
 		if utils.IsBitSet(key, i) {
-			if curr.lChild != nil {
+			if curr.Lchild != nil {
 				flagMatches = utils.IsBitSet(flag, i)
 				if !flagMatches {
-					return false, nil
+					return false
 				}
 			}
 
 		} else {
-			if curr.rChild != nil {
+			if curr.Rchild != nil {
 				flagMatches = utils.IsBitSet(flag, i)
 				if !flagMatches {
-					return false, nil
+					return false
 				}
 			}
 
 		}
 	}
 
-	return true, nil
+	return true
 }
 
 // GetProof searching the tree for a value if it exists, and returns the flag and then proof
-func (s *SMT) GetProof(key []byte, rootNode *node) ([]byte, [][]byte, uint8, bool, error) {
+func (s *SMT) GetProof(key []byte) ([]byte, [][]byte, uint8, bool) {
 	flag := make([]byte, s.GetHeight()/8) // Flag is used to save space by removing default hashesh (zeros) from the proofs
 	proof := make([][]byte, 0)
 	proofLen := uint8(0)
 
-	curr := rootNode
+	curr := s.GetRoot()
 	if curr == nil {
-		return flag, proof, 0, false, fmt.Errorf("nil root")
+		return flag, proof, 0, false
 	}
 	if bytes.Equal(curr.key, key) {
-		return flag, proof, proofLen, true, nil
+		return flag, proof, proofLen, true
 	}
 
 	var nextKey *node
 
 	for i := 0; i < s.GetHeight()-1; i++ {
 		if utils.IsBitSet(key, i) {
-			if curr.lChild != nil {
+			if curr.Lchild != nil {
 				utils.SetBit(flag, i)
-				proof = append(proof, curr.lChild.value)
+				proof = append(proof, curr.Lchild.value)
 			}
 
-			nextKey = curr.rChild
+			nextKey = curr.Rchild
 
 		} else {
-			if curr.rChild != nil {
+			if curr.Rchild != nil {
 				utils.SetBit(flag, i)
-				proof = append(proof, curr.rChild.value)
+				proof = append(proof, curr.Rchild.value)
 			}
 
-			nextKey = curr.lChild
+			nextKey = curr.Lchild
 		}
 
 		if nextKey == nil {
-			return flag, proof, proofLen, false, nil
+			return flag, proof, proofLen, false
 		} else {
 			curr = nextKey
 			proofLen++
 			if bytes.Equal(key, curr.key) {
-				return flag, proof, proofLen, true, nil
+				return flag, proof, proofLen, true
 			}
 		}
 	}
 
 	if curr.key == nil {
-		return flag, proof, proofLen, false, nil
+		return flag, proof, proofLen, false
 	}
-	return flag, proof, proofLen, true, nil
+	return flag, proof, proofLen, true
 }
 
 // getStateIndex returns the index of a stateroot in the historical state roots buffer
-//func (s *SMT) getStateIndex(stateRoot string) int {
-//	for i := 0; i < s.historicalStateRoots.Len(); i++ {
-//		if fmt.Sprintf("%v", s.historicalStateRoots.At(i)) == stateRoot {
-//			return i
-//		}
-//	}
-//
-//	return -1
-//}
+func (s *SMT) getStateIndex(stateRoot string) int {
+	for i := 0; i < s.historicalStateRoots.Len(); i++ {
+		if fmt.Sprintf("%v", s.historicalStateRoots.At(i)) == stateRoot {
+			return i
+		}
+	}
+
+	return -1
+}
 
 // GetHistoricalProof reconstructs a proof of inclusion or exclusion for a value in a historical database then returns the flag and proof
-func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) ([]byte, [][]byte, uint8, bool, error) {
+func (s *SMT) GetHistoricalProof(key []byte, root []byte, database databases.DAL) ([]byte, [][]byte, uint8, bool, error) {
 	flag := make([]byte, s.GetHeight()/8)
 	proof := make([][]byte, 0)
 	proofLen := uint8(0)
@@ -674,22 +447,14 @@ func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) 
 	for i := 0; i < s.GetHeight()-1; i++ {
 		children, err := database.GetTrieDB(curr)
 		if err != nil {
+			index := s.getStateIndex(hex.EncodeToString(root))
 
-			localRoot := root
-			for {
-				tree, err := s.forest.Get(localRoot)
-				if err != nil {
-					return flag, proof, 0, false, fmt.Errorf("cannot get tree (%s): %w", localRoot, err)
-				}
-
-				children, err = tree.database.GetTrieDB(curr)
+			for j := index; j >= 0; j-- {
+				db := s.historicalStates[fmt.Sprintf("%v", s.historicalStateRoots.At(j))]
+				children, err = db.GetTrieDB(curr)
 				if err == nil {
 					break
 				}
-				if s.IsSnapshot(tree) {
-					break
-				}
-				localRoot = tree.previous
 			}
 
 			if children == nil {
@@ -702,13 +467,12 @@ func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) 
 		var Ckey []byte
 
 		// the case where we are not at a leaf node!
-		if len(children) == bothChildrenHashLen {
-			// retrieve value for rootNode from the database, split into Left child value and Right child value
+		if len(children) == 64 {
+			// retrieve value for root from the database, split into Left child value and Right child value
 			// by splitting value slice in half!
-
-			Lchild = children[0:hashLength]
-			Rchild = children[hashLength:bothChildrenHashLen]
-		} else if len(children) == childHashLen {
+			Lchild = children[0:32]
+			Rchild = children[32:64]
+		} else if len(children) == 33 {
 			// The case where the node we are pulling from the database has only one set child
 			// check the first bit of the flag
 			lr := utils.IsBitSet(children, 0)
@@ -716,11 +480,11 @@ func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) 
 			if lr {
 				// If it is set the left child is nil
 				Lchild = nilChild
-				Rchild = children[1:childHashLen]
+				Rchild = children[1:33]
 
 			} else {
 				// If it is not set the right child is nil
-				Lchild = children[1:childHashLen]
+				Lchild = children[1:33]
 				Rchild = nilChild
 			}
 
@@ -768,7 +532,7 @@ func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) 
 
 }
 
-// VerifyInclusionProof calculates the inclusion proof from a given rootNode, flag, proof list, and size.
+// VerifyInclusionProof calculates the inclusion proof from a given root, flag, proof list, and size.
 //
 // This function is exclusively for inclusive proofs
 func VerifyInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte, size uint8, root []byte, height int) bool {
@@ -832,110 +596,83 @@ func VerifyNonInclusionProof(key []byte, value []byte, flag []byte, proof [][]by
 	return !bytes.Equal(computed, root)
 }
 
-func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher databases.Batcher) error {
-
-	err := oldTree.database.CopyTo(newTree.database)
+func (s *SMT) updateHistoricalStates(root []byte) error {
+	// Make a copy of the historical state and link it to the old state root
+	// get string representation of the current root of the trie
+	oldRoot := hex.EncodeToString(root)
+	historicDB, err := s.database.CopyDB(oldRoot)
 	if err != nil {
-		return fmt.Errorf("error while copying DB: %s", err)
+		return err
 	}
-
-	numStates := newTree.historicalStateRoots.Len()
+	s.historicalStates[oldRoot] = historicDB
+	numStates := s.historicalStateRoots.Len()
 	switch {
 	case numStates > s.numHistoricalStates:
 		return errors.New("We have more Historical States stored than the Maximum Allowed Amount!")
 
-	case numStates >= int(s.snapshotInterval):
-		if newTree.height%s.snapshotInterval != 0 {
-			stateToPrune := newTree.historicalStateRoots.At(int(s.snapshotInterval)).(Root)
-			referenceState := newTree.historicalStateRoots.At(int(s.snapshotInterval - 1)).(Root)
-			dbToPrune, err := s.forest.Get(stateToPrune)
-			if err != nil {
-				return fmt.Errorf("cannot get tree referenced in history: %w", err)
-			}
-			dbReference, err := s.forest.Get(referenceState)
-			if err != nil {
-				return fmt.Errorf("cannot get tree referenced in history: %w", err)
-			}
+	case numStates < s.numHistoricalStates && numStates < s.numFullStates:
+		s.historicalStateRoots.PushBack(oldRoot)
 
-			err = dbToPrune.database.PruneDB(dbReference.database)
+	case numStates < s.numHistoricalStates && numStates >= s.numFullStates:
+		s.historicalStateRoots.PushBack(oldRoot)
+		si := numStates - s.numFullStates
+		if si%s.snapshotInterval != 0 {
+			stateToPrune := fmt.Sprintf("%v", s.historicalStateRoots.At(s.numFullStates))
+			referenceState := fmt.Sprintf("%v", s.historicalStateRoots.At(s.numFullStates-1))
+			err = s.historicalStates[stateToPrune].PruneDB(s.historicalStates[referenceState])
 			if err != nil {
 				return err
 			}
-			_ = newTree.historicalStateRoots.PopFront()
+		}
 
+	case numStates == s.numHistoricalStates:
+		s.historicalStateRoots.PushBack(oldRoot)
+		rootToRemove := fmt.Sprintf("%v", s.historicalStateRoots.PopFront())
+		s.historicalStates[rootToRemove] = nil
+		si := numStates - s.numFullStates
+		if si%s.snapshotInterval != 0 {
+			stateToPrune := fmt.Sprintf("%v", s.historicalStateRoots.At(s.numFullStates))
+			referenceState := fmt.Sprintf("%v", s.historicalStateRoots.At(s.numFullStates-1))
+			err = s.historicalStates[stateToPrune].PruneDB(s.historicalStates[referenceState])
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	height := make([]byte, 8)
-	binary.BigEndian.PutUint64(height, newTree.height)
-
-	batcher.Put(metadataKeyPrevious, oldTree.root)
-	batcher.Put(metadataHeight, height)
-
 	return nil
+
 }
 
 // Update takes a sorted list of keys and associated values and inserts
 // them into the trie, and if that is successful updates the databases.
-func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
-
-	t, err := s.forest.Get(root)
+func (s *SMT) Update(keys [][]byte, values [][]byte) error {
+	s.database.NewBatch()
+	res, err := s.UpdateAtomically(s.GetRoot(), keys, values, s.height-1)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get tree: %w", err)
+		return err
 	}
 
-	batcher := t.database.NewBatcher()
-
-	treeRoot, err := t.Root()
+	err = s.updateHistoricalStates(s.GetRoot().value)
 	if err != nil {
-		return nil, fmt.Errorf("cannot load tree root: %w", err)
+		return err
 	}
-	newRootNode, err := s.UpdateAtomically(treeRoot, keys, values, s.height-1, batcher, t.database)
+
+	err = s.database.UpdateTrieDB()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
+	err = s.database.UpdateKVDB(keys, values)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create new DB: %w", err)
+		return err
 	}
 
-	var newHistoricalStatRoots deque.Deque
+	s.root = res
 
-	for i := 0; i < t.historicalStateRoots.Len(); i++ {
-		newHistoricalStatRoots.PushBack(t.historicalStateRoots.At(i))
-	}
-	newHistoricalStatRoots.PushBack(root)
+	s.invalidateCache(keys)
 
-	newTree := &tree{
-		root:                 newRootNode.value,
-		rootNode:             newRootNode,
-		database:             db,
-		previous:             root,
-		cachedBranches:       make(map[string]*proofHolder),
-		forest:               s.forest,
-		height:               t.height + 1,
-		historicalStateRoots: newHistoricalStatRoots,
-	}
-
-	err = s.updateHistoricalStates(t, newTree, batcher)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.UpdateTrieDB(batcher)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.UpdateKVDB(keys, values)
-	if err != nil {
-		return nil, err
-	}
-
-	s.forest.Add(newTree)
-
-	return newRootNode.value, nil
+	return nil
 }
 
 // GetHeight returns the Height of the SMT
@@ -943,7 +680,12 @@ func (s *SMT) GetHeight() int {
 	return s.height
 }
 
-func (s *SMT) insertIntoKeys(database databases.DAL, insert []byte, keys [][]byte, values [][]byte) ([][]byte, [][]byte, error) {
+// GetRoot returns the Root of the SMT
+func (s *SMT) GetRoot() *node {
+	return s.root
+}
+
+func (s *SMT) insertIntoKeys(insert []byte, keys [][]byte, values [][]byte) ([][]byte, [][]byte, error) {
 	// Initialize new slices, with capacity accounting for the inserted value
 	newKeys := make([][]byte, 0, len(keys)+1)
 	newValues := make([][]byte, 0, len(values)+1)
@@ -960,7 +702,7 @@ func (s *SMT) insertIntoKeys(database databases.DAL, insert []byte, keys [][]byt
 			newKeys = append(newKeys, keys[i:]...)
 
 			// Insert the old value and remaining values into newValues
-			oldVal, err := database.GetKVDB(insert)
+			oldVal, err := s.database.GetKVDB(insert)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -975,26 +717,26 @@ func (s *SMT) insertIntoKeys(database databases.DAL, insert []byte, keys [][]byt
 	}
 
 	// Did not find a spot for it in the slice, means it's place is at the end
-	oldVal, err := database.GetKVDB(insert)
+	oldVal, err := s.database.GetKVDB(insert)
 	if err != nil {
 		return nil, nil, err
 	}
 	return append(newKeys, insert), append(newValues, oldVal), nil
 }
 
-// UpdateAtomically updates the trie atomically and returns the state rootNode
+// UpdateAtomically updates the trie atomically and returns the state root
 // NOTE: This function assumes keys and values are sorted and haves indexes mapping to each other
-func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
+func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, height int) (*node, error) {
 	var err error
 	if rootNode.value != nil {
-		batcher.Put(rootNode.value, nil)
+		s.database.PutIntoBatcher(rootNode.value, nil)
 	}
 	if rootNode.key != nil {
-		keys, values, err = s.insertIntoKeys(database, rootNode.key, keys, values)
+		keys, values, err = s.insertIntoKeys(rootNode.key, keys, values)
 		if err != nil {
 			return nil, err
 		}
-		//s.invalidateCache([][]byte{rootNode.key})
+		s.invalidateCache([][]byte{rootNode.key})
 		rootNode.key = nil
 	}
 
@@ -1003,8 +745,8 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	}
 
 	// If we are at a leaf node, then we create said node
-	if len(keys) == 1 && rootNode.lChild == nil && rootNode.rChild == nil {
-		return s.ComputeRootNode(nil, nil, rootNode, keys, values, height, batcher), nil
+	if len(keys) == 1 && rootNode.Lchild == nil && rootNode.Rchild == nil {
+		return s.ComputeRootNode(nil, nil, rootNode, keys, values, height), nil
 	}
 
 	//We initialize the nodes as empty to prevent nil pointer exceptions later
@@ -1015,21 +757,21 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	lvalues, rvalues := values[:splitIndex], values[splitIndex:]
 
 	if len(lkeys) != len(lvalues) {
-		return nil, errors.New("left Key/Value Length mismatch")
+		return nil, errors.New("Left Key/Value Length mismatch")
 	}
 	if len(rkeys) != len(rvalues) {
-		return nil, errors.New("right Key/Value Length mismatch")
+		return nil, errors.New("Right Key/Value Length mismatch")
 	}
 
 	if len(rkeys) == 0 && len(lkeys) > 0 {
 		// if we only have keys belonging on the left side of the trie to update
-		return s.updateLeft(lnode, rnode, rootNode, lkeys, lvalues, height, batcher, database)
+		return s.updateLeft(lnode, rnode, rootNode, lkeys, lvalues, height)
 	} else if len(lkeys) == 0 && len(rkeys) > 0 {
 		// if we only have keys belonging on the right side of the trie to update
-		return s.updateRight(lnode, rnode, rootNode, rkeys, rvalues, height, batcher, database)
+		return s.updateRight(lnode, rnode, rootNode, rkeys, rvalues, height)
 	} else if len(lkeys) > 0 && len(rkeys) > 0 {
 		// update in parallel otherwise
-		return s.updateParallel(lnode, rnode, rootNode, keys, values, lkeys, rkeys, lvalues, rvalues, height, batcher, database)
+		return s.updateParallel(lnode, rnode, rootNode, keys, values, lkeys, rkeys, lvalues, rvalues, height)
 	}
 
 	return rootNode, nil
@@ -1037,21 +779,21 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 
 // GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
 // we just return the children
-func (n *node) GetandSetChildren(hashes [257]Root) (*node, *node) {
-	if n.lChild == nil {
-		n.lChild = newNode(nil, n.height-1)
+func (n *node) GetandSetChildren(hashes [257][]byte) (*node, *node) {
+	if n.Lchild == nil {
+		n.Lchild = newNode(nil, n.height-1)
 	}
-	if n.rChild == nil {
-		n.rChild = newNode(nil, n.height-1)
+	if n.Rchild == nil {
+		n.Rchild = newNode(nil, n.height-1)
 	}
 
-	return n.lChild, n.rChild
+	return n.Lchild, n.Rchild
 }
 
 // updateParallel updates both the left and right subtrees and computes a new rootNode
-func (s *SMT) updateParallel(lnode *node, rnode *node, rootNode *node, keys [][]byte, values [][]byte, lkeys [][]byte, rkeys [][]byte, lvalues [][]byte, rvalues [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
-	lupdate, err1 := s.UpdateAtomically(lnode, lkeys, lvalues, height-1, batcher, database)
-	rupdate, err2 := s.UpdateAtomically(rnode, rkeys, rvalues, height-1, batcher, database)
+func (s *SMT) updateParallel(lnode *node, rnode *node, rootNode *node, keys [][]byte, values [][]byte, lkeys [][]byte, rkeys [][]byte, lvalues [][]byte, rvalues [][]byte, height int) (*node, error) {
+	lupdate, err1 := s.UpdateAtomically(lnode, lkeys, lvalues, height-1)
+	rupdate, err2 := s.UpdateAtomically(rnode, rkeys, rvalues, height-1)
 
 	if err1 != nil {
 		return nil, err1
@@ -1060,42 +802,42 @@ func (s *SMT) updateParallel(lnode *node, rnode *node, rootNode *node, keys [][]
 		return nil, err2
 	}
 
-	return s.ComputeRootNode(lupdate, rupdate, rootNode, keys, values, height, batcher), nil
+	return s.ComputeRootNode(lupdate, rupdate, rootNode, keys, values, height), nil
 }
 
 // updateLeft updates the left subtrees and computes a new rootNode
-func (s *SMT) updateLeft(lnode *node, rnode *node, rootNode *node, lkeys [][]byte, lvalues [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
-	update, err := s.UpdateAtomically(lnode, lkeys, lvalues, height-1, batcher, database)
+func (s *SMT) updateLeft(lnode *node, rnode *node, rootNode *node, lkeys [][]byte, lvalues [][]byte, height int) (*node, error) {
+	update, err := s.UpdateAtomically(lnode, lkeys, lvalues, height-1)
 	if err != nil {
 		return nil, err
 	}
-	return s.ComputeRootNode(update, rnode, rootNode, lkeys, lvalues, height, batcher), nil
+	return s.ComputeRootNode(update, rnode, rootNode, lkeys, lvalues, height), nil
 }
 
 // updateRight updates the right subtrees and computes a new rootNode
-func (s *SMT) updateRight(lnode *node, rnode *node, rootNode *node, rkeys [][]byte, rvalues [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
-	update, err := s.UpdateAtomically(rnode, rkeys, rvalues, height-1, batcher, database)
+func (s *SMT) updateRight(lnode *node, rnode *node, rootNode *node, rkeys [][]byte, rvalues [][]byte, height int) (*node, error) {
+	update, err := s.UpdateAtomically(rnode, rkeys, rvalues, height-1)
 	if err != nil {
 		return nil, err
 	}
-	return s.ComputeRootNode(lnode, update, rootNode, rkeys, rvalues, height, batcher), nil
+	return s.ComputeRootNode(lnode, update, rootNode, rkeys, rvalues, height), nil
 }
 
 // ComputeRoot either returns a new leafNode or computes a new rootNode by hashing its children
-func (s *SMT) ComputeRootNode(lnode *node, rnode *node, oldRootNode *node, keys [][]byte, values [][]byte, height int, batcher databases.Batcher) *node {
+func (s *SMT) ComputeRootNode(lnode *node, rnode *node, oldRootNode *node, keys [][]byte, values [][]byte, height int) *node {
 	if lnode == nil && rnode == nil {
 		ln := newNode(ComputeCompactValue(keys[0], values[0], height, s.height), height)
 		ln.key = keys[0]
-		batcher.Put(ln.value, ln.key)
+		s.database.PutIntoBatcher(ln.value, ln.key)
 		return ln
 	} else {
-		return interiorNode(lnode, rnode, height, batcher)
+		return s.interiorNode(lnode, rnode, height)
 	}
 }
 
 // interiorNode computes the new node's Hash by hashing it's children's nodes, and also cleans up any default nodes
 // that are not needed
-func interiorNode(lnode *node, rnode *node, height int, batcher databases.Batcher) *node {
+func (s *SMT) interiorNode(lnode *node, rnode *node, height int) *node {
 
 	// If any nodes are default nodes, they are no longer needed and can be discarded
 	if lnode != nil && bytes.Equal(lnode.value, nil) {
@@ -1108,43 +850,48 @@ func interiorNode(lnode *node, rnode *node, height int, batcher databases.Batche
 	// Hashes the children depending on if they are nil or filled
 	if (lnode != nil) && (rnode != nil) {
 		in := newNode(HashInterNode(lnode.value, rnode.value), height)
-		in.lChild = lnode
-		in.rChild = rnode
-		batcher.Put(in.value, append(in.lChild.value, in.rChild.value...))
+		in.Lchild = lnode
+		in.Rchild = rnode
+		s.database.PutIntoBatcher(in.value, append(in.Lchild.value, in.Rchild.value...))
 		return in
 	} else if lnode == nil && rnode != nil {
 		in := newNode(HashInterNode(GetDefaultHashForHeight(height-1), rnode.value), height)
-		in.lChild = lnode
-		in.rChild = rnode
-		// if the left node is nil value of the rChild attached to key in DB will be prefaced by
+		in.Lchild = lnode
+		in.Rchild = rnode
+		// if the left node is nil value of the Rchild attached to key in DB will be prefaced by
 		// 4 bits with the first bit set
 		lFlag := make([]byte, 1)
 		utils.SetBit(lFlag, 0)
-		batcher.Put(in.value, append(lFlag, in.rChild.value...))
+		s.database.PutIntoBatcher(in.value, append(lFlag, in.Rchild.value...))
 		return in
 	} else if rnode == nil && lnode != nil {
 		in := newNode(HashInterNode(lnode.value, GetDefaultHashForHeight(height-1)), height)
-		in.lChild = lnode
-		in.rChild = rnode
+		in.Lchild = lnode
+		in.Rchild = rnode
 		rFlag := make([]byte, 1)
-		// if the right node is nil value of the lChild attached to key in DB will be prefaced by
+		// if the right node is nil value of the Lchild attached to key in DB will be prefaced by
 		// 4 unset bits
-		batcher.Put(in.value, append(rFlag, in.lChild.value...))
+		s.database.PutIntoBatcher(in.value, append(rFlag, in.Lchild.value...))
 		return in
 	}
 	return nil
 }
 
 // SafeClose is an exported function to safely close the databases
-func (s *SMT) SafeClose() {
+func (s *SMT) SafeClose() (error, error) {
+	err1, err2 := s.database.SafeClose()
+	if err1 != nil || err2 != nil {
+		return err1, err2
+	}
+	for i := 0; i < s.historicalStateRoots.Len(); i++ {
+		db := s.historicalStates[fmt.Sprintf("%v", s.historicalStateRoots.At(i))]
+		err1, err2 = db.SafeClose()
+		if err1 != nil || err2 != nil {
+			return err1, err2
+		}
+	}
 
-	// Purge calls eviction method, which closes the DB
-	s.forest.cache.Purge()
-	//s.forest.fullCache.Purge()
-}
-
-func (s *SMT) IsSnapshot(t *tree) bool {
-	return t.height%s.snapshotInterval == 0
+	return nil, nil
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.

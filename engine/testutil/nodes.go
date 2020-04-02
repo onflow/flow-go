@@ -41,7 +41,7 @@ import (
 func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
-	db, dbDir := unittest.TempBadgerDB(t)
+	db := unittest.TempBadgerDB(t)
 
 	state, err := UncheckedState(db, identities)
 	require.NoError(t, err)
@@ -75,7 +75,6 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 		State:  state,
 		Me:     me,
 		Net:    stub,
-		DBDir:  dbDir,
 	}
 }
 
@@ -181,15 +180,14 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	blocksStorage := storage.NewBlocks(node.DB)
 	payloadsStorage := storage.NewPayloads(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
-	eventsStorage := storage.NewEvents(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
 
-	dbDir := unittest.TempDBDir(t)
+	levelDB := unittest.TempLevelDB(t)
 
-	ls, err := ledger.NewTrieStorage(dbDir)
+	ls, err := ledger.NewTrieStorage(levelDB)
 	require.NoError(t, err)
 
 	_, err = bootstrap.BootstrapLedger(ls)
@@ -220,7 +218,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		blocksStorage,
 		payloadsStorage,
 		collectionsStorage,
-		eventsStorage,
 		computationEngine,
 		providerEngine,
 		execState,
@@ -233,10 +230,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		ExecutionEngine: computationEngine,
 		ReceiptsEngine:  providerEngine,
 		BadgerDB:        node.DB,
+		LevelDB:         levelDB,
 		VM:              vm,
 		State:           execState,
-		Ledger:          ls,
-		LevelDbDir:      dbDir,
 	}
 }
 

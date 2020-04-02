@@ -12,11 +12,11 @@ import (
 
 // BootstrapLedger adds the above root account to the ledger
 func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
-	view := state.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
+	view := state.NewView(state.LedgerGetRegister(ledger, ledger.LatestStateCommitment()))
 
 	BootstrapView(view)
 
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
+	newStateCommitment, err := state.CommitDelta(ledger, view.Delta())
 	if err != nil {
 		return nil, err
 	}

@@ -41,40 +41,39 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		ids = append(ids, id1, id2)
 		values = append(values, value1, value2)
 
-		unittest.RunWithTempDBDir(t, func(dir string) {
-			f, err := ledger.NewTrieStorage(dir)
-			defer f.Done()
-			require.NoError(t, err)
-			startState, err := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
-			require.NoError(t, err)
-			regTs, err := f.GetRegisterTouches(ids, startState)
-			require.NoError(t, err)
+		db := unittest.TempLevelDB(t)
 
-			chunk := &flow.Chunk{
-				ChunkBody: flow.ChunkBody{
-					CollectionIndex: uint(i),
-					StartState:      startState,
-					EventCollection: unittest.IdentifierFixture(),
-				},
-				Index: uint64(i),
-			}
-			chunks = append(chunks, chunk)
+		f, err := ledger.NewTrieStorage(db)
+		require.NoError(t, err)
+		startState, err := f.UpdateRegisters(ids, values)
+		require.NoError(t, err)
+		regTs, err := f.GetRegisterTouches(ids, startState)
+		require.NoError(t, err)
 
-			// creates a chunk state
-			chunkState := &flow.ChunkState{
-				ChunkID:   chunk.ID(),
-				Registers: flow.Ledger{},
-			}
-			chunkStates = append(chunkStates, chunkState)
-
-			// creates a chunk data pack for the chunk
-			chunkDataPack := flow.ChunkDataPack{
-				ChunkID:         chunk.ID(),
+		chunk := &flow.Chunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex: uint(i),
 				StartState:      startState,
-				RegisterTouches: regTs,
-			}
-			chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
-		})
+				EventCollection: unittest.IdentifierFixture(),
+			},
+			Index: uint64(i),
+		}
+		chunks = append(chunks, chunk)
+
+		// creates a chunk state
+		chunkState := &flow.ChunkState{
+			ChunkID:   chunk.ID(),
+			Registers: flow.Ledger{},
+		}
+		chunkStates = append(chunkStates, chunkState)
+
+		// creates a chunk data pack for the chunk
+		chunkDataPack := flow.ChunkDataPack{
+			ChunkID:         chunk.ID(),
+			StartState:      startState,
+			RegisterTouches: regTs,
+		}
+		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
 	}
 
 	payload := flow.Payload{

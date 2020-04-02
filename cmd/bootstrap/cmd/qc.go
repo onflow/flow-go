@@ -16,7 +16,7 @@ func constructGenesisQC(block *flow.Block, nodeInfosPub []NodeInfoPub, nodeInfos
 		log.Fatal().Err(err).Msg("generating genesis QC failed")
 	}
 
-	writeJSON(FilenameGenesisQC, qc)
+	writeJSON(filenameGenesisQC, qc)
 }
 
 func generateQCSignerData(nsPub []NodeInfoPub, nsPriv []NodeInfoPriv, dkg DKGDataPriv) run.SignerData {

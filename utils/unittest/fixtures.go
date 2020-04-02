@@ -245,21 +245,14 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
-		ra.Body.ExecutionResultID = id
+		ra.ResultApprovalBody.ExecutionResultID = id
 	}
 }
 
 func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultApproval {
-	attestation := flow.Attestation{
-		BlockID:           IdentifierFixture(),
-		ExecutionResultID: IdentifierFixture(),
-		ChunkIndex:        uint64(0),
-	}
-
 	approval := flow.ResultApproval{
-		Body: flow.ResultApprovalBody{
-			Attestation:          attestation,
-			ApproverID:           IdentifierFixture(),
+		ResultApprovalBody: flow.ResultApprovalBody{
+			ExecutionResultID:    IdentifierFixture(),
 			AttestationSignature: SignatureFixture(),
 			Spock:                nil,
 		},
@@ -329,7 +322,7 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 			panic(err)
 		}
 		id.StakingPubKey = stak.PublicKey()
-		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed())
+		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, generateRandomSeed())
 		if err != nil {
 			panic(err)
 		}
@@ -426,21 +419,13 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 
 // VerifiableChunk returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
-
-	guarantees := make([]*flow.CollectionGuarantee, 0)
-
-	var col flow.Collection
-
-	for i := 0; i <= int(chunkIndex); i++ {
-		col = CollectionFixture(1)
-		guarantee := col.Guarantee()
-		guarantees = append(guarantees, &guarantee)
-	}
+func VerifiableChunkFixture() *verification.VerifiableChunk {
+	coll := CollectionFixture(3)
+	guarantee := coll.Guarantee()
 
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
-		Guarantees: guarantees,
+		Guarantees: []*flow.CollectionGuarantee{&guarantee},
 	}
 	header := BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
@@ -450,25 +435,23 @@ func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 		Payload: payload,
 	}
 
-	chunks := make([]*flow.Chunk, 0)
+	chunk := flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: 0,
+			StartState:      StateCommitmentFixture(),
+		},
+		Index: 0,
+	}
 
-	var chunk flow.Chunk
-
-	for i := 0; i <= int(chunkIndex); i++ {
-		chunk = flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: uint(i),
-				StartState:      StateCommitmentFixture(),
-			},
-			Index: uint64(i),
-		}
-		chunks = append(chunks, &chunk)
+	chunkState := flow.ChunkState{
+		ChunkID:   chunk.ID(),
+		Registers: flow.Ledger{},
 	}
 
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID: block.ID(),
-			Chunks:  chunks,
+			Chunks:  flow.ChunkList{&chunk},
 		},
 	}
 
@@ -477,11 +460,12 @@ func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 	}
 
 	return &verification.VerifiableChunk{
-		ChunkIndex: chunkIndex,
+		ChunkIndex: chunk.Index,
 		EndState:   StateCommitmentFixture(),
 		Block:      &block,
 		Receipt:    &receipt,
-		Collection: &col,
+		Collection: &coll,
+		ChunkState: &chunkState,
 	}
 }
 

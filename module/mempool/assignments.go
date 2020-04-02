@@ -2,7 +2,7 @@
 package mempool
 
 import (
-	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -14,11 +14,11 @@ type Assignments interface {
 	Has(assignmentID flow.Identifier) bool
 
 	// ByID retrieves the chunk assignment from mempool based on provided ID
-	ByID(assignmentID flow.Identifier) (*chunkmodels.Assignment, error)
+	ByID(assignmentID flow.Identifier) (*chunkassignment.Assignment, error)
 
 	// Add will add the given Assignment to the memory pool; it will error if
 	// the Assignment is already in the memory pool.
-	Add(assignmentFingerprint flow.Identifier, assignment *chunkmodels.Assignment) error
+	Add(assignmentFingerprint flow.Identifier, assignment *chunkassignment.Assignment) error
 
 	// Rem will remove the given Assignment from the memory pool; it will
 	// return true if the Assignment was known and removed.
@@ -29,5 +29,5 @@ type Assignments interface {
 
 	// All will retrieve all Assignments that are currently in the memory pool
 	// as a slice.
-	All() []*chunkmodels.Assignment
+	All() []*chunkassignment.Assignment
 }

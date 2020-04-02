@@ -102,7 +102,7 @@ func (id *Identity) UnmarshalJSON(b []byte) error {
 		}
 	}
 	if m.NetworkPubKey != nil {
-		if id.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSA_P256, m.NetworkPubKey); err != nil {
+		if id.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSA_SECp256k1, m.NetworkPubKey); err != nil {
 			return err
 		}
 	}

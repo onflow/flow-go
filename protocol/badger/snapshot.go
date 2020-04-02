@@ -108,7 +108,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 			var identity flow.Identity
 			err = operation.RetrieveIdentity(nodeID, &identity)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve identity (%x): %w", nodeID, err)
+				return fmt.Errorf("could not retrieve role (%x): %w", nodeID, err)
 			}
 
 			// set the stake for the node

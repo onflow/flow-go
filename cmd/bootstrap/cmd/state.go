@@ -19,10 +19,12 @@ func genGenesisExecutionState() flow.StateCommitment {
 	if err != nil {
 		log.Fatal().Err(err).Msg("error encoding account 0 private key")
 	}
-	writeJSON(FilenameAccount0Priv, enc)
+	writeJSON(filenameAccount0Priv, enc)
 
-	dbpath := filepath.Join(flagOutdir, DirnameExecutionState)
-	stateCommitment, err := run.GenerateExecutionState(dbpath, account0Priv)
+	dbpath := filepath.Join(flagOutdir, dirnameExecutionState)
+	db := createLevelDB(dbpath)
+	defer db.SafeClose()
+	stateCommitment, err := run.GenerateExecutionState(db, account0Priv)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}

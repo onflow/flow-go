@@ -308,9 +308,9 @@ func (m *MiddlewareTestSuit) StopMiddlewares() {
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed
 func (m *MiddlewareTestSuit) generateNetworkingKey(seed []byte) crypto.PrivateKey {
-	s := make([]byte, crypto.KeyGenSeedMinLenECDSA_SECp256k1)
+	s := make([]byte, 100)
 	copy(s, seed)
-	prvKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, s)
+	prvKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, s)
 	require.NoError(m.Suite.T(), err)
 	return prvKey
 }

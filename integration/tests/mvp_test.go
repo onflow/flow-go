@@ -19,14 +19,11 @@ func TestMVP_Network(t *testing.T) {
 	t.Skip()
 
 	colNode := testnet.NewNodeConfig(flow.RoleCollection)
-	exeNode := testnet.NewNodeConfig(flow.RoleExecution)
 
 	net := []*testnet.NodeConfig{
 		colNode,
-		exeNode,
 		testnet.NewNodeConfig(flow.RoleConsensus),
-		testnet.NewNodeConfig(flow.RoleConsensus),
-		testnet.NewNodeConfig(flow.RoleConsensus),
+		testnet.NewNodeConfig(flow.RoleExecution),
 		testnet.NewNodeConfig(flow.RoleVerification),
 	}
 
@@ -35,7 +32,7 @@ func TestMVP_Network(t *testing.T) {
 
 	ctx := context.Background()
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(t, "mvp", net)
+	flowNetwork, err := testnet.PrepareFlowNetwork(ctx, t, "mvp", net)
 	require.NoError(t, err)
 
 	flowNetwork.Start(ctx)
@@ -46,7 +43,7 @@ func TestMVP_Network(t *testing.T) {
 	colNodeAPIPort := colContainer.Ports[testnet.ColNodeAPIPort]
 	require.NotEqual(t, "", colNodeAPIPort)
 
-	exeContainer, ok := flowNetwork.ContainerByID(exeNode.Identifier)
+	exeContainer, ok := flowNetwork.ContainerByID(colNode.Identifier)
 	require.True(t, ok)
 	exeNodeAPIPort := exeContainer.Ports[testnet.ExeNodeAPIPort]
 	require.NotEqual(t, "", exeNodeAPIPort)

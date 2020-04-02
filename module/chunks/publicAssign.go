@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/random"
-	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/model/chunkassignment"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -42,7 +42,7 @@ func NewPublicAssignment(alpha int) (*PublicAssignment, error) {
 
 // Assign receives identity list of verifier nodes, chunk lists and a random generator
 // it returns a chunk assignment
-func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkmodels.Assignment, error) {
+func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkassignment.Assignment, error) {
 	// computes a finger print for identities||chunks
 	ids := identities.NodeIDs()
 	hash, err := fingerPrint(ids, chunks, rng, p.alpha)
@@ -73,13 +73,13 @@ func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.Chun
 
 // chunkAssignment implements the business logic of the Public Chunk Assignment algorithm and returns an
 // assignment object for the chunks where each chunk is assigned to alpha-many verifier node from ids list
-func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkmodels.Assignment, error) {
+func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (*chunkassignment.Assignment, error) {
 	if len(ids) < alpha {
 		return nil, fmt.Errorf("not enough verification nodes for chunk assignment: %d, minumum should be %d", len(ids), alpha)
 	}
 
 	// creates an assignment
-	assignment := chunkmodels.NewAssignment()
+	assignment := chunkassignment.NewAssignment()
 
 	// permutes the entire slice
 	err := rng.Shuffle(len(ids), ids.Swap)
