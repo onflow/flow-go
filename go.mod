@@ -11,7 +11,7 @@ require (
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/ethereum/go-ethereum v1.9.9
-	github.com/gammazero/deque v0.0.0-20190521012701-46e4ffb7a622
+	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.0
 	github.com/golang/protobuf v1.3.2

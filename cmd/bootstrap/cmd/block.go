@@ -12,7 +12,7 @@ func constructGenesisBlock(stateComm flow.StateCommitment, nodes []NodeInfoPub, 
 	identityList := generateIdentityList(nodes, dkg)
 	block := run.GenerateRootBlock(identityList, seal)
 
-	writeJSON(filenameGenesisBlock, block)
+	writeJSON(FilenameGenesisBlock, block)
 
 	return block
 }

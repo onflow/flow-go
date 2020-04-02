@@ -1,10 +1,29 @@
-package cmd
+package bootstrap
+
+// TODO
+// This file copied from cmd/bootstrap, need to consolidate
 
 import (
 	"encoding/json"
 
 	"github.com/dapperlabs/flow-go/crypto"
 )
+
+func pubKeyToBytes(key crypto.PublicKey) []byte {
+	enc, err := key.Encode()
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+func privKeyToBytes(key crypto.PrivateKey) []byte {
+	enc, err := key.Encode()
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
 
 // EncodableNetworkPubKey wraps a public key and allows it to be JSON encoded and decoded. It is not defined in the
 // crypto package since the crypto package should not know about the different key types.
@@ -56,7 +75,7 @@ func (priv *EncodableNetworkPrivKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var err error
-	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.ECDSA_P256, bz)
+	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.ECDSA_SECp256k1, bz)
 	return err
 }
 

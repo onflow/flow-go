@@ -54,6 +54,12 @@ func (suite *Suite) SetupTest() {
 	suite.Require().Nil(err)
 }
 
+func (suite *Suite) TearDownTest() {
+	suite.reqNode.Done()
+	suite.colNode.Done()
+	suite.conNode.Done()
+}
+
 func TestProviderEngine(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
