@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -33,16 +34,16 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ generating internal private networking and staking keys")
-		internalNodesPub, internalNodesPriv := genNetworkAndStakingKeys(partnerNodes)
+		internalNodes := genNetworkAndStakingKeys(partnerNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ assembling network and staking keys")
-		stakingNodes := mergeNodeInfos(internalNodesPub, partnerNodes)
+		stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
 		writeJSON(FilenameNodeInfosPub, stakingNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ running DKG for consensus nodes")
-		dkgDataPub, dkgDataPriv := runDKG(filterConsensusNodes(stakingNodes))
+		dkgData := runDKG(filterConsensusNodes(stakingNodes))
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ generating private key for account 0 and generating genesis execution state")
@@ -50,12 +51,11 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis seal and genesis block")
-		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgDataPub)
+		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgData)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis QC")
-		constructGenesisQC(&block, filterConsensusNodes(stakingNodes), filterConsensusNodesPriv(internalNodesPriv),
-			dkgDataPriv)
+		constructGenesisQC(&block, filterConsensusNodes(stakingNodes), filterConsensusNodes(internalNodes), dkgData)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ computing collector clusters")
@@ -96,7 +96,7 @@ func init() {
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
 }
 
-func assemblePartnerNodes() []NodeInfoPub {
+func assemblePartnerNodes() []model.NodeInfoPub {
 	partners := readPartnerNodes()
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
 
@@ -104,7 +104,7 @@ func assemblePartnerNodes() []NodeInfoPub {
 	readJSON(flagPartnerStakes, &stakes)
 	log.Info().Msgf("read %v stakes for partner nodes", len(stakes))
 
-	var nodes []NodeInfoPub
+	var nodes []model.NodeInfoPub
 	for _, partner := range partners {
 		// validate every single partner node
 		nodeID := validateNodeID(partner.NodeID)
@@ -173,8 +173,8 @@ func readPartnerNodes() []PartnerNodeInfoPub {
 	return partners
 }
 
-func mergeNodeInfos(internalNodesPub, partnerNodes []NodeInfoPub) []NodeInfoPub {
-	nodes := append(internalNodesPub, partnerNodes...)
+func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
+	nodes := append(internalNodes, partnerNodes...)
 
 	// test for duplicate Addresses
 	addressLookup := make(map[string]struct{})

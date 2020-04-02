@@ -8,34 +8,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/crypto"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type NodeConfig struct {
-	Role    flow.Role
-	Address string
-	Stake   uint64
-}
+func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 
-type NodeInfoPriv struct {
-	Role           flow.Role
-	Address        string
-	NodeID         flow.Identifier
-	NetworkPrivKey EncodableNetworkPrivKey
-	StakingPrivKey EncodableStakingPrivKey
-}
-
-type NodeInfoPub struct {
-	Role          flow.Role
-	Address       string
-	NodeID        flow.Identifier
-	NetworkPubKey EncodableNetworkPubKey
-	StakingPubKey EncodableStakingPubKey
-	Stake         uint64
-}
-
-func genNetworkAndStakingKeys(partnerNodes []NodeInfoPub) ([]NodeInfoPub, []NodeInfoPriv) {
-	var nodeConfigs []NodeConfig
+	var nodeConfigs []model.NodeConfig
 	readJSON(flagConfig, &nodeConfigs)
 	nodes := len(nodeConfigs)
 	log.Info().Msgf("read %v node configurations", nodes)
@@ -57,19 +36,17 @@ func genNetworkAndStakingKeys(partnerNodes []NodeInfoPub) ([]NodeInfoPub, []Node
 	}
 	log.Info().Msgf("generated %v staking keys for nodes in config", nodes)
 
-	nodeInfosPub := make([]NodeInfoPub, 0, nodes)
-	nodeInfosPriv := make([]NodeInfoPriv, 0, nodes)
+	nodeInfos := make([]model.NodeInfo, 0, len(nodeConfigs))
 	for i, nodeConfig := range nodeConfigs {
 		log.Debug().Int("i", i).Str("address", nodeConfig.Address).Msg("assembling node information")
-		nodeInfoPriv, nodeInfoPub := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
-		nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
-		nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfoPriv.NodeID), nodeInfoPriv)
+
+		nodeInfo := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
+		nodeInfos = append(nodeInfos, nodeInfo)
+		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
 	}
 
 	log.Debug().Msgf("will calculated additionally needed collector nodes to have majority in each cluster")
-	additionalCollectorNodes := calcAdditionalCollectorNodes(uint(flagCollectionClusters), int(minNodesPerCluster),
-		nodeInfosPub, partnerNodes)
+	additionalCollectorNodes := calcAdditionalCollectorNodes(uint(flagCollectionClusters), int(minNodesPerCluster), nodeInfos, partnerNodes)
 
 	// for each cluster
 	i := 0
@@ -87,27 +64,27 @@ func genNetworkAndStakingKeys(partnerNodes []NodeInfoPub) ([]NodeInfoPub, []Node
 				log.Fatal().Err(err).Msg("cannot generate networking key")
 			}
 
-			nodeInfoPriv, nodeInfoPub := assembleNodeInfo(NodeConfig{
+			nodeInfo := assembleNodeInfo(model.NodeConfig{
 				Role:    flow.RoleCollection,
 				Address: fmt.Sprintf(flagGeneratedCollectorAddressTemplate, i),
 				Stake:   flagGeneratedCollectorStake,
 			}, networkKey, stakingKey)
-			nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
-			nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
+			nodeInfos = append(nodeInfos, nodeInfo)
 
 			i++
 		}
 	}
 	log.Debug().Msgf("generated %v additional internal nodes for collection clusters", i)
 
-	for _, nodeInfoPriv := range nodeInfosPriv {
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfoPriv.NodeID), nodeInfoPriv)
+	for _, nodeInfo := range nodeInfos {
+		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
 	}
 
-	return nodeInfosPub, nodeInfosPriv
+	return nodeInfos
 }
 
-func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.PrivateKey) (NodeInfoPriv, NodeInfoPub) {
+func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey) model.NodeInfo {
+
 	nodeID, err := flow.PublicKeyToID(stakingKey.PublicKey())
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate NodeID from PublicKey")
@@ -118,27 +95,19 @@ func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.Priva
 		Str("stakingPubKey", pubKeyToString(stakingKey.PublicKey())).
 		Msg("encoded public staking and network keys")
 
-	nodeInfoPriv := NodeInfoPriv{
+	nodeInfo := model.NodeInfo{
+		NodeID:         nodeID,
 		Role:           nodeConfig.Role,
 		Address:        nodeConfig.Address,
-		NodeID:         nodeID,
-		NetworkPrivKey: EncodableNetworkPrivKey{networkKey},
-		StakingPrivKey: EncodableStakingPrivKey{stakingKey},
+		Stake:          nodeConfig.Stake,
+		NetworkPrivKey: networkKey,
+		StakingPrivKey: stakingKey,
 	}
 
-	nodeInfoPub := NodeInfoPub{
-		Role:          nodeConfig.Role,
-		Address:       nodeConfig.Address,
-		NodeID:        nodeID,
-		NetworkPubKey: EncodableNetworkPubKey{networkKey.PublicKey()},
-		StakingPubKey: EncodableStakingPubKey{stakingKey.PublicKey()},
-		Stake:         nodeConfig.Stake,
-	}
-
-	return nodeInfoPriv, nodeInfoPub
+	return nodeInfo
 }
 
-func validateAddressesUnique(ns []NodeConfig) {
+func validateAddressesUnique(ns []model.NodeConfig) {
 	lookup := make(map[string]struct{})
 	for _, n := range ns {
 		if _, ok := lookup[n.Address]; ok {
@@ -150,7 +119,7 @@ func validateAddressesUnique(ns []NodeConfig) {
 // calcAdditionalCollectorNodes calculates how many additional internal collector nodes need to be generated based on
 // the number of clusters and the number of existing nodes. Returns a slice of integers, where each element represents
 // one cluster and the value represents how many nodes are needed in that cluster
-func calcAdditionalCollectorNodes(nClusters uint, minPerCluster int, internalNodes, partnerNodes []NodeInfoPub) []int {
+func calcAdditionalCollectorNodes(nClusters uint, minPerCluster int, internalNodes, partnerNodes []model.NodeInfo) []int {
 	partnerNodesByCluster := make([]map[flow.Identifier]struct{}, nClusters)
 	for i := range partnerNodesByCluster {
 		partnerNodesByCluster[i] = make(map[flow.Identifier]struct{})

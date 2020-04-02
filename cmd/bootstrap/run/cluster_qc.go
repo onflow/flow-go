@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -18,12 +19,7 @@ import (
 	protoBadger "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
-type ClusterSigner struct {
-	Identity       flow.Identity
-	StakingPrivKey crypto.PrivateKey
-}
-
-func GenerateClusterGenesisQC(ccSigners []ClusterSigner, block *flow.Block, clusterBlock *cluster.Block) (
+func GenerateClusterGenesisQC(ccSigners []bootstrap.NodeInfo, block *flow.Block, clusterBlock *cluster.Block) (
 	*model.QuorumCertificate, error) {
 
 	ps, db, err := NewProtocolState(block)

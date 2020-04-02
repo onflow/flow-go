@@ -94,7 +94,7 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 			KeyShare:   processor.privkey,
 			GroupIndex: processor.current,
 		})
-		dkgData.GroupPubKey = processor.pubgroupkey
+		dkgData.PubGroupKey = processor.pubgroupkey
 	}
 
 	return dkgData, nil

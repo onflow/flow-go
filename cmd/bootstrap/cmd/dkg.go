@@ -6,9 +6,11 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+//TODO remove all these in favour of model/bootstrap
 type DKGParticipantPriv struct {
 	NodeID              flow.Identifier
 	RandomBeaconPrivKey EncodableRandomBeaconPrivKey
@@ -31,7 +33,7 @@ type DKGDataPub struct {
 	Participants []DKGParticipantPub
 }
 
-func runDKG(nodes []NodeInfoPub) (DKGDataPub, DKGDataPriv) {
+func runDKG(nodes []model.NodeInfo) model.DKGData {
 	n := len(nodes)
 
 	log.Info().Msgf("read %v node infos for DKG", n)
@@ -43,45 +45,15 @@ func runDKG(nodes []NodeInfoPub) (DKGDataPub, DKGDataPriv) {
 	}
 	log.Info().Msgf("finished running DKG")
 
-	dkgDataPriv := DKGDataPriv{
-		Participants: make([]DKGParticipantPriv, 0, n),
-		PubGroupKey:  EncodableRandomBeaconPubKey{dkgData.PubGroupKey},
-	}
-	dkgDataPub := DKGDataPub{
-		Participants: make([]DKGParticipantPub, 0, n),
-		PubGroupKey:  EncodableRandomBeaconPubKey{dkgData.PubGroupKey},
-	}
-	for i, nodeInfo := range nodes {
-		log.Debug().Int("i", i).Str("nodeId", nodeInfo.NodeID.String()).Msg("assembling dkg data")
-		partPriv, partPub := assembleDKGParticipant(nodeInfo, dkgData.Participants[i])
-		dkgDataPriv.Participants = append(dkgDataPriv.Participants, partPriv)
-		dkgDataPub.Participants = append(dkgDataPub.Participants, partPub)
-		writeJSON(fmt.Sprintf(FilenameRandomBeaconPriv, partPriv.NodeID), partPriv)
+	for i, participant := range dkgData.Participants {
+		nodeID := participant.NodeID
+
+		log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
+
+		writeJSON(fmt.Sprintf(FilenameRandomBeaconPriv, nodeID), participant.Private())
 	}
 
-	writeJSON(FilenameDKGDataPub, dkgDataPub)
+	writeJSON(FilenameDKGDataPub, dkgData.Public())
 
-	return dkgDataPub, dkgDataPriv
-}
-
-func assembleDKGParticipant(info NodeInfoPub, part run.DKGParticipant) (DKGParticipantPriv, DKGParticipantPub) {
-	pub := pubKeyToString(part.Priv.PublicKey())
-
-	log.Debug().
-		Str("pub", pub).
-		Msg("participant's encoded public DKG key")
-
-	partPriv := DKGParticipantPriv{
-		NodeID:              info.NodeID,
-		RandomBeaconPrivKey: EncodableRandomBeaconPrivKey{part.Priv},
-		GroupIndex:          part.GroupIndex,
-	}
-
-	partPub := DKGParticipantPub{
-		NodeID:             info.NodeID,
-		RandomBeaconPubKey: EncodableRandomBeaconPubKey{part.Priv.PublicKey()},
-		GroupIndex:         part.GroupIndex,
-	}
-
-	return partPriv, partPub
+	return dkgData
 }

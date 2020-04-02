@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -28,26 +29,26 @@ func TestClusterFor(t *testing.T) {
 }
 
 func TestCalcInternalCollectorNodes(t *testing.T) {
-	internalNodes := []NodeInfoPub{
-		NodeInfoPub{
+	internalNodes := []model.NodeInfo{
+		{
 			Role:   flow.RoleConsensus, // should be ignored
 			NodeID: flow.MakeID(1),
 		},
-		NodeInfoPub{
+		{
 			Role:   flow.RoleCollection,
 			NodeID: flow.MakeID(3),
 		},
 	}
-	partnerNodes := []NodeInfoPub{
-		NodeInfoPub{
+	partnerNodes := []model.NodeInfo{
+		{
 			Role:   flow.RoleConsensus, // should be ignored
 			NodeID: flow.MakeID(2),
 		},
-		NodeInfoPub{
+		{
 			Role:   flow.RoleCollection,
 			NodeID: flow.MakeID(4),
 		},
-		NodeInfoPub{
+		{
 			Role:   flow.RoleCollection,
 			NodeID: flow.MakeID(5),
 		},

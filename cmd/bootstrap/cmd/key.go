@@ -17,21 +17,7 @@ var (
 	flagStakingSeed []byte
 )
 
-type PartnerNodeInfoPriv struct {
-	Role           flow.Role
-	Address        string
-	NodeID         flow.Identifier
-	NetworkPrivKey EncodableNetworkPrivKey
-	StakingPrivKey EncodableStakingPrivKey
-}
-
-type PartnerNodeInfoPub struct {
-	Role          flow.Role
-	Address       string
-	NodeID        flow.Identifier
-	NetworkPubKey EncodableNetworkPubKey
-	StakingPubKey EncodableStakingPubKey
-}
+// TODO can these be replaced by just NodeInfo?
 
 // keyCmd represents the key command
 var keyCmd = &cobra.Command{
@@ -58,12 +44,13 @@ var keyCmd = &cobra.Command{
 		log.Info().Msg("generated staking key")
 
 		log.Debug().Str("address", flagAddress).Msg("assembling node information")
-		priv, pub := assembleNodeInfo(NodeConfig{role, flagAddress, 0}, networkKeys[0],
+		nodeInfo := assembleNodeInfo(NodeConfig{role, flagAddress, 0}, networkKeys[0],
 			stakingKeys[0])
 
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, priv.NodeID), PartnerNodeInfoPriv(priv))
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPub, pub.NodeID),
-			PartnerNodeInfoPub{pub.Role, pub.Address, pub.NodeID, pub.NetworkPubKey, pub.StakingPubKey})
+		//TODO is this ok to not have partner-specific models? seems they are the same
+		// only difference is partnerpublic does not have stake
+		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
+		writeJSON(fmt.Sprintf(FilenameNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 	},
 }
 

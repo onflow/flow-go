@@ -7,9 +7,17 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// NodeConfig contains configuration information used as input to the
+// bootstrap process.
+type NodeConfig struct {
+	Role    flow.Role
+	Address string
+	Stake   uint64
+}
+
 // Defines the canonical structure for private node info.
 // NOTE: should be used only for encoding.
-type nodeInfoPriv struct {
+type NodeInfoPriv struct {
 	Role           flow.Role
 	Address        string
 	NodeID         flow.Identifier
@@ -19,7 +27,7 @@ type nodeInfoPriv struct {
 
 // Defines the canonical structure for public node info.
 // NOTE: should be used only for encoding.
-type nodeInfoPub struct {
+type NodeInfoPub struct {
 	Role          flow.Role
 	Address       string
 	NodeID        flow.Identifier
@@ -28,20 +36,26 @@ type nodeInfoPub struct {
 	StakingPubKey EncodableStakingPubKey
 }
 
-// NodeInfo contains configuration information for a node, including private
-// information. This is used during the bootstrapping process to represent each
-// node. When writing node information to disk, use `Public` or `Private`.
+// NodeInfo contains information for a node, including private information.
+// This is used during the bootstrapping process to represent each node.
+// When writing node information to disk, use `Public` or `Private`.
 type NodeInfo struct {
 	NodeID         flow.Identifier
 	Role           flow.Role
 	Address        string
 	Stake          uint64
+	NetworkPubKey  crypto.PublicKey
 	NetworkPrivKey crypto.PrivateKey
+	StakingPubKey  crypto.PublicKey
 	StakingPrivKey crypto.PrivateKey
 }
 
-func (node NodeInfo) Private() nodeInfoPriv {
-	return nodeInfoPriv{
+func (node NodeInfo) HasPrivateKeys() bool {
+	return node.NetworkPrivKey != nil && node.StakingPrivKey != nil
+}
+
+func (node NodeInfo) Private() NodeInfoPriv {
+	return NodeInfoPriv{
 		Role:           node.Role,
 		Address:        node.Address,
 		NodeID:         node.NodeID,
@@ -51,8 +65,8 @@ func (node NodeInfo) Private() nodeInfoPriv {
 }
 
 // Public returns the canonical public structure
-func (node NodeInfo) Public() nodeInfoPub {
-	return nodeInfoPub{
+func (node NodeInfo) Public() NodeInfoPub {
+	return NodeInfoPub{
 		Role:          node.Role,
 		Address:       node.Address,
 		NodeID:        node.NodeID,
@@ -87,15 +101,69 @@ func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
 	}
 }
 
+// Defines the canonical structure for private node DKG information.
+// NOTE: should only be used for encoding.
+type DKGParticipantPriv struct {
+	NodeID              flow.Identifier
+	RandomBeaconPrivKey EncodableRandomBeaconPrivKey
+	GroupIndex          int
+}
+
+// Defines the canonical structure for public node DKG information.
+// NOTE: should only be used for encoding.
+type DKGParticipantPub struct {
+	NodeID             flow.Identifier
+	RandomBeaconPubKey EncodableRandomBeaconPubKey
+	GroupIndex         int
+}
+
 type DKGParticipant struct {
 	NodeID     flow.Identifier
 	KeyShare   crypto.PrivateKey
 	GroupIndex int
 }
 
+// Private returns the canonical private structure.
+func (part *DKGParticipant) Private() DKGParticipantPriv {
+	return DKGParticipantPriv{
+		NodeID:              part.NodeID,
+		RandomBeaconPrivKey: EncodableRandomBeaconPrivKey{PrivateKey: part.KeyShare},
+		GroupIndex:          part.GroupIndex,
+	}
+}
+
+// Public returns the canonical public structure.
+func (part *DKGParticipant) Public() DKGParticipantPub {
+	return DKGParticipantPub{
+		NodeID:             part.NodeID,
+		RandomBeaconPubKey: EncodableRandomBeaconPubKey{PublicKey: part.KeyShare.PublicKey()},
+		GroupIndex:         part.GroupIndex,
+	}
+}
+
 type DKGData struct {
-	GroupPubKey  crypto.PublicKey
+	PubGroupKey  crypto.PublicKey
 	Participants []DKGParticipant
+}
+
+type DKGDataPub struct {
+	PubGroupKey  EncodableRandomBeaconPubKey
+	Participants []DKGParticipantPub
+}
+
+// Public returns the canonical public structure.
+func (dkg *DKGData) Public() DKGDataPub {
+
+	pub := DKGDataPub{
+		PubGroupKey:  EncodableRandomBeaconPubKey{PublicKey: dkg.PubGroupKey},
+		Participants: make([]DKGParticipantPub, 0, len(dkg.Participants)),
+	}
+
+	for _, part := range dkg.Participants {
+		pub.Participants = append(pub.Participants, part.Public())
+	}
+
+	return pub
 }
 
 func (dkg *DKGData) ForHotStuff() *hotstuff.DKGPublicData {
@@ -110,7 +178,7 @@ func (dkg *DKGData) ForHotStuff() *hotstuff.DKGPublicData {
 	}
 
 	return &hotstuff.DKGPublicData{
-		GroupPubKey:           dkg.GroupPubKey,
+		GroupPubKey:           dkg.PubGroupKey,
 		IdToDKGParticipantMap: participantLookup,
 	}
 }

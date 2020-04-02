@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -82,18 +83,8 @@ func privKeyToBytes(key crypto.PrivateKey) []byte {
 	return enc
 }
 
-func filterConsensusNodes(nodes []NodeInfoPub) []NodeInfoPub {
-	c := make([]NodeInfoPub, 0)
-	for _, node := range nodes {
-		if node.Role == flow.RoleConsensus {
-			c = append(c, node)
-		}
-	}
-	return c
-}
-
-func filterConsensusNodesPriv(nodes []NodeInfoPriv) []NodeInfoPriv {
-	c := make([]NodeInfoPriv, 0)
+func filterConsensusNodes(nodes []model.NodeInfo) []model.NodeInfo {
+	c := make([]model.NodeInfo, 0)
 	for _, node := range nodes {
 		if node.Role == flow.RoleConsensus {
 			c = append(c, node)
