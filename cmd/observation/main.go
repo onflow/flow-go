@@ -81,7 +81,7 @@ func main() {
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// create a finalizer that will handling updating the protocol
+			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := followerfinalizer.NewFinalizer(node.DB)
 
