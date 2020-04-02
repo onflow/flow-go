@@ -43,6 +43,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 
 		unittest.RunWithTempDBDir(t, func(dir string) {
 			f, err := ledger.NewTrieStorage(dir)
+			defer f.Done()
 			require.NoError(t, err)
 			startState, err := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
 			require.NoError(t, err)
