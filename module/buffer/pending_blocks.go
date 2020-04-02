@@ -2,14 +2,13 @@ package buffer
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
 )
 
 type PendingBlocks struct {
 	backend *backend
 }
 
-func NewPendingBlocks() module.PendingBlockBuffer {
+func NewPendingBlocks() *PendingBlocks {
 	b := &PendingBlocks{backend: newBackend()}
 	return b
 }
