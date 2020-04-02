@@ -12,6 +12,7 @@ import (
 // Any implementation of IngestEngine should implement following interfaces:
 // * Engine
 // * FinalizationConsumer
+// * ReadyDoneAware
 type IngestEngine interface {
 	// Engine related methods
 	//
@@ -53,4 +54,9 @@ type IngestEngine interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnDoubleProposeDetected(*model.Block, *model.Block)
+
+	// ReadyDoneAware
+	//
+	Ready() <-chan struct{}
+	Done() <-chan struct{}
 }

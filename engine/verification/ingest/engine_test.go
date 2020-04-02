@@ -133,9 +133,9 @@ func (suite *TestSuite) SetupTest() {
 }
 
 // TestNewEngine verifies the establishment of the network registration upon
-// creation of an instance of verifier.Engine using the New method
+// creation of an instance of verifier.IngestEngine using the New method
 // It also returns an instance of new engine to be used in the later tests
-func (suite *TestSuite) TestNewEngine() *ingest.Engine {
+func (suite *TestSuite) TestNewEngine() *ingest.IngestEngine {
 	e, err := ingest.New(zerolog.Logger{},
 		suite.net,
 		suite.state,
