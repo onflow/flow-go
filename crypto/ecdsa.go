@@ -30,7 +30,7 @@ func bitsToBytes(bits int) int {
 func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
 	r, s, err := goecdsa.Sign(rand.Reader, sk.goPrKey, h)
 	if err != nil {
-		return nil, errors.New("ECDSA Signature has failed")
+		return nil, fmt.Errorf("ECDSA Sign has failed: %w", err)
 	}
 	rBytes := r.Bytes()
 	sBytes := s.Bytes()
@@ -127,7 +127,7 @@ func (a *ECDSAalgo) decodePrivateKey(der []byte) (PrivateKey, error) {
 	if a.algo == ECDSA_P256 {
 		sk, err := x509.ParseECPrivateKey(der)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("decode private key failed: %w", err)
 		}
 		return &PrKeyECDSA{a, sk}, nil
 	}
@@ -160,7 +160,7 @@ func (a *ECDSAalgo) decodePublicKey(der []byte) (PublicKey, error) {
 	if a.algo == ECDSA_P256 {
 		i, err := x509.ParsePKIXPublicKey(der)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("decode public key failed: %w", err)
 		}
 		goecdsaPk := i.(*goecdsa.PublicKey)
 		return &PubKeyECDSA{

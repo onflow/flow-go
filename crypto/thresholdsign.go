@@ -97,12 +97,12 @@ func (s *ThresholdSigner) SignShare() (Signature, error) {
 	// sign
 	share, err := s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
 	// add the node own signature
 	valid, _, err := s.AddSignatureShare(s.currentIndex, share)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
 	if !valid {
 		return nil, errors.New("The current node private and public keys do not match")
@@ -149,7 +149,7 @@ func (s *ThresholdSigner) enoughShares() bool {
 func (s *ThresholdSigner) AddSignatureShare(orig int, share Signature) (bool, bool, error) {
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
-		return false, s.enoughShares(), err
+		return false, s.enoughShares(), fmt.Errorf("add signature share failed: %w", err)
 	}
 	// check if share is valid and threshold is not reached
 	if verif && !s.enoughShares() {
@@ -206,7 +206,7 @@ func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	// Verify the computed signature
 	verif, err := s.VerifyThresholdSignature(thresholdSignature)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("verify threshold signature failed: %w", err)
 	}
 	if !verif {
 		return nil, errors.New(

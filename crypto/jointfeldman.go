@@ -4,6 +4,7 @@ package crypto
 
 import (
 	"errors"
+	"fmt"
 )
 
 // Implements Joint Feldman protocol using BLS set up on BLS381 curve.
@@ -50,14 +51,14 @@ func (s *JointFeldmanState) StartDKG(seed []byte) error {
 			s.fvss[i].running = false
 			err := s.fvss[i].StartDKG(seed)
 			if err != nil {
-				return errors.New("error when starting dkg")
+				return fmt.Errorf("error when starting dkg: %w", err)
 			}
 		}
 	}
 	s.fvss[s.currentIndex].running = false
 	err := s.fvss[s.currentIndex].StartDKG(seed)
 	if err != nil {
-		return err
+		return fmt.Errorf("error when starting dkg: %w", err)
 	}
 	s.jointRunning = true
 	return nil
@@ -72,7 +73,7 @@ func (s *JointFeldmanState) NextTimeout() error {
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].NextTimeout()
 		if err != nil {
-			return errors.New("next timeout has failed")
+			return fmt.Errorf("next timeout has failed: %w", err)
 		}
 	}
 	return nil
@@ -147,7 +148,7 @@ func (s *JointFeldmanState) ReceiveDKGMsg(orig int, msg []byte) error {
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].ReceiveDKGMsg(orig, msg)
 		if err != nil {
-			return errors.New("receive dkg message has failed")
+			return fmt.Errorf("handle message has failed: %w", err)
 		}
 	}
 	return nil
@@ -166,7 +167,7 @@ func (s *JointFeldmanState) Disqualify(node int) error {
 	for i := 0; i < s.size; i++ {
 		err := s.fvss[i].Disqualify(node)
 		if err != nil {
-			return errors.New("disqualif has failed")
+			return fmt.Errorf("disqualif has failed: %w", err)
 		}
 	}
 	return nil
