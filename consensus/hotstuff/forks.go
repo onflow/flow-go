@@ -37,6 +37,7 @@ type Forks interface {
 	// MakeForkChoice prompts the ForkChoice to generate a fork choice for the
 	// current view `curView`. The fork choice is a qc that should be used for
 	// building the primaries block.
+	// It returns a qc and the block that the qc is pointing to.
 	//
 	// PREREQUISITE:
 	// ForkChoice cannot generate ForkChoices retroactively for past views.
@@ -49,7 +50,7 @@ type Forks interface {
 	// is smaller than the view of any qc ForkChoice has seen.
 	// Note that tracking the view of the newest qc is for safety purposes
 	// and _independent_ of the fork-choice rule.
-	MakeForkChoice(curView uint64) (*model.Block, *model.QuorumCertificate, error)
+	MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error)
 }
 
 type ForksReader interface {
