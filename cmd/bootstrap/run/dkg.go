@@ -104,14 +104,12 @@ type message struct {
 
 // Send a message from one node to another
 func (proc *localDKGProcessor) Send(dest int, data []byte) {
-	log.Debug().Str("data", fmt.Sprintf("%x", data)).Msgf("%d Sending to %d", proc.current, dest)
 	newMsg := &message{proc.current, data}
 	proc.chans[dest] <- newMsg
 }
 
 // Broadcast a message from one node to all nodes
 func (proc *localDKGProcessor) Broadcast(data []byte) {
-	log.Debug().Str("data", fmt.Sprintf("%x", data)).Msgf("%d Broadcasting", proc.current)
 	newMsg := &message{proc.current, data}
 	for i := 0; i < len(proc.chans); i++ {
 		if i != proc.current {
@@ -122,12 +120,10 @@ func (proc *localDKGProcessor) Broadcast(data []byte) {
 
 // Blacklist a node
 func (proc *localDKGProcessor) Blacklist(node int) {
-	log.Debug().Msgf("%d wants to blacklist %d", proc.current, node)
 }
 
 // FlagMisbehavior flags a node for misbehaviour
 func (proc *localDKGProcessor) FlagMisbehavior(node int, logData string) {
-	log.Debug().Msgf("%d flags a misbehavior from %d: %s", proc.current, node, logData)
 }
 
 // dkgRunChan simulates processing incoming messages by a node
@@ -136,7 +132,6 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 	for {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
-			log.Debug().Str("data", fmt.Sprintf("%x", newMsg.data)).Msgf("%d Receiving from %d", proc.current, newMsg.orig)
 			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
 			if err != nil {
 				log.Fatal().Err(err).Msg("failed to receive DKG mst")
@@ -145,19 +140,16 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 		case <-time.After(1 * time.Second):
 			switch phase {
 			case 0:
-				log.Debug().Msgf("%d shares phase ended", proc.current)
 				err := proc.dkg.NextTimeout()
 				if err != nil {
 					log.Fatal().Err(err).Msg("failed to wait for next timeout")
 				}
 			case 1:
-				log.Debug().Msgf("%d complaints phase ended", proc.current)
 				err := proc.dkg.NextTimeout()
 				if err != nil {
 					log.Fatal().Err(err).Msg("failed to wait for next timeout")
 				}
 			case 2:
-				log.Debug().Msgf("%d dkg ended", proc.current)
 				privkey, pubgroupkey, _, err := proc.dkg.EndDKG()
 				if err != nil {
 					log.Fatal().Err(err).Msg("end dkg error should be nit")

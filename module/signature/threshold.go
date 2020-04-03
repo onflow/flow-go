@@ -6,14 +6,44 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
+// ThresholdVerifier is a verifier capable of verifying threshold signature
+// shares and verifying a threshold signature against a group public key.
+// *Important*: the threshold verifier can only verify signatures for
+// messages of one specific context (specified via the KMAC tag at construction).
+type ThresholdVerifier struct {
+	hasher crypto.Hasher
+}
+
+// NewThresholdVerifier creates a new threshold verifier. *Important*: the
+// threshold provider can only verify signatures in the context of the provided
+// KMAC tag.
+func NewThresholdVerifier(tag string) *ThresholdVerifier {
+	tv := &ThresholdVerifier{
+		hasher: crypto.NewBLS_KMAC(tag),
+	}
+	return tv
+}
+
+// Verify will verify the provided signture share against the message and the provided
+// public key share.
+func (tv *ThresholdVerifier) Verify(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
+	return key.Verify(sig, msg, tv.hasher)
+}
+
+// VerifyThreshold will verify the given threshold signature against the given message and the given
+// group public key.
+func (tv *ThresholdVerifier) VerifyThreshold(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
+	return key.Verify(sig, msg, tv.hasher)
+}
+
 // ThresholdProvider is a signer capable of generating and verifying signature
 // shares, as well as reconstructing a threshold signature from shares and
 // verifying it against a group public key.
 // *Important*: the threshold provider can only create and verify signatures in
 // the context of the provided KMAC tag.
 type ThresholdProvider struct {
-	hasher crypto.Hasher
-	priv   crypto.PrivateKey
+	*ThresholdVerifier
+	priv crypto.PrivateKey
 }
 
 // NewThresholdProvider creates new threshold provider, using the given private
@@ -21,8 +51,8 @@ type ThresholdProvider struct {
 // can only create and verify signatures in the context of the provided KMAC tag.
 func NewThresholdProvider(tag string, priv crypto.PrivateKey) *ThresholdProvider {
 	tp := &ThresholdProvider{
-		hasher: crypto.NewBLS_KMAC(tag),
-		priv:   priv,
+		ThresholdVerifier: NewThresholdVerifier(tag),
+		priv:              priv,
 	}
 	return tp
 }
@@ -31,12 +61,6 @@ func NewThresholdProvider(tag string, priv crypto.PrivateKey) *ThresholdProvider
 // share.
 func (tp *ThresholdProvider) Sign(msg []byte) (crypto.Signature, error) {
 	return tp.priv.Sign(msg, tp.hasher)
-}
-
-// Verify will verify the provided signture share against the message and the provided
-// public key share.
-func (tp *ThresholdProvider) Verify(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
-	return key.Verify(sig, msg, tp.hasher)
 }
 
 // Combine will combine the provided public signature shares to attempt and reconstruct a threshold
@@ -62,10 +86,4 @@ func (tp *ThresholdProvider) Combine(size uint, shares []crypto.Signature, indic
 	}
 
 	return thresSig, nil
-}
-
-// VerifyThreshold will verify the given threshold signature against the given message and the given
-// group public key.
-func (tp *ThresholdProvider) VerifyThreshold(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
-	return key.Verify(sig, msg, tp.hasher)
 }

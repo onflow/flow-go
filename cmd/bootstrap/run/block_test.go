@@ -2,7 +2,6 @@ package run
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,7 +18,6 @@ func TestBlockEncodingJSON(t *testing.T) {
 	block.Seals = []*flow.Seal{}
 	bz, err := json.Marshal(block)
 	assert.NoError(t, err)
-	fmt.Printf("%v", block)
 	var actual flow.Block
 	err = json.Unmarshal(bz, &actual)
 	assert.NoError(t, err)

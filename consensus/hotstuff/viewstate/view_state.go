@@ -21,7 +21,7 @@ type ViewState struct {
 }
 
 // New creates a new ViewState instance
-func New(protocolState protocol.State, dkgState dkg.State, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
+func New(protocolState protocol.State, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
 	// finding all consensus members
 	allNodes, err := protocolState.Final().Identities(consensusMembersFilter)
 	if err != nil {
@@ -37,7 +37,6 @@ func New(protocolState protocol.State, dkgState dkg.State, myID flow.Identifier,
 		myID:                   myID,
 		consensusMembersFilter: consensusMembersFilter,
 		allNodes:               allNodes,
-		dkgState:               dkgState,
 	}, nil
 }
 

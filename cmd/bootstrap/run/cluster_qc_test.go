@@ -19,6 +19,7 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
+		unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus)),
 	}
 	for _, participant := range participants {
 		block.Identities = append(block.Identities, participant.Identity())

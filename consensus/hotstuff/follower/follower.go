@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -38,14 +37,13 @@ type FollowerLogic struct {
 func NewFollowerLogic(
 	me module.Local,
 	protocolState protocol.State,
-	dkgState dkg.State,
 	trustedRoot *forks.BlockQC,
 	verifier hotstuff.Verifier,
 	finalizationCallback module.Finalizer,
 	notifier notifications.FinalizationConsumer,
 	log zerolog.Logger,
 ) (*FollowerLogic, error) {
-	viewState, err := viewstate.New(protocolState, dkgState, me.NodeID(), filter.HasRole(flow.RoleConsensus))
+	viewState, err := viewstate.New(protocolState, me.NodeID(), filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
 	}

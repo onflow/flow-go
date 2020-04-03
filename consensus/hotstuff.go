@@ -21,7 +21,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
@@ -44,8 +43,7 @@ func NewHotstuff(log zerolog.Logger, state protocol.State, me module.Local, buil
 
 	// initialize view state
 	// TODO: inject real DKG public data
-	var dkgState dkg.State
-	viewState, err := viewstate.New(state, dkgState, me.NodeID(), nodeSet)
+	viewState, err := viewstate.New(state, me.NodeID(), nodeSet)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize view state: %w", err)
 	}

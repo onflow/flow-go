@@ -101,7 +101,7 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 		signers[i] = signer
 
 		// create view state
-		vs, err := viewstate.New(ps, nil, participant.NodeID, selector)
+		vs, err := viewstate.New(ps, participant.NodeID, selector)
 		if err != nil {
 			return nil, nil, err
 		}

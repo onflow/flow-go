@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -30,7 +29,6 @@ type HotStuffFollower struct {
 func New(
 	me module.Local,
 	protocolState protocol.State,
-	dkgState dkg.State,
 	trustedRootBlock *flow.Header,
 	rootBlockQC *model.QuorumCertificate,
 	verifier hotstuff.Verifier,
@@ -39,7 +37,7 @@ func New(
 	log zerolog.Logger,
 ) (*HotStuffFollower, error) {
 	trustedRoot := unsafeToBlockQC(trustedRootBlock, rootBlockQC)
-	followerLogic, err := NewFollowerLogic(me, protocolState, dkgState, trustedRoot, verifier, finalizationCallback, notifier, log)
+	followerLogic, err := NewFollowerLogic(me, protocolState, trustedRoot, verifier, finalizationCallback, notifier, log)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
 	}

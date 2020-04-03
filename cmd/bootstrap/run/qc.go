@@ -119,7 +119,7 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 		signers[i] = signer
 
 		// create view state
-		vs, err := viewstate.New(ps, participantData.DKGState, participant.NodeID, selector)
+		vs, err := viewstate.New(ps, participant.NodeID, selector)
 		if err != nil {
 			return nil, nil, err
 		}

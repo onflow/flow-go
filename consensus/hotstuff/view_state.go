@@ -2,7 +2,6 @@ package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/dkg"
 )
 
 type ViewState interface {
@@ -15,10 +14,6 @@ type ViewState interface {
 
 	// IsSelfLeaderForView checks whether we are the leader for the given view.
 	IsSelfLeaderForView(view uint64) bool
-
-	// DKGState returns a wrapper API around DKG state information.
-	// NOTE: as we currently run with a single epoch, this never changes.
-	DKGState() dkg.State
 
 	// AllConsensusParticipants returns a list of the identities of all
 	// participants to the consensus algorithm.

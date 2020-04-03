@@ -8,16 +8,18 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	model "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
@@ -26,6 +28,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/signature"
 	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -113,13 +116,21 @@ func main() {
 			// state when the follower detects newly finalized blocks
 			final := followerfinalizer.NewFinalizer(node.DB)
 
+			// initialize the staking & beacon verifiers, signature joiner
+			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			merger := signature.NewCombiner()
+
+			// define the node set that is valid as signers
+			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+
 			// TODO use a noop notification consumer for now
 			noop := notifications.NoopConsumer{}
 
-			// TODO: initialize hotstuff verifier
-			var verifier hotstuff.Verifier
-
-			core, err := follower.New(node.Me, node.State, node.DKGState, &node.GenesisBlock.Header, node.GenesisQC, verifier, final, noop, node.Logger)
+			core, err := follower.New(node.Me, node.State, &node.GenesisBlock.Header, node.GenesisQC, verifier, final, noop, node.Logger)
 			if err != nil {
 				//return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower

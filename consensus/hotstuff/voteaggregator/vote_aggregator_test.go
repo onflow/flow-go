@@ -19,7 +19,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	dkgmock "github.com/dapperlabs/flow-go/state/dkg/mocks"
 	protomock "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -33,7 +32,6 @@ type AggregatorSuite struct {
 	participants flow.IdentityList
 	qcs          map[flow.Identifier]*model.QuorumCertificate
 	protocol     *protomock.State
-	dkg          *dkgmock.State
 	snapshot     *protomock.Snapshot
 	signer       *mocks.Signer
 	forks        *mocks.Forks
@@ -61,16 +59,12 @@ func (as *AggregatorSuite) SetupTest() {
 	as.protocol = &protomock.State{}
 	as.protocol.On("Final").Return(as.snapshot)
 
-	// create mocked dkg state
-	as.dkg = &dkgmock.State{}
-	as.dkg.On("GroupSize").Return(uint(len(as.participants)), nil)
-
 	// create a mocked forks
 	as.forks = &mocks.Forks{}
 
 	// create a real viewstate
 	var err error
-	as.viewstate, err = viewstate.New(as.protocol, as.dkg, as.participants[0].NodeID, filter.HasRole(flow.RoleConsensus))
+	as.viewstate, err = viewstate.New(as.protocol, as.participants[0].NodeID, filter.HasRole(flow.RoleConsensus))
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals
