@@ -821,7 +821,6 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	}
 
 	// checks pending receipts in parallel and non-blocking based on new block ID
-	// currently error is
 	_ = e.unit.Do(func() error {
 		e.checkPendingReceipts(block.BlockID)
 		return nil
