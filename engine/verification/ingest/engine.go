@@ -828,13 +828,5 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	})
 }
 
-// OnDoubleProposeDetected is part of implementing FinalizationConsumer interface
-//
-// OnDoubleProposeDetected notifications are produced by the Finalization Logic
-// whenever a double block proposal (equivocation) was detected.
-// Prerequisites:
-// Implementation must be concurrency safe; Non-blocking;
-// and must handle repetition of the same events (with some processing overhead).
-func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
-
-}
+// To implement FinalizationConsumer
+func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
