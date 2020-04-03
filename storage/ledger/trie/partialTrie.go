@@ -33,7 +33,7 @@ func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, 
 	var failedKeys []string
 	for i, key := range registerIDs {
 		value := values[i]
-
+		// lookup the key and update the value
 		node, found := p.keyLookUp[string(key)]
 		if !found {
 			failedKeys = append(failedKeys, string(key))
@@ -44,10 +44,11 @@ func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, 
 	if len(failedKeys) > 0 {
 		return nil, failedKeys, fmt.Errorf("key(s) doesn't exist")
 	}
+	// after updating all the nodes, compute the value recursively only once
 	return p.root.ComputeValue(), failedKeys, nil
 }
 
-// NewPSMT builds a PSMT given chunkdatapack registertouches
+// NewPSMT builds a Partial Sparse Merkle Tree (PMST) given a chunkdatapack registertouches
 func NewPSMT(
 	rootValue []byte, // stateCommitment
 	height int,
@@ -61,6 +62,7 @@ func NewPSMT(
 	}
 	psmt := PSMT{newNode(nil, height-1), height, make(map[string]*node)}
 
+	// We need to decode proof encodings
 	proofholder, err := DecodeProof(proofs)
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
@@ -75,7 +77,7 @@ func NewPSMT(
 		return nil, fmt.Errorf("keys' size and proofs' size doesn't match")
 	}
 
-	// iterating over proofs
+	// iterating over proofs for building the tree
 	for i, proofSize := range proofholder.sizes {
 		value := values[i]
 		key := keys[i]
@@ -91,15 +93,15 @@ func NewPSMT(
 
 		// we process the key bit by bit until we reach the end of the proof (due to compactness)
 		for j := 0; j < int(proofSize); j++ {
-			// determine v
-			v := GetDefaultHashForHeight(currentNode.height - 1)
 			// if a flag (bit j in flags) is false, the value is a default value
 			// otherwise the value is stored in the proofs
+			v := GetDefaultHashForHeight(currentNode.height - 1)
 			if utils.IsBitSet(flags, j) {
 				// use the proof at index proofIndex
 				v = proof[proofIndex]
 				proofIndex++
 			}
+			// look at the bit number j (left to right) for branching
 			if utils.IsBitSet(key, j) { // right branching
 				if currentNode.lChild == nil { // check left child
 					currentNode.lChild = newNode(v, currentNode.height-1)
@@ -123,15 +125,20 @@ func NewPSMT(
 			}
 		}
 		if inclusion { // inclusion proof
-			// set leaf
+			// for the last node set the leaf key and value
 			currentNode.key = key
-			psmt.keyLookUp[string(key)] = currentNode
 			currentNode.value = ComputeCompactValue(key, value, currentNode.height, height)
+			// keep a reference to this node by key (for update purpose)
+			psmt.keyLookUp[string(key)] = currentNode
 
 		} else { // exclusion proof
-			// expand it till reaching the leaf node
+			// for exclusion proofs we continue expand the tree till reaching the leaf node
+			// this will simplify the update operations for these nodes
+			// by differentiating unknown registers and unset registers
 			for j := currentNode.height; j > 0; j-- {
+				// set node value based on the height
 				v := GetDefaultHashForHeight(j - 1)
+				// continue checking the key bits
 				if utils.IsBitSet(key, height-j-1) { // right branching
 					if currentNode.rChild == nil {
 						currentNode.rChild = newNode(nil, currentNode.height-1)
