@@ -152,3 +152,14 @@ func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
 	}
 	return ce, nil
 }
+
+func EventToMessage(e flow.Event) *entities.Event {
+	id := e.TransactionID
+	return &entities.Event{
+		Type:             string(e.Type),
+		TransactionId:    id[:],
+		TransactionIndex: e.TransactionIndex,
+		EventIndex:       e.EventIndex,
+		Payload:          e.Payload,
+	}
+}

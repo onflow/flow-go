@@ -2,14 +2,19 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
+	"github.com/dapperlabs/flow-go/model/flow"
+	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	access "github.com/dapperlabs/flow-go/protobuf/services/access"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -27,7 +32,7 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, e *ingestion.Engine) *Engine {
+func New(log zerolog.Logger, config Config, e *ingestion.Engine, events storage.Events) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
@@ -35,6 +40,8 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine) *Engine {
 		unit: engine.NewUnit(),
 		handler: &handler{
 			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+			engine:                       e,
+			events:                       events,
 		},
 		server: grpc.NewServer(),
 		config: config,
@@ -81,6 +88,7 @@ func (e *Engine) serve() {
 type handler struct {
 	access.UnimplementedAccessAPIServer
 	engine *ingestion.Engine
+	events storage.Events
 }
 
 // Ping responds to requests when the server is up.
@@ -88,10 +96,8 @@ func (h *handler) Ping(ctx context.Context, req *access.PingRequest) (*access.Pi
 	return &access.PingResponse{}, nil
 }
 
-func (h *handler) ExecuteScript(
-	ctx context.Context,
-	req *access.ExecuteScriptAtLatestBlockRequest,
-) (*access.ExecuteScriptResponse, error) {
+func (h *handler) ExecuteScriptAtLatestBlock(_ context.Context,
+	req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
 
 	value, err := h.engine.ExecuteScript(req.Script)
 	if err != nil {
@@ -103,4 +109,33 @@ func (h *handler) ExecuteScript(
 	}
 
 	return res, nil
+}
+
+func (h *handler) GetEventsForBlockIDs(_ context.Context,
+	req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
+
+	blockIDs := req.BlockIds
+	if blockIDs == nil {
+		return nil, nil
+	}
+
+	eType := flow.EventType(req.Type)
+
+	result := make([]*entities.Event, 0)
+
+	for _, b := range blockIDs {
+		bID := flow.HashToID(b)
+
+		flowEvents, err := h.events.ByBlockIDEventType(bID, eType)
+		if err != nil {
+			return nil, fmt.Errorf(" failed to get events for block: %w", err)
+		}
+		for _, e := range flowEvents {
+			event := convert.EventToMessage(e)
+			result = append(result, event)
+		}
+	}
+	return &access.EventsResponse{
+		Events: result,
+	}, nil
 }
