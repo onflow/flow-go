@@ -130,6 +130,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+// OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 	e.unit.Launch(func() {
 		id := hb.BlockID
@@ -215,10 +216,10 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	return identifiers, nil
 }
 
+// OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks
 func (e *Engine) OnBlockIncorporated(*model.Block) {
-	return
 }
 
+// OnDoubleProposeDetected is a noop for this engine since access node is only dealing with finalized blocks
 func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
-	return
 }
