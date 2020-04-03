@@ -95,8 +95,14 @@ func createValidators(ps *protoBadger.State, signerData SignerData, block *flow.
 	f := &mock.ForksReader{}
 
 	for i, signer := range signerData.Signers {
+		// get the signer private keys
+		keys, err := signer.PrivateKeys()
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not get private keys for signer: %w", err)
+		}
+
 		// create signer
-		s, err := NewRandomBeaconSigProvider(ps, signerData.DkgPubData, signer.Identity(), signer.StakingPrivKey(), signer.RandomBeaconPrivKey)
+		s, err := NewRandomBeaconSigProvider(ps, signerData.DkgPubData, signer.Identity(), keys.StakingKey, signer.RandomBeaconPrivKey)
 		if err != nil {
 			return nil, nil, err
 		}

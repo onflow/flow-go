@@ -59,7 +59,7 @@ func createClusterSigners(t *testing.T, n int) []model.NodeInfo {
 	signers := make([]model.NodeInfo, n)
 
 	for i, id := range ids {
-		signers[i] = model.NewNodeInfoWithPrivateKeys(
+		signers[i] = model.NewPrivateNodeInfo(
 			id.NodeID,
 			id.Role,
 			id.Address,

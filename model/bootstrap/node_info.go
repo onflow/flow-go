@@ -2,9 +2,25 @@
 package bootstrap
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
+
+// NodeInfoType enumerates the two different options for
+type NodeInfoType int
+
+const (
+	NodeInfoTypeInvalid NodeInfoType = iota
+	NodeInfoTypePublic
+	NodeInfoTypePrivate
+)
+
+// ErrMissingPrivateInfo is returned when a method is called on NodeInfo
+// that is only valid on instances containing private info.
+var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a public node type")
 
 // NodeConfig contains configuration information used as input to the
 // bootstrap process.
@@ -14,8 +30,7 @@ type NodeConfig struct {
 	Stake   uint64
 }
 
-// Defines the canonical structure for private node info.
-// NOTE: should be used only for encoding.
+// Defines the canonical structure for encoding private node info.
 type NodeInfoPriv struct {
 	Role           flow.Role
 	Address        string
@@ -24,8 +39,15 @@ type NodeInfoPriv struct {
 	StakingPrivKey EncodableStakingPrivKey
 }
 
-// Defines the canonical structure for public node info.
-// NOTE: should be used only for encoding.
+func (node *NodeInfoPriv) Encode() ([]byte, error) {
+	return json.MarshalIndent(node, "", "  ")
+}
+
+func DecodeNodeInfoPriv(raw []byte, target interface{}) error {
+	return json.Unmarshal(raw, target)
+}
+
+// Defines the canonical structure for encoding public node info.
 type NodeInfoPub struct {
 	Role          flow.Role
 	Address       string
@@ -35,25 +57,42 @@ type NodeInfoPub struct {
 	StakingPubKey EncodableStakingPubKey
 }
 
+func (node *NodeInfoPub) Encode() ([]byte, error) {
+	return json.MarshalIndent(node, "", "  ")
+}
+
+func DecodeNodeInfoPub(raw []byte, target interface{}) error {
+	return json.Unmarshal(raw, target)
+}
+
+// NodePrivateKeys is a wrapper for the private keys for a node, comprising all
+// sensitive information for a node.
+type NodePrivateKeys struct {
+	StakingKey crypto.PrivateKey
+	NetworkKey crypto.PrivateKey
+}
+
 // NodeInfo contains information for a node. This is used during the bootstrapping
 // process to represent each node. When writing node information to disk, use
-// `Public` or `Private` to obtain canonical structures.
+// `Public` or `Private` to obtain the appropriate canonical structure.
 //
 // A NodeInfo instance can contain EITHER public keys OR private keys, not both.
 // This can be ensured by using only using the provided constructors and NOT
 // manually constructing an instance.
 type NodeInfo struct {
-	NodeID         flow.Identifier
-	Role           flow.Role
-	Address        string
-	Stake          uint64
+	NodeID  flow.Identifier
+	Role    flow.Role
+	Address string
+	Stake   uint64
+
+	// key information is private
 	networkPubKey  crypto.PublicKey
 	networkPrivKey crypto.PrivateKey
 	stakingPubKey  crypto.PublicKey
 	stakingPrivKey crypto.PrivateKey
 }
 
-func NewNodeInfoWithPublicKeys(
+func NewPublicNodeInfo(
 	nodeID flow.Identifier,
 	role flow.Role,
 	addr string,
@@ -71,7 +110,7 @@ func NewNodeInfoWithPublicKeys(
 	}
 }
 
-func NewNodeInfoWithPrivateKeys(
+func NewPrivateNodeInfo(
 	nodeID flow.Identifier,
 	role flow.Role,
 	addr string,
@@ -89,12 +128,15 @@ func NewNodeInfoWithPrivateKeys(
 	}
 }
 
-func (node NodeInfo) HasPrivateKeys() bool {
-	return node.networkPrivKey != nil && node.stakingPrivKey != nil
-}
-
-func (node NodeInfo) HasPublicKeys() bool {
-	return node.networkPubKey != nil && node.stakingPubKey != nil
+// Type returns the type of the node info instance.
+func (node NodeInfo) Type() NodeInfoType {
+	if node.networkPrivKey != nil && node.stakingPrivKey != nil {
+		return NodeInfoTypePrivate
+	}
+	if node.networkPubKey != nil && node.stakingPubKey != nil {
+		return NodeInfoTypePublic
+	}
+	return NodeInfoTypeInvalid
 }
 
 func (node NodeInfo) NetworkPubKey() crypto.PublicKey {
@@ -104,13 +146,6 @@ func (node NodeInfo) NetworkPubKey() crypto.PublicKey {
 	return node.networkPrivKey.PublicKey()
 }
 
-func (node NodeInfo) NetworkPrivKey() crypto.PrivateKey {
-	if !node.HasPrivateKeys() {
-		panic("node has no private key info")
-	}
-	return node.networkPrivKey
-}
-
 func (node NodeInfo) StakingPubKey() crypto.PublicKey {
 	if node.stakingPubKey != nil {
 		return node.stakingPubKey
@@ -118,33 +153,49 @@ func (node NodeInfo) StakingPubKey() crypto.PublicKey {
 	return node.stakingPrivKey.PublicKey()
 }
 
-func (node NodeInfo) StakingPrivKey() crypto.PrivateKey {
-	if !node.HasPrivateKeys() {
-		panic("node has no private key info")
+func (node NodeInfo) PrivateKeys() (*NodePrivateKeys, error) {
+	if node.Type() != NodeInfoTypePrivate {
+		return nil, ErrMissingPrivateInfo
 	}
-	return node.stakingPrivKey
+	return &NodePrivateKeys{
+		StakingKey: node.stakingPrivKey,
+		NetworkKey: node.networkPrivKey,
+	}, nil
 }
 
-func (node NodeInfo) Private() NodeInfoPriv {
-	if !node.HasPrivateKeys() {
-		panic("node has no private key info")
+// Private returns the canonical private encodable structure.
+func (node NodeInfo) Private() (NodeInfoPriv, error) {
+	if node.Type() != NodeInfoTypePrivate {
+		return NodeInfoPriv{}, ErrMissingPrivateInfo
 	}
+
 	return NodeInfoPriv{
 		Role:           node.Role,
 		Address:        node.Address,
 		NodeID:         node.NodeID,
-		NetworkPrivKey: EncodableNetworkPrivKey{PrivateKey: node.NetworkPrivKey()},
-		StakingPrivKey: EncodableStakingPrivKey{PrivateKey: node.StakingPrivKey()},
-	}
+		NetworkPrivKey: EncodableNetworkPrivKey{PrivateKey: node.networkPrivKey},
+		StakingPrivKey: EncodableStakingPrivKey{PrivateKey: node.stakingPrivKey},
+	}, nil
 }
 
-// Public returns the canonical public structure
+// Public returns the canonical public encodable structure
 func (node NodeInfo) Public() NodeInfoPub {
 	return NodeInfoPub{
 		Role:          node.Role,
 		Address:       node.Address,
 		NodeID:        node.NodeID,
 		Stake:         node.Stake,
+		NetworkPubKey: EncodableNetworkPubKey{PublicKey: node.NetworkPubKey()},
+		StakingPubKey: EncodableStakingPubKey{PublicKey: node.StakingPubKey()},
+	}
+}
+
+// PartnerPublic returns the public data for a partner node.
+func (node NodeInfo) PartnerPublic() PartnerNodeInfoPub {
+	return PartnerNodeInfoPub{
+		Role:          node.Role,
+		Address:       node.Address,
+		NodeID:        node.NodeID,
 		NetworkPubKey: EncodableNetworkPubKey{PublicKey: node.NetworkPubKey()},
 		StakingPubKey: EncodableStakingPubKey{PublicKey: node.StakingPubKey()},
 	}
@@ -172,4 +223,12 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 		filtered = append(filtered, node)
 	}
 	return filtered
+}
+
+func ToIdentityList(nodes []NodeInfo) flow.IdentityList {
+	il := make(flow.IdentityList, 0, len(nodes))
+	for _, node := range nodes {
+		il = append(il, node.Identity())
+	}
+	return il
 }

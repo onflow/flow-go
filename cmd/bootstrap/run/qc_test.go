@@ -51,7 +51,7 @@ func createSignerData(t *testing.T, n int) SignerData {
 	}
 
 	for i, id := range ids {
-		signerData.Signers[i].NodeInfo = bootstrap.NewNodeInfoWithPrivateKeys(
+		signerData.Signers[i].NodeInfo = bootstrap.NewPrivateNodeInfo(
 			id.NodeID,
 			id.Role,
 			id.Address,

@@ -86,8 +86,14 @@ func createClusterValidators(ps *protoBadger.State, ccSigners []bootstrap.NodeIn
 	f := &mock.ForksReader{}
 
 	for i, signer := range ccSigners {
+		// get the signers keys
+		keys, err := signer.PrivateKeys()
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not retrieve private keys for signer: %w", err)
+		}
+
 		// create signer
-		s, err := newStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, signer.Identity(), signer.StakingPrivKey())
+		s, err := newStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, signer.Identity(), keys.StakingKey)
 		if err != nil {
 			return nil, nil, err
 		}

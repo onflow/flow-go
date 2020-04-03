@@ -50,9 +50,13 @@ var keyCmd = &cobra.Command{
 		}
 		nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0])
 
-		//TODO is this ok to not have partner-specific models? seems they are the same
-		// only difference is partnerpublic does not have stake
-		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
+		// retrieve private representation of the node
+		private, err := nodeInfo.Private()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not access private keys")
+		}
+
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
 		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 	},
 }

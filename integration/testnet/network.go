@@ -205,7 +205,12 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 	// write keyfiles for each node
 	for _, nodeConfig := range confs {
 		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, nodeConfig.NodeID))
-		err = writeJSON(path, nodeConfig.Private())
+
+		// retrieve private representation of the node
+		private, err := nodeConfig.NodeInfo.Private()
+		require.Nil(t, err)
+
+		err = writeJSON(path, private)
 		require.Nil(t, err)
 	}
 
@@ -345,7 +350,7 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 		addr := fmt.Sprintf("%s:%d", name, 2137)
 		roleCounter[conf.Role]++
 
-		info := bootstrap.NewNodeInfoWithPrivateKeys(
+		info := bootstrap.NewPrivateNodeInfo(
 			conf.Identifier,
 			conf.Role,
 			addr,

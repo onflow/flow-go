@@ -121,7 +121,7 @@ func assemblePartnerNodes() []model.NodeInfo {
 		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
 		stake := validateStake(stakes[partner.NodeID])
 
-		node := model.NewNodeInfoWithPublicKeys(
+		node := model.NewPublicNodeInfo(
 			nodeID,
 			partner.Role,
 			partner.Address,

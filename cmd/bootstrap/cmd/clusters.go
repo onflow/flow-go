@@ -74,7 +74,7 @@ func filterClusterSigners(nodeInfos []model.NodeInfo) []model.NodeInfo {
 
 	var filtered []model.NodeInfo
 	for _, node := range nodeInfos {
-		if node.HasPrivateKeys() {
+		if node.Type() == model.NodeInfoTypePrivate {
 			filtered = append(filtered, node)
 		}
 	}

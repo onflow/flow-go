@@ -41,7 +41,14 @@ func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 
 		nodeInfo := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
 		internalNodes = append(internalNodes, nodeInfo)
-		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
+
+		// retrieve private representation of the node
+		private, err := nodeInfo.Private()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not access private key for internal node")
+		}
+
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
 	}
 
 	log.Debug().Msgf("will generate additionally needed collector nodes to have majority in each cluster")
@@ -59,7 +66,13 @@ func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 	log.Info().Msgf("generated %v additional internal nodes for collection clusters", len(addNodeInfos))
 
 	for _, nodeInfo := range internalNodes {
-		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), nodeInfo.Private())
+		// retrieve private representation of the node
+		private, err := nodeInfo.Private()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not access private key for internal node")
+		}
+
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
 	}
 
 	return internalNodes
@@ -77,7 +90,7 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 		Str("stakingPubKey", pubKeyToString(stakingKey.PublicKey())).
 		Msg("encoded public staking and network keys")
 
-	nodeInfo := model.NewNodeInfoWithPrivateKeys(
+	nodeInfo := model.NewPrivateNodeInfo(
 		nodeID,
 		nodeConfig.Role,
 		nodeConfig.Address,
