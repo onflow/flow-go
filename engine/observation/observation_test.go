@@ -233,7 +233,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			BlockID: block.ID(),
 		}
 		ingestEng.OnFinalizedBlock(mb)
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 
 		// 3. Ingest engine requests all collections of the block
 		suite.collectionsConduit.AssertExpectations(suite.T())

@@ -2,24 +2,25 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 )
 
 func computeCollectorClusters(stakingNodes []NodeInfoPub) *flow.ClusterList {
-	clusters := flow.NewClusterList(uint(flagCollectionClusters))
+	identities := flow.IdentityList{}
 
 	for _, node := range stakingNodes {
 		if node.Role != flow.RoleCollection {
 			continue
 		}
 
-		index := clusterFor(node.NodeID, uint(flagCollectionClusters))
-		clusters.Add(uint(index), &flow.Identity{
+		identities = append(identities, &flow.Identity{
 			NodeID:             node.NodeID,
 			Address:            node.Address,
 			Role:               node.Role,
@@ -28,6 +29,18 @@ func computeCollectorClusters(stakingNodes []NodeInfoPub) *flow.ClusterList {
 			RandomBeaconPubKey: nil,
 			NetworkPubKey:      node.NetworkPubKey,
 		})
+	}
+
+	// order the identities by node ID
+	sort.Slice(identities, func(i, j int) bool {
+		return order.ByNodeIDAsc(identities[i], identities[j])
+	})
+
+	// create the desired number of clusters and assign nodes
+	clusters := flow.NewClusterList(uint(flagCollectionClusters))
+	for i, identity := range identities {
+		index := uint(i) % uint(flagCollectionClusters)
+		clusters.Add(index, identity)
 	}
 
 	return clusters
