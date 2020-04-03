@@ -792,13 +792,7 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 	}
 }
 
-// OnBlockIncorporated is part of implementing FinalizationConsumer interface
-//
-// OnBlockIncorporated notifications are produced by the Finalization Logic
-// whenever a block is incorporated into the consensus state.
-// Prerequisites:
-// Implementation must be concurrency safe; Non-blocking;
-// and must handle repetition of the same events (with some processing overhead).
+// To implement FinalizationConsumer
 func (e *Engine) OnBlockIncorporated(*model.Block) {
 
 }
