@@ -8,10 +8,10 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 )
 
-func (h *Handler) GetLatestBlockHeader(ctx context.Context, req *observation.GetLatestBlockHeaderRequest) (*observation.BlockHeaderResponse, error) {
+func (h *Handler) GetLatestBlockHeader(ctx context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
 
 	var header *flow.Header
 	var err error
@@ -31,7 +31,7 @@ func (h *Handler) GetLatestBlockHeader(ctx context.Context, req *observation.Get
 	return createBlockHeaderResponse(header)
 }
 
-func (h *Handler) GetBlockHeaderByID(_ context.Context, req *observation.GetBlockHeaderByIDRequest) (*observation.BlockHeaderResponse, error) {
+func (h *Handler) GetBlockHeaderByID(_ context.Context, req *access.GetBlockHeaderByIDRequest) (*access.BlockHeaderResponse, error) {
 
 	id := flow.HashToID(req.Id)
 	header, err := h.headers.ByBlockID(id)
@@ -43,7 +43,7 @@ func (h *Handler) GetBlockHeaderByID(_ context.Context, req *observation.GetBloc
 	return createBlockHeaderResponse(header)
 }
 
-func (h *Handler) GetBlockHeaderByHeight(_ context.Context, req *observation.GetBlockHeaderByHeightRequest) (*observation.BlockHeaderResponse, error) {
+func (h *Handler) GetBlockHeaderByHeight(_ context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
 
 	header, err := h.headers.ByNumber(req.Height)
 	if err != nil {
@@ -54,13 +54,13 @@ func (h *Handler) GetBlockHeaderByHeight(_ context.Context, req *observation.Get
 	return createBlockHeaderResponse(header)
 }
 
-func createBlockHeaderResponse(header *flow.Header) (*observation.BlockHeaderResponse, error) {
+func createBlockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, error) {
 	msg, err := convert.BlockHeaderToMessage(header)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not convert block header: %s", err.Error())
 	}
 
-	resp := &observation.BlockHeaderResponse{
+	resp := &access.BlockHeaderResponse{
 		Block: &msg,
 	}
 	return resp, nil

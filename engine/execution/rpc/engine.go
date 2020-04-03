@@ -9,7 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -34,14 +34,13 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine) *Engine {
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
-			engine:                            e,
+			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
 		},
 		server: grpc.NewServer(),
 		config: config,
 	}
 
-	observation.RegisterObserveServiceServer(eng.server, eng.handler)
+	access.RegisterAccessAPIServer(eng.server, eng.handler)
 
 	return eng
 }
@@ -80,26 +79,26 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	observation.UnimplementedObserveServiceServer
+	access.UnimplementedAccessAPIServer
 	engine *ingestion.Engine
 }
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(ctx context.Context, req *observation.PingRequest) (*observation.PingResponse, error) {
-	return &observation.PingResponse{}, nil
+func (h *handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
+	return &access.PingResponse{}, nil
 }
 
 func (h *handler) ExecuteScript(
 	ctx context.Context,
-	req *observation.ExecuteScriptRequest,
-) (*observation.ExecuteScriptResponse, error) {
+	req *access.ExecuteScriptAtLatestBlockRequest,
+) (*access.ExecuteScriptResponse, error) {
 
 	value, err := h.engine.ExecuteScript(req.Script)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &observation.ExecuteScriptResponse{
+	res := &access.ExecuteScriptResponse{
 		Value: value,
 	}
 

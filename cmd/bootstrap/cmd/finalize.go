@@ -11,12 +11,13 @@ import (
 )
 
 var (
-	flagConfig                            string
-	flagCollectionClusters                uint16
-	flagGeneratedCollectorAddressTemplate string
-	flagGeneratedCollectorStake           uint64
-	flagPartnerNodeInfoDir                string
-	flagPartnerStakes                     string
+	flagConfig                                       string
+	flagCollectionClusters                           uint16
+	flagGeneratedCollectorAddressTemplate            string
+	flagGeneratedCollectorStake                      uint64
+	flagPartnerNodeInfoDir                           string
+	flagPartnerStakes                                string
+	flagCollectorGenerationMaxHashGrindingIterations uint
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -38,7 +39,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 
 		log.Info().Msg("✨ assembling network and staking keys")
 		stakingNodes := mergeNodeInfos(internalNodesPub, partnerNodes)
-		writeJSON(filenameNodeInfosPub, stakingNodes)
+		writeJSON(FilenameNodeInfosPub, stakingNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ running DKG for consensus nodes")
@@ -87,9 +88,11 @@ func init() {
 			"will be replaced by an index)")
 	finalizeCmd.Flags().Uint64Var(&flagGeneratedCollectorStake, "generated-collector-stake", 100,
 		"stake for collector nodes that will be generated")
+	finalizeCmd.Flags().UintVar(&flagCollectorGenerationMaxHashGrindingIterations, "collector-gen-max-iter", 1000,
+		"max hash grinding iterations for collector generation")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
 		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
-		"NetworkPubKey, StakingPubKey)", filenamePartnerNodeInfoSuffix))
+		"NetworkPubKey, StakingPubKey)", FilenamePartnerNodeInfoSuffix))
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
@@ -161,7 +164,7 @@ func readPartnerNodes() []PartnerNodeInfoPub {
 	}
 	for _, f := range files {
 		// skip files that do not include node-infos
-		if !strings.HasSuffix(f, filenamePartnerNodeInfoSuffix) {
+		if !strings.HasSuffix(f, FilenamePartnerNodeInfoSuffix) {
 			continue
 		}
 

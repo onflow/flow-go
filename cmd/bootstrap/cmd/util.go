@@ -92,6 +92,16 @@ func filterConsensusNodes(nodes []NodeInfoPub) []NodeInfoPub {
 	return c
 }
 
+func filterCollectorNodes(nodes []NodeInfoPub) []NodeInfoPub {
+	c := make([]NodeInfoPub, 0)
+	for _, node := range nodes {
+		if node.Role == flow.RoleCollection {
+			c = append(c, node)
+		}
+	}
+	return c
+}
+
 func filterConsensusNodesPriv(nodes []NodeInfoPriv) []NodeInfoPriv {
 	c := make([]NodeInfoPriv, 0)
 	for _, node := range nodes {

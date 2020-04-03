@@ -47,6 +47,16 @@ func MakeBlock(seed int) *model.Block {
 	}
 }
 
+func MakeBlockWithQC(block uint64, qc uint64) *model.Block {
+	b, qcB := MakeBlock(int(block)), MakeBlock(int(qc))
+	b.QC = &model.QuorumCertificate{
+		BlockID:             qcB.BlockID,
+		View:                qc,
+		AggregatedSignature: &model.AggregatedSignature{},
+	}
+	return b
+}
+
 // create a protocol state with N identities
 func NewProtocolState(t *testing.T, n int) (protocol.State, flow.IdentityList) {
 	ctrl := gomock.NewController(t)
@@ -247,4 +257,24 @@ func MakeSignerAndVerifierWithFakeDKG(t *testing.T, n int) (
 		}
 	}
 	return ids, signers, verifier, aggregator, stakingKeys, randomBKeys, dkgPubData
+}
+
+func VoteForBlock(block *model.Block) *model.Vote {
+	return &model.Vote{
+		BlockID:   block.BlockID,
+		View:      block.View,
+		Signature: &model.SingleSignature{},
+	}
+}
+
+func QCForBlock(block *model.Block) *model.QuorumCertificate {
+	return &model.QuorumCertificate{
+		BlockID:             block.BlockID,
+		View:                block.View,
+		AggregatedSignature: nil,
+	}
+}
+
+func MakeIdentity(id byte) *flow.Identity {
+	return &flow.Identity{NodeID: flow.Identifier{id}}
 }
