@@ -41,6 +41,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	blockIDs := make([][]byte, totalBlocks)
 	events := make([]flow.Event, 0)
 
+	// setup the events storage mock
 	for i := range blockIDs {
 		id := unittest.IdentifierFixture()
 		blockIDs[i] = id[:]
@@ -48,6 +49,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		for j := range eventsForBlock {
 			eventsForBlock[j] = unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture())
 		}
+		// expect one call for each block ID
 		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(eventsForBlock, nil).Once()
 		events = append(events, eventsForBlock...)
 	}
