@@ -147,7 +147,7 @@ func dkgRunChan(proc *LocalDKGProcessor, sync *sync.WaitGroup, phase int) {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debug().Str("data", fmt.Sprintf("%x", newMsg.data)).Msgf("%d Receiving from %d", proc.current, newMsg.orig)
-			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.data)
+			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
 			if err != nil {
 				log.Fatal().Err(err).Msg("failed to receive DKG mst")
 			}

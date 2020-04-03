@@ -135,13 +135,13 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	return x, Y, y, nil
 }
 
-// ReceiveDKGMsg processes a new DKG message received by the current node
-func (s *JointFeldmanState) ReceiveDKGMsg(orig int, msg []byte) error {
+// HandleMsg processes a new DKG message received by the current node
+func (s *JointFeldmanState) HandleMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
 		return cryptoError{"dkg protocol is not running"}
 	}
 	for i := index(0); int(i) < s.size; i++ {
-		err := s.fvss[i].ReceiveDKGMsg(orig, msg)
+		err := s.fvss[i].HandleMsg(orig, msg)
 		if err != nil {
 			return cryptoError{"receive dkg message has failed"}
 		}

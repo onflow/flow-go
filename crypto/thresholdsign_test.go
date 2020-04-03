@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestThresholdSignature(t *testing.T) {
@@ -40,7 +41,7 @@ func testThresholdSignatureFeldmanVSS(t *testing.T) {
 		var err error
 		processors[current].dkg, err = NewDKG(FeldmanVSS, n, current,
 			&processors[current], lead)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	// create the node (buffered) communication channels
@@ -53,7 +54,7 @@ func testThresholdSignatureFeldmanVSS(t *testing.T) {
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 		go tsDkgRunChan(&processors[current], &sync, t, 2)
 	}
 
@@ -96,7 +97,7 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 		var err error
 		processors[current].dkg, err = NewDKG(JointFeldman, n, current,
 			&processors[current], lead)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	// create the node (buffered) communication channels
@@ -109,7 +110,7 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 		go tsDkgRunChan(&processors[current], &sync, t, 0)
 	}
 
@@ -162,7 +163,7 @@ func testStatelessThresholdSignatureFeldmanVSS(t *testing.T) {
 		var err error
 		processors[current].dkg, err = NewDKG(FeldmanVSS, n, current,
 			&processors[current], lead)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	// create the node (buffered) communication channels
@@ -175,7 +176,7 @@ func testStatelessThresholdSignatureFeldmanVSS(t *testing.T) {
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 		go tsDkgRunChan(&processors[current], &sync, t, 2)
 	}
 
@@ -206,8 +207,8 @@ func tsDkgRunChan(proc *testDKGProcessor,
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving DKG from %d:", proc.current, newMsg.orig)
-			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.data)
-			assert.Nil(t, err)
+			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
+			require.NoError(t, err)
 
 		// if timeout, finalize DKG and sign the share
 		case <-time.After(200 * time.Millisecond):
@@ -215,18 +216,18 @@ func tsDkgRunChan(proc *testDKGProcessor,
 			case 0:
 				log.Infof("%d shares phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			case 1:
 				log.Infof("%d complaints phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			case 2:
 				log.Infof("%d dkg ended \n", proc.current)
 				sk, groupPK, nodesPK, err := proc.dkg.EndDKG()
-				assert.NotNil(t, sk)
-				assert.NotNil(t, groupPK)
-				assert.NotNil(t, nodesPK)
-				assert.Nil(t, err, "End dkg failed: %v\n", err)
+				require.NotNil(t, sk)
+				require.NotNil(t, groupPK)
+				require.NotNil(t, nodesPK)
+				require.Nil(t, err, "End dkg failed: %v\n", err)
 				if groupPK == nil {
 					proc.pkBytes = []byte{}
 				} else {
@@ -235,7 +236,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				n := proc.dkg.Size()
 				kmac := NewBLS_KMAC(ThresholdSignatureTag)
 				proc.ts, err = NewThresholdSigner(n, proc.current, kmac)
-				assert.Nil(t, err)
+				require.NoError(t, err)
 				proc.ts.SetKeys(sk, groupPK, nodesPK)
 				proc.ts.SetMessageToSign(messageToSign)
 				// needed to test the statless api
@@ -258,16 +259,17 @@ func tsRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving TS from %d:", proc.current, newMsg.orig)
-			verif, thresholdReached, err := proc.ts.AddSignatureShare(
+			verif, err := proc.ts.AddSignatureShare(
 				newMsg.orig, newMsg.data)
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			assert.True(t, verif,
 				"the signature share sent from %d to %d is not correct", newMsg.orig,
 				proc.current)
-			if thresholdReached {
+			if proc.ts.EnoughShares() {
 				thresholdSignature, err := proc.ts.ThresholdSignature()
+				require.NoError(t, err)
 				verif, err = proc.ts.VerifyThresholdSignature(thresholdSignature)
-				assert.Nil(t, err)
+				require.NoError(t, err)
 				assert.True(t, verif, "the threshold signature is not correct")
 				if verif {
 					log.Infof("%d reconstructed a valid signature: %d\n", proc.current,
@@ -313,7 +315,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving TS from %d:", proc.current, newMsg.orig)
 			verif, err := proc.keys.publicKeyShares[newMsg.orig].Verify(newMsg.data, messageToSign, kmac)
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			assert.True(t, verif,
 				"the signature share sent from %d to %d is not correct", newMsg.orig,
 				proc.current)
@@ -335,8 +337,9 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 			if threshReached {
 				// Reconstruct the threshold signature
 				thresholdSignature, err := ReconstructThresholdSignature(n, signShares, signers)
+				require.NoError(t, err)
 				verif, err = proc.keys.groupPublicKey.Verify(thresholdSignature, messageToSign, kmac)
-				assert.Nil(t, err)
+				require.NoError(t, err)
 				assert.True(t, verif, "the threshold signature is not correct")
 				if verif {
 					log.Infof("%d reconstructed a valid signature: %d\n", proc.current,
