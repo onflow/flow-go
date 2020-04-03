@@ -12,7 +12,6 @@ import (
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
@@ -45,7 +44,7 @@ func main() {
 		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
 		chunkStateTracker    *stdmap.ChunkStateTrackers
 		verifierEng          *verifier.Engine
-		ingestEng            *verification.IngestEngine
+		ingestEng            *ingest.Engine
 	)
 
 	cmd.FlowNode("verification").
@@ -124,7 +123,7 @@ func main() {
 			// should be moved to a configuration class
 			// DISCLAIMER: alpha down there is not a production-level value
 
-			ingestEng, err := ingest.New(node.Logger,
+			ingestEng, err = ingest.New(node.Logger,
 				node.Network,
 				node.State,
 				node.Me,
@@ -155,7 +154,7 @@ func main() {
 				&node.GenesisBlock.Header,
 				node.GenesisQC,
 				final,
-				*ingestEng,
+				ingestEng,
 				node.Logger)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
