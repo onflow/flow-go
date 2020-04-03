@@ -808,7 +808,6 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	// block should be in the storage
 	if !e.blockStorage.Has(block.BlockID) {
 		e.log.Error().
-			Err(storage.ErrNotFound).
 			Hex("block_id", logging.ID(block.BlockID)).
 			Msg("expected block is not available in the storage")
 		return
