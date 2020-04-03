@@ -75,14 +75,6 @@ func pubKeyToString(key crypto.PublicKey) string {
 	return fmt.Sprintf("%x", pubKeyToBytes(key))
 }
 
-func privKeyToBytes(key crypto.PrivateKey) []byte {
-	enc, err := key.Encode()
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot encode private key")
-	}
-	return enc
-}
-
 func filterConsensusNodes(nodes []model.NodeInfo) []model.NodeInfo {
 	c := make([]model.NodeInfo, 0)
 	for _, node := range nodes {

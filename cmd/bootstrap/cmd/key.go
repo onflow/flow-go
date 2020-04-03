@@ -59,8 +59,12 @@ var keyCmd = &cobra.Command{
 		log.Info().Msg("generated staking key")
 
 		log.Debug().Str("address", flagAddress).Msg("assembling node information")
-		nodeInfo := assembleNodeInfo(model.NodeConfig{role, flagAddress, 0}, networkKeys[0],
-			stakingKeys[0])
+		conf := model.NodeConfig{
+			Role:    role,
+			Address: flagAddress,
+			Stake:   0,
+		}
+		nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0])
 
 		//TODO is this ok to not have partner-specific models? seems they are the same
 		// only difference is partnerpublic does not have stake
