@@ -22,7 +22,6 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 	keys = append(keys, key1)
 	values = append(values, value1)
 
-	//trie := newTestSMT(t, trieHeight, 10, 100, 5)
 	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
 		defaultHash := GetDefaultHashForHeight(trieHeight - 1)
@@ -219,5 +218,4 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 }
 
 // TODO add test for incompatible proofs [Byzantine milestone]
-
 // TODO add test key not exist [Byzantine milestone]

@@ -56,11 +56,23 @@ func NewPSMT(
 	proofs [][]byte,
 ) (*PSMT, error) {
 
+	if height < 1 {
+		return nil, fmt.Errorf("minimum acceptable value for the  hight is 1")
+	}
 	psmt := PSMT{newNode(nil, height-1), height, make(map[string]*node)}
 
 	proofholder, err := DecodeProof(proofs)
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
+	}
+
+	// check size of key, values and proofs
+	if len(keys) != len(values) {
+		return nil, fmt.Errorf("keys' size and values' size doesn't match")
+	}
+
+	if len(keys) != len(proofholder.sizes) {
+		return nil, fmt.Errorf("keys' size and proofs' size doesn't match")
 	}
 
 	// iterating over proofs
@@ -150,8 +162,7 @@ func NewPSMT(
 			currentNode.value = defaultLeafHash
 		}
 	}
-	// check if the state commitment matches
-	// useing computeValue instead of value for extensive checking
+	// check if the state commitment matches the root value of the partial trie
 	if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
 		return nil, fmt.Errorf("rootNode hash doesn't match the proofs")
 	}
