@@ -49,7 +49,7 @@ func NewThresholdSigner(size int, currentIndex int, hashAlgo Hasher) (*Threshold
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)}
 	}
-	if size <= currentIndex || currentIndex < 0 {
+	if currentIndex >= size || currentIndex < 0 {
 		return nil, fmt.Errorf("The current index must be between 0 and %d", size-1)
 	}
 
