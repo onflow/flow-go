@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/cadence"
-	"github.com/dapperlabs/cadence/encoding"
+	encoding "github.com/dapperlabs/cadence/encoding/xdr"
 	"github.com/dapperlabs/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -135,15 +135,11 @@ func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) 
 		fields := make([]cadence.Value, len(event.Fields))
 
 		for j, field := range event.Fields {
-			convertedField, err := cadence.ConvertValue(field)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert event field: %w", err)
-			}
-
+			convertedField := cadence.ConvertValue(field)
 			fields[j] = convertedField
 		}
 
-		eventValue := cadence.NewComposite(fields)
+		eventValue := cadence.NewEvent(fields)
 
 		payload, err := encoding.Encode(eventValue)
 		if err != nil {

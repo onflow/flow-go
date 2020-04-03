@@ -94,11 +94,11 @@ const (
 	verifVectorSize = PubKeyLenBLS_BLS12381
 )
 
-func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg []byte) error {
+func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
-	if orig >= s.Size() {
+	if orig >= s.Size() || orig < 0 {
 		return errors.New("wrong input")
 	}
 

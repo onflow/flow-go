@@ -27,9 +27,9 @@ type DKGstate interface {
 	Threshold() int
 	// StartDKG starts running a DKG
 	StartDKG(seed []byte) error
-	// ReceiveDKGMsg processes a new DKG message received by the current node
+	// HandleMsg processes a new DKG message received by the current node
 	// orig is the message origin index
-	ReceiveDKGMsg(orig int, msg []byte) error
+	HandleMsg(orig int, msg []byte) error
 	// EndDKG ends a DKG protocol, the public data and node private key are finalized
 	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	// NextTimeout set the next timeout of the protocol if any timeout applies
@@ -63,8 +63,8 @@ func NewDKG(dkg DKGType, size int, currentIndex int,
 		return nil, fmt.Errorf("size should be between %d and %d", DKGMinSize, DKGMaxSize)
 	}
 
-	if currentIndex >= size || leaderIndex >= size {
-		return nil, fmt.Errorf("indices of current and leader nodes must be in the correct range")
+	if currentIndex >= size || leaderIndex >= size || currentIndex < 0 || leaderIndex < 0 {
+		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d", size-1))
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
