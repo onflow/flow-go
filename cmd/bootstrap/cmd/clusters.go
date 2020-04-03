@@ -50,7 +50,7 @@ func constructGenesisBlocksForCollectorClusters(clusters *flow.ClusterList) []cl
 	clusterBlocks := run.GenerateGenesisClusterBlocks(clusters)
 
 	for i, clusterBlock := range clusterBlocks {
-		writeJSON(fmt.Sprintf(filenameGenesisClusterBlock, i), clusterBlock)
+		writeJSON(fmt.Sprintf(FilenameGenesisClusterBlock, i), clusterBlock)
 	}
 
 	return clusterBlocks
@@ -73,7 +73,7 @@ func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, node
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster genesis QC failed")
 		}
 
-		writeJSON(fmt.Sprintf(filenameGenesisClusterQC, i), qc)
+		writeJSON(fmt.Sprintf(FilenameGenesisClusterQC, i), qc)
 	}
 }
 

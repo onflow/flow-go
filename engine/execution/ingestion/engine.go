@@ -37,6 +37,7 @@ type Engine struct {
 	blocks             storage.Blocks
 	payloads           storage.Payloads
 	collections        storage.Collections
+	events             storage.Events
 	computationManager computation.ComputationManager
 	providerEngine     provider.ProviderEngine
 	mempool            *Mempool
@@ -52,6 +53,7 @@ func New(
 	blocks storage.Blocks,
 	payloads storage.Payloads,
 	collections storage.Collections,
+	events storage.Events,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
@@ -68,6 +70,7 @@ func New(
 		blocks:             blocks,
 		payloads:           payloads,
 		collections:        collections,
+		events:             events,
 		computationManager: executionEngine,
 		providerEngine:     providerEngine,
 		mempool:            mempool,
@@ -461,7 +464,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		// TODO - Should the deltas be applied to a particular state?
 		// Not important now, but might become important once we produce proofs
 		var err error
-		endState, err = e.execState.CommitDelta(view.Delta())
+		endState, err = e.execState.CommitDelta(view.Delta(), startState)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 		}
@@ -510,6 +513,13 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	err = e.execState.PersistStateCommitment(result.ExecutableBlock.Block.ID(), endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
+	}
+
+	if len(result.Events) > 0 {
+		err = e.events.Store(result.ExecutableBlock.Block.ID(), result.Events)
+		if err != nil {
+			return nil, fmt.Errorf("failed to store events: %w", err)
+		}
 	}
 
 	err = e.providerEngine.BroadcastExecutionReceipt(receipt)

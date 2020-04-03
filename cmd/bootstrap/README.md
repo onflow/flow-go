@@ -58,12 +58,16 @@ This step will generate the staking and networking keys for a _single partner no
 Values directly specified as command line parameters:
   - node network address
   - node role
-  - seed for generating staking key (min 64 bytes in hex encoding)
-  - seed for generating networking key (min 64 bytes in hex encoding)
+
+#### Optional Inputs
+Values can be specified as command line parameters:
+  - seed for generating staking key (min 48 bytes in hex encoding)
+  - seed for generating networking key (min 48 bytes in hex encoding)
+If seeds are not provided, the CLI will try to use the system's pseudo-random number generator (PRNG), e. g. `dev/urandom`. Make sure you are running the CLI on a hardware that has a cryptographically secure PRNG, or provide seeds generated on such a system.
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap key --address "example.com" --role "consensus" --networking-seed d69b867d5932037c02a4f44335502138b56722adb07a8379ce6736fe4a0b9192443eb694bb3b7f18e0133d68f55a02a3997d6a163ce36280686cda3eba8524ca --staking-seed 23f2421dbcae62de1954b18bd6f4b96ca0aeeef90ea83d89aa542e727c7be78d0ed9a220b049b482cb3342c0534e429663f44d5d2c03ade73e74812489da884b -o ./bootstrap/partner-node-infos
+go run -tags relic ./cmd/bootstrap key --address "example.com" --role "consensus" -o ./bootstrap/partner-node-infos
 ```
 
 #### Generated output files

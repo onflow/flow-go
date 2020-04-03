@@ -12,7 +12,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 )
 
 func generateRandomSeeds(n int) [][]byte {
@@ -111,25 +110,6 @@ func filterConsensusNodesPriv(nodes []NodeInfoPriv) []NodeInfoPriv {
 		}
 	}
 	return c
-}
-
-func createLevelDB(dir string) *leveldb.LevelDB {
-	path := filepath.Clean(dir)
-
-	err := os.MkdirAll(path, 0755)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not create execution state LevelDB dir")
-	}
-
-	kvdbPath := filepath.Join(path, "kvdb")
-	tdbPath := filepath.Join(path, "tdb")
-
-	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
-	if err != nil {
-		log.Fatal().Err(err).Msg("error initializing LevelDB")
-	}
-
-	return db
 }
 
 func filesInDir(dir string) ([]string, error) {

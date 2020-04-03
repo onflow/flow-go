@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 )
 
 func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
@@ -25,11 +24,9 @@ func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 	}, nil
 }
 
-func GenerateExecutionState(levelDB *leveldb.LevelDB, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	ledgerStorage, err := ledger.NewTrieStorage(levelDB)
-	defer func() {
-		_, _ = ledgerStorage.CloseStorage()
-	}()
+func GenerateExecutionState(dbDir string, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
+	ledgerStorage, err := ledger.NewTrieStorage(dbDir)
+	defer ledgerStorage.CloseStorage()
 	if err != nil {
 		return nil, err
 	}
@@ -38,14 +35,14 @@ func GenerateExecutionState(levelDB *leveldb.LevelDB, priv flow.AccountPrivateKe
 }
 
 func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	view := state.NewView(state.LedgerGetRegister(ledger, ledger.LatestStateCommitment()))
+	view := state.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
 	err := createRootAccount(view, priv)
 	if err != nil {
 		return nil, err
 	}
 
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta())
+	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
 		return nil, err
 	}

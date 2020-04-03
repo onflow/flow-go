@@ -18,4 +18,5 @@ type ComputationOrder struct {
 type ComputationResult struct {
 	ExecutableBlock *entity.ExecutableBlock
 	StateViews      []*state.View
+	Events          []flow.Event
 }

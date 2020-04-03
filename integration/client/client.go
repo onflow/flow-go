@@ -10,13 +10,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 )
 
 // Client is a Flow user agent client.
 // NOTE: This is a stop gap solution till the flow-go-sdk also starts using the latest access node API
 type Client struct {
-	rpcClient observation.ObserveServiceClient
+	rpcClient access.AccessAPIClient
 	close     func() error
 }
 
@@ -29,7 +29,7 @@ func New(addr string) (*Client, error) {
 		return nil, err
 	}
 
-	grpcClient := observation.NewObserveServiceClient(conn)
+	grpcClient := access.NewAccessAPIClient(conn)
 
 	return &Client{
 		rpcClient: grpcClient,
@@ -44,7 +44,7 @@ func (c *Client) Close() error {
 
 // Ping tests the connection to the Observation API.
 func (c *Client) Ping(ctx context.Context) error {
-	_, err := c.rpcClient.Ping(ctx, &observation.PingRequest{})
+	_, err := c.rpcClient.Ping(ctx, &access.PingRequest{})
 	return err
 }
 
@@ -54,7 +54,7 @@ func (c *Client) SendTransaction(ctx context.Context, tx flow.TransactionBody) e
 
 	_, err := c.rpcClient.SendTransaction(
 		ctx,
-		&observation.SendTransactionRequest{Transaction: txMsg},
+		&access.SendTransactionRequest{Transaction: txMsg},
 	)
 
 	return err
@@ -62,7 +62,7 @@ func (c *Client) SendTransaction(ctx context.Context, tx flow.TransactionBody) e
 
 // ExecuteScript executes a script against the latest sealed world state.
 func (c *Client) ExecuteScript(ctx context.Context, script []byte) ([]byte, error) {
-	res, err := c.rpcClient.ExecuteScript(ctx, &observation.ExecuteScriptRequest{Script: script})
+	res, err := c.rpcClient.ExecuteScriptAtLatestBlock(ctx, &access.ExecuteScriptAtLatestBlockRequest{Script: script})
 	if err != nil {
 		return nil, err
 	}
