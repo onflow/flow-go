@@ -31,6 +31,7 @@ func (suite *Suite) SetupTest() {
 
 }
 
+// TestGetEventsForBlockIDs tests the GetEventsForBlockIDs API call
 func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	totalBlocks := 10
@@ -51,19 +52,23 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		events = append(events, eventsForBlock...)
 	}
 
+	// create the handler
 	handler := &handler{
 		UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
 		events:                       suite.events,
 	}
 
+	// create the API request
 	req := &access.GetEventsForBlockIDsRequest{
 		Type:     string(flow.EventAccountCreated),
 		BlockIds: blockIDs,
 	}
 
+	// execute the call
 	resp, err := handler.GetEventsForBlockIDs(context.Background(), req)
-	suite.Require().NoError(err)
 
+	// check the response
+	suite.Require().NoError(err)
 	actualEvents := resp.Events
 	expectedEvents := make([]*entities.Event, totalEvents)
 	for i, e := range events {

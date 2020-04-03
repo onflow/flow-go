@@ -79,6 +79,8 @@ func BlockHeaderToMessage(h *flow.Header) (entities.BlockHeader, error) {
 
 func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 
+	id := h.ID()
+
 	parentID := h.ParentID
 	t, err := ptypes.TimestampProto(h.Timestamp)
 	if err != nil {
@@ -101,6 +103,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	}
 
 	bh := entities.Block{
+		Id:                   id[:],
 		Height:               h.Height,
 		ParentId:             parentID[:],
 		Timestamp:            t,
