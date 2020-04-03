@@ -11,7 +11,7 @@ import (
 )
 
 func TestEncodableNetworkPubKey(t *testing.T) {
-	netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, generateRandomSeed(t))
+	netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed(t))
 	require.NoError(t, err)
 	key := EncodableNetworkPubKey{netw.PublicKey()}
 

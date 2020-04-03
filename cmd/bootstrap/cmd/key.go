@@ -18,22 +18,6 @@ var (
 	flagStakingSeed []byte
 )
 
-type PartnerNodeInfoPriv struct {
-	Role           flow.Role
-	Address        string
-	NodeID         flow.Identifier
-	NetworkPrivKey model.EncodableNetworkPrivKey
-	StakingPrivKey model.EncodableStakingPrivKey
-}
-
-type PartnerNodeInfoPub struct {
-	Role          flow.Role
-	Address       string
-	NodeID        flow.Identifier
-	NetworkPubKey model.EncodableNetworkPubKey
-	StakingPubKey model.EncodableStakingPubKey
-}
-
 // keyCmd represents the key command
 var keyCmd = &cobra.Command{
 	Use:   "key",

@@ -6,9 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
-// TODO
-// This file copied from cmd/bootstrap, need to consolidate
-
 // EncodableNetworkPubKey wraps a public key and allows it to be JSON encoded and decoded. It is not defined in the
 // crypto package since the crypto package should not know about the different key types.
 type EncodableNetworkPubKey struct {
@@ -31,7 +28,7 @@ func (pub *EncodableNetworkPubKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var err error
-	pub.PublicKey, err = crypto.DecodePublicKey(crypto.ECDSA_SECp256k1, bz)
+	pub.PublicKey, err = crypto.DecodePublicKey(crypto.ECDSA_P256, bz)
 	return err
 }
 

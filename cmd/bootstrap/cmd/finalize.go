@@ -164,8 +164,8 @@ func validateStake(stake uint64) uint64 {
 	return stake
 }
 
-func readPartnerNodes() []PartnerNodeInfoPub {
-	var partners []PartnerNodeInfoPub
+func readPartnerNodes() []model.PartnerNodeInfoPub {
+	var partners []model.PartnerNodeInfoPub
 	files, err := filesInDir(flagPartnerNodeInfoDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read partner node infos")
@@ -177,7 +177,7 @@ func readPartnerNodes() []PartnerNodeInfoPub {
 		}
 
 		// read file and append to partners
-		var p PartnerNodeInfoPub
+		var p model.PartnerNodeInfoPub
 		readJSON(f, &p)
 		partners = append(partners, p)
 	}
