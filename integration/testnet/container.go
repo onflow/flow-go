@@ -22,8 +22,8 @@ func (c *ContainerConfig) ImageName() string {
 	return fmt.Sprintf("gcr.io/dl-flow/%s:latest", c.Role.String())
 }
 
-// NodeContainer represents a test Docker container for a generic Flow node.
-type NodeContainer struct {
+// Container represents a test Docker container for a generic Flow node.
+type Container struct {
 	*testingdock.Container
 	Config  ContainerConfig
 	Ports   map[string]string // port mapping
@@ -33,7 +33,7 @@ type NodeContainer struct {
 
 // bindPort exposes the given container port and binds it to the given host port.
 // If no protocol is specified, assumes TCP.
-func (c *NodeContainer) bindPort(hostPort, containerPort string) {
+func (c *Container) bindPort(hostPort, containerPort string) {
 
 	// use TCP protocol if none specified
 	containerNATPort := nat.Port(containerPort)
@@ -55,7 +55,7 @@ func (c *NodeContainer) bindPort(hostPort, containerPort string) {
 }
 
 // addFlag adds a command line flag to the container's startup command.
-func (c *NodeContainer) addFlag(flag, val string) {
+func (c *Container) addFlag(flag, val string) {
 	c.Opts.Config.Cmd = append(
 		c.Opts.Config.Cmd,
 		fmt.Sprintf("--%s=%s", flag, val),
@@ -64,12 +64,12 @@ func (c *NodeContainer) addFlag(flag, val string) {
 
 // Name returns the container name. This is the name that appears in logs as
 // well as the hostname that container can be reached at over the Docker network.
-func (c *NodeContainer) Name() string {
+func (c *Container) Name() string {
 	return c.Opts.Name
 }
 
 // DB returns the node's database.
-func (c *NodeContainer) DB() (*badger.DB, error) {
+func (c *Container) DB() (*badger.DB, error) {
 	dbPath := filepath.Join(c.DataDir, DefaultFlowDBDir)
 	db, err := badger.Open(badger.DefaultOptions(dbPath).WithLogger(nil))
 	return db, err

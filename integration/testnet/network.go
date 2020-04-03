@@ -47,7 +47,7 @@ const (
 type FlowNetwork struct {
 	suite      *testingdock.Suite
 	Network    *testingdock.Network
-	Containers []*NodeContainer
+	Containers []*Container
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -110,7 +110,7 @@ func (n *FlowNetwork) Cleanup() error {
 
 // ContainerByID returns the container with the given node ID. If such a
 // container exists, returns true. Otherwise returns false.
-func (n *FlowNetwork) ContainerByID(id flow.Identifier) (*NodeContainer, bool) {
+func (n *FlowNetwork) ContainerByID(id flow.Identifier) (*Container, bool) {
 	for _, c := range n.Containers {
 		if c.Config.NodeID == id {
 			return c, true
@@ -215,7 +215,7 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 	}
 
 	// create container for each node
-	containers := make([]*NodeContainer, 0, nNodes)
+	containers := make([]*Container, 0, nNodes)
 	for _, nodeConf := range confs {
 		nodeContainer, err := createContainer(t, suite, bootstrapDir, nodeConf)
 		require.Nil(t, err)
@@ -232,7 +232,7 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 }
 
 // createContainer ...
-func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string, conf ContainerConfig) (*NodeContainer, error) {
+func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string, conf ContainerConfig) (*Container, error) {
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
 		Name:      conf.ContainerName,
@@ -258,7 +258,7 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 		return nil, fmt.Errorf("could not get tmp dir: %w", err)
 	}
 
-	nodeContainer := &NodeContainer{
+	nodeContainer := &Container{
 		Config:  conf,
 		Ports:   make(map[string]string),
 		DataDir: tmpdir,
