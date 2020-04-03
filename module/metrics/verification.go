@@ -28,6 +28,10 @@ var (
 		Name: "storage_per_chunk",
 		Help: "storage per chunk data",
 	}, []string{"name"})
+	chunkVerificationDuration = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "chunk_verification_duration",
+		Help: "duration of verify engine receiving a chunk ready to verify till it finalizes its verification",
+	}, []string{"name"})
 )
 
 // IncExecutedBlockCounter increases executed blocks counter by one
@@ -61,4 +65,11 @@ func UpdateTotalStorage(value float64) {
 // a negative value decreases it.
 func UpdateStoragePerChunk(value float64, chunkID flow.Identifier) {
 	storagePerChunk.WithLabelValues(chunkID.String()).Add(value)
+}
+
+// VerificationDuration sets the overall time it takes to verify a chunk
+// the duration starts by verifier engine receiving a verifiable chunk till it finalizes
+// the verification of chunk
+func VerificationDuration(value float64, chunkID flow.Identifier) {
+	chunkVerificationDuration.WithLabelValues(chunkID.String()).Set(value)
 }
