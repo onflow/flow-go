@@ -50,7 +50,7 @@ func NewThresholdSigner(size int, currentIndex int, hashAlgo Hasher) (*Threshold
 		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)}
 	}
 	if size <= currentIndex || currentIndex < 0 {
-		return nil, cryptoError{"The current index must be between 0 and the group size"}
+		return nil, fmt.Errorf("The current index must be between 0 and %d", size-1)
 	}
 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
