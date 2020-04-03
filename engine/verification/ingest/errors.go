@@ -5,5 +5,5 @@ import (
 )
 
 var (
-	ErrInvType = errors.New("error invalid type")
+	ErrInvType = errors.New("could not process message: invalid type")
 )
