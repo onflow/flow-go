@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -129,6 +130,20 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+func (e *Engine) OnFinalizedBlock(hb *model.Block) {
+	e.unit.Launch(func() {
+		id := hb.BlockID
+		block, err := e.blocks.ByID(id)
+		if err != nil {
+			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to lookup block")
+		}
+		err = e.ProcessLocal(block)
+		if err != nil {
+			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
+		}
+	})
+}
+
 // onBlock handles an incoming block.
 // TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
 func (e *Engine) onBlock(_ flow.Identifier, block *flow.Block) error {
@@ -198,4 +213,12 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	}
 	identifiers := flow.GetIDs(identities)
 	return identifiers, nil
+}
+
+func (e *Engine) OnBlockIncorporated(*model.Block) {
+	return
+}
+
+func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
+	return
 }

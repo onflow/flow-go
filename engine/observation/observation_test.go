@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -226,13 +227,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Seal").Return(seal, nil).Once()
 
-		// 2. FinalizerSubscriber was notified by the follower engine about a new block.
-		// Follower engine --> FinalizerSubscriber --> Ingest engine
-		fs := ingestion.NewFinalizerSubscriber(suite.log, ingestEng, blocks)
+		// 2. Ingest engine was notified by the follower engine about a new block.
+		// Follower engine --> Ingest engine
 		mb := &model.Block{
 			BlockID: block.ID(),
 		}
-		fs.OnFinalizedBlock(mb) // FinalizerSubscriber should call the ingest engine at this point
+		ingestEng.OnFinalizedBlock(mb)
+		time.Sleep(5 * time.Millisecond)
 
 		// 3. Ingest engine requests all collections of the block
 		suite.collectionsConduit.AssertExpectations(suite.T())
