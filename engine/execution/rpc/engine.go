@@ -2,11 +2,12 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"net"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
@@ -115,27 +116,30 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 
 	blockIDs := req.BlockIds
-	if blockIDs == nil {
-		return nil, nil
+	if blockIDs == nil || len(blockIDs) < 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "no block IDs provided")
 	}
 
 	eType := flow.EventType(req.Type)
 
-	result := make([]*entities.Event, 0)
+	events := make([]*entities.Event, 0)
 
+	// collect all the events in events
 	for _, b := range blockIDs {
 		bID := flow.HashToID(b)
 
 		flowEvents, err := h.events.ByBlockIDEventType(bID, eType)
 		if err != nil {
-			return nil, fmt.Errorf(" failed to get events for block: %w", err)
+			return nil, status.Errorf(codes.Internal, "failed to get events for block: %w", err)
 		}
+
 		for _, e := range flowEvents {
 			event := convert.EventToMessage(e)
-			result = append(result, event)
+			events = append(events, event)
 		}
 	}
+
 	return &access.EventsResponse{
-		Events: result,
+		Events: events,
 	}, nil
 }

@@ -35,6 +35,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 		maxHeight = req.EndHeight
 	}
 
+	// find the block IDs for all the blocks between min and max height (inclusive)
 	blockIDs := make([][]byte, 0)
 	for i := minHeight; i <= maxHeight; i++ {
 		block, err := h.blocks.ByHeight(i)
