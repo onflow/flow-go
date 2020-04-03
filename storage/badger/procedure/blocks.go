@@ -58,6 +58,58 @@ func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn)
 	}
 }
 
+// RetrieveUnfinalizedAncestors retrieves all un-finalized ancestors of the
+// given block, including the block itself, reverse-ordered by height.
+func RetrieveUnfinalizedAncestors(blockID flow.Identifier, unfinalized *[]*flow.Header) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// retrieve the block header of the block we want to finalize
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header: %w", err)
+		}
+
+		// retrieve the current boundary of the finalized state
+		var boundary uint64
+		err = operation.RetrieveBoundary(&boundary)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve boundary: %w", err)
+		}
+
+		// if the block has already been finalized, exit early
+		if boundary >= header.Height {
+			*unfinalized = []*flow.Header{}
+			return nil
+		}
+
+		// retrieve the ID of the last finalized block as marker for stopping
+		var headID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &headID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve head: %w", err)
+		}
+
+		// in order to validate the validity of all changes, we need to iterate
+		// through the blocks that need to be finalized from oldest to youngest;
+		// we thus start at the youngest remember all of the intermediary steps
+		// while tracing back until we reach the finalized state
+		*unfinalized = append(*unfinalized, &header)
+		parentID := header.ParentID
+		for parentID != headID {
+			var parent flow.Header
+			err = operation.RetrieveHeader(parentID, &parent)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve parent (%x): %w", parentID, err)
+			}
+			*unfinalized = append(*unfinalized, &parent)
+			parentID = parent.ParentID
+		}
+
+		return nil
+	}
+}
+
 // RetrieveUnfinalizedDescendants find all unfinalized block IDs that connect to the finalized block
 func RetrieveUnfinalizedDescendants(unfinalizedBlockIDs *[]flow.Identifier) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {

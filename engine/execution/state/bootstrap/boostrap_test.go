@@ -8,14 +8,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestGenerateGenesisStateCommitment(t *testing.T) {
-	unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+	unittest.RunWithTempDBDir(t, func(dbDir string) {
 
-		ls, err := ledger.NewTrieStorage(db)
+		ls, err := ledger.NewTrieStorage(dbDir)
 		require.NoError(t, err)
 
 		newStateCommitment, err := BootstrapLedger(ls)

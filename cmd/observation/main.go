@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/observation/ingestion"
 	"github.com/dapperlabs/flow-go/engine/observation/rpc"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -20,8 +20,8 @@ func main() {
 		receiptLimit    uint
 		ingestEng       *ingestion.Engine
 		rpcConf         rpc.Config
-		collectionRPC   observation.ObserveServiceClient
-		executionRPC    observation.ObserveServiceClient
+		collectionRPC   access.AccessAPIClient
+		executionRPC    access.AccessAPIClient
 		err             error
 		blocks          *storage.Blocks
 		headers         *storage.Headers
@@ -43,7 +43,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			collectionRPC = observation.NewObserveServiceClient(collectionRPCConn)
+			collectionRPC = access.NewAccessAPIClient(collectionRPCConn)
 			return nil
 		}).
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
@@ -51,7 +51,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			executionRPC = observation.NewObserveServiceClient(executionRPCConn)
+			executionRPC = access.NewAccessAPIClient(executionRPCConn)
 			return nil
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {

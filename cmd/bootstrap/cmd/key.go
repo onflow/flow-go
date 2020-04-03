@@ -61,8 +61,8 @@ var keyCmd = &cobra.Command{
 		priv, pub := assembleNodeInfo(NodeConfig{role, flagAddress, 0}, networkKeys[0],
 			stakingKeys[0])
 
-		writeJSON(fmt.Sprintf(filenameNodeInfoPriv, priv.NodeID), PartnerNodeInfoPriv(priv))
-		writeJSON(fmt.Sprintf(filenameNodeInfoPub, pub.NodeID),
+		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, priv.NodeID), PartnerNodeInfoPriv(priv))
+		writeJSON(fmt.Sprintf(FilenameNodeInfoPub, pub.NodeID),
 			PartnerNodeInfoPub{pub.Role, pub.Address, pub.NodeID, pub.NetworkPubKey, pub.StakingPubKey})
 	},
 }

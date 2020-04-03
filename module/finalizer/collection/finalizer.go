@@ -73,6 +73,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
 
+		// there are no blocks to finalize, we may have already finalized
+		// this block - exit early
+		if boundary >= header.Height {
+			return nil
+		}
+
 		// in order to validate the validity of all changes, we need to iterate
 		// through the blocks that need to be finalized from oldest to youngest;
 		// we thus start at the youngest remember all of the intermediary steps

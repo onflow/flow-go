@@ -98,9 +98,9 @@ func TestFinalizer(t *testing.T) {
 			err := finalizer.MakeFinal(block.ID())
 			assert.Nil(t, err)
 
-			// finalize the block again - this should fail
+			// finalize the block again - this should be a no-op
 			err = finalizer.MakeFinal(block.ID())
-			assert.Error(t, err)
+			assert.Nil(t, err)
 		})
 
 		t.Run("unconnected block", func(t *testing.T) {

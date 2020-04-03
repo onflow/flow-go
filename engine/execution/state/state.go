@@ -15,8 +15,9 @@ import (
 type ExecutionState interface {
 	// NewView creates a new ready-only view at the given state commitment.
 	NewView(flow.StateCommitment) *View
+
 	// CommitDelta commits a register delta and returns the new state commitment.
-	CommitDelta(Delta) (flow.StateCommitment, error)
+	CommitDelta(Delta, flow.StateCommitment) (flow.StateCommitment, error)
 
 	GetRegisters(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, error)
 	GetChunkRegisters(flow.Identifier) (flow.Ledger, error)
@@ -89,11 +90,11 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 	return NewView(LedgerGetRegister(s.ls, commitment))
 }
 
-func CommitDelta(ledger storage.Ledger, delta Delta) (flow.StateCommitment, error) {
+func CommitDelta(ledger storage.Ledger, delta Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
 
 	// TODO: update CommitDelta to also return proofs
-	commit, _, err := ledger.UpdateRegistersWithProof(ids, values)
+	commit, _, err := ledger.UpdateRegistersWithProof(ids, values, baseState)
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +102,8 @@ func CommitDelta(ledger storage.Ledger, delta Delta) (flow.StateCommitment, erro
 	return commit, nil
 }
 
-func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
-	return CommitDelta(s.ls, delta)
+func (s *state) CommitDelta(delta Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
+	return CommitDelta(s.ls, delta, baseState)
 }
 
 func (s *state) GetRegisters(
