@@ -6,22 +6,24 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Defines the canonical structure for private node DKG information.
-// NOTE: should only be used for encoding.
+// DKGParticipantPriv is the canonical structure for encoding private node DKG information.
 type DKGParticipantPriv struct {
 	NodeID              flow.Identifier
 	RandomBeaconPrivKey EncodableRandomBeaconPrivKey
 	GroupIndex          int
 }
 
-// Defines the canonical structure for public node DKG information.
-// NOTE: should only be used for encoding.
+// DKGParticipantPub is the canonical structure for encoding public node DKG information.
 type DKGParticipantPub struct {
 	NodeID             flow.Identifier
 	RandomBeaconPubKey EncodableRandomBeaconPubKey
 	GroupIndex         int
 }
 
+// DKGParticipant represents a DKG participant, including private information.
+// It is used while running the DKG during boostrapping. To write public DKG
+// data, or per-node key-shares, use `Private` or `Public` for the appropriate
+// canonical encoding.
 type DKGParticipant struct {
 	NodeID     flow.Identifier
 	KeyShare   crypto.PrivateKey
@@ -46,11 +48,14 @@ func (part *DKGParticipant) Public() DKGParticipantPub {
 	}
 }
 
+// DKGData represents all data in the DKG process, including private information.
+// It is used while running the DKG during boostrapping.
 type DKGData struct {
 	PubGroupKey  crypto.PublicKey
 	Participants []DKGParticipant
 }
 
+// DKGDataPub is canonical structure for encoding public DKG data.
 type DKGDataPub struct {
 	PubGroupKey  EncodableRandomBeaconPubKey
 	Participants []DKGParticipantPub
@@ -71,6 +76,7 @@ func (dkg *DKGData) Public() DKGDataPub {
 	return pub
 }
 
+// ForHotStuff converts DKG data for use in HotStuff.
 func (dkg *DKGData) ForHotStuff() *hotstuff.DKGPublicData {
 
 	participantLookup := make(map[flow.Identifier]*hotstuff.DKGParticipant)
