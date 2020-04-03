@@ -1,16 +1,23 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
+	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/chunks"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -26,6 +33,9 @@ func main() {
 		authReceipts         *stdmap.Receipts
 		pendingReceipts      *stdmap.PendingReceipts
 		blockStorage         *storage.Blocks
+		headerStorage        *storage.Headers
+		conPayloads          *storage.Payloads
+		conCache             *buffer.PendingBlocks
 		authCollections      *stdmap.Collections
 		pendingCollections   *stdmap.PendingCollections
 		collectionTrackers   *stdmap.CollectionTrackers
@@ -34,6 +44,7 @@ func main() {
 		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
 		chunkStateTracker    *stdmap.ChunkStateTrackers
 		verifierEng          *verifier.Engine
+		ingestEng            *ingest.Engine
 	)
 
 	cmd.FlowNode("verification").
@@ -63,10 +74,13 @@ func main() {
 			collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
 			return err
 		}).
-		Module("blocks storage", func(node *cmd.FlowNodeBuilder) error {
+		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
 			// creates a block storage for the node
 			// to reflect incoming blocks on state
 			blockStorage = storage.NewBlocks(node.DB)
+			// headers and consensus storage for consensus follower engine
+			headerStorage = storage.NewHeaders(node.DB)
+			conPayloads = storage.NewPayloads(node.DB)
 			return nil
 		}).
 		Module("chunk states mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -84,6 +98,11 @@ func main() {
 		Module("chunk data pack tracker mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit)
 			return err
+		}).
+		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+			// consensus cache for follower engine
+			conCache = buffer.NewPendingBlocks()
+			return nil
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
@@ -104,7 +123,7 @@ func main() {
 			// should be moved to a configuration class
 			// DISCLAIMER: alpha down there is not a production-level value
 
-			eng, err := ingest.New(node.Logger,
+			ingestEng, err = ingest.New(node.Logger,
 				node.Network,
 				node.State,
 				node.Me,
@@ -120,7 +139,57 @@ func main() {
 				chunkDataPackTracker,
 				blockStorage,
 				assigner)
-			return eng, err
+			return ingestEng, err
+		}).
+		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// create a finalizer that handles updating the protocol
+			// state when the follower detects newly finalized blocks
+			final := finalizer.NewFinalizer(node.DB)
+
+			// creates a consensus follower with ingestEngine as the notifier
+			// so that it gets notified upon each new finalized block
+			core, err := follower.New(node.Me,
+				node.State,
+				node.DKGPubData,
+				&node.GenesisBlock.Header,
+				node.GenesisQC,
+				final,
+				ingestEng,
+				node.Logger)
+			if err != nil {
+				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
+				// TODO for now we ignore failures in follower
+				// this is necessary for integration tests to run, until they are
+				// updated to generate/use valid genesis QC and DKG files.
+				// ref https://github.com/dapperlabs/flow-go/issues/3057
+				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
+			}
+
+			followerEng, err := followereng.New(node.Logger,
+				node.Network,
+				node.Me,
+				node.State,
+				headerStorage,
+				conPayloads,
+				conCache,
+				core)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower engine: %w", err)
+			}
+
+			// create a block synchronization engine to handle follower getting
+			// out of sync
+			sync, err := synchronization.New(node.Logger,
+				node.Network,
+				node.Me,
+				node.State,
+				blockStorage,
+				followerEng)
+			if err != nil {
+				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
+			}
+
+			return followerEng.WithSynchronization(sync), nil
 		}).
 		Run()
 }

@@ -20,5 +20,5 @@ type ForkChoice interface {
 	// Error return indicates incorrect usage. Processing a QC with view v
 	// should result in the PaceMaker being in view v+1 or larger. Hence, given
 	// that the current View is curView, all QCs should have view < curView
-	MakeForkChoice(curView uint64) (*model.Block, *model.QuorumCertificate, error)
+	MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error)
 }
