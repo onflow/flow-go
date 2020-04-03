@@ -61,7 +61,7 @@ func TestHappyPath(t *testing.T) {
 	require.NoError(t, err)
 
 	// the fork choice should return block and qc for view 5
-	choiceBlock, choiceQC, err := f.MakeForkChoice(curView)
+	choiceQC, choiceBlock, err := f.MakeForkChoice(curView)
 	require.NoError(t, err)
 	require.Equal(t, preferedQC, choiceQC)
 	require.Equal(t, blocks.blockMap[choiceQC.View], choiceBlock)
@@ -89,7 +89,7 @@ func TestNoQcForLatestMainFork(t *testing.T) {
 
 	// the fork choice should return block and qc for view 5
 	preferedQC := makeQC(4, blocks.blockMap[4].BlockID)
-	choiceBlock, choiceQC, err := f.MakeForkChoice(curView)
+	choiceQC, choiceBlock, err := f.MakeForkChoice(curView)
 	require.NoError(t, err)
 	require.Equal(t, preferedQC, choiceQC)
 	require.Equal(t, blocks.blockMap[preferedQC.View], choiceBlock)
@@ -120,7 +120,7 @@ func TestNewestOverLongestHappyPath(t *testing.T) {
 	err := f.AddQC(preferedQC)
 	require.NoError(t, err)
 
-	choiceBlock, choiceQC, err := f.MakeForkChoice(curView)
+	choiceQC, choiceBlock, err := f.MakeForkChoice(curView)
 	require.NoError(t, err)
 	require.Equal(t, preferedQC, choiceQC)
 	require.Equal(t, blocks.blockMap[preferedQC.View], choiceBlock)
@@ -150,7 +150,7 @@ func TestNewestOverLongestForkFromNewest(t *testing.T) {
 	// the fork choice should return block and qc for view 4
 	preferedQC := makeQC(4, blocks.blockMap[4].BlockID)
 	notifier.On("OnForkChoiceGenerated", curView, preferedQC).Return().Once()
-	choiceBlock, choiceQC, err := f.MakeForkChoice(curView)
+	choiceQC, choiceBlock, err := f.MakeForkChoice(curView)
 	require.NoError(t, err)
 	require.Equal(t, preferedQC, choiceQC)
 	require.Equal(t, blocks.blockMap[preferedQC.View], choiceBlock)
@@ -180,7 +180,7 @@ func TestForkBelowLockedForkFromNewest(t *testing.T) {
 
 	// the fork choice should return block and qc for view 6
 	preferedQC := makeQC(6, blocks.blockMap[6].BlockID)
-	choiceBlock, choiceQC, err := f.MakeForkChoice(curView)
+	choiceQC, choiceBlock, err := f.MakeForkChoice(curView)
 	require.NoError(t, err)
 	require.Equal(t, preferedQC, choiceQC)
 	require.Equal(t, blocks.blockMap[choiceQC.View], choiceBlock)
@@ -213,7 +213,7 @@ func TestForkBelowLockedHappyPath(t *testing.T) {
 	require.NoError(t, err)
 
 	// the fork choice should return block and qc for view 7
-	choiceBlock, choiceQC, err := f.MakeForkChoice(curView)
+	choiceQC, choiceBlock, err := f.MakeForkChoice(curView)
 	require.NoError(t, err)
 	require.Equal(t, preferedQC, choiceQC)
 	require.Equal(t, blocks.blockMap[choiceQC.View], choiceBlock)
