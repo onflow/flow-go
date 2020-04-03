@@ -860,14 +860,11 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					// adds the block to the storage of the node
 					// Note: this is done by the follower
 					// this block should be done in a thread-safe way
-					func(b *flow.Block) {
-						blockStorageLock.Lock()
-						defer blockStorageLock.Unlock()
-						// we don't check for error as it definitely
-						// returns error when we have duplicate blocks
-						// however, this is not the concern for this test
-						_ = verNode.BlockStorage.Store(b)
-					}(block)
+					blockStorageLock.Lock()
+					// we don't check for error as it definitely returns error when we
+					// have duplicate blocks, however, this is not the concern for this test
+					_ = verNode.BlockStorage.Store(b)
+					blockStorageLock.Unlock()
 
 					// casts block into a Hotstuff block for notifier
 					hotstuffBlock := &model.Block{
