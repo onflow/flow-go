@@ -232,3 +232,11 @@ func ToIdentityList(nodes []NodeInfo) flow.IdentityList {
 	}
 	return il
 }
+
+func ToPublicNodeInfoList(nodes []NodeInfo) []NodeInfoPub {
+	pub := make([]NodeInfoPub, 0, len(nodes))
+	for _, node := range nodes {
+		pub = append(pub, node.Public())
+	}
+	return pub
+}

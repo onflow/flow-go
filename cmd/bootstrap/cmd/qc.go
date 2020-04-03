@@ -8,10 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// NOTE: stakingNodes is ALL staked nodes (including partners), internalNodes, is
-// only internal staked nodes.
-func constructGenesisQC(block *flow.Block, stakingNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
-	signerData := GenerateQCSignerData(stakingNodes, internalNodes, dkgData)
+func constructGenesisQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
+	signerData := GenerateQCSignerData(allNodes, internalNodes, dkgData)
 
 	qc, err := run.GenerateGenesisQC(signerData, block)
 	if err != nil {
@@ -21,19 +19,17 @@ func constructGenesisQC(block *flow.Block, stakingNodes, internalNodes []model.N
 	writeJSON(model.FilenameGenesisQC, qc)
 }
 
-// NOTE: stakingNodes is ALL staked nodes (including partners), internalNodes, is
-// only internal staked nodes.
-func GenerateQCSignerData(stakingNodes, internalNodes []model.NodeInfo, dkg model.DKGData) run.SignerData {
+func GenerateQCSignerData(allNodes, internalNodes []model.NodeInfo, dkg model.DKGData) run.SignerData {
 
 	// stakingNodes can include external validators, so it can be longer than internalNodes
-	if len(stakingNodes) < len(internalNodes) {
-		log.Fatal().Int("len(stakingNodes)", len(stakingNodes)).Int("len(internalNodes)", len(internalNodes)).
+	if len(allNodes) < len(internalNodes) {
+		log.Fatal().Int("len(stakingNodes)", len(allNodes)).Int("len(internalNodes)", len(internalNodes)).
 			Msg("need at least as many staking public keys as staking private keys")
 	}
 
 	// length of DKG participants needs to match stakingNodes, since we run DKG for external and internal validators
-	if len(stakingNodes) != len(dkg.Participants) {
-		log.Fatal().Int("len(stakingNodes)", len(stakingNodes)).Int("len(dkg.Participants)", len(dkg.Participants)).
+	if len(allNodes) != len(dkg.Participants) {
+		log.Fatal().Int("len(stakingNodes)", len(allNodes)).Int("len(dkg.Participants)", len(dkg.Participants)).
 			Msg("need exactly the same number of staking public keys as DKG private participants")
 	}
 

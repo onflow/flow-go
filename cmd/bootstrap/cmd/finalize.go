@@ -40,7 +40,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 
 		log.Info().Msg("✨ assembling network and staking keys")
 		stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-		writeJSON(model.FilenameNodeInfosPub, publicNodeInfos(stakingNodes))
+		writeJSON(model.FilenameNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ running DKG for consensus nodes")
@@ -204,12 +204,4 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	return nodes
-}
-
-func publicNodeInfos(nodeInfos []model.NodeInfo) []model.NodeInfoPub {
-	pub := make([]model.NodeInfoPub, 0, len(nodeInfos))
-	for _, node := range nodeInfos {
-		pub = append(pub, node.Public())
-	}
-	return pub
 }
