@@ -16,7 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/protobuf/services/observation"
+	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 )
 
 // Config defines the configurable options for the ingress server.
@@ -39,14 +39,14 @@ func New(config Config, e *ingest.Engine) *Ingress {
 	ingress := &Ingress{
 		unit: engine.NewUnit(),
 		handler: &handler{
-			UnimplementedObserveServiceServer: observation.UnimplementedObserveServiceServer{},
-			engine:                            e,
+			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+			engine:                       e,
 		},
 		server: grpc.NewServer(),
 		config: config,
 	}
 
-	observation.RegisterObserveServiceServer(ingress.server, ingress.handler)
+	access.RegisterAccessAPIServer(ingress.server, ingress.handler)
 
 	return ingress
 }
@@ -88,18 +88,18 @@ func (i *Ingress) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	observation.UnimplementedObserveServiceServer
+	access.UnimplementedAccessAPIServer
 	engine network.Engine
 }
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(ctx context.Context, req *observation.PingRequest) (*observation.PingResponse, error) {
-	return &observation.PingResponse{}, nil
+func (h *handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
+	return &access.PingResponse{}, nil
 }
 
 // SendTransaction accepts new transactions and inputs them to the ingress
 // engine for validation and routing.
-func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
+func (h *handler) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 	tx, err := convert.MessageToTransaction(req.Transaction)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
@@ -112,5 +112,5 @@ func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTran
 
 	txID := tx.ID()
 
-	return &observation.SendTransactionResponse{Id: txID[:]}, nil
+	return &access.SendTransactionResponse{Id: txID[:]}, nil
 }

@@ -11,8 +11,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func generateRandomSeeds(n int) [][]byte {
@@ -73,16 +71,6 @@ func pubKeyToBytes(key crypto.PublicKey) []byte {
 
 func pubKeyToString(key crypto.PublicKey) string {
 	return fmt.Sprintf("%x", pubKeyToBytes(key))
-}
-
-func filterConsensusNodes(nodes []model.NodeInfo) []model.NodeInfo {
-	c := make([]model.NodeInfo, 0)
-	for _, node := range nodes {
-		if node.Role == flow.RoleConsensus {
-			c = append(c, node)
-		}
-	}
-	return c
 }
 
 func filesInDir(dir string) ([]string, error) {

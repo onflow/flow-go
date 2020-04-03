@@ -1,15 +1,15 @@
 syntax = "proto3";
 
-package flow.services.observation;
+package flow;
 
-option go_package = "observation";
+option go_package = "flow";
 
 import "sdk/entities/entities.proto";
 
-// ObserveService is the public-facing API provided by observation nodes.
-service ObserveService {
+// AccessAPI is the public-facing API provided by access nodes.
+service AccessAPI {
 
-  // Ping is used to check if the observation node is alive and healthy.
+  // Ping is used to check if the access node is alive and healthy.
   rpc Ping (PingRequest) returns (PingResponse);
 
   // Block Headers
@@ -51,13 +51,20 @@ service ObserveService {
 
   // Scripts
 
-  // ExecuteScript executes a script against the latest sealed world state.
-  rpc ExecuteScript (ExecuteScriptRequest) returns (ExecuteScriptResponse);
+  // ExecuteScriptAtLatestBlock executes a read-only Cadance script against the latest sealed execution state.
+  rpc ExecuteScriptAtLatestBlock (ExecuteScriptAtLatestBlockRequest) returns (ExecuteScriptResponse);
+  // ExecuteScriptAtBlockID executes a ready-only Cadence script against the execution state at the block with the given ID.
+  rpc ExecuteScriptAtBlockID (ExecuteScriptAtBlockIDRequest) returns (ExecuteScriptResponse);
+  // ExecuteScriptAtBlockHeight executes a ready-only Cadence script against the execution state at the given block height.
+  rpc ExecuteScriptAtBlockHeight (ExecuteScriptAtBlockHeightRequest) returns (ExecuteScriptResponse);
 
   // Events
 
-  // GetEvents retrieves events matching the given query.
-  rpc GetEvents (GetEventsRequest) returns (GetEventsResponse);
+  // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and the end block height (inclusive) that have the given type
+  rpc GetEventsForHeightRange (GetEventsForHeightRangeRequest) returns (EventsResponse);
+
+  // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
+  rpc GetEventsForBlockIDs (GetEventsForBlockIDsRequest) returns (EventsResponse);
 }
 
 message PingRequest {}
@@ -79,7 +86,7 @@ message GetBlockHeaderByHeightRequest {
 }
 
 message BlockHeaderResponse {
-  flow.sdk.entities.BlockHeader block = 1;
+  flow.BlockHeader block = 1;
 }
 
 // Blocks
@@ -97,7 +104,7 @@ message GetBlockByHeightRequest {
 }
 
 message BlockResponse {
-  flow.sdk.entities.Block block = 1;
+  flow.Block block = 1;
 }
 
 // Collections
@@ -107,13 +114,13 @@ message GetCollectionByIDRequest {
 }
 
 message CollectionResponse {
-  flow.sdk.entities.Collection collection = 1;
+  flow.Collection collection = 1;
 }
 
 // Transactions
 
 message SendTransactionRequest {
-  flow.sdk.entities.Transaction transaction = 1;
+  flow.Transaction transaction = 1;
 }
 
 message SendTransactionResponse {
@@ -125,12 +132,12 @@ message GetTransactionRequest {
 }
 
 message TransactionResponse {
-  flow.sdk.entities.Transaction transaction = 1;
+  flow.Transaction transaction = 1;
 }
 
 message TransactionResultResponse {
-  flow.sdk.entities.TransactionStatus status = 1;
-  repeated flow.sdk.entities.Event events = 2;
+  flow.TransactionStatus status = 1;
+  repeated flow.Event events = 2;
 }
 
 // Accounts
@@ -140,13 +147,23 @@ message GetAccountRequest {
 }
 
 message GetAccountResponse {
-  flow.sdk.entities.Account account = 1;
+  flow.Account account = 1;
 }
 
 // Scripts
 
-message ExecuteScriptRequest {
+message ExecuteScriptAtLatestBlockRequest {
   bytes script = 1;
+}
+
+message ExecuteScriptAtBlockIDRequest {
+  bytes block_id = 1;
+  bytes script = 2;
+}
+
+message ExecuteScriptAtBlockHeightRequest {
+  uint64 block_height = 1;
+  bytes script = 2;
 }
 
 message ExecuteScriptResponse {
@@ -155,12 +172,18 @@ message ExecuteScriptResponse {
 
 // Events
 
-message GetEventsRequest {
+message GetEventsForHeightRangeRequest {
   string type = 1;
-  uint64 start_block = 2;
-  uint64 end_block = 3;
+  uint64 start_height = 2;
+  uint64 end_height = 3;
 }
 
-message GetEventsResponse {
-  repeated flow.sdk.entities.Event events = 1;
+message EventsResponse {
+  repeated flow.Event events = 1;
 }
+
+message GetEventsForBlockIDsRequest {
+  string type = 1;
+  repeated bytes block_ids = 2;
+}
+

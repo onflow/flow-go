@@ -199,7 +199,7 @@ func (e *EventHandler) Start() error {
 }
 
 // startNewView will only be called when there is a view change from pacemaker.
-// It reads the current view, and check if it needs to proposal or vote for block.
+// It reads the current view, and check if it needs to proposal or vote in this view.
 func (e *EventHandler) startNewView() error {
 	curView := e.paceMaker.CurView()
 	e.log.Info().
@@ -211,9 +211,9 @@ func (e *EventHandler) startNewView() error {
 
 		// as the leader of the current view,
 		// build the block proposal for the current view
-		_, qc, err := e.forks.MakeForkChoice(curView)
+		qc, _, err := e.forks.MakeForkChoice(curView)
 		if err != nil {
-			return fmt.Errorf("can not make for choice for view %v: %w", curView, err)
+			return fmt.Errorf("can not make fork choice for view %v: %w", curView, err)
 		}
 
 		proposal, err := e.blockProducer.MakeBlockProposal(qc, curView)
@@ -380,9 +380,6 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 			nextLeader.NodeID,
 		)
 		if err != nil {
-			// TODO: should we error here? E.g.
-			//    return fmt.Errorf("failed to send vote: %w", err)
-			//    We probably want to continue in that case ...
 			e.log.Warn().Msg(fmt.Sprintf("failed to send vote: %s", err))
 		}
 	}

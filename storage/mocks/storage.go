@@ -78,6 +78,20 @@ func (mr *MockBlocksMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockBlocks)(nil).ByID), arg0)
 }
 
+// Has mocks base method
+func (m *MockBlocks) Has(arg0 flow.Identifier) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Has", arg0)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// Has indicates an expected call of Has
+func (mr *MockBlocksMockRecorder) Has(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Has", reflect.TypeOf((*MockBlocks)(nil).Has), arg0)
+}
+
 // IndexByGuarantees mocks base method
 func (m *MockBlocks) IndexByGuarantees(arg0 flow.Identifier) error {
 	m.ctrl.T.Helper()

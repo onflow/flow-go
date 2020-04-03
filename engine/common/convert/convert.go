@@ -6,7 +6,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 )
 
 func MessageToAccountSignature(m *entities.AccountSignature) flow.AccountSignature {
@@ -119,8 +119,8 @@ func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 		signs[i] = g.Bytes()
 	}
 	return &entities.CollectionGuarantee{
-		CollectionHash: id[:],
-		Signatures:     signs,
+		CollectionId: id[:],
+		Signatures:   signs,
 	}
 }
 
@@ -139,13 +139,16 @@ func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
 		return nil, fmt.Errorf("invalid collection")
 	}
 
-	transactions := make([]*entities.Transaction, len(c.Transactions))
+	transactionsIDs := make([][]byte, len(c.Transactions))
 	for i, t := range c.Transactions {
-		transactions[i] = TransactionToMessage(*t)
+		id := t.ID()
+		transactionsIDs[i] = id[:]
 	}
 
+	collectionID := c.ID()
 	ce := &entities.Collection{
-		Transactions: transactions,
+		Id:             collectionID[:],
+		TransactionIds: transactionsIDs,
 	}
 	return ce, nil
 }

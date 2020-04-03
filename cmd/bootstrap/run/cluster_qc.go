@@ -87,14 +87,14 @@ func createClusterValidators(ps *protoBadger.State, ccSigners []bootstrap.NodeIn
 
 	for i, signer := range ccSigners {
 		// create signer
-		s, err := NewStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, signer.Identity(), signer.StakingPrivKey())
+		s, err := newStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, signer.Identity(), signer.StakingPrivKey())
 		if err != nil {
 			return nil, nil, err
 		}
 		signers[i] = s
 
 		// create view state
-		vs, err := viewstate.New(ps, nil, signer.NodeID, filter.In(signersToIdentityList(ccSigners))) // TODO need to filter per cluster
+		vs, err := viewstate.New(ps, nil, signer.NodeID, filter.In(signersToIdentityList(ccSigners)))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -107,9 +107,9 @@ func createClusterValidators(ps *protoBadger.State, ccSigners []bootstrap.NodeIn
 }
 
 // create a new StakingSigProvider
-func NewStakingProvider(ps protocol.State, signers []bootstrap.NodeInfo, tag string, id *flow.Identity, sk crypto.PrivateKey) (
+func newStakingProvider(ps protocol.State, signers []bootstrap.NodeInfo, tag string, id *flow.Identity, sk crypto.PrivateKey) (
 	*signature.StakingSigProvider, error) {
-	vs, err := viewstate.New(ps, nil, id.NodeID, filter.In(signersToIdentityList(signers))) // TODO need to filter per cluster
+	vs, err := viewstate.New(ps, nil, id.NodeID, filter.In(signersToIdentityList(signers)))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create view state: %w", err)
 	}
@@ -125,7 +125,7 @@ func NewStakingProvider(ps protocol.State, signers []bootstrap.NodeInfo, tag str
 // aggregateSigs function is a temporary workaround for the StakigSigner.Aggregate function. It is used here since the
 // current implementation of StakigSigner.Aggregate assumes that the block that is signed is also the anchor for the
 // identity list in the protocol state, which is not the case for cluster blocks.
-// TODO: Replace this function ones the sig aggregation logic has been adjusted to refer to a consensus block with to
+// TODO: Replace this function once the sig aggregation logic has been adjusted to refer to a consensus block with to
 // get the identity list.
 func aggregateSigs(block *model.Block, sigs []*model.SingleSignature) (*model.AggregatedSignature, error) {
 	if len(sigs) == 0 { // ensure that sigs is not empty

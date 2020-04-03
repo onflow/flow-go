@@ -81,10 +81,10 @@ func init() {
 	_ = keyCmd.MarkFlagRequired("role")
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
-	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", []byte{}, "networking seed")
-	_ = keyCmd.MarkFlagRequired("networking-seed")
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", []byte{}, "staking seed")
-	_ = keyCmd.MarkFlagRequired("staking-seed")
+	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(),
+		fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(),
+		fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
 }
 
 func validateRole(role string) flow.Role {

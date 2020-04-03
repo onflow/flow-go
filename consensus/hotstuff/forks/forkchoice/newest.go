@@ -48,6 +48,7 @@ func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier notifications.
 // MakeForkChoice prompts the ForkChoice to generate a fork choice for the
 // current view `curView`. NewestForkChoice always returns the qc with the largest
 // view number seen.
+// It returns a qc and the block that the qc is pointing to.
 //
 // PREREQUISITE:
 // ForkChoice cannot generate ForkChoices retroactively for past views.
@@ -60,7 +61,7 @@ func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier notifications.
 // is smaller than the view of any qc ForkChoice has seen.
 // Note that tracking the view of the newest qc is for safety purposes
 // and _independent_ of the fork-choice rule.
-func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*model.Block, *model.QuorumCertificate, error) {
+func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error) {
 	choice := fc.preferredParent
 	if choice.Block.View >= curView {
 		// sanity check;
@@ -72,7 +73,7 @@ func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*model.Block, *model
 		)
 	}
 	fc.notifier.OnForkChoiceGenerated(curView, choice.QC)
-	return choice.Block, choice.QC, nil
+	return choice.QC, choice.Block, nil
 }
 
 // updateQC updates `preferredParent` according to the fork-choice rule.
