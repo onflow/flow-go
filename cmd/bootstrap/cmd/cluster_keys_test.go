@@ -15,7 +15,6 @@ func TestClusterForIndex(t *testing.T) {
 	assert.Equal(t, 0, clusterForIndex(0, 3))
 	assert.Equal(t, 1, clusterForIndex(1, 3))
 	assert.Equal(t, 2, clusterForIndex(2, 3))
-	assert.Equal(t, 0, clusterForIndex(0, 3))
 }
 
 func TestCalcTotalCollectors(t *testing.T) {

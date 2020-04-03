@@ -68,7 +68,7 @@ func generateAdditionalInternalCollectors(nClusters, minPerCluster int, internal
 	// hash grind until all the requirements are satisfied
 hashGrindingLoop:
 	for g := 0; ; g++ {
-		if g == int(flagCollectorGenerationMaxHashGrindingIterations) {
+		if g >= int(flagCollectorGenerationMaxHashGrindingIterations) {
 			log.Fatal().Msgf("hash grinding to generate internal collectors that satisfy the requirements failed "+
 				"after %v iterations", g)
 		}
@@ -105,6 +105,7 @@ hashGrindingLoop:
 		break hashGrindingLoop
 	}
 
+	// NOTE: the following is a test whether the code above created an assignment that satisfies our requirements.
 	err := verifyCollectorClustering(nClusters, minPerCluster, collectors)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("collector clustering failed")
