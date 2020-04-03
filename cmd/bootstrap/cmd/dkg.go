@@ -22,7 +22,8 @@ func runDKG(nodes []model.NodeInfo) model.DKGData {
 	log.Info().Msgf("finished running DKG")
 
 	for i, participant := range dkgData.Participants {
-		nodeID := participant.NodeID
+		nodeID := nodes[i].NodeID
+		participant.NodeID = nodeID
 
 		log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
 

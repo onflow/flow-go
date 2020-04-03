@@ -11,7 +11,7 @@ import (
 // NOTE: stakingNodes is ALL staked nodes (including partners), internalNodes, is
 // only internal staked nodes.
 func constructGenesisQC(block *flow.Block, stakingNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
-	signerData := generateQCSignerData(stakingNodes, internalNodes, dkgData)
+	signerData := GenerateQCSignerData(stakingNodes, internalNodes, dkgData)
 
 	qc, err := run.GenerateGenesisQC(signerData, block)
 	if err != nil {
@@ -23,7 +23,7 @@ func constructGenesisQC(block *flow.Block, stakingNodes, internalNodes []model.N
 
 // NOTE: stakingNodes is ALL staked nodes (including partners), internalNodes, is
 // only internal staked nodes.
-func generateQCSignerData(stakingNodes, internalNodes []model.NodeInfo, dkg model.DKGData) run.SignerData {
+func GenerateQCSignerData(stakingNodes, internalNodes []model.NodeInfo, dkg model.DKGData) run.SignerData {
 
 	// stakingNodes can include external validators, so it can be longer than internalNodes
 	if len(stakingNodes) < len(internalNodes) {

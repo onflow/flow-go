@@ -162,3 +162,14 @@ func (node NodeInfo) Identity() *flow.Identity {
 	}
 	return identity
 }
+
+func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
+	var filtered []NodeInfo
+	for _, node := range nodes {
+		if node.Role != role {
+			continue
+		}
+		filtered = append(filtered, node)
+	}
+	return filtered
+}
