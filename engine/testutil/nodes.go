@@ -305,8 +305,7 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.BlockStorage == nil {
-		node.BlockStorage =
-			storage.NewBlocks(node.DB)
+		node.BlockStorage = storage.NewBlocks(node.DB)
 	}
 
 	if node.VerifierEngine == nil {
