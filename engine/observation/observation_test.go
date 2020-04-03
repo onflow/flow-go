@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
@@ -39,6 +41,7 @@ type Suite struct {
 	collClient         *obs.AccessAPIClient
 	execClient         *obs.AccessAPIClient
 	collectionsConduit *networkmock.Conduit
+	me                 *mockmodule.Local
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -56,6 +59,9 @@ func (suite *Suite) SetupTest() {
 	suite.execClient = new(obs.AccessAPIClient)
 	suite.net = new(mockmodule.Network)
 	suite.collectionsConduit = &networkmock.Conduit{}
+	suite.me = new(mockmodule.Local)
+	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleObservation))
+	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
@@ -210,7 +216,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		transactions := bstorage.NewTransactions(db)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, nil, nil, blocks, headers, collections, transactions)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, nil, suite.me, blocks, headers, collections, transactions)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
@@ -221,9 +227,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Seal").Return(seal, nil).Once()
 
-		// 2. Ingest engine was notified by the follower engine with a new block
-		err = ingestEng.Process(originID, &block)
-		require.NoError(suite.T(), err)
+		// 2. Ingest engine was notified by the follower engine about a new block.
+		// Follower engine --> Ingest engine
+		mb := &model.Block{
+			BlockID: block.ID(),
+		}
+		ingestEng.OnFinalizedBlock(mb)
+		time.Sleep(5 * time.Millisecond)
 
 		// 3. Ingest engine requests all collections of the block
 		suite.collectionsConduit.AssertExpectations(suite.T())
