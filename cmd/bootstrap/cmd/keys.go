@@ -60,9 +60,7 @@ func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 	)
 
 	// add additional internal collectors
-	for _, addNode := range addNodeInfos {
-		internalNodes = append(internalNodes, addNode)
-	}
+	internalNodes = append(internalNodes, addNodeInfos...)
 	log.Info().Msgf("generated %v additional internal nodes for collection clusters", len(addNodeInfos))
 
 	for _, nodeInfo := range internalNodes {
