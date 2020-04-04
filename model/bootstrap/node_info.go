@@ -2,7 +2,6 @@
 package bootstrap
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -39,14 +38,6 @@ type NodeInfoPriv struct {
 	StakingPrivKey EncodableStakingPrivKey
 }
 
-func (node *NodeInfoPriv) Encode() ([]byte, error) {
-	return json.MarshalIndent(node, "", "  ")
-}
-
-func DecodeNodeInfoPriv(raw []byte, target interface{}) error {
-	return json.Unmarshal(raw, target)
-}
-
 // Defines the canonical structure for encoding public node info.
 type NodeInfoPub struct {
 	Role          flow.Role
@@ -55,14 +46,6 @@ type NodeInfoPub struct {
 	Stake         uint64
 	NetworkPubKey EncodableNetworkPubKey
 	StakingPubKey EncodableStakingPubKey
-}
-
-func (node *NodeInfoPub) Encode() ([]byte, error) {
-	return json.MarshalIndent(node, "", "  ")
-}
-
-func DecodeNodeInfoPub(raw []byte, target interface{}) error {
-	return json.Unmarshal(raw, target)
 }
 
 // NodePrivateKeys is a wrapper for the private keys for a node, comprising all
