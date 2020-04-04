@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"crypto/rand"
 	"sync"
 	"testing"
 	"time"
@@ -158,8 +159,8 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 
 	// start DKG in all nodes
 	// start listening on the channels
-	h, _ := NewHasher(SHA3_256)
-	seed := h.ComputeHash([]byte{1, 2, 3})
+	seed := make([]byte, SeedMinLenDKG)
+	rand.Read(seed)
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		// start dkg could also run in parallel

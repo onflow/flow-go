@@ -12,9 +12,8 @@ import (
 
 // BLS tests
 func TestBLS_BLS12381(t *testing.T) {
-	h, err := NewHasher(SHA3_384)
-	require.Nil(t, err)
-	seed := h.ComputeHash([]byte{1, 2, 3, 4})
+	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
+	rand.Read(seed)
 	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
 	require.Nil(t, err)
 	halg := NewBLS_KMAC("test tag")

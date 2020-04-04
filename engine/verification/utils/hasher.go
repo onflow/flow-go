@@ -19,7 +19,7 @@ func NewResultApprovalHasher() crypto.Hasher {
 // NewChunkAssignmentRNG generates and returns a hasher for chunk
 // assignment
 func NewChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
-	h, err := crypto.NewHasher(crypto.SHA3_384)
+	h, err := crypto.NewSHA3_384()
 	if err != nil {
 		return nil, fmt.Errorf("could not generate hasher: %w", err)
 	}

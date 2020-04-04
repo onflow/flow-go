@@ -27,7 +27,7 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 	}
 
 	// step-1: creating hasher
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	hasher, err := crypto.NewSHA3_256()
 	if err != nil {
 		return nil, err
 	}

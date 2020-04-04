@@ -153,7 +153,7 @@ func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand
 		return nil, fmt.Errorf("could not encode alpha: %w", err)
 	}
 
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	hasher, err := crypto.NewHasherSHA3_256()
 	if err != nil {
 		return nil, fmt.Errorf("could not create hasher: %w", err)
 	}

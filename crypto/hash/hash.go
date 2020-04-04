@@ -1,9 +1,8 @@
-package crypto
+package hash
 
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"io"
 )
 
@@ -64,7 +63,7 @@ func HashesToBytes(hashes []Hash) [][]byte {
 
 // NewHasher chooses and initializes a hashing algorithm
 // Deprecated and will removed later: use dedicated hash generation functions instead.
-func NewHasher(algo HashingAlgorithm) (Hasher, error) {
+/*func NewHasher(algo HashingAlgorithm) (Hasher, error) {
 	switch algo {
 	case SHA3_256:
 		return NewSHA3_256(), nil
@@ -77,4 +76,4 @@ func NewHasher(algo HashingAlgorithm) (Hasher, error) {
 	default:
 		return nil, fmt.Errorf("the hashing algorithm %s is not supported.", algo)
 	}
-}
+}*/

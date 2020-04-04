@@ -85,7 +85,7 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, er
 
 // signTransaction signs a transaction with a private key.
 func signTransaction(tx flow.TransactionBody, privateKey crypto.PrivateKey) (crypto.Signature, error) {
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	hasher, err := crypto.NewHasherSHA3_256()
 	if err != nil {
 		return nil, err
 	}

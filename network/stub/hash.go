@@ -20,7 +20,7 @@ func eventKey(channelID uint8, event interface{}) (string, error) {
 		return "", fmt.Errorf("could not encode event: %w", err)
 	}
 
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	hasher, err := crypto.NewSHA3_256()
 	if err != nil {
 		return "", fmt.Errorf("could not create a hasher: %w", err)
 	}
