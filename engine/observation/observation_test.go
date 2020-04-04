@@ -5,16 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dgraph-io/badger/v2"
-
-	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
-
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
@@ -26,11 +24,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -262,7 +260,7 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection, flow.Seal) {
 	collection := unittest.CollectionFixture(10)
 	cg := &flow.CollectionGuarantee{
 		CollectionID: collection.ID(),
-		Signatures:   []crypto.Signature{[]byte("signature A")},
+		Signature:    crypto.Signature([]byte("signature A")),
 	}
 	block := unittest.BlockFixture()
 	block.Guarantees = []*flow.CollectionGuarantee{cg}

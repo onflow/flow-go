@@ -13,7 +13,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 
 	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"

@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	cluster "github.com/dapperlabs/flow-go/cluster/badger"
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -16,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	trace "github.com/dapperlabs/flow-go/module/trace/mock"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
+	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -185,7 +185,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block.Payload.Collection.ID(),
-					Signatures:   nil,
+					SignerIDs:    block.ParentVoterIDs,
+					Signature:    block.ParentVoterSig,
 				},
 			})
 		})
@@ -235,13 +236,15 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					Signatures:   nil,
+					SignerIDs:    block1.ParentVoterIDs,
+					Signature:    block1.ParentVoterSig,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block2.Payload.Collection.ID(),
-					Signatures:   nil,
+					SignerIDs:    block2.ParentVoterIDs,
+					Signature:    block2.ParentVoterSig,
 				},
 			})
 		})
@@ -290,7 +293,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					Signatures:   nil,
+					SignerIDs:    block1.ParentVoterIDs,
+					Signature:    block1.ParentVoterSig,
 				},
 			})
 		})
@@ -341,7 +345,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					Signatures:   nil,
+					SignerIDs:    block1.ParentVoterIDs,
+					Signature:    block1.ParentVoterSig,
 				},
 			})
 		})

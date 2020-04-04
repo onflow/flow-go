@@ -1,7 +1,6 @@
 package messages
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -51,9 +50,9 @@ type ClusterBlockProposal struct {
 // ClusterBlockVote is a vote for a proposed block in collection node cluster
 // consensus; effectively a vote for a particular collection.
 type ClusterBlockVote struct {
-	BlockID   flow.Identifier
-	View      uint64
-	Signature crypto.Signature
+	BlockID flow.Identifier
+	View    uint64
+	SigData []byte
 }
 
 // ClusterBlockRequest is a request for a block in collection node cluster

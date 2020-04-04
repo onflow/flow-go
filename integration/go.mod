@@ -15,6 +15,7 @@ require (
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/stretchr/testify v1.5.1
 	google.golang.org/grpc v1.28.0
+	gotest.tools v2.2.0+incompatible
 )
 
 replace github.com/dapperlabs/flow-go => ../

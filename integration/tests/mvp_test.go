@@ -21,7 +21,7 @@ func TestMVP_Network(t *testing.T) {
 	colNode := testnet.NewNodeConfig(flow.RoleCollection)
 	exeNode := testnet.NewNodeConfig(flow.RoleExecution)
 
-	net := []*testnet.NodeConfig{
+	net := []testnet.NodeConfig{
 		colNode,
 		exeNode,
 		testnet.NewNodeConfig(flow.RoleConsensus),
@@ -29,13 +29,14 @@ func TestMVP_Network(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleVerification),
 	}
+	conf := testnet.NetworkConfig{Nodes: net}
 
 	// Enable verbose logging
 	testingdock.Verbose = true
 
 	ctx := context.Background()
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(t, "mvp", net)
+	flowNetwork, err := testnet.PrepareFlowNetwork(t, "mvp", conf)
 	require.NoError(t, err)
 
 	flowNetwork.Start(ctx)

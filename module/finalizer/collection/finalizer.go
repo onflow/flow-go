@@ -142,8 +142,8 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: payload.Collection.ID(),
-					SignerIDs:    header.ParentSigners,
-					Signatures:   nil,
+					SignerIDs:    step.ParentVoterIDs,
+					Signature:    step.ParentVoterSig,
 				},
 			})
 		}
