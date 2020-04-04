@@ -75,8 +75,6 @@ func NewHasher(algo HashingAlgorithm) (Hasher, error) {
 	case SHA2_384:
 		return NewSHA2_384(), nil
 	default:
-		return nil, cryptoError{
-			fmt.Sprintf("the hashing algorithm %s is not supported.", algo),
-		}
+		return nil, fmt.Errorf("the hashing algorithm %s is not supported.", algo)
 	}
 }

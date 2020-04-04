@@ -69,14 +69,14 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 		})
 		return ECDSA_SECp256k1Instance, nil
 	}
-	return nil, cryptoError{fmt.Sprintf("the signature scheme %s is not supported.", algo)}
+	return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
 }
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
 	signer, err := NewSigner(algo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("key generation failed: %w", err)
 	}
 	return signer.generatePrivateKey(seed)
 }
@@ -85,7 +85,7 @@ func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) 
 func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 	signer, err := NewSigner(algo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode private key failed: %w", err)
 	}
 	return signer.decodePrivateKey(data)
 }
@@ -94,7 +94,7 @@ func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 	signer, err := NewSigner(algo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode public key failed: %w", err)
 	}
 	return signer.decodePublicKey(data)
 }

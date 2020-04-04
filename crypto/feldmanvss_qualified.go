@@ -2,6 +2,10 @@
 
 package crypto
 
+import (
+	"errors"
+)
+
 // Implements Feldman Verifiable Secret Sharing using BLS setup on BLS381 curve.
 // a complaint system is added to qualify/disqualify the leader
 // Private keys are Zr elements while public keys are G2 elements
@@ -42,7 +46,7 @@ func (s *feldmanVSSQualState) init() {
 // sets the next protocol timeout
 func (s *feldmanVSSQualState) NextTimeout() error {
 	if !s.running {
-		return cryptoError{"dkg protocol is not running"}
+		return errors.New("dkg protocol is not running")
 	}
 	// if leader is already disqualified, there is nothing to do
 	if s.disqualified {
@@ -61,18 +65,18 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 		s.setComplaintsTimeout()
 		return nil
 	}
-	return cryptoError{"next timeout should be to end DKG protocol"}
+	return errors.New("next timeout should be to end DKG protocol")
 }
 
 // EndDKG ends the protocol and returns the keys
 // This is also a timeout to receiving all complaint answers
 func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
-		return nil, nil, nil, cryptoError{"dkg protocol is not running"}
+		return nil, nil, nil, errors.New("dkg protocol is not running")
 	}
 	if !s.sharesTimeout || !s.complaintsTimeout {
 		return nil, nil, nil,
-			cryptoError{"two timeouts should be set before ending dkg"}
+			errors.New("two timeouts should be set before ending dkg")
 	}
 	s.running = false
 	// check if a complaint has remained without an answer
@@ -121,10 +125,10 @@ const (
 
 func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {
 	if !s.running {
-		return cryptoError{"dkg is not running"}
+		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return cryptoError{"wrong input"}
+		return errors.New("wrong input")
 	}
 
 	if len(msg) == 0 {
@@ -160,10 +164,10 @@ func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {
 
 func (s *feldmanVSSQualState) Disqualify(node int) error {
 	if !s.running {
-		return cryptoError{"dkg is not running"}
+		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() {
-		return cryptoError{"wrong input"}
+		return errors.New("wrong input")
 	}
 	if index(node) == s.leaderIndex {
 		s.disqualified = true
