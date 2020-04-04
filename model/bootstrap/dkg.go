@@ -77,18 +77,18 @@ func (dd *DKGData) Public() DKGDataPub {
 }
 
 // ForHotStuff converts DKG data for use in HotStuff.
-func (dd *DKGData) ForHotStuff() *dkg.PublicData {
+func (pub *DKGDataPub) ForHotStuff() *dkg.PublicData {
 
 	participantLookup := make(map[flow.Identifier]*dkg.Participant)
-	for _, part := range dd.Participants {
-		participantLookup[part.NodeID] = &dkg.Participant{
-			PublicKeyShare: part.KeyShare.PublicKey(),
-			Index:          uint(part.GroupIndex),
+	for _, participant := range pub.Participants {
+		participantLookup[participant.NodeID] = &dkg.Participant{
+			PublicKeyShare: participant.RandomBeaconPubKey,
+			Index:          uint(participant.GroupIndex),
 		}
 	}
 
 	return &dkg.PublicData{
-		GroupPubKey:     dd.PubGroupKey,
+		GroupPubKey:     pub.PubGroupKey,
 		IDToParticipant: participantLookup,
 	}
 }

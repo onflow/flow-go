@@ -221,6 +221,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
+
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.bootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
@@ -458,9 +459,9 @@ func loadDKGPublicData(path string) (*dkg.PublicData, error) {
 	if err != nil {
 		return nil, err
 	}
-	dkg := &dkg.PublicData{}
-	err = json.Unmarshal(data, dkg)
-	return dkg, err
+	dkgPubData := &bootstrap.DKGDataPub{}
+	err = json.Unmarshal(data, dkgPubData)
+	return dkgPubData.ForHotStuff(), err
 }
 
 func loadTrustedRootBlock(path string) (*flow.Block, error) {

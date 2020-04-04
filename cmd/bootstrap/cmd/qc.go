@@ -20,7 +20,7 @@ func constructGenesisQC(block *flow.Block, allNodes, internalNodes []model.NodeI
 	writeJSON(model.FilenameGenesisQC, qc)
 }
 
-func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkg model.DKGData) run.ParticipantData {
+func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) run.ParticipantData {
 
 	// stakingNodes can include external validators, so it can be longer than internalNodes
 	if len(allNodes) < len(internalNodes) {
@@ -29,8 +29,8 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkg mod
 	}
 
 	// length of DKG participants needs to match stakingNodes, since we run DKG for external and internal validators
-	if len(allNodes) != len(dkg.Participants) {
-		log.Fatal().Int("len(stakingNodes)", len(allNodes)).Int("len(dkg.Participants)", len(dkg.Participants)).
+	if len(allNodes) != len(dkgData.Participants) {
+		log.Fatal().Int("len(stakingNodes)", len(allNodes)).Int("len(dkgData.Participants)", len(dkgData.Participants)).
 			Msg("need exactly the same number of staking public keys as DKG private participants")
 	}
 
@@ -39,7 +39,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkg mod
 	// the QC will be signed by everyone in internalNodes
 	for _, node := range internalNodes {
 		// find the corresponding entry in dkg
-		part := findDKGParticipant(dkg, node.NodeID)
+		part := findDKGParticipant(dkgData, node.NodeID)
 
 		if node.NodeID == flow.ZeroID {
 			log.Fatal().Str("Address", node.Address).Msg("NodeID must not be zero")
@@ -55,8 +55,8 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkg mod
 		})
 	}
 
-	dkgPubData := dkg.ForHotStuff()
-	sd.DKGState = wrapper.NewState(dkgPubData)
+	dkgPubData := dkgData.Public()
+	sd.DKGState = wrapper.NewState(dkgPubData.ForHotStuff())
 
 	return sd
 }

@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	clusterstate "github.com/dapperlabs/flow-go/cluster/badger"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/protocol"
+	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 func TestCollection(t *testing.T) {
