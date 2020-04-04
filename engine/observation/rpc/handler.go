@@ -11,7 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )

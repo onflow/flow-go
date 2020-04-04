@@ -6,8 +6,9 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+
 	"github.com/dapperlabs/flow-go/engine"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )

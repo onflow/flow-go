@@ -7,10 +7,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 
 	realstorage "github.com/dapperlabs/flow-go/storage"

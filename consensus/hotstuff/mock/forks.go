@@ -124,24 +124,24 @@ func (_m *Forks) IsSafeBlock(block *model.Block) bool {
 }
 
 // MakeForkChoice provides a mock function with given fields: curView
-func (_m *Forks) MakeForkChoice(curView uint64) (*model.Block, *model.QuorumCertificate, error) {
+func (_m *Forks) MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error) {
 	ret := _m.Called(curView)
 
-	var r0 *model.Block
-	if rf, ok := ret.Get(0).(func(uint64) *model.Block); ok {
+	var r0 *model.QuorumCertificate
+	if rf, ok := ret.Get(0).(func(uint64) *model.QuorumCertificate); ok {
 		r0 = rf(curView)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.Block)
+			r0 = ret.Get(0).(*model.QuorumCertificate)
 		}
 	}
 
-	var r1 *model.QuorumCertificate
-	if rf, ok := ret.Get(1).(func(uint64) *model.QuorumCertificate); ok {
+	var r1 *model.Block
+	if rf, ok := ret.Get(1).(func(uint64) *model.Block); ok {
 		r1 = rf(curView)
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*model.QuorumCertificate)
+			r1 = ret.Get(1).(*model.Block)
 		}
 	}
 

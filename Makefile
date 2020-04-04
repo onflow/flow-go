@@ -118,7 +118,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'Consumer' -dir="./consensus/hotstuff/notifications/" -case=underscore -output="./consensus/hotstuff/notifications/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'AccessAPIClient' -dir=protobuf/services/access -case=underscore -output="./engine/observation/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'AccessAPIClient' -dir="./engine/observation/mock/wrapper" -case=underscore -output="./engine/observation/mock" -outpkg="mock"
 
 
 # this ensures there is no unused dependency being added by accident

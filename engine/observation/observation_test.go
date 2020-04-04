@@ -12,6 +12,10 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
@@ -22,8 +26,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
-	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 
 	networkmock "github.com/dapperlabs/flow-go/network/mock"

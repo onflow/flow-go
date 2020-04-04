@@ -9,6 +9,8 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/module/buffer"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
@@ -16,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/observation/rpc"
 	"github.com/dapperlabs/flow-go/module"
 	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 

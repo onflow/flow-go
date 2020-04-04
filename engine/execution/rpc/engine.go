@@ -7,9 +7,10 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 )
 
 // Config defines the configurable options for the gRPC server.
