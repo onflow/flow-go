@@ -146,7 +146,7 @@ func (s *ThresholdSigner) EnoughShares() bool {
 // The function returns true if the share is valid, false otherwise
 func (s *ThresholdSigner) AddSignatureShare(orig int, share Signature) (bool, error) {
 	if orig >= s.size || orig < 0 {
-		return false, cryptoError{"orig input is invalid"}
+		return false, errors.New("orig input is invalid")
 	}
 
 	verif, err := s.verifyShare(share, index(orig))
@@ -187,7 +187,7 @@ func (s *ThresholdSigner) ThresholdSignature() (Signature, error) {
 		s.thresholdSignature = thresholdSignature
 		return thresholdSignature, nil
 	}
-	return nil, cryptoError{"The number of signatures shares does not reach the threshold"}
+	return nil, errors.New("The number of signatures shares does not reach the threshold")
 }
 
 // ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
@@ -230,8 +230,8 @@ func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // - Signature: the threshold signature if there is no returned error, nil otherwise
 func ReconstructThresholdSignature(size int, shares []Signature, signers []int) (Signature, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
-		return nil, cryptoError{fmt.Sprintf("size should be between %d and %d",
-			ThresholdMinSize, ThresholdMaxSize)}
+		return nil, fmt.Errorf("size should be between %d and %d",
+			ThresholdMinSize, ThresholdMaxSize)
 	}
 
 	if len(shares) != len(signers) {
@@ -240,7 +240,7 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 	// check if the threshold was not reached
 	threshold := optimalThreshold(size)
 	if len(shares) < threshold+1 {
-		return nil, cryptoError{"The number of signatures does not reach the threshold"}
+		return nil, errors.New("The number of signatures does not reach the threshold")
 	}
 
 	// flatten the shares (required by the C layer)
@@ -249,7 +249,7 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 	for i, share := range shares {
 		flatShares = append(flatShares, share...)
 		if signers[i] >= size || signers[i] < 0 {
-			return nil, cryptoError{fmt.Sprintf("signer index #%d is invalid", i)}
+			return nil, fmt.Errorf("signer index #%d is invalid", i)
 		}
 		indexSigners = append(indexSigners, index(signers[i]))
 	}
