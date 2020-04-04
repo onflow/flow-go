@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/test"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -20,10 +21,11 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 	}
+
 	for _, signer := range signers {
-		id := signer.Identity
-		block.Identities = append(block.Identities, &id)
+		block.Identities = append(block.Identities, signer.Identity())
 	}
+
 	block.ParentID = flow.ZeroID
 	block.View = 3
 	block.Seals = []*flow.Seal{&flow.Seal{}}
@@ -45,17 +47,26 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func createClusterSigners(t *testing.T, n int) []ClusterSigner {
+func createClusterSigners(t *testing.T, n int) []model.NodeInfo {
 	_, ids := test.NewProtocolState(t, n)
 
 	stakingKeys, err := test.AddStakingPrivateKeys(ids)
-	require.NoError(t, err)
+	require.Nil(t, err)
 
-	signers := make([]ClusterSigner, n)
+	networkKeys, err := unittest.NetworkingKeys(len(ids))
+	require.Nil(t, err)
+
+	signers := make([]model.NodeInfo, n)
 
 	for i, id := range ids {
-		signers[i].Identity = *id
-		signers[i].StakingPrivKey = stakingKeys[i]
+		signers[i] = model.NewPrivateNodeInfo(
+			id.NodeID,
+			id.Role,
+			id.Address,
+			id.Stake,
+			networkKeys[i],
+			stakingKeys[i],
+		)
 	}
 
 	return signers

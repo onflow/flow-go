@@ -33,13 +33,14 @@ func TestCollection(t *testing.T) {
 		verNode  = testnet.NewNodeConfig(flow.RoleVerification)
 	)
 
-	nodes := []*testnet.NodeConfig{colNode1, colNode2, conNode1, conNode2, conNode3, exeNode, verNode}
+	nodes := []testnet.NodeConfig{colNode1, colNode2, conNode1, conNode2, conNode3, exeNode, verNode}
+	conf := testnet.NetworkConfig{Nodes: nodes}
 
 	testingdock.Verbose = true
 
 	ctx := context.Background()
 
-	net, err := testnet.PrepareFlowNetwork(t, "col", nodes)
+	net, err := testnet.PrepareFlowNetwork(t, "col", conf)
 	require.Nil(t, err)
 
 	net.Start(ctx)

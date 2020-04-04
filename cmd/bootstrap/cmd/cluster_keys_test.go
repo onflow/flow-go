@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -42,16 +43,16 @@ func TestGenerateAdditionalInternalCollectors(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping time intensive test")
 	}
-	res, _ := generateAdditionalInternalCollectors(3, 3, []NodeInfoPub{}, []NodeInfoPub{})
+	res := generateAdditionalInternalCollectors(3, 3, []model.NodeInfo{}, []model.NodeInfo{})
 	assert.Len(t, res, 9)
-	res, _ = generateAdditionalInternalCollectors(3, 3, []NodeInfoPub{}, generatePartnerCollectorNodes(3))
+	res = generateAdditionalInternalCollectors(3, 3, []model.NodeInfo{}, generatePartnerCollectorNodes(3))
 	assert.Len(t, res, 6)
-	res, _ = generateAdditionalInternalCollectors(3, 3, []NodeInfoPub{}, generatePartnerCollectorNodes(9))
+	res = generateAdditionalInternalCollectors(3, 3, []model.NodeInfo{}, generatePartnerCollectorNodes(9))
 	assert.Len(t, res, 18)
 }
 
-func generatePartnerCollectorNodes(n int) []NodeInfoPub {
-	res := make([]NodeInfoPub, n)
+func generatePartnerCollectorNodes(n int) []model.NodeInfo {
+	res := make([]model.NodeInfo, n)
 
 	for i := range res {
 		networkKeys, err := run.GenerateNetworkingKeys(1, [][]byte{generateRandomSeed()})
@@ -64,10 +65,13 @@ func generatePartnerCollectorNodes(n int) []NodeInfoPub {
 			log.Fatal().Err(err).Msg("cannot generate staking key")
 		}
 
-		_, pub := assembleNodeInfo(NodeConfig{flow.RoleCollection, fmt.Sprintf("parter-collector-%v", i), 100},
-			networkKeys[0], stakingKeys[0])
-
-		res[i] = pub
+		conf := model.NodeConfig{
+			Role:    flow.RoleCollection,
+			Address: fmt.Sprintf("parter-collector-%v", i),
+			Stake:   100,
+		}
+		info := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0])
+		res[i] = info
 	}
 
 	return res

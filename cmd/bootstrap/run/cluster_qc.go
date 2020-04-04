@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -18,12 +19,7 @@ import (
 	protoBadger "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
-type ClusterSigner struct {
-	Identity       flow.Identity
-	StakingPrivKey crypto.PrivateKey
-}
-
-func GenerateClusterGenesisQC(ccSigners []ClusterSigner, block *flow.Block, clusterBlock *cluster.Block) (
+func GenerateClusterGenesisQC(ccSigners []bootstrap.NodeInfo, block *flow.Block, clusterBlock *cluster.Block) (
 	*model.QuorumCertificate, error) {
 
 	ps, db, err := NewProtocolState(block)
@@ -80,7 +76,7 @@ func GenerateClusterGenesisQC(ccSigners []ClusterSigner, block *flow.Block, clus
 	return qc, err
 }
 
-func createClusterValidators(ps *protoBadger.State, ccSigners []ClusterSigner, block *flow.Block) (
+func createClusterValidators(ps *protoBadger.State, ccSigners []bootstrap.NodeInfo, block *flow.Block) (
 	[]*validator.Validator, []*signature.StakingSigProvider, error) {
 	n := len(ccSigners)
 
@@ -90,16 +86,21 @@ func createClusterValidators(ps *protoBadger.State, ccSigners []ClusterSigner, b
 	f := &mock.ForksReader{}
 
 	for i, signer := range ccSigners {
+		// get the signers keys
+		keys, err := signer.PrivateKeys()
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not retrieve private keys for signer: %w", err)
+		}
+
 		// create signer
-		signerId := signer.Identity
-		s, err := newStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, &signerId, signer.StakingPrivKey)
+		s, err := newStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, signer.Identity(), keys.StakingKey)
 		if err != nil {
 			return nil, nil, err
 		}
 		signers[i] = s
 
 		// create view state
-		vs, err := viewstate.New(ps, nil, signer.Identity.NodeID, filter.In(signersToIdentityList(ccSigners)))
+		vs, err := viewstate.New(ps, nil, signer.NodeID, filter.In(signersToIdentityList(ccSigners)))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -112,7 +113,7 @@ func createClusterValidators(ps *protoBadger.State, ccSigners []ClusterSigner, b
 }
 
 // create a new StakingSigProvider
-func newStakingProvider(ps protocol.State, signers []ClusterSigner, tag string, id *flow.Identity, sk crypto.PrivateKey) (
+func newStakingProvider(ps protocol.State, signers []bootstrap.NodeInfo, tag string, id *flow.Identity, sk crypto.PrivateKey) (
 	*signature.StakingSigProvider, error) {
 	vs, err := viewstate.New(ps, nil, id.NodeID, filter.In(signersToIdentityList(signers)))
 	if err != nil {
@@ -160,10 +161,10 @@ func unsafeAggregate(sigs []*model.SingleSignature) ([]crypto.Signature, []flow.
 	return aggStakingSig, signerIDs
 }
 
-func signersToIdentityList(signers []ClusterSigner) flow.IdentityList {
+func signersToIdentityList(signers []bootstrap.NodeInfo) flow.IdentityList {
 	identities := make([]*flow.Identity, len(signers))
 	for i, signer := range signers {
-		identities[i] = &signer.Identity
+		identities[i] = signer.Identity()
 	}
 	return identities
 }
