@@ -3,23 +3,23 @@ package run
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mock"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/protocol"
-	protoBadger "github.com/dapperlabs/flow-go/protocol/badger"
+	"github.com/dapperlabs/flow-go/module/signature"
+	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 )
 
-func GenerateClusterGenesisQC(ccSigners []bootstrap.NodeInfo, block *flow.Block, clusterBlock *cluster.Block) (
+func GenerateClusterGenesisQC(participants []bootstrap.NodeInfo, block *flow.Block, clusterBlock *cluster.Block) (
 	*model.QuorumCertificate, error) {
 
 	ps, db, err := NewProtocolState(block)
@@ -28,7 +28,7 @@ func GenerateClusterGenesisQC(ccSigners []bootstrap.NodeInfo, block *flow.Block,
 	}
 	defer db.Close()
 
-	_, signers, err := createClusterValidators(ps, ccSigners, block)
+	_, signers, err := createClusterValidators(ps, participants, block)
 	if err != nil {
 		return nil, err
 	}
@@ -42,28 +42,19 @@ func GenerateClusterGenesisQC(ccSigners []bootstrap.NodeInfo, block *flow.Block,
 		Timestamp:   clusterBlock.Timestamp,
 	}
 
-	sigs := make([]*model.SingleSignature, len(signers))
-	for i, signer := range signers {
-		vote, err := signer.VoteFor(&hotBlock)
+	votes := make([]*model.Vote, 0, len(signers))
+	for _, signer := range signers {
+		vote, err := signer.CreateVote(&hotBlock)
 		if err != nil {
 			return nil, err
 		}
-		sigs[i] = vote.Signature
+		votes = append(votes, vote)
 	}
 
-	// manually aggregate sigs
-	// TODO replace this with proper aggregation as soon as the protocol state is fetched from a reference consensus
-	// block
-	aggsig, err := aggregateSigs(&hotBlock, sigs)
+	// create the QC from the votes
+	qc, err := signers[0].CreateQC(votes)
 	if err != nil {
 		return nil, err
-	}
-
-	// make QC
-	qc := &model.QuorumCertificate{
-		View:                hotBlock.View,
-		BlockID:             hotBlock.BlockID,
-		AggregatedSignature: aggsig,
 	}
 
 	// validate QC
@@ -76,95 +67,48 @@ func GenerateClusterGenesisQC(ccSigners []bootstrap.NodeInfo, block *flow.Block,
 	return qc, err
 }
 
-func createClusterValidators(ps *protoBadger.State, ccSigners []bootstrap.NodeInfo, block *flow.Block) (
-	[]*validator.Validator, []*signature.StakingSigProvider, error) {
-	n := len(ccSigners)
+func createClusterValidators(ps *protoBadger.State, participants []bootstrap.NodeInfo, block *flow.Block) (
+	[]hotstuff.Validator, []hotstuff.Signer, error) {
+	n := len(participants)
 
-	signers := make([]*signature.StakingSigProvider, n)
-	validators := make([]*validator.Validator, n)
+	signers := make([]hotstuff.Signer, n)
+	validators := make([]hotstuff.Validator, n)
 
-	f := &mock.ForksReader{}
+	forks := &mocks.ForksReader{}
 
-	for i, signer := range ccSigners {
-		// get the signers keys
-		keys, err := signer.PrivateKeys()
+	nodeIDs := make([]flow.Identifier, 0, len(participants))
+	for _, participant := range participants {
+		nodeIDs = append(nodeIDs, participant.NodeID)
+	}
+	selector := filter.HasNodeID(nodeIDs...)
+
+	for i, participant := range participants {
+		// get the participant keys
+		keys, err := participant.PrivateKeys()
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not retrieve private keys for signer: %w", err)
+			return nil, nil, fmt.Errorf("could not retrieve private keys for participant: %w", err)
 		}
 
-		// create signer
-		s, err := newStakingProvider(ps, ccSigners, encoding.CollectorVoteTag, signer.Identity(), keys.StakingKey)
+		// create local module
+		local, err := local.New(participant.Identity(), keys.StakingKey)
 		if err != nil {
 			return nil, nil, err
 		}
-		signers[i] = s
+
+		// create signer for participant
+		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, local)
+		signer := verification.NewSingleSigner(ps, provider, selector, participant.NodeID)
+		signers[i] = signer
 
 		// create view state
-		vs, err := viewstate.New(ps, nil, signer.NodeID, filter.In(signersToIdentityList(ccSigners)))
+		vs, err := viewstate.New(ps, participant.NodeID, selector)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		// create validator
-		v := validator.New(vs, f, s)
+		v := validator.New(vs, forks, signer)
 		validators[i] = v
 	}
 	return validators, signers, nil
-}
-
-// create a new StakingSigProvider
-func newStakingProvider(ps protocol.State, signers []bootstrap.NodeInfo, tag string, id *flow.Identity, sk crypto.PrivateKey) (
-	*signature.StakingSigProvider, error) {
-	vs, err := viewstate.New(ps, nil, id.NodeID, filter.In(signersToIdentityList(signers)))
-	if err != nil {
-		return nil, fmt.Errorf("cannot create view state: %w", err)
-	}
-	me, err := local.New(id, sk)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create local: %w", err)
-	}
-
-	sigProvider := signature.NewStakingSigProvider(vs, tag, me)
-	return sigProvider, nil
-}
-
-// aggregateSigs function is a temporary workaround for the StakigSigner.Aggregate function. It is used here since the
-// current implementation of StakigSigner.Aggregate assumes that the block that is signed is also the anchor for the
-// identity list in the protocol state, which is not the case for cluster blocks.
-// TODO: Replace this function once the sig aggregation logic has been adjusted to refer to a consensus block with to
-// get the identity list.
-func aggregateSigs(block *model.Block, sigs []*model.SingleSignature) (*model.AggregatedSignature, error) {
-	if len(sigs) == 0 { // ensure that sigs is not empty
-		return nil, fmt.Errorf("cannot aggregate an empty slice of signatures")
-	}
-
-	aggStakingSig, signerIDs := unsafeAggregate(sigs) // unsafe aggregate staking sigs: crypto math only; will not catch error
-
-	return &model.AggregatedSignature{
-		StakingSignatures:     aggStakingSig,
-		RandomBeaconSignature: nil,
-		SignerIDs:             signerIDs,
-	}, nil
-}
-
-func unsafeAggregate(sigs []*model.SingleSignature) ([]crypto.Signature, []flow.Identifier) {
-	// This implementation is a naive way of aggregation the signatures. It will work, with
-	// the downside of costing more bandwidth.
-	// The more optimal way, which is the real aggregation, will be implemented when the crypto
-	// API is available.
-	aggStakingSig := make([]crypto.Signature, len(sigs))
-	signerIDs := make([]flow.Identifier, len(sigs))
-	for i, sig := range sigs {
-		aggStakingSig[i] = sig.StakingSignature
-		signerIDs[i] = sig.SignerID
-	}
-	return aggStakingSig, signerIDs
-}
-
-func signersToIdentityList(signers []bootstrap.NodeInfo) flow.IdentityList {
-	identities := make([]*flow.Identity, len(signers))
-	for i, signer := range signers {
-		identities[i] = signer.Identity()
-	}
-	return identities
 }

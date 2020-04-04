@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/hashicorp/go-multierror"
@@ -20,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/dapperlabs/testingdock"
 )
 
 const (
@@ -183,7 +183,7 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
-	signerData := bootstrapcmd.GenerateQCSignerData(nodeInfos, nodeInfos, dkg)
+	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
 	qc, err := bootstraprun.GenerateGenesisQC(signerData, &genesis)
 	require.Nil(t, err)
 

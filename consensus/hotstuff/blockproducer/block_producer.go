@@ -37,7 +37,7 @@ func (bp *BlockProducer) MakeBlockProposal(qc *model.QuorumCertificate, view uin
 	}
 
 	// then sign the proposal
-	proposal, err := bp.signer.Propose(block)
+	proposal, err := bp.signer.CreateProposal(block)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign block proposal: %w", err)
 	}
@@ -52,10 +52,9 @@ func (bp *BlockProducer) makeBlockForView(qc *model.QuorumCertificate, view uint
 	// in hotstuff, we use this for view number and signature-related fields
 	setHotstuffFields := func(header *flow.Header) {
 		header.View = view
+		header.ParentVoterIDs = qc.SignerIDs
+		header.ParentVoterSig = qc.SigData
 		header.ProposerID = bp.viewState.Self()
-		header.ParentStakingSigs = qc.AggregatedSignature.StakingSignatures
-		header.ParentRandomBeaconSig = qc.AggregatedSignature.RandomBeaconSignature
-		header.ParentSigners = qc.AggregatedSignature.SignerIDs
 	}
 
 	// retrieve a fully built block header from the builder

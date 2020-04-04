@@ -6,12 +6,13 @@ import (
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 )
 
 func constructGenesisQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
-	signerData := GenerateQCSignerData(allNodes, internalNodes, dkgData)
+	participantData := GenerateQCParticipantData(allNodes, internalNodes, dkgData)
 
-	qc, err := run.GenerateGenesisQC(signerData, block)
+	qc, err := run.GenerateGenesisQC(participantData, block)
 	if err != nil {
 		log.Fatal().Err(err).Msg("generating genesis QC failed")
 	}
@@ -19,7 +20,7 @@ func constructGenesisQC(block *flow.Block, allNodes, internalNodes []model.NodeI
 	writeJSON(model.FilenameGenesisQC, qc)
 }
 
-func GenerateQCSignerData(allNodes, internalNodes []model.NodeInfo, dkg model.DKGData) run.SignerData {
+func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) run.ParticipantData {
 
 	// stakingNodes can include external validators, so it can be longer than internalNodes
 	if len(allNodes) < len(internalNodes) {
@@ -28,17 +29,17 @@ func GenerateQCSignerData(allNodes, internalNodes []model.NodeInfo, dkg model.DK
 	}
 
 	// length of DKG participants needs to match stakingNodes, since we run DKG for external and internal validators
-	if len(allNodes) != len(dkg.Participants) {
-		log.Fatal().Int("len(stakingNodes)", len(allNodes)).Int("len(dkg.Participants)", len(dkg.Participants)).
+	if len(allNodes) != len(dkgData.Participants) {
+		log.Fatal().Int("len(stakingNodes)", len(allNodes)).Int("len(dkgData.Participants)", len(dkgData.Participants)).
 			Msg("need exactly the same number of staking public keys as DKG private participants")
 	}
 
-	sd := run.SignerData{}
+	sd := run.ParticipantData{}
 
 	// the QC will be signed by everyone in internalNodes
 	for _, node := range internalNodes {
 		// find the corresponding entry in dkg
-		part := findDKGParticipant(dkg, node.NodeID)
+		part := findDKGParticipant(dkgData, node.NodeID)
 
 		if node.NodeID == flow.ZeroID {
 			log.Fatal().Str("Address", node.Address).Msg("NodeID must not be zero")
@@ -48,13 +49,14 @@ func GenerateQCSignerData(allNodes, internalNodes []model.NodeInfo, dkg model.DK
 			log.Fatal().Str("NodeID", node.NodeID.String()).Msg("Stake must not be 0")
 		}
 
-		sd.Signers = append(sd.Signers, run.Signer{
+		sd.Participants = append(sd.Participants, run.Participant{
 			NodeInfo:            node,
 			RandomBeaconPrivKey: part.KeyShare,
 		})
 	}
 
-	sd.DkgPubData = dkg.ForHotStuff()
+	dkgPubData := dkgData.Public()
+	sd.DKGState = wrapper.NewState(dkgPubData.ForHotStuff())
 
 	return sd
 }

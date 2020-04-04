@@ -1,7 +1,6 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -15,10 +14,6 @@ type ViewState interface {
 
 	// IsSelfLeaderForView checks whether we are the leader for the given view.
 	IsSelfLeaderForView(view uint64) bool
-
-	// DKGPublicData represents the public portion of the DKG data.
-	// NOTE: as we currently run with a single epoch, this never changes.
-	DKGPublicData() *DKGPublicData
 
 	// AllConsensusParticipants returns a list of the identities of all
 	// participants to the consensus algorithm.
@@ -34,23 +29,10 @@ type ViewState interface {
 	// IdentitiesForConsensusParticipants returns the identities for the nodes
 	// of the given node identifiers at the given block, including the up-to-date
 	// staked amounts.
-	IdentitiesForConsensusParticipants(blockID flow.Identifier, consensusNodeIDs ...flow.Identifier) (flow.IdentityList, error)
+	IdentitiesForConsensusParticipants(blockID flow.Identifier, consensusNodeIDs []flow.Identifier) (flow.IdentityList, error)
 
 	// LeaderForView returns the identity of the leader for the given view.
 	LeaderForView(view uint64) *flow.Identity
-}
-
-// DKGPublicData is the public data for DKG participants who generated their key shares
-type DKGPublicData struct {
-	GroupPubKey           crypto.PublicKey                    // the group public key
-	IdToDKGParticipantMap map[flow.Identifier]*DKGParticipant // the mapping from DKG participants Identifier to its full DKGParticipant info
-}
-
-// DKGParticipant contains an individual participant's DKG data
-type DKGParticipant struct {
-	Id             flow.Identifier
-	PublicKeyShare crypto.PublicKey
-	DKGIndex       int
 }
 
 // ComputeStakeThresholdForBuildingQC returns the stake that is minimally required for building a QC
