@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/metrics/verification"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -108,7 +109,8 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 			chunkVerifier := chunks.NewChunkVerifier(vm)
-			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier)
+			mc := verification.NewMetricsConsumer(node.Tracer)
+			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, mc)
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

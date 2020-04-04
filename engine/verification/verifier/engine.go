@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	verificationmetrics "github.com/dapperlabs/flow-go/module/metrics/verification"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -25,13 +26,14 @@ import (
 // constructing a partial trie, executing transactions and check the final state commitment and
 // other chunk meta data (e.g. tx count)
 type Engine struct {
-	unit    *engine.Unit         // used to control startup/shutdown
-	log     zerolog.Logger       // used to log relevant actions
-	conduit network.Conduit      // used to propagate result approvals
-	me      module.Local         // used to access local node information
-	state   protocol.State       // used to access the protocol state
-	rah     crypto.Hasher        // used as hasher to sign the result approvals
-	chVerif module.ChunkVerifier // used to verify chunks
+	unit    *engine.Unit                        // used to control startup/shutdown
+	log     zerolog.Logger                      // used to log relevant actions
+	conduit network.Conduit                     // used to propagate result approvals
+	me      module.Local                        // used to access local node information
+	state   protocol.State                      // used to access the protocol state
+	rah     crypto.Hasher                       // used as hasher to sign the result approvals
+	chVerif module.ChunkVerifier                // used to verify chunks
+	mc      verificationmetrics.MetricsConsumer // used to capture the performance metrics
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -41,6 +43,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	chVerif module.ChunkVerifier,
+	mc *verificationmetrics.MetricsConsumer,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -50,6 +53,7 @@ func New(
 		me:      me,
 		chVerif: chVerif,
 		rah:     utils.NewResultApprovalHasher(),
+		mc:      mc,
 	}
 
 	var err error
@@ -105,7 +109,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *verification.VerifiableChunk:
-		return e.verify(originID, resource)
+		// starts verification performance metrics trackers
+		e.mc.OnChunkVerificationStated(resource.ChunkDataPack.ChunkID)
+		// starts verification of chunk
+		err := e.verify(originID, resource)
+		// closes verification performance metrics trackers
+		e.mc.OnChunkVerificationFinished(resource.ChunkDataPack.ChunkID, resource.Block.ID())
+		return err
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
@@ -204,6 +214,8 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 		Uint64("chunkIndex", chunk.ChunkIndex).
 		Hex("execution receipt", logging.Entity(chunk.Receipt)).
 		Msg("result approval submitted")
+	// tracks number of emitted result approvals for this block
+	e.mc.OnResultApproval(chunk.Block.ID())
 
 	return nil
 }

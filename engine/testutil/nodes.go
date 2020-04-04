@@ -29,6 +29,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/metrics/verification"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -312,7 +313,8 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		rt := runtime.NewInterpreterRuntime()
 		vm := virtualmachine.New(rt)
 		chunkVerifier := chunks.NewChunkVerifier(vm)
-		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, chunkVerifier)
+		mc := verification.NewMetricsConsumer(node.Tracer)
+		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, chunkVerifier, mc)
 		require.Nil(t, err)
 	}
 
