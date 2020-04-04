@@ -126,7 +126,7 @@ type NetworkConfig struct {
 }
 
 // NodeConfig defines the input config for a particular node, specified prior
-// to network creation. ContainerNode
+// to network creation.
 type NodeConfig struct {
 	Role          flow.Role
 	Stake         uint64
