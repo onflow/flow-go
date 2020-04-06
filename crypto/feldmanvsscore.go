@@ -6,6 +6,10 @@ package crypto
 // #include "dkg_include.h"
 import "C"
 
+import (
+	"errors"
+)
+
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
@@ -137,7 +141,7 @@ func readVerifVector(A []pointG2, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(A)),
 	) != valid {
-		return cryptoError{"the verifcation vector does not encode public keys correctly"}
+		return errors.New("the verifcation vector does not encode public keys correctly")
 	}
 	return nil
 }

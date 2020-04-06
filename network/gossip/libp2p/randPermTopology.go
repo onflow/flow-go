@@ -3,7 +3,7 @@ package libp2p
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
@@ -26,12 +26,8 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 		return nil, fmt.Errorf("cannot sample topology idList %d smaller than desired fanout %d", len(idList), size)
 	}
 
-	// step-1: creating hasher
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
-	if err != nil {
-		return nil, err
-	}
-	// step-2: computing hash of node's identifier
+	// computing hash of node's identifier
+	hasher := hash.NewSHA3_256()
 	hash := hasher.ComputeHash([]byte(seed))
 
 	// creates a new random generator based on the hash as a seed

@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	clusterstate "github.com/dapperlabs/flow-go/cluster/badger"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/protocol"
+	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 func TestCollection(t *testing.T) {
@@ -33,13 +33,14 @@ func TestCollection(t *testing.T) {
 		verNode  = testnet.NewNodeConfig(flow.RoleVerification)
 	)
 
-	nodes := []*testnet.NodeConfig{colNode1, colNode2, conNode1, conNode2, conNode3, exeNode, verNode}
+	nodes := []testnet.NodeConfig{colNode1, colNode2, conNode1, conNode2, conNode3, exeNode, verNode}
+	conf := testnet.NetworkConfig{Nodes: nodes}
 
 	testingdock.Verbose = true
 
 	ctx := context.Background()
 
-	net, err := testnet.PrepareFlowNetwork(t, "col", nodes)
+	net, err := testnet.PrepareFlowNetwork(t, "col", conf)
 	require.Nil(t, err)
 
 	net.Start(ctx)

@@ -30,7 +30,7 @@ type xorshiftp struct {
 func NewRand(seed []byte) (*xorshifts, error) {
 	// safety check
 	if len(seed) == 0 || len(seed)%16 != 0 {
-		return nil, fmt.Errorf("seed length should be a non-zero multiple of 16")
+		return nil, fmt.Errorf("new Rand seed length should be a non-zero multiple of 16")
 	}
 	// create the xorshift128+ instances
 	states := make([]xorshiftp, 0, len(seed)/16)

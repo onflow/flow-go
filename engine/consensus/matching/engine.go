@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -226,7 +226,7 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 	// get the list of approvers so we can tally their votes
 	// get all execution node identities from the state
 	approvers, err := e.state.AtBlockID(blockID).Identities(
-		filter.HasStake,
+		filter.HasStake(true),
 		filter.HasRole(flow.RoleVerification),
 	)
 	if err != nil {

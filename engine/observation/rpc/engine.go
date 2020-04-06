@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	access "github.com/dapperlabs/flow-go/protobuf/services/access"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
 

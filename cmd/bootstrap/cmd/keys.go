@@ -7,34 +7,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/crypto"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type NodeConfig struct {
-	Role    flow.Role
-	Address string
-	Stake   uint64
-}
+func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 
-type NodeInfoPriv struct {
-	Role           flow.Role
-	Address        string
-	NodeID         flow.Identifier
-	NetworkPrivKey EncodableNetworkPrivKey
-	StakingPrivKey EncodableStakingPrivKey
-}
-
-type NodeInfoPub struct {
-	Role          flow.Role
-	Address       string
-	NodeID        flow.Identifier
-	NetworkPubKey EncodableNetworkPubKey
-	StakingPubKey EncodableStakingPubKey
-	Stake         uint64
-}
-
-func genNetworkAndStakingKeys(partnerNodes []NodeInfoPub) ([]NodeInfoPub, []NodeInfoPriv) {
-	var nodeConfigs []NodeConfig
+	var nodeConfigs []model.NodeConfig
 	readJSON(flagConfig, &nodeConfigs)
 	nodes := len(nodeConfigs)
 	log.Info().Msgf("read %v node configurations", nodes)
@@ -56,35 +35,49 @@ func genNetworkAndStakingKeys(partnerNodes []NodeInfoPub) ([]NodeInfoPub, []Node
 	}
 	log.Info().Msgf("generated %v staking keys for nodes in config", nodes)
 
-	nodeInfosPub := make([]NodeInfoPub, 0, nodes)
-	nodeInfosPriv := make([]NodeInfoPriv, 0, nodes)
+	internalNodes := make([]model.NodeInfo, 0, len(nodeConfigs))
 	for i, nodeConfig := range nodeConfigs {
 		log.Debug().Int("i", i).Str("address", nodeConfig.Address).Msg("assembling node information")
-		nodeInfoPriv, nodeInfoPub := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
-		nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
-		nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfoPriv.NodeID), nodeInfoPriv)
+
+		nodeInfo := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
+		internalNodes = append(internalNodes, nodeInfo)
+
+		// retrieve private representation of the node
+		private, err := nodeInfo.Private()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not access private key for internal node")
+		}
+
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
 	}
 
 	log.Debug().Msgf("will generate additionally needed collector nodes to have majority in each cluster")
-	addNodeInfosPriv, addNodeInfosPub := generateAdditionalInternalCollectors(int(flagCollectionClusters),
-		int(minNodesPerCluster), filterCollectorNodes(nodeInfosPub), filterCollectorNodes(partnerNodes))
+	addNodeInfos := generateAdditionalInternalCollectors(
+		int(flagCollectionClusters),
+		int(minNodesPerCluster),
+		model.FilterByRole(internalNodes, flow.RoleCollection),
+		model.FilterByRole(partnerNodes, flow.RoleCollection),
+	)
 
-	// add additional collectors
-	for i := range addNodeInfosPriv {
-		nodeInfosPub = append(nodeInfosPub, addNodeInfosPub[i])
-		nodeInfosPriv = append(nodeInfosPriv, addNodeInfosPriv[i])
+	// add additional internal collectors
+	internalNodes = append(internalNodes, addNodeInfos...)
+	log.Info().Msgf("generated %v additional internal nodes for collection clusters", len(addNodeInfos))
+
+	for _, nodeInfo := range internalNodes {
+		// retrieve private representation of the node
+		private, err := nodeInfo.Private()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not access private key for internal node")
+		}
+
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
 	}
-	log.Info().Msgf("generated %v additional internal nodes for collection clusters", len(addNodeInfosPriv))
 
-	for _, nodeInfoPriv := range nodeInfosPriv {
-		writeJSON(fmt.Sprintf(FilenameNodeInfoPriv, nodeInfoPriv.NodeID), nodeInfoPriv)
-	}
-
-	return nodeInfosPub, nodeInfosPriv
+	return internalNodes
 }
 
-func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.PrivateKey) (NodeInfoPriv, NodeInfoPub) {
+func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey) model.NodeInfo {
+
 	nodeID, err := flow.PublicKeyToID(stakingKey.PublicKey())
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate NodeID from PublicKey")
@@ -95,27 +88,19 @@ func assembleNodeInfo(nodeConfig NodeConfig, networkKey, stakingKey crypto.Priva
 		Str("stakingPubKey", pubKeyToString(stakingKey.PublicKey())).
 		Msg("encoded public staking and network keys")
 
-	nodeInfoPriv := NodeInfoPriv{
-		Role:           nodeConfig.Role,
-		Address:        nodeConfig.Address,
-		NodeID:         nodeID,
-		NetworkPrivKey: EncodableNetworkPrivKey{networkKey},
-		StakingPrivKey: EncodableStakingPrivKey{stakingKey},
-	}
+	nodeInfo := model.NewPrivateNodeInfo(
+		nodeID,
+		nodeConfig.Role,
+		nodeConfig.Address,
+		nodeConfig.Stake,
+		networkKey,
+		stakingKey,
+	)
 
-	nodeInfoPub := NodeInfoPub{
-		Role:          nodeConfig.Role,
-		Address:       nodeConfig.Address,
-		NodeID:        nodeID,
-		NetworkPubKey: EncodableNetworkPubKey{networkKey.PublicKey()},
-		StakingPubKey: EncodableStakingPubKey{stakingKey.PublicKey()},
-		Stake:         nodeConfig.Stake,
-	}
-
-	return nodeInfoPriv, nodeInfoPub
+	return nodeInfo
 }
 
-func validateAddressesUnique(ns []NodeConfig) {
+func validateAddressesUnique(ns []model.NodeConfig) {
 	lookup := make(map[string]struct{})
 	for _, n := range ns {
 		if _, ok := lookup[n.Address]; ok {

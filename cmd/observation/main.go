@@ -7,9 +7,14 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/buffer"
+	"github.com/dapperlabs/flow-go/module/signature"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/observation/ingestion"
@@ -84,8 +89,19 @@ func main() {
 			// state when the follower detects newly finalized blocks
 			final := followerfinalizer.NewFinalizer(node.DB)
 
+			// initialize the staking & beacon verifiers, signature joiner
+			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			merger := signature.NewCombiner()
+
+			// define the node set that is valid as signers
+			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+
 			// create a follower with the ingestEng as the finalization notification consumer
-			core, err := follower.New(node.Me, node.State, node.DKGPubData, &node.GenesisBlock.Header, node.GenesisQC, final, ingestEng, node.Logger)
+			core, err := follower.New(node.Me, node.State, &node.GenesisBlock.Header, node.GenesisQC, verifier, final, ingestEng, node.Logger)
 			if err != nil {
 				// TODO for now we ignore failures in follower
 				// this is necessary for integration tests to run, until they are

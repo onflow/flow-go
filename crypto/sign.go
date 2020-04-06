@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // revive:disable:var-naming
@@ -69,14 +71,14 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 		})
 		return ECDSA_SECp256k1Instance, nil
 	}
-	return nil, cryptoError{fmt.Sprintf("the signature scheme %s is not supported.", algo)}
+	return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
 }
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
 	signer, err := NewSigner(algo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("key generation failed: %w", err)
 	}
 	return signer.generatePrivateKey(seed)
 }
@@ -85,7 +87,7 @@ func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) 
 func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 	signer, err := NewSigner(algo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode private key failed: %w", err)
 	}
 	return signer.decodePrivateKey(data)
 }
@@ -94,7 +96,7 @@ func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 	signer, err := NewSigner(algo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode public key failed: %w", err)
 	}
 	return signer.decodePublicKey(data)
 }
@@ -128,7 +130,7 @@ type PrivateKey interface {
 	// KeySize return the key size in bytes.
 	KeySize() int
 	// Sign generates a signature using the provided hasher.
-	Sign([]byte, Hasher) (Signature, error)
+	Sign([]byte, hash.Hasher) (Signature, error)
 	// PublicKey returns the public key.
 	PublicKey() PublicKey
 	// Encode returns a bytes representation of the private key
@@ -146,7 +148,7 @@ type PublicKey interface {
 	// KeySize return the key size in bytes.
 	KeySize() int
 	// Verify verifies a signature of an input message using the provided hasher.
-	Verify(Signature, []byte, Hasher) (bool, error)
+	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
 	Encode() ([]byte, error)
 	// Equals returns true if the given PublicKeys are equal. Keys are considered unequal if their algorithms are

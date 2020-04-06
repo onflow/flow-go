@@ -5,6 +5,7 @@ import (
 
 	"math/rand"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,9 +24,11 @@ func TestECDSA(t *testing.T) {
 	for i, curve := range ECDSAcurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
 
-		halg := NewSHA3_256()
+		halg := hash.NewSHA3_256()
 		seed := make([]byte, ECDSAseedLen[i])
-		rand.Read(seed)
+		n, err := rand.Read(seed)
+		require.Equal(t, n, ECDSAseedLen[i])
+		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(curve, seed)
 		if err != nil {
 			log.Error(err.Error())
@@ -38,25 +41,25 @@ func TestECDSA(t *testing.T) {
 
 // Signing bench
 func BenchmarkECDSA_P256Sign(b *testing.B) {
-	halg := NewSHA3_256()
+	halg := hash.NewSHA3_256()
 	benchSign(b, ECDSA_P256, halg)
 }
 
 // Verifying bench
 func BenchmarkECDSA_P256Verify(b *testing.B) {
-	halg := NewSHA3_256()
+	halg := hash.NewSHA3_256()
 	benchVerify(b, ECDSA_P256, halg)
 }
 
 // Signing bench
 func BenchmarkECDSA_SECp256k1Sign(b *testing.B) {
-	halg := NewSHA3_256()
+	halg := hash.NewSHA3_256()
 	benchSign(b, ECDSA_SECp256k1, halg)
 }
 
 // Verifying bench
 func BenchmarkECDSA_SECp256k1Verify(b *testing.B) {
-	halg := NewSHA3_256()
+	halg := hash.NewSHA3_256()
 	benchVerify(b, ECDSA_SECp256k1, halg)
 }
 
@@ -77,7 +80,9 @@ func TestECDSAEncodeDecode(t *testing.T) {
 		t.Logf("Testing encode/decode for curve %s", curve)
 		// Key generation seed
 		seed := make([]byte, ECDSAseedLen[i])
-		rand.Read(seed)
+		read, err := rand.Read(seed)
+		require.Equal(t, read, ECDSAseedLen[i])
+		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(curve, seed)
 		assert.Nil(t, err, "the key generation has failed")
 
@@ -116,7 +121,9 @@ func TestECDSAEquals(t *testing.T) {
 	for i, curve := range ECDSAcurves {
 		// generate a key pair
 		seed := make([]byte, ECDSAseedLen[i])
-		rand.Read(seed)
+		n, err := rand.Read(seed)
+		require.Equal(t, n, ECDSAseedLen[i])
+		require.NoError(t, err)
 		// first pair
 		sk1, err := GeneratePrivateKey(curve, seed)
 		require.NoError(t, err)
@@ -130,7 +137,9 @@ func TestECDSAEquals(t *testing.T) {
 		require.NoError(t, err)
 		pk3 := sk3.PublicKey()
 		// fourth pair after changing the seed
-		rand.Read(seed)
+		n, err = rand.Read(seed)
+		require.Equal(t, n, ECDSAseedLen[i])
+		require.NoError(t, err)
 		sk4, err := GeneratePrivateKey(curve, seed)
 		require.NoError(t, err)
 		pk4 := sk4.PublicKey()

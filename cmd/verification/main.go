@@ -9,16 +9,21 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
+	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/chunks"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/module/metrics/verification"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -148,13 +153,24 @@ func main() {
 			// state when the follower detects newly finalized blocks
 			final := finalizer.NewFinalizer(node.DB)
 
+			// initialize the staking & beacon verifiers, signature joiner
+			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			merger := signature.NewCombiner()
+
+			// define the node set that is valid as signers
+			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
 			core, err := follower.New(node.Me,
 				node.State,
-				node.DKGPubData,
 				&node.GenesisBlock.Header,
 				node.GenesisQC,
+				verifier,
 				final,
 				ingestEng,
 				node.Logger)

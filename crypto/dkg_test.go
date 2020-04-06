@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"crypto/rand"
 	"sync"
 	"testing"
 	"time"
@@ -158,8 +159,10 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 
 	// start DKG in all nodes
 	// start listening on the channels
-	h, _ := NewHasher(SHA3_256)
-	seed := h.ComputeHash([]byte{1, 2, 3})
+	seed := make([]byte, SeedMinLenDKG)
+	read, err := rand.Read(seed)
+	require.Equal(t, read, SeedMinLenDKG)
+	require.NoError(t, err)
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		// start dkg could also run in parallel
@@ -280,7 +283,7 @@ func dkgRunChan(proc *testDKGProcessor,
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving from %d:", proc.current, newMsg.orig)
-			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.data)
+			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
 			require.Nil(t, err)
 		// if timeout, stop and finalize
 		case <-time.After(200 * time.Millisecond):

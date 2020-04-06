@@ -2,6 +2,10 @@
 
 package crypto
 
+import (
+	"errors"
+)
+
 // Implements Feldman Verifiable Secret Sharing using BLS set up on BLS381 curve.
 // Private keys are Zr elements while public keys are G2 elements
 
@@ -41,7 +45,7 @@ func (s *feldmanVSSstate) init() {
 
 func (s *feldmanVSSstate) StartDKG(seed []byte) error {
 	if s.running {
-		return cryptoError{"dkg is already running"}
+		return errors.New("dkg is already running")
 	}
 
 	s.running = true
@@ -54,11 +58,11 @@ func (s *feldmanVSSstate) StartDKG(seed []byte) error {
 
 func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
-		return nil, nil, nil, cryptoError{"dkg is not running"}
+		return nil, nil, nil, errors.New("dkg is not running")
 	}
 	s.running = false
 	if !s.validKey {
-		return nil, nil, nil, cryptoError{"keys are not correct"}
+		return nil, nil, nil, errors.New("keys are not correct")
 	}
 	// private key of the current node
 	x := &PrKeyBLS_BLS12381{
@@ -90,12 +94,12 @@ const (
 	verifVectorSize = PubKeyLenBLS_BLS12381
 )
 
-func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg []byte) error {
+func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	if !s.running {
-		return cryptoError{"dkg is not running"}
+		return errors.New("dkg is not running")
 	}
-	if orig >= s.Size() {
-		return cryptoError{"wrong input"}
+	if orig >= s.Size() || orig < 0 {
+		return errors.New("wrong input")
 	}
 
 	if len(msg) == 0 {
@@ -123,10 +127,10 @@ func (s *feldmanVSSstate) ReceiveDKGMsg(orig int, msg []byte) error {
 
 func (s *feldmanVSSstate) Disqualify(node int) error {
 	if !s.running {
-		return cryptoError{"dkg is not running"}
+		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() {
-		return cryptoError{"wrong input"}
+		return errors.New("wrong input")
 	}
 	if index(node) == s.leaderIndex {
 		s.validKey = false

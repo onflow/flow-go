@@ -11,7 +11,7 @@ import (
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -242,7 +242,7 @@ type SMT struct {
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
 func HashLeaf(key []byte, value []byte) []byte {
-	hasher := crypto.NewSHA3_256()
+	hasher := hash.NewSHA3_256()
 	_, err := hasher.Write(key)
 	if err != nil {
 		panic(err)
@@ -257,7 +257,7 @@ func HashLeaf(key []byte, value []byte) []byte {
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
-	hasher := crypto.NewSHA3_256()
+	hasher := hash.NewSHA3_256()
 	_, err := hasher.Write(hash1)
 	if err != nil {
 		panic(err)
@@ -1195,7 +1195,7 @@ func EncodeProof(pholder *proofHolder) [][]byte {
 }
 
 // DecodeProof takes in an encodes array of byte arrays an converts them into a proofHolder
-func DecodeProof(proofs [][]byte) *proofHolder {
+func DecodeProof(proofs [][]byte) (*proofHolder, error) {
 	flags := make([][]byte, 0)
 	newProofs := make([][][]byte, 0)
 	inclusions := make([]bool, 0)
@@ -1207,15 +1207,22 @@ func DecodeProof(proofs [][]byte) *proofHolder {
 	// Each subsequent 32 bytes are the proofs needed for the verifier
 	// Each result is put into their own array and put into a proofHolder
 	for _, proof := range proofs {
+		if len(proof) < 4 {
+			return nil, fmt.Errorf("error decoding the proof: proof size too small")
+		}
 		byteInclusion := proof[0:1]
 		inclusion := utils.IsBitSet(byteInclusion, 0)
 		inclusions = append(inclusions, inclusion)
 		size := proof[1:2]
 		sizes = append(sizes, size...)
 		flagSize := int(proof[2])
+		if flagSize < 1 {
+			return nil, fmt.Errorf("error decoding the proof: flag size should be greater than 0")
+		}
 		flags = append(flags, proof[3:flagSize+3])
 		byteProofs := make([][]byte, 0)
 		for i := flagSize + 3; i < len(proof); i += 32 {
+			// TODO understand the logic here
 			if i+32 <= len(proof) {
 				byteProofs = append(byteProofs, proof[i:i+32])
 			} else {
@@ -1224,5 +1231,5 @@ func DecodeProof(proofs [][]byte) *proofHolder {
 		}
 		newProofs = append(newProofs, byteProofs)
 	}
-	return newProofHolder(flags, newProofs, inclusions, sizes)
+	return newProofHolder(flags, newProofs, inclusions, sizes), nil
 }
