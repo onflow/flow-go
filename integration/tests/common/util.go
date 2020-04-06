@@ -1,4 +1,4 @@
-package testutil
+package common
 
 import (
 	"bytes"
@@ -9,9 +9,38 @@ import (
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func ReadCounter(ctx context.Context, client *testnet.Client) (int, error) {
+func deployCounter(ctx context.Context, client *testnet.Client) error {
+
+	contract := dsl.Contract{
+		Name: "Testing",
+		Members: []dsl.CadenceCode{
+			dsl.Resource{
+				Name: "Counter",
+				Code: `
+				pub var count: Int
+
+				init() {
+					self.count = 0
+				}
+				pub fun add(_ count: Int) {
+					self.count = self.count + count
+				}`,
+			},
+			dsl.Code(`
+				pub fun createCounter(): @Counter {
+					return <-create Counter()
+      			}`,
+			),
+		},
+	}
+
+	return client.DeployContract(ctx, contract)
+}
+
+func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
 	script := dsl.Main{
 		ReturnType: "Int",
@@ -32,17 +61,22 @@ func ReadCounter(ctx context.Context, client *testnet.Client) (int, error) {
 	return int(i.Value.Int64()), nil
 }
 
-func CreateCounter(ctx context.Context, client *testnet.Client) error {
-	return client.SendTransaction(ctx, dsl.Transaction{
+func createCounter(ctx context.Context, client *testnet.Client) error {
+
+	txDSL := dsl.Transaction{
 		Import: dsl.Import{Address: flow.RootAddress},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				if signer.storage[Testing.Counter] == nil {
-				let existing <- signer.storage[Testing.Counter] <- Testing.CreateCounter()
+				let existing <- signer.storage[Testing.Counter] <- Testing.createCounter()
             	    destroy existing
             	    signer.published[&Testing.Counter] = &signer.storage[Testing.Counter] as Testing.Counter
             	}
             	signer.published[&Testing.Counter]?.add(2)`),
-		}})
+		},
+	}
+
+	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
+	return client.SendTransaction(ctx, tx)
 
 }
