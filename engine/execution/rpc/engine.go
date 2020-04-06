@@ -115,7 +115,7 @@ func (h *handler) ExecuteScriptAtLatestBlock(_ context.Context,
 func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 
-	blockIDs := req.BlockIds
+	blockIDs := req.GetBlockIds()
 	if len(blockIDs) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "no block IDs provided")
 	}
