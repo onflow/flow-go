@@ -15,7 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
-	verificationmetrics "github.com/dapperlabs/flow-go/module/metrics/verification"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -26,14 +26,14 @@ import (
 // constructing a partial trie, executing transactions and check the final state commitment and
 // other chunk meta data (e.g. tx count)
 type Engine struct {
-	unit    *engine.Unit                        // used to control startup/shutdown
-	log     zerolog.Logger                      // used to log relevant actions
-	conduit network.Conduit                     // used to propagate result approvals
-	me      module.Local                        // used to access local node information
-	state   protocol.State                      // used to access the protocol state
-	rah     crypto.Hasher                       // used as hasher to sign the result approvals
-	chVerif module.ChunkVerifier                // used to verify chunks
-	mc      verificationmetrics.MetricsConsumer // used to capture the performance metrics
+	unit    *engine.Unit                // used to control startup/shutdown
+	log     zerolog.Logger              // used to log relevant actions
+	conduit network.Conduit             // used to propagate result approvals
+	me      module.Local                // used to access local node information
+	state   protocol.State              // used to access the protocol state
+	rah     crypto.Hasher               // used as hasher to sign the result approvals
+	chVerif module.ChunkVerifier        // used to verify chunks
+	mc      metrics.VerificationMetrics // used to capture the performance metrics
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -43,7 +43,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	chVerif module.ChunkVerifier,
-	mc *verificationmetrics.MetricsConsumer,
+	mc metrics.VerificationMetrics,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -109,13 +109,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *verification.VerifiableChunk:
-		// starts verification performance metrics trackers
-		e.mc.OnChunkVerificationStated(resource.ChunkDataPack.ChunkID)
-		// starts verification of chunk
-		err := e.verify(originID, resource)
-		// closes verification performance metrics trackers
-		e.mc.OnChunkVerificationFinished(resource.ChunkDataPack.ChunkID, resource.Block.ID())
-		return err
+		return e.verifyWithMetrics(originID, resource)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
@@ -262,4 +256,23 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 		Body:              body,
 		VerifierSignature: bodySign,
 	}, nil
+}
+
+func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.VerifiableChunk) error {
+	// starts verification performance metrics trackers
+	if ch.ChunkDataPack != nil {
+		e.mc.OnChunkVerificationStated(ch.ChunkDataPack.ChunkID)
+	}
+	// starts verification of chunk
+	err := e.verify(originID, ch)
+	if err != nil {
+		return err
+	}
+	// closes verification performance metrics trackers
+	if ch.ChunkDataPack != nil && ch.Receipt != nil {
+		chunkID := ch.ChunkDataPack.ChunkID
+		blockID := ch.Receipt.ExecutionResult.ExecutionResultBody.BlockID
+		e.mc.OnChunkVerificationFinished(chunkID, blockID)
+	}
+	return nil
 }

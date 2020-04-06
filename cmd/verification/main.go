@@ -109,7 +109,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 			chunkVerifier := chunks.NewChunkVerifier(vm)
-			mc := verification.NewMetricsConsumer(node.Tracer)
+			mc := verification.NewMetrics(node.Tracer)
 			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, mc)
 			return verifierEng, err
 		}).
