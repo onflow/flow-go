@@ -70,11 +70,11 @@ func NewPSMT(
 
 	// check size of key, values and proofs
 	if len(keys) != len(values) {
-		return nil, fmt.Errorf("keys' size and values' size doesn't match")
+		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(values))
 	}
 
 	if len(keys) != len(proofholder.sizes) {
-		return nil, fmt.Errorf("keys' size and proofs' size doesn't match")
+		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(proofholder.sizes))
 	}
 
 	// iterating over proofs for building the tree
@@ -132,7 +132,7 @@ func NewPSMT(
 			psmt.keyLookUp[string(key)] = currentNode
 
 		} else { // exclusion proof
-			// for exclusion proofs we continue expand the tree till reaching the leaf node
+			// for exclusion proofs we continue expanding the tree till it reaches the leaf node
 			// this will simplify the update operations for these nodes
 			// by differentiating unknown registers and unset registers
 			for j := currentNode.height; j > 0; j-- {

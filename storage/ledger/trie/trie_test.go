@@ -2557,7 +2557,7 @@ func TestProofEncoderDecoder(t *testing.T) {
 
 		p, err := DecodeProof(EncodeProof(proofHldr))
 		require.NoError(t, err)
-		require.Equal(t, p, proofHldr, "Proof Encoder has an issue")
+		require.Equal(t, p, proofHldr, "Proof encoder and/or decoder has an issue")
 	})
 
 	trieHeight = 257
@@ -2582,7 +2582,7 @@ func TestProofEncoderDecoder(t *testing.T) {
 
 		p, err := DecodeProof(EncodeProof(proofHldr))
 		require.NoError(t, err)
-		require.Equal(t, p, proofHldr, "Proof Encoder has an issue")
+		require.Equal(t, p, proofHldr, "Proof encoder and/or decoder has an issue")
 	})
 }
 
