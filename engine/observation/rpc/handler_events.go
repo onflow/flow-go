@@ -59,7 +59,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 func (h *Handler) GetEventsForBlockIDs(ctx context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 
 	if req.BlockIds == nil || len(req.BlockIds) == 0 {
-		return nil, status.Error(codes.InvalidArgument, " block ids not specified")
+		return nil, status.Error(codes.InvalidArgument, "block IDs not specified")
 	}
 
 	// forward the request to the execution node
