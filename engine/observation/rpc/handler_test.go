@@ -227,7 +227,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 func (suite *Suite) TestGetEventsForBlockIDs() {
 
-	blockIDs := getIds(5)
+	blockIDs := getIDs(5)
 	events := getEvents(10)
 
 	req := &access.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}

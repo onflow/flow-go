@@ -120,7 +120,12 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		return nil, status.Errorf(codes.InvalidArgument, "no block IDs provided")
 	}
 
-	eType := flow.EventType(req.GetType())
+	reqEvent := req.GetType()
+	if reqEvent == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid event type")
+	}
+
+	eType := flow.EventType(reqEvent)
 
 	events := make([]*entities.Event, 0)
 
@@ -133,7 +138,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 			return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 		}
 
-		for _, e := range flowEvents {
+		for _, e := range blockEvents {
 			event := convert.EventToMessage(e)
 			events = append(events, event)
 		}
