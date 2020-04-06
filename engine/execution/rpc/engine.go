@@ -116,7 +116,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 
 	blockIDs := req.BlockIds
-	if blockIDs == nil || len(blockIDs) < 0 {
+	if len(blockIDs) == 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "no block IDs provided")
 	}
 
