@@ -71,7 +71,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// check the response
 	suite.Require().NoError(err)
-	actualEvents := resp.Events
+	actualEvents := resp.GetEvents()
 	expectedEvents := make([]*entities.Event, totalEvents)
 	for i, e := range events {
 		expectedEvents[i] = convert.EventToMessage(e)
