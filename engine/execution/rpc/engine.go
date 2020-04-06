@@ -128,7 +128,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	for _, b := range blockIDs {
 		bID := flow.HashToID(b)
 
-		flowEvents, err := h.events.ByBlockIDEventType(bID, eType)
+		blockEvents, err := h.events.ByBlockIDEventType(bID, eType)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 		}
