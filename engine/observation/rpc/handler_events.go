@@ -13,7 +13,7 @@ import (
 func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
 
 	// validate the request
-	if req.StartHeight < 0 || req.EndHeight < 0 || req.EndHeight < req.StartHeight {
+	if req.EndHeight < req.StartHeight {
 		return nil, status.Error(codes.InvalidArgument, " invalid start or end height")
 	}
 

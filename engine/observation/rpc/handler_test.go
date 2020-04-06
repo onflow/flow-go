@@ -364,7 +364,7 @@ func (suite *Suite) checkResponse(resp interface{}, err error) {
 
 func getIds(n int) [][]byte {
 	ids := make([][]byte, n)
-	for i, _ := range ids {
+	for i := range ids {
 		id := unittest.IdentifierFixture()
 		ids[i] = id[:]
 	}
@@ -373,7 +373,7 @@ func getIds(n int) [][]byte {
 
 func getEvents(n int) []*entities.Event {
 	events := make([]*entities.Event, 10)
-	for i, _ := range events {
+	for i := range events {
 		event := entities.Event{Type: string(flow.EventAccountCreated)}
 		events[i] = &event
 	}
