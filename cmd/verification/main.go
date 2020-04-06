@@ -23,8 +23,8 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/module/metrics/verification"
+	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 

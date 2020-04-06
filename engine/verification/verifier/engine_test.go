@@ -36,7 +36,7 @@ type VerifierEngineTestSuite struct {
 	me      *MockLocal
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
-	conduit *network.Conduit // mocks conduit for submitting result approvals
+	conduit *network.Conduit          // mocks conduit for submitting result approvals
 	metrics *mock.VerificationMetrics // mocks performance monitoring metrics
 }
 
