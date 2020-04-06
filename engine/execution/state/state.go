@@ -63,6 +63,8 @@ type ExecutionState interface {
 	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
 
 	PersistStateViews(blockID flow.Identifier, views []*delta.View) error
+
+	UpdateHighestExecutedBlockIfHigher(header *flow.Header) error
 }
 
 type state struct {
@@ -273,4 +275,22 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 		StartState: startStateCommitment,
 		EndState:   endStateCommitment,
 	}, nil
+}
+
+func (s *state) UpdateHighestExecutedBlockIfHigher(header *flow.Header) error {
+	return s.db.Update(func(txn *badger.Txn) error {
+		var number uint64
+		var blockID flow.Identifier
+		err := operation.RetrieveHighestExecutedBlockNumber(&number, &blockID)(txn)
+		if err != nil && err != storage.ErrNotFound {
+			return fmt.Errorf("cannot retrieve highest executed block: %w", err)
+		}
+		if number < header.Height {
+			err = operation.UpdateHighestExecutedBlockNumber(header.Height, header.ID())(txn)
+			if err != nil {
+				return fmt.Errorf("cannot update highest executed block: %w", err)
+			}
+		}
+		return nil
+	})
 }

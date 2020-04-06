@@ -193,7 +193,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	ls, err := ledger.NewTrieStorage(dbDir)
 	require.NoError(t, err)
 
+	genesisHead, err := node.State.Final().Head()
+	require.NoError(t, err)
+
 	_, err = bootstrap.BootstrapLedger(ls)
+	require.NoError(t, err)
+
+	err = bootstrap.BootstrapExecutionDatabase( node.DB, genesisHead)
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, chunkDataPackStorage, executionResults, node.DB)

@@ -72,7 +72,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	providerEngine := new(provider.ProviderEngine)
 	protocolState := new(protocol.State)
 	executionState := new(state.ExecutionState)
-	mutator := new(protocol.Mutator)
+	//mutator := new(protocol.Mutator)
 	snapshot := new(protocol.Snapshot)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
@@ -82,8 +82,8 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 		return identityList.Filter(f[0])
 	}, nil)
 
-	protocolState.On("Mutate").Return(mutator)
-	mutator.On("Finalize", mock.Anything).Return(nil)
+	//protocolState.On("Mutate").Return(mutator)
+	//mutator.On("Finalize", mock.Anything).Return(nil)
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
@@ -205,6 +205,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 	ctx.executionState.On("GetExecutionResultID", executableBlock.Block.ParentID).Return(func(blockID flow.Identifier) flow.Identifier {
 		return previousExecutionResultID
 	}, nil)
+
+	ctx.executionState.On("UpdateHighestExecutedBlockIfHigher", &executableBlock.Block.Header).Return(nil)
 
 	ctx.executionState.On("PersistExecutionResult", executableBlock.Block.ID(), mock.MatchedBy(func(er flow.ExecutionResult) bool {
 		return er.BlockID == executableBlock.Block.ID() && er.PreviousResultID == previousExecutionResultID

@@ -336,3 +336,17 @@ func (_m *ExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) ([]byte,
 
 	return r0, r1
 }
+
+// UpdateHighestExecutedBlockIfHigher provides a mock function with given fields: header
+func (_m *ExecutionState) UpdateHighestExecutedBlockIfHigher(header *flow.Header) error {
+	ret := _m.Called(header)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.Header) error); ok {
+		r0 = rf(header)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

@@ -39,4 +39,5 @@ type ExecutionStateDelta struct {
 	StateViews []*delta.View
 	StartState flow.StateCommitment
 	EndState   flow.StateCommitment
+	Events     []flow.Event
 }

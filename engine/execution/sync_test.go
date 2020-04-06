@@ -56,7 +56,7 @@ func TestSyncFlow(t *testing.T) {
 	//	col3.ID(): col3,
 	//}
 
-	//Create two blocks, with one tx each
+	//Create three blocks, with one tx each
 	block1 := &flow.Block{
 		Header: flow.Header{
 			ParentID: genesis.ID(),

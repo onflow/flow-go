@@ -65,7 +65,7 @@ func main() {
 			return err
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
+			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, )
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
@@ -74,6 +74,11 @@ func main() {
 			}
 			if !bytes.Equal(flow.GenesisStateCommitment, block.Seals[0].FinalState) {
 				panic("genesis seal state commitment different from precalculated")
+			}
+
+			err = bootstrap.BootstrapExecutionDatabase(node.DB, &block.Header)
+			if err != nil {
+				panic(fmt.Sprintf("error while boostrapping execution state - cannot bootstrap database: %s", err))
 			}
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

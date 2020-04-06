@@ -12,9 +12,9 @@ import (
 const (
 
 	// special database markers
-	codeBoundary = 1 // latest finalized block number
-	codeNumber   = 2 // lookup for block by number
-	codeDelta    = 3 // history of stake changes
+	codeBoundary             = 1 // latest finalized block number
+	codeFinalizedBlockNumber = 2 // lookup for block by number
+	codeDelta                = 3 // history of stake changes
 
 	// block header and entities included in block contents
 	codeHeader    = 10
@@ -42,6 +42,7 @@ const (
 	codeIndexExecutionResultByBlock  = 106
 	codeIndexCollectionByTransaction = 107
 	codeIndexHeaderByCollection      = 108
+	codeHighestExecutedBlockNumber   = 109 //highest executed block number
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

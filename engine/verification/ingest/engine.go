@@ -792,7 +792,7 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 				e.log.Error().
 					Err(err).
 					Hex("receipt_id", logging.ID(p.Receipt.ID())).
-					Hex("origin_id", logging.ID(origin.NodeID)).
+					Hex("origin_id", logging.ID(p.OriginID)).
 					Msg("could not verify origin ID of pending receipt")
 			} else {
 				// execution results are only valid from execution nodes

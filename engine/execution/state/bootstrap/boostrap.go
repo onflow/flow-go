@@ -4,14 +4,17 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-// BootstrapLedger adds the above root account to the ledger
+// BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
 func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
@@ -23,6 +26,18 @@ func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
 	}
 
 	return newStateCommitment, nil
+}
+
+func BootstrapExecutionDatabase(db *badger.DB, genesis *flow.Header) error {
+	err := db.Update(func(txn *badger.Txn) error {
+		return operation.InsertHighestExecutedBlockNumber(genesis.Height, genesis.ID())(txn)
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func BootstrapView(view *delta.View) {

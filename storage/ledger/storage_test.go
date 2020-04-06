@@ -1,4 +1,4 @@
-package ledger
+package ledger_test
 
 import (
 	"testing"
@@ -7,13 +7,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestNewTrieStorage(t *testing.T) {
 	unittest.RunWithTempDBDir(t, func(dbDir string) {
-		_, err := NewTrieStorage(dbDir)
+		_, err := ledger.NewTrieStorage(dbDir)
 		assert.NoError(t, err)
 	})
 }
@@ -22,7 +23,7 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	t.Run("mismatched IDs and values", func(t *testing.T) {
 		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
-			f, err := NewTrieStorage(dbDir)
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
@@ -40,7 +41,7 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	t.Run("empty update", func(t *testing.T) {
 		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
-			f, err := NewTrieStorage(dbDir)
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			// create empty values
@@ -60,7 +61,7 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	t.Run("non-empty update", func(t *testing.T) {
 		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
-			f, err := NewTrieStorage(dbDir)
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
@@ -83,7 +84,7 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	t.Run("mismatched IDs and values", func(t *testing.T) {
 		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
-			f, err := NewTrieStorage(dbDir)
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
@@ -101,7 +102,7 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	t.Run("empty update", func(t *testing.T) {
 		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
-			f, err := NewTrieStorage(dbDir)
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			currentRoot := f.EmptyStateCommitment()
@@ -121,7 +122,7 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	t.Run("non-empty update", func(t *testing.T) {
 		unittest.RunWithTempDBDir(t, func(dbDir string) {
 
-			f, err := NewTrieStorage(dbDir)
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()

@@ -82,6 +82,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		Guarantees: guarantees,
 	}
 	header := unittest.BlockHeaderFixture()
+	header.Height = 0
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{

@@ -190,11 +190,12 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	// However, for executing scripts we need latest finalized state and
 	// we need protocol state to be able to find other nodes
 	// Once the Consensus Follower is ready to be implemented, this should be replaced
-	blockID := block.Header.ID()
-	err = e.state.Mutate().Finalize(blockID)
-	if err != nil {
-		return fmt.Errorf("could not finalize block: %w", err)
-	}
+
+	//blockID := block.Header.ID()
+	//err = e.state.Mutate().Finalize(blockID)
+	//if err != nil {
+	//	return fmt.Errorf("could not finalize block: %w", err)
+	//}
 
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
@@ -542,7 +543,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
-	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateViews, startState)
+	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateViews, result.Events, startState)
 	if err != nil {
 		return nil, err
 	}
@@ -555,7 +556,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
 
-func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.View, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.View, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
 
 	err := e.execState.PersistStateViews(block.ID(), stateViews)
 	if err != nil {
@@ -607,6 +608,11 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.Vie
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
 
+	err = e.execState.UpdateHighestExecutedBlockIfHigher(&block.Header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update highest executed block: %w", err)
+	}
+
 	executionResult, err := e.generateExecutionResultForBlock(block, chunks, endState)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
@@ -621,13 +627,8 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.Vie
 		ExecutorID:        e.me.NodeID(),
 	}
 
-	err = e.execState.PersistStateCommitment(result.ExecutableBlock.Block.ID(), endState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to store state commitment: %w", err)
-	}
-
-	if len(result.Events) > 0 {
-		err = e.events.Store(result.ExecutableBlock.Block.ID(), result.Events)
+	if len(events) > 0 {
+		err = e.events.Store(block.ID(), events)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store events: %w", err)
 		}
@@ -638,7 +639,7 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.Vie
 		return nil, fmt.Errorf("could not send broadcast order: %w", err)
 	}
 
-	return endState, nil
+	return receipt, nil
 }
 
 // generateChunk creates a chunk from the provided computation data.
@@ -739,7 +740,7 @@ func (e *Engine) StartSync(targetBlock *entity.ExecutableBlock) {
 func (e *Engine) handleExecutionStateDelta(executionStateDelta *messages.ExecutionStateDelta, originID flow.Identifier) error {
 
 	//TODO - validate state sync, reject invalid messages, change provider
-	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateViews, executionStateDelta.StartState)
+	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateViews, executionStateDelta.Events, executionStateDelta.StartState)
 	if err != nil {
 		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).Err(err).Msg("fatal error while processing sync message")
 	}
