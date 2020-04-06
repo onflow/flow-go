@@ -323,7 +323,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.Require().Equal(expEvents, resp.Events)
 	})
 
-	suite.Run("valid request with max height > last finalized block height", func() {
+	suite.Run("valid request with max_height > last_finalized_block_height", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
 		expBlockIDs = setupStorage(minHeight, headHeight)
