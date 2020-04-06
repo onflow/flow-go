@@ -21,11 +21,10 @@ func Demo(logger zerolog.Logger, port int, exit chan os.Signal) {
 	// executes experiment
 	go sendMetrics()
 
-	select {
-	case <-exit:
-		log.Warn().Msg("component startup aborted")
-		os.Exit(1)
-	}
+	<-exit
+	log.Warn().Msg("component startup aborted")
+	os.Exit(1)
+
 }
 
 // sendMetrics increases result approvals counter and checked chunks counter 100 times each

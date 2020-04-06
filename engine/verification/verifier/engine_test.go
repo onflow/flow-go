@@ -60,11 +60,11 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 
 	// mocks metrics
 	suite.metrics.On("OnChunkVerificationStated", testifymock.Anything).
-		Run(func(args testifymock.Arguments) { return })
+		Run(func(args testifymock.Arguments) {})
 	suite.metrics.On("OnChunkVerificationFinished", testifymock.Anything, testifymock.Anything).
-		Run(func(args testifymock.Arguments) { return })
+		Run(func(args testifymock.Arguments) {})
 	suite.metrics.On("OnResultApproval", testifymock.Anything).
-		Run(func(args testifymock.Arguments) { return })
+		Run(func(args testifymock.Arguments) {})
 
 	// Mocks the signature oracle of the engine
 	//
