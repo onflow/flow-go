@@ -160,7 +160,9 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 	// start DKG in all nodes
 	// start listening on the channels
 	seed := make([]byte, SeedMinLenDKG)
-	rand.Read(seed)
+	read, err := rand.Read(seed)
+	require.Equal(t, read, SeedMinLenDKG)
+	require.NoError(t, err)
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		// start dkg could also run in parallel

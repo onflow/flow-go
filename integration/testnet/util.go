@@ -57,8 +57,8 @@ func getSeeds(n int) ([][]byte, error) {
 	seeds := make([][]byte, n)
 	for i := 0; i < n; i++ {
 		seed := make([]byte, 48)
-		_, err := rand.Read(seed)
-		if err != nil {
+		n, err := rand.Read(seed)
+		if err != nil || n != 48 {
 			return nil, err
 		}
 

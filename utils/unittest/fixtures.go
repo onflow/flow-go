@@ -322,7 +322,7 @@ func WithStake(stake uint64) func(*flow.Identity) {
 
 func generateRandomSeed() []byte {
 	seed := make([]byte, 48)
-	if _, err := crand.Read(seed); err != nil {
+	if n, err := crand.Read(seed); err != nil || n != 48 {
 		panic(err)
 	}
 	return seed

@@ -14,7 +14,9 @@ import (
 func TestDeterministicKeyGen(t *testing.T) {
 	// 2 keys generated with the same seed should be equal
 	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
-	rand.Read(seed)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLenBLS_BLS12381)
+	require.NoError(t, err)
 	sk1, err := GeneratePrivateKey(BLS_BLS12381, seed)
 	require.Nil(t, err)
 	sk2, err := GeneratePrivateKey(BLS_BLS12381, seed)
@@ -27,9 +29,11 @@ func TestPRGseeding(t *testing.T) {
 	NewSigner(BLS_BLS12381)
 	// 2 scalars generated with the same seed should be equal
 	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
-	rand.Read(seed)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLenBLS_BLS12381)
+	require.NoError(t, err)
 	// 1st scalar (wrapped in a private key)
-	err := seedRelic(seed)
+	err = seedRelic(seed)
 	require.Nil(t, err)
 	var sk1 PrKeyBLS_BLS12381
 	err = randZr(&sk1.scalar)
