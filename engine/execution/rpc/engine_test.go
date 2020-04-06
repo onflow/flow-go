@@ -2,10 +2,13 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -60,22 +63,85 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		events:                       suite.events,
 	}
 
-	// create the API request
-	req := &access.GetEventsForBlockIDsRequest{
-		Type:     string(flow.EventAccountCreated),
-		BlockIds: blockIDs,
+	concoctReq := func(errType string, blockIDs [][]byte) *access.GetEventsForBlockIDsRequest {
+		return &access.GetEventsForBlockIDsRequest{
+			Type:     errType,
+			BlockIds: blockIDs,
+		}
 	}
 
-	// execute the call
-	resp, err := handler.GetEventsForBlockIDs(context.Background(), req)
+	// happy path - valid requests receives a valid response
+	suite.Run("happy path", func() {
 
-	// check the response
-	suite.Require().NoError(err)
-	actualEvents := resp.GetEvents()
-	expectedEvents := make([]*entities.Event, totalEvents)
-	for i, e := range events {
-		expectedEvents[i] = convert.EventToMessage(e)
-	}
-	suite.Require().ElementsMatch(expectedEvents, actualEvents)
-	suite.events.AssertExpectations(suite.T())
+		// create a valid API request
+		req := concoctReq(string(flow.EventAccountCreated), blockIDs)
+
+		// execute the GetEventsForBlockIDs call
+		resp, err := handler.GetEventsForBlockIDs(context.Background(), req)
+
+		// check that a successful response is received
+		suite.Require().NoError(err)
+		actualEvents := resp.GetEvents()
+		expectedEvents := make([]*entities.Event, totalEvents)
+		for i, e := range events {
+			expectedEvents[i] = convert.EventToMessage(e)
+		}
+		suite.Require().ElementsMatch(expectedEvents, actualEvents)
+
+		// check that appropriate storage calls were made
+		suite.events.AssertExpectations(suite.T())
+	})
+
+	// failure path - empty even type in the request results in an error
+	suite.Run("request with empty event type", func() {
+
+		// create an API request with empty even type
+		req := concoctReq("", blockIDs)
+
+		_, err := handler.GetEventsForBlockIDs(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+
+		// check that no storage calls was made
+		suite.events.AssertExpectations(suite.T())
+	})
+
+	// failure path - empty block ids in request results in an error
+	suite.Run("request with empty event type", func() {
+
+		// create an API request with empty block ids
+		req := concoctReq(string(flow.EventAccountCreated), nil)
+
+		_, err := handler.GetEventsForBlockIDs(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+
+		// check that no storage calls was made
+		suite.events.AssertExpectations(suite.T())
+	})
+
+	// failure path - non-existent block id in request results in an error
+	suite.Run("request with empty event type", func() {
+
+		id := unittest.IdentifierFixture()
+
+		// expect a storage call for the invalid id but return an error
+		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(nil, errors.New("")).Once()
+
+		// create an API request with the invalid block id
+		req := concoctReq(string(flow.EventAccountCreated), [][]byte{id[:]})
+
+		_, err := handler.GetEventsForBlockIDs(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.Internal, ""))
+
+		// check that no storage calls was made
+		suite.events.AssertExpectations(suite.T())
+	})
 }
