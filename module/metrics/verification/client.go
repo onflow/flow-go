@@ -44,6 +44,8 @@ func incResultApprovalCounter(blockID flow.Identifier) {
 // UpdateTotalStorage updates the size of on disk storage overhead of the
 // verification node by value. A positive value adds up the storage, while
 // a negative value decreases it.
+// Todo wire this up to do monitoring
+// https://github.com/dapperlabs/flow-go/issues/3183
 func updateTotalStorage(value float64) {
 	totalStorage.Add(value)
 }
@@ -51,6 +53,8 @@ func updateTotalStorage(value float64) {
 // UpdateStoragePerChunk updates the size of on memory overhead of the
 // verification per chunk ID. A positive value adds up the memory overhead, while
 // a negative value decreases it.
+// Todo wire this up to do monitoring
+// https://github.com/dapperlabs/flow-go/issues/3183
 func updateStoragePerChunk(value float64, chunkID flow.Identifier) {
 	storagePerChunk.WithLabelValues(chunkID.String()).Add(value)
 }

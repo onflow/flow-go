@@ -258,6 +258,7 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 	}, nil
 }
 
+// verifyWithMetrics acts as a wrapper around the verify method that captures its performance-related metrics
 func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.VerifiableChunk) error {
 	// starts verification performance metrics trackers
 	if ch.ChunkDataPack != nil {
