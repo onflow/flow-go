@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// contains set of functions interacting with the Prometheus server
 var (
 	chunksCheckedPerBlock = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "chunks_checked_per_block",
