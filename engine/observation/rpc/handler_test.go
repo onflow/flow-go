@@ -296,7 +296,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.assertAllExpectations() // assert that request was not sent to execution node
 	})
 
-	suite.Run("valid request with min height < max height < last finalized block height", func() {
+	suite.Run("valid request with min_height < max_height < last_finalized_block_height", func() {
 
 		headHeight = maxHeight + 1
 
