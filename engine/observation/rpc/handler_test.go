@@ -70,9 +70,9 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 	// make sure we got the latest block
 	id := block.ID()
-	suite.Require().Equal(id[:], resp.Block.Id)
-	suite.Require().Equal(block.Height, resp.Block.Height)
-	suite.Require().Equal(block.ParentID[:], resp.Block.ParentId)
+	suite.Require().Equal(id[:], resp.GetBlock().GetId())
+	suite.Require().Equal(block.Height, resp.GetBlock().GetHeight())
+	suite.Require().Equal(block.ParentID[:], resp.GetBlock().GetParentId())
 	suite.assertAllExpectations()
 }
 
@@ -92,9 +92,9 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 
 	// make sure we got the latest sealed block
 	id := block.ID()
-	suite.Require().Equal(id[:], resp.Block.Id)
-	suite.Require().Equal(block.Height, resp.Block.Height)
-	suite.Require().Equal(block.ParentID[:], resp.Block.ParentId)
+	suite.Require().Equal(id[:], resp.GetBlock().GetId())
+	suite.Require().Equal(block.Height, resp.GetBlock().GetHeight())
+	suite.Require().Equal(block.ParentID[:], resp.GetBlock().GetParentId())
 	suite.assertAllExpectations()
 }
 
@@ -115,7 +115,7 @@ func (suite *Suite) TestGetTransaction() {
 	resp, err := handler.GetTransaction(context.Background(), req)
 	suite.checkResponse(resp, err)
 
-	actual, err := convert.MessageToTransaction(resp.Transaction)
+	actual, err := convert.MessageToTransaction(resp.GetTransaction())
 	suite.checkResponse(resp, err)
 	suite.Require().Equal(expected, actual)
 	suite.assertAllExpectations()
@@ -147,7 +147,7 @@ func (suite *Suite) TestGetCollection() {
 	suite.transactions.AssertExpectations(suite.T())
 	suite.checkResponse(resp, err)
 
-	actualColl := resp.Collection
+	actualColl := resp.GetCollection()
 	actualIDs := make([]flow.Identifier, len(actualColl.TransactionIds))
 	for i, t := range actualColl.TransactionIds {
 		actualIDs[i] = flow.HashToID(t)
@@ -259,9 +259,12 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	var expBlockIDs [][]byte
 
 	setupHeadHeight := func(height uint64) {
-		header := unittest.BlockHeaderFixture()
-		header.Height = height
-		suite.snapshot.On("Head").Return(&header, nil).Once()
+		header := unittest.BlockHeaderFixture() // create a mock header
+		header.Height = height                  // set the header height
+		seal := unittest.SealFixture()          // create a mock seal
+		seal.BlockID = header.ID()              // make the seal point to the header
+		suite.snapshot.On("Seal").Return(seal, nil).Once()
+		suite.headers.On("ByBlockID", header.ID()).Return(&header, nil).Once()
 	}
 
 	setupStorage := func(min uint64, max uint64) [][]byte {
@@ -296,7 +299,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.assertAllExpectations() // assert that request was not sent to execution node
 	})
 
-	suite.Run("valid request with min_height < max_height < last_finalized_block_height", func() {
+	suite.Run("valid request with min_height < max_height < last_sealed_block_height", func() {
 
 		headHeight = maxHeight + 1
 
@@ -307,7 +310,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		setupExecClient(expEvents)
 
 		// create handler
-		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, nil, nil, nil)
+		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
 
 		req := &access.GetEventsForHeightRangeRequest{
 			StartHeight: minHeight,
@@ -320,10 +323,10 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		// check response
 		suite.checkResponse(resp, err)
 		suite.assertAllExpectations()
-		suite.Require().Equal(expEvents, resp.Events)
+		suite.Require().Equal(expEvents, resp.GetEvents())
 	})
 
-	suite.Run("valid request with max_height > last_finalized_block_height", func() {
+	suite.Run("valid request with max_height > last_sealed_block_height", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
 		expBlockIDs = setupStorage(minHeight, headHeight)
@@ -331,7 +334,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		expEvents := getEvents(10)
 		setupExecClient(expEvents)
 
-		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, nil, nil, nil)
+		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
 
 		req := &access.GetEventsForHeightRangeRequest{
 			StartHeight: minHeight,
@@ -342,7 +345,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		suite.checkResponse(resp, err)
 		suite.assertAllExpectations()
-		suite.Require().Equal(expEvents, resp.Events)
+		suite.Require().Equal(expEvents, resp.GetEvents())
 	})
 
 }

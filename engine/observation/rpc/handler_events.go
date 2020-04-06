@@ -13,12 +13,17 @@ import (
 func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
 
 	// validate the request
-	if req.EndHeight < req.StartHeight {
+	if req.GetEndHeight() < req.GetStartHeight() {
 		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
 	}
 
-	// get the latest finalized block header
-	head, err := h.state.Final().Head()
+	reqEvent := req.GetType()
+	if reqEvent == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid event type")
+	}
+
+	// get the latest sealed block header
+	head, err := h.getLatestSealedHeader()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, " failed to get events: %v", err)
 	}
@@ -28,7 +33,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 	// derive bounds for block height
 	minHeight = req.GetStartHeight()
 
-	// limit max height to last finalized block in the chain
+	// limit max height to last sealed block in the chain
 	if head.Height < req.GetEndHeight() {
 		maxHeight = head.Height
 	} else {
@@ -48,7 +53,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 
 	// create a request to be sent to the execution node
 	fwdReq := &access.GetEventsForBlockIDsRequest{
-		Type:     req.Type,
+		Type:     reqEvent,
 		BlockIds: blockIDs,
 	}
 
