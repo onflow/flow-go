@@ -132,10 +132,10 @@ type NetworkConfig struct {
 // NodeConfig defines the input config for a particular node, specified prior
 // to network creation.
 type NodeConfig struct {
-	Role          flow.Role
-	Stake         uint64
-	Identifier    flow.Identifier
-	ContainerName string
+	Role       flow.Role
+	Stake      uint64
+	Identifier flow.Identifier
+	LogLevel   string
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -143,6 +143,7 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 		Role:       role,
 		Stake:      1000,                         // default stake
 		Identifier: unittest.IdentifierFixture(), // default random ID
+		LogLevel:   "debug",                      // log at debug by default
 	}
 
 	for _, apply := range opts {
@@ -150,6 +151,12 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 	}
 
 	return c
+}
+
+func WithLogLevel(level string) func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.LogLevel = level
+	}
 }
 
 func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*FlowNetwork, error) {
@@ -247,7 +254,7 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 				fmt.Sprintf("--nodeid=%s", conf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
-				"--loglevel=debug",
+				fmt.Sprintf("--loglevel=%s", conf.LogLevel),
 				"--nclusters=1",
 			},
 		},
@@ -349,7 +356,6 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 
 		// define the node's name <role>_<n> and address <name>:<port>
 		name := fmt.Sprintf("%s_%d", conf.Role.String(), roleCounter[conf.Role]+1)
-		conf.ContainerName = name
 
 		addr := fmt.Sprintf("%s:%d", name, 2137)
 		roleCounter[conf.Role]++
@@ -366,6 +372,7 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 		containerConf := ContainerConfig{
 			NodeInfo:      info,
 			ContainerName: name,
+			LogLevel:      conf.LogLevel,
 		}
 
 		confs = append(confs, containerConf)
