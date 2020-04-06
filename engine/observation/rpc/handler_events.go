@@ -58,7 +58,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
 func (h *Handler) GetEventsForBlockIDs(ctx context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 
-	if req.BlockIds == nil || len(req.BlockIds) == 0 {
+	if len(req.GetBlockIds()) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "block IDs not specified")
 	}
 
