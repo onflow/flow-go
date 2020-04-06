@@ -8,7 +8,6 @@ require (
 	github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dapperlabs/flow-go/protobuf v0.3.2-0.20200312195452-df4550a863b7
-	github.com/dapperlabs/testingdock v0.4.2 // indirect
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/ethereum/go-ethereum v1.9.9
@@ -16,6 +15,7 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.0
 	github.com/golang/protobuf v1.3.2
+	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/ipfs/go-log v0.0.1
@@ -29,6 +29,7 @@ require (
 	github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381 // indirect
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
+	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/philhofer/fwd v1.0.0 // indirect
