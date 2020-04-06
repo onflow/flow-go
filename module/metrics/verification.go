@@ -4,7 +4,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// VerificationMetrics
+// VerificationMetrics implements an interface of event handlers that are called upon certain events to capture
+// metrics for sake of monitoring
 type VerificationMetrics interface {
 	// OnChunkVerificationStated is called whenever the verification of a chunk is started
 	// it starts the timer to record the execution time

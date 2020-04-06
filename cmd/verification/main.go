@@ -23,7 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics/verification"
+	verificationmetrics "github.com/dapperlabs/flow-go/module/metrics/verification"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -114,7 +114,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 			chunkVerifier := chunks.NewChunkVerifier(vm)
-			mc := verification.NewMetrics(node.Tracer)
+			mc := verificationmetrics.NewMetrics(node.Tracer)
 			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, mc)
 			return verifierEng, err
 		}).
