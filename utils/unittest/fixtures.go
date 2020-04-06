@@ -86,7 +86,6 @@ func SealFixture() flow.Seal {
 		BlockID:       IdentifierFixture(),
 		PreviousState: StateCommitmentFixture(),
 		FinalState:    StateCommitmentFixture(),
-		Signature:     SignatureFixture(),
 	}
 }
 
@@ -353,11 +352,6 @@ func WithNodeID(b byte) func(*flow.Identity) {
 // WithRandomPublicKeys adds random public keys to an identity.
 func WithRandomPublicKeys() func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		randBeac, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
-		if err != nil {
-			panic(err)
-		}
-		identity.RandomBeaconPubKey = randBeac.PublicKey()
 		stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
 		if err != nil {
 			panic(err)
