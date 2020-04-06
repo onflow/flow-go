@@ -3,12 +3,17 @@
 package unittest
 
 import (
+<<<<<<< HEAD
 	"crypto/rand"
+=======
+	"math/rand"
+>>>>>>> master
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
 )
@@ -25,7 +30,6 @@ type message struct {
 
 // implements DKGProcessor interface
 type TestDKGProcessor struct {
-	t       *testing.T
 	current int
 	dkg     crypto.DKGstate
 	chans   []chan *message
@@ -42,8 +46,6 @@ type TestDKGProcessor struct {
 // This is a testing function
 // it simulates sending a honest message from one node to another
 func (proc *TestDKGProcessor) honestSend(dest int, data []byte) {
-	proc.t.Logf("%d Sending to %d:\n", proc.current, dest)
-	proc.t.Log(data)
 	newMsg := &message{proc.current, proc.msgType, data}
 	proc.chans[dest] <- newMsg
 }
@@ -57,8 +59,6 @@ func (proc *TestDKGProcessor) Send(dest int, data []byte) {
 // This is a testing function
 // it simulates broadcasting a message from one node to all nodes
 func (proc *TestDKGProcessor) Broadcast(data []byte) {
-	proc.t.Logf("%d Broadcasting:", proc.current)
-	proc.t.Log(data)
 	newMsg := &message{proc.current, proc.msgType, data}
 	for i := 0; i < len(proc.chans); i++ {
 		if i != proc.current {
@@ -68,13 +68,11 @@ func (proc *TestDKGProcessor) Broadcast(data []byte) {
 }
 
 func (proc *TestDKGProcessor) Blacklist(node int) {
-	proc.t.Logf("%d wants to blacklist %d", proc.current, node)
 }
 func (proc *TestDKGProcessor) FlagMisbehavior(node int, logData string) {
-	proc.t.Logf("%d flags a misbehavior from %d: %s", proc.current, node, logData)
 }
 
-func RunDKGKeys(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey) {
+func RunDKG(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey) {
 	lead := 0
 	var wg sync.WaitGroup
 	chans := make([]chan *message, n)
@@ -83,7 +81,6 @@ func RunDKGKeys(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []c
 	// create n processors for all nodes
 	for current := 0; current < n; current++ {
 		processors = append(processors, TestDKGProcessor{
-			t:       t,
 			current: current,
 			chans:   chans,
 			msgType: dkgType,
@@ -92,7 +89,7 @@ func RunDKGKeys(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []c
 		var err error
 		processors[current].dkg, err = crypto.NewDKG(crypto.FeldmanVSS, n, current,
 			&processors[current], lead)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	// create the node (buffered) communication channels
@@ -101,18 +98,21 @@ func RunDKGKeys(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []c
 	}
 	// start DKG in all nodes but the leader
 	seed := make([]byte, crypto.SeedMinLenDKG)
-	rand.Read(seed)
+	bytes, err := rand.Read(seed)
+	require.NoError(t, err)
+	require.Equal(t, bytes, len(seed))
+
 	wg.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)
-		assert.Nil(t, err)
+		require.NoError(t, err)
 		go tsDkgRunChan(&processors[current], &wg, t, 2)
 	}
 
 	// synchronize the main thread to end DKG
 	wg.Wait()
 	for i := 1; i < n; i++ {
-		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes,
+		require.Equal(t, processors[i].pkBytes, processors[0].pkBytes,
 			"2 group public keys are mismatching")
 	}
 
@@ -140,15 +140,12 @@ func tsDkgRunChan(proc *TestDKGProcessor,
 		case <-time.After(200 * time.Millisecond):
 			switch phase {
 			case 0:
-				proc.t.Logf("%d shares phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
 				assert.Nil(t, err)
 			case 1:
-				proc.t.Logf("%d complaints phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
 				assert.Nil(t, err)
 			case 2:
-				proc.t.Logf("%d dkg ended \n", proc.current)
 				sk, groupPK, nodesPK, err := proc.dkg.EndDKG()
 				assert.NotNil(t, sk)
 				assert.NotNil(t, groupPK)

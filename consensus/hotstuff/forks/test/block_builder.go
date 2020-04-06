@@ -88,9 +88,10 @@ func (f *BlockBuilder) Blocks() ([]*model.Block, error) {
 
 		// generate QC for the new block
 		qcs[bv.BlockIndex()] = &model.QuorumCertificate{
-			View:                block.View,
-			BlockID:             block.BlockID,
-			AggregatedSignature: nil,
+			View:      block.View,
+			BlockID:   block.BlockID,
+			SignerIDs: nil,
+			SigData:   nil,
 		}
 	}
 

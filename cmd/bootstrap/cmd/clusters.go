@@ -7,28 +7,21 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/order"
 )
 
-func computeCollectorClusters(stakingNodes []NodeInfoPub) *flow.ClusterList {
-	identities := flow.IdentityList{}
+func computeCollectorClusters(stakingNodes []model.NodeInfo) *flow.ClusterList {
 
+	identities := flow.IdentityList{}
 	for _, node := range stakingNodes {
 		if node.Role != flow.RoleCollection {
 			continue
 		}
 
-		identities = append(identities, &flow.Identity{
-			NodeID:             node.NodeID,
-			Address:            node.Address,
-			Role:               node.Role,
-			Stake:              node.Stake,
-			StakingPubKey:      node.StakingPubKey,
-			RandomBeaconPubKey: nil,
-			NetworkPubKey:      node.NetworkPubKey,
-		})
+		identities = append(identities, node.Identity())
 	}
 
 	// order the identities by node ID
@@ -50,54 +43,41 @@ func constructGenesisBlocksForCollectorClusters(clusters *flow.ClusterList) []cl
 	clusterBlocks := run.GenerateGenesisClusterBlocks(clusters)
 
 	for i, clusterBlock := range clusterBlocks {
-		writeJSON(fmt.Sprintf(FilenameGenesisClusterBlock, i), clusterBlock)
+		writeJSON(fmt.Sprintf(model.FilenameGenesisClusterBlock, i), clusterBlock)
 	}
 
 	return clusterBlocks
 }
 
-func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, nodeInfosPriv []NodeInfoPriv,
-	block flow.Block, clusterBlocks []cluster.Block) {
+func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, nodeInfos []model.NodeInfo, block flow.Block, clusterBlocks []cluster.Block) {
+
 	if len(clusterBlocks) != clusterList.Size() {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("clusterList.Size()", clusterList.Size()).
 			Msg("number of clusters needs to equal number of cluster blocks")
 	}
 
 	for i := 0; i < clusterList.Size(); i++ {
-		identities := clusterList.ByIndex(uint(i))
+		signers := filterClusterSigners(nodeInfos)
 
-		signerData := createClusterSigners(identities, nodeInfosPriv)
-
-		qc, err := run.GenerateClusterGenesisQC(signerData, &block, &clusterBlocks[i])
+		qc, err := run.GenerateClusterGenesisQC(signers, &block, &clusterBlocks[i])
 		if err != nil {
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster genesis QC failed")
 		}
 
-		writeJSON(fmt.Sprintf(FilenameGenesisClusterQC, i), qc)
+		writeJSON(fmt.Sprintf(model.FilenameGenesisClusterQC, i), qc)
 	}
 }
 
-func createClusterSigners(identities flow.IdentityList, nodeInfosPriv []NodeInfoPriv) []run.ClusterSigner {
-	clusterSigners := make([]run.ClusterSigner, 0, len(identities))
-	for _, identity := range identities {
-		found, pk := findNodeInfoPriv(nodeInfosPriv, identity.NodeID)
-		if !found {
-			log.Debug().Msg("could not find private key for collector, skipping it as a signer")
-			continue
-		}
-		clusterSigners = append(clusterSigners, run.ClusterSigner{
-			Identity:       *identity,
-			StakingPrivKey: pk.StakingPrivKey,
-		})
-	}
-	return clusterSigners
-}
+// Filters a list of nodes to omit nodes for which we don't have private
+// staking key information (ie. partner nodes).
+func filterClusterSigners(nodeInfos []model.NodeInfo) []model.NodeInfo {
 
-func findNodeInfoPriv(nsPriv []NodeInfoPriv, nodeID flow.Identifier) (bool, NodeInfoPriv) {
-	for _, nPriv := range nsPriv {
-		if nPriv.NodeID == nodeID {
-			return true, nPriv
+	var filtered []model.NodeInfo
+	for _, node := range nodeInfos {
+		if node.Type() == model.NodeInfoTypePrivate {
+			filtered = append(filtered, node)
 		}
 	}
-	return false, NodeInfoPriv{}
+
+	return filtered
 }

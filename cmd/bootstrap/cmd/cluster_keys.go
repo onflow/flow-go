@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/crypto"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -22,7 +23,7 @@ const (
 
 type collector struct {
 	collectorType  collectorType
-	nodeInfoPub    NodeInfoPub
+	nodeInfoPub    model.NodeInfo
 	stakingPrivKey crypto.PrivateKey
 }
 
@@ -47,8 +48,8 @@ func (c collector) NodeID() flow.Identifier {
 // keys. That more complex approach has not been chosen for simplicity, but depending on the number of tries the current
 // approach needs to find a valid collector allocation it might be worthwhile to rething that decision. by shifting
 // partner nodes through deterministic
-func generateAdditionalInternalCollectors(nClusters, minPerCluster int, internalNodes, partnerNodes []NodeInfoPub,
-) ([]NodeInfoPriv, []NodeInfoPub) {
+func generateAdditionalInternalCollectors(nClusters, minPerCluster int, internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
+
 	maxPartnerPerCluster := len(partnerNodes) / nClusters
 	if len(partnerNodes)%nClusters > 0 {
 		maxPartnerPerCluster++
@@ -137,7 +138,7 @@ func calcTotalCollectors(nClusters, minPerCluster, nPartners int) int {
 	return nTotal
 }
 
-func insertNodes(cs []collector, internalNodes, partnerNodes []NodeInfoPub) []collector {
+func insertNodes(cs []collector, internalNodes, partnerNodes []model.NodeInfo) []collector {
 	for _, n := range internalNodes {
 		cs = append(cs, collector{
 			collectorType: existingInternalCollector,
@@ -171,9 +172,9 @@ func insertRandomCollectorsSorted(cs []collector, n int) []collector {
 	return cs
 }
 
-func assembleAdditionalInternalCollectors(cs []collector) ([]NodeInfoPriv, []NodeInfoPub) {
-	nodeInfosPriv := make([]NodeInfoPriv, 0)
-	nodeInfosPub := make([]NodeInfoPub, 0)
+func assembleAdditionalInternalCollectors(cs []collector) []model.NodeInfo {
+
+	nodeInfos := make([]model.NodeInfo, 0)
 	for _, c := range cs {
 		if c.collectorType == existingPartnerCollector || c.collectorType == existingInternalCollector {
 			continue
@@ -184,16 +185,17 @@ func assembleAdditionalInternalCollectors(cs []collector) ([]NodeInfoPriv, []Nod
 			log.Fatal().Err(err).Msg("cannot generate networking key")
 		}
 
-		nodeInfoPriv, nodeInfoPub := assembleNodeInfo(NodeConfig{
+		nodeConfig := model.NodeConfig{
 			Role:    flow.RoleCollection,
-			Address: fmt.Sprintf(flagGeneratedCollectorAddressTemplate, len(nodeInfosPriv)),
+			Address: fmt.Sprintf(flagGeneratedCollectorAddressTemplate, len(nodeInfos)),
 			Stake:   flagGeneratedCollectorStake,
-		}, networkKey, c.stakingPrivKey)
+		}
+		nodeInfo := assembleNodeInfo(nodeConfig, networkKey, c.stakingPrivKey)
 
-		nodeInfosPriv = append(nodeInfosPriv, nodeInfoPriv)
-		nodeInfosPub = append(nodeInfosPub, nodeInfoPub)
+		nodeInfos = append(nodeInfos, nodeInfo)
 	}
-	return nodeInfosPriv, nodeInfosPub
+
+	return nodeInfos
 }
 
 func sortCollectors(cs []collector) {

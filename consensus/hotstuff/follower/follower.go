@@ -11,13 +11,12 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -38,13 +37,13 @@ type FollowerLogic struct {
 func NewFollowerLogic(
 	me module.Local,
 	protocolState protocol.State,
-	dkgPubData *hotstuff.DKGPublicData,
 	trustedRoot *forks.BlockQC,
+	verifier hotstuff.Verifier,
 	finalizationCallback module.Finalizer,
 	notifier notifications.FinalizationConsumer,
 	log zerolog.Logger,
 ) (*FollowerLogic, error) {
-	viewState, err := viewstate.New(protocolState, dkgPubData, me.NodeID(), filter.HasRole(flow.RoleConsensus))
+	viewState, err := viewstate.New(protocolState, me.NodeID(), filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
 	}
@@ -52,7 +51,7 @@ func NewFollowerLogic(
 	if err != nil {
 		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
 	}
-	validator := validator.New(viewState, finalizationLogic, signature.NewRandomBeaconAwareSigVerifier())
+	validator := validator.New(viewState, finalizationLogic, verifier)
 
 	err = validator.ValidateQC(trustedRoot.QC, trustedRoot.Block)
 	if err != nil {

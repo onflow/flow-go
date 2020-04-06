@@ -43,7 +43,7 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 		return nil, &model.NoVoteError{Msg: "not above the last voted view"}
 	}
 
-	vote, err := v.signer.VoteFor(block)
+	vote, err := v.signer.CreateVote(block)
 	if err != nil {
 		return nil, fmt.Errorf("could not vote for block: %w", err)
 	}

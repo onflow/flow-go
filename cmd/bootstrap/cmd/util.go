@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func generateRandomSeeds(n int) [][]byte {
@@ -72,44 +71,6 @@ func pubKeyToBytes(key crypto.PublicKey) []byte {
 
 func pubKeyToString(key crypto.PublicKey) string {
 	return fmt.Sprintf("%x", pubKeyToBytes(key))
-}
-
-func privKeyToBytes(key crypto.PrivateKey) []byte {
-	enc, err := key.Encode()
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot encode private key")
-	}
-	return enc
-}
-
-func filterConsensusNodes(nodes []NodeInfoPub) []NodeInfoPub {
-	c := make([]NodeInfoPub, 0)
-	for _, node := range nodes {
-		if node.Role == flow.RoleConsensus {
-			c = append(c, node)
-		}
-	}
-	return c
-}
-
-func filterCollectorNodes(nodes []NodeInfoPub) []NodeInfoPub {
-	c := make([]NodeInfoPub, 0)
-	for _, node := range nodes {
-		if node.Role == flow.RoleCollection {
-			c = append(c, node)
-		}
-	}
-	return c
-}
-
-func filterConsensusNodesPriv(nodes []NodeInfoPriv) []NodeInfoPriv {
-	c := make([]NodeInfoPriv, 0)
-	for _, node := range nodes {
-		if node.Role == flow.RoleConsensus {
-			c = append(c, node)
-		}
-	}
-	return c
 }
 
 func filesInDir(dir string) ([]string, error) {
