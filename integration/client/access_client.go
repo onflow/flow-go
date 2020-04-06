@@ -14,17 +14,17 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Client is a Flow user agent client.
+// AccessClient is a Flow user agent client.
 // NOTE: This is a stop gap solution till the flow-go-sdk also starts using the latest access node API
-type Client struct {
+type AccessClient struct {
 	rpcClient access.AccessAPIClient
 	close     func() error
 }
 
-// New initializes a Flow client with the default gRPC provider.
+// NewAccessClient initializes a Flow client with the default gRPC provider.
 //
 // An error will be returned if the host is unreachable.
-func New(addr string) (*Client, error) {
+func NewAccessClient(addr string) (*AccessClient, error) {
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
@@ -32,25 +32,25 @@ func New(addr string) (*Client, error) {
 
 	grpcClient := access.NewAccessAPIClient(conn)
 
-	return &Client{
+	return &AccessClient{
 		rpcClient: grpcClient,
 		close:     func() error { return conn.Close() },
 	}, nil
 }
 
 // Close closes the client connection.
-func (c *Client) Close() error {
+func (c *AccessClient) Close() error {
 	return c.close()
 }
 
 // Ping tests the connection to the Observation API.
-func (c *Client) Ping(ctx context.Context) error {
+func (c *AccessClient) Ping(ctx context.Context) error {
 	_, err := c.rpcClient.Ping(ctx, &access.PingRequest{})
 	return err
 }
 
 // SendTransaction submits a transaction to the network.
-func (c *Client) SendTransaction(ctx context.Context, tx flow.TransactionBody) error {
+func (c *AccessClient) SendTransaction(ctx context.Context, tx flow.TransactionBody) error {
 	txMsg := convert.TransactionToMessage(tx)
 
 	_, err := c.rpcClient.SendTransaction(
@@ -62,7 +62,7 @@ func (c *Client) SendTransaction(ctx context.Context, tx flow.TransactionBody) e
 }
 
 // ExecuteScript executes a script against the latest sealed world state.
-func (c *Client) ExecuteScript(ctx context.Context, script []byte) ([]byte, error) {
+func (c *AccessClient) ExecuteScript(ctx context.Context, script []byte) ([]byte, error) {
 	res, err := c.rpcClient.ExecuteScriptAtLatestBlock(ctx, &access.ExecuteScriptAtLatestBlockRequest{Script: script})
 	if err != nil {
 		return nil, err
