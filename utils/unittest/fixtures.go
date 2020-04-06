@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -279,8 +280,8 @@ func StateCommitmentFixture() flow.StateCommitment {
 	return state
 }
 
-func HashFixture(size int) crypto.Hash {
-	hash := make(crypto.Hash, size)
+func HashFixture(size int) hash.Hash {
+	hash := make(hash.Hash, size)
 	for i := 0; i < size; i++ {
 		hash[i] = byte(i)
 	}

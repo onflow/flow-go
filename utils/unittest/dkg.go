@@ -3,6 +3,7 @@
 package unittest
 
 import (
+	"crypto/rand"
 	"sync"
 	"testing"
 	"time"

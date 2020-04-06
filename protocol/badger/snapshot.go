@@ -10,7 +10,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
@@ -242,7 +242,7 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 
 func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
-	if len(indices)*4 > crypto.KmacMaxParamsLen {
+	if len(indices)*4 > hash.KmacMaxParamsLen {
 		return nil, fmt.Errorf("unsupported number of indices")
 	}
 
@@ -262,7 +262,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	}
 
 	// create a KMAC instance with our key and 32 bytes output size
-	kmac, err := crypto.NewKMAC_128(key, nil, 32)
+	kmac, err := hash.NewKMAC_128(key, nil, 32)
 	if err != nil {
 		return nil, fmt.Errorf("could not create kmac: %w", err)
 	}

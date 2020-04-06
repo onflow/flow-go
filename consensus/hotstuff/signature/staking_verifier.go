@@ -7,12 +7,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // StakingSigVerifier verifies signatures generated with staking keys. Specifically, it verifies
 // individual signatures (e.g. from a vote) and aggregated signatures (e.g. from a Quorum Certificate).
 type StakingSigVerifier struct {
-	stakingHasher crypto.Hasher // the hasher for staking signature
+	stakingHasher hash.Hasher // the hasher for staking signature
 }
 
 // NewStakingSigVerifier constructs a new StakingSigVerifier

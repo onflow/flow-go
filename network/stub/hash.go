@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
@@ -20,7 +20,7 @@ func eventKey(channelID uint8, event interface{}) (string, error) {
 		return "", fmt.Errorf("could not encode event: %w", err)
 	}
 
-	hasher, err := crypto.NewSHA3_256()
+	hasher := hash.NewSHA3_256()
 	if err != nil {
 		return "", fmt.Errorf("could not create a hasher: %w", err)
 	}

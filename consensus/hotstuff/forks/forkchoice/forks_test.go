@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	mockdist "github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/mock"
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mockfinalizer "github.com/dapperlabs/flow-go/module/mock"
 )
@@ -209,7 +209,7 @@ func computeID(view uint64, qc *model.QuorumCertificate, payloadHash flow.Identi
 
 	id = append(id, payloadHash[:]...)
 
-	hasher := crypto.NewSHA3_256()
+	hasher := hash.NewSHA3_256()
 	hash := hasher.ComputeHash(id)
 
 	var identifier flow.Identifier

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -11,7 +12,7 @@ import (
 
 // NewResultApprovalHasher generates and returns a hasher for signing
 // and verification of result approvals
-func NewResultApprovalHasher() crypto.Hasher {
+func NewResultApprovalHasher() hash.Hasher {
 	h := crypto.NewBLS_KMAC("result approval")
 	return h
 }
@@ -19,10 +20,7 @@ func NewResultApprovalHasher() crypto.Hasher {
 // NewChunkAssignmentRNG generates and returns a hasher for chunk
 // assignment
 func NewChunkAssignmentRNG(res *flow.ExecutionResult) (random.Rand, error) {
-	h, err := crypto.NewSHA3_384()
-	if err != nil {
-		return nil, fmt.Errorf("could not generate hasher: %w", err)
-	}
+	h := hash.NewSHA3_384()
 
 	// encodes result approval body to byte slice
 	b, err := encoding.DefaultEncoder.Encode(res.ExecutionResultBody)

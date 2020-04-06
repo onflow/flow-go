@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/test"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
@@ -177,7 +178,7 @@ func testWrongViewRBEnabled(t *testing.T) {
 
 type TestRandomBeaconSigVerifier struct {
 	// the hasher for signer random beacon signature
-	randomBeaconHasher crypto.Hasher
+	randomBeaconHasher hash.Hasher
 }
 
 func NewTestRandomBeaconSigVerifier(tag string) TestRandomBeaconSigVerifier {

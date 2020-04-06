@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
@@ -14,7 +15,7 @@ import (
 // Specifically, it verifies individual key shares and reconstructed threshold signatures.
 type RandomBeaconSigVerifier struct {
 	// the hasher for signer random beacon signature
-	randomBeaconHasher crypto.Hasher
+	randomBeaconHasher hash.Hasher
 }
 
 // NewRandomBeaconSigVerifier constructs a new RandomBeaconSigVerifier
