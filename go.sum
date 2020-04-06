@@ -87,8 +87,11 @@ github.com/cpuguy83/go-md2man/v2 v2.0.0/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsr
 github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2 h1:/7hkvJx5m7IYKX0NDkMMBEjYNvUxRtREEHGlgi0wYDk=
 github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2/go.mod h1:WgzAWRd7gcxi6dfJmEdeTArtQVGOr48oLxLW4adsztk=
 github.com/dapperlabs/flow v0.0.0-20200403223221-0685a2afc8af h1:4ei4rzHa0BY+4+ZLN9d58sqyLK9lwdiRosGv26KmKOc=
+github.com/dapperlabs/flow v0.0.0-20200405045545-03db81265125 h1:ifpdhl3xozLCXe0l+s7BhjiimQd6TwDbOcjlP3hKzac=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200403223221-0685a2afc8af h1:SsebYQtw/Fxz5tAvPqUZ4CdncOV/bDH1Y0zcL94L2zc=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200403223221-0685a2afc8af/go.mod h1:ThpXZwEduNJCzmpEVEUy3Ml5dDAWttnzlBJPTOSAin0=
+github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125 h1:Zc17Y/8ycLcVd1T/tsiho0k9XVq+SxCHhYBuzkn5kkQ=
+github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125/go.mod h1:ThpXZwEduNJCzmpEVEUy3Ml5dDAWttnzlBJPTOSAin0=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

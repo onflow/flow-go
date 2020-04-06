@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
@@ -35,13 +35,13 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine) *Engine {
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+			UnimplementedExecutionAPIServer: execution.UnimplementedExecutionAPIServer{},
 		},
 		server: grpc.NewServer(),
 		config: config,
 	}
 
-	access.RegisterAccessAPIServer(eng.server, eng.handler)
+	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
 
 	return eng
 }
@@ -80,26 +80,26 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	access.UnimplementedAccessAPIServer
+	execution.UnimplementedExecutionAPIServer
 	engine *ingestion.Engine
 }
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
-	return &access.PingResponse{}, nil
+func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execution.PingResponse, error) {
+	return &execution.PingResponse{}, nil
 }
 
-func (h *handler) ExecuteScript(
+func (h *handler) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
-	req *access.ExecuteScriptAtLatestBlockRequest,
-) (*access.ExecuteScriptResponse, error) {
+	req *execution.ExecuteScriptAtLatestBlockRequest,
+) (*execution.ExecuteScriptResponse, error) {
 
 	value, err := h.engine.ExecuteScript(req.Script)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &access.ExecuteScriptResponse{
+	res := &execution.ExecuteScriptResponse{
 		Value: value,
 	}
 
