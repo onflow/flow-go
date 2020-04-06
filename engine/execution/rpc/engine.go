@@ -36,6 +36,7 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine) *Engine {
 		unit: engine.NewUnit(),
 		handler: &handler{
 			UnimplementedExecutionAPIServer: execution.UnimplementedExecutionAPIServer{},
+			engine:                          e,
 		},
 		server: grpc.NewServer(),
 		config: config,
