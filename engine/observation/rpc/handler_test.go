@@ -362,7 +362,7 @@ func (suite *Suite) checkResponse(resp interface{}, err error) {
 	suite.Require().NotNil(resp)
 }
 
-func getIds(n int) [][]byte {
+func getIDs(n int) [][]byte {
 	ids := make([][]byte, n)
 	for i := range ids {
 		id := unittest.IdentifierFixture()
