@@ -101,7 +101,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// process receives and submits an event to the verifier engine for processing.
+// process receives verifiable chunks, evaluate them and send them for chunk verifier
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *verification.VerifiableChunk:

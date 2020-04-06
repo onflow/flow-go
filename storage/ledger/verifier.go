@@ -30,7 +30,10 @@ func (v *TrieVerifier) VerifyRegistersProof(
 	values []flow.RegisterValue,
 	proof []flow.StorageProof,
 ) (verified bool, err error) {
-	proofHldr := trie.DecodeProof(proof)
+	proofHldr, err := trie.DecodeProof(proof)
+	if err != nil {
+		return false, err
+	}
 	length := proofHldr.GetSize()
 	verified = true
 	var verify bool
