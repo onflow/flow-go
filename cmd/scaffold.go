@@ -17,10 +17,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -28,7 +28,8 @@ import (
 	"github.com/dapperlabs/flow-go/module/trace"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-	protocol "github.com/dapperlabs/flow-go/protocol/badger"
+	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -80,6 +81,7 @@ type FlowNodeBuilder struct {
 	DB             *badger.DB
 	Me             *local.Local
 	State          *protocol.State
+	DKGState       *wrapper.State
 	modules        []namedModuleFunc
 	components     []namedComponentFunc
 	doneObject     []namedDoneObject
@@ -92,8 +94,7 @@ type FlowNodeBuilder struct {
 
 	// genesis information
 	GenesisBlock *flow.Block
-	GenesisQC    *model.AggregatedSignature
-	DKGPubData   *hotstuff.DKGPublicData
+	GenesisQC    *model.QuorumCertificate
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -216,14 +217,16 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 
 		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadRootBlockSignatures(fnb.BaseConfig.bootstrapDir)
+		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.bootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
-		fnb.DKGPubData, err = loadDKGPublicData(fnb.BaseConfig.bootstrapDir)
+
+		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.bootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 		}
+		fnb.DKGState = wrapper.NewState(dkgPubData)
 
 		err = state.Mutate().Bootstrap(fnb.GenesisBlock)
 		if err != nil {
@@ -451,18 +454,18 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func loadDKGPublicData(path string) (*hotstuff.DKGPublicData, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameDKGDataPub))
+func loadDKGPublicData(path string) (*dkg.PublicData, error) {
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameDKGDataPub))
 	if err != nil {
 		return nil, err
 	}
-	dkg := &hotstuff.DKGPublicData{}
-	err = json.Unmarshal(data, dkg)
-	return dkg, err
+	dkgPubData := &bootstrap.DKGDataPub{}
+	err = json.Unmarshal(data, dkgPubData)
+	return dkgPubData.ForHotStuff(), err
 }
 
 func loadTrustedRootBlock(path string) (*flow.Block, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameGenesisBlock))
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisBlock))
 	if err != nil {
 		return nil, err
 	}
@@ -472,23 +475,23 @@ func loadTrustedRootBlock(path string) (*flow.Block, error) {
 
 }
 
-func loadRootBlockSignatures(path string) (*model.AggregatedSignature, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrapcmd.FilenameGenesisQC))
+func loadRootBlockQC(path string) (*model.QuorumCertificate, error) {
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisQC))
 	if err != nil {
 		return nil, err
 	}
-	qc := &model.AggregatedSignature{}
+	qc := &model.QuorumCertificate{}
 	err = json.Unmarshal(data, qc)
 	return qc, err
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
-func loadPrivateNodeInfo(path string, myID flow.Identifier) (*bootstrapcmd.NodeInfoPriv, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf(bootstrapcmd.FilenameNodeInfoPriv, myID)))
+func loadPrivateNodeInfo(path string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
+	data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, myID)))
 	if err != nil {
 		return nil, err
 	}
-	var info bootstrapcmd.NodeInfoPriv
+	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
 }

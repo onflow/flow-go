@@ -27,7 +27,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
-		Signatures:   nil,
+		Signature:    nil,
 	}
 
 	block := flow.Block{

@@ -1,13 +1,26 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/module/buffer"
+	"github.com/dapperlabs/flow-go/module/signature"
+
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/observation/ingestion"
 	"github.com/dapperlabs/flow-go/engine/observation/rpc"
 	"github.com/dapperlabs/flow-go/module"
+	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -25,8 +38,10 @@ func main() {
 		err             error
 		blocks          *storage.Blocks
 		headers         *storage.Headers
+		payloads        *storage.Payloads
 		collections     *storage.Collections
 		transactions    *storage.Transactions
+		conCache        *buffer.PendingBlocks // pending block cache for follower
 	)
 
 	cmd.FlowNode("observation").
@@ -61,18 +76,53 @@ func main() {
 			transactions = storage.NewTransactions(node.DB)
 			return nil
 		}).
-		//Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		//	cache := buffer.NewPendingBlocks()
-		//	// using Mock TODO: Create the follower engine here
-		//	hsf := new(mock.HotStuffFollower)
-		//	// Not sure right now what to put in for
-		//	// dkgPubData,  trustedRootBlock and rootBlockSigs in follower_loop follower.New()
-		//	followEng, err := follower.New(node.Logger, node.Network, node.Me, node.State, headers, payloads, cache, hsf)
-		//	return followEng, err
-		//}).
+		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+			conCache = buffer.NewPendingBlocks()
+			return nil
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, blocks, headers, collections, transactions)
 			return ingestEng, err
+		}).
+		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// create a finalizer that will handle updating the protocol
+			// state when the follower detects newly finalized blocks
+			final := followerfinalizer.NewFinalizer(node.DB)
+
+			// initialize the staking & beacon verifiers, signature joiner
+			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			merger := signature.NewCombiner()
+
+			// define the node set that is valid as signers
+			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+
+			// create a follower with the ingestEng as the finalization notification consumer
+			core, err := follower.New(node.Me, node.State, &node.GenesisBlock.Header, node.GenesisQC, verifier, final, ingestEng, node.Logger)
+			if err != nil {
+				// TODO for now we ignore failures in follower
+				// this is necessary for integration tests to run, until they are
+				// updated to generate/use valid genesis QC and DKG files.
+				// ref https://github.com/dapperlabs/flow-go/issues/3057
+				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
+			}
+
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.State, headers, payloads, conCache, core)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower engine: %w", err)
+			}
+
+			// create a block synchronization engine to handle follower getting
+			// out of sync
+			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, blocks, follower)
+			if err != nil {
+				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
+			}
+
+			return follower.WithSynchronization(sync), nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, node.State, rpcConf, collectionRPC, executionRPC, blocks, headers, collections, transactions)

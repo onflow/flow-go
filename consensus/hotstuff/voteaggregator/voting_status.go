@@ -1,16 +1,18 @@
 package voteaggregator
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // VotingStatus keeps track of incorporated votes for the same block
 type VotingStatus struct {
-	sigAggregator    hotstuff.SigAggregator
+	signer           hotstuff.Signer
 	block            *model.Block
 	stakeThreshold   uint64
 	accumulatedStake uint64
@@ -19,9 +21,9 @@ type VotingStatus struct {
 }
 
 // NewVotingStatus creates a new Voting Status instance
-func NewVotingStatus(block *model.Block, stakeThreshold uint64, sigAggregator hotstuff.SigAggregator) *VotingStatus {
+func NewVotingStatus(block *model.Block, stakeThreshold uint64, signer hotstuff.Signer) *VotingStatus {
 	return &VotingStatus{
-		sigAggregator:    sigAggregator,
+		signer:           signer,
 		block:            block,
 		stakeThreshold:   stakeThreshold,
 		accumulatedStake: 0,
@@ -50,31 +52,28 @@ func (vs *VotingStatus) AddVote(vote *model.Vote, voter *flow.Identity) {
 	vs.accumulatedStake += voter.Stake
 }
 
-// CanBuildQC check whether it has collected enough signatures from the votes to build a QC
+// CanBuildQC check whether the
 func (vs *VotingStatus) CanBuildQC() bool {
-	return vs.hasEnoughStake() && vs.hasEnoughSigShares()
+	return vs.hasEnoughStake()
 }
 
 // TryBuildQC returns a QC if the existing votes are enought to build a QC, otherwise
 // an error will be returned.
 func (vs *VotingStatus) TryBuildQC() (*model.QuorumCertificate, bool, error) {
+
 	// check if there are enough votes to build QC
 	if !vs.CanBuildQC() {
 		return nil, false, nil
 	}
 
 	// build the aggregated signature
-	sigs := getSigsSliceFromVotes(vs.votes)
-	aggregatedSig, err := vs.sigAggregator.Aggregate(vs.block, sigs)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not build aggregate signatures for building QC: %w", err)
+	votes := getSliceForVotes(vs.votes)
+	qc, err := vs.signer.CreateQC(votes)
+	if errors.Is(err, verification.ErrInsufficientShares) {
+		return nil, false, nil
 	}
-
-	// build the QC
-	qc := &model.QuorumCertificate{
-		View:                vs.block.View,
-		BlockID:             vs.block.BlockID,
-		AggregatedSignature: aggregatedSig,
+	if err != nil {
+		return nil, false, fmt.Errorf("could not create QC from votes: %w", err)
 	}
 
 	return qc, true, nil
@@ -84,16 +83,12 @@ func (vs *VotingStatus) hasEnoughStake() bool {
 	return vs.accumulatedStake >= vs.stakeThreshold
 }
 
-func (vs *VotingStatus) hasEnoughSigShares() bool {
-	return vs.sigAggregator.CanReconstruct(len(vs.votes))
-}
-
-func getSigsSliceFromVotes(votes map[flow.Identifier]*model.Vote) []*model.SingleSignature {
-	var signatures = make([]*model.SingleSignature, 0, len(votes))
+func getSliceForVotes(votes map[flow.Identifier]*model.Vote) []*model.Vote {
+	var voteSlice = make([]*model.Vote, 0, len(votes))
 
 	for _, vote := range votes {
-		signatures = append(signatures, vote.Signature)
+		voteSlice = append(voteSlice, vote)
 	}
 
-	return signatures
+	return voteSlice
 }

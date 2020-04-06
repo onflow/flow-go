@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/cadence"
-	"github.com/dapperlabs/cadence/encoding"
+	encoding "github.com/dapperlabs/cadence/encoding/xdr"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -62,10 +62,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *d
 		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
 	}
 
-	value, err := cadence.ConvertValue(result.Value)
-	if err != nil {
-		return nil, fmt.Errorf("failed to export runtime value: %w", err)
-	}
+	value := cadence.ConvertValue(result.Value)
 
 	encodedValue, err := encoding.Encode(value)
 	if err != nil {

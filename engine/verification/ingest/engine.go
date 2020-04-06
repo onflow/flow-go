@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
@@ -18,12 +19,12 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine implements the ingest engine of the verification node. It is
+// IngestEngine implements the ingest engine of the verification node. It is
 // responsible for receiving and handling new execution receipts. It requests
 // all dependent resources for each execution receipt and relays a complete
 // execution result to the verifier engine when all dependencies are ready.
@@ -161,8 +162,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
-	case *flow.Block:
-		return e.handleBlock(resource)
 	case *flow.ExecutionReceipt:
 		return e.handleExecutionReceipt(originID, resource)
 	case *flow.Collection:
@@ -174,7 +173,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *messages.ChunkDataPackResponse:
 		return e.handleChunkDataPack(originID, &resource.Data)
 	default:
-		return errors.Errorf("invalid event type (%T)", event)
+		return ErrInvType
 	}
 }
 
@@ -259,27 +258,6 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	// removes chunk data pack tracker from  mempool
 	e.chunkDataPackTackers.Rem(chunkDataPack.ChunkID)
 
-	e.checkPendingChunks()
-
-	return nil
-}
-
-// handleBlock handles an incoming block.
-func (e *Engine) handleBlock(block *flow.Block) error {
-	e.log.Info().
-		Hex("block_id", logging.Entity(block)).
-		Uint64("block_view", block.View).
-		Msg("received block")
-
-	err := e.blockStorage.Store(block)
-	if err != nil {
-		return fmt.Errorf("could not store block: %w", err)
-	}
-
-	// checks pending receipts based on this block
-	e.checkPendingReceipts(block.ID())
-
-	// checks pending chunks that
 	e.checkPendingChunks()
 
 	return nil
@@ -498,13 +476,11 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Iden
 // getBlockForReceipt checks the block referenced by the given receipt. If the
 // block is available locally, returns true and the block. Otherwise, returns
 // false and requests the block.
-// TODO does not yet request block
 func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this pending execution receipt
 	block, err := e.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
-		// TODO should request the block here. For now, we require that we
-		// have received the block at this point as there is no way to request it
+		// block is not ready for retrieval. Should wait for the consensus follower.
 		return nil, false
 	}
 
@@ -646,11 +622,6 @@ func (e *Engine) checkPendingChunks() {
 	e.checkChunksLock.Lock()
 	defer e.checkChunksLock.Unlock()
 
-	// re-sends the requests for pending receipts
-	for _, p := range e.pendingReceipts.All() {
-		e.getBlockForReceipt(p.Receipt)
-	}
-
 	// checks the current authenticated receipts for their resources
 	// ready for verification
 	receipts := e.authReceipts.All()
@@ -780,7 +751,7 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 // Otherwise it is dropped completely
 func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 	for _, p := range e.pendingReceipts.All() {
-		if p.Receipt.ExecutionResult.BlockID == blockID {
+		if blockID == p.Receipt.ExecutionResult.BlockID {
 			// removes receipt from pending receipts pool
 			e.pendingReceipts.Rem(p.Receipt.ID())
 			// adds receipt to authenticated receipts pool
@@ -820,3 +791,34 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 		}
 	}
 }
+
+// To implement FinalizationConsumer
+func (e *Engine) OnBlockIncorporated(*model.Block) {
+
+}
+
+// OnFinalizedBlock is part of implementing FinalizationConsumer interface
+//
+// OnFinalizedBlock notifications are produced by the Finalization Logic whenever
+// a block has been finalized. They are emitted in the order the blocks are finalized.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	// block should be in the storage
+	if !e.blockStorage.Has(block.BlockID) {
+		e.log.Error().
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("expected block is not available in the storage")
+		return
+	}
+
+	// checks pending receipts in parallel and non-blocking based on new block ID
+	_ = e.unit.Do(func() error {
+		e.checkPendingReceipts(block.BlockID)
+		return nil
+	})
+}
+
+// To implement FinalizationConsumer
+func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}

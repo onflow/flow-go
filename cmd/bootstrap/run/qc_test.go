@@ -5,13 +5,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/test"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestGenerateGenesisQC(t *testing.T) {
-	signerData := createSignerData(t, 3)
+	participantData := createSignerData(t, 3)
 
 	block := unittest.BlockFixture()
 	block.Height = 0
@@ -20,9 +22,8 @@ func TestGenerateGenesisQC(t *testing.T) {
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 	}
-	for _, signer := range signerData.Signers {
-		id := signer.Identity
-		block.Identities = append(block.Identities, &id)
+	for _, participant := range participantData.Participants {
+		block.Identities = append(block.Identities, participant.Identity())
 	}
 	block.ParentID = flow.ZeroID
 	block.View = 3
@@ -30,29 +31,51 @@ func TestGenerateGenesisQC(t *testing.T) {
 	block.Guarantees = nil
 	block.PayloadHash = block.Payload.Hash()
 
-	_, err := GenerateGenesisQC(signerData, &block)
+	_, err := GenerateGenesisQC(participantData, &block)
 	require.NoError(t, err)
 }
 
-func createSignerData(t *testing.T, n int) SignerData {
-	_, ids := test.NewProtocolState(t, n)
+func createSignerData(t *testing.T, n int) ParticipantData {
+	identities := unittest.IdentityListFixture(n)
 
-	stakingKeys, err := test.AddStakingPrivateKeys(ids)
+	networkingKeys, err := unittest.NetworkingKeys(n)
 	require.NoError(t, err)
 
-	randomBKeys, dkgPubData, err := test.AddRandomBeaconPrivateKeys(t, ids)
+	stakingKeys, err := unittest.StakingKeys(n)
 	require.NoError(t, err)
 
-	signerData := SignerData{
-		DkgPubData: dkgPubData,
-		Signers:    make([]Signer, n),
+	randomBKeys, groupKey, _ := unittest.RunDKG(t, n)
+
+	pubData := dkg.PublicData{
+		GroupPubKey:     groupKey,
+		IDToParticipant: make(map[flow.Identifier]*dkg.Participant),
+	}
+	for i, identity := range identities {
+		participant := dkg.Participant{
+			Index:          uint(i),
+			PublicKeyShare: randomBKeys[i].PublicKey(),
+		}
+		pubData.IDToParticipant[identity.NodeID] = &participant
 	}
 
-	for i, id := range ids {
-		signerData.Signers[i].Identity = *id
-		signerData.Signers[i].RandomBeaconPrivKey = randomBKeys[i]
-		signerData.Signers[i].StakingPrivKey = stakingKeys[i]
+	participantData := ParticipantData{
+		DKGState:     wrapper.NewState(&pubData),
+		Participants: make([]Participant, n),
 	}
 
-	return signerData
+	for i, identity := range identities {
+		participantData.Participants[i].NodeInfo = bootstrap.NewPrivateNodeInfo(
+			identity.NodeID,
+			identity.Role,
+			identity.Address,
+			identity.Stake,
+			networkingKeys[i],
+			stakingKeys[i],
+		)
+
+		// add random beacon private key
+		participantData.Participants[i].RandomBeaconPrivKey = randomBKeys[i]
+	}
+
+	return participantData
 }

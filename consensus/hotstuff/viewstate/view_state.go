@@ -3,10 +3,10 @@ package viewstate
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/dkg"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 // ViewState provides method for querying identities related information by view or block ID
@@ -17,11 +17,11 @@ type ViewState struct {
 	consensusMembersFilter flow.IdentityFilter // identityFilter to find only the consensus members for the cluster
 	allNodes               flow.IdentityList   // the cached all consensus members for finding leaders for a certain view
 
-	dkgPublicData *hotstuff.DKGPublicData
+	dkgState dkg.State
 }
 
 // New creates a new ViewState instance
-func New(protocolState protocol.State, dkgPublicData *hotstuff.DKGPublicData, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
+func New(protocolState protocol.State, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
 	// finding all consensus members
 	allNodes, err := protocolState.Final().Identities(consensusMembersFilter)
 	if err != nil {
@@ -37,7 +37,6 @@ func New(protocolState protocol.State, dkgPublicData *hotstuff.DKGPublicData, my
 		myID:                   myID,
 		consensusMembersFilter: consensusMembersFilter,
 		allNodes:               allNodes,
-		dkgPublicData:          dkgPublicData,
 	}, nil
 }
 
@@ -56,9 +55,9 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 	return v.IsSelf(v.LeaderForView(view).ID())
 }
 
-// DKGPublicData returns the public DKG data for block
-func (v *ViewState) DKGPublicData() *hotstuff.DKGPublicData {
-	return v.dkgPublicData
+// DKGState returns the public DKG data for block
+func (v *ViewState) DKGState() dkg.State {
+	return v.dkgState
 }
 
 // ConsensusParticipants returns all _staked_ consensus participants at block with blockID.
@@ -66,7 +65,7 @@ func (v *ViewState) DKGPublicData() *hotstuff.DKGPublicData {
 // `ViewState.consensusMembersFilter` (defined at construction time).
 func (v *ViewState) AllConsensusParticipants(blockID flow.Identifier) (flow.IdentityList, error) {
 	// create filters
-	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake}
+	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake(true)}
 	// query all staked consensus participants
 	identities, err := v.protocolState.AtBlockID(blockID).Identities(filters...)
 	if err != nil {
@@ -76,21 +75,23 @@ func (v *ViewState) AllConsensusParticipants(blockID flow.Identifier) (flow.Iden
 }
 
 // IdentityForConsensusParticipant returns the flow.Identity corresponding to the consensus participant
-// with ID `participantId`. Errors, if participantId is not a valid and staked consensus participant
+// with ID `participantID`. Errors, if participantID is not a valid and staked consensus participant
 // at blockID, this method error. Which node is considered an eligible consensus participant is
 // determined by `ViewState.consensusMembersFilter` (defined at construction time).
-func (v *ViewState) IdentityForConsensusParticipant(blockID flow.Identifier, participantId flow.Identifier) (*flow.Identity, error) {
-	id, err := v.protocolState.AtBlockID(blockID).Identity(participantId)
+// ERROR conditions:
+//   * INVALID CONSENSUS MEMBER: participantID does NOT correspond to staked consensus participant
+func (v *ViewState) IdentityForConsensusParticipant(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+	identity, err := v.protocolState.AtBlockID(blockID).Identity(participantID)
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving identity for %s: %w", participantId, err)
+		return nil, fmt.Errorf("error retrieving identity for %s: %w", participantID, err)
 	}
-	if !v.consensusMembersFilter(id) { // participantId is not a consensus participant
-		return nil, fmt.Errorf("not a consensus participant: %s", participantId)
+	if !v.consensusMembersFilter(identity) { // participantID is not a consensus participant
+		return nil, fmt.Errorf("not a consensus participant: %s", participantID)
 	}
-	if id.Stake == 0 {
-		return nil, fmt.Errorf("not a staked node: %s", participantId)
+	if identity.Stake == 0 {
+		return nil, fmt.Errorf("not a staked node: %s", participantID)
 	}
-	return id, nil
+	return identity, nil
 }
 
 // IdentitiesForConsensusParticipant translates the given consensus IDs to flow.Identifiers.
@@ -108,7 +109,12 @@ func (v *ViewState) IdentityForConsensusParticipant(blockID flow.Identifier, par
 // ERROR conditions:
 //   * DUPLICATES: consensusNodeIDs contains duplicates
 //   * DUPLICATES: an element in consensusNodeIDs does NOT correspond to staked consensus node
-func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, consensusNodeIDs ...flow.Identifier) (flow.IdentityList, error) {
+// Properties
+//   * PRESERVES ORDER of `consensusNodeIDs`, i.e. for the returned list L, we have L[k] is the flow.Identity for consensusNodeIDs[k]
+// ERROR conditions:
+//   * DUPLICATES: consensusNodeIDs contains duplicates
+//   * INVALID CONSENSUS MEMBER: an element in consensusNodeIDs does NOT correspond to staked consensus participant
+func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, consensusNodeIDs []flow.Identifier) (flow.IdentityList, error) {
 	if len(consensusNodeIDs) == 0 { // Special case: consensusNodeIDs is empty
 		// _no_ filter will be applied and all consensus participants are returned.
 		return v.AllConsensusParticipants(blockID)
@@ -127,7 +133,7 @@ func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, 
 
 	// Retrieve full flow.Identity for each element in consensusNodeIDs:
 	// Select Identities at block via Filters: consensus participants, staked, element of consensusNodeIDs
-	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake, filter.HasNodeID(consensusNodeIDs...)}
+	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake(true), filter.HasNodeID(consensusNodeIDs...)}
 	consensusIdentities, err := v.protocolState.AtBlockID(blockID).Identities(filters...)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)

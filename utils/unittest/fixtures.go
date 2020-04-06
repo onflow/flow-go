@@ -51,9 +51,14 @@ func BlockHeaderFixture() flow.Header {
 
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	return flow.Header{
-		ParentID: parent.ID(),
-		View:     rand.Uint64(),
+		ChainID:        "chain",
+		ParentID:       parentID,
+		View:           rand.Uint64(),
 		Height:   parent.Height + 1,
+		ParentVoterIDs: IdentifierListFixture(4),
+		ParentVoterSig: SignatureFixture(),
+		ProposerID:     IdentifierFixture(),
+		ProposerSig:    SignatureFixture(),
 	}
 }
 
@@ -130,7 +135,7 @@ func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
 	return &flow.CollectionGuarantee{
 		CollectionID: IdentifierFixture(),
 		SignerIDs:    IdentifierListFixture(16),
-		Signatures:   SignaturesFixture(16),
+		Signature:    SignatureFixture(),
 	}
 }
 
@@ -138,8 +143,8 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 	ret := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 1; i <= n; i++ {
 		cg := flow.CollectionGuarantee{
-			CollectionID: flow.Identifier{byte(i)},
-			Signatures:   []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
+			CollectionID: IdentifierFixture(),
+			Signature:    SignatureFixture(),
 		}
 		ret = append(ret, &cg)
 	}
@@ -171,7 +176,7 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
 			CollectionID: flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
-			Signatures:   SignaturesFixture(16),
+			Signature:    SignatureFixture(),
 		},
 		Transactions: []*flow.TransactionBody{&txBody},
 	}
@@ -278,8 +283,14 @@ func IdentifierFixture() flow.Identifier {
 
 // WithRole adds a role to an identity fixture.
 func WithRole(role flow.Role) func(*flow.Identity) {
-	return func(id *flow.Identity) {
-		id.Role = role
+	return func(identity *flow.Identity) {
+		identity.Role = role
+	}
+}
+
+func WithStake(stake uint64) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.Stake = stake
 	}
 }
 
@@ -291,40 +302,47 @@ func generateRandomSeed() []byte {
 	return seed
 }
 
-// WithRole adds a role to an identity fixture.
-func WithRandomPublicKeys() func(*flow.Identity) {
-	return func(id *flow.Identity) {
-		randBeac, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
-		if err != nil {
-			panic(err)
-		}
-		id.RandomBeaconPubKey = randBeac.PublicKey()
-		stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
-		if err != nil {
-			panic(err)
-		}
-		id.StakingPubKey = stak.PublicKey()
-		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed())
-		if err != nil {
-			panic(err)
-		}
-		id.NetworkPubKey = netw.PublicKey()
-	}
-}
-
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
-	nodeId := IdentifierFixture()
-	id := flow.Identity{
-		NodeID:  nodeId,
-		Address: fmt.Sprintf("address-%v", nodeId[0:7]),
+	nodeID := IdentifierFixture()
+	identity := flow.Identity{
+		NodeID:  nodeID,
+		Address: fmt.Sprintf("address-%v", nodeID[0:7]),
 		Role:    flow.RoleConsensus,
 		Stake:   1000,
 	}
 	for _, apply := range opts {
-		apply(&id)
+		apply(&identity)
 	}
-	return &id
+	return &identity
+}
+
+// WithNodeID adds a node ID with the given first byte to an identity.
+func WithNodeID(b byte) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.NodeID = flow.Identifier{b}
+	}
+}
+
+// WithRandomPublicKeys adds random public keys to an identity.
+func WithRandomPublicKeys() func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		randBeac, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
+		if err != nil {
+			panic(err)
+		}
+		identity.RandomBeaconPubKey = randBeac.PublicKey()
+		stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
+		if err != nil {
+			panic(err)
+		}
+		identity.StakingPubKey = stak.PublicKey()
+		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed())
+		if err != nil {
+			panic(err)
+		}
+		identity.NetworkPubKey = netw.PublicKey()
+	}
 }
 
 // IdentityListFixture returns a list of node identity objects. The identities

@@ -280,7 +280,7 @@ func dkgRunChan(proc *testDKGProcessor,
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving from %d:", proc.current, newMsg.orig)
-			err := proc.dkg.ReceiveDKGMsg(newMsg.orig, newMsg.data)
+			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
 			require.Nil(t, err)
 		// if timeout, stop and finalize
 		case <-time.After(200 * time.Millisecond):

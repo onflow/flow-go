@@ -6,19 +6,20 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cluster"
-	badgercluster "github.com/dapperlabs/flow-go/cluster/badger"
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	model "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
@@ -27,7 +28,9 @@ import (
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/module/signature"
+	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -48,8 +51,8 @@ func main() {
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
 
-		clusterID    string        // chain ID for the cluster
-		clusterState cluster.State // chain state for the cluster
+		clusterID    string         // chain ID for the cluster
+		clusterState *cluster.State // chain state for the cluster
 
 		prov *provider.Engine
 		ing  *ingest.Engine
@@ -86,7 +89,7 @@ func main() {
 
 			// determine the chain ID for my cluster and create cluster state
 			clusterID = protocol.ChainIDForCluster(myCluster)
-			clusterState, err = badgercluster.NewState(node.DB, clusterID)
+			clusterState, err = cluster.NewState(node.DB, clusterID)
 			if err != nil {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}
@@ -113,10 +116,21 @@ func main() {
 			// state when the follower detects newly finalized blocks
 			final := followerfinalizer.NewFinalizer(node.DB)
 
+			// initialize the staking & beacon verifiers, signature joiner
+			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			merger := signature.NewCombiner()
+
+			// define the node set that is valid as signers
+			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+
 			// TODO use a noop notification consumer for now
 			noop := notifications.NoopConsumer{}
 
-			core, err := follower.New(node.Me, node.State, node.DKGPubData, &node.GenesisBlock.Header, node.GenesisQC, final, noop, node.Logger)
+			core, err := follower.New(node.Me, node.State, &node.GenesisBlock.Header, node.GenesisQC, verifier, final, noop, node.Logger)
 			if err != nil {
 				//return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower

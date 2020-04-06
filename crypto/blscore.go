@@ -8,6 +8,7 @@ package crypto
 import "C"
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -34,13 +35,13 @@ func (a *BLS_BLS12381Algo) init() error {
 	if a.prKeyLength != PrKeyLenBLS_BLS12381 ||
 		a.pubKeyLength != PubKeyLenBLS_BLS12381 ||
 		a.signatureLength != SignatureLenBLS_BLS12381 {
-		return cryptoError{"BLS Lengths in types.go are not matching bls_include.h"}
+		return errors.New("BLS Lengths in types.go are not matching bls_include.h")
 	}
 
 	// Inits relic context and sets the B12_381 context
 	c := C.relic_init_BLS12_381()
 	if c == nil {
-		return cryptoError{"Relic core init failed"}
+		return errors.New("Relic core init failed")
 	}
 	a.context.relicCtx = c
 	a.context.precCtx = C.init_precomputed_data_BLS12_381()
@@ -84,8 +85,8 @@ func (p *pointG2) equals(other *pointG2) bool {
 // seeds the internal relic random function
 func seedRelic(seed []byte) error {
 	if len(seed) < (securityBits / 8) {
-		return cryptoError{fmt.Sprintf("seed length needs to be larger than %d",
-			securityBits/8)}
+		return fmt.Errorf("seed length needs to be larger than %d",
+			securityBits/8)
 	}
 	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 	return nil
@@ -95,7 +96,7 @@ func seedRelic(seed []byte) error {
 func randZr(x *scalar) error {
 	C.bn_randZr((*C.bn_st)(x))
 	if x == nil {
-		return cryptoError{"the memory allocation of the random number has failed"}
+		return errors.New("the memory allocation of the random number has failed")
 	}
 	return nil
 }
@@ -161,7 +162,7 @@ func readPointG2(a *pointG2, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)),
 	) != valid {
-		return cryptoError{"reading a G2 point has failed"}
+		return errors.New("reading a G2 point has failed")
 	}
 	return nil
 }

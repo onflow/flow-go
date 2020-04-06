@@ -3,14 +3,15 @@ package access
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dgraph-io/badger/v2"
-
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
@@ -20,13 +21,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
+	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	access "github.com/dapperlabs/flow-go/protobuf/services/access"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-
-	networkmock "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -39,6 +39,7 @@ type Suite struct {
 	collClient         *obs.AccessAPIClient
 	execClient         *obs.AccessAPIClient
 	collectionsConduit *networkmock.Conduit
+	me                 *mockmodule.Local
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -56,6 +57,9 @@ func (suite *Suite) SetupTest() {
 	suite.execClient = new(obs.AccessAPIClient)
 	suite.net = new(mockmodule.Network)
 	suite.collectionsConduit = &networkmock.Conduit{}
+	suite.me = new(mockmodule.Local)
+	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleObservation))
+	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
@@ -210,7 +214,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		transactions := bstorage.NewTransactions(db)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, nil, nil, blocks, headers, collections, transactions)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, nil, suite.me, blocks, headers, collections, transactions)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
@@ -221,9 +225,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Seal").Return(seal, nil).Once()
 
-		// 2. Ingest engine was notified by the follower engine with a new block
-		err = ingestEng.Process(originID, &block)
-		require.NoError(suite.T(), err)
+		// 2. Ingest engine was notified by the follower engine about a new block.
+		// Follower engine --> Ingest engine
+		mb := &model.Block{
+			BlockID: block.ID(),
+		}
+		ingestEng.OnFinalizedBlock(mb)
+		time.Sleep(10 * time.Millisecond)
 
 		// 3. Ingest engine requests all collections of the block
 		suite.collectionsConduit.AssertExpectations(suite.T())
@@ -250,7 +258,7 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection, flow.Seal) {
 	collection := unittest.CollectionFixture(10)
 	cg := &flow.CollectionGuarantee{
 		CollectionID: collection.ID(),
-		Signatures:   []crypto.Signature{[]byte("signature A")},
+		Signature:    crypto.Signature([]byte("signature A")),
 	}
 	block := unittest.BlockFixture()
 	block.Guarantees = []*flow.CollectionGuarantee{cg}

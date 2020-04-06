@@ -1,866 +1,432 @@
 package validator
 
 import (
+	"errors"
 	"math/rand"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/mock"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/signature"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/test"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+func TestValidateProposal(t *testing.T) {
+	suite.Run(t, new(ProposalSuite))
+}
+
+type ProposalSuite struct {
+	suite.Suite
+	participants flow.IdentityList
+	leader       *flow.Identity
+	finalized    uint64
+	parent       *model.Block
+	block        *model.Block
+	proposal     *model.Proposal
+	vote         *model.Vote
+	viewstate    *mocks.ViewState
+	forks        *mocks.Forks
+	verifier     *mocks.Verifier
+	validator    *Validator
+}
+
+func (ps *ProposalSuite) SetupTest() {
+
+	// the leader is a random node for now
+	ps.finalized = uint64(rand.Uint32() + 1)
+	ps.participants = unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
+	ps.leader = ps.participants[0]
+
+	// the parent is the last finalized block, followed directly by a block from the leader
+	ps.parent = helper.MakeBlock(ps.T(),
+		helper.WithBlockView(ps.finalized),
+	)
+	ps.block = helper.MakeBlock(ps.T(),
+		helper.WithBlockView(ps.finalized+1),
+		helper.WithBlockProposer(ps.leader.NodeID),
+		helper.WithParentBlock(ps.parent),
+		helper.WithParentSigners(ps.participants.NodeIDs()),
+	)
+	ps.proposal = &model.Proposal{Block: ps.block}
+	ps.vote = ps.proposal.ProposerVote()
+
+	// the leader for the block view is the correct one
+	ps.viewstate = &mocks.ViewState{}
+	ps.viewstate.On("LeaderForView", ps.block.View).Return(ps.leader)
+	ps.viewstate.On("AllConsensusParticipants", ps.parent.BlockID).Return(ps.participants, nil)
+	ps.viewstate.On("AllConsensusParticipants", ps.block.BlockID).Return(ps.participants, nil)
+	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.parent.BlockID, ps.participants.NodeIDs()).Return(ps.participants, nil)
+	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.block.BlockID, ps.participants.NodeIDs()).Return(ps.participants, nil)
+	for _, participant := range ps.participants {
+		ps.viewstate.On("IdentityForConsensusParticipant", ps.parent.BlockID, participant.NodeID).Return(participant, nil)
+		ps.viewstate.On("IdentityForConsensusParticipant", ps.block.BlockID, participant.NodeID).Return(participant, nil)
+	}
+
+	// the finalized view is the one of the parent of the
+	ps.forks = &mocks.Forks{}
+	ps.forks.On("FinalizedView").Return(ps.finalized)
+	ps.forks.On("GetBlock", ps.parent.BlockID).Return(ps.parent, true)
+	ps.forks.On("GetBlock", ps.block.BlockID).Return(ps.block, true)
+
+	// set up the mocked verifier
+	ps.verifier = &mocks.Verifier{}
+	ps.verifier.On("VerifyQC", ps.block.QC.SignerIDs, ps.block.QC.SigData, ps.parent).Return(true, nil)
+	ps.verifier.On("VerifyVote", ps.vote.SignerID, ps.vote.SigData, ps.block).Return(true, nil)
+
+	// set up the validator with the mocked dependencies
+	ps.validator = New(ps.viewstate, ps.forks, ps.verifier)
+}
+
+func (ps *ProposalSuite) TestProposalOK() {
+
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.NoError(ps.T(), err, "a valid proposal should be accepted")
+}
+
+func (ps *ProposalSuite) TestProposalSignatureError() {
+
+	// change the verifier to error on signature validation
+	*ps.verifier = mocks.Verifier{}
+	ps.verifier.On("VerifyQC", ps.block.QC.SignerIDs, ps.block.QC.SigData, ps.parent).Return(true, nil)
+	ps.verifier.On("VerifyVote", ps.vote.SignerID, ps.vote.SigData, ps.block).Return(true, errors.New("dummy error"))
+
+	// check that validation now fails
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.Error(ps.T(), err, "a proposal should be rejected if signature check fails")
+
+	// check that the error is not one that leads to invalid
+	var invalid *model.ErrorInvalidBlock
+	assert.True(ps.T(), errors.As(err, &invalid), "if signature check fails, we should not generate a invalid error")
+}
+
+func (ps *ProposalSuite) TestProposalSignatureInvalid() {
+
+	// change the verifier to fail signature validation
+	*ps.verifier = mocks.Verifier{}
+	ps.verifier.On("VerifyQC", ps.block.QC.SignerIDs, ps.block.QC.SigData, ps.parent).Return(true, nil)
+	ps.verifier.On("VerifyVote", ps.vote.SignerID, ps.vote.SigData, ps.block).Return(false, nil)
+
+	// check that validation now fails
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.Error(ps.T(), err, "a proposal with an invalid signature should be rejected")
+
+	// check that the error is an invalid proposal error to allow creating slashing challenge
+	var invalid *model.ErrorInvalidBlock
+	assert.True(ps.T(), errors.As(err, &invalid), "if signature is invalid, we should generate an invalid error")
+}
+
+func (ps *ProposalSuite) TestProposalWrongLeader() {
+
+	// change the viewstate to return a different leader
+	*ps.viewstate = mocks.ViewState{}
+	ps.viewstate.On("LeaderForView", ps.proposal.Block.View).Return(ps.participants[1])
+	ps.viewstate.On("AllConsensusParticipants", ps.parent.BlockID).Return(ps.participants, nil)
+	ps.viewstate.On("AllConsensusParticipants", ps.block.BlockID).Return(ps.participants, nil)
+	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.parent.BlockID, ps.participants.NodeIDs()).Return(ps.participants, nil)
+	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.block.BlockID, ps.participants.NodeIDs()).Return(ps.participants, nil)
+	for _, participant := range ps.participants {
+		ps.viewstate.On("IdentityForConsensusParticipant", ps.parent.BlockID, participant.NodeID).Return(participant, nil)
+		ps.viewstate.On("IdentityForConsensusParticipant", ps.block.BlockID, participant.NodeID).Return(participant, nil)
+	}
+
+	// check that validation fails now
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.Error(ps.T(), err, "a proposal from the wrong proposer should be rejected")
+
+	// check that the error is an invalid proposal error to allow creating slashing challenge
+	var invalid *model.ErrorInvalidBlock
+	assert.True(ps.T(), errors.As(err, &invalid), "if the proposal has wrong proposer, we should generate a invalid error")
+}
+
+func (ps *ProposalSuite) TestProposalMismatchingView() {
+
+	// change the QC's view to be different from the parent
+	ps.proposal.Block.QC.View++
+
+	// check that validation fails now
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.Error(ps.T(), err, "a proposal with a mismatching QC view should be rejected")
+
+	// check that the error is an invalid proposal error to allow creating slashing challenge
+	var invalid *model.ErrorInvalidBlock
+	assert.True(ps.T(), errors.As(err, &invalid), "if the QC has a mismatching view, we should generate a invalid error")
+}
+
+func (ps *ProposalSuite) TestProposalMissingParentHigher() {
+
+	// change forks to not find the parent
+	ps.block.QC.View = ps.finalized
+	*ps.forks = mocks.Forks{}
+	ps.forks.On("FinalizedView").Return(ps.finalized)
+	ps.forks.On("GetBlock", ps.block.QC.BlockID).Return(nil, false)
+
+	// check that validation fails now
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.Error(ps.T(), err, "a proposal with a missing parent should be rejected")
+
+	// check that the error is a missing block error because we should have the block but we don't
+	var missing *model.ErrorMissingBlock
+	assert.True(ps.T(), errors.As(err, &missing), "if we don't have the proposal parent for a QC above or equal finalized view, we should generate an missing block error")
+}
+
+func (ps *ProposalSuite) TestProposalMissingParentLower() {
+
+	// change forks to not find the parent
+	ps.block.QC.View = ps.finalized - 1
+	*ps.forks = mocks.Forks{}
+	ps.forks.On("FinalizedView").Return(ps.finalized)
+	ps.forks.On("GetBlock", ps.block.QC.BlockID).Return(nil, false)
+
+	// check that validation fails now
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.Error(ps.T(), err, "a proposal with a missing parent should be rejected")
+
+	// check that the error is an unverifiable block because we can't verify the block
+	assert.True(ps.T(), errors.Is(err, model.ErrUnverifiableBlock), "if we don't have the proposal parent for a QC below finalized view, we should generate an unverifiable block error")
+}
+
+func (ps *ProposalSuite) TestProposalQCInvalid() {
+
+	// change verifier to fail on QC validation
+	*ps.verifier = mocks.Verifier{}
+	ps.verifier.On("VerifyQC", ps.block.QC.SignerIDs, ps.block.QC.SigData, ps.parent).Return(false, nil)
+	ps.verifier.On("VerifyVote", ps.vote.SignerID, ps.vote.SigData, ps.block).Return(true, nil)
+
+	// check that validation fails now
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.Error(ps.T(), err, "a proposal with an invalid QC should be rejected")
+
+	// check that the error is an invalid proposal error to allow creating slashing challenge
+	var invalid *model.ErrorInvalidBlock
+	assert.True(ps.T(), errors.As(err, &invalid), "if the QC is invalid, we should generate a invalid error")
+}
+
+func (ps *ProposalSuite) TestProposalQCError() {
+
+	// change viewstate to error when getting stuff
+	*ps.viewstate = mocks.ViewState{}
+	ps.viewstate.On("LeaderForView", ps.block.View).Return(ps.leader)
+	ps.viewstate.On("AllConsensusParticipants", ps.parent.BlockID).Return(ps.participants, nil)
+	ps.viewstate.On("AllConsensusParticipants", ps.block.BlockID).Return(ps.participants, nil)
+	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.parent.BlockID, ps.participants.NodeIDs()).Return(ps.participants, errors.New("dummy error"))
+	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.block.BlockID, ps.participants.NodeIDs()).Return(ps.participants, errors.New("dummy error"))
+	for _, participant := range ps.participants {
+		ps.viewstate.On("IdentityForConsensusParticipant", ps.parent.BlockID, participant.NodeID).Return(participant, nil)
+		ps.viewstate.On("IdentityForConsensusParticipant", ps.block.BlockID, participant.NodeID).Return(participant, nil)
+	}
+
+	// check that validation fails now
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.Error(ps.T(), err, "a proposal with an invalid QC should be rejected")
+
+	// check that the error is an invalid proposal error to allow creating slashing challenge
+	var invalid *model.ErrorInvalidBlock
+	assert.False(ps.T(), errors.As(err, &invalid), "if we can't verify the QC, we should not generate a invalid error")
+}
+
 func TestValidateVote(t *testing.T) {
-	// Happy Path
-	t.Run("A valid vote should be valid", testVoteOK)
-	// Unhappy Path
-	t.Run("A vote with invalid view should be rejected", testVoteInvalidView)
-	t.Run("A vote with invalid block ID should be rejected", testVoteInvalidBlock)
-	t.Run("A vote from unstaked node should be rejected", testVoteUnstakedNode)
-	t.Run("A vote with invalid staking sig should be rejected", testVoteInvalidStaking)
-	t.Run("A vote with invalid random beacon sig should be rejected", testVoteInvalidRandomB)
+	suite.Run(t, new(VoteSuite))
+}
+
+type VoteSuite struct {
+	suite.Suite
+	signer    *flow.Identity
+	block     *model.Block
+	vote      *model.Vote
+	forks     *mocks.Forks
+	verifier  *mocks.Verifier
+	viewstate *mocks.ViewState
+	validator *Validator
+}
+
+func (vs *VoteSuite) SetupTest() {
+
+	// create a random signing identity
+	vs.signer = unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+
+	// create a block that should be signed
+	vs.block = helper.MakeBlock(vs.T())
+
+	// create a vote for this block
+	vs.vote = &model.Vote{
+		View:     vs.block.View,
+		BlockID:  vs.block.BlockID,
+		SignerID: vs.signer.NodeID,
+		SigData:  []byte{},
+	}
+
+	// set up the mocked forks
+	vs.forks = &mocks.Forks{}
+	vs.forks.On("GetBlock", vs.block.BlockID).Return(vs.block, true)
+
+	// set up the mocked verifier
+	vs.verifier = &mocks.Verifier{}
+	vs.verifier.On("VerifyVote", vs.vote.SignerID, vs.vote.SigData, vs.block).Return(true, nil)
+
+	// the leader for the block view is the correct one
+	vs.viewstate = &mocks.ViewState{}
+	vs.viewstate.On("IdentityForConsensusParticipant", vs.block.BlockID, vs.signer.NodeID).Return(vs.signer, nil)
+
+	// set up the validator with the mocked dependencies
+	vs.validator = New(vs.viewstate, vs.forks, vs.verifier)
+}
+
+func (vs *VoteSuite) TestVoteOK() {
+
+	// check the happy case, which is the default for the suite
+	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	assert.NoError(vs.T(), err, "a valid vote should be accepted")
+}
+
+func (vs *VoteSuite) TestVoteMismatchingView() {
+
+	// make the view on the vote different
+	vs.vote.View++
+
+	// check that the vote is no longer validated
+	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	assert.Error(vs.T(), err, "a vote with a mismatching view should be rejected")
+
+	// TODO: this should raise an error that allows a slashing challenge
+	var malformedVote *model.ErrorInvalidVote
+	assert.True(vs.T(), errors.As(err, &malformedVote), "a mismatching view should create a invalid vote error")
+}
+
+func (vs *VoteSuite) TestVoteSignatureError() {
+
+	// make the verification fail on signature
+	*vs.verifier = mocks.Verifier{}
+	vs.verifier.On("VerifyVote", vs.vote.SignerID, vs.vote.SigData, vs.block).Return(true, errors.New("dummy error"))
+
+	// check that the vote is no longer validated
+	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	assert.Error(vs.T(), err, "a vote with error on signature validation should be rejected")
+}
+
+func (vs *VoteSuite) TestVoteSignatureInvalid() {
+
+	// make sure the signature is treated as invalid
+	*vs.verifier = mocks.Verifier{}
+	vs.verifier.On("VerifyVote", vs.vote.SignerID, vs.vote.SigData, vs.block).Return(false, nil)
+
+	// check that the vote is no longer validated
+	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	assert.Error(vs.T(), err, "a vote with an invalid signature should be rejected")
 }
 
 func TestValidateQC(t *testing.T) {
-	// Happy Path
-	t.Run("A valid QC should be valid", testQCOK)
-	// Unhappy Path
-	t.Run("A QC with invalid blockID should be rejected", testQCInvalidBlock)
-	t.Run("A QC with invalid view should be rejected", testQCInvalidView)
-	t.Run("A QC from unstaked nodes should be rejected", testQCHasUnstakedSigner)
-	t.Run("A QC with insufficient stakes should be rejected", testQCHasInsufficentStake)
-	t.Run("A QC with invalid staking sig should be rejected", testQCHasInvalidStakingSig)
-	t.Run("A QC with invalid random beacon sig should be rejected", testQCHasInvalidRandomBSig)
+	suite.Run(t, new(QCSuite))
 }
 
-func TestValidateProposal(t *testing.T) {
-	// Happy Path
-	t.Run("A valid proposal should be accepted", testProposalOK)
-	// Unhappy Path
-	t.Run("A proposal with invalid view should be rejected", testProposalInvalidView)
-	t.Run("A proposal with invalid block ID should be rejected", testProposalInvalidBlock)
-	t.Run("A proposal from unstaked node should be rejected", testProposalUnstakedNode)
-	t.Run("A proposal with invalid staking sig should be rejected", testProposalInvalidStaking)
-	t.Run("A proposal with invalid random beacon sig should be rejected", testProposalInvalidRandomB)
-	t.Run("A proposal from the wrong leader should be rejected", testProposalWrongLeader)
-	t.Run("A proposal with a QC pointing to a non-existing block, but equal to finalized view should be rejected", testProposalWrongParentEqual)
-	t.Run("A proposal with a QC pointing to a non-existing block, but above finalized view should be rejected", testProposalWrongParentAbove)
-	t.Run("A proposal with a QC pointing to a non-existing block, but below finalized view should be unverifiable", testProposalWrongParentBelow)
-	t.Run("A proposal with a invalid QC should be rejected", testProposalInvalidQC)
+type QCSuite struct {
+	suite.Suite
+	participants flow.IdentityList
+	signers      flow.IdentityList
+	block        *model.Block
+	qc           *model.QuorumCertificate
+	viewstate    *mocks.ViewState
+	verifier     *mocks.Verifier
+	validator    *Validator
 }
 
-func testVoteOK(t *testing.T) {
-	vs, signers, ids, _, _ := createValidators(t, 3)
-	v, signer, id := vs[0], signers[0], ids[0]
+func (qs *QCSuite) SetupTest() {
 
-	// make block
-	block := test.MakeBlock(3)
+	// create a list of 10 nodes with one stake each
+	qs.participants = unittest.IdentityListFixture(10,
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithStake(1),
+	)
 
-	// make vote
-	vote, err := signer.VoteFor(block)
-	require.NoError(t, err)
+	// signers are a qualified majority at 7
+	qs.signers = qs.participants[:7]
 
-	// validate vote
-	signerID, err := v.ValidateVote(vote, block)
-	require.NoError(t, err)
+	// create a block that has the signers in its QC
+	qs.block = helper.MakeBlock(qs.T())
+	qs.qc = helper.MakeQC(qs.T(), helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
 
-	// validate signerID
-	require.Equal(t, signerID, id)
+	// return the correct participants and identities from view state
+	qs.viewstate = &mocks.ViewState{}
+	qs.viewstate.On("IdentitiesForConsensusParticipants", qs.qc.BlockID, qs.signers.NodeIDs()).Return(qs.signers, nil)
+	qs.viewstate.On("AllConsensusParticipants", qs.qc.BlockID).Return(qs.participants, nil)
+
+	// set up the mocked verifier to verify the QC correctly
+	qs.verifier = &mocks.Verifier{}
+	qs.verifier.On("VerifyQC", qs.qc.SignerIDs, qs.qc.SigData, qs.block).Return(true, nil)
+
+	// set up the validator with the mocked dependencies
+	qs.validator = New(qs.viewstate, nil, qs.verifier)
 }
 
-func testVoteInvalidView(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 3)
-	v, signer := vs[0], signers[0]
+func (qs *QCSuite) TestQCOK() {
 
-	// make block
-	block := test.MakeBlock(3)
-
-	// make vote
-	vote, err := signer.VoteFor(block)
-	require.NoError(t, err)
-
-	// signature is valid, but View is invalid
-	vote.View = 4
-
-	// validate vote
-	_, err = v.ValidateVote(vote, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "wrong view number")
+	// check the default happy case passes
+	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	assert.NoError(qs.T(), err, "a valid QC should be accepted")
 }
 
-func testVoteInvalidBlock(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 3)
-	v, signer := vs[0], signers[0]
+func (qs *QCSuite) TestQCSignersError() {
 
-	// make block
-	block := test.MakeBlock(3)
+	// change the viewstate to fail at retrieving participants
+	*qs.viewstate = mocks.ViewState{}
+	qs.viewstate.On("IdentitiesForConsensusParticipants", qs.qc.BlockID, qs.signers.NodeIDs()).Return(qs.signers, errors.New("dummy error"))
+	qs.viewstate.On("AllConsensusParticipants", qs.qc.BlockID).Return(qs.participants, nil)
 
-	// make vote
-	vote, err := signer.VoteFor(block)
-	require.NoError(t, err)
-
-	// signature is valid, but BlockID is invalid
-	vote.BlockID = flow.HashToID([]byte{1, 2, 3})
-
-	// validate vote
-	_, err = v.ValidateVote(vote, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "wrong block ID")
+	// the QC should not be validated anymore
+	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	assert.Error(qs.T(), err, "a QC should be rejected if we can't retrieve signer identities")
 }
 
-func testVoteUnstakedNode(t *testing.T) {
-	vs, signers, ids, _, _ := createValidators(t, 3)
-	v, signer, id := vs[0], signers[0], ids[0]
+func (qs *QCSuite) TestQCParticipantsError() {
 
-	// make block
-	block := test.MakeBlock(3)
+	// change the view state to fail on participants
+	*qs.viewstate = mocks.ViewState{}
+	qs.viewstate.On("IdentitiesForConsensusParticipants", qs.qc.BlockID, qs.signers.NodeIDs()).Return(qs.signers, nil)
+	qs.viewstate.On("AllConsensusParticipants", qs.qc.BlockID).Return(qs.participants, errors.New("dummy error"))
 
-	// make vote
-	vote, err := signer.VoteFor(block)
-	require.NoError(t, err)
-
-	// signer is now unstaked
-	id.Stake = 0
-
-	// validate vote
-	_, err = v.ValidateVote(vote, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "not a staked node")
+	// the QC should not be validated anymore
+	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	assert.Error(qs.T(), err, "a QC should be rejected if we can't retrieve participant identities")
 }
 
-func testVoteInvalidStaking(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 3)
-	v, signer := vs[0], signers[0]
+func (qs *QCSuite) TestQCInsufficientStake() {
 
-	// make block
-	block := test.MakeBlock(3)
+	// reduce the number of signers so the threshold is not reached
+	*qs.viewstate = mocks.ViewState{}
+	qs.viewstate.On("IdentitiesForConsensusParticipants", qs.qc.BlockID, qs.signers.NodeIDs()).Return(qs.signers[:6], nil)
+	qs.viewstate.On("AllConsensusParticipants", qs.qc.BlockID).Return(qs.participants, nil)
 
-	// make vote
-	vote, err := signer.VoteFor(block)
-	require.NoError(t, err)
+	// the QC should not be validated anymore
+	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	assert.Error(qs.T(), err, "a QC should be rejected if it has insufficient voted stake")
 
-	// make vote from others
-	voteFromOthers, err := signers[1].VoteFor(block)
-	require.NoError(t, err)
-
-	// take staking signature from others' vote
-	vote.Signature.StakingSignature = voteFromOthers.Signature.StakingSignature
-
-	// validate vote
-	_, err = v.ValidateVote(vote, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid staking signature")
+	// we should get a threshold error to bubble up for extra info
+	var invalid *model.ErrorInvalidBlock
+	assert.True(qs.T(), errors.As(err, &invalid), "if there is insufficient voted stake, an invalid block error should be raised")
 }
 
-func testVoteInvalidRandomB(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 3)
-	v, signer := vs[0], signers[0]
+func (qs *QCSuite) TestQCSignatureError() {
 
-	// make block
-	block := test.MakeBlock(3)
+	// set up the verifier to fail QC verification
+	*qs.verifier = mocks.Verifier{}
+	qs.verifier.On("VerifyQC", qs.qc.SignerIDs, qs.qc.SigData, qs.block).Return(true, errors.New("dummy error"))
 
-	// make vote
-	vote, err := signer.VoteFor(block)
-	require.NoError(t, err)
-
-	// make vote from others
-	voteFromOthers, err := signers[1].VoteFor(block)
-	require.NoError(t, err)
-
-	// take random beacon signature from others' vote
-	vote.Signature.RandomBeaconSignature = voteFromOthers.Signature.RandomBeaconSignature
-
-	// validate vote
-	_, err = v.ValidateVote(vote, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid random beacon signature")
+	// the QC should not be validated anymore
+	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	assert.Error(qs.T(), err, "a QC should be rejected if we fail to verify it")
 }
 
-func testQCOK(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 3)
-	v := vs[0]
+func (qs *QCSuite) TestQCSignatureInvalid() {
 
-	// make block
-	block := test.MakeBlock(3)
+	// change the verifier to fail the QC signature
+	*qs.verifier = mocks.Verifier{}
+	qs.verifier.On("VerifyQC", qs.qc.SignerIDs, qs.qc.SigData, qs.block).Return(false, nil)
 
-	// make votes
-	vote1, err := signers[0].VoteFor(block)
-	require.NoError(t, err)
-	vote2, err := signers[1].VoteFor(block)
-	require.NoError(t, err)
-	vote3, err := signers[2].VoteFor(block)
-	require.NoError(t, err)
+	// the QC should no longer be validation
+	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	assert.Error(qs.T(), err, "a QC should be rejected if the signature is invalid")
 
-	// manually aggregate sigs
-	aggsig, err := signers[0].Aggregate(block, []*model.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-
-	// make QC
-	qc := &model.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// validate QC
-	err = v.ValidateQC(qc, block)
-	require.NoError(t, err)
-}
-
-func testQCInvalidBlock(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 3)
-	v := vs[0]
-
-	// make block
-	block := test.MakeBlock(3)
-
-	// make votes
-	vote1, err := signers[0].VoteFor(block)
-	require.NoError(t, err)
-	vote2, err := signers[1].VoteFor(block)
-	require.NoError(t, err)
-	vote3, err := signers[2].VoteFor(block)
-	require.NoError(t, err)
-
-	// manually aggregate sigs
-	aggsig, err := signers[0].Aggregate(block, []*model.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-
-	// make QC
-	qc := &model.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// replace with invalid blockID
-	block.BlockID = flow.HashToID([]byte{1, 2})
-
-	// validate QC
-	err = v.ValidateQC(qc, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "qc.BlockID")
-}
-
-func testQCInvalidView(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 3)
-	v := vs[0]
-
-	// make block
-	block := test.MakeBlock(3)
-
-	// make votes
-	vote1, err := signers[0].VoteFor(block)
-	require.NoError(t, err)
-	vote2, err := signers[1].VoteFor(block)
-	require.NoError(t, err)
-	vote3, err := signers[2].VoteFor(block)
-	require.NoError(t, err)
-
-	// manually aggregate sigs
-	aggsig, err := signers[0].Aggregate(block, []*model.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-
-	// make QC
-	qc := &model.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// replace with invalid view
-	block.View = 5
-
-	// validate QC
-	err = v.ValidateQC(qc, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "qc.View")
-}
-
-func testQCHasUnstakedSigner(t *testing.T) {
-	vs, signers, ids, _, _ := createValidators(t, 3)
-	v := vs[0]
-
-	// make block
-	block := test.MakeBlock(3)
-
-	// make votes
-	vote1, err := signers[0].VoteFor(block)
-	require.NoError(t, err)
-	vote2, err := signers[1].VoteFor(block)
-	require.NoError(t, err)
-	vote3, err := signers[2].VoteFor(block)
-	require.NoError(t, err)
-
-	// manually aggregate sigs
-	aggsig, err := signers[0].Aggregate(block, []*model.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-
-	// make QC
-	qc := &model.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// one signer is unstaked
-	ids[2].Stake = 0
-
-	// validate QC
-	err = v.ValidateQC(qc, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unstaked identities")
-}
-
-func testQCHasInsufficentStake(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 3)
-	v := vs[0]
-
-	// make block
-	block := test.MakeBlock(3)
-
-	// make votes
-	vote1, err := signers[0].VoteFor(block)
-	require.NoError(t, err)
-	vote2, err := signers[1].VoteFor(block)
-	require.NoError(t, err)
-	vote3, err := signers[2].VoteFor(block)
-	require.NoError(t, err)
-
-	// manually aggregate sigs
-	aggsig, err := signers[0].Aggregate(block, []*model.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-
-	// only take 2 signers
-	aggsig.SignerIDs = []flow.Identifier{
-		aggsig.SignerIDs[0],
-		aggsig.SignerIDs[1],
-	}
-
-	// make QC
-	qc := &model.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// validate QC
-	err = v.ValidateQC(qc, block)
-	// a valid QC require `2/3 + 1` of the stakes, this QC only has 2/3 stakes, which is insufficient
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "insufficient stake")
-}
-
-func testQCHasInvalidRandomBSig(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 3)
-	v := vs[0]
-
-	// make block
-	block := test.MakeBlock(3)
-
-	// make votes
-	vote1, err := signers[0].VoteFor(block)
-	require.NoError(t, err)
-	vote2, err := signers[1].VoteFor(block)
-	require.NoError(t, err)
-	vote3, err := signers[2].VoteFor(block)
-	require.NoError(t, err)
-
-	// manually aggregate sigs
-	aggsig, err := signers[0].Aggregate(block, []*model.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-	require.NoError(t, err)
-
-	// making bad votes
-	invalidBlock := test.MakeBlock(4)
-	badvote1, err := signers[0].VoteFor(invalidBlock)
-	require.NoError(t, err)
-	badvote2, err := signers[1].VoteFor(invalidBlock)
-	require.NoError(t, err)
-	badvote3, err := signers[2].VoteFor(invalidBlock)
-	require.NoError(t, err)
-
-	// aggregate bad votes to make a bad random beacon sig
-	badaggsig, err := signers[0].Aggregate(invalidBlock, []*model.SingleSignature{badvote1.Signature, badvote2.Signature, badvote3.Signature})
-	require.NoError(t, err)
-
-	// the random beacon signatures and the signers are now mismatch
-	aggsig.RandomBeaconSignature = badaggsig.RandomBeaconSignature
-
-	// make QC
-	qc := &model.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// validate QC
-	err = v.ValidateQC(qc, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "reconstructed random beacon signature in QC is invalid")
-}
-
-func testQCHasInvalidStakingSig(t *testing.T) {
-	vs, signers, _, _, _ := createValidators(t, 4)
-	v := vs[0]
-
-	// make block
-	block := test.MakeBlock(3)
-
-	// make votes
-	vote1, err := signers[0].VoteFor(block)
-	require.NoError(t, err)
-	vote2, err := signers[1].VoteFor(block)
-	require.NoError(t, err)
-	vote3, err := signers[2].VoteFor(block)
-	require.NoError(t, err)
-	vote4, err := signers[3].VoteFor(block)
-	require.NoError(t, err)
-
-	// manually aggregate sigs
-	aggsig, err := signers[0].Aggregate(block, []*model.SingleSignature{vote1.Signature, vote2.Signature, vote3.Signature})
-	require.NoError(t, err)
-
-	// manually aggregate sigs from different votes (1,2,4)
-	badaggsig, err := signers[0].Aggregate(block, []*model.SingleSignature{vote1.Signature, vote2.Signature, vote4.Signature})
-	require.NoError(t, err)
-
-	// the staking signatures and the signers are now mismatch
-	aggsig.StakingSignatures = badaggsig.StakingSignatures
-
-	// make QC
-	qc := &model.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// validate QC
-	err = v.ValidateQC(qc, block)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "aggregated staking signature in QC is invalid")
-}
-
-func testProposalOK(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	// create validators and other dependencies
-	vs, signers, _, viewstates, f := createValidators(t, n)
-
-	// make a block producer and a qc of view 3
-	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// mock forks has the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
-
-	err = v.ValidateProposal(proposal)
-	require.NoError(t, err)
-}
-
-func testProposalInvalidView(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	// create validators and other dependencies
-	vs, signers, _, viewstates, f := createValidators(t, n)
-
-	// make a block producer and a qc of view 3
-	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// mock forks has the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
-
-	// signer is still the leader of view 7, but View is invalid
-	proposal.Block.View = 7
-
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid block")
-}
-
-func testProposalInvalidBlock(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	// create validators and other dependencies
-	vs, signers, _, viewstates, f := createValidators(t, n)
-
-	// make a block producer and a qc of view 3
-	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// mock forks has the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
-
-	// invalid block id
-	proposal.Block.BlockID = flow.HashToID([]byte{1, 2, 3})
-
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid block")
-}
-
-func testProposalUnstakedNode(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	// create validators and other dependencies
-	vs, signers, ids, viewstates, f := createValidators(t, n)
-
-	// make a block producer and a qc of view 3
-	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v, id := vs[index], ids[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// mock forks has the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
-
-	// signer is now unstaked
-	id.Stake = 0
-
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "not a staked node")
-}
-
-func testProposalInvalidStaking(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	// create validators and other dependencies
-	vs, signers, _, viewstates, f := createValidators(t, n)
-
-	// make a block producer and a qc of view 3
-	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// make a different proposal to take its signature
-	proposal7, err := bp.MakeBlockProposal(qc, 7)
-
-	// invalid staking sig
-	proposal.StakingSignature = proposal7.StakingSignature
-
-	// mock forks has the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
-
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid staking signature")
-}
-
-func testProposalInvalidRandomB(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	// create validators and other dependencies
-	vs, signers, _, viewstates, f := createValidators(t, n)
-
-	// make a block producer and a qc of view 3
-	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// make a different proposal to take its signature
-	proposal7, err := bp.MakeBlockProposal(qc, 7)
-
-	// invalid random beacon sig
-	proposal.RandomBeaconSignature = proposal7.RandomBeaconSignature
-
-	// mock forks has the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
-
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid random beacon signature")
-}
-
-func testProposalWrongLeader(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	// create validators and other dependencies
-	vs, signers, _, viewstates, f := createValidators(t, n)
-
-	// make a block producer and a qc of view 3
-	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// make a view where signer is not the leader of
-	wrongViewAsLeader := uint64(5)
-
-	// build proposal
-	proposal, err := bp.MakeBlockProposal(qc, wrongViewAsLeader)
-
-	// mock forks doesn't have the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
-
-	// validate proposal
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "wrong leader")
-}
-
-func testProposalWrongParentEqual(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	// create validators and other dependencies
-	vs, signers, _, viewstates, f := createValidators(t, n)
-
-	// make a block producer and a qc of view 3
-	bp, qc, _ := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// mock forks doesn't have the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(nil, false)
-
-	// proposal.Block.QC.View equals to finalized view
-	f.On("FinalizedView").Return(qcview)
-
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Equal(t, err, &model.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID})
-}
-
-func testProposalWrongParentAbove(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	vs, signers, _, viewstates, f := createValidators(t, n)
-	// make a block producer and a qc of view 3
-	bp, qc, _ := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// mock forks doesn't have the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(nil, false)
-
-	// proposal.Block.QC.View is above finalized view
-	f.On("FinalizedView").Return(uint64(qcview - 1))
-
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Equal(t, err, &model.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID})
-}
-
-func testProposalWrongParentBelow(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	vs, signers, _, viewstates, f := createValidators(t, n)
-	// make a block producer and a qc of view 3
-	bp, qc, _ := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// mock forks doesn't have the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(nil, false)
-
-	// proposal.Block.QC.View is below finalized view
-	f.On("FinalizedView").Return(uint64(5))
-
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Equal(t, err, model.ErrUnverifiableBlock)
-}
-
-func testProposalInvalidQC(t *testing.T) {
-	n, qcview, view := 3, uint64(3), uint64(4)
-
-	// index-th node as the signer
-	index := leaderOfView(n, view)
-
-	vs, signers, _, viewstates, f := createValidators(t, n)
-	// make a block producer and a qc of view 3
-	bp, qc, block := makeBlockProducerAndQC(t, signers, viewstates, index, qcview)
-
-	// validator
-	v := vs[index]
-
-	// build proposal for view 4
-	proposal, err := bp.MakeBlockProposal(qc, view)
-	require.NoError(t, err)
-
-	// mock forks doesn't have the parent block
-	f.On("GetBlock", proposal.Block.QC.BlockID).Return(block, true)
-
-	// make QC invalid
-	proposal.Block.QC.View = 10
-
-	err = v.ValidateProposal(proposal)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "qc.View")
-}
-
-type FakeBuilder struct{}
-
-// the fake builder takes
-func (b *FakeBuilder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
-	var payloadHash flow.Identifier
-	rand.Read(payloadHash[:])
-
-	// construct default block on top of the provided parent
-	header := &flow.Header{
-		Timestamp:   time.Now().UTC(),
-		PayloadHash: payloadHash,
-	}
-
-	// apply the custom fields setter of the consensus algorithm
-	setter(header)
-	return header, nil
-}
-
-// create validator for `n` nodes in a cluster with the index-th node as the signer
-func createValidators(t *testing.T, n int) ([]*Validator, []*signature.RandomBeaconAwareSigProvider, flow.IdentityList, []hotstuff.ViewState, *mock.ForksReader) {
-	ps, ids := test.NewProtocolState(t, n)
-
-	stakingKeys, err := test.AddStakingPrivateKeys(ids)
-	require.NoError(t, err)
-
-	randomBKeys, dkgPubData, err := test.AddRandomBeaconPrivateKeys(t, ids)
-
-	signers := make([]*signature.RandomBeaconAwareSigProvider, n)
-	viewstates := make([]hotstuff.ViewState, n)
-	validators := make([]*Validator, n)
-
-	f := &mock.ForksReader{}
-
-	for i := 0; i < n; i++ {
-		// create signer
-		signer, err := test.NewRandomBeaconSigProvider(ps, dkgPubData, ids[i], stakingKeys[i], randomBKeys[i])
-		require.NoError(t, err)
-		signers[i] = signer
-
-		// create view state
-		vs, err := viewstate.New(ps, dkgPubData, ids[i].NodeID, filter.HasRole(flow.RoleConsensus))
-		require.NoError(t, err)
-		viewstates[i] = vs
-
-		// create validator
-		v := New(vs, f, signer)
-		validators[i] = v
-	}
-	return validators, signers, ids, viewstates, f
-}
-
-func createBlockProducer(t *testing.T, signer hotstuff.Signer, vs hotstuff.ViewState) *blockproducer.BlockProducer {
-	builder := &FakeBuilder{}
-	bp, err := blockproducer.New(signer, vs, builder)
-	require.NoError(t, err)
-	return bp
-}
-
-// makeBlockProducerAndQC  initialized a BlockProducer, block and qc pointing to this block. The qc is constructed from the votes of the provided signers
-func makeBlockProducerAndQC(t *testing.T, signers []*signature.RandomBeaconAwareSigProvider, viewstates []hotstuff.ViewState, index int, view uint64) (*blockproducer.BlockProducer, *model.QuorumCertificate, *model.Block) {
-	signer, viewstate := signers[index], viewstates[index]
-	n := len(signers)
-
-	// make block
-	block := test.MakeBlock(int(view))
-
-	// make votes
-	sigs := make([]*model.SingleSignature, n)
-	for i := 0; i < n; i++ {
-		vote, err := signers[i].VoteFor(block)
-		require.NoError(t, err)
-		sigs[i] = vote.Signature
-	}
-
-	// manually aggregate sigs
-	aggsig, err := signer.Aggregate(block, sigs)
-	require.NoError(t, err)
-
-	// make QC
-	qc := &model.QuorumCertificate{
-		View:                block.View,
-		BlockID:             block.BlockID,
-		AggregatedSignature: aggsig,
-	}
-
-	// create block builder
-	bp := createBlockProducer(t, signer, viewstate)
-
-	return bp, qc, block
-}
-
-func leaderOfView(n int, view uint64) int {
-	// referred to engine/consensus/hotstuff/viewstate.go#roundRobin
-	return int(view) % n
 }

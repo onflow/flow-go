@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	access "github.com/dapperlabs/flow-go/protobuf/services/access"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 
 	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"

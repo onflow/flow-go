@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
@@ -29,7 +30,7 @@ import (
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -132,7 +133,7 @@ func (suite *TestSuite) SetupTest() {
 }
 
 // TestNewEngine verifies the establishment of the network registration upon
-// creation of an instance of verifier.Engine using the New method
+// creation of an instance of verifier.IngestEngine using the New method
 // It also returns an instance of new engine to be used in the later tests
 func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 	e, err := ingest.New(zerolog.Logger{},
@@ -159,25 +160,11 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 }
 
 // TestHandleBlock passes a block to ingest engine and evaluates internal path
+// as ingest engine only accepts a block through consensus follower, it should return an error
 func (suite *TestSuite) TestHandleBlock() {
 	eng := suite.TestNewEngine()
-
-	// expects that the block be added to the mempool and block storage
-	suite.blockStorage.On("Store", suite.block).Return(nil).Once()
-
-	// expects that checkPendingChunks is executed checking for pending and authenticated receipts
-	// pendingReceipts iteration on All happens twice one at handlingBlocks and one at checkPendingChunks
-
-	// receipt should go to the pending receipts mempool
-	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}, nil).Twice()
-	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
-	suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true).Once()
-	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil).Once()
-
 	err := eng.Process(unittest.IdentifierFixture(), suite.block)
-	suite.Assert().Nil(err)
-
-	suite.blockStorage.AssertExpectations(suite.T())
+	assert.Equal(suite.T(), err, ingest.ErrInvType)
 }
 
 // TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
@@ -560,7 +547,6 @@ func (suite *TestSuite) TestVerifyReady() {
 
 	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	consIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 	testcases := []struct {
@@ -576,10 +562,6 @@ func (suite *TestSuite) TestVerifyReady() {
 			getResource: func(s *TestSuite) interface{} { return s.collection },
 			from:        collIdentity,
 			label:       "received collection",
-		}, {
-			getResource: func(s *TestSuite) interface{} { return s.block },
-			from:        consIdentity,
-			label:       "received block",
 		}, {
 			getResource: func(s *TestSuite) interface{} {
 				return &messages.ExecutionStateResponse{
@@ -608,7 +590,6 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			// allow adding the received resource to mempool
 			suite.authCollections.On("Add", suite.collection).Return(nil)
-			suite.blockStorage.On("Store", suite.block).Return(nil)
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
 			// we have all dependencies
@@ -725,7 +706,6 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.chunkDataPackTracker.On("Rem", chunkDataPack.ChunkID).Return(true).Once()
 
 	// terminates call to checkPendingChunks as it is out of this test's scope
-	suite.pendingReceipts.On("All").Return(nil).Once()
 	suite.authReceipts.On("All").Return(nil).Once()
 
 	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
@@ -736,7 +716,6 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.chunkDataPacks.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
-	suite.pendingReceipts.AssertExpectations(suite.T())
 	suite.authReceipts.AssertExpectations(suite.T())
 }
 
@@ -847,7 +826,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// to the verifier exactly once.
 	verifierEng, verifierEngWG := setupMockVerifierEng(t, vChunks)
 	assigner := NewMockAssigner(verID.NodeID)
-	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, testutil.WithVerifierEngine(verifierEng))
+	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner,
+		testutil.WithVerifierEngine(verifierEng))
 
 	colNode := testutil.CollectionNode(t, hub, colID, identities)
 
@@ -863,6 +843,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	var senderWG sync.WaitGroup
 	senderWG.Add(erCount * senderCount)
 
+	var blockStorageLock sync.Mutex
+
 	for _, completeER := range ers {
 		for _, coll := range completeER.Collections {
 			err := colNode.Collections.Store(coll)
@@ -875,11 +857,30 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 			go func(j int, id flow.Identifier, block *flow.Block, receipt *flow.ExecutionReceipt) {
 
 				sendBlock := func() {
-					_ = verNode.IngestEngine.Process(conID.NodeID, block)
+					// adds the block to the storage of the node
+					// Note: this is done by the follower
+					// this block should be done in a thread-safe way
+					blockStorageLock.Lock()
+					// we don't check for error as it definitely returns error when we
+					// have duplicate blocks, however, this is not the concern for this test
+					_ = verNode.BlockStorage.Store(block)
+					blockStorageLock.Unlock()
+
+					// casts block into a Hotstuff block for notifier
+					hotstuffBlock := &model.Block{
+						BlockID:     block.ID(),
+						View:        block.View,
+						ProposerID:  block.ProposerID,
+						QC:          nil,
+						PayloadHash: block.Hash(),
+						Timestamp:   block.Timestamp,
+					}
+					verNode.IngestEngine.OnFinalizedBlock(hotstuffBlock)
 				}
 
 				sendReceipt := func() {
-					_ = verNode.IngestEngine.Process(exeID.NodeID, receipt)
+					err := verNode.IngestEngine.Process(exeID.NodeID, receipt)
+					require.NoError(t, err)
 				}
 
 				switch j % 2 {

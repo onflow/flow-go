@@ -20,6 +20,6 @@ func TestGenerateGenesisStateCommitment(t *testing.T) {
 		newStateCommitment, err := BootstrapLedger(ls)
 		require.NoError(t, err)
 
-		assert.Equal(t, newStateCommitment, flow.GenesisStateCommitment)
+		assert.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
 	})
 }

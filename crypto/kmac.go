@@ -36,11 +36,11 @@ func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) 
 	// check the lengths as per NIST.SP.800-185
 	if len(key) >= KmacMaxParamsLen || len(customizer) >= KmacMaxParamsLen {
 		return nil,
-			cryptoError{fmt.Sprintf("kmac key and customizer lengths must be less than %d", KmacMaxParamsLen)}
+			fmt.Errorf("kmac key and customizer lengths must be less than %d", KmacMaxParamsLen)
 	}
 	if outputSize >= KmacMaxParamsLen || outputSize < 0 {
 		return nil,
-			cryptoError{fmt.Sprintf("kmac output size must be a positive number less than %d", KmacMaxParamsLen)}
+			fmt.Errorf("kmac output size must be a positive number less than %d", KmacMaxParamsLen)
 	}
 	k.commonHasher = &commonHasher{
 		algo:       KMAC128,
