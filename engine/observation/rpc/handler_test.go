@@ -284,7 +284,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(&execResp, nil).Once()
 	}
 
-	suite.Run(" invalid request max height < min height", func() {
+	suite.Run("invalid request max height < min height", func() {
 		req := &access.GetEventsForHeightRangeRequest{
 			StartHeight: maxHeight,
 			EndHeight:   minHeight,
