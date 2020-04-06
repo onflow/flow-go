@@ -53,7 +53,6 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 	}
 
 	return h.executionRPC.GetEventsForBlockIDs(ctx, fwdReq)
-
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
