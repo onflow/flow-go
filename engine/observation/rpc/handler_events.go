@@ -14,7 +14,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 
 	// validate the request
 	if req.EndHeight < req.StartHeight {
-		return nil, status.Error(codes.InvalidArgument, " invalid start or end height")
+		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
 	}
 
 	// get the latest finalized block header
