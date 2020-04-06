@@ -2,7 +2,6 @@
 
 package mocks
 
-import dkg "github.com/dapperlabs/flow-go/state/dkg"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 
 import mock "github.com/stretchr/testify/mock"
@@ -33,22 +32,6 @@ func (_m *ViewState) AllConsensusParticipants(blockID flow.Identifier) (flow.Ide
 	}
 
 	return r0, r1
-}
-
-// DKGState provides a mock function with given fields:
-func (_m *ViewState) DKGState() dkg.State {
-	ret := _m.Called()
-
-	var r0 dkg.State
-	if rf, ok := ret.Get(0).(func() dkg.State); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(dkg.State)
-		}
-	}
-
-	return r0
 }
 
 // IdentitiesForConsensusParticipants provides a mock function with given fields: blockID, consensusNodeIDs

@@ -3,11 +3,7 @@
 package unittest
 
 import (
-<<<<<<< HEAD
 	"crypto/rand"
-=======
-	"math/rand"
->>>>>>> master
 	"sync"
 	"testing"
 	"time"
