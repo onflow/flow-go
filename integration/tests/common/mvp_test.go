@@ -1,4 +1,4 @@
-package tests
+package common
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/integration/testnet"
+	"github.com/dapperlabs/flow-go/integration/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -52,7 +53,7 @@ func TestMVP_Network(t *testing.T) {
 	exeNodeAPIPort := exeContainer.Ports[testnet.ExeNodeAPIPort]
 	require.NotEqual(t, "", exeNodeAPIPort)
 
-	key, err := generateRandomKey()
+	key, err := testutil.RandomAccountKey()
 	require.NoError(t, err)
 
 	colClient, err := testnet.NewClient(fmt.Sprintf(":%s", colNodeAPIPort), key)
@@ -70,7 +71,7 @@ func TestMVP_Emulator(t *testing.T) {
 	// TODO - start an emulator instance
 	t.Skip()
 
-	key, err := getEmulatorKey()
+	key, err := testutil.EmulatorRootKey()
 	require.NoError(t, err)
 
 	c, err := testnet.NewClient(":3569", key)
@@ -84,7 +85,7 @@ func runMVPTest(t *testing.T, colClient *testnet.Client, exeClient *testnet.Clie
 	ctx := context.Background()
 
 	// contract is not deployed, so script fails
-	counter, err := readCounter(ctx, exeClient)
+	counter, err := testutil.ReadCounter(ctx, exeClient)
 	require.Error(t, err)
 
 	err = deployCounter(ctx, colClient)
@@ -92,17 +93,17 @@ func runMVPTest(t *testing.T, colClient *testnet.Client, exeClient *testnet.Clie
 
 	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, exeClient)
+		counter, err = testutil.ReadCounter(ctx, exeClient)
 
 		return err == nil && counter == -3
 	}, 30*time.Second, time.Second)
 
-	err = createCounter(ctx, colClient)
+	err = testutil.CreateCounter(ctx, colClient)
 	require.NoError(t, err)
 
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, exeClient)
+		counter, err = testutil.ReadCounter(ctx, exeClient)
 
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)

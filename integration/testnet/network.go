@@ -43,6 +43,10 @@ const (
 	ExeNodeAPIPort = "exe-api-port"
 )
 
+func init() {
+	testingdock.Verbose = true
+}
+
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
 	suite      *testingdock.Suite

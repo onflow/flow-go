@@ -1,18 +1,19 @@
-package tests
+package testutil
 
 import (
 	"bytes"
 	"context"
 	"crypto/rand"
 
-	"github.com/dapperlabs/cadence/encoding"
+	encoding "github.com/dapperlabs/cadence/encoding/xdr"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
+func ReadCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
 	script := dsl.Main{
 		ReturnType: "Int",
@@ -33,13 +34,13 @@ func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 	return int(i.Value.Int64()), nil
 }
 
-func createCounter(ctx context.Context, client *testnet.Client) error {
+func CreateCounter(ctx context.Context, client *testnet.Client) error {
 	return client.SendTransaction(ctx, dsl.Transaction{
 		Import: dsl.Import{Address: flow.RootAddress},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				if signer.storage[Testing.Counter] == nil {
-				let existing <- signer.storage[Testing.Counter] <- Testing.createCounter()
+				let existing <- signer.storage[Testing.Counter] <- Testing.CreateCounter()
             	    destroy existing
             	    signer.published[&Testing.Counter] = &signer.storage[Testing.Counter] as Testing.Counter
             	}

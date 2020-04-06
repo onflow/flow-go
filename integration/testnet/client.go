@@ -2,7 +2,6 @@ package testnet
 
 import (
 	"context"
-	"math/big"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/client"
@@ -49,11 +48,10 @@ func (c *Client) SendTransaction(ctx context.Context, code dsl.Transaction) erro
 
 	codeStr := code.ToCadence()
 
-	rootAddress := flow.BytesToAddress(big.NewInt(1).Bytes())
 	tx := flow.TransactionBody{
 		Script:           []byte(codeStr),
 		ReferenceBlockID: unittest.IdentifierFixture(),
-		PayerAccount:     rootAddress,
+		PayerAccount:     flow.RootAddress,
 	}
 
 	sig, err := signTransaction(tx, c.key.PrivateKey)
@@ -62,10 +60,25 @@ func (c *Client) SendTransaction(ctx context.Context, code dsl.Transaction) erro
 	}
 
 	accountSig := flow.AccountSignature{
-		Account:   rootAddress,
+		Account:   flow.RootAddress,
 		Signature: sig.Bytes(),
 	}
 
+	tx.Signatures = append(tx.Signatures, accountSig)
+
+	return c.client.SendTransaction(ctx, tx)
+}
+
+func (c *Client) SendTransactionManual(ctx context.Context, tx flow.TransactionBody) error {
+	sig, err := signTransaction(tx, c.key.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	accountSig := flow.AccountSignature{
+		Account:   flow.RootAddress,
+		Signature: sig,
+	}
 	tx.Signatures = append(tx.Signatures, accountSig)
 
 	return c.client.SendTransaction(ctx, tx)
