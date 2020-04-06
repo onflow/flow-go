@@ -120,7 +120,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		return nil, status.Errorf(codes.InvalidArgument, "no block IDs provided")
 	}
 
-	eType := flow.EventType(req.Type)
+	eType := flow.EventType(req.GetType())
 
 	events := make([]*entities.Event, 0)
 
