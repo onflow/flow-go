@@ -79,6 +79,8 @@ func TestCollection(t *testing.T) {
 	head, err := state.Final().Head()
 	assert.Nil(t, err)
 
+	t.Fail()
+
 	// should be able to read a valid latest block
 	assert.Equal(t, chainID, head.ChainID)
 }
