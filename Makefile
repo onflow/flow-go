@@ -108,6 +108,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	GO111MODULE=on mockery -name '.*' -dir=module/trace -case=underscore -output="./module/trace/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=module/metrics -case=underscore -output="./module/metrics/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
