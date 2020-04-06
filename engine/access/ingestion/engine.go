@@ -39,7 +39,7 @@ type Engine struct {
 	transactions storage.Transactions
 }
 
-// New creates a new observation ingestion engine
+// New creates a new access ingestion engine
 func New(log zerolog.Logger,
 	net module.Network,
 	state protocol.State,

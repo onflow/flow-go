@@ -14,10 +14,10 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/access/ingestion"
+	obs "github.com/dapperlabs/flow-go/engine/access/mock"
+	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
-	"github.com/dapperlabs/flow-go/engine/observation/ingestion"
-	obs "github.com/dapperlabs/flow-go/engine/observation/mock"
-	"github.com/dapperlabs/flow-go/engine/observation/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
@@ -58,7 +58,7 @@ func (suite *Suite) SetupTest() {
 	suite.net = new(mockmodule.Network)
 	suite.collectionsConduit = &networkmock.Conduit{}
 	suite.me = new(mockmodule.Local)
-	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleObservation))
+	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 }
 

@@ -15,10 +15,10 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	"github.com/dapperlabs/flow-go/engine/access/ingestion"
+	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/engine/observation/ingestion"
-	"github.com/dapperlabs/flow-go/engine/observation/rpc"
 	"github.com/dapperlabs/flow-go/module"
 	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	access "github.com/dapperlabs/flow-go/protobuf/services/access"
@@ -44,7 +44,7 @@ func main() {
 		conCache        *buffer.PendingBlocks // pending block cache for follower
 	)
 
-	cmd.FlowNode("observation").
+	cmd.FlowNode("access").
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of collections in the memory pool")

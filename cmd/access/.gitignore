@@ -1,5 +1,5 @@
-# Observation node binary
-observation
+# Access node binary
+access
 
 # Data directories of running collection nodes
 data*

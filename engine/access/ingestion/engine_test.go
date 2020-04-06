@@ -55,7 +55,7 @@ func (suite *Suite) SetupTest() {
 	tracer, err := trace.NewTracer(log)
 	require.NoError(suite.T(), err)
 
-	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleObservation))
+	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
 	// mock out protocol state
 	suite.proto.state = new(protocol.State)
