@@ -60,20 +60,3 @@ func HashesToBytes(hashes []Hash) [][]byte {
 	}
 	return b
 }
-
-// NewHasher chooses and initializes a hashing algorithm
-// Deprecated and will removed later: use dedicated hash generation functions instead.
-/*func NewHasher(algo HashingAlgorithm) (Hasher, error) {
-	switch algo {
-	case SHA3_256:
-		return NewSHA3_256(), nil
-	case SHA3_384:
-		return NewSHA3_384(), nil
-	case SHA2_256:
-		return NewSHA2_256(), nil
-	case SHA2_384:
-		return NewSHA2_384(), nil
-	default:
-		return nil, fmt.Errorf("the hashing algorithm %s is not supported.", algo)
-	}
-}*/

@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os/user"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -56,9 +57,9 @@ func toNodeInfoList(confs []ContainerConfig) []bootstrap.NodeInfo {
 func getSeeds(n int) ([][]byte, error) {
 	seeds := make([][]byte, n)
 	for i := 0; i < n; i++ {
-		seed := make([]byte, 48)
+		seed := make([]byte, crypto.SeedMinLenDKG)
 		n, err := rand.Read(seed)
-		if err != nil || n != 48 {
+		if err != nil || n != crypto.SeedMinLenDKG {
 			return nil, err
 		}
 
