@@ -29,7 +29,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 	minHeight = req.GetStartHeight()
 
 	// limit max height to last finalized block in the chain
-	if head.Height < req.EndHeight {
+	if head.Height < req.GetEndHeight() {
 		maxHeight = head.Height
 	} else {
 		maxHeight = req.GetEndHeight()
