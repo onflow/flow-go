@@ -18,33 +18,9 @@ func (f SigningAlgorithm) String() string {
 	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_SECp256k1"}[f]
 }
 
-// HashingAlgorithm is an identifier for a hashing algorithm.
-type HashingAlgorithm int
-
-const (
-	// Supported hashing algorithms
-	UnknownHashingAlgorithm HashingAlgorithm = iota
-	SHA2_256
-	SHA2_384
-	SHA3_256
-	SHA3_384
-	KMAC128
-)
-
-// String returns the string representation of this hashing algorithm.
-func (f HashingAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384", "KMAC128"}[f]
-}
-
 const (
 	// targeted bits of security
 	securityBits = 128
-
-	// Lengths of hash outputs in bytes
-	HashLenSha2_256 = 32
-	HashLenSha2_384 = 48
-	HashLenSha3_256 = 32
-	HashLenSha3_384 = 48
 
 	// BLS signature scheme lengths
 
@@ -82,10 +58,7 @@ const (
 	ThresholdMinSize     = DKGMinSize
 	DKGMaxSize       int = 254
 	ThresholdMaxSize     = DKGMaxSize
-
-	// KMAC
-	// the parameter maximum bytes-length as defined in NIST SP 800-185
-	KmacMaxParamsLen = 2040 / 8
+	SeedMinLenDKG        = securityBits / 8
 )
 
 // Signature is a generic type, regardless of the signature scheme

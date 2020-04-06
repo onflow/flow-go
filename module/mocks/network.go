@@ -6,6 +6,7 @@ package mocks
 
 import (
 	crypto "github.com/dapperlabs/flow-go/crypto"
+	hash "github.com/dapperlabs/flow-go/crypto/hash"
 	flow "github.com/dapperlabs/flow-go/model/flow"
 	network "github.com/dapperlabs/flow-go/network"
 	gomock "github.com/golang/mock/gomock"
@@ -102,7 +103,7 @@ func (mr *MockLocalMockRecorder) NodeID() *gomock.Call {
 }
 
 // Sign mocks base method
-func (m *MockLocal) Sign(arg0 []byte, arg1 crypto.Hasher) (crypto.Signature, error) {
+func (m *MockLocal) Sign(arg0 []byte, arg1 hash.Hasher) (crypto.Signature, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Sign", arg0, arg1)
 	ret0, _ := ret[0].(crypto.Signature)

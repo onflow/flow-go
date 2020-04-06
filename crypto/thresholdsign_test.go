@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"crypto/rand"
 	"sync"
 	"testing"
 	"time"
@@ -49,8 +50,10 @@ func testThresholdSignatureFeldmanVSS(t *testing.T) {
 		chans[i] = make(chan *message, 2*n)
 	}
 	// start DKG in all nodes
-	h, _ := NewHasher(SHA3_256)
-	seed := h.ComputeHash([]byte{1, 2, 3})
+	seed := make([]byte, SeedMinLenDKG)
+	read, err := rand.Read(seed)
+	require.Equal(t, read, SeedMinLenDKG)
+	require.NoError(t, err)
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)
@@ -105,8 +108,10 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 		chans[i] = make(chan *message, 2*n)
 	}
 	// start DKG in all nodes but the leader
-	h, _ := NewHasher(SHA3_256)
-	seed := h.ComputeHash([]byte{1, 2, 3})
+	seed := make([]byte, SeedMinLenDKG)
+	read, err := rand.Read(seed)
+	require.Equal(t, read, SeedMinLenDKG)
+	require.NoError(t, err)
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)
@@ -171,8 +176,10 @@ func testStatelessThresholdSignatureFeldmanVSS(t *testing.T) {
 		chans[i] = make(chan *message, 2*n)
 	}
 	// start DKG in all nodes
-	h, _ := NewHasher(SHA3_256)
-	seed := h.ComputeHash([]byte{1, 2, 3})
+	seed := make([]byte, SeedMinLenDKG)
+	read, err := rand.Read(seed)
+	require.Equal(t, read, SeedMinLenDKG)
+	require.NoError(t, err)
 	sync.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)

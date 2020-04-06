@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -12,7 +13,7 @@ import (
 // *Important: the aggregation verifier can only verify signatures in the context
 // of the provided KMAC tag.
 type AggregationVerifier struct {
-	hasher crypto.Hasher
+	hasher hash.Hasher
 }
 
 // NewAggregationVerifier creates a new aggregation verifier, which can only

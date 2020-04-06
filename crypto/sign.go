@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // revive:disable:var-naming
@@ -128,7 +130,7 @@ type PrivateKey interface {
 	// KeySize return the key size in bytes.
 	KeySize() int
 	// Sign generates a signature using the provided hasher.
-	Sign([]byte, Hasher) (Signature, error)
+	Sign([]byte, hash.Hasher) (Signature, error)
 	// PublicKey returns the public key.
 	PublicKey() PublicKey
 	// Encode returns a bytes representation of the private key
@@ -146,7 +148,7 @@ type PublicKey interface {
 	// KeySize return the key size in bytes.
 	KeySize() int
 	// Verify verifies a signature of an input message using the provided hasher.
-	Verify(Signature, []byte, Hasher) (bool, error)
+	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
 	Encode() ([]byte, error)
 	// Equals returns true if the given PublicKeys are equal. Keys are considered unequal if their algorithms are

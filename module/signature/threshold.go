@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // ThresholdVerifier is a verifier capable of verifying threshold signature
@@ -11,7 +12,7 @@ import (
 // *Important*: the threshold verifier can only verify signatures for
 // messages of one specific context (specified via the KMAC tag at construction).
 type ThresholdVerifier struct {
-	hasher crypto.Hasher
+	hasher hash.Hasher
 }
 
 // NewThresholdVerifier creates a new threshold verifier. *Important*: the

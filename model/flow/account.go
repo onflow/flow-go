@@ -4,6 +4,7 @@ package flow
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // Account represents an account on the Flow network.
@@ -22,7 +23,7 @@ type Account struct {
 type AccountPublicKey struct {
 	PublicKey crypto.PublicKey
 	SignAlgo  crypto.SigningAlgorithm
-	HashAlgo  crypto.HashingAlgorithm
+	HashAlgo  hash.HashingAlgorithm
 	SeqNumber uint64
 	Weight    int
 }
@@ -31,7 +32,7 @@ type AccountPublicKey struct {
 type AccountPrivateKey struct {
 	PrivateKey crypto.PrivateKey
 	SignAlgo   crypto.SigningAlgorithm
-	HashAlgo   crypto.HashingAlgorithm
+	HashAlgo   hash.HashingAlgorithm
 }
 
 // PublicKey returns a weighted public key.
