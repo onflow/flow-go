@@ -8,16 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
-
 	"github.com/dapperlabs/flow-go/engine/common/convert"
-	"github.com/dapperlabs/flow-go/model/flow"
-
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-
 	mockaccess "github.com/dapperlabs/flow-go/engine/observation/mock"
+	"github.com/dapperlabs/flow-go/model/flow"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
