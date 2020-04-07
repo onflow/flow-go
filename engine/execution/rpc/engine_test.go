@@ -109,7 +109,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	})
 
 	// failure path - empty block ids in request results in an error
-	suite.Run("request with empty event type", func() {
+	suite.Run("request with empty block IDs", func() {
 
 		// create an API request with empty block ids
 		req := concoctReq(string(flow.EventAccountCreated), nil)
