@@ -150,6 +150,36 @@ func (_m *ExecutionState) GetExecutionResultID(blockID flow.Identifier) (flow.Id
 	return r0, r1
 }
 
+// GetHighestExecutedBlockID provides a mock function with given fields:
+func (_m *ExecutionState) GetHighestExecutedBlockID() (uint64, flow.Identifier, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 flow.Identifier
+	if rf, ok := ret.Get(1).(func() flow.Identifier); ok {
+		r1 = rf()
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(flow.Identifier)
+		}
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func() error); ok {
+		r2 = rf()
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 // GetRegisters provides a mock function with given fields: _a0, _a1
 func (_m *ExecutionState) GetRegisters(_a0 []byte, _a1 [][]byte) ([][]byte, error) {
 	ret := _m.Called(_a0, _a1)

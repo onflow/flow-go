@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
@@ -15,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -197,12 +195,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 		Run(func(args mock.Arguments) { actualCalls++ }).
 		Return(nil)
 
-	var highestExecutedNumber uint64
-	var highestExecutedBlockID flow.Identifier
-	err := exeNode.BadgerDB.View(operation.RetrieveHighestExecutedBlockNumber(&highestExecutedNumber, &highestExecutedBlockID))
-	require.NoError(t, err)
-	require.Equal(t, genesis.ID(), highestExecutedBlockID)
-	require.Equal(t, genesis.Height, highestExecutedNumber)
+	exeNode.AssertHighestExecutedBlock(t, &genesis.Header)
 
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, fork)
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, block3) // block 3 cannot be executed if parent (block2 is missing)
@@ -212,11 +205,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, block2)
 	hub.Eventually(t, equal(6, &actualCalls)) // now block 3 and 2 can be executed
 
-
-	err = exeNode.BadgerDB.View(operation.RetrieveHighestExecutedBlockNumber(&highestExecutedNumber, &highestExecutedBlockID))
-	require.NoError(t, err)
-	require.Equal(t, block3.ID(), highestExecutedBlockID)
-	require.Equal(t, block3.Height, highestExecutedNumber)
+	exeNode.AssertHighestExecutedBlock(t, &block3.Header)
 
 	consensusEngine.AssertExpectations(t)
 

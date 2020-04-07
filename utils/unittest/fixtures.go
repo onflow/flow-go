@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
@@ -29,6 +30,15 @@ func BlockFixture() flow.Block {
 	return BlockWithParentFixture(&header)
 }
 
+
+func StateDeltaFixture() *messages.ExecutionStateDelta {
+	header := BlockHeaderFixture()
+	block := BlockWithParentFixture(&header)
+	return &messages.ExecutionStateDelta{
+		Block:      &block,
+	}
+}
+
 func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
@@ -42,6 +52,22 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: CollectionGuaranteesFixture(16),
+	}
+	header := BlockHeaderWithParentFixture(parent)
+	header.PayloadHash = payload.Hash()
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+	return &messages.ExecutionStateDelta{
+		Block:      &block,
+	}
+}
+
 func BlockHeaderFixture() flow.Header {
 	return BlockHeaderWithParentFixture(&flow.Header{
 		ParentID: IdentifierFixture(),
@@ -52,7 +78,7 @@ func BlockHeaderFixture() flow.Header {
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	return flow.Header{
 		ChainID:        "chain",
-		ParentID:       parentID,
+		ParentID:       parent.ID(),
 		View:           rand.Uint64(),
 		Height:   parent.Height + 1,
 		ParentVoterIDs: IdentifierListFixture(4),

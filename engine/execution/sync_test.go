@@ -3,11 +3,8 @@ package execution_test
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -44,11 +41,11 @@ func TestSyncFlow(t *testing.T) {
 
 	tx1 := execTestutil.DeployCounterContractTransaction()
 	tx2 := execTestutil.CreateCounterTransaction()
-	tx3 := execTestutil.AddToCounterTransaction()
+	tx4 := execTestutil.AddToCounterTransaction()
 
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
-	col3 := flow.Collection{Transactions: []*flow.TransactionBody{&tx3}}
+	col4 := flow.Collection{Transactions: []*flow.TransactionBody{&tx4}}
 
 	//collections := map[flow.Identifier]flow.Collection{
 	//	col1.ID(): col1,
@@ -89,14 +86,24 @@ func TestSyncFlow(t *testing.T) {
 
 	block3 := &flow.Block{
 		Header: flow.Header{
-			ParentID: block2.ParentID,
+			ParentID: block2.ID(),
 			View:     45,
 			Height:   3,
 		},
 		Payload: flow.Payload{
+		},
+	}
+
+	block4 := &flow.Block{
+		Header: flow.Header{
+			ParentID: block3.ID(),
+			View:     46,
+			Height:   4,
+		},
+		Payload: flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
 				{
-					CollectionID: col3.ID(),
+					CollectionID: col4.ID(),
 				},
 			},
 		},
@@ -114,53 +121,54 @@ func TestSyncFlow(t *testing.T) {
 	collectionEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col2.ID() })).Run(func(args mock.Arguments) {
 		colConduit.Submit(&messages.CollectionResponse{Collection: col2,}, exe2ID.NodeID)
 	}).Return(nil)
-	//collectionEngine.On("Submit", exe1ID.NodeID, &messages.CollectionRequest{ID: col3.ID()}).Run(func(args mock.Arguments) {
-	//	colConduit.Submit(&messages.CollectionResponse{Collection: col3,}, exe1ID.NodeID)
-	//}).Return(nil)
+	collectionEngine.On("Submit", exe1ID.NodeID, &messages.CollectionRequest{ID: col4.ID()}).Run(func(args mock.Arguments) {
+		colConduit.Submit(&messages.CollectionResponse{Collection: col4,}, exe1ID.NodeID)
+	}).Return(nil)
 
 	var receipt *flow.ExecutionReceipt
 
-	isBlock2Executed := false
+
+	executedBlocks := map[flow.Identifier]bool{}
 
 	verificationEngine := new(network.Engine)
 	_, _ = verificationNode.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
 	verificationEngine.On("Submit", exe2ID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
-			if receipt.ExecutionResult.BlockID == block2.ID() {
-				isBlock2Executed = true
-			}
+			executedBlocks[receipt.ExecutionResult.BlockID] = true
 		}).
 		Return(nil)
 
 	consensusEngine := new(network.Engine)
 	_, _ = consensusNode.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	// should be both exe2 and exe1
 	consensusEngine.On("Submit", exe2ID.NodeID, mock.Anything).Return(nil)
 
 	// submit block from consensus node
 	exeNode2.IngestionEngine.Submit(conID.NodeID, block1)
-	time.Sleep(200 * time.Millisecond)
+	//time.Sleep(200 * time.Millisecond)
 	exeNode2.IngestionEngine.Submit(conID.NodeID, block2)
 
 	// wait for block2 to be executed on execNode2
 	hub.Eventually(t, func() bool {
-		return isBlock2Executed == true
+		return executedBlocks[block2.ID()]
 	})
 
 	// make sure exe1 didn't get any blocks
-	head1, err := exeNode1.State.Final().Head()
-	require.NoError(t, err)
-	assert.Equal(t, uint64(0), head1.Height)
+	exeNode1.AssertHighestExecutedBlock(t, &genesis.Header)
+	exeNode2.AssertHighestExecutedBlock(t, &block2.Header)
 
-	head2, err := exeNode2.State.Final().Head()
-	require.NoError(t, err)
-	assert.Equal(t, uint64(2), head2.Height)
-
-	// submit block3 to exe1 which should trigger sync
+	// submit block3 and block4 to exe1 which should trigger sync
 	exeNode1.IngestionEngine.Submit(conID.NodeID, block3)
+	exeNode1.IngestionEngine.Submit(conID.NodeID, block4)
 
-	verificationEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *flow.ExecutionReceipt) bool { return r.ExecutionResult.BlockID == block3.ID() })).Return(nil)
-	consensusEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *flow.ExecutionReceipt) bool { return r.ExecutionResult.BlockID == block3.ID() })).Return(nil)
+	//verificationEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *flow.ExecutionReceipt) bool { return r.ExecutionResult.BlockID == block3.ID() })).Return(nil)
+	//consensusEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *flow.ExecutionReceipt) bool { return r.ExecutionResult.BlockID == block3.ID() })).Return(nil)
+
+	// wait for block2 to be executed on execNode2
+	hub.Eventually(t, func() bool {
+		return executedBlocks[block4.ID()] && executedBlocks[block3.ID()]
+	})
 
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)

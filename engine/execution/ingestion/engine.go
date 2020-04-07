@@ -234,11 +234,18 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		// if state commitment doesn't exist and there are no known blocks which will produce
 		// it soon (execution queue) that we save it as orphaned
 		if err == storage.ErrNotFound {
-			_, err := enqueue(executableBlock, orphanQueues)
+			queue, err := enqueue(executableBlock, orphanQueues)
 			if err != nil {
 				panic(fmt.Sprintf("cannot add orphaned block: %s", err))
 			}
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
+			// special case when sync threshold is zero
+			if e.syncModeThreshold == 0 && !e.syncInProgress.Load() {
+				e.syncInProgress.Store(true)
+				// Start sync mode - initializing would require DB operation and will stop processing blocks here
+				// which is exactly what we want
+				e.StartSync(queue.Head.ExecutableBlock)
+			}
 			return nil
 		}
 		// any other error while accessing storage - panic
@@ -702,15 +709,21 @@ func (e *Engine) generateExecutionResultForBlock(
 	return er, nil
 }
 
-func (e *Engine) StartSync(targetBlock *entity.ExecutableBlock) {
+func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 	// find latest finalized block with state commitment
 	// this way we maximise chance of path existing between it and fresh one
 	// TODO - this doesn't make sense if we treat every block as finalized (MVP)
 
-	lastExecutedBlock, err := e.execState.FindLatestFinalizedAndExecutedBlock()
+	targetBlockID := firstKnown.Block.ParentID
+
+	e.log.Info().Msg("starting state synchronisation")
+
+	lastExecutedHeight, lastExecutedBlockID, err := e.execState.GetHighestExecutedBlockID()
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("error while starting sync - cannot find last executed block")
+		e.log.Fatal().Err(err).Msg("error while starting sync - cannot find highest executed block")
 	}
+
+	e.log.Debug().Msgf("sync from height %d to height %d", lastExecutedHeight, firstKnown.Block.Height-1)
 
 	otherNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter())
 	if err != nil {
@@ -727,9 +740,11 @@ func (e *Engine) StartSync(targetBlock *entity.ExecutableBlock) {
 	// TODO - ability to sync from multiple servers
 	otherNodeIdentity := otherNodes[rand.Intn(len(otherNodes))]
 
+	e.log.Debug().Hex("target_node", logging.Entity(otherNodeIdentity)).Msg("requesting sync from node")
+
 	err = e.syncConduit.Submit(&messages.ExecutionStateSyncRequest{
-		CurrentBlockID: lastExecutedBlock.ID(),
-		TargetBlockID:  targetBlock.Block.ID(),
+		CurrentBlockID: lastExecutedBlockID,
+		TargetBlockID:  targetBlockID,
 	}, otherNodeIdentity.NodeID)
 
 	if err != nil {

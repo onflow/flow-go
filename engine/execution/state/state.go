@@ -35,9 +35,9 @@ type ReadOnlyExecutionState interface {
 
 	GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error)
 
-	FindLatestFinalizedAndExecutedBlock() (*flow.Header, error)
-
 	RetrieveStateDelta(blockID flow.Identifier) (*messages.ExecutionStateDelta, error)
+
+	GetHighestExecutedBlockID() (uint64, flow.Identifier, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -250,6 +250,7 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 	var startStateCommitment flow.StateCommitment
 	var endStateCommitment flow.StateCommitment
 	var stateViews []*delta.View
+	var events []flow.Event
 	err := s.db.View(func(txn *badger.Txn) error {
 		err := procedure.RetrieveBlock(blockID, &block)(txn)
 		if err != nil {
@@ -260,6 +261,10 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 			return err
 		}
 		err = operation.LookupStateCommitment(block.ParentID, &startStateCommitment)(txn)
+		if err != nil {
+			return err
+		}
+		err = operation.LookupEventsByBlockID(blockID, &events)(txn)
 		if err != nil {
 			return err
 		}
@@ -274,6 +279,7 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 		StateViews: stateViews,
 		StartState: startStateCommitment,
 		EndState:   endStateCommitment,
+		Events:     events,
 	}, nil
 }
 
@@ -282,7 +288,7 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(header *flow.Header) error {
 		var number uint64
 		var blockID flow.Identifier
 		err := operation.RetrieveHighestExecutedBlockNumber(&number, &blockID)(txn)
-		if err != nil && err != storage.ErrNotFound {
+		if err != nil {
 			return fmt.Errorf("cannot retrieve highest executed block: %w", err)
 		}
 		if number < header.Height {
@@ -293,4 +299,16 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(header *flow.Header) error {
 		}
 		return nil
 	})
+}
+
+func (s *state) GetHighestExecutedBlockID() (uint64, flow.Identifier, error) {
+	var height uint64
+	var blockID flow.Identifier
+	err := s.db.View(func(txn *badger.Txn) error {
+		return operation.RetrieveHighestExecutedBlockNumber(&height, &blockID)(txn)
+	})
+	if err != nil {
+		return 0, flow.ZeroID, err
+	}
+	return height, blockID, nil
 }
