@@ -42,7 +42,7 @@ func (s *Snapshot) Collection() (*flow.LightCollection, error) {
 		}
 
 		// set the collection
-		collection = payload.Collection
+		collection = payload.Collection.Light()
 
 		return nil
 	})
