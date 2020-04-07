@@ -13,6 +13,7 @@ import (
 	engineCommon "github.com/dapperlabs/flow-go/engine"
 	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
 	provider "github.com/dapperlabs/flow-go/engine/execution/provider/mock"
+	realState "github.com/dapperlabs/flow-go/engine/execution/state"
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -75,12 +76,12 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
 
-	protocolState.On("Final").Return(snapshot)
+	protocolState.On("Final").Return(snapshot).Maybe()
 	snapshot.On("Identities", mock.Anything).Return(func(f ...flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(f[0])
 	}, nil)
 
-	protocolState.On("Mutate").Return(mutator)
+	protocolState.On("Mutate").Return(mutator).Maybe()
 	mutator.On("Finalize", mock.Anything).Return(nil)
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
@@ -183,7 +184,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 	if len(computationResult.StateViews) == 0 { //if block was empty, no new state commitment is produced
 		newStateCommitment = executableBlock.StartState
 	}
-	ctx.executionState.On("NewView", executableBlock.StartState).Return(nil)
+	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(realState.View))
 
 	ctx.computationManager.On("ComputeBlock", executableBlock, mock.Anything).Return(computationResult, nil).Once()
 
@@ -326,4 +327,38 @@ func TestBlockOutOfOrder(t *testing.T) {
 		assert.False(t, more)
 	})
 
+}
+
+func TestExecuteScriptAtBlockID(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+		// Meaningless script
+		script := []byte{1, 1, 2, 3, 5, 8, 11}
+		scriptResult := []byte{1}
+
+		// Ensure block we're about to query against is executable
+		executableBlock := unittest.ExecutableBlockFixture(0)
+		executableBlock.StartState = unittest.StateCommitmentFixture()
+
+		snapshot := new(protocol.Snapshot)
+		snapshot.On("Head").Return(&executableBlock.Block.Header, nil)
+
+		// Add all data needed for execution of script
+		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ID()).Return(executableBlock.StartState, nil)
+		ctx.state.On("AtBlockID", executableBlock.Block.ID()).Return(snapshot)
+		view := new(realState.View)
+		ctx.executionState.On("NewView", executableBlock.StartState).Return(view)
+
+		// Successful call to computation manager
+		ctx.computationManager.On("ExecuteScript", script, &executableBlock.Block.Header, view).Return(scriptResult, nil)
+
+		// Execute our script and expect no error
+		res, err := ctx.engine.ExecuteScriptAtBlockID(script, executableBlock.Block.ID())
+		assert.NoError(t, err)
+		assert.Equal(t, scriptResult, res)
+
+		// Assert other components were called as expected
+		ctx.computationManager.AssertExpectations(t)
+		ctx.executionState.AssertExpectations(t)
+		ctx.state.AssertExpectations(t)
+	})
 }
