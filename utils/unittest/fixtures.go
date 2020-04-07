@@ -590,6 +590,6 @@ func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
 	return &flow.AccountPrivateKey{
 		PrivateKey: emulatorRootKey,
 		SignAlgo:   emulatorRootKey.Algorithm(),
-		HashAlgo:   crypto.SHA3_256,
+		HashAlgo:   hash.SHA3_256,
 	}, nil
 }
