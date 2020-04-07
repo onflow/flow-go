@@ -300,7 +300,7 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 		nodeContainer.bindPort(hostPort, containerPort)
 
 		nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(hostPort))
+		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 		nodeContainer.Ports[ColNodeAPIPort] = hostPort
 
 	case flow.RoleExecution:
@@ -311,7 +311,7 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 		nodeContainer.bindPort(hostPort, containerPort)
 
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(hostPort))
+		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 		nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 
 		// create directories for execution state trie and values in the tmp

@@ -7,14 +7,14 @@ require (
 	github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dapperlabs/flow-go/integration v0.0.0-20200406190816-e4c4d2b5219c
-	github.com/dapperlabs/flow-go/protobuf v0.3.2-0.20200312195452-df4550a863b7
+	github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.0
-	github.com/golang/protobuf v1.3.2
+	github.com/golang/protobuf v1.3.5
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/ipfs/go-log v0.0.1
@@ -42,7 +42,7 @@ require (
 	github.com/whyrusleeping/go-logging v0.0.1
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
-	google.golang.org/grpc v1.26.0
+	google.golang.org/grpc v1.28.0
 	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )
 

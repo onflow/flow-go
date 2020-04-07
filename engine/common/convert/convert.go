@@ -5,8 +5,9 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+
 	"github.com/dapperlabs/flow-go/model/flow"
-	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 )
 
 func MessageToAccountSignature(m *entities.AccountSignature) flow.AccountSignature {
@@ -85,6 +86,8 @@ func BlockHeaderToMessage(h *flow.Header) (entities.BlockHeader, error) {
 
 func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 
+	id := h.ID()
+
 	parentID := h.ParentID
 	t, err := ptypes.TimestampProto(h.Timestamp)
 	if err != nil {
@@ -102,6 +105,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	}
 
 	bh := entities.Block{
+		Id:                   id[:],
 		Height:               h.Height,
 		ParentId:             parentID[:],
 		Timestamp:            t,
@@ -148,4 +152,15 @@ func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
 		TransactionIds: transactionsIDs,
 	}
 	return ce, nil
+}
+
+func EventToMessage(e flow.Event) *entities.Event {
+	id := e.TransactionID
+	return &entities.Event{
+		Type:             string(e.Type),
+		TransactionId:    id[:],
+		TransactionIndex: e.TransactionIndex,
+		EventIndex:       e.EventIndex,
+		Payload:          e.Payload,
+	}
 }

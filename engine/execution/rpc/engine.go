@@ -6,10 +6,17 @@ import (
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -27,20 +34,22 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, e *ingestion.Engine) *Engine {
+func New(log zerolog.Logger, config Config, e *ingestion.Engine, events storage.Events) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+			UnimplementedExecutionAPIServer: execution.UnimplementedExecutionAPIServer{},
+			engine:                          e,
+			events:                          events,
 		},
 		server: grpc.NewServer(),
 		config: config,
 	}
 
-	access.RegisterAccessAPIServer(eng.server, eng.handler)
+	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
 
 	return eng
 }
@@ -79,28 +88,66 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	access.UnimplementedAccessAPIServer
+	execution.UnimplementedExecutionAPIServer
 	engine *ingestion.Engine
+	events storage.Events
 }
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
-	return &access.PingResponse{}, nil
+func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execution.PingResponse, error) {
+	return &execution.PingResponse{}, nil
 }
 
-func (h *handler) ExecuteScript(
+func (h *handler) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
-	req *access.ExecuteScriptAtLatestBlockRequest,
-) (*access.ExecuteScriptResponse, error) {
+	req *execution.ExecuteScriptAtLatestBlockRequest,
+) (*execution.ExecuteScriptResponse, error) {
 
 	value, err := h.engine.ExecuteScript(req.Script)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &access.ExecuteScriptResponse{
+	res := &execution.ExecuteScriptResponse{
 		Value: value,
 	}
 
 	return res, nil
+}
+
+func (h *handler) GetEventsForBlockIDs(_ context.Context,
+	req *execution.GetEventsForBlockIDsRequest) (*execution.EventsResponse, error) {
+
+	blockIDs := req.GetBlockIds()
+	if len(blockIDs) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "no block IDs provided")
+	}
+
+	reqEvent := req.GetType()
+	if reqEvent == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid event type")
+	}
+
+	eType := flow.EventType(reqEvent)
+
+	events := make([]*entities.Event, 0)
+
+	// collect all the events in events
+	for _, b := range blockIDs {
+		bID := flow.HashToID(b)
+
+		blockEvents, err := h.events.ByBlockIDEventType(bID, eType)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+		}
+
+		for _, e := range blockEvents {
+			event := convert.EventToMessage(e)
+			events = append(events, event)
+		}
+	}
+
+	return &execution.EventsResponse{
+		Events: events,
+	}, nil
 }

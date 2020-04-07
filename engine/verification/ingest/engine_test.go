@@ -270,7 +270,7 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 }
 
 func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
-	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleCollection, flow.RoleVerification, flow.RoleObservation}
+	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleCollection, flow.RoleVerification, flow.RoleAccess}
 
 	for _, role := range invalidRoles {
 		suite.Run(fmt.Sprintf("role: %s", role), func() {
@@ -391,7 +391,7 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 // process method should return an error
 func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 
-	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleObservation}
+	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
 
 	for _, role := range invalidRoles {
 		// refresh test state in between each loop
@@ -491,7 +491,7 @@ func (suite *TestSuite) TestHandleExecutionState_Tracked_UnstakedSender() {
 }
 
 func (suite *TestSuite) TestHandleExecutionState_SenderWithWrongRole() {
-	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleObservation}
+	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
 
 	for _, role := range invalidRoles {
 		// refresh test state in between each loop
