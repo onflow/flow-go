@@ -126,7 +126,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions())
+			block.SetPayload(model.EmptyPayload())
 			insert(block)
 
 			// finalize the block

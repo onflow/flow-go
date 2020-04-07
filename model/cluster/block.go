@@ -14,9 +14,7 @@ func Genesis() *Block {
 		ParentID:  flow.ZeroID,
 	}
 
-	payload := Payload{
-		Collection: flow.Collection{},
-	}
+	payload := EmptyPayload()
 
 	header.PayloadHash = payload.Hash()
 
@@ -45,6 +43,10 @@ func (b *Block) SetPayload(payload Payload) {
 // It contains only a single collection.
 type Payload struct {
 	Collection flow.Collection
+}
+
+func EmptyPayload() Payload {
+	return PayloadFromTransactions()
 }
 
 // PayloadFromTransactions creates a payload given a list of transaction hashes.
