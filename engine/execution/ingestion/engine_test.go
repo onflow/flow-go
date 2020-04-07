@@ -183,17 +183,17 @@ func TestValidatingCollectionResponse(t *testing.T) {
 func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *entity.ExecutableBlock, previousExecutionResultID flow.Identifier) {
 	computationResult := executionUnittest.ComputationResultForBlockFixture(executableBlock)
 	newStateCommitment := unittest.StateCommitmentFixture()
-	if len(computationResult.StateViews) == 0 { //if block was empty, no new state commitment is produced
+	if len(computationResult.StateInteractions) == 0 { //if block was empty, no new state commitment is produced
 		newStateCommitment = executableBlock.StartState
 	}
 	ctx.executionState.On("NewView", executableBlock.StartState).Return(nil)
 
 	ctx.computationManager.On("ComputeBlock", executableBlock, mock.Anything).Return(computationResult, nil).Once()
 
-	ctx.executionState.On("PersistStateViews", executableBlock.Block.ID(), mock.Anything).Return(nil)
+	ctx.executionState.On("PersistStateInteractions", executableBlock.Block.ID(), mock.Anything).Return(nil)
 
-	for _, view := range computationResult.StateViews {
-		ctx.executionState.On("CommitDelta", view.Delta()).Return(newStateCommitment, nil)
+	for _, view := range computationResult.StateInteractions {
+		ctx.executionState.On("CommitDelta", view.Delta).Return(newStateCommitment, nil)
 		ctx.executionState.On("PersistChunkHeader", mock.MatchedBy(func(f *flow.ChunkHeader) bool {
 			return bytes.Equal(f.StartState, executableBlock.StartState)
 		})).Return(nil)

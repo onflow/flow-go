@@ -12,11 +12,11 @@ type StateSynchronizer struct {
 }
 
 // DeltaRange provides a mock function with given fields: startID, endID, onDelta
-func (_m *StateSynchronizer) DeltaRange(startID flow.Identifier, endID flow.Identifier, onDelta func(flow.Identifier, *messages.ExecutionStateDelta) error) error {
+func (_m *StateSynchronizer) DeltaRange(startID flow.Identifier, endID flow.Identifier, onDelta func(*messages.ExecutionStateDelta) error) error {
 	ret := _m.Called(startID, endID, onDelta)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, func(flow.Identifier, *messages.ExecutionStateDelta) error) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, func(*messages.ExecutionStateDelta) error) error); ok {
 		r0 = rf(startID, endID, onDelta)
 	} else {
 		r0 = ret.Error(0)

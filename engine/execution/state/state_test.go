@@ -11,8 +11,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/storage/mocks"
@@ -249,64 +247,64 @@ func TestState_GetChunkRegisters(t *testing.T) {
 		})
 	})
 
-	t.Run("FindLatestFinalizedAndExecutedBlock", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-			ls := new(storage.Ledger)
-			sc := new(storage.Commits)
-			ch := new(storage.ChunkHeaders)
-			cdp := new(storage.ChunkDataPacks)
-			er := new(storage.ExecutionResults)
-			es := state.NewExecutionState(ls, sc, ch, cdp, er, db)
-
-			blockA := unittest.BlockFixture()
-			blockB := unittest.BlockWithParentFixture(&blockA.Header)
-			blockC := unittest.BlockWithParentFixture(&blockB.Header)
-			blockD := unittest.BlockWithParentFixture(&blockC.Header)
-
-			err := db.Update(func(txn *badger.Txn) error {
-				err := procedure.InsertBlock(&blockA)(txn)
-				require.NoError(t, err)
-
-				err = procedure.InsertBlock(&blockB)(txn)
-				require.NoError(t, err)
-
-				err = procedure.InsertBlock(&blockC)(txn)
-				require.NoError(t, err)
-
-				err = procedure.InsertBlock(&blockD)(txn)
-				require.NoError(t, err)
-
-				err = operation.InsertNumber(blockA.View, blockA.ID())(txn)
-				require.NoError(t, err)
-
-				err = operation.InsertBoundary(blockA.View)(txn)
-				require.NoError(t, err)
-
-				err = procedure.FinalizeBlock(blockB.ID())(txn)
-				require.NoError(t, err)
-
-				err = procedure.FinalizeBlock(blockC.ID())(txn) //finalize up to C
-				require.NoError(t, err)
-
-				err = operation.IndexStateCommitment(blockA.ID(), unittest.StateCommitmentFixture())(txn)
-				require.NoError(t, err)
-
-				err = operation.IndexStateCommitment(blockB.ID(), unittest.StateCommitmentFixture())(txn) // state commitment up to B
-				require.NoError(t, err)
-
-				return nil
-			})
-			require.NoError(t, err)
-
-			header, err := es.FindLatestFinalizedAndExecutedBlock()
-			assert.NoError(t, err)
-
-			assert.Equal(t, &blockB.Header, header)
-
-			ch.AssertExpectations(t)
-			ls.AssertExpectations(t)
-			sc.AssertExpectations(t)
-			er.AssertExpectations(t)
-		})
-	})
+	//t.Run("FindLatestFinalizedAndExecutedBlock", func(t *testing.T) {
+	//	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	//		ls := new(storage.Ledger)
+	//		sc := new(storage.Commits)
+	//		ch := new(storage.ChunkHeaders)
+	//		cdp := new(storage.ChunkDataPacks)
+	//		er := new(storage.ExecutionResults)
+	//		es := state.NewExecutionState(ls, sc, ch, cdp, er, db)
+	//
+	//		blockA := unittest.BlockFixture()
+	//		blockB := unittest.BlockWithParentFixture(&blockA.Header)
+	//		blockC := unittest.BlockWithParentFixture(&blockB.Header)
+	//		blockD := unittest.BlockWithParentFixture(&blockC.Header)
+	//
+	//		err := db.Update(func(txn *badger.Txn) error {
+	//			err := procedure.InsertBlock(&blockA)(txn)
+	//			require.NoError(t, err)
+	//
+	//			err = procedure.InsertBlock(&blockB)(txn)
+	//			require.NoError(t, err)
+	//
+	//			err = procedure.InsertBlock(&blockC)(txn)
+	//			require.NoError(t, err)
+	//
+	//			err = procedure.InsertBlock(&blockD)(txn)
+	//			require.NoError(t, err)
+	//
+	//			err = operation.InsertNumber(blockA.View, blockA.ID())(txn)
+	//			require.NoError(t, err)
+	//
+	//			err = operation.InsertBoundary(blockA.View)(txn)
+	//			require.NoError(t, err)
+	//
+	//			err = procedure.FinalizeBlock(blockB.ID())(txn)
+	//			require.NoError(t, err)
+	//
+	//			err = procedure.FinalizeBlock(blockC.ID())(txn) //finalize up to C
+	//			require.NoError(t, err)
+	//
+	//			err = operation.IndexStateCommitment(blockA.ID(), unittest.StateCommitmentFixture())(txn)
+	//			require.NoError(t, err)
+	//
+	//			err = operation.IndexStateCommitment(blockB.ID(), unittest.StateCommitmentFixture())(txn) // state commitment up to B
+	//			require.NoError(t, err)
+	//
+	//			return nil
+	//		})
+	//		require.NoError(t, err)
+	//
+	//		header, err := es.FindLatestFinalizedAndExecutedBlock()
+	//		assert.NoError(t, err)
+	//
+	//		assert.Equal(t, &blockB.Header, header)
+	//
+	//		ch.AssertExpectations(t)
+	//		ls.AssertExpectations(t)
+	//		sc.AssertExpectations(t)
+	//		er.AssertExpectations(t)
+	//	})
+	//})
 }

@@ -62,7 +62,7 @@ type ExecutionState interface {
 
 	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
 
-	PersistStateViews(blockID flow.Identifier, views []*delta.View) error
+	PersistStateInteractions(blockID flow.Identifier, views []*delta.Interactions) error
 
 	UpdateHighestExecutedBlockIfHigher(header *flow.Header) error
 }
@@ -207,41 +207,41 @@ func (s *state) PersistExecutionResult(blockID flow.Identifier, result flow.Exec
 	return s.executionResults.Index(blockID, result.ID())
 }
 
-// FindLatestFinalizedAndExecutedBlock finds latest block which is both finalized
-// and we have state commitment for it
-func (s *state) FindLatestFinalizedAndExecutedBlock() (*flow.Header, error) {
-	var header flow.Header
-	err := s.db.View(func(txn *badger.Txn) error {
-		err := procedure.RetrieveLatestFinalizedHeader(&header)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot find latest finalized block: %w", err)
-		}
+//// FindLatestFinalizedAndExecutedBlock finds latest block which is both finalized
+//// and we have state commitment for it
+//func (s *state) FindLatestFinalizedAndExecutedBlock() (*flow.Header, error) {
+//	var header flow.Header
+//	err := s.db.View(func(txn *badger.Txn) error {
+//		err := procedure.RetrieveLatestFinalizedHeader(&header)(txn)
+//		if err != nil {
+//			return fmt.Errorf("cannot find latest finalized block: %w", err)
+//		}
+//
+//		var stateCommitment flow.StateCommitment
+//		err = operation.LookupStateCommitment(header.ID(), &stateCommitment)(txn)
+//
+//		for err == storage.ErrNotFound {
+//			parentID := header.ParentID
+//			err = operation.RetrieveHeader(parentID, &header)(txn)
+//			if err != nil {
+//				return fmt.Errorf("cannot retrieve block (%s): %w", header.ID(), err)
+//			}
+//			err = operation.LookupStateCommitment(header.ID(), &stateCommitment)(txn)
+//		}
+//		if err != nil {
+//			return fmt.Errorf("error while finding latest finalized block: %w", err)
+//		}
+//		return nil
+//	})
+//	if err != nil {
+//		return nil, err
+//	}
+//	return &header, nil
+//}
 
-		var stateCommitment flow.StateCommitment
-		err = operation.LookupStateCommitment(header.ID(), &stateCommitment)(txn)
-
-		for err == storage.ErrNotFound {
-			parentID := header.ParentID
-			err = operation.RetrieveHeader(parentID, &header)(txn)
-			if err != nil {
-				return fmt.Errorf("cannot retrieve block (%s): %w", header.ID(), err)
-			}
-			err = operation.LookupStateCommitment(header.ID(), &stateCommitment)(txn)
-		}
-		if err != nil {
-			return fmt.Errorf("error while finding latest finalized block: %w", err)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &header, nil
-}
-
-func (s *state) PersistStateViews(blockID flow.Identifier, views []*delta.View) error {
+func (s *state) PersistStateInteractions(blockID flow.Identifier, views []*delta.Interactions) error {
 	return s.db.Update(func(txn *badger.Txn) error {
-		return operation.InsertExecutionStateViews(blockID, views)(txn)
+		return operation.InsertExecutionStateInteractions(blockID, views)(txn)
 	})
 }
 
@@ -249,37 +249,45 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 	var block flow.Block
 	var startStateCommitment flow.StateCommitment
 	var endStateCommitment flow.StateCommitment
-	var stateViews []*delta.View
+	var stateInteractions []*delta.Interactions
 	var events []flow.Event
 	err := s.db.View(func(txn *badger.Txn) error {
 		err := procedure.RetrieveBlock(blockID, &block)(txn)
 		if err != nil {
-			return err
-		}
-		err = operation.LookupStateCommitment(blockID, &endStateCommitment)(txn)
-		if err != nil {
-			return err
-		}
-		err = operation.LookupStateCommitment(block.ParentID, &startStateCommitment)(txn)
-		if err != nil {
-			return err
-		}
-		err = operation.LookupEventsByBlockID(blockID, &events)(txn)
-		if err != nil {
-			return err
+			return fmt.Errorf("cannot retrieve block: %w", err)
 		}
 
-		return operation.RetrieveExecutionStateViews(blockID, stateViews)(txn)
+		err = operation.LookupStateCommitment(blockID, &endStateCommitment)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot lookup state commitment: %w", err)
+
+		}
+
+		err = operation.LookupStateCommitment(block.ParentID, &startStateCommitment)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot lookup parent state commitment: %w", err)
+		}
+
+		err = operation.LookupEventsByBlockID(blockID, &events)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot lookup events: %w", err)
+		}
+
+		err = operation.RetrieveExecutionStateInteractions(blockID, &stateInteractions)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot lookup execution state views: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &messages.ExecutionStateDelta{
-		Block:      &block,
-		StateViews: stateViews,
-		StartState: startStateCommitment,
-		EndState:   endStateCommitment,
-		Events:     events,
+		Block:             &block,
+		StateInteractions: stateInteractions,
+		StartState:        startStateCommitment,
+		EndState:          endStateCommitment,
+		Events:            events,
 	}, nil
 }
 

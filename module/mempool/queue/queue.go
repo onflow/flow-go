@@ -4,12 +4,20 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
 type Node struct {
-	ExecutableBlock *entity.ExecutableBlock
-	Children        []*Node
+	Item     Blockify
+	Children []*Node
+}
+
+
+// Blockify becuase Blocker seems a bit off.
+// Make items behave like a block, so it can be queued
+type Blockify interface {
+	flow.Entity
+	Height() uint64
+	ParentID() flow.Identifier
 }
 
 // Queue is a fork-aware queue/tree of blocks for use in execution Node, where parallel forks
@@ -27,11 +35,11 @@ type Queue struct {
 // Make queue an entity so it can be stored in mempool
 
 func (q *Queue) ID() flow.Identifier {
-	return q.Head.ExecutableBlock.Block.ID()
+	return q.Head.Item.ID()
 }
 
 func (q *Queue) Checksum() flow.Identifier {
-	return q.Head.ExecutableBlock.Block.Checksum()
+	return q.Head.Item.Checksum()
 }
 
 // Size returns number of elements in the queue
@@ -41,29 +49,29 @@ func (q *Queue) Size() int {
 
 // Returns difference between lowest and highest element in the queue
 func (q *Queue) Height() uint64 {
-	return q.Highest.ExecutableBlock.Block.Height - q.Head.ExecutableBlock.Block.Height
+	return q.Highest.Item.Height() - q.Head.Item.Height()
 }
 
 // traverse Node children recursively and populate m
 func traverse(node *Node, m map[flow.Identifier]*Node, highest *Node) {
-	m[node.ExecutableBlock.Block.ID()] = node
+	m[node.Item.ID()] = node
 	for _, node := range node.Children {
-		if node.ExecutableBlock.Block.Height > highest.ExecutableBlock.Block.Height {
+		if node.Item.Height() > highest.Item.Height() {
 			*highest = *node
 		}
 		traverse(node, m, highest)
 	}
 }
 
-func NewQueue(executableBlock *entity.ExecutableBlock) *Queue {
+func NewQueue(blockify Blockify) *Queue {
 	n := &Node{
-		ExecutableBlock: executableBlock,
-		Children:        nil,
+		Item:     blockify,
+		Children: nil,
 	}
 	return &Queue{
 		Head:    n,
 		Highest: n,
-		Nodes:   map[flow.Identifier]*Node{n.ExecutableBlock.Block.ID(): n},
+		Nodes:   map[flow.Identifier]*Node{n.Item.ID(): n},
 	}
 }
 
@@ -90,7 +98,7 @@ func dequeue(queue *Queue) *Queue {
 
 	//copy all but head caches
 	for key, val := range queue.Nodes {
-		if key != queue.Head.ExecutableBlock.Block.ID() {
+		if key != queue.Head.Item.ID() {
 			cache[key] = val
 		}
 	}
@@ -102,21 +110,21 @@ func dequeue(queue *Queue) *Queue {
 }
 
 // TryAdd tries to add a new Node to the queue and returns if the operation has been successful
-func (q *Queue) TryAdd(executableBlock *entity.ExecutableBlock) bool {
-	n, ok := q.Nodes[executableBlock.Block.ParentID]
+func (q *Queue) TryAdd(executableBlock Blockify) bool {
+	n, ok := q.Nodes[executableBlock.ParentID()]
 	if !ok {
 		return false
 	}
-	if n.ExecutableBlock.Block.Height != executableBlock.Block.Height-1 {
+	if n.Item.Height() != executableBlock.Height()-1 {
 		return false
 	}
 	newNode := &Node{
-		ExecutableBlock: executableBlock,
-		Children:        nil,
+		Item:     executableBlock,
+		Children: nil,
 	}
 	n.Children = append(n.Children, newNode)
-	q.Nodes[executableBlock.Block.ID()] = newNode
-	if executableBlock.Block.Height > q.Highest.ExecutableBlock.Block.Height {
+	q.Nodes[executableBlock.ID()] = newNode
+	if executableBlock.Height() > q.Highest.Item.Height() {
 		q.Highest = newNode
 	}
 	return true
@@ -124,7 +132,7 @@ func (q *Queue) TryAdd(executableBlock *entity.ExecutableBlock) bool {
 
 // Attach joins two queues together, fails if new queue head cannot be attached
 func (q *Queue) Attach(other *Queue) error {
-	n, ok := q.Nodes[other.Head.ExecutableBlock.Block.ParentID]
+	n, ok := q.Nodes[other.Head.Item.ParentID()]
 	if !ok {
 		return fmt.Errorf("cannot join queues, other queue head does not reference known parent")
 	}
@@ -132,14 +140,14 @@ func (q *Queue) Attach(other *Queue) error {
 	for identifier, node := range other.Nodes {
 		q.Nodes[identifier] = node
 	}
-	if other.Highest.ExecutableBlock.Block.Height > q.Highest.ExecutableBlock.Block.Height {
+	if other.Highest.Item.Height() > q.Highest.Item.Height() {
 		q.Highest = other.Highest
 	}
 	return nil
 }
 
 // Dismount removes the head element, returns it and it's children as new queues
-func (q *Queue) Dismount() (*entity.ExecutableBlock, []*Queue) {
+func (q *Queue) Dismount() (Blockify, []*Queue) {
 
 	queues := make([]*Queue, len(q.Head.Children))
 	if len(q.Head.Children) == 1 { //optimize for most common single-child case
@@ -149,5 +157,5 @@ func (q *Queue) Dismount() (*entity.ExecutableBlock, []*Queue) {
 			queues[i] = rebuildQueue(child)
 		}
 	}
-	return q.Head.ExecutableBlock, queues
+	return q.Head.Item, queues
 }

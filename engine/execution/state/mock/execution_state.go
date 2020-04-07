@@ -81,29 +81,6 @@ func (_m *ExecutionState) CommitDelta(_a0 delta.Delta, _a1 []byte) ([]byte, erro
 	return r0, r1
 }
 
-// FindLatestFinalizedAndExecutedBlock provides a mock function with given fields:
-func (_m *ExecutionState) FindLatestFinalizedAndExecutedBlock() (*flow.Header, error) {
-	ret := _m.Called()
-
-	var r0 *flow.Header
-	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetChunkRegisters provides a mock function with given fields: _a0
 func (_m *ExecutionState) GetChunkRegisters(_a0 flow.Identifier) (flow.Ledger, error) {
 	ret := _m.Called(_a0)
@@ -307,12 +284,12 @@ func (_m *ExecutionState) PersistStateCommitment(_a0 flow.Identifier, _a1 []byte
 	return r0
 }
 
-// PersistStateViews provides a mock function with given fields: blockID, views
-func (_m *ExecutionState) PersistStateViews(blockID flow.Identifier, views []*delta.View) error {
+// PersistStateInteractions provides a mock function with given fields: blockID, views
+func (_m *ExecutionState) PersistStateInteractions(blockID flow.Identifier, views []*delta.Interactions) error {
 	ret := _m.Called(blockID, views)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []*delta.View) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []*delta.Interactions) error); ok {
 		r0 = rf(blockID, views)
 	} else {
 		r0 = ret.Error(0)

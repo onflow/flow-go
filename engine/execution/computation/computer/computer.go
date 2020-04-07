@@ -50,7 +50,7 @@ func (e *blockComputer) executeBlock(
 
 	collections := block.Collections()
 
-	views := make([]*delta.View, len(collections))
+	interactions := make([]*delta.Interactions, len(collections))
 
 	events := make([]flow.Event, 0)
 
@@ -68,15 +68,15 @@ func (e *blockComputer) executeBlock(
 		txIndex = nextIndex
 		events = append(events, collEvents...)
 
-		views[i] = collectionView
+		interactions[i] = collectionView.Interactions()
 
 		stateView.ApplyDelta(collectionView.Delta())
 	}
 
 	return &execution.ComputationResult{
-		ExecutableBlock: block,
-		StateViews:      views,
-		Events:          events,
+		ExecutableBlock:   block,
+		StateInteractions: interactions,
+		Events:            events,
 	}, nil
 }
 

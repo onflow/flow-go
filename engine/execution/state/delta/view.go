@@ -18,6 +18,12 @@ type View struct {
 	readFunc GetRegisterFunc
 }
 
+// Interactions is set of interactions with the register
+type Interactions struct {
+	Delta Delta
+	Reads []flow.RegisterID
+}
+
 // NewView instantiates a new ledger view with the provided read function.
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
@@ -25,6 +31,42 @@ func NewView(readFunc GetRegisterFunc) *View {
 		reads:    make([]flow.RegisterID, 0),
 		readFunc: readFunc,
 	}
+}
+
+// Interactions returns copy of current state of interactions with a View
+func (r *View) Interactions() *Interactions {
+
+	var delta = make(Delta, len(r.delta))
+	var reads = make([]flow.RegisterID, len(r.reads))
+
+	//copy data
+	for s, value := range r.delta {
+		delta[s] = value
+	}
+	for i := range r.reads {
+		reads[i] = r.reads[i]
+	}
+
+	return &Interactions{
+		Delta: delta,
+		Reads: reads,
+	}
+}
+
+// AllRegisters returns all the register IDs ether in read or delta
+func (r *Interactions) AllRegisters() []flow.RegisterID {
+	set := make(map[string]bool, len(r.Reads)+len(r.Delta))
+	for _, reg := range r.Reads {
+		set[string(reg)] = true
+	}
+	for _, reg := range r.Delta.RegisterIDs() {
+		set[string(reg)] = true
+	}
+	ret := make([]flow.RegisterID, 0, len(set))
+	for r := range set {
+		ret = append(ret, flow.RegisterID(r))
+	}
+	return ret
 }
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
@@ -78,18 +120,4 @@ func (r *View) Reads() []flow.RegisterID {
 	return r.reads
 }
 
-// AllRegisters returns all the register IDs ether in read or delta
-func (r *View) AllRegisters() []flow.RegisterID {
-	set := make(map[string]bool, len(r.reads)+len(r.delta))
-	for _, reg := range r.reads {
-		set[string(reg)] = true
-	}
-	for _, reg := range r.delta.RegisterIDs() {
-		set[string(reg)] = true
-	}
-	ret := make([]flow.RegisterID, 0, len(set))
-	for r := range set {
-		ret = append(ret, flow.RegisterID(r))
-	}
-	return ret
-}
+

@@ -144,3 +144,35 @@ func TestDelta_MergeWith(t *testing.T) {
 		assert.True(t, d1.HasBeenDeleted(registerID1))
 	})
 }
+
+func TestDelta_RegisterUpdatesAreSorted(t *testing.T) {
+
+	d := delta.NewDelta()
+
+	key := make([]flow.RegisterID, 5)
+	value := make([]flow.RegisterValue, 5)
+
+	key[0] = []byte{0, 0, 11}
+	key[1] = []byte{1}
+	key[2] = []byte{2}
+	key[3] = []byte{3}
+	key[4] = []byte{11, 0, 0}
+
+	value[0] = flow.RegisterValue("a")
+	value[1] = flow.RegisterValue("b")
+	value[2] = flow.RegisterValue("c")
+	value[3] = flow.RegisterValue("d")
+	value[4] = flow.RegisterValue("e")
+
+	// set in random order
+	d.Set(key[2], value[2])
+	d.Set(key[1], value[1])
+	d.Set(key[3], value[3])
+	d.Set(key[0], value[0])
+	d.Set(key[4], value[4])
+
+	retKeys, retValues := d.RegisterUpdates()
+
+	assert.Equal(t, key, retKeys)
+	assert.Equal(t, value, retValues)
+}

@@ -30,7 +30,18 @@ func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
 
 func BootstrapExecutionDatabase(db *badger.DB, genesis *flow.Header) error {
 	err := db.Update(func(txn *badger.Txn) error {
-		return operation.InsertHighestExecutedBlockNumber(genesis.Height, genesis.ID())(txn)
+		err := operation.InsertHighestExecutedBlockNumber(genesis.Height, genesis.ID())(txn)
+		if err != nil {
+			return err
+		}
+
+		views := make([]*delta.Interactions, 0)
+		err = operation.InsertExecutionStateInteractions(genesis.ID(), views)(txn)
+		if err != nil {
+			return err
+		}
+
+		return operation.IndexStateCommitment(flow.GenesisParentID, flow.GenesisStateCommitment)(txn)
 	})
 
 	if err != nil {

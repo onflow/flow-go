@@ -16,7 +16,7 @@ type ComputationOrder struct {
 }
 
 type ComputationResult struct {
-	ExecutableBlock *entity.ExecutableBlock
-	StateViews      []*delta.View
-	Events          []flow.Event
+	ExecutableBlock   *entity.ExecutableBlock
+	StateInteractions []*delta.Interactions
+	Events            []flow.Event
 }

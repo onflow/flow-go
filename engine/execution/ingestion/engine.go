@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -49,6 +51,7 @@ type Engine struct {
 	mempool            *Mempool
 	execState          state.ExecutionState
 	wg                 sync.WaitGroup
+	syncWg                 sync.WaitGroup
 	syncModeThreshold  uint64 //how many consecutive orphaned blocks trigger sync
 	syncInProgress     *atomic.Bool
 	stateSync          executionSync.StateSynchronizer
@@ -146,6 +149,7 @@ func (e *Engine) Done() <-chan struct{} {
 
 func (e *Engine) Wait() {
 	e.wg.Wait() //wait for block execution
+	e.syncWg.Wait() // wait for sync
 }
 
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
@@ -221,11 +225,11 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to existing orphan queue")
 			e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 			// this is only queue which grew and could trigger threshold
-			if !e.syncInProgress.Load() && queue.Height() > e.syncModeThreshold {
+			if !e.syncInProgress.Load() && queue.Height() >= e.syncModeThreshold {
 				e.syncInProgress.Store(true)
 				// Start sync mode - initializing would require DB operation and will stop processing blocks here
 				// which is exactly what we want
-				e.StartSync(queue.Head.ExecutableBlock)
+				e.StartSync(queue.Head.Item.(*entity.ExecutableBlock))
 			}
 			return nil
 		}
@@ -238,13 +242,14 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 			if err != nil {
 				panic(fmt.Sprintf("cannot add orphaned block: %s", err))
 			}
+			e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
 			// special case when sync threshold is zero
-			if e.syncModeThreshold == 0 && !e.syncInProgress.Load() {
+			if queue.Height() >= e.syncModeThreshold && !e.syncInProgress.Load() {
 				e.syncInProgress.Store(true)
 				// Start sync mode - initializing would require DB operation and will stop processing blocks here
 				// which is exactly what we want
-				e.StartSync(queue.Head.ExecutableBlock)
+				e.StartSync(queue.Head.Item.(*entity.ExecutableBlock))
 			}
 			return nil
 		}
@@ -275,11 +280,11 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 }
 
 // tryRequeueOrphans tries to put orphaned queue into other queues after a new block has been added
-func (e *Engine) tryRequeueOrphans(executableBlock *entity.ExecutableBlock, targetQueue *queue.Queue, potentialQueues *stdmap.QueuesBackdata) {
+func (e *Engine) tryRequeueOrphans(blockify queue.Blockify, targetQueue *queue.Queue, potentialQueues *stdmap.QueuesBackdata) {
 	for _, queue := range potentialQueues.All() {
 		// only need to check for heads, as all children has parent already
 		// there might be many queues sharing a parent
-		if queue.Head.ExecutableBlock.Block.ParentID == executableBlock.Block.ID() {
+		if queue.Head.Item.ParentID() == blockify.ID() {
 			err := targetQueue.Attach(queue)
 			// shouldn't happen
 			if err != nil {
@@ -321,14 +326,14 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 		}
 		_, newQueues := executionQueue.Dismount()
 		for _, queue := range newQueues {
-			queue.Head.ExecutableBlock.StartState = finalState
+			queue.Head.Item.(*entity.ExecutableBlock).StartState = finalState
 			err := executionQueues.Add(queue)
 			if err != nil {
 				return fmt.Errorf("fatal error cannot add children block to execution queue: %w", err)
 			}
-			if queue.Head.ExecutableBlock.IsComplete() {
+			if queue.Head.Item.(*entity.ExecutableBlock).IsComplete() {
 				e.wg.Add(1)
-				go e.executeBlock(queue.Head.ExecutableBlock)
+				go e.executeBlock(queue.Head.Item.(*entity.ExecutableBlock))
 			}
 		}
 		executionQueues.Rem(executableBlock.Block.ID())
@@ -419,10 +424,10 @@ func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *mess
 	err = e.stateSync.DeltaRange(
 		req.CurrentBlockID,
 		req.TargetBlockID,
-		func(blockID flow.Identifier, delta *messages.ExecutionStateDelta) error {
+		func(delta *messages.ExecutionStateDelta) error {
 			e.log.Debug().
 				Hex("origin_id", logging.ID(originID)).
-				Hex("block_id", logging.ID(blockID)).
+				Hex("block_id", logging.ID(delta.Block.ID())).
 				Msg("sending block delta")
 
 			// TODO: include full block (header + payload) in response?
@@ -431,6 +436,11 @@ func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *mess
 			//	Delta:   delta,
 			//}
 			//
+			time.Sleep(100*time.Millisecond)
+
+			spew.Dump(delta)
+			time.Sleep(100*time.Millisecond)
+
 			err := e.syncConduit.Submit(delta, originID)
 			if err != nil {
 				return fmt.Errorf("could not submit block delta: %w", err)
@@ -453,28 +463,28 @@ func (e *Engine) clearCollectionsCache(block *entity.ExecutableBlock, backdata *
 }
 
 // tryEnqueue checks if a block fits somewhere into the already existing queues, and puts it there is so
-func tryEnqueue(executableBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
+func tryEnqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	for _, queue := range queues.All() {
-		if queue.TryAdd(executableBlock) {
+		if queue.TryAdd(blockify) {
 			return queue, true
 		}
 	}
 	return nil, false
 }
 
-func newQueue(executableBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
-	q := queue.NewQueue(executableBlock)
+func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
+	q := queue.NewQueue(blockify)
 	return q, queues.Add(q)
 }
 
 // enqueue inserts block into matching queue or creates a new one
-func enqueue(executableBlock *entity.ExecutableBlock, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
+func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
 	for _, queue := range queues.All() {
-		if queue.TryAdd(executableBlock) {
+		if queue.TryAdd(blockify) {
 			return queue, nil
 		}
 	}
-	return newQueue(executableBlock, queues)
+	return newQueue(blockify, queues)
 }
 
 func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) error {
@@ -550,7 +560,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
-	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateViews, result.Events, startState)
+	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateInteractions, result.Events, startState)
 	if err != nil {
 		return nil, err
 	}
@@ -563,29 +573,35 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
 
-func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.View, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Interactions, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
 
-	err := e.execState.PersistStateViews(block.ID(), stateViews)
+	time.Sleep(100*time.Millisecond)
+	spew.Dump(stateInteractions)
+	time.Sleep(100*time.Millisecond)
+
+	originalState := startState
+
+	err := e.execState.PersistStateInteractions(block.ID(), stateInteractions)
 	if err != nil {
 		return nil, err
 	}
 
-	chunks := make([]*flow.Chunk, len(stateViews))
+	chunks := make([]*flow.Chunk, len(stateInteractions))
 
 	// TODO check current state root == startState
 	var endState flow.StateCommitment = startState
 
-	for i, view := range stateViews {
+	for i, view := range stateInteractions {
 		// TODO - Deltas should be applied to a particular state
 		var err error
-		endState, err = e.execState.CommitDelta(view.Delta(), startState)
+		endState, err = e.execState.CommitDelta(view.Delta, startState)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 		}
 		//
 		chunk := generateChunk(i, startState, endState)
 		//
-		chunkHeader := generateChunkHeader(chunk, view.Reads())
+		chunkHeader := generateChunkHeader(chunk, view.Reads)
 		//
 		err = e.execState.PersistChunkHeader(chunkHeader)
 		if err != nil {
@@ -640,6 +656,8 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateViews []*delta.Vie
 			return nil, fmt.Errorf("failed to store events: %w", err)
 		}
 	}
+
+	e.log.Debug().Hex("block_id", logging.Entity(block)).Hex("start_state", originalState).Hex("final_state", endState).Msg("saved computation results")
 
 	err = e.providerEngine.BroadcastExecutionReceipt(receipt)
 	if err != nil {
@@ -754,18 +772,106 @@ func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 
 func (e *Engine) handleExecutionStateDelta(executionStateDelta *messages.ExecutionStateDelta, originID flow.Identifier) error {
 
+	e.log.Debug().Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("received sync delta")
+
+	time.Sleep(100*time.Millisecond)
+	spew.Dump(executionStateDelta)
+	time.Sleep(100*time.Millisecond)
+
+
+	return e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
+
+		//try enqueue
+		if queue, added := tryEnqueue(executionStateDelta, backdata); added {
+			e.log.Debug().Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("added block to existing orphan queue")
+			e.tryRequeueOrphans(executionStateDelta, queue, backdata)
+			return nil
+		}
+
+		stateCommitment, err := e.execState.StateCommitmentByBlockID(executionStateDelta.ParentID())
+		// if state commitment doesn't exist and there are no known deltas which will produce
+		// it soon (sync queue) that we save it as orphaned
+		if err == storage.ErrNotFound {
+			_, err := enqueue(executionStateDelta, backdata)
+			if err != nil {
+				panic(fmt.Sprintf("cannot create new queue for sync delta: %s", err))
+			}
+			return nil
+		}
+		if err != nil {
+			panic(fmt.Sprintf("unexpected error while accessing storage for sync deltas, shutting down: %v", err))
+		}
+
+		newQueue, err := enqueue(executionStateDelta, backdata) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
+		if err != nil {
+			panic(fmt.Sprintf("cannot enqueue sync delta: %s", err))
+		}
+
+		e.tryRequeueOrphans(executionStateDelta, newQueue, backdata)
+
+		if !bytes.Equal(stateCommitment, executionStateDelta.StartState) {
+			return fmt.Errorf("internal incosistency with delta - state commitment for parent retirieved from DB different from start state in delta! ")
+		}
+
+		e.syncWg.Add(1)
+		go e.saveDelta(executionStateDelta)
+
+		return nil
+	})
+}
+
+func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
+
+	defer e.syncWg.Done()
+
+
 	//TODO - validate state sync, reject invalid messages, change provider
-	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateViews, executionStateDelta.Events, executionStateDelta.StartState)
+	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateInteractions, executionStateDelta.Events, executionStateDelta.StartState)
 	if err != nil {
 		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).Err(err).Msg("fatal error while processing sync message")
 	}
 
-	if bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, executionStateDelta.EndState) {
-		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).Err(err).Msg("processing sync message produced unexpected state commitment")
+	if !bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, executionStateDelta.EndState) {
+		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).
+			Hex("saved_state", executionReceipt.ExecutionResult.FinalStateCommit).
+			Hex("delta_end_state", executionStateDelta.EndState).
+			Hex("delta_start_state", executionStateDelta.StartState).
+			Err(err).Msg("processing sync message produced unexpected state commitment")
 	}
 
-	return nil
+
+	err = e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
+
+		executionQueue, err := backdata.ByID(executionStateDelta.Block.ID())
+		if err != nil {
+			return fmt.Errorf("fatal error - synced delta not present in sync queue: %w", err)
+		}
+		_, newQueues := executionQueue.Dismount()
+		for _, queue := range newQueues {
+			if !bytes.Equal(queue.Head.Item.(*messages.ExecutionStateDelta).StartState, executionReceipt.ExecutionResult.FinalStateCommit) {
+				return fmt.Errorf("internal incosistency with delta - state commitment for after applying delta different from start state of next one! ")
+			}
+			err := backdata.Add(queue)
+			if err != nil {
+				return fmt.Errorf("fatal error cannot add children block to sync queue: %w", err)
+			}
+
+				e.syncWg.Add(1)
+				go e.saveDelta(queue.Head.Item.(*messages.ExecutionStateDelta))
+		}
+		backdata.Rem(executionStateDelta.Block.ID())
+		return nil
+	})
+
+	if err != nil {
+		e.log.Err(err).
+			Hex("block_id", logging.Entity(executionStateDelta.Block)).
+			Msg("error while requeueing delta after saving")
+	}
+
+	e.log.Debug().Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("finished processing sync delta")
 }
+
 
 // generateChunkDataPack creates a chunk data pack
 func generateChunkDataPack(

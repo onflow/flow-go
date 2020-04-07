@@ -106,14 +106,14 @@ func TestQueue(t *testing.T) {
 		// order of children is not guaranteed
 		var queueD *Queue
 		var queueB *Queue
-		if queuesC[0].Head.ExecutableBlock == d {
+		if queuesC[0].Head.Item == d {
 			queueD = queuesC[0]
 			queueB = queuesC[1]
 		} else {
 			queueD = queuesC[1]
 			queueB = queuesC[0]
 		}
-		assert.Equal(t, d, queueD.Head.ExecutableBlock)
+		assert.Equal(t, d, queueD.Head.Item)
 		sizeD := queueD.Size()
 		heightD := queueD.Height()
 		sizeB := queueB.Size()
@@ -140,7 +140,7 @@ func TestQueue(t *testing.T) {
 		for len(executionHeads) > 0 {
 			currentHead := <-executionHeads
 			block, newQueues := currentHead.Dismount()
-			blocksInOrder = append(blocksInOrder, block)
+			blocksInOrder = append(blocksInOrder, block.(*entity.ExecutableBlock))
 			for _, newQueue := range newQueues {
 				executionHeads <- newQueue
 			}

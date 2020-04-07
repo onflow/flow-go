@@ -35,9 +35,25 @@ type ExecutionStateSyncRequest struct {
 }
 
 type ExecutionStateDelta struct {
-	Block      *flow.Block
-	StateViews []*delta.View
-	StartState flow.StateCommitment
-	EndState   flow.StateCommitment
-	Events     []flow.Event
+	Block             *flow.Block
+	StateInteractions []*delta.Interactions
+	StartState        flow.StateCommitment
+	EndState          flow.StateCommitment
+	Events            []flow.Event
+}
+
+func (b *ExecutionStateDelta) ID() flow.Identifier {
+	return b.Block.ID()
+}
+
+func (b *ExecutionStateDelta) Checksum() flow.Identifier {
+	return b.Block.Checksum()
+}
+
+func (b *ExecutionStateDelta) Height() uint64 {
+	return b.Block.Height
+}
+
+func (b *ExecutionStateDelta) ParentID() flow.Identifier {
+	return b.Block.ParentID
 }

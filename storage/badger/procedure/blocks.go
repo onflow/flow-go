@@ -215,7 +215,7 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 		}
 
 		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,
+			PreviousResultID: flow.GenesisExecutionResultParentID,
 			BlockID:          genesis.ID(),
 			FinalStateCommit: seal.FinalState,
 		}}

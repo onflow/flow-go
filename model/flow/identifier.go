@@ -17,6 +17,9 @@ type Identifier [32]byte
 
 var ZeroID = Identifier{}
 
+var GenesisParentID = ZeroID
+var GenesisExecutionResultParentID = ZeroID
+
 // HexStringToIdentifier converts a hex string to an identifier. The input
 // must be 64 characters long and contain only valid hex characters.
 func HexStringToIdentifier(hexString string) (Identifier, error) {
