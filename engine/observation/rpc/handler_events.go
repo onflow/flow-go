@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 )
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and the end block height (inclusive) that have the given type

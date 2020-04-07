@@ -9,12 +9,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/model/flow"
-	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
@@ -40,15 +41,15 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine, events storage.
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
-			engine:                       e,
-			events:                       events,
+			UnimplementedExecutionAPIServer: execution.UnimplementedExecutionAPIServer{},
+			engine:                          e,
+			events:                          events,
 		},
 		server: grpc.NewServer(),
 		config: config,
 	}
 
-	access.RegisterAccessAPIServer(eng.server, eng.handler)
+	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
 
 	return eng
 }
@@ -87,25 +88,27 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	access.UnimplementedAccessAPIServer
+	execution.UnimplementedExecutionAPIServer
 	engine *ingestion.Engine
 	events storage.Events
 }
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
-	return &access.PingResponse{}, nil
+func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execution.PingResponse, error) {
+	return &execution.PingResponse{}, nil
 }
 
-func (h *handler) ExecuteScriptAtLatestBlock(_ context.Context,
-	req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
+func (h *handler) ExecuteScriptAtLatestBlock(
+	ctx context.Context,
+	req *execution.ExecuteScriptAtLatestBlockRequest,
+) (*execution.ExecuteScriptResponse, error) {
 
 	value, err := h.engine.ExecuteScript(req.Script)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &access.ExecuteScriptResponse{
+	res := &execution.ExecuteScriptResponse{
 		Value: value,
 	}
 
@@ -113,7 +116,7 @@ func (h *handler) ExecuteScriptAtLatestBlock(_ context.Context,
 }
 
 func (h *handler) GetEventsForBlockIDs(_ context.Context,
-	req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
+	req *execution.GetEventsForBlockIDsRequest) (*execution.EventsResponse, error) {
 
 	blockIDs := req.GetBlockIds()
 	if len(blockIDs) == 0 {
@@ -144,7 +147,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		}
 	}
 
-	return &access.EventsResponse{
+	return &execution.EventsResponse{
 		Events: events,
 	}, nil
 }

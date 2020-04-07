@@ -5,8 +5,9 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+
 	"github.com/dapperlabs/flow-go/model/flow"
-	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 )
 
 func MessageToAccountSignature(m *entities.AccountSignature) flow.AccountSignature {

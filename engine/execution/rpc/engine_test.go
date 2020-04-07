@@ -10,10 +10,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -59,12 +60,12 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// create the handler
 	handler := &handler{
-		UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
-		events:                       suite.events,
+		UnimplementedExecutionAPIServer: execution.UnimplementedExecutionAPIServer{},
+		events:                          suite.events,
 	}
 
-	concoctReq := func(errType string, blockIDs [][]byte) *access.GetEventsForBlockIDsRequest {
-		return &access.GetEventsForBlockIDsRequest{
+	concoctReq := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
+		return &execution.GetEventsForBlockIDsRequest{
 			Type:     errType,
 			BlockIds: blockIDs,
 		}

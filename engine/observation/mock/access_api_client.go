@@ -2,8 +2,8 @@
 
 package mock
 
+import access "github.com/dapperlabs/flow/protobuf/go/flow/access"
 import context "context"
-import flow "github.com/dapperlabs/flow-go/protobuf/services/access"
 import grpc "google.golang.org/grpc"
 import mock "github.com/stretchr/testify/mock"
 
@@ -13,7 +13,7 @@ type AccessAPIClient struct {
 }
 
 // ExecuteScriptAtBlockHeight provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) ExecuteScriptAtBlockHeight(ctx context.Context, in *flow.ExecuteScriptAtBlockHeightRequest, opts ...grpc.CallOption) (*flow.ExecuteScriptResponse, error) {
+func (_m *AccessAPIClient) ExecuteScriptAtBlockHeight(ctx context.Context, in *access.ExecuteScriptAtBlockHeightRequest, opts ...grpc.CallOption) (*access.ExecuteScriptResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -23,17 +23,17 @@ func (_m *AccessAPIClient) ExecuteScriptAtBlockHeight(ctx context.Context, in *f
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.ExecuteScriptResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.ExecuteScriptAtBlockHeightRequest, ...grpc.CallOption) *flow.ExecuteScriptResponse); ok {
+	var r0 *access.ExecuteScriptResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.ExecuteScriptAtBlockHeightRequest, ...grpc.CallOption) *access.ExecuteScriptResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ExecuteScriptResponse)
+			r0 = ret.Get(0).(*access.ExecuteScriptResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.ExecuteScriptAtBlockHeightRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.ExecuteScriptAtBlockHeightRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -43,7 +43,7 @@ func (_m *AccessAPIClient) ExecuteScriptAtBlockHeight(ctx context.Context, in *f
 }
 
 // ExecuteScriptAtBlockID provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) ExecuteScriptAtBlockID(ctx context.Context, in *flow.ExecuteScriptAtBlockIDRequest, opts ...grpc.CallOption) (*flow.ExecuteScriptResponse, error) {
+func (_m *AccessAPIClient) ExecuteScriptAtBlockID(ctx context.Context, in *access.ExecuteScriptAtBlockIDRequest, opts ...grpc.CallOption) (*access.ExecuteScriptResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -53,17 +53,17 @@ func (_m *AccessAPIClient) ExecuteScriptAtBlockID(ctx context.Context, in *flow.
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.ExecuteScriptResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.ExecuteScriptAtBlockIDRequest, ...grpc.CallOption) *flow.ExecuteScriptResponse); ok {
+	var r0 *access.ExecuteScriptResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.ExecuteScriptAtBlockIDRequest, ...grpc.CallOption) *access.ExecuteScriptResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ExecuteScriptResponse)
+			r0 = ret.Get(0).(*access.ExecuteScriptResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.ExecuteScriptAtBlockIDRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.ExecuteScriptAtBlockIDRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -73,7 +73,7 @@ func (_m *AccessAPIClient) ExecuteScriptAtBlockID(ctx context.Context, in *flow.
 }
 
 // ExecuteScriptAtLatestBlock provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) ExecuteScriptAtLatestBlock(ctx context.Context, in *flow.ExecuteScriptAtLatestBlockRequest, opts ...grpc.CallOption) (*flow.ExecuteScriptResponse, error) {
+func (_m *AccessAPIClient) ExecuteScriptAtLatestBlock(ctx context.Context, in *access.ExecuteScriptAtLatestBlockRequest, opts ...grpc.CallOption) (*access.ExecuteScriptResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -83,17 +83,17 @@ func (_m *AccessAPIClient) ExecuteScriptAtLatestBlock(ctx context.Context, in *f
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.ExecuteScriptResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.ExecuteScriptAtLatestBlockRequest, ...grpc.CallOption) *flow.ExecuteScriptResponse); ok {
+	var r0 *access.ExecuteScriptResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.ExecuteScriptAtLatestBlockRequest, ...grpc.CallOption) *access.ExecuteScriptResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ExecuteScriptResponse)
+			r0 = ret.Get(0).(*access.ExecuteScriptResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.ExecuteScriptAtLatestBlockRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.ExecuteScriptAtLatestBlockRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -103,7 +103,7 @@ func (_m *AccessAPIClient) ExecuteScriptAtLatestBlock(ctx context.Context, in *f
 }
 
 // GetAccount provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetAccount(ctx context.Context, in *flow.GetAccountRequest, opts ...grpc.CallOption) (*flow.GetAccountResponse, error) {
+func (_m *AccessAPIClient) GetAccount(ctx context.Context, in *access.GetAccountRequest, opts ...grpc.CallOption) (*access.GetAccountResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -113,17 +113,17 @@ func (_m *AccessAPIClient) GetAccount(ctx context.Context, in *flow.GetAccountRe
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.GetAccountResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetAccountRequest, ...grpc.CallOption) *flow.GetAccountResponse); ok {
+	var r0 *access.GetAccountResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountRequest, ...grpc.CallOption) *access.GetAccountResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.GetAccountResponse)
+			r0 = ret.Get(0).(*access.GetAccountResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetAccountRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -133,7 +133,7 @@ func (_m *AccessAPIClient) GetAccount(ctx context.Context, in *flow.GetAccountRe
 }
 
 // GetBlockByHeight provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetBlockByHeight(ctx context.Context, in *flow.GetBlockByHeightRequest, opts ...grpc.CallOption) (*flow.BlockResponse, error) {
+func (_m *AccessAPIClient) GetBlockByHeight(ctx context.Context, in *access.GetBlockByHeightRequest, opts ...grpc.CallOption) (*access.BlockResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -143,17 +143,17 @@ func (_m *AccessAPIClient) GetBlockByHeight(ctx context.Context, in *flow.GetBlo
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.BlockResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetBlockByHeightRequest, ...grpc.CallOption) *flow.BlockResponse); ok {
+	var r0 *access.BlockResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetBlockByHeightRequest, ...grpc.CallOption) *access.BlockResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.BlockResponse)
+			r0 = ret.Get(0).(*access.BlockResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetBlockByHeightRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetBlockByHeightRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -163,7 +163,7 @@ func (_m *AccessAPIClient) GetBlockByHeight(ctx context.Context, in *flow.GetBlo
 }
 
 // GetBlockByID provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetBlockByID(ctx context.Context, in *flow.GetBlockByIDRequest, opts ...grpc.CallOption) (*flow.BlockResponse, error) {
+func (_m *AccessAPIClient) GetBlockByID(ctx context.Context, in *access.GetBlockByIDRequest, opts ...grpc.CallOption) (*access.BlockResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -173,17 +173,17 @@ func (_m *AccessAPIClient) GetBlockByID(ctx context.Context, in *flow.GetBlockBy
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.BlockResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetBlockByIDRequest, ...grpc.CallOption) *flow.BlockResponse); ok {
+	var r0 *access.BlockResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetBlockByIDRequest, ...grpc.CallOption) *access.BlockResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.BlockResponse)
+			r0 = ret.Get(0).(*access.BlockResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetBlockByIDRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetBlockByIDRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -193,7 +193,7 @@ func (_m *AccessAPIClient) GetBlockByID(ctx context.Context, in *flow.GetBlockBy
 }
 
 // GetBlockHeaderByHeight provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetBlockHeaderByHeight(ctx context.Context, in *flow.GetBlockHeaderByHeightRequest, opts ...grpc.CallOption) (*flow.BlockHeaderResponse, error) {
+func (_m *AccessAPIClient) GetBlockHeaderByHeight(ctx context.Context, in *access.GetBlockHeaderByHeightRequest, opts ...grpc.CallOption) (*access.BlockHeaderResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -203,17 +203,17 @@ func (_m *AccessAPIClient) GetBlockHeaderByHeight(ctx context.Context, in *flow.
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.BlockHeaderResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetBlockHeaderByHeightRequest, ...grpc.CallOption) *flow.BlockHeaderResponse); ok {
+	var r0 *access.BlockHeaderResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetBlockHeaderByHeightRequest, ...grpc.CallOption) *access.BlockHeaderResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.BlockHeaderResponse)
+			r0 = ret.Get(0).(*access.BlockHeaderResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetBlockHeaderByHeightRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetBlockHeaderByHeightRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -223,7 +223,7 @@ func (_m *AccessAPIClient) GetBlockHeaderByHeight(ctx context.Context, in *flow.
 }
 
 // GetBlockHeaderByID provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetBlockHeaderByID(ctx context.Context, in *flow.GetBlockHeaderByIDRequest, opts ...grpc.CallOption) (*flow.BlockHeaderResponse, error) {
+func (_m *AccessAPIClient) GetBlockHeaderByID(ctx context.Context, in *access.GetBlockHeaderByIDRequest, opts ...grpc.CallOption) (*access.BlockHeaderResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -233,17 +233,17 @@ func (_m *AccessAPIClient) GetBlockHeaderByID(ctx context.Context, in *flow.GetB
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.BlockHeaderResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetBlockHeaderByIDRequest, ...grpc.CallOption) *flow.BlockHeaderResponse); ok {
+	var r0 *access.BlockHeaderResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetBlockHeaderByIDRequest, ...grpc.CallOption) *access.BlockHeaderResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.BlockHeaderResponse)
+			r0 = ret.Get(0).(*access.BlockHeaderResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetBlockHeaderByIDRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetBlockHeaderByIDRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -253,7 +253,7 @@ func (_m *AccessAPIClient) GetBlockHeaderByID(ctx context.Context, in *flow.GetB
 }
 
 // GetCollectionByID provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetCollectionByID(ctx context.Context, in *flow.GetCollectionByIDRequest, opts ...grpc.CallOption) (*flow.CollectionResponse, error) {
+func (_m *AccessAPIClient) GetCollectionByID(ctx context.Context, in *access.GetCollectionByIDRequest, opts ...grpc.CallOption) (*access.CollectionResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -263,17 +263,17 @@ func (_m *AccessAPIClient) GetCollectionByID(ctx context.Context, in *flow.GetCo
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.CollectionResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetCollectionByIDRequest, ...grpc.CallOption) *flow.CollectionResponse); ok {
+	var r0 *access.CollectionResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetCollectionByIDRequest, ...grpc.CallOption) *access.CollectionResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.CollectionResponse)
+			r0 = ret.Get(0).(*access.CollectionResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetCollectionByIDRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetCollectionByIDRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -283,7 +283,7 @@ func (_m *AccessAPIClient) GetCollectionByID(ctx context.Context, in *flow.GetCo
 }
 
 // GetEventsForBlockIDs provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetEventsForBlockIDs(ctx context.Context, in *flow.GetEventsForBlockIDsRequest, opts ...grpc.CallOption) (*flow.EventsResponse, error) {
+func (_m *AccessAPIClient) GetEventsForBlockIDs(ctx context.Context, in *access.GetEventsForBlockIDsRequest, opts ...grpc.CallOption) (*access.EventsResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -293,17 +293,17 @@ func (_m *AccessAPIClient) GetEventsForBlockIDs(ctx context.Context, in *flow.Ge
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.EventsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetEventsForBlockIDsRequest, ...grpc.CallOption) *flow.EventsResponse); ok {
+	var r0 *access.EventsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetEventsForBlockIDsRequest, ...grpc.CallOption) *access.EventsResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.EventsResponse)
+			r0 = ret.Get(0).(*access.EventsResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetEventsForBlockIDsRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetEventsForBlockIDsRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -313,7 +313,7 @@ func (_m *AccessAPIClient) GetEventsForBlockIDs(ctx context.Context, in *flow.Ge
 }
 
 // GetEventsForHeightRange provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetEventsForHeightRange(ctx context.Context, in *flow.GetEventsForHeightRangeRequest, opts ...grpc.CallOption) (*flow.EventsResponse, error) {
+func (_m *AccessAPIClient) GetEventsForHeightRange(ctx context.Context, in *access.GetEventsForHeightRangeRequest, opts ...grpc.CallOption) (*access.EventsResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -323,17 +323,17 @@ func (_m *AccessAPIClient) GetEventsForHeightRange(ctx context.Context, in *flow
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.EventsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetEventsForHeightRangeRequest, ...grpc.CallOption) *flow.EventsResponse); ok {
+	var r0 *access.EventsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetEventsForHeightRangeRequest, ...grpc.CallOption) *access.EventsResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.EventsResponse)
+			r0 = ret.Get(0).(*access.EventsResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetEventsForHeightRangeRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetEventsForHeightRangeRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -343,7 +343,7 @@ func (_m *AccessAPIClient) GetEventsForHeightRange(ctx context.Context, in *flow
 }
 
 // GetLatestBlock provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetLatestBlock(ctx context.Context, in *flow.GetLatestBlockRequest, opts ...grpc.CallOption) (*flow.BlockResponse, error) {
+func (_m *AccessAPIClient) GetLatestBlock(ctx context.Context, in *access.GetLatestBlockRequest, opts ...grpc.CallOption) (*access.BlockResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -353,17 +353,17 @@ func (_m *AccessAPIClient) GetLatestBlock(ctx context.Context, in *flow.GetLates
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.BlockResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetLatestBlockRequest, ...grpc.CallOption) *flow.BlockResponse); ok {
+	var r0 *access.BlockResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetLatestBlockRequest, ...grpc.CallOption) *access.BlockResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.BlockResponse)
+			r0 = ret.Get(0).(*access.BlockResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetLatestBlockRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetLatestBlockRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -373,7 +373,7 @@ func (_m *AccessAPIClient) GetLatestBlock(ctx context.Context, in *flow.GetLates
 }
 
 // GetLatestBlockHeader provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetLatestBlockHeader(ctx context.Context, in *flow.GetLatestBlockHeaderRequest, opts ...grpc.CallOption) (*flow.BlockHeaderResponse, error) {
+func (_m *AccessAPIClient) GetLatestBlockHeader(ctx context.Context, in *access.GetLatestBlockHeaderRequest, opts ...grpc.CallOption) (*access.BlockHeaderResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -383,17 +383,17 @@ func (_m *AccessAPIClient) GetLatestBlockHeader(ctx context.Context, in *flow.Ge
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.BlockHeaderResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetLatestBlockHeaderRequest, ...grpc.CallOption) *flow.BlockHeaderResponse); ok {
+	var r0 *access.BlockHeaderResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetLatestBlockHeaderRequest, ...grpc.CallOption) *access.BlockHeaderResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.BlockHeaderResponse)
+			r0 = ret.Get(0).(*access.BlockHeaderResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetLatestBlockHeaderRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetLatestBlockHeaderRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -403,7 +403,7 @@ func (_m *AccessAPIClient) GetLatestBlockHeader(ctx context.Context, in *flow.Ge
 }
 
 // GetTransaction provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetTransaction(ctx context.Context, in *flow.GetTransactionRequest, opts ...grpc.CallOption) (*flow.TransactionResponse, error) {
+func (_m *AccessAPIClient) GetTransaction(ctx context.Context, in *access.GetTransactionRequest, opts ...grpc.CallOption) (*access.TransactionResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -413,17 +413,17 @@ func (_m *AccessAPIClient) GetTransaction(ctx context.Context, in *flow.GetTrans
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.TransactionResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetTransactionRequest, ...grpc.CallOption) *flow.TransactionResponse); ok {
+	var r0 *access.TransactionResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetTransactionRequest, ...grpc.CallOption) *access.TransactionResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.TransactionResponse)
+			r0 = ret.Get(0).(*access.TransactionResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetTransactionRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetTransactionRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -433,7 +433,7 @@ func (_m *AccessAPIClient) GetTransaction(ctx context.Context, in *flow.GetTrans
 }
 
 // GetTransactionResult provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetTransactionResult(ctx context.Context, in *flow.GetTransactionRequest, opts ...grpc.CallOption) (*flow.TransactionResultResponse, error) {
+func (_m *AccessAPIClient) GetTransactionResult(ctx context.Context, in *access.GetTransactionRequest, opts ...grpc.CallOption) (*access.TransactionResultResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -443,17 +443,17 @@ func (_m *AccessAPIClient) GetTransactionResult(ctx context.Context, in *flow.Ge
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.TransactionResultResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.GetTransactionRequest, ...grpc.CallOption) *flow.TransactionResultResponse); ok {
+	var r0 *access.TransactionResultResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetTransactionRequest, ...grpc.CallOption) *access.TransactionResultResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.TransactionResultResponse)
+			r0 = ret.Get(0).(*access.TransactionResultResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.GetTransactionRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetTransactionRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -463,7 +463,7 @@ func (_m *AccessAPIClient) GetTransactionResult(ctx context.Context, in *flow.Ge
 }
 
 // Ping provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) Ping(ctx context.Context, in *flow.PingRequest, opts ...grpc.CallOption) (*flow.PingResponse, error) {
+func (_m *AccessAPIClient) Ping(ctx context.Context, in *access.PingRequest, opts ...grpc.CallOption) (*access.PingResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -473,17 +473,17 @@ func (_m *AccessAPIClient) Ping(ctx context.Context, in *flow.PingRequest, opts 
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.PingResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.PingRequest, ...grpc.CallOption) *flow.PingResponse); ok {
+	var r0 *access.PingResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.PingRequest, ...grpc.CallOption) *access.PingResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.PingResponse)
+			r0 = ret.Get(0).(*access.PingResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.PingRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.PingRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -493,7 +493,7 @@ func (_m *AccessAPIClient) Ping(ctx context.Context, in *flow.PingRequest, opts 
 }
 
 // SendTransaction provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) SendTransaction(ctx context.Context, in *flow.SendTransactionRequest, opts ...grpc.CallOption) (*flow.SendTransactionResponse, error) {
+func (_m *AccessAPIClient) SendTransaction(ctx context.Context, in *access.SendTransactionRequest, opts ...grpc.CallOption) (*access.SendTransactionResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -503,17 +503,17 @@ func (_m *AccessAPIClient) SendTransaction(ctx context.Context, in *flow.SendTra
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *flow.SendTransactionResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.SendTransactionRequest, ...grpc.CallOption) *flow.SendTransactionResponse); ok {
+	var r0 *access.SendTransactionResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SendTransactionRequest, ...grpc.CallOption) *access.SendTransactionResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.SendTransactionResponse)
+			r0 = ret.Get(0).(*access.SendTransactionResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *flow.SendTransactionRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SendTransactionRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
