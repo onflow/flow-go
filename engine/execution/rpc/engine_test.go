@@ -125,7 +125,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	})
 
 	// failure path - non-existent block id in request results in an error
-	suite.Run("request with empty event type", func() {
+	suite.Run("request with non-existent block ID", func() {
 
 		id := unittest.IdentifierFixture()
 
