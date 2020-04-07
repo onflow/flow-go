@@ -436,13 +436,18 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get latest seal: %w", err)
 	}
 
-	stateCommit, err := e.execState.StateCommitmentByBlockID(seal.BlockID)
+	return e.ExecuteScriptAtBlockID(script, seal.BlockID)
+}
+
+func (e *Engine) ExecuteScriptAtBlockID(script []byte, blockID flow.Identifier) ([]byte, error) {
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", seal.BlockID, err)
+		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
 	}
-	block, err := e.state.AtBlockID(seal.BlockID).Head()
+	block, err := e.state.AtBlockID(blockID).Head()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sealed block (%s): %w", seal.BlockID, err)
+		return nil, fmt.Errorf("failed to get sealed block (%s): %w", blockID, err)
 	}
 
 	blockView := e.execState.NewView(stateCommit)

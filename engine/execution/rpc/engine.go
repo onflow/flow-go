@@ -115,6 +115,24 @@ func (h *handler) ExecuteScriptAtLatestBlock(
 	return res, nil
 }
 
+func (h *handler) ExecuteScriptAtBlockID(
+	ctx context.Context,
+	req *execution.ExecuteScriptAtBlockIDRequest,
+) (*execution.ExecuteScriptResponse, error) {
+	blockID := flow.HashToID(req.GetBlockId())
+
+	value, err := h.engine.ExecuteScriptAtBlockID(req.Script, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &execution.ExecuteScriptResponse{
+		Value: value,
+	}
+
+	return res, nil
+}
+
 func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	req *execution.GetEventsForBlockIDsRequest) (*execution.EventsResponse, error) {
 
