@@ -3,7 +3,6 @@ package collection
 import (
 	"context"
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -29,79 +28,6 @@ func defaultOtherNodes() []testnet.NodeConfig {
 	)
 
 	return []testnet.NodeConfig{conNode1, conNode2, conNode3, exeNode, verNode}
-}
-
-func TestConsistentGenesis(t *testing.T) {
-
-	t.Skip()
-
-	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")
-		})
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
-		})
-	)
-
-	nodes := append([]testnet.NodeConfig{colNode1, colNode2}, defaultOtherNodes()...)
-	conf := testnet.NetworkConfig{Nodes: nodes}
-
-	net, err := testnet.PrepareFlowNetwork(t, "col", conf)
-	require.Nil(t, err)
-
-	net.Start(context.Background())
-	defer net.Cleanup()
-
-	// get the collection node containers
-	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
-	assert.True(t, ok)
-	colContainer2, ok := net.ContainerByID(colNode2.Identifier)
-	assert.True(t, ok)
-
-	//// get the node's ingress port and create an RPC client
-	//ingressPort, ok := colContainer.Ports[testnet.ColNodeAPIPort]
-	//assert.True(t, ok)
-	//
-	//key, err := testutil.AccountKeyFixture()
-	//assert.Nil(t, err)
-	//client, err := testnet.NewClientWithKey(fmt.Sprintf(":%s", ingressPort), key)
-	//assert.Nil(t, err)
-	//
-	//err = client.SendTransactionDSL(ctx, testutil.NoopTransactionDSL())
-	//assert.Nil(t, err)
-
-	// give the cluster a chance to do some consensus
-	time.Sleep(10 * time.Second)
-	err = net.StopContainers()
-	assert.Nil(t, err)
-
-	identities := net.Identities()
-
-	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
-
-	// create a database for col1 and col2
-	db1, err := colContainer1.DB()
-	require.Nil(t, err)
-	db2, err := colContainer2.DB()
-	require.Nil(t, err)
-
-	// get cluster state for col1 and col2
-	state1, err := clusterstate.NewState(db1, chainID)
-	assert.Nil(t, err)
-	state2, err := clusterstate.NewState(db2, chainID)
-	assert.Nil(t, err)
-
-	// get chain head for col1 and col2
-	head1, err := state1.Final().Head()
-	assert.Nil(t, err)
-	head2, err := state2.Final().Head()
-	assert.Nil(t, err)
-
-	// the head should be either equal, or at most off by one
-	assert.True(t, math.Abs(float64(head1.Height-head2.Height)) < 2)
-	t.Logf("COL1 height: %d\tCOL2 height: %d\n", head1.Height, head2.Height)
-
 }
 
 func TestTransactionIngress_InvalidTransaction(t *testing.T) {
