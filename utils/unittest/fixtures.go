@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -85,7 +86,6 @@ func SealFixture() flow.Seal {
 		BlockID:       IdentifierFixture(),
 		PreviousState: StateCommitmentFixture(),
 		FinalState:    StateCommitmentFixture(),
-		Signature:     SignatureFixture(),
 	}
 }
 
@@ -284,8 +284,8 @@ func StateCommitmentFixture() flow.StateCommitment {
 	return state
 }
 
-func HashFixture(size int) crypto.Hash {
-	hash := make(crypto.Hash, size)
+func HashFixture(size int) hash.Hash {
+	hash := make(hash.Hash, size)
 	for i := 0; i < size; i++ {
 		hash[i] = byte(i)
 	}
@@ -321,7 +321,7 @@ func WithStake(stake uint64) func(*flow.Identity) {
 
 func generateRandomSeed() []byte {
 	seed := make([]byte, 48)
-	if _, err := crand.Read(seed); err != nil {
+	if n, err := crand.Read(seed); err != nil || n != 48 {
 		panic(err)
 	}
 	return seed
@@ -352,11 +352,6 @@ func WithNodeID(b byte) func(*flow.Identity) {
 // WithRandomPublicKeys adds random public keys to an identity.
 func WithRandomPublicKeys() func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		randBeac, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
-		if err != nil {
-			panic(err)
-		}
-		identity.RandomBeaconPubKey = randBeac.PublicKey()
 		stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
 		if err != nil {
 			panic(err)

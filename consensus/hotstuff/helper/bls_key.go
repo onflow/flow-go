@@ -11,7 +11,8 @@ import (
 
 func MakeBLSKey(t *testing.T) crypto.PrivateKey {
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLS_BLS12381)
-	_, err := rand.Read(seed)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, crypto.KeyGenSeedMinLenBLS_BLS12381)
 	require.NoError(t, err)
 	privKey, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
 	require.NoError(t, err)

@@ -8,6 +8,7 @@ import (
 	encoding "github.com/dapperlabs/cadence/encoding/xdr"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -62,7 +63,10 @@ func noopTransaction() dsl.Transaction {
 
 func generateRandomKey() (*flow.AccountPrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_P256)
-	_, _ = rand.Read(seed)
+	n, err := rand.Read(seed)
+	if err != nil || n != crypto.KeyGenSeedMinLenECDSA_P256 {
+		return nil, err
+	}
 	key, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
 	if err != nil {
 		return nil, err
@@ -71,7 +75,7 @@ func generateRandomKey() (*flow.AccountPrivateKey, error) {
 	return &flow.AccountPrivateKey{
 		PrivateKey: key,
 		SignAlgo:   key.Algorithm(),
-		HashAlgo:   crypto.SHA3_256,
+		HashAlgo:   hash.SHA3_256,
 	}, nil
 
 }
@@ -84,6 +88,6 @@ func getEmulatorKey() (*flow.AccountPrivateKey, error) {
 	return &flow.AccountPrivateKey{
 		PrivateKey: key,
 		SignAlgo:   key.Algorithm(),
-		HashAlgo:   crypto.SHA3_256,
+		HashAlgo:   hash.SHA3_256,
 	}, nil
 }

@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // ECDSAalgo embeds SignAlgo
@@ -27,7 +29,7 @@ func bitsToBytes(bits int) int {
 }
 
 // signHash implements ECDSA signature
-func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
+func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 	r, s, err := goecdsa.Sign(rand.Reader, sk.goPrKey, h)
 	if err != nil {
 		return nil, fmt.Errorf("ECDSA Sign has failed: %w", err)
@@ -46,7 +48,7 @@ func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
 // This function does not modify the private key, even temporarily
 // For most of the hashers (including sha2 and sha3), the input alg
 // is modified temporarily
-func (sk *PrKeyECDSA) Sign(data []byte, alg Hasher) (Signature, error) {
+func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 	if alg == nil {
 		return nil, errors.New("Sign requires a Hasher")
 	}
@@ -55,7 +57,7 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg Hasher) (Signature, error) {
 }
 
 // verifyHash implements ECDSA signature verification
-func (pk *PubKeyECDSA) verifyHash(sig Signature, h Hash) (bool, error) {
+func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 	var r big.Int
 	var s big.Int
 	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
@@ -68,7 +70,7 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h Hash) (bool, error) {
 // This function does not modify the public key, even temporarily
 // For most of the hashers (including sha2 and sha3), the input alg
 // is modified temporarily
-func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, error) {
+func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
 	if alg == nil {
 		return false, errors.New("Verify requires a Hasher")
 	}

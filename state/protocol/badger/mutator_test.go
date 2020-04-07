@@ -96,7 +96,6 @@ func TestExtendSealedBoundary(t *testing.T) {
 			BlockID:       block.ID(),
 			PreviousState: genesis.Seals[0].FinalState,
 			FinalState:    unittest.StateCommitmentFixture(),
-			Signature:     nil,
 		}
 
 		sealingBlock := unittest.BlockFixture()
@@ -463,7 +462,6 @@ func TestExtendBlockNotConnected(t *testing.T) {
 			BlockID:       block.ID(),
 			PreviousState: genesis.Seals[0].FinalState,
 			FinalState:    unittest.StateCommitmentFixture(),
-			Signature:     nil,
 		}}
 		sealingBlock.PayloadHash = sealingBlock.Payload.Hash()
 
@@ -521,13 +519,11 @@ func TestExtendSealNotConnected(t *testing.T) {
 			BlockID:       genesis.ID(),
 			PreviousState: genesis.Seals[0].FinalState,
 			FinalState:    unittest.StateCommitmentFixture(),
-			Signature:     nil,
 		}
 		seal2 := &flow.Seal{
 			BlockID:       genesis.ID(),
 			PreviousState: unittest.StateCommitmentFixture(), // not seal1.FinalState, this will cause the error
 			FinalState:    unittest.StateCommitmentFixture(),
-			Signature:     nil,
 		}
 
 		block := unittest.BlockFixture()

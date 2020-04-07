@@ -3,7 +3,7 @@
 package unittest
 
 import (
-	"math/rand"
+	"crypto/rand"
 	"sync"
 	"testing"
 	"time"
@@ -93,10 +93,11 @@ func RunDKG(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []crypt
 		chans[i] = make(chan *message, 2*n)
 	}
 	// start DKG in all nodes but the leader
-	seed := make([]byte, 48)
+	seed := make([]byte, crypto.SeedMinLenDKG)
 	bytes, err := rand.Read(seed)
 	require.NoError(t, err)
 	require.Equal(t, bytes, len(seed))
+
 	wg.Add(n)
 	for current := 0; current < n; current++ {
 		err := processors[current].dkg.StartDKG(seed)
