@@ -7,7 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/trace"
 )
 
-const ChunkExecutionSpanner = "chunk_execution_duration"
+const chunkExecutionSpanner = "chunk_execution_duration"
 
 type Metrics struct {
 	sync.RWMutex
@@ -24,7 +24,7 @@ func NewMetrics(t trace.Tracer) *Metrics {
 // it starts the timer to record the execution time
 func (c *Metrics) OnChunkVerificationStated(chunkID flow.Identifier) {
 	// starts spanner tracer for this chunk ID
-	c.tracer.StartSpan(chunkID, ChunkExecutionSpanner)
+	c.tracer.StartSpan(chunkID, chunkExecutionSpanner)
 }
 
 // OnChunkVerificationFinished is called whenever chunkID verification gets finished
