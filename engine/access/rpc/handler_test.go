@@ -11,8 +11,8 @@ import (
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
 
+	mockaccess "github.com/dapperlabs/flow-go/engine/access/mock"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
-	mockaccess "github.com/dapperlabs/flow-go/engine/observation/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	realstorage "github.com/dapperlabs/flow-go/storage"
