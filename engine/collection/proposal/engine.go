@@ -36,7 +36,7 @@ type Engine struct {
 	me           module.Local
 	protoState   protocol.State // flow-wide protocol chain state
 	clusterState cluster.State  // cluster-specific chain state
-	provider     network.Engine
+	ingest       network.Engine
 	pool         mempool.Transactions
 	transactions storage.Transactions
 	headers      storage.Headers
@@ -54,7 +54,7 @@ func New(
 	protoState protocol.State,
 	clusterState cluster.State,
 	tracer trace.Tracer,
-	provider network.Engine,
+	ingest network.Engine,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
 	headers storage.Headers,
@@ -74,7 +74,7 @@ func New(
 		protoState:   protoState,
 		clusterState: clusterState,
 		tracer:       tracer,
-		provider:     provider,
+		ingest:       ingest,
 		pool:         pool,
 		transactions: transactions,
 		headers:      headers,
@@ -240,7 +240,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Int("collection_size", len(payload.Collection.Transactions)).
 		Msg("submitted proposal")
 
-	trace.StartCollectionSpan(e.tracer, &payload.Collection).
+	light := payload.Collection.Light()
+	trace.StartCollectionSpan(e.tracer, &light).
 		SetTag("node_type", "collection").
 		SetTag("node_id", e.me.NodeID().String())
 
@@ -293,34 +294,18 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	blockID := proposal.Header.ID()
 	collection := proposal.Payload.Collection
 
-	// ensure we have received and validated all transactions in the proposal
-	var missingTxErr *multierror.Error
-	for _, txID := range collection.Transactions {
-		if !e.pool.Has(txID) {
-			// note each missing transaction in the error and reject the block
-			missingTxErr = multierror.Append(missingTxErr, fmt.Errorf("cannot validate missing transaction (id=%x)", txID))
-
-			// request the missing transaction
-			req := &messages.SubmitTransactionRequest{
-				Request: messages.TransactionRequest{ID: txID},
+	// validate any transactions we haven't yet seen
+	var merr *multierror.Error
+	for _, tx := range collection.Transactions {
+		if !e.pool.Has(tx.ID()) {
+			err = e.ingest.ProcessLocal(tx)
+			if err != nil {
+				merr = multierror.Append(merr, err)
 			}
-			e.provider.SubmitLocal(req)
 		}
 	}
-	if err := missingTxErr.ErrorOrNil(); err != nil {
-		return fmt.Errorf("cannot validate block proposal (id=%x) with missing transactions: %w", proposal.Header.ID(), err)
-	}
-
-	// store the transactions
-	for _, txID := range collection.Transactions {
-		tx, err := e.pool.ByID(txID)
-		if err != nil {
-			return fmt.Errorf("could not store missing transaction: %w", err)
-		}
-		err = e.transactions.Store(tx)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("could not store transaction: %w", err)
-		}
+	if err := merr.ErrorOrNil(); err != nil {
+		return fmt.Errorf("cannot validate block proposal (id=%x) with invalid transactions: %w", proposal.Header.ID(), err)
 	}
 
 	// store the payload
