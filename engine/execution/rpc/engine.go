@@ -98,23 +98,6 @@ func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execut
 	return &execution.PingResponse{}, nil
 }
 
-func (h *handler) ExecuteScriptAtLatestBlock(
-	ctx context.Context,
-	req *execution.ExecuteScriptAtLatestBlockRequest,
-) (*execution.ExecuteScriptResponse, error) {
-
-	value, err := h.engine.ExecuteScript(req.Script)
-	if err != nil {
-		return nil, err
-	}
-
-	res := &execution.ExecuteScriptResponse{
-		Value: value,
-	}
-
-	return res, nil
-}
-
 func (h *handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *execution.ExecuteScriptAtBlockIDRequest,

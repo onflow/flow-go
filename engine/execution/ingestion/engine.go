@@ -429,16 +429,6 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 	return nil
 }
 
-func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
-
-	seal, err := e.state.Final().Seal()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get latest seal: %w", err)
-	}
-
-	return e.ExecuteScriptAtBlockID(script, seal.BlockID)
-}
-
 func (e *Engine) ExecuteScriptAtBlockID(script []byte, blockID flow.Identifier) ([]byte, error) {
 
 	stateCommit, err := e.execState.StateCommitmentByBlockID(blockID)
@@ -447,7 +437,7 @@ func (e *Engine) ExecuteScriptAtBlockID(script []byte, blockID flow.Identifier) 
 	}
 	block, err := e.state.AtBlockID(blockID).Head()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sealed block (%s): %w", blockID, err)
+		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
 	}
 
 	blockView := e.execState.NewView(stateCommit)

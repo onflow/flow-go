@@ -76,12 +76,12 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
 
-	protocolState.On("Final").Return(snapshot)
+	protocolState.On("Final").Return(snapshot).Maybe()
 	snapshot.On("Identities", mock.Anything).Return(func(f ...flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(f[0])
 	}, nil)
 
-	protocolState.On("Mutate").Return(mutator)
+	protocolState.On("Mutate").Return(mutator).Maybe()
 	mutator.On("Finalize", mock.Anything).Return(nil)
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
@@ -338,15 +338,6 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		// Ensure block we're about to query against is executable
 		executableBlock := unittest.ExecutableBlockFixture(0)
 		executableBlock.StartState = unittest.StateCommitmentFixture()
-		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
-
-		ctx.assertSuccessfulBlockComputation(executableBlock, unittest.IdentifierFixture())
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(executableBlock.StartState, nil)
-		err := ctx.engine.handleBlock(executableBlock.Block)
-		require.NoError(t, err)
-
-		_, more := <-ctx.engine.Done() // block to be processed
-		assert.False(t, more)
 
 		snapshot := new(protocol.Snapshot)
 		snapshot.On("Head").Return(&executableBlock.Block.Header, nil)
