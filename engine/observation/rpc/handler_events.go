@@ -45,7 +45,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 	for i := minHeight; i <= maxHeight; i++ {
 		block, err := h.blocks.ByHeight(i)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, " failed to get events: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to get events: %w", err)
 		}
 		id := block.ID()
 		blockIDs = append(blockIDs, id[:])
