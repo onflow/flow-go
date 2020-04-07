@@ -739,7 +739,11 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 	// mine keeps the list of chunks assigned to this node
 	mine := make(flow.ChunkList, 0, len(chunkIndices))
 	for _, index := range chunkIndices {
-		mine = append(mine, res.Chunks.ByIndex(index))
+		chunk, ok := res.Chunks.ByIndex(index)
+		if !ok {
+			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+		}
+		mine = append(mine, chunk)
 	}
 
 	return mine, nil
