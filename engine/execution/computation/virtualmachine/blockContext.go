@@ -126,6 +126,14 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 	}, nil
 }
 
+func (bc *blockContext) GetAccount(ledger Ledger, address flow.Address) (*flow.Account, error) {
+	ctx := bc.newScriptContext(ledger)
+
+	account := ctx.GetAccount(address)
+
+	return account, nil
+}
+
 // ConvertEvents creates flow.Events from runtime.events
 func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) {
 
