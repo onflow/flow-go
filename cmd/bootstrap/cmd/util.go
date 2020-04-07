@@ -23,7 +23,7 @@ func generateRandomSeeds(n int) [][]byte {
 
 func generateRandomSeed() []byte {
 	seed := make([]byte, randomSeedBytes)
-	if _, err := rand.Read(seed); err != nil {
+	if n, err := rand.Read(seed); err != nil || n != randomSeedBytes {
 		log.Fatal().Err(err).Msg("cannot generate random seeds")
 	}
 	return seed

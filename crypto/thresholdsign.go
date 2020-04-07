@@ -9,6 +9,8 @@ import "C"
 import (
 	"errors"
 	"fmt"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // ThresholdSigner holds the data needed for threshold signaures
@@ -27,7 +29,7 @@ type ThresholdSigner struct {
 	// the group public key shares (a DKG output)
 	publicKeyShares []PublicKey
 	// the hasher to be used for all signatures
-	hashAlgo Hasher
+	hashAlgo hash.Hasher
 	// the message to be signed. Siganture shares and the threshold signature
 	// are verified using this message
 	messageToSign []byte
@@ -46,7 +48,7 @@ const ThresholdSignatureTag = "Threshold Signatures"
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
 // size is the number of participants
-func NewThresholdSigner(size int, currentIndex int, hashAlgo Hasher) (*ThresholdSigner, error) {
+func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*ThresholdSigner, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)
 	}

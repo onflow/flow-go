@@ -22,10 +22,6 @@ func generateIdentityList(nodes []model.NodeInfo, dkgData model.DKGData) flow.Id
 
 	for _, node := range nodes {
 		ident := node.Identity()
-		if node.Role == flow.RoleConsensus {
-			ident.RandomBeaconPubKey = findDKGParticipant(dkgData, node.NodeID).KeyShare.PublicKey()
-		}
-
 		list = append(list, ident)
 	}
 

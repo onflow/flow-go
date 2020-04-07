@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"testing"
 
@@ -12,25 +13,27 @@ import (
 
 func TestDeterministicKeyGen(t *testing.T) {
 	// 2 keys generated with the same seed should be equal
-	seed := []byte{1, 2, 3, 4}
-	h, _ := NewHasher(SHA3_384)
-	sk1, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
-	assert.Nil(t, err)
-	pk1Bytes, _ := sk1.PublicKey().Encode()
-	sk2, err := GeneratePrivateKey(BLS_BLS12381, h.ComputeHash(seed))
-	assert.Nil(t, err)
-	pk2Bytes, _ := sk2.PublicKey().Encode()
-	assert.Equal(t, pk1Bytes, pk2Bytes)
+	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLenBLS_BLS12381)
+	require.NoError(t, err)
+	sk1, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	require.Nil(t, err)
+	sk2, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	require.Nil(t, err)
+	assert.True(t, sk1.Equals(sk2), "private keys should be equal")
 }
 
-// test the deterministicity of the reelic PRG (used by the DKG polynimials)
+// test the deterministicity of the relic PRG (used by the DKG polynimials)
 func TestPRGseeding(t *testing.T) {
 	NewSigner(BLS_BLS12381)
 	// 2 scalars generated with the same seed should be equal
-	h, _ := NewHasher(SHA3_384)
-	seed := h.ComputeHash([]byte{1, 2, 3, 4})
+	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLenBLS_BLS12381)
+	require.NoError(t, err)
 	// 1st scalar (wrapped in a private key)
-	err := seedRelic(seed)
+	err = seedRelic(seed)
 	require.Nil(t, err)
 	var sk1 PrKeyBLS_BLS12381
 	err = randZr(&sk1.scalar)
@@ -42,19 +45,15 @@ func TestPRGseeding(t *testing.T) {
 	err = randZr(&sk2.scalar)
 	require.Nil(t, err)
 	// compare the 2 scalars (by comparing the private keys)
-	sk1Bytes, err := sk1.Encode()
-	require.Nil(t, err)
-	sk2Bytes, err := sk2.Encode()
-	require.Nil(t, err)
-	assert.Equal(t, sk1Bytes, sk2Bytes)
+	assert.True(t, sk1.Equals(&sk2), "private keys should be equal")
 }
 
 // TestG1 helps debugging but is not a unit test
 func TestG1(t *testing.T) {
 	NewSigner(BLS_BLS12381)
-
-	h, _ := NewHasher(SHA3_256)
-	seedRelic(h.ComputeHash([]byte{0}))
+	seed := make([]byte, securityBits/8)
+	rand.Read(seed)
+	seedRelic(seed)
 	var expo scalar
 	randZr(&expo)
 	var res pointG1
@@ -65,8 +64,9 @@ func TestG1(t *testing.T) {
 // G1 bench
 func BenchmarkG1(b *testing.B) {
 	NewSigner(BLS_BLS12381)
-	h, _ := NewHasher(SHA3_256)
-	seedRelic(h.ComputeHash([]byte{0}))
+	seed := make([]byte, securityBits/8)
+	rand.Read(seed)
+	seedRelic(seed)
 	var expo scalar
 	randZr(&expo)
 	var res pointG1
@@ -81,9 +81,7 @@ func BenchmarkG1(b *testing.B) {
 
 // TestG2 helps debugging but is not a unit test
 func TestG2(t *testing.T) {
-
 	NewSigner(BLS_BLS12381)
-
 	var expo scalar
 	(&expo).setInt(1)
 	var res pointG2
@@ -94,8 +92,9 @@ func TestG2(t *testing.T) {
 // G2 bench
 func BenchmarkG2(b *testing.B) {
 	NewSigner(BLS_BLS12381)
-	h, _ := NewHasher(SHA3_256)
-	seedRelic(h.ComputeHash([]byte{0}))
+	seed := make([]byte, securityBits/8)
+	rand.Read(seed)
+	seedRelic(seed)
 	var expo scalar
 	randZr(&expo)
 	var res pointG2

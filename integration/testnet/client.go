@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -106,10 +107,7 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, er
 
 // signTransaction signs a transaction with a private key.
 func signTransaction(tx flow.TransactionBody, privateKey crypto.PrivateKey) (crypto.Signature, error) {
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
-	if err != nil {
-		return nil, err
-	}
+	hasher := hash.NewSHA3_256()
 
 	transaction := flow.Transaction{
 		TransactionBody: tx,

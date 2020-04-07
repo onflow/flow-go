@@ -3,7 +3,7 @@
 package merkle
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 type node interface{}
@@ -20,6 +20,6 @@ type full struct {
 }
 
 type leaf struct {
-	key crypto.Hash // redundant copy of hash (key/path) for root hash
+	key hash.Hash   // redundant copy of hash (key/path) for root hash
 	val interface{} // the concrete data we actually stored
 }
