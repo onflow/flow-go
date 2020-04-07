@@ -66,6 +66,7 @@ func main() {
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			// TODO inject this into HotStuff
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
+			_ = privateDKGData
 			return err
 		}).
 		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {
