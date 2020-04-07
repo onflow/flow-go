@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
@@ -13,6 +14,7 @@ import (
 	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 
+	mockaccess "github.com/dapperlabs/flow-go/engine/observation/mock"
 	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -29,6 +31,7 @@ type Suite struct {
 	headers      *storage.Headers
 	collections  *storage.Collections
 	transactions *storage.Transactions
+	execClient   *mockaccess.AccessAPIClient
 }
 
 func TestHandler(t *testing.T) {
@@ -44,6 +47,7 @@ func (suite *Suite) SetupTest() {
 	suite.headers = new(storage.Headers)
 	suite.transactions = new(storage.Transactions)
 	suite.collections = new(storage.Collections)
+	suite.execClient = new(mockaccess.AccessAPIClient)
 }
 
 func (suite *Suite) TestPing() {
@@ -66,9 +70,9 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 	// make sure we got the latest block
 	id := block.ID()
-	suite.Require().Equal(id[:], resp.Block.Id)
-	suite.Require().Equal(block.Height, resp.Block.Height)
-	suite.Require().Equal(block.ParentID[:], resp.Block.ParentId)
+	suite.Require().Equal(id[:], resp.GetBlock().GetId())
+	suite.Require().Equal(block.Height, resp.GetBlock().GetHeight())
+	suite.Require().Equal(block.ParentID[:], resp.GetBlock().GetParentId())
 	suite.assertAllExpectations()
 }
 
@@ -88,9 +92,9 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 
 	// make sure we got the latest sealed block
 	id := block.ID()
-	suite.Require().Equal(id[:], resp.Block.Id)
-	suite.Require().Equal(block.Height, resp.Block.Height)
-	suite.Require().Equal(block.ParentID[:], resp.Block.ParentId)
+	suite.Require().Equal(id[:], resp.GetBlock().GetId())
+	suite.Require().Equal(block.Height, resp.GetBlock().GetHeight())
+	suite.Require().Equal(block.ParentID[:], resp.GetBlock().GetParentId())
 	suite.assertAllExpectations()
 }
 
@@ -111,7 +115,7 @@ func (suite *Suite) TestGetTransaction() {
 	resp, err := handler.GetTransaction(context.Background(), req)
 	suite.checkResponse(resp, err)
 
-	actual, err := convert.MessageToTransaction(resp.Transaction)
+	actual, err := convert.MessageToTransaction(resp.GetTransaction())
 	suite.checkResponse(resp, err)
 	suite.Require().Equal(expected, actual)
 	suite.assertAllExpectations()
@@ -143,7 +147,7 @@ func (suite *Suite) TestGetCollection() {
 	suite.transactions.AssertExpectations(suite.T())
 	suite.checkResponse(resp, err)
 
-	actualColl := resp.Collection
+	actualColl := resp.GetCollection()
 	actualIDs := make([]flow.Identifier, len(actualColl.TransactionIds))
 	for i, t := range actualColl.TransactionIds {
 		actualIDs[i] = flow.HashToID(t)
@@ -221,6 +225,131 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	suite.assertAllExpectations()
 }
 
+func (suite *Suite) TestGetEventsForBlockIDs() {
+
+	blockIDs := getIDs(5)
+	events := getEvents(10)
+
+	req := &access.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}
+	expectedResp := access.EventsResponse{
+		Events: events,
+	}
+	ctx := context.Background()
+
+	// expect one call to the executor api client
+	suite.execClient.On("GetEventsForBlockIDs", ctx, req).Return(&expectedResp, nil).Once()
+
+	// create the handler
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, nil, nil, nil)
+
+	// execute request
+	acutalResponse, err := handler.GetEventsForBlockIDs(ctx, req)
+
+	// check response
+	suite.checkResponse(acutalResponse, err)
+	suite.Require().Equal(expectedResp, *acutalResponse)
+	suite.assertAllExpectations()
+}
+
+func (suite *Suite) TestGetEventsForHeightRange() {
+	ctx := context.Background()
+	var minHeight uint64 = 5
+	var maxHeight uint64 = 10
+	var headHeight uint64
+	var expBlockIDs [][]byte
+
+	setupHeadHeight := func(height uint64) {
+		header := unittest.BlockHeaderFixture() // create a mock header
+		header.Height = height                  // set the header height
+		seal := unittest.SealFixture()          // create a mock seal
+		seal.BlockID = header.ID()              // make the seal point to the header
+		suite.snapshot.On("Seal").Return(seal, nil).Once()
+		suite.headers.On("ByBlockID", header.ID()).Return(&header, nil).Once()
+	}
+
+	setupStorage := func(min uint64, max uint64) [][]byte {
+		ids := make([][]byte, 0)
+		for i := min; i <= max; i++ {
+			b := unittest.BlockFixture()
+			suite.blocks.On("ByHeight", i).Return(&b, nil).Once()
+			m, err := convert.BlockToMessage(&b)
+			suite.Require().NoError(err)
+			ids = append(ids, m.Id)
+		}
+		return ids
+	}
+
+	setupExecClient := func(events []*entities.Event) {
+		execReq := &access.GetEventsForBlockIDsRequest{BlockIds: expBlockIDs, Type: string(flow.EventAccountCreated)}
+		execResp := access.EventsResponse{
+			Events: events,
+		}
+		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(&execResp, nil).Once()
+	}
+
+	suite.Run("invalid request max height < min height", func() {
+		req := &access.GetEventsForHeightRangeRequest{
+			StartHeight: maxHeight,
+			EndHeight:   minHeight,
+			Type:        string(flow.EventAccountCreated)}
+
+		handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, nil, nil)
+		_, err := handler.GetEventsForHeightRange(ctx, req)
+		require.Error(suite.T(), err)
+		suite.assertAllExpectations() // assert that request was not sent to execution node
+	})
+
+	suite.Run("valid request with min_height < max_height < last_sealed_block_height", func() {
+
+		headHeight = maxHeight + 1
+
+		// setup mocks
+		setupHeadHeight(headHeight)
+		expBlockIDs = setupStorage(minHeight, maxHeight)
+		expEvents := getEvents(10)
+		setupExecClient(expEvents)
+
+		// create handler
+		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
+
+		req := &access.GetEventsForHeightRangeRequest{
+			StartHeight: minHeight,
+			EndHeight:   maxHeight,
+			Type:        string(flow.EventAccountCreated)}
+
+		// execute request
+		resp, err := handler.GetEventsForHeightRange(ctx, req)
+
+		// check response
+		suite.checkResponse(resp, err)
+		suite.assertAllExpectations()
+		suite.Require().Equal(expEvents, resp.GetEvents())
+	})
+
+	suite.Run("valid request with max_height > last_sealed_block_height", func() {
+		headHeight = maxHeight - 1
+		setupHeadHeight(headHeight)
+		expBlockIDs = setupStorage(minHeight, headHeight)
+
+		expEvents := getEvents(10)
+		setupExecClient(expEvents)
+
+		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
+
+		req := &access.GetEventsForHeightRangeRequest{
+			StartHeight: minHeight,
+			EndHeight:   maxHeight,
+			Type:        string(flow.EventAccountCreated)}
+
+		resp, err := handler.GetEventsForHeightRange(ctx, req)
+
+		suite.checkResponse(resp, err)
+		suite.assertAllExpectations()
+		suite.Require().Equal(expEvents, resp.GetEvents())
+	})
+
+}
+
 func (suite *Suite) assertAllExpectations() {
 	suite.snapshot.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
@@ -228,9 +357,28 @@ func (suite *Suite) assertAllExpectations() {
 	suite.headers.AssertExpectations(suite.T())
 	suite.collections.AssertExpectations(suite.T())
 	suite.transactions.AssertExpectations(suite.T())
+	suite.execClient.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) checkResponse(resp interface{}, err error) {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
+}
+
+func getIDs(n int) [][]byte {
+	ids := make([][]byte, n)
+	for i := range ids {
+		id := unittest.IdentifierFixture()
+		ids[i] = id[:]
+	}
+	return ids
+}
+
+func getEvents(n int) []*entities.Event {
+	events := make([]*entities.Event, 10)
+	for i := range events {
+		event := entities.Event{Type: string(flow.EventAccountCreated)}
+		events[i] = &event
+	}
+	return events
 }
