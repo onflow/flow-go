@@ -1,0 +1,79 @@
+{
+  "ChainID": "flow",
+  "ParentID": "0000000000000000000000000000000000000000000000000000000000000000",
+  "Height": 0,
+  "PayloadHash": "f6d1293ba1b9f2fc90ecef9cfbcf42b1df254097c413fcc90b3119dbd7d45fbd",
+  "Timestamp": "2018-12-19T22:32:30.000000042Z",
+  "View": 0,
+  "ParentVoterIDs": null,
+  "ParentVoterSig": null,
+  "ProposerID": "0000000000000000000000000000000000000000000000000000000000000000",
+  "ProposerSig": null,
+  "Identities": [
+    {
+      "NodeID": "0000000000000000000000000000000000000000000000000000000000000001",
+      "Address": "collection_1:2137",
+      "Role": "collection",
+      "Stake": 1000,
+      "StakingPubKey": "hloNzGMT+XA2KDgCEUHH3anRZ3K7lUVYVq4PNMlc3+Bir5J7M6bEFgnoQ5/o6G0hEGtAcjXj5JLpAeYQZrPjL+jPPpMSEPongoP7M2UJYhoDbvVFdbZJscF1gJlWat0t",
+      "NetworkPubKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE60ifpBzGvEJ8trCrHLCxK8VaXqTu9iYrTVFjyS8pP3STQ07DEZg4vgkUmH3VdX7XyWJUls9akMDvrCMxW0q+ow=="
+    },
+    {
+      "NodeID": "0000000000000000000000000000000000000000000000000000000000000002",
+      "Address": "collection_2:2137",
+      "Role": "collection",
+      "Stake": 1000,
+      "StakingPubKey": "rdtHgJ2N0aRJfExWKP7SGni6XfOvpGhL3Ep6qvTgLLC/LiCy4gyCjLLLLT5LR7pCFxZNSmuxEn62pYdAQzDh3umTlBY2KRH095SNRZzbAzU1iYen2Ro8fly35SRluwW9",
+      "NetworkPubKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEP+KxZRmc+mljq3ykGop/VIw6yxh8SSAjOH3aFqJd0wSplt63SjJ6cGoifReb1S3zKyTxjQ2vjPiwrdc9d98ZBw=="
+    },
+    {
+      "NodeID": "36310c2ae7f8764363f535f53231c1c52091a911382115da54c4f5c551451189",
+      "Address": "consensus_1:2137",
+      "Role": "consensus",
+      "Stake": 1000,
+      "StakingPubKey": "gJtIdXFmLdy03qNp9CiKwXaGkg3Vbzwy64MHZXfuX65k2y1mP3Lhj4fe6lS8kxdcFjT2/GLufHU+PjOnVcUSSaGQMHN4e96/wbvk93vGbIdsQBlciJQBchXNYngyJqvD",
+      "NetworkPubKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqFdx4R2h8SYHQXVwegtcZ1+Rf+yFJfdqE8v6xZxTeeiHXelfNEg1HPFKTdK8fA8LAAy0CWQ5rt87Qs2VMXyGIw=="
+    },
+    {
+      "NodeID": "b3908c76e177df9886d1647a7ba72bcaf8476021587e08c8d0fee481e5bb0618",
+      "Address": "consensus_2:2137",
+      "Role": "consensus",
+      "Stake": 1000,
+      "StakingPubKey": "o6PwdzhltWDp49NqjWFAmuVGzMhrhdXpR5FOR3tXubv5frmwBzkcIJlzRR1tkl/9A5Gz4LljtAIQFDq6mSjsrYL1RVt6iqgEluk1cBBmEsNOXVtmT41YMeJsaiaPM9Jy",
+      "NetworkPubKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdO12I0aMCT+MqYbWeLDx4lsmyd8T4wsJp1S903Njn+1f0qfemRcCz1AmMz+kXMdab7uDwVEZrye5OFeKcMDBrw=="
+    },
+    {
+      "NodeID": "4c85220e4664f4e6452e2290225b12b41ee49febe7764086a38ad155755732e8",
+      "Address": "consensus_3:2137",
+      "Role": "consensus",
+      "Stake": 1000,
+      "StakingPubKey": "lVROdiiFxAc0c5Eme+Pn7yC0II/XW8pY+y4ZI74Pt1pw3nDg/ASfmAdo1vdz/rXdFQ2ybWnxtf4Dir1j8E0Ido0UHKgK7GW7nEldhBxOC3NQUejPZbN0oSr/PN8vMqc+",
+      "NetworkPubKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE72uzYKUyk7Bo8NexXmrAIHKMd3OmDX2Py1W5+tcdeGo3JhdkLJ5kJVBppp7c2BDsKUyrR2XK/Y4EHdJVWc/Ofw=="
+    },
+    {
+      "NodeID": "f760a4509bb7f82146b758d2e5e82f50e29e0d18645834425cebe91178fd6ad4",
+      "Address": "execution_1:2137",
+      "Role": "execution",
+      "Stake": 1000,
+      "StakingPubKey": "o8liXIAoN0+ioo0fIL2xFZKhCYwynb5aHoS35mhdt7ePig2lNszOuRIjSM4HowjXGZM17XijExGZ63Q1+W3RZEuqsLhN96eR4GLwo34s3DSOT1mfcquSA/97eL880yxZ",
+      "NetworkPubKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJMea+2bvxNgxe01IevpCOzlPRRFwnuBkhNrhQ23Db0dQSPHLaFw413KRezIzLIODSbFbBUfTskdoBFXWVfOP3A=="
+    },
+    {
+      "NodeID": "1bb6bd24c38daab1112bc7b6f7bec55054bd1e4bc3bfd5400d7311d058060e38",
+      "Address": "verification_1:2137",
+      "Role": "verification",
+      "Stake": 1000,
+      "StakingPubKey": "iRTtaRwogrsbw5+2fuJD6GzCyfrHWSEXEXDrL8hNUY/lihCM/XOwhY04x8YwGyLgFUSRPq6ozfCCQ2kFPzONaTGyJ0MsJ/y0g36RzvOXnfE2KHRbT6WzkdkLSQDXp+1K",
+      "NetworkPubKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzs9m5jLYN+17T/sBOC9xZr7DeUgpr6uiJYCvGMhfAVUrY5oC91CxOOkmvlqhkuGs4D1Fmc3alFP2R3aZZH1dw=="
+    }
+  ],
+  "Guarantees": null,
+  "Seals": [
+    {
+      "BlockID": "0000000000000000000000000000000000000000000000000000000000000000",
+      "ExecutionResultID": "0000000000000000000000000000000000000000000000000000000000000000",
+      "PreviousState": null,
+      "FinalState": "56ca0QmH/7ah7bUjXMoaY/7pU0vb2lcxKkX3AbXAqjo="
+    }
+  ]
+}

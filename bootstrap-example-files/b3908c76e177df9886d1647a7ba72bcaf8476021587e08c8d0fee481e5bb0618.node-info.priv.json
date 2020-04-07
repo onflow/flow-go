@@ -1,0 +1,7 @@
+{
+  "Role": "consensus",
+  "Address": "consensus_2:2137",
+  "NodeID": "b3908c76e177df9886d1647a7ba72bcaf8476021587e08c8d0fee481e5bb0618",
+  "NetworkPrivKey": "MHcCAQEEIHdssCTDp1rEqtM25Ns6VRTl5yYg4jVbmn8H1DKwtSwxoAoGCCqGSM49AwEHoUQDQgAEdO12I0aMCT+MqYbWeLDx4lsmyd8T4wsJp1S903Njn+1f0qfemRcCz1AmMz+kXMdab7uDwVEZrye5OFeKcMDBrw==",
+  "StakingPrivKey": "D3PTFX2DzpW2qDgoL0xG/YiKtgCk+WlE1g6l5hxva6g="
+}
