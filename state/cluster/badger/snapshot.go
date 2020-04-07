@@ -22,8 +22,8 @@ type Snapshot struct {
 	final   bool
 }
 
-func (s *Snapshot) Collection() (*flow.LightCollection, error) {
-	var collection flow.LightCollection
+func (s *Snapshot) Collection() (*flow.Collection, error) {
+	var collection flow.Collection
 
 	err := s.state.db.View(func(tx *badger.Txn) error {
 
@@ -42,7 +42,7 @@ func (s *Snapshot) Collection() (*flow.LightCollection, error) {
 		}
 
 		// set the collection
-		collection = payload.Collection.Light()
+		collection = payload.Collection
 
 		return nil
 	})

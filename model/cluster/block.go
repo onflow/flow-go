@@ -51,6 +51,10 @@ func EmptyPayload() Payload {
 
 // PayloadFromTransactions creates a payload given a list of transaction hashes.
 func PayloadFromTransactions(transactions ...*flow.TransactionBody) Payload {
+	// avoid a nil transaction list
+	if len(transactions) == 0 {
+		transactions = []*flow.TransactionBody{}
+	}
 	return Payload{
 		Collection: flow.Collection{
 			Transactions: transactions,

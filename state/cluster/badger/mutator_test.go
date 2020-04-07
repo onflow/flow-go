@@ -71,11 +71,8 @@ func TestBootstrap(t *testing.T) {
 		t.Run("invalid payload", func(t *testing.T) {
 			defer cleanup()
 			genesis := cluster.Genesis()
-			genesis.Payload = cluster.Payload{
-				Collection: flow.LightCollection{
-					Transactions: []flow.Identifier{unittest.IdentifierFixture()},
-				},
-			}
+			// this is invalid because genesis collection should be empty
+			genesis.Payload = unittest.ClusterPayloadFixture(2)
 
 			err := mutator.Bootstrap(genesis)
 			assert.Error(t, err)
@@ -94,13 +91,13 @@ func TestBootstrap(t *testing.T) {
 				var collection flow.LightCollection
 				err = operation.RetrieveCollection(genesis.Collection.ID(), &collection)(tx)
 				assert.Nil(t, err)
-				assert.Equal(t, genesis.Collection, collection)
+				assert.Equal(t, genesis.Collection.Light(), collection)
 
 				// should index collection
 				collection = flow.LightCollection{} // reset the collection
-				err = operation.LookupCollectionPayload(genesis.Height, genesis.ID(), genesis.ParentID, &collection)(tx)
+				err = operation.LookupCollectionPayload(genesis.Height, genesis.ID(), genesis.ParentID, &collection.Transactions)(tx)
 				assert.Nil(t, err)
-				assert.Equal(t, genesis.Collection, collection)
+				assert.Equal(t, genesis.Collection.Light(), collection)
 
 				// should insert header
 				var header flow.Header
@@ -153,10 +150,6 @@ func TestExtend(t *testing.T) {
 		// a helper function to insert a block
 		insert := func(block cluster.Block) {
 			_ = db.Update(func(tx *badger.Txn) error {
-				// first insert the payload
-				err := procedure.InsertClusterPayload(&block.Payload)(tx)
-				assert.Nil(t, err)
-				// then insert the block
 				err = procedure.InsertClusterBlock(&block)(tx)
 				assert.Nil(t, err)
 				return nil
@@ -275,13 +268,11 @@ func TestExtend(t *testing.T) {
 			defer cleanup()
 			bootstrap()
 
-			tx1 := unittest.TransactionFixture()
+			tx1 := unittest.TransactionBodyFixture()
 
 			// create a block extending genesis containing tx1
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			payload1 := cluster.Payload{
-				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
-			}
+			payload1 := cluster.PayloadFromTransactions(&tx1)
 			block1.SetPayload(payload1)
 			insert(block1)
 
@@ -291,9 +282,7 @@ func TestExtend(t *testing.T) {
 
 			// create a block building on block1 ALSO containing tx1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			payload2 := cluster.Payload{
-				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
-			}
+			payload2 := cluster.PayloadFromTransactions(&tx1)
 			block2.SetPayload(payload2)
 			insert(block2)
 
@@ -307,13 +296,11 @@ func TestExtend(t *testing.T) {
 			defer cleanup()
 			bootstrap()
 
-			tx1 := unittest.TransactionFixture()
+			tx1 := unittest.TransactionBodyFixture()
 
 			// create a block extending genesis containing tx1
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			payload1 := cluster.Payload{
-				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
-			}
+			payload1 := cluster.PayloadFromTransactions(&tx1)
 			block1.SetPayload(payload1)
 			insert(block1)
 
@@ -327,9 +314,7 @@ func TestExtend(t *testing.T) {
 
 			// create a block building on block1 ALSO containing tx1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			payload2 := cluster.Payload{
-				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
-			}
+			payload2 := cluster.PayloadFromTransactions(&tx1)
 			block2.SetPayload(payload2)
 			insert(block2)
 
@@ -343,13 +328,11 @@ func TestExtend(t *testing.T) {
 			defer cleanup()
 			bootstrap()
 
-			tx1 := unittest.TransactionFixture()
+			tx1 := unittest.TransactionBodyFixture()
 
 			// create a block extending genesis containing tx1
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			payload1 := cluster.Payload{
-				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
-			}
+			payload1 := cluster.PayloadFromTransactions(&tx1)
 			block1.SetPayload(payload1)
 			insert(block1)
 
@@ -359,9 +342,7 @@ func TestExtend(t *testing.T) {
 
 			// create a block ALSO extending genesis ALSO containing tx1
 			block2 := unittest.ClusterBlockWithParent(genesis)
-			payload2 := cluster.Payload{
-				Collection: flow.LightCollection{Transactions: []flow.Identifier{tx1.ID()}},
-			}
+			payload2 := cluster.PayloadFromTransactions(&tx1)
 			block2.SetPayload(payload2)
 			insert(block2)
 
