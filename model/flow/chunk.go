@@ -145,7 +145,7 @@ func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
 // if requested chunk is out of the range, it returns nil and false
 // boolean return value indicates whether requested chunk is within range
 func (cl ChunkList) ByIndex(i uint64) (*Chunk, bool) {
-	if i < 0 || i >= uint64(len(cl)) {
+	if i >= uint64(len(cl)) {
 		// index out of range
 		return nil, false
 	}
@@ -157,7 +157,7 @@ func (cl ChunkList) ByIndex(i uint64) (*Chunk, bool) {
 // if requested chunk is out of the range, it returns nil and false
 // TODO adding proof of membership to it
 func (cl ChunkList) ByIndexWithProof(i uint64) (*Chunk, Proof, bool) {
-	if i < 0 || i >= uint64(len(cl)) {
+	if i >= uint64(len(cl)) {
 		// index out of range
 		return nil, nil, false
 	}
