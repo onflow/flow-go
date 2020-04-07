@@ -11,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
@@ -22,8 +25,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
-	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -231,7 +232,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			BlockID: block.ID(),
 		}
 		ingestEng.OnFinalizedBlock(mb)
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 
 		// 3. Ingest engine requests all collections of the block
 		suite.collectionsConduit.AssertExpectations(suite.T())

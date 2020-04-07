@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/crypto/random"
 	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
@@ -126,7 +126,7 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 // - internal state of random generator
 // - alpha
 // the generated fingerprint is deterministic in the set of aforementioned parameters
-func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (crypto.Hash, error) {
+func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand, alpha int) (hash.Hash, error) {
 	// sorts and encodes ids
 	sort.Sort(ids)
 	encIDs, err := encoding.DefaultEncoder.Encode(ids)
@@ -153,12 +153,8 @@ func fingerPrint(ids flow.IdentifierList, chunks flow.ChunkList, rng random.Rand
 		return nil, fmt.Errorf("could not encode alpha: %w", err)
 	}
 
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
-	if err != nil {
-		return nil, fmt.Errorf("could not create hasher: %w", err)
-	}
-
 	// computes and returns hash(encIDs || encChunks || encRng || encAlpha)
+	hasher := hash.NewSHA3_256()
 	_, err = hasher.Write(encIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not hash ids: %w", err)

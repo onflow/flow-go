@@ -18,13 +18,12 @@ var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|acc
 
 // Identity represents a node identity.
 type Identity struct {
-	NodeID             Identifier
-	Address            string
-	Role               Role
-	Stake              uint64
-	StakingPubKey      crypto.PublicKey
-	RandomBeaconPubKey crypto.PublicKey
-	NetworkPubKey      crypto.PublicKey
+	NodeID        Identifier
+	Address       string
+	Role          Role
+	Stake         uint64
+	StakingPubKey crypto.PublicKey
+	NetworkPubKey crypto.PublicKey
 }
 
 // ParseIdentity parses a string representation of an identity.
@@ -73,13 +72,12 @@ func (iy Identity) Checksum() Identifier {
 }
 
 type jsonMarshalIdentity struct {
-	NodeID             Identifier
-	Address            string
-	Role               Role
-	Stake              uint64
-	StakingPubKey      []byte
-	RandomBeaconPubKey []byte
-	NetworkPubKey      []byte
+	NodeID        Identifier
+	Address       string
+	Role          Role
+	Stake         uint64
+	StakingPubKey []byte
+	NetworkPubKey []byte
 }
 
 func (iy *Identity) UnmarshalJSON(b []byte) error {
@@ -97,11 +95,6 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 			return err
 		}
 	}
-	if m.RandomBeaconPubKey != nil {
-		if iy.RandomBeaconPubKey, err = crypto.DecodePublicKey(crypto.BLS_BLS12381, m.RandomBeaconPubKey); err != nil {
-			return err
-		}
-	}
 	if m.NetworkPubKey != nil {
 		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSA_P256, m.NetworkPubKey); err != nil {
 			return err
@@ -111,15 +104,10 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 }
 
 func (iy Identity) MarshalJSON() ([]byte, error) {
-	m := jsonMarshalIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil, nil}
+	m := jsonMarshalIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
 	var err error
 	if iy.StakingPubKey != nil {
 		if m.StakingPubKey, err = iy.StakingPubKey.Encode(); err != nil {
-			return nil, err
-		}
-	}
-	if iy.RandomBeaconPubKey != nil {
-		if m.RandomBeaconPubKey, err = iy.RandomBeaconPubKey.Encode(); err != nil {
 			return nil, err
 		}
 	}

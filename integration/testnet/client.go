@@ -5,23 +5,24 @@ import (
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// Client is a GRPC client of the Observation API exposed by the Flow network.
+// AccessClient is a GRPC client of the Observation API exposed by the Flow network.
 // NOTE: we use integration/client rather than sdk/client as a stopgap until
 // the SDK client is updated with the latest protobuf definitions.
 type Client struct {
-	client *client.Client
+	client *client.AccessClient
 	key    *flow.AccountPrivateKey
 }
 
 func NewClient(addr string, key *flow.AccountPrivateKey) (*Client, error) {
 
-	client, err := client.New(addr)
+	client, err := client.NewAccessClient(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -85,10 +86,7 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, er
 
 // signTransaction signs a transaction with a private key.
 func signTransaction(tx flow.TransactionBody, privateKey crypto.PrivateKey) (crypto.Signature, error) {
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
-	if err != nil {
-		return nil, err
-	}
+	hasher := hash.NewSHA3_256()
 
 	transaction := flow.Transaction{
 		TransactionBody: tx,

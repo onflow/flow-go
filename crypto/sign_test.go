@@ -4,9 +4,11 @@ import (
 	"testing"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
-func testSignVerify(t *testing.T, halg Hasher, sk PrivateKey, input []byte) {
+func testSignVerify(t *testing.T, halg hash.Hasher, sk PrivateKey, input []byte) {
 	s, err := sk.Sign(input, halg)
 	if err != nil {
 		log.Error(err.Error())
@@ -25,7 +27,7 @@ func testSignVerify(t *testing.T, halg Hasher, sk PrivateKey, input []byte) {
 	}
 }
 
-func benchSign(b *testing.B, algo SigningAlgorithm, halg Hasher) {
+func benchSign(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 	seed := make([]byte, 48)
 	for j := 0; j < len(seed); j++ {
 		seed[j] = byte(j)
@@ -41,7 +43,7 @@ func benchSign(b *testing.B, algo SigningAlgorithm, halg Hasher) {
 	b.StopTimer()
 }
 
-func benchVerify(b *testing.B, algo SigningAlgorithm, halg Hasher) {
+func benchVerify(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 	seed := make([]byte, 48)
 	for j := 0; j < len(seed); j++ {
 		seed[j] = byte(j)

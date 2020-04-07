@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
@@ -30,7 +30,7 @@ type Engine struct {
 	conduit network.Conduit      // used to propagate result approvals
 	me      module.Local         // used to access local node information
 	state   protocol.State       // used to access the protocol state
-	rah     crypto.Hasher        // used as hasher to sign the result approvals
+	rah     hash.Hasher          // used as hasher to sign the result approvals
 	chVerif module.ChunkVerifier // used to verify chunks
 }
 

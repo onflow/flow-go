@@ -3,9 +3,10 @@ package rpc
 import (
 	"context"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	access "github.com/dapperlabs/flow-go/protobuf/services/access"
 )
 
 func (h *Handler) GetLatestBlock(_ context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
