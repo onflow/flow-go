@@ -73,7 +73,6 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	providerEngine := new(provider.ProviderEngine)
 	protocolState := new(protocol.State)
 	executionState := new(state.ExecutionState)
-	//mutator := new(protocol.Mutator)
 	snapshot := new(protocol.Snapshot)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}

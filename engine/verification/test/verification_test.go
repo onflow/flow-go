@@ -161,9 +161,8 @@ func TestHappyPath(t *testing.T) {
 	// sleep for 1 second to make sure that receipt finds its way to
 	// authReceipts pool
 	assert.Eventually(t, func() bool {
-		//hub.DeliverAll()
 		return verNode.AuthReceipts.Has(completeER.Receipt.ID())
-	}, 5*time.Second, 50*time.Millisecond)
+	}, time.Second, 50*time.Millisecond)
 
 	// flush the chunk state request
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
