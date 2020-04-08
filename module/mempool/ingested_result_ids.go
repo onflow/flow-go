@@ -9,15 +9,15 @@ import (
 // Ingest engine to the Verify engine of Verification node
 type IngestedResultIDs interface {
 	// Has checks whether the mempool has the result ID
-	Has(result *flow.ExecutionResultBody) bool
+	Has(resultID flow.Identifier) bool
 
 	// Add will add the given result ID to the memory pool or it will error if
 	// the result ID is already in the memory pool.
-	Add(result *flow.ExecutionResultBody) error
+	Add(result *flow.ExecutionResult) error
 
 	// Rem will remove the given result ID from the memory pool; it will
 	// return true if the result ID was known and removed.
-	Rem(result flow.Identifier) bool
+	Rem(resultID flow.Identifier) bool
 
 	// All will retrieve all result IDs that are currently in the memory pool
 	// as an IdentityList
