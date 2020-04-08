@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,17 +36,12 @@ func TestPathfinding(t *testing.T) {
 
 	allStateDeltas := []*messages.ExecutionStateDelta{a, b, c, d, e, f, g}
 
-	ch := 'a'
-
 	for _, delta := range allStateDeltas {
-		fmt.Printf("%c => %v\n", ch, delta)
-		ch++
-		executionStateMock.On("RetrieveStateDelta", delta.Block.ID()).Return(delta, nil).Times(0)
+		executionStateMock.On("RetrieveStateDelta", delta.Block.ID()).Return(delta, nil).Maybe()
 	}
 
 	sync := &stateSync{
 		execState: executionStateMock,
-		//registerDeltas: registerDeltas,
 	}
 
 	testPath := func(start *messages.ExecutionStateDelta, end *messages.ExecutionStateDelta, expectedPath []*messages.ExecutionStateDelta) func(t *testing.T) {

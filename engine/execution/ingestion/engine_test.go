@@ -13,7 +13,7 @@ import (
 	engineCommon "github.com/dapperlabs/flow-go/engine"
 	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
 	provider "github.com/dapperlabs/flow-go/engine/execution/provider/mock"
-	realState "github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -185,7 +185,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 	if len(computationResult.StateInteractions) == 0 { //if block was empty, no new state commitment is produced
 		newStateCommitment = executableBlock.StartState
 	}
-	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(realState.View))
+	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
 
 	ctx.computationManager.On("ComputeBlock", executableBlock, mock.Anything).Return(computationResult, nil).Once()
 
@@ -350,7 +350,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		// Add all data needed for execution of script
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ID()).Return(executableBlock.StartState, nil)
 		ctx.state.On("AtBlockID", executableBlock.Block.ID()).Return(snapshot)
-		view := new(realState.View)
+		view := new(delta.View)
 		ctx.executionState.On("NewView", executableBlock.StartState).Return(view)
 
 		// Successful call to computation manager
