@@ -191,6 +191,11 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("execution receipt received")
 
+	if e.ingestedResultIDs.Has(receipt.ExecutionResult.ID()) {
+		// discards the receipt if its result has already been ingested
+		return nil
+	}
+
 	// TODO: correctness check for execution receipts
 	// extracts list of verifier nodes id
 	origin, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
@@ -233,6 +238,11 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
 		Msg("chunk data pack received")
+
+	if e.ingestedChunkIDs.Has(chunkDataPack.ChunkID) {
+		// discards the chunk data pack if it belongs to an already ingested chunk
+		return nil
+	}
 
 	// checks if this event is a reply of a prior request
 	// extracts the tracker
@@ -326,6 +336,11 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(res.State.ChunkID)).
 		Msg("execution state received")
+
+	if e.ingestedChunkIDs.Has(res.State.ChunkID) {
+		// discards the state if it belongs to an already ingested chunk
+		return nil
+	}
 
 	// checks if this event is a reply of a prior request extracts the tracker
 	tracker, err := e.chunkStateTrackers.ByChunkID(res.State.ChunkID)
@@ -649,7 +664,18 @@ func (e *Engine) checkPendingChunks() {
 		}
 
 		if len(mychunks) == 0 {
-
+			// no un-ingested chunk remains with this receipt
+			// marks execution result as ingested
+			err := e.ingestedResultIDs.Add(&receipt.ExecutionResult)
+			if err != nil {
+				e.log.Error().
+					Err(err).
+					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+					Msg("could add ingested result to mempool")
+				continue
+			}
+			// removes receipt from mempool to avoid further iteration
+			e.authReceipts.Rem(receipt.ID())
 		}
 
 		for _, chunk := range mychunks {
@@ -762,7 +788,7 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 	for _, index := range chunkIndices {
 		chunk := res.Chunks.ByIndex(index)
 		// discard the chunk if it has been already ingested
-		if e.ingestedChunkIDs.Has(chunk) {
+		if e.ingestedChunkIDs.Has(chunk.ID()) {
 			continue
 		}
 		mine = append(mine, chunk)
