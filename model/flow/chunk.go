@@ -152,18 +152,6 @@ func (cl ChunkList) ByIndex(i uint64) (*Chunk, bool) {
 	return cl[i], true
 }
 
-// ByIndexWithProof returns an entity from the list by index and proof of membership
-// if requested chunk is within range of list, it returns chunk, its proof of membership and true
-// if requested chunk is out of the range, it returns nil and false
-// TODO adding proof of membership to it
-func (cl ChunkList) ByIndexWithProof(i uint64) (*Chunk, Proof, bool) {
-	if i >= uint64(len(cl)) {
-		// index out of range
-		return nil, nil, false
-	}
-	return cl[i], nil, true
-}
-
 // Len returns the number of Chunks in the list. It is also part of the sort
 // interface that makes ChunkList sortable
 func (cl ChunkList) Len() int {
