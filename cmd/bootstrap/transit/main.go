@@ -1,20 +1,55 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
-	"fmt"
-	"os"
 	"flag"
+	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
+	"os"
+	"path/filepath"
 
-	"golang.org/x/crypto/nacl/box"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"golang.org/x/crypto/nacl/box"
+	"cloud.google.com/go/storage"
 )
 
 const (
-	FilenameTransitKeyPub = "%v.transit-key.pub"
-	FilenameTransitKeyPriv = "%v.transit-key.priv"
+	FilenameTransitKeyPub      = "%v.transit-key.pub"
+	FilenameTransitKeyPriv     = "%v.transit-key.priv"
+	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv+".enc"
 )
+
+const fileMode = os.FileMode(0644)
+
+const flowBucket = "flow-genesis-bootstrap"
+
+var (
+	filesToUpload = []string{
+		FilenameTransitKeyPub,
+		bootstrap.FilenameNodeInfoPub,
+	}
+	filesToDownload = []string{
+		FilenameRandomBeaconCipher,
+		bootstrap.FilenameDKGDataPub,
+		bootstrap.FilenameNodeInfosPub,
+		bootstrap.FilenameGenesisBlock,
+	}
+)
+
+
+var gcsClient *storage.Client
+
+
+func init() {
+	cli, err := storage.NewClient(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to initialize GCS client: %s", err)
+	}
+	gcsClient = cli
+}
 
 func main() {
 
@@ -29,134 +64,151 @@ func main() {
 
 	var err error = nil
 	if pull && push {
-		fmt.Fprintf(stderr, "Only one of -pull or -push may be specified\n")
 		flag.Usage()
-		os.Exit(2)
+		log.Fatal("Only one of -pull or -push may be specified\n")
 	}
 
 	if !(pull || push) {
-		fmt.Fprintf(stderr, "One of -pull or -push must be specified\n")
 		flag.Usage()
-		os.Exit(2)
+		log.Fatal("One of -pull or -push must be specified")
 	}
 
 	if keydir == "" {
-		fmt.Fprintf(stderr, "Access key required\n")
 		flag.Usage()
-		os.Exit(2)
+		log.Fatal("Access key required")
 	}
 
 	nodeId, err := fetchNodeId(bootdir)
 	if err != nil {
-		fmt.Fprintf(stderr, "Could not determine node ID: %s\n", err)
-		os.Exit(1)
+		log.Fatalf("Could not determine node ID: %s\n", err)
 	}
 
 	if push {
-		return runPush()
+		runPush(bootdir, keydir, nodeId)
+		return
 	}
 
 	if pull {
-		return runPull()
+		runPull(bootdir, keydir, nodeId)
+		return
 	}
 }
 
+// Read the NodeID file
 func fetchNodeId(bootdir string) (string, error) {
 	path := filepath.Join(bootdir, bootstrap.FilenameNodeId)
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading file %s: %w", path, err)
+		return "", fmt.Errorf("Error reading file %s: %w", path, err)
 	}
 
 	return string(data), nil
 }
 
-func runPush(bootdir, token) {
-	generateKeys(bootdir)
+func runPush(bootdir, token, nodeId string) {
+	log.Println("Running push")
+	err := generateKeys(bootdir, nodeId)
+	if err != nil {
+		log.Fatalf("Failed to push: %s", err)
+	}
+	for _, file := range filesToUpload {
+		err = bucketUpload(bootdir, fmt.Sprintf(file, nodeId), token)
+		if err != nil {
+			log.Fatalf("Failed to push: %s", err)
+		}
+	}
 }
 
-// generateKeys creates the transit keypair, and also writes them to disk for later
-func generateKeys(bootdir string) (transitPub, transitPriv [32]byte, err error) {
+func runPull(bootdir, token, nodeId string) {
+	log.Println("Running pull")
+	var err error
+	for _, file := range filesToDownload {
+		err = bucketDownload(bootdir, fmt.Sprintf(file, nodeId), token)
+		if err != nil {
+			log.Fatalf("Failed to pull: %s", err)
+		}
+	}
 
-	fmt.Fprintf(os.Stderr, "Generating keypair %s\n", filename)
+	err = unwrapFile(bootdir, nodeId)
+	if err != nil {
+		log.Fatalf("Failed to pull: %s", err)
+	}
+}
+
+// generateKeys creates the transit keypair and writes them to disk for later
+func generateKeys(bootdir, nodeId string) error {
+
+	privPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
+	pubPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
+
+	log.Print("Generating keypair")
 
 	// Generate the keypair
 	priv, pub, err := box.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create keys: %w", err)
+		return fmt.Errorf("Failed to create keys: %w", err)
 	}
 
 	// Write private key file
-	privateFile, err := os.Create(filename + ".priv")
+	err = ioutil.WriteFile(privPath, priv[:], fileMode)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to open %s.priv for writing: %w", filename, err)
-	}
-	defer privateFile.Close()
-
-	_, err = privateFile.Write(priv[:])
-	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to write public key file: %w", err)
+		return fmt.Errorf("Failed to write pivate key file: %w", err)
 	}
 
 	// Write public key file
-	publicFile, err := os.Create(filename + ".pub")
+	err = ioutil.WriteFile(pubPath, pub[:], fileMode)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to open %s.pub for writing: %w", filename, err)
-	}
-	defer publicFile.Close()
-
-	_, err = publicFile.Write(pub[:])
-	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to write public key file: %w", err)
+		return fmt.Errorf("Failed to write public key file: %w", err)
 	}
 
-	return pub, priv, nil
+	return nil
 }
 
-func unwrapFile(filename, keyfile string) error {
+func unwrapFile(bootdir, nodeId string) error {
 
-	ciphertext, err := ioutil.ReadFile(filename)
+	log.Print("Decrypting Random Beacon key")
+
+	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
+	privKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
+	ciphertextPath := filepath.Join(bootdir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, nodeId))
+
+	ciphertext, err := ioutil.ReadFile(ciphertextPath)
 	if err != nil {
-		return fmt.Errorf("Failed to open ciphertext file %s: %w", filename, err)
+		return fmt.Errorf("Failed to open ciphertext file %s: %w", ciphertextPath, err)
 	}
 
-	publicKey, err := ioutil.ReadFile(keyfile+".pub",)
+	publicKey, err := ioutil.ReadFile(pubKeyPath)
 	if err != nil {
-		return fmt.Errorf("Faield to open public keyfile %s.pub: %w", keyfile, err)
+		return fmt.Errorf("Faield to open public keyfile %s: %w", pubKeyPath, err)
 	}
 
-	privateKey, err := ioutil.ReadFile(keyfile+".priv",)
+	privateKey, err := ioutil.ReadFile(privKeyPath)
 	if err != nil {
-		return fmt.Errorf("Faield to open private keyfile %s.priv: %w", keyfile, err)
+		return fmt.Errorf("Faield to open private keyfile %s: %w", privKeyPath, err)
 	}
-
-	outputFile, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("Could not open output file for writing %s: %w", filename, err)
-	}
-	defer outputFile.Close()
-
 
 	// NaCl is picky and wants its type to be exactly a [32]byte, but readfile reads a slice
 	var pubKeyBytes, privKeyBytes [32]byte
 	copy(pubKeyBytes[:], publicKey)
 	copy(privKeyBytes[:], privateKey)
 
-	plaintext := make([]byte, 0, len(ciphertext) - box.AnonymousOverhead)
+	plaintext := make([]byte, 0, len(ciphertext)-box.AnonymousOverhead)
 	plaintext, ok := box.OpenAnonymous(plaintext, ciphertext, &pubKeyBytes, &privKeyBytes)
 	if !ok {
 		return fmt.Errorf("Failed to decrypt ciphertext: unknown error")
 	}
 
-	_, err = outputFile.Write(plaintext)
+	err = ioutil.WriteFile(plaintextPath, plaintext, fileMode)
 	if err != nil {
-		return fmt.Errorf("Failed to write the decrypted file: %w", err)
+		return fmt.Errorf("Failed to write the decrypted file %s: %w", plaintextPath, err)
 	}
 
 	return nil
 }
 
 func wrapFile(inputFile, keyfile, outputFile string) error {
+	//path := 
 	plaintext, err := ioutil.ReadFile(inputFile)
 	if err != nil {
 		return fmt.Errorf("Failed to open plaintext file %s: %w", inputFile, err)
@@ -176,11 +228,64 @@ func wrapFile(inputFile, keyfile, outputFile string) error {
 	var pubKeyBytes [32]byte
 	copy(pubKeyBytes[:], publicKey)
 
-	ciphertext := make([]byte, 0, len(plaintext) + box.AnonymousOverhead)
+	ciphertext := make([]byte, 0, len(plaintext)+box.AnonymousOverhead)
 
 	ciphertext, err = box.SealAnonymous(ciphertext, plaintext, &pubKeyBytes, rand.Reader)
 	if err != nil {
 		return fmt.Errorf("Could not encrypt file: %w", err)
+	}
+
+	//ioutil.WriteFile()
+
+	return nil
+}
+
+func bucketUpload(bootdir, filename, token string) error {
+	path := filepath.Join(bootdir, filename)
+	log.Printf("Uploading %s\n", path)
+	ctx := context.Background()
+	
+	upload := gcsClient.Bucket(flowBucket).
+		Object(filepath.Join(token, filename)).
+		NewWriter(ctx)
+	defer upload.Close()
+
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("Error opening upload file: %w", err)
+	}
+	defer file.Close()
+
+	_, err = io.Copy(upload, file)
+	if err != nil {
+		return fmt.Errorf("Error uploading file: %w", err)
+	}
+
+	return nil
+}
+
+func bucketDownload(bootdir, filename, token string) error {
+	path := filepath.Join(bootdir, filename)
+	log.Printf("Uploading %s\n", path)
+	ctx := context.Background()
+	
+	download, err := gcsClient.Bucket(flowBucket).
+		Object(filepath.Join(token, filename)).
+		NewReader(ctx)
+	if err != nil {
+		return fmt.Errorf("Error creating GCS object reader: %w", err)
+	}
+	defer download.Close()
+
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("Error creating download file: %w", err)
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, download)
+	if err != nil {
+		return fmt.Errorf("Error downloading file: %w", err)
 	}
 
 	return nil
