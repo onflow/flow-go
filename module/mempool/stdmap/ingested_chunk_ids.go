@@ -2,6 +2,7 @@ package stdmap
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/model"
 )
 
 // IngestedChunkIDs represents a concurrency-safe memory pool for ingested chunk IDs.
@@ -23,8 +24,9 @@ func NewIngestedChunkIDs(limit uint) (*IngestedChunkIDs, error) {
 // Add will add the given chunk ID to the memory pool or it will error if
 // the chunk ID is already in the memory pool.
 func (i *IngestedChunkIDs) Add(chunk *flow.Chunk) error {
-	id := &IngestedChunkID{
-		ChunkID: chunk.ID(),
+	// wraps chunk ID around an ID entity to be stored in the mempool
+	id := &model.IdEntity{
+		Id: chunk.ID(),
 	}
 	return i.Backend.Add(id)
 }
@@ -45,8 +47,8 @@ func (i *IngestedChunkIDs) All() flow.IdentifierList {
 	entities := i.Backend.All()
 	chunkIDs := make([]flow.Identifier, 0, len(entities))
 	for _, entity := range entities {
-		id := entity.(IngestedChunkID)
-		chunkIDs = append(chunkIDs, id.ChunkID)
+		idEntity := entity.(model.IdEntity)
+		chunkIDs = append(chunkIDs, idEntity.Id)
 	}
 	return chunkIDs
 }
