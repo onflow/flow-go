@@ -8,80 +8,109 @@ import (
 	"io/ioutil"
 
 	"golang.org/x/crypto/nacl/box"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
+)
+
+const (
+	FilenameTransitKeyPub = "%v.transit-key.pub"
+	FilenameTransitKeyPriv = "%v.transit-key.priv"
 )
 
 func main() {
 
-	var ciphertext, keyfile, keyInFile string
-	var mode string
+	var bootdir, keydir string
+	var pull, push bool
 
-	plaintextFile := "random-beacon-key"
-
-	flag.StringVar(&keyInFile, "key", "transit-key", "The name of the keypair files generated without the pub/priv suffix")
-	flag.StringVar(&ciphertext, "encrypted-file", "random-beacon-key.enc", "Wrapped random beacon key input file")
-	flag.StringVar(&keyfile, "create-key", "transit-key", "The name of the keypair files to generate")
-	flag.StringVar(&mode, "mode", "decrypt", "One of [decrypt, gen-keys]")
+	flag.StringVar(&bootdir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
+	flag.StringVar(&keydir, "k", "", "Key provided by the Flow team to access the transit server")
+	flag.BoolVar(&pull, "pull", false, "Fetch keys and metadata from the transit server")
+	flag.BoolVar(&push, "push", false, "Upload public keys to the transit server")
 	flag.Parse()
 
 	var err error = nil
-	switch mode {
-	case "decrypt":
-		err = unwrapFile(ciphertext, keyInFile)
-	case "gen-keys":
-		err = generateKeys(keyfile)
-	case "encrypt":
-		fmt.Println("What are you trying to encrypt? RTFM dude.")
-		os.Exit(13)
-		return
-	case "wrap-file":
-		err = wrapFile(plaintextFile, keyInFile, ciphertext)
-	default:
+	if pull && push {
+		fmt.Fprintf(stderr, "Only one of -pull or -push may be specified\n")
 		flag.Usage()
-		return
+		os.Exit(2)
 	}
 
+	if !(pull || push) {
+		fmt.Fprintf(stderr, "One of -pull or -push must be specified\n")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	if keydir == "" {
+		fmt.Fprintf(stderr, "Access key required\n")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	nodeId, err := fetchNodeId(bootdir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
+		fmt.Fprintf(stderr, "Could not determine node ID: %s\n", err)
 		os.Exit(1)
 	}
 
+	if push {
+		return runPush()
+	}
+
+	if pull {
+		return runPull()
+	}
 }
 
-func generateKeys(filename string) error {
+func fetchNodeId(bootdir string) (string, error) {
+	path := filepath.Join(bootdir, bootstrap.FilenameNodeId)
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading file %s: %w", path, err)
+	}
+
+	return string(data), nil
+}
+
+func runPush(bootdir, token) {
+	generateKeys(bootdir)
+}
+
+// generateKeys creates the transit keypair, and also writes them to disk for later
+func generateKeys(bootdir string) (transitPub, transitPriv [32]byte, err error) {
 
 	fmt.Fprintf(os.Stderr, "Generating keypair %s\n", filename)
 
 	// Generate the keypair
 	priv, pub, err := box.GenerateKey(rand.Reader)
 	if err != nil {
-		return fmt.Errorf("Failed to create keys: %w", err)
+		return nil, nil, fmt.Errorf("Failed to create keys: %w", err)
 	}
 
 	// Write private key file
 	privateFile, err := os.Create(filename + ".priv")
 	if err != nil {
-		return fmt.Errorf("Failed to open %s.priv for writing: %w", filename, err)
+		return nil, nil, fmt.Errorf("Failed to open %s.priv for writing: %w", filename, err)
 	}
 	defer privateFile.Close()
 
 	_, err = privateFile.Write(priv[:])
 	if err != nil {
-		return fmt.Errorf("Failed to write public key file: %w", err)
+		return nil, nil, fmt.Errorf("Failed to write public key file: %w", err)
 	}
 
 	// Write public key file
 	publicFile, err := os.Create(filename + ".pub")
 	if err != nil {
-		return fmt.Errorf("Failed to open %s.pub for writing: %w", filename, err)
+		return nil, nil, fmt.Errorf("Failed to open %s.pub for writing: %w", filename, err)
 	}
 	defer publicFile.Close()
 
 	_, err = publicFile.Write(pub[:])
 	if err != nil {
-		return fmt.Errorf("Failed to write public key file: %w", err)
+		return nil, nil, fmt.Errorf("Failed to write public key file: %w", err)
 	}
 
-	return nil
+	return pub, priv, nil
 }
 
 func unwrapFile(filename, keyfile string) error {
