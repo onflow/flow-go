@@ -50,23 +50,3 @@ func (i *IngestedChunkIDs) All() flow.IdentifierList {
 	}
 	return chunkIDs
 }
-
-// IngestedChunkID is an internal data structure for IngestedChunIDs mempool that represents
-// chunksIDs as entities so that they can be stored in the mempool
-type IngestedChunkID struct {
-	ChunkID flow.Identifier
-}
-
-// ID implements flow.Entity.ID for Identifier to make it capable of being stored directly
-// in mempools and storage
-// ID returns the identifier itself
-func (id IngestedChunkID) ID() flow.Identifier {
-	return id.ChunkID
-}
-
-// ID implements flow.Entity.ID for Identifier to make it capable of being stored directly
-// in mempools and storage
-// ID returns checksum of identifier
-func (id IngestedChunkID) Checksum() flow.Identifier {
-	return flow.MakeID(id)
-}
