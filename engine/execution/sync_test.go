@@ -47,12 +47,6 @@ func TestSyncFlow(t *testing.T) {
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
 	col4 := flow.Collection{Transactions: []*flow.TransactionBody{&tx4}}
 
-	//collections := map[flow.Identifier]flow.Collection{
-	//	col1.ID(): col1,
-	//	col2.ID(): col2,
-	//	col3.ID(): col3,
-	//}
-
 	//Create three blocks, with one tx each
 	block1 := &flow.Block{
 		Header: flow.Header{
@@ -109,11 +103,6 @@ func TestSyncFlow(t *testing.T) {
 		},
 	}
 
-	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.ParentID)
-	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.ParentID)
-	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.ParentID)
-	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.ParentID)
-
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
 
@@ -134,7 +123,7 @@ func TestSyncFlow(t *testing.T) {
 
 	verificationEngine := new(network.Engine)
 	_, _ = verificationNode.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
-	verificationEngine.On("Submit", exe2ID.NodeID, mock.Anything).
+	verificationEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			identifier, _ := args[0].(flow.Identifier)
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
@@ -145,12 +134,10 @@ func TestSyncFlow(t *testing.T) {
 
 	consensusEngine := new(network.Engine)
 	_, _ = consensusNode.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
-	// should be both exe2 and exe1
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(0)
 
 	// submit block from consensus node
 	exeNode2.IngestionEngine.Submit(conID.NodeID, block1)
-	//time.Sleep(200 * time.Millisecond)
 	exeNode2.IngestionEngine.Submit(conID.NodeID, block2)
 
 	// wait for block2 to be executed on execNode2
@@ -168,9 +155,6 @@ func TestSyncFlow(t *testing.T) {
 	// submit block3 and block4 to exe1 which should trigger sync
 	exeNode1.IngestionEngine.Submit(conID.NodeID, block3)
 	exeNode1.IngestionEngine.Submit(conID.NodeID, block4)
-
-	//verificationEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *flow.ExecutionReceipt) bool { return r.ExecutionResult.BlockID == block3.ID() })).Return(nil)
-	//consensusEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *flow.ExecutionReceipt) bool { return r.ExecutionResult.BlockID == block3.ID() })).Return(nil)
 
 	// wait for block3/4 to be executed on execNode1
 	hub.Eventually(t, func() bool {

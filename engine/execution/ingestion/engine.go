@@ -51,9 +51,10 @@ type Engine struct {
 	mempool            *Mempool
 	execState          state.ExecutionState
 	wg                 sync.WaitGroup
-	syncWg                 sync.WaitGroup
+	syncWg             sync.WaitGroup
 	syncModeThreshold  uint64 //how many consecutive orphaned blocks trigger sync
 	syncInProgress     *atomic.Bool
+	syncTargetBlockID  atomic.Value
 	stateSync          executionSync.StateSynchronizer
 }
 
@@ -734,6 +735,8 @@ func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 
 	targetBlockID := firstKnown.Block.ParentID
 
+	e.syncTargetBlockID.Store(targetBlockID)
+
 	e.log.Info().Msg("starting state synchronisation")
 
 	lastExecutedHeight, lastExecutedBlockID, err := e.execState.GetHighestExecutedBlockID()
@@ -839,6 +842,46 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 			Err(err).Msg("processing sync message produced unexpected state commitment")
 	}
 
+	targetBlockID := e.syncTargetBlockID.Load().(flow.Identifier)
+
+	// last block was saved
+	if targetBlockID == executionStateDelta.Block.ID() {
+
+		e.mempool.Run(func(_ *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
+			var syncedQueue *queue.Queue
+			hadQueue := false
+			for _, q := range orphanQueues.All() {
+				if q.Head.Item.(*entity.ExecutableBlock).Block.ParentID == targetBlockID {
+					syncedQueue = q
+					hadQueue = true
+					break
+				}
+			}
+			if !hadQueue {
+				panic(fmt.Sprintf("orphan queues do not contain final block ID (%s)", targetBlockID))
+			}
+			orphanQueues.Rem(syncedQueue.ID())
+
+			//if the state we generated from applying this is not equal to EndState we would have panicked earlier
+			executableBlock := syncedQueue.Head.Item.(*entity.ExecutableBlock)
+			executableBlock.StartState = executionStateDelta.EndState
+
+			err = executionQueues.Add(syncedQueue)
+			if err != nil {
+				panic(fmt.Sprintf("cannot add queue to execution queues"))
+			}
+			if executableBlock.IsComplete() {
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
+
+				e.wg.Add(1)
+				go e.executeBlock(executableBlock)
+			}
+
+			return nil
+		})
+
+		return
+	}
 
 	err = e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
 
