@@ -90,6 +90,37 @@ func TestView_Set(t *testing.T) {
 		delta := v.Delta()
 		assert.False(t, delta.HasBeenDeleted(registerID))
 	})
+
+	t.Run("SpockSecret", func(t *testing.T) {
+		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+		registerID1 := make([]byte, 32)
+		copy(registerID1, "reg1")
+
+		registerID2 := make([]byte, 32)
+		copy(registerID2, "reg2")
+
+		registerID3 := make([]byte, 32)
+		copy(registerID3, "reg3")
+
+		// this part checks that spocks ordering be based
+		// on update orders and not registerIDs
+		v.Set(registerID2, flow.RegisterValue("1"))
+		v.Set(registerID3, flow.RegisterValue("2"))
+		v.Set(registerID1, flow.RegisterValue("3"))
+		// this part checks that delete functionality
+		// doesn't impact secret
+		v.Delete(registerID1)
+		// this part checks that it always update the
+		// intermediate values and not just the final values
+		v.Set(registerID1, flow.RegisterValue("4"))
+		v.Set(registerID1, flow.RegisterValue("5"))
+		v.Set(registerID3, flow.RegisterValue("6"))
+
+		s := v.SpockSecret()
+		assert.Equal(t, s, []byte("123456"))
+	})
 }
 
 func TestView_Delete(t *testing.T) {

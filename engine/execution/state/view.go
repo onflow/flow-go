@@ -12,16 +12,19 @@ type GetRegisterFunc func(key flow.RegisterID) (flow.RegisterValue, error)
 type View struct {
 	delta Delta
 	// TODO: store reads as set
-	reads    []flow.RegisterID
-	readFunc GetRegisterFunc
+	reads []flow.RegisterID
+	// SpocksSecret keeps the secret used for SPoCKs
+	spockSecret []byte
+	readFunc    GetRegisterFunc
 }
 
 // NewView instantiates a new ledger view with the provided read function.
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
-		delta:    NewDelta(),
-		reads:    make([]flow.RegisterID, 0),
-		readFunc: readFunc,
+		delta:       NewDelta(),
+		reads:       make([]flow.RegisterID, 0),
+		spockSecret: make([]byte, 0),
+		readFunc:    readFunc,
 	}
 }
 
@@ -53,6 +56,9 @@ func (r *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
 
 // Set sets a register value in this view.
 func (r *View) Set(key flow.RegisterID, value flow.RegisterValue) {
+	// every time we write something to delta (order preserving)
+	// we append the value to the end of the SpocksSecret byte slice
+	r.spockSecret = append(r.spockSecret, value...)
 	r.delta.Set(key, value)
 }
 
@@ -76,7 +82,7 @@ func (r *View) Reads() []flow.RegisterID {
 	return r.reads
 }
 
-// AllRegisters returns all the register IDs ether in read or delta
+// AllRegisters returns all the register IDs either in read or delta
 func (r *View) AllRegisters() []flow.RegisterID {
 	set := make(map[string]bool, len(r.reads)+len(r.delta))
 	for _, reg := range r.reads {
@@ -90,4 +96,9 @@ func (r *View) AllRegisters() []flow.RegisterID {
 		ret = append(ret, flow.RegisterID(r))
 	}
 	return ret
+}
+
+// SpockSecret returns the secret value for SPoCK
+func (r *View) SpockSecret() []byte {
+	return r.spockSecret
 }
