@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
@@ -21,7 +22,7 @@ func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 	return flow.AccountPrivateKey{
 		PrivateKey: priv,
 		SignAlgo:   crypto.ECDSA_SECp256k1,
-		HashAlgo:   crypto.SHA2_256,
+		HashAlgo:   hash.SHA2_256,
 	}, nil
 }
 

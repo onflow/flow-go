@@ -17,7 +17,7 @@ const (
 	RoleConsensus    Role = 2
 	RoleExecution    Role = 3
 	RoleVerification Role = 4
-	RoleObservation  Role = 5
+	RoleAccess       Role = 5
 )
 
 // String returns a string version of role.
@@ -31,8 +31,8 @@ func (r Role) String() string {
 		return "execution"
 	case RoleVerification:
 		return "verification"
-	case RoleObservation:
-		return "observation"
+	case RoleAccess:
+		return "access"
 	default:
 		panic(fmt.Sprintf("invalid role (%d)", r))
 	}
@@ -49,8 +49,8 @@ func ParseRole(role string) (Role, error) {
 		return RoleExecution, nil
 	case "verification":
 		return RoleVerification, nil
-	case "observation":
-		return RoleObservation, nil
+	case "access":
+		return RoleAccess, nil
 	default:
 		return 0, errors.Errorf("invalid role string (%s)", role)
 	}

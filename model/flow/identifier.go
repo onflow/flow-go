@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/storage/merkle"
 )
@@ -69,7 +70,7 @@ func HashToID(hash []byte) Identifier {
 // MakeID creates an ID from the hash of encoded data.
 func MakeID(body interface{}) Identifier {
 	data := encoding.DefaultEncoder.MustEncode(body)
-	hasher := crypto.NewSHA3_256()
+	hasher := hash.NewSHA3_256()
 	hash := hasher.ComputeHash(data)
 	return HashToID(hash)
 }
@@ -80,7 +81,7 @@ func PublicKeyToID(pub crypto.PublicKey) (Identifier, error) {
 	if err != nil {
 		return Identifier{}, err
 	}
-	hasher := crypto.NewSHA3_256()
+	hasher := hash.NewSHA3_256()
 	hash := hasher.ComputeHash(b)
 	return HashToID(hash), nil
 }
@@ -120,7 +121,7 @@ func CheckMerkleRoot(root Identifier, ids ...Identifier) bool {
 
 func ConcatSum(ids ...Identifier) Identifier {
 	var sum Identifier
-	hasher := crypto.NewSHA3_256()
+	hasher := hash.NewSHA3_256()
 	for _, id := range ids {
 		_, _ = hasher.Write(id[:])
 	}

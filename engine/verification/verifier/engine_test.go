@@ -1,6 +1,7 @@
 package verifier_test
 
 import (
+	"crypto/rand"
 	"errors"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/test"
@@ -33,7 +35,7 @@ type VerifierEngineTestSuite struct {
 	ss      *protocol.Snapshot
 	me      *MockLocal
 	sk      crypto.PrivateKey
-	hasher  crypto.Hasher
+	hasher  hash.Hasher
 	conduit *network.Conduit // mocks conduit for submitting result approvals
 }
 
@@ -57,9 +59,11 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	// Mocks the signature oracle of the engine
 	//
 	// generates signing and verification keys
-	seed := []byte{1, 2, 3, 4}
-	h, _ := crypto.NewHasher(crypto.SHA3_384)
-	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, h.ComputeHash(seed))
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLS_BLS12381)
+	n, err := rand.Read(seed)
+	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBLS_BLS12381)
+	require.NoError(suite.T(), err)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
 	require.NoError(suite.T(), err)
 	suite.sk = sk
 	// tag of hasher should be the same as the tag of engine's hasher
@@ -196,7 +200,7 @@ func (m *MockLocal) Address() string {
 	return ""
 }
 
-func (m *MockLocal) Sign(msg []byte, hasher crypto.Hasher) (crypto.Signature, error) {
+func (m *MockLocal) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, error) {
 	return m.sk.Sign(msg, hasher)
 }
 

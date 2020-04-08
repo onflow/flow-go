@@ -30,6 +30,7 @@ func main() {
 	var (
 		stateCommitments   storage.Commits
 		ledgerStorage      storage.Ledger
+		events             storage.Events
 		providerEngine     *provider.Engine
 		computationManager *computation.Manager
 		ingestionEng       *ingestion.Engine
@@ -126,7 +127,7 @@ func main() {
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, events)
 			return rpcEng, nil
 		}).Run()
 

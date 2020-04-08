@@ -187,8 +187,6 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 	qc, err := bootstraprun.GenerateGenesisQC(signerData, &genesis)
 	require.Nil(t, err)
 
-	// TODO private random beacon key files
-
 	// create a temporary directory to store all bootstrapping files, these
 	// will be shared between all nodes
 	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
@@ -202,7 +200,14 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkg.Public())
 	require.Nil(t, err)
 
-	// write keyfiles for each node
+	// write private key files for each DKG participant
+	for _, part := range dkg.Participants {
+		filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, part.NodeID)
+		err = writeJSON(filepath.Join(bootstrapDir, filename), part.Private())
+		require.Nil(t, err)
+	}
+
+	// write private key files for each node
 	for _, nodeConfig := range confs {
 		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, nodeConfig.NodeID))
 
@@ -289,7 +294,7 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 		nodeContainer.bindPort(hostPort, containerPort)
 
 		nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(hostPort))
+		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 		nodeContainer.Ports[ColNodeAPIPort] = hostPort
 
 	case flow.RoleExecution:
@@ -300,7 +305,7 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 		nodeContainer.bindPort(hostPort, containerPort)
 
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckGRPC(hostPort))
+		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 		nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 
 		// create directories for execution state trie and values in the tmp

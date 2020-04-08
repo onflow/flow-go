@@ -2,16 +2,11 @@
 
 package flow
 
-import (
-	"github.com/dapperlabs/flow-go/crypto"
-)
-
 type Seal struct {
 	BlockID           Identifier
 	ExecutionResultID Identifier
 	PreviousState     StateCommitment
 	FinalState        StateCommitment
-	Signature         crypto.Signature
 }
 
 func (s Seal) Body() interface{} {

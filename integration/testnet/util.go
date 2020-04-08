@@ -8,17 +8,32 @@ import (
 	"io/ioutil"
 	"os/user"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// healthcheckGRPC returns a Docker healthcheck function that pings the GRPC
+// healthcheckAccessGRPC returns a Docker healthcheck function that pings the Access node GRPC
 // service exposed at the given port.
-func healthcheckGRPC(apiPort string) func() error {
+func healthcheckAccessGRPC(apiPort string) func() error {
 	return func() error {
 		fmt.Println("healthchecking...")
-		c, err := client.New(fmt.Sprintf(":%s", apiPort))
+		c, err := client.NewAccessClient(fmt.Sprintf(":%s", apiPort))
+		if err != nil {
+			return err
+		}
+
+		return c.Ping(context.Background())
+	}
+}
+
+// healthcheckExecutionGRPC returns a Docker healthcheck function that pings the Execution node GRPC
+// service exposed at the given port.
+func healthcheckExecutionGRPC(apiPort string) func() error {
+	return func() error {
+		fmt.Println("healthchecking...")
+		c, err := client.NewExecutionClient(fmt.Sprintf(":%s", apiPort))
 		if err != nil {
 			return err
 		}
@@ -56,9 +71,9 @@ func toNodeInfoList(confs []ContainerConfig) []bootstrap.NodeInfo {
 func getSeeds(n int) ([][]byte, error) {
 	seeds := make([][]byte, n)
 	for i := 0; i < n; i++ {
-		seed := make([]byte, 48)
-		_, err := rand.Read(seed)
-		if err != nil {
+		seed := make([]byte, crypto.SeedMinLenDKG)
+		n, err := rand.Read(seed)
+		if err != nil || n != crypto.SeedMinLenDKG {
 			return nil, err
 		}
 

@@ -1,12 +1,12 @@
 package hash
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // DefaultHasher is the default hasher used by Flow.
-var DefaultHasher crypto.Hasher
+var DefaultHasher hash.Hasher
 
 func init() {
-	DefaultHasher = crypto.NewSHA3_256()
+	DefaultHasher = hash.NewSHA3_256()
 }

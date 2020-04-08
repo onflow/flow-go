@@ -65,7 +65,7 @@ func init() {
 	rootCmd.AddCommand(keyCmd)
 
 	keyCmd.Flags().StringVar(&flagRole, "role", "",
-		"node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"observation\")")
+		"node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"access\")")
 	_ = keyCmd.MarkFlagRequired("role")
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
@@ -79,7 +79,7 @@ func validateRole(role string) flow.Role {
 	parsed, err := flow.ParseRole(role)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unsupported role, allowed values: \"collection\", \"consensus\", \"execution\", " +
-			"\"verification\" or \"observation\"")
+			"\"verification\" or \"access\"")
 	}
 	return parsed
 }

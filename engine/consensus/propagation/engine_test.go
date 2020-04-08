@@ -168,7 +168,7 @@ func TestPropagateCollectionGuarantee(t *testing.T) {
 		case 3:
 			role = flow.RoleVerification
 		case 4:
-			role = flow.RoleObservation
+			role = flow.RoleAccess
 		}
 		identity := &flow.Identity{
 			NodeID:  nodeID,

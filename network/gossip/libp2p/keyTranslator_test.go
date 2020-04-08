@@ -143,7 +143,8 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 func (k *KeyTranslatorTestSuite) createSeed() []byte {
 	seedLen := int(math.Max(fcrypto.KeyGenSeedMinLenECDSA_P256, fcrypto.KeyGenSeedMinLenECDSA_SECp256k1))
 	seed := make([]byte, seedLen)
-	_, err := rand.Read(seed)
+	n, err := rand.Read(seed)
 	require.NoError(k.T(), err)
+	require.Equal(k.T(), n, seedLen)
 	return seed
 }
