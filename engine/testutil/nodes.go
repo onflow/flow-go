@@ -316,6 +316,16 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
+	if node.IngestedChunkIDs == nil {
+		node.IngestedChunkIDs, err = stdmap.NewIngestedChunkIDs(1000)
+		require.Nil(t, err)
+	}
+
+	if node.IngestedResultIDs == nil {
+		node.IngestedResultIDs, err = stdmap.NewIngestedResultIDs(1000)
+		require.Nil(t, err)
+	}
+
 	if node.IngestEngine == nil {
 		node.IngestEngine, err = ingest.New(node.Log,
 			node.Net,
@@ -331,6 +341,8 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.ChunkStateTracker,
 			node.ChunkDataPacks,
 			node.ChunkDataPackTrackers,
+			node.IngestedChunkIDs,
+			node.IngestedResultIDs,
 			node.BlockStorage,
 			assigner)
 		require.Nil(t, err)

@@ -41,13 +41,13 @@ func (_m *IngestedChunkIDs) All() flow.IdentifierList {
 	return r0
 }
 
-// Has provides a mock function with given fields: chunk
-func (_m *IngestedChunkIDs) Has(chunk *flow.Chunk) bool {
-	ret := _m.Called(chunk)
+// Has provides a mock function with given fields: chunkID
+func (_m *IngestedChunkIDs) Has(chunkID flow.Identifier) bool {
+	ret := _m.Called(chunkID)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*flow.Chunk) bool); ok {
-		r0 = rf(chunk)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(chunkID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}

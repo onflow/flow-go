@@ -103,6 +103,8 @@ type VerificationNode struct {
 	ChunkStateTracker     mempool.ChunkStateTrackers
 	ChunkDataPacks        mempool.ChunkDataPacks
 	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
+	IngestedChunkIDs      mempool.IngestedChunkIDs
+	IngestedResultIDs     mempool.IngestedResultIDs
 	IngestEngine          *ingest.Engine
 	VerifierEngine        network.Engine
 }

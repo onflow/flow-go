@@ -9,7 +9,7 @@ import (
 // Ingest engine to the Verify engine of Verification node
 type IngestedChunkIDs interface {
 	// Has checks whether the mempool has the chunk ID
-	Has(chunk *flow.Chunk) bool
+	Has(chunkID flow.Identifier) bool
 
 	// Add will add the given chunk ID to the memory pool or it will error if
 	// the chunk ID is already in the memory pool.
