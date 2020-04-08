@@ -172,7 +172,7 @@ func TestView_Delete(t *testing.T) {
 	})
 }
 
-func TestView_ApplyDelta(t *testing.T) {
+func TestView_MergeView(t *testing.T) {
 	registerID1 := make([]byte, 32)
 	copy(registerID1, "fruit")
 
@@ -184,11 +184,11 @@ func TestView_ApplyDelta(t *testing.T) {
 			return nil, nil
 		})
 
-		d := state.NewDelta()
-		d.Set(registerID1, flow.RegisterValue("apple"))
-		d.Set(registerID2, flow.RegisterValue("carrot"))
+		chView := v.NewChild()
+		chView.Set(registerID1, flow.RegisterValue("apple"))
+		chView.Set(registerID2, flow.RegisterValue("carrot"))
 
-		v.ApplyDelta(d)
+		v.MergeView(chView)
 
 		b1, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -207,9 +207,8 @@ func TestView_ApplyDelta(t *testing.T) {
 		v.Set(registerID1, flow.RegisterValue("apple"))
 		v.Set(registerID2, flow.RegisterValue("carrot"))
 
-		d := state.NewDelta()
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		v.MergeView(chView)
 
 		b1, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -227,10 +226,9 @@ func TestView_ApplyDelta(t *testing.T) {
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 
-		d := state.NewDelta()
-		d.Set(registerID2, flow.RegisterValue("carrot"))
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		chView.Set(registerID2, flow.RegisterValue("carrot"))
+		v.MergeView(chView)
 
 		b1, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -248,10 +246,9 @@ func TestView_ApplyDelta(t *testing.T) {
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 
-		d := state.NewDelta()
-		d.Set(registerID1, flow.RegisterValue("orange"))
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		chView.Set(registerID1, flow.RegisterValue("orange"))
+		v.MergeView(chView)
 
 		b, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -266,10 +263,9 @@ func TestView_ApplyDelta(t *testing.T) {
 		v.Set(registerID1, flow.RegisterValue("apple"))
 		v.Delete(registerID1)
 
-		d := state.NewDelta()
-		d.Set(registerID1, flow.RegisterValue("orange"))
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		chView.Set(registerID1, flow.RegisterValue("orange"))
+		v.MergeView(chView)
 
 		b, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -283,10 +279,9 @@ func TestView_ApplyDelta(t *testing.T) {
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 
-		d := state.NewDelta()
-		d.Delete(registerID1)
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		chView.Delete(registerID1)
+		v.MergeView(chView)
 
 		b, err := v.Get(registerID1)
 		assert.NoError(t, err)

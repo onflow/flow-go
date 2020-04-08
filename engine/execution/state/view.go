@@ -74,9 +74,10 @@ func (v *View) Delta() Delta {
 	return v.delta
 }
 
-// ApplyDelta applies the changes from a delta to this view.
-func (v *View) ApplyDelta(delta Delta) {
-	v.delta.MergeWith(delta)
+// MergeView applies the changes from a the given view to this view.
+func (v *View) MergeView(child *View) {
+	v.spockSecret = append(v.spockSecret, child.spockSecret...)
+	v.delta.MergeWith(child.delta)
 }
 
 // Reads returns the register IDs read by this view.
