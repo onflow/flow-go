@@ -10,9 +10,8 @@ type GetRegisterFunc func(key flow.RegisterID) (flow.RegisterValue, error)
 // A ledger view records writes to a delta that can be used to update the
 // underlying data source.
 type View struct {
-	delta Delta
-	// TODO: store reads as set
-	reads []flow.RegisterID
+	delta       Delta
+	regTouchSet map[string]bool
 	// SpocksSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing SpocksSecret
 	// for views other than collection views to improve performance
@@ -24,7 +23,7 @@ type View struct {
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
 		delta:       NewDelta(),
-		reads:       make([]flow.RegisterID, 0),
+		regTouchSet: make(map[string]bool, 0),
 		spockSecret: make([]byte, 0),
 		readFunc:    readFunc,
 	}
@@ -50,8 +49,8 @@ func (v *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
 		return nil, err
 	}
 
-	// record read
-	v.reads = append(v.reads, key)
+	// capture register touch
+	v.regTouchSet[string(key)] = true
 
 	return value, nil
 }
@@ -61,6 +60,9 @@ func (v *View) Set(key flow.RegisterID, value flow.RegisterValue) {
 	// every time we write something to delta (order preserving)
 	// we append the value to the end of the SpocksSecret byte slice
 	v.spockSecret = append(v.spockSecret, value...)
+	// capture register touch
+	v.regTouchSet[string(key)] = true
+	// add key value to delta
 	v.delta.Set(key, value)
 }
 
@@ -75,27 +77,21 @@ func (v *View) Delta() Delta {
 }
 
 // MergeView applies the changes from a the given view to this view.
+// TODO rename this, this is not actually a merge as we can't merge
+// readFunc s.
 func (v *View) MergeView(child *View) {
+	for k := range child.RegisterTouches() {
+		v.regTouchSet[string(k)] = true
+	}
+	// SpockSecret is order aware
 	v.spockSecret = append(v.spockSecret, child.spockSecret...)
 	v.delta.MergeWith(child.delta)
 }
 
-// Reads returns the register IDs read by this view.
-func (v *View) Reads() []flow.RegisterID {
-	return v.reads
-}
-
-// AllRegisters returns all the register IDs either in read or delta
-func (v *View) AllRegisters() []flow.RegisterID {
-	set := make(map[string]bool, len(v.reads)+len(v.delta))
-	for _, reg := range v.reads {
-		set[string(reg)] = true
-	}
-	for _, reg := range v.delta.RegisterIDs() {
-		set[string(reg)] = true
-	}
-	ret := make([]flow.RegisterID, 0, len(set))
-	for r := range set {
+// RegisterTouches returns the register IDs touched by this view (either read or write)
+func (v *View) RegisterTouches() []flow.RegisterID {
+	ret := make([]flow.RegisterID, 0, len(v.regTouchSet))
+	for r := range v.regTouchSet {
 		ret = append(ret, flow.RegisterID(r))
 	}
 	return ret

@@ -289,7 +289,7 @@ func TestView_MergeView(t *testing.T) {
 	})
 }
 
-func TestView_Reads(t *testing.T) {
+func TestView_RegisterTouches(t *testing.T) {
 	registerID1 := make([]byte, 32)
 	copy(registerID1, "fruit")
 
@@ -301,27 +301,11 @@ func TestView_Reads(t *testing.T) {
 	})
 
 	t.Run("Empty", func(t *testing.T) {
-		reads := v.Reads()
-		assert.Empty(t, reads)
+		touches := v.RegisterTouches()
+		assert.Empty(t, touches)
 	})
 
-	t.Run("ValueInCache", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-
-		v.Set(registerID1, flow.RegisterValue("apple"))
-
-		// cache reads are not recorded
-		_, err := v.Get(registerID1)
-		assert.NoError(t, err)
-
-		// read list should be empty
-		reads := v.Reads()
-		assert.Empty(t, reads)
-	})
-
-	t.Run("ValuesNotInCache", func(t *testing.T) {
+	t.Run("Set and Get", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			if bytes.Equal(key, registerID1) {
 				return flow.RegisterValue("orange"), nil
@@ -337,13 +321,12 @@ func TestView_Reads(t *testing.T) {
 		_, err := v.Get(registerID1)
 		assert.NoError(t, err)
 
-		_, err = v.Get(registerID2)
-		assert.NoError(t, err)
+		v.Set(registerID2, flow.RegisterValue("apple"))
 
-		reads := v.Reads()
-		assert.Len(t, reads, 2)
+		touches := v.RegisterTouches()
+		assert.Len(t, touches, 2)
 
-		assert.Equal(t, registerID1, reads[0])
-		assert.Equal(t, registerID2, reads[1])
+		assert.Equal(t, registerID1, touches[0])
+		assert.Equal(t, registerID2, touches[1])
 	})
 }
