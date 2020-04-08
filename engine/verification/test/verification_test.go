@@ -62,36 +62,14 @@ func TestHappyPath(t *testing.T) {
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
 	exeEngine := new(network.Engine)
-	exeChunkStateConduit, err := exeNode.Net.Register(engine.ExecutionStateProvider, exeEngine)
 	assert.Nil(t, err)
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
-	exeChunkStateSeen := make(map[flow.Identifier]struct{})
 	exeChunkDataSeen := make(map[flow.Identifier]struct{})
 
 	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			if req, ok := args[1].(*messages.ExecutionStateRequest); ok {
-				require.True(t, ok)
-				for i := 0; i < chunkNum; i++ {
-					chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
-					if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
-						// each assigned chunk state should be requested only once
-						_, ok := exeChunkStateSeen[chunkID]
-						require.False(t, ok)
-						exeChunkStateSeen[chunkID] = struct{}{}
-
-						// publishes the execution state response to the network
-						res := &messages.ExecutionStateResponse{
-							State: *completeER.ChunkStates[i],
-						}
-						err := exeChunkStateConduit.Submit(res, verIdentity.NodeID)
-						assert.Nil(t, err)
-						return
-					}
-				}
-				require.Error(t, fmt.Errorf(" requested an unidentifed chunk state %v", req))
-			} else if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
+			if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
 				require.True(t, ok)
 				for i := 0; i < chunkNum; i++ {
 					chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
@@ -177,15 +155,6 @@ func TestHappyPath(t *testing.T) {
 	exeNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.ExecutionStateProvider
 	})
-
-	// only assigned chunks state should be added to the mempool
-	for i := 0; i < chunkNum; i++ {
-		if isAssigned(i, chunkNum) {
-			assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
-		} else {
-			assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
-		}
-	}
 
 	// flush the collection request
 	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {

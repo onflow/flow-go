@@ -99,8 +99,6 @@ type VerificationNode struct {
 	AuthCollections       mempool.Collections
 	PendingCollections    mempool.PendingCollections
 	CollectionTrackers    mempool.CollectionTrackers
-	ChunkStates           mempool.ChunkStates
-	ChunkStateTracker     mempool.ChunkStateTrackers
 	ChunkDataPacks        mempool.ChunkDataPacks
 	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
 	IngestEngine          *ingest.Engine

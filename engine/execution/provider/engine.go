@@ -113,40 +113,40 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages.ExecutionStateRequest) error {
-	chunkID := req.ChunkID
+// func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages.ExecutionStateRequest) error {
+// 	chunkID := req.ChunkID
 
-	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("received execution state request")
+// 	e.log.Info().
+// 		Hex("origin_id", logging.ID(originID)).
+// 		Hex("chunk_id", logging.ID(chunkID)).
+// 		Msg("received execution state request")
 
-	id, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", id, err)
-	}
+// 	id, err := e.state.Final().Identity(originID)
+// 	if err != nil {
+// 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+// 	}
 
-	if id.Role != flow.RoleVerification {
-		return fmt.Errorf("invalid role for requesting execution state: %s", id.Role)
-	}
+// 	if id.Role != flow.RoleVerification {
+// 		return fmt.Errorf("invalid role for requesting execution state: %s", id.Role)
+// 	}
 
-	registers, err := e.execState.GetChunkRegisters(chunkID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve chunk state (id=%s): %w", chunkID, err)
-	}
+// 	registers, err := e.execState.GetChunkRegisters(chunkID)
+// 	if err != nil {
+// 		return fmt.Errorf("could not retrieve chunk state (id=%s): %w", chunkID, err)
+// 	}
 
-	msg := &messages.ExecutionStateResponse{State: flow.ChunkState{
-		ChunkID:   chunkID,
-		Registers: registers,
-	}}
+// 	msg := &messages.ExecutionStateResponse{State: flow.ChunkState{
+// 		ChunkID:   chunkID,
+// 		Registers: registers,
+// 	}}
 
-	err = e.execStateCon.Submit(msg, id.NodeID)
-	if err != nil {
-		return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
-	}
+// 	err = e.execStateCon.Submit(msg, id.NodeID)
+// 	if err != nil {
+// 		return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // handleChunkDataPackRequest receives a request for the chunk data pack associated with chunkID from the
 // requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
