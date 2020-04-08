@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
-	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -431,17 +429,6 @@ func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *mess
 				Hex("block_id", logging.ID(delta.Block.ID())).
 				Msg("sending block delta")
 
-			// TODO: include full block (header + payload) in response?
-			//msg := &messages.ExecutionStateDelta{
-			//	BlockID: blockID,
-			//	Delta:   delta,
-			//}
-			//
-			time.Sleep(100 * time.Millisecond)
-
-			spew.Dump(delta)
-			time.Sleep(100 * time.Millisecond)
-
 			err := e.syncConduit.Submit(delta, originID)
 			if err != nil {
 				return fmt.Errorf("could not submit block delta: %w", err)
@@ -575,10 +562,6 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 }
 
 func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Interactions, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
-
-	time.Sleep(100 * time.Millisecond)
-	spew.Dump(stateInteractions)
-	time.Sleep(100 * time.Millisecond)
 
 	originalState := startState
 
@@ -776,10 +759,6 @@ func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 func (e *Engine) handleExecutionStateDelta(executionStateDelta *messages.ExecutionStateDelta, originID flow.Identifier) error {
 
 	e.log.Debug().Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("received sync delta")
-
-	time.Sleep(100 * time.Millisecond)
-	spew.Dump(executionStateDelta)
-	time.Sleep(100 * time.Millisecond)
 
 	return e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
 
