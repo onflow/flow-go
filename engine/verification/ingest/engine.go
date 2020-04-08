@@ -44,6 +44,8 @@ type Engine struct {
 	collectionTrackers   mempool.CollectionTrackers    // keeps track of collection requests that this engine made
 	chunkDataPacks       mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
 	chunkDataPackTackers mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
+	ingestedResultIDs    mempool.IngestedResultIDs     // keeps ids of ingested execution results
+	ingestedChunkIDs     mempool.IngestedChunkIDs      // keeps ids of ingested chunks
 	blockStorage         storage.Blocks
 	checkChunksLock      sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
 	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
@@ -67,6 +69,8 @@ func New(
 	chunkStateTrackers mempool.ChunkStateTrackers,
 	chunkDataPacks mempool.ChunkDataPacks,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
+	ingestedChunkIDs mempool.IngestedChunkIDs,
+	ingestedResultIDs mempool.IngestedResultIDs,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
 ) (*Engine, error) {
@@ -86,6 +90,8 @@ func New(
 		chunkStateTrackers:   chunkStateTrackers,
 		chunkDataPacks:       chunkDataPacks,
 		chunkDataPackTackers: chunkDataPackTrackers,
+		ingestedChunkIDs:     ingestedChunkIDs,
+		ingestedResultIDs:    ingestedResultIDs,
 		blockStorage:         blockStorage,
 		assigner:             assigner,
 	}
@@ -638,8 +644,12 @@ func (e *Engine) checkPendingChunks() {
 			e.log.Error().
 				Err(err).
 				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-				Msg("could not fetch the assigned chunks")
+				Msg("could not fetch assigned chunks")
 			continue
+		}
+
+		if len(mychunks) == 0 {
+
 		}
 
 		for _, chunk := range mychunks {
@@ -700,17 +710,28 @@ func (e *Engine) checkPendingChunks() {
 			// clean up would be something like this:
 			// cleans the execution receipt from receipts mempool
 			// cleans block form blocks mempool
-			// cleans all chunk states from chunkStates mempool
-			// for now, we clean the mempool from only the collection, as otherwise
-			// ingest engine sends the chunk corresponding to this collection everytime
-			// this function gets called, since it has everything that is needed to verify this
+
+			// marks this chunk as ingested
+			err = e.ingestedChunkIDs.Add(chunk)
+			if err != nil {
+				e.log.Error().
+					Err(err).
+					Hex("chunk", logging.Entity(chunk)).
+					Msg("could not add chunk to ingested chunks mempool")
+			}
+
+			// cleans up resources of the ingested chunk from mempools
 			e.authCollections.Rem(collection.ID())
+			e.chunkStates.Rem(chunkState.ID())
+			e.chunkDataPacks.Rem(chunkDatapack.ID())
+
 		}
 	}
 }
 
 // myChunks returns the list of chunks in the chunk list that this verifier node
-// is assigned to
+// is assigned to, and are not ingested yet. A chunk is ingested once a verifiable chunk is
+// formed out of it and is passed to verify engine
 func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 
 	// extracts list of verifier nodes id
@@ -739,7 +760,12 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 	// mine keeps the list of chunks assigned to this node
 	mine := make(flow.ChunkList, 0, len(chunkIndices))
 	for _, index := range chunkIndices {
-		mine = append(mine, res.Chunks.ByIndex(index))
+		chunk := res.Chunks.ByIndex(index)
+		// discard the chunk if it has been already ingested
+		if e.ingestedChunkIDs.Has(chunk) {
+			continue
+		}
+		mine = append(mine, chunk)
 	}
 
 	return mine, nil
