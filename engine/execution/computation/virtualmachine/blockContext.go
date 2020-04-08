@@ -23,6 +23,9 @@ type BlockContext interface {
 
 	// ExecuteScript computes the result of a read-only script.
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
+
+	// GetAccount looks up the flow account for the given address
+	GetAccount(ledger Ledger, address flow.Address) (*flow.Account, error)
 }
 
 type blockContext struct {
