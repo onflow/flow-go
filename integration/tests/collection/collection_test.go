@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,11 +21,11 @@ import (
 // default set of non-collection nodes
 func defaultOtherNodes() []testnet.NodeConfig {
 	var (
-		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		exeNode  = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel("info"))
-		verNode  = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel("info"))
+		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel))
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel))
+		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel))
+		exeNode  = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel))
+		verNode  = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel))
 	)
 
 	return []testnet.NodeConfig{conNode1, conNode2, conNode3, exeNode, verNode}
@@ -44,7 +45,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	)
 
 	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
-	conf := testnet.NetworkConfig{Nodes: nodes}
+	conf := testnet.NewNetworkConfig(nodes)
 
 	net, err := testnet.PrepareFlowNetwork(t, "col_invalid_txns", conf)
 	require.Nil(t, err)
@@ -120,7 +121,7 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 	)
 
 	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
-	conf := testnet.NetworkConfig{Nodes: nodes}
+	conf := testnet.NewNetworkConfig(nodes)
 
 	net, err := testnet.PrepareFlowNetwork(t, "col_valid_txns", conf)
 	require.Nil(t, err)

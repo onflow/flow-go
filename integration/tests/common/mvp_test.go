@@ -29,7 +29,7 @@ func TestMVP_Network(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleVerification),
 	}
-	conf := testnet.NetworkConfig{Nodes: net}
+	conf := testnet.NewNetworkConfig(net)
 
 	// Enable verbose logging
 	testingdock.Verbose = true
