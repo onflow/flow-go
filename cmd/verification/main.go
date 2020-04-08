@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
+	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
@@ -164,14 +164,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := follower.New(node.Me,
-				node.State,
-				&node.GenesisBlock.Header,
-				node.GenesisQC,
-				verifier,
-				final,
-				ingestEng,
-				node.Logger)
+			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC, selector)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower

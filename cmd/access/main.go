@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
+	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
@@ -100,8 +100,9 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
 
-			// create a follower with the ingestEng as the finalization notification consumer
-			core, err := follower.New(node.Me, node.State, &node.GenesisBlock.Header, node.GenesisQC, verifier, final, ingestEng, node.Logger)
+			// creates a consensus follower with ingestEngine as the notifier
+			// so that it gets notified upon each new finalized block
+			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC, selector)
 			if err != nil {
 				// TODO for now we ignore failures in follower
 				// this is necessary for integration tests to run, until they are
