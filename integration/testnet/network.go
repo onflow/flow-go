@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/hashicorp/go-multierror"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 
@@ -124,9 +125,28 @@ func (n *FlowNetwork) ContainerByID(id flow.Identifier) (*Container, bool) {
 }
 
 // NetworkConfig is the config for the network.
-// TODO add nclusters, etc. here
 type NetworkConfig struct {
-	Nodes []NodeConfig
+	Nodes     []NodeConfig
+	NClusters uint
+}
+
+func NewNetworkConfig(nodes []NodeConfig, opts ...func(*NetworkConfig)) NetworkConfig {
+	c := NetworkConfig{
+		Nodes:     nodes,
+		NClusters: 1, // default to 1 cluster
+	}
+
+	for _, apply := range opts {
+		apply(&c)
+	}
+
+	return c
+}
+
+func WithClusters(n uint) func(*NetworkConfig) {
+	return func(conf *NetworkConfig) {
+		conf.NClusters = n
+	}
 }
 
 // NodeConfig defines the input config for a particular node, specified prior
@@ -153,9 +173,9 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 	return c
 }
 
-func WithLogLevel(level string) func(config *NodeConfig) {
+func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
-		config.LogLevel = level
+		config.LogLevel = level.String()
 	}
 }
 
@@ -233,7 +253,7 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 	// create container for each node
 	containers := make([]*Container, 0, nNodes)
 	for _, nodeConf := range confs {
-		nodeContainer, err := createContainer(t, suite, bootstrapDir, nodeConf)
+		nodeContainer, err := createContainer(t, suite, bootstrapDir, nodeConf, networkConf)
 		require.Nil(t, err)
 		network.After(nodeContainer.Container)
 
@@ -248,19 +268,19 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 }
 
 // createContainer ...
-func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string, conf ContainerConfig) (*Container, error) {
+func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string, nodeConf ContainerConfig, netConf NetworkConfig) (*Container, error) {
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
-		Name:      conf.ContainerName,
+		Name:      nodeConf.ContainerName,
 		Config: &container.Config{
-			Image: conf.ImageName(),
+			Image: nodeConf.ImageName(),
 			User:  currentUser(),
 			Cmd: []string{
-				fmt.Sprintf("--nodeid=%s", conf.NodeID.String()),
+				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
-				fmt.Sprintf("--loglevel=%s", conf.LogLevel),
-				"--nclusters=1",
+				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel),
+				fmt.Sprintf("--nclusters=%d", netConf.NClusters),
 			},
 		},
 		HostConfig: &container.HostConfig{},
@@ -275,7 +295,7 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 	}
 
 	nodeContainer := &Container{
-		Config:  conf,
+		Config:  nodeConf,
 		Ports:   make(map[string]string),
 		DataDir: tmpdir,
 		Opts:    opts,
@@ -296,7 +316,7 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 		fmt.Sprintf("%s:%s:ro", bootstrapDir, DefaultBootstrapDir),
 	)
 
-	switch conf.Role {
+	switch nodeConf.Role {
 	case flow.RoleCollection:
 
 		hostPort := testingdock.RandomPort(t)
