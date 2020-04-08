@@ -98,12 +98,13 @@ func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execut
 	return &execution.PingResponse{}, nil
 }
 
-func (h *handler) ExecuteScriptAtLatestBlock(
+func (h *handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
-	req *execution.ExecuteScriptAtLatestBlockRequest,
+	req *execution.ExecuteScriptAtBlockIDRequest,
 ) (*execution.ExecuteScriptResponse, error) {
+	blockID := flow.HashToID(req.GetBlockId())
 
-	value, err := h.engine.ExecuteScript(req.Script)
+	value, err := h.engine.ExecuteScriptAtBlockID(req.Script, blockID)
 	if err != nil {
 		return nil, err
 	}
