@@ -11,15 +11,15 @@ import (
 	"os"
 	"path/filepath"
 
+	"cloud.google.com/go/storage"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"golang.org/x/crypto/nacl/box"
-	"cloud.google.com/go/storage"
 )
 
 const (
 	FilenameTransitKeyPub      = "%v.transit-key.pub"
 	FilenameTransitKeyPriv     = "%v.transit-key.priv"
-	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv+".enc"
+	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".enc"
 )
 
 const fileMode = os.FileMode(0644)
@@ -39,9 +39,7 @@ var (
 	}
 )
 
-
 var gcsClient *storage.Client
-
 
 func init() {
 	cli, err := storage.NewClient(context.Background())
@@ -53,14 +51,24 @@ func init() {
 
 func main() {
 
-	var bootdir, keydir string
+	var bootdir, keydir, wrapId string
 	var pull, push bool
 
 	flag.StringVar(&bootdir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
 	flag.StringVar(&keydir, "k", "", "Key provided by the Flow team to access the transit server")
 	flag.BoolVar(&pull, "pull", false, "Fetch keys and metadata from the transit server")
 	flag.BoolVar(&push, "push", false, "Upload public keys to the transit server")
+	flag.StringVar(&wrapId, "x-server-wrap", "", "(Flow Team Use), wrap response keys")
 	flag.Parse()
+
+	// Wrap takes prescedence, so we just do that first
+	if wrapId != "" {
+		err := wrapFile(bootdir, wrapId)
+		if err != nil {
+			log.Fatalf("Failed to wrap response: %s\n", err)
+		}
+		return
+	}
 
 	var err error = nil
 	if pull && push {
@@ -207,23 +215,20 @@ func unwrapFile(bootdir, nodeId string) error {
 	return nil
 }
 
-func wrapFile(inputFile, keyfile, outputFile string) error {
-	//path := 
-	plaintext, err := ioutil.ReadFile(inputFile)
+func wrapFile(bootdir, nodeId string) error {
+	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
+	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, nodeId))
+	ciphertextPath := filepath.Join(bootdir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+
+	plaintext, err := ioutil.ReadFile(plaintextPath)
 	if err != nil {
-		return fmt.Errorf("Failed to open plaintext file %s: %w", inputFile, err)
+		return fmt.Errorf("Failed to open plaintext file %s: %w", plaintextPath, err)
 	}
 
-	publicKey, err := ioutil.ReadFile(keyfile)
+	publicKey, err := ioutil.ReadFile(pubKeyPath)
 	if err != nil {
-		return fmt.Errorf("Faield to open public keyfile %s: %w", keyfile, err)
+		return fmt.Errorf("Faield to open public keyfile %s: %w", pubKeyPath, err)
 	}
-
-	ciphertextFile, err := os.Create(outputFile)
-	if err != nil {
-		return fmt.Errorf("Could not open output file for writing %s: %w", outputFile, err)
-	}
-	defer ciphertextFile.Close()
 
 	var pubKeyBytes [32]byte
 	copy(pubKeyBytes[:], publicKey)
@@ -235,7 +240,10 @@ func wrapFile(inputFile, keyfile, outputFile string) error {
 		return fmt.Errorf("Could not encrypt file: %w", err)
 	}
 
-	//ioutil.WriteFile()
+	err = ioutil.WriteFile(ciphertextPath, ciphertext, fileMode)
+	if err != nil {
+		return fmt.Errorf("Error writing ciphertext: %w", err)
+	}
 
 	return nil
 }
@@ -244,7 +252,7 @@ func bucketUpload(bootdir, filename, token string) error {
 	path := filepath.Join(bootdir, filename)
 	log.Printf("Uploading %s\n", path)
 	ctx := context.Background()
-	
+
 	upload := gcsClient.Bucket(flowBucket).
 		Object(filepath.Join(token, filename)).
 		NewWriter(ctx)
@@ -268,7 +276,7 @@ func bucketDownload(bootdir, filename, token string) error {
 	path := filepath.Join(bootdir, filename)
 	log.Printf("Uploading %s\n", path)
 	ctx := context.Background()
-	
+
 	download, err := gcsClient.Bucket(flowBucket).
 		Object(filepath.Join(token, filename)).
 		NewReader(ctx)

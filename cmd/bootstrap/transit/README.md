@@ -34,3 +34,15 @@ After Genesis, rulling `-pull` will:
 
 1. Decrypt `<id>.random-beacon.priv.json.enc` using the transit keys
    - `<id>.random-beacon.priv.json`
+
+## Wrapping Responses
+The transit script also has `-wrap` for the other end of the connection. This function takes a private random-beacon key and wraps it with the corresponding transit key, which can then be sent back to the node.
+
+```shell
+./transit -wrap ${ID}
+```
+
+The wrap function:
+1. Takes in `<id>.random-beacon.priv.json` and produces
+   - `<id>.random-beacon.priv.json.enc`
+1. Uploads `<id>.random-beacon.priv.json.enc` to the server

@@ -1,4 +1,4 @@
 *.pub
 *.priv
-*.en
-dapper-upload
+*.enc
+transit
