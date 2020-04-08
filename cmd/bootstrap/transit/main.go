@@ -55,7 +55,7 @@ func main() {
 	var pull, push bool
 
 	flag.StringVar(&bootdir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
-	flag.StringVar(&keydir, "k", "", "Key provided by the Flow team to access the transit server")
+	flag.StringVar(&keydir, "t", "", "Token provided by the Flow team to access the transit server")
 	flag.BoolVar(&pull, "pull", false, "Fetch keys and metadata from the transit server")
 	flag.BoolVar(&push, "push", false, "Upload public keys to the transit server")
 	flag.StringVar(&wrapId, "x-server-wrap", "", "(Flow Team Use), wrap response keys")
@@ -102,7 +102,7 @@ func main() {
 	}
 }
 
-// Read the NodeID file
+// Read the NodeID file to build other filenames from
 func fetchNodeId(bootdir string) (string, error) {
 	path := filepath.Join(bootdir, bootstrap.FilenameNodeId)
 	data, err := ioutil.ReadFile(path)
@@ -113,6 +113,9 @@ func fetchNodeId(bootdir string) (string, error) {
 	return string(data), nil
 }
 
+// Run the push process
+// - create transit keypair
+// - upload files to GCS bucket
 func runPush(bootdir, token, nodeId string) {
 	log.Println("Running push")
 	err := generateKeys(bootdir, nodeId)
