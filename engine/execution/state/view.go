@@ -31,66 +31,66 @@ func NewView(readFunc GetRegisterFunc) *View {
 }
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
-func (r *View) NewChild() *View {
-	return NewView(r.Get)
+func (v *View) NewChild() *View {
+	return NewView(v.Get)
 }
 
 // Get gets a register value from this view.
 //
 // This function will return an error if it fails to read from the underlying
 // data source for this view.
-func (r *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
-	value, exists := r.delta.Get(key)
+func (v *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
+	value, exists := v.delta.Get(key)
 	if exists {
 		return value, nil
 	}
 
-	value, err := r.readFunc(key)
+	value, err := v.readFunc(key)
 	if err != nil {
 		return nil, err
 	}
 
 	// record read
-	r.reads = append(r.reads, key)
+	v.reads = append(v.reads, key)
 
 	return value, nil
 }
 
 // Set sets a register value in this view.
-func (r *View) Set(key flow.RegisterID, value flow.RegisterValue) {
+func (v *View) Set(key flow.RegisterID, value flow.RegisterValue) {
 	// every time we write something to delta (order preserving)
 	// we append the value to the end of the SpocksSecret byte slice
-	r.spockSecret = append(r.spockSecret, value...)
-	r.delta.Set(key, value)
+	v.spockSecret = append(v.spockSecret, value...)
+	v.delta.Set(key, value)
 }
 
 // Delete removes a register in this view.
-func (r *View) Delete(key flow.RegisterID) {
-	r.delta.Delete(key)
+func (v *View) Delete(key flow.RegisterID) {
+	v.delta.Delete(key)
 }
 
 // Delta returns a record of the registers that were mutated in this view.
-func (r *View) Delta() Delta {
-	return r.delta
+func (v *View) Delta() Delta {
+	return v.delta
 }
 
 // ApplyDelta applies the changes from a delta to this view.
-func (r *View) ApplyDelta(delta Delta) {
-	r.delta.MergeWith(delta)
+func (v *View) ApplyDelta(delta Delta) {
+	v.delta.MergeWith(delta)
 }
 
 // Reads returns the register IDs read by this view.
-func (r *View) Reads() []flow.RegisterID {
-	return r.reads
+func (v *View) Reads() []flow.RegisterID {
+	return v.reads
 }
 
 // AllRegisters returns all the register IDs either in read or delta
-func (r *View) AllRegisters() []flow.RegisterID {
-	set := make(map[string]bool, len(r.reads)+len(r.delta))
-	for _, reg := range r.reads {
+func (v *View) AllRegisters() []flow.RegisterID {
+	set := make(map[string]bool, len(v.reads)+len(v.delta))
+	for _, reg := range v.reads {
 		set[string(reg)] = true
 	}
-	for _, reg := range r.delta.RegisterIDs() {
+	for _, reg := range v.delta.RegisterIDs() {
 		set[string(reg)] = true
 	}
 	ret := make([]flow.RegisterID, 0, len(set))
@@ -101,6 +101,6 @@ func (r *View) AllRegisters() []flow.RegisterID {
 }
 
 // SpockSecret returns the secret value for SPoCK
-func (r *View) SpockSecret() []byte {
-	return r.spockSecret
+func (v *View) SpockSecret() []byte {
+	return v.spockSecret
 }
