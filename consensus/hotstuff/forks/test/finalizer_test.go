@@ -10,8 +10,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	mockn "github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/mock"
 	mockm "github.com/dapperlabs/flow-go/module/mock"
 )
 
@@ -549,7 +549,7 @@ func TestNotification(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	notifier := &mockn.Consumer{}
+	notifier := &mocks.Consumer{}
 	// 5 blocks including the genesis are incorporated
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(5)
 	notifier.On("OnFinalizedBlock", blocks[0]).Return(nil).Once()
@@ -568,8 +568,8 @@ func TestNotification(t *testing.T) {
 
 // ========== internal functions ===============
 
-func newFinalizer(t *testing.T) (forks.Finalizer, *mockn.Consumer, *mockm.Finalizer) {
-	notifier := &mockn.Consumer{}
+func newFinalizer(t *testing.T) (forks.Finalizer, *mocks.Consumer, *mockm.Finalizer) {
+	notifier := &mocks.Consumer{}
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil)
 	notifier.On("OnFinalizedBlock", mock.Anything).Return(nil)
 	finalizationCallback := &mockm.Finalizer{}

@@ -1,4 +1,4 @@
-package follower
+package runner
 
 import (
 	"sync"

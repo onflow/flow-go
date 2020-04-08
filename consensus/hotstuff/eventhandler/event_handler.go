@@ -41,7 +41,7 @@ func New(
 	validator hotstuff.Validator,
 ) (*EventHandler, error) {
 	e := &EventHandler{
-		log:            log.With().Str("hotstuff", "event_handler").Logger(),
+		log:            log.With().Str("hotstuff", "participant").Logger(),
 		paceMaker:      paceMaker,
 		blockProducer:  blockProducer,
 		forks:          forks,

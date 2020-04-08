@@ -85,14 +85,14 @@ func (f *LevelledForest) GetVertex(id flow.Identifier) (Vertex, bool) {
 // GetChildren returns a VertexIterator to iterate over the children
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id` , `level`
 func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
-	container, _ := f.vertices[id]
+	container := f.vertices[id]
 	// if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	return newVertexIterator(container.children) // VertexIterator gracefully handles nil slices
 }
 
 // GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
 func (f *LevelledForest) GetNumberOfChildren(id flow.Identifier) int {
-	container, _ := f.vertices[id] // if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
+	container := f.vertices[id] // if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	num := 0
 	for _, child := range container.children {
 		if child.vertex != nil {
@@ -135,7 +135,6 @@ func (f *LevelledForest) AddVertex(vertex Vertex) {
 	// container is empty, i.e. full vertex is new and should be stored in container
 	container.vertex = vertex // add vertex to container
 	f.registerWithParent(container)
-	return
 }
 
 func (f *LevelledForest) registerWithParent(vertexContainer *vertexContainer) {
@@ -153,7 +152,6 @@ func (f *LevelledForest) registerWithParent(vertexContainer *vertexContainer) {
 	}
 	parentContainer := f.getOrCreateVertexContainer(vertexContainer.vertex.Parent())
 	parentContainer.children = append(parentContainer.children, vertexContainer) // append works on nil slices: creates slice with capacity 2
-	return
 }
 
 // getOrCreateVertexContainer returns the vertexContainer if there exists one

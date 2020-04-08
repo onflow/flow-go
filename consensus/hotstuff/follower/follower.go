@@ -8,15 +8,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -27,43 +20,27 @@ import (
 //
 // CAUTION: Follower is NOT CONCURRENCY safe
 type FollowerLogic struct {
+	log                  zerolog.Logger
 	validator            hotstuff.Validator
 	finalizationLogic    forks.Finalizer
 	finalizationCallback module.Finalizer
-	notifier             notifications.FinalizationConsumer
-	log                  zerolog.Logger
+	notifier             hotstuff.FinalizationConsumer
 }
 
-func NewFollowerLogic(
-	me module.Local,
-	protocolState protocol.State,
-	trustedRoot *forks.BlockQC,
-	verifier hotstuff.Verifier,
-	finalizationCallback module.Finalizer,
-	notifier notifications.FinalizationConsumer,
+func New(
 	log zerolog.Logger,
+	validator hotstuff.Validator,
+	finalizationCallback module.Finalizer,
+	viewstate hotstuff.ViewState,
+	finalizationLogic forks.Finalizer,
+	notifier hotstuff.FinalizationConsumer,
 ) (*FollowerLogic, error) {
-	viewState, err := viewstate.New(protocolState, me.NodeID(), filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
-	}
-	finalizationLogic, err := finalizer.New(trustedRoot, finalizationCallback, notifier)
-	if err != nil {
-		return nil, fmt.Errorf("initialization of consensus follower failed: %w", err)
-	}
-	validator := validator.New(viewState, finalizationLogic, verifier)
-
-	err = validator.ValidateQC(trustedRoot.QC, trustedRoot.Block)
-	if err != nil {
-		return nil, fmt.Errorf("invalid root qc: %w", err)
-	}
-
 	return &FollowerLogic{
-		validator:            validator,
-		finalizationLogic:    finalizationLogic,
-		finalizationCallback: finalizationCallback,
-		notifier:             notifier,
 		log:                  log.With().Str("hotstuff", "follower").Logger(),
+		validator:            validator,
+		finalizationCallback: finalizationCallback,
+		finalizationLogic:    finalizationLogic,
+		notifier:             notifier,
 	}, nil
 }
 

@@ -46,7 +46,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
 	conf := testnet.NetworkConfig{Nodes: nodes}
 
-	net, err := testnet.PrepareFlowNetwork(t, "col", conf)
+	net, err := testnet.PrepareFlowNetwork(t, "col_invalid_txns", conf)
 	require.Nil(t, err)
 
 	net.Start(context.Background())
@@ -122,7 +122,7 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
 	conf := testnet.NetworkConfig{Nodes: nodes}
 
-	net, err := testnet.PrepareFlowNetwork(t, "col", conf)
+	net, err := testnet.PrepareFlowNetwork(t, "col_valid_txns", conf)
 	require.Nil(t, err)
 
 	net.Start(context.Background())
