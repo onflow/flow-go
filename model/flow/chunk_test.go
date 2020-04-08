@@ -16,14 +16,8 @@ func TestChunkList_ByIndex(t *testing.T) {
 	_, ok := chunkList.ByIndex(11)
 	require.False(t, ok)
 
-	_, _, ok = chunkList.ByIndexWithProof(11)
-	require.False(t, ok)
-
 	// a within range chunk by index
 	_, ok = chunkList.ByIndex(1)
-	require.True(t, ok)
-
-	_, _, ok = chunkList.ByIndexWithProof(1)
 	require.True(t, ok)
 
 }
