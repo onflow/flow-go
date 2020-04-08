@@ -84,8 +84,7 @@ func TestSyncFlow(t *testing.T) {
 			View:     45,
 			Height:   3,
 		},
-		Payload: flow.Payload{
-		},
+		Payload: flow.Payload{},
 	}
 
 	block4 := &flow.Block{
@@ -107,17 +106,16 @@ func TestSyncFlow(t *testing.T) {
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
 
 	collectionEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col1.ID() })).Run(func(args mock.Arguments) {
-		colConduit.Submit(&messages.CollectionResponse{Collection: col1,}, exe2ID.NodeID)
+		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col1}, exe2ID.NodeID)
 	}).Return(nil)
 	collectionEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col2.ID() })).Run(func(args mock.Arguments) {
-		colConduit.Submit(&messages.CollectionResponse{Collection: col2,}, exe2ID.NodeID)
+		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col2}, exe2ID.NodeID)
 	}).Return(nil)
 	collectionEngine.On("Submit", exe1ID.NodeID, &messages.CollectionRequest{ID: col4.ID()}).Run(func(args mock.Arguments) {
-		colConduit.Submit(&messages.CollectionResponse{Collection: col4,}, exe1ID.NodeID)
+		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col4}, exe1ID.NodeID)
 	}).Return(nil)
 
 	var receipt *flow.ExecutionReceipt
-
 
 	executedBlocks := map[flow.Identifier]*flow.Identifier{}
 

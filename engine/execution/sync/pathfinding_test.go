@@ -65,7 +65,6 @@ func TestPathfinding(t *testing.T) {
 		}
 	}
 
-
 	t.Run("simple path", testPath(a, f, []*messages.ExecutionStateDelta{c, d, f}))
 
 	t.Run("simple path reversed", testError(f, a))
@@ -82,8 +81,6 @@ func TestPathfinding(t *testing.T) {
 	t.Run("same height forks", testPath(d, b, []*messages.ExecutionStateDelta{b}))
 	t.Run("same height forks reversed ", testPath(b, d, []*messages.ExecutionStateDelta{d}))
 
-	t.Run("same height far forks", testPath(g, e, []*messages.ExecutionStateDelta{d, e }))
+	t.Run("same height far forks", testPath(g, e, []*messages.ExecutionStateDelta{d, e}))
 	t.Run("same height far forks reversed ", testPath(e, g, []*messages.ExecutionStateDelta{b, g}))
 }
-
-

@@ -119,5 +119,3 @@ func (r *View) ApplyDelta(delta Delta) {
 func (r *View) Reads() []flow.RegisterID {
 	return r.reads
 }
-
-

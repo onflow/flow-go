@@ -34,8 +34,6 @@ type Engine struct {
 	me            module.Local
 	execStateCon  network.Conduit
 	chunksConduit network.Conduit
-	stateSync     sync.StateSynchronizer
-	syncCon   network.Conduit
 }
 
 func New(
@@ -55,7 +53,6 @@ func New(
 		state:     state,
 		me:        me,
 		execState: execState,
-		stateSync: stateSync,
 	}
 
 	var err error
@@ -75,11 +72,6 @@ func New(
 		return nil, errors.Wrap(err, "could not register chunk data pack provider engine")
 	}
 	eng.chunksConduit = chunksConduit
-
-	//eng.syncCon, err = net.Register(engine.ExecutionSync, &eng)
-	//if err != nil {
-	//	return nil, errors.Wrap(err, "could not register execution sync engine")
-	//}
 
 	return &eng, nil
 }
@@ -121,8 +113,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			err = e.onExecutionStateRequest(originID, v)
 		case *messages.ChunkDataPackRequest:
 			err = e.handleChunkDataPackRequest(originID, v.ChunkID)
-		case *messages.ExecutionStateDelta:
-			return e.onExecutionStateDelta(originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -165,13 +155,6 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 		return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
 	}
 
-	return nil
-}
-
-
-func (e *Engine) onExecutionStateDelta(originID flow.Identifier, req *messages.ExecutionStateDelta) error {
-	// TODO: apply delta to store
-	// Does this belong in this engine? Does it matter if we are removing the engines anyways?
 	return nil
 }
 

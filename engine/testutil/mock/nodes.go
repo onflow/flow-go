@@ -31,12 +31,12 @@ import (
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
-	Log     zerolog.Logger
-	Tracer  trace.Tracer
-	DB      *badger.DB
-	State   protocol.State
-	Me      module.Local
-	Net     *stub.Network
+	Log    zerolog.Logger
+	Tracer trace.Tracer
+	DB     *badger.DB
+	State  protocol.State
+	Me     module.Local
+	Net    *stub.Network
 	DBDir  string
 }
 

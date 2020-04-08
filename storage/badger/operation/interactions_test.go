@@ -27,7 +27,6 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 
 		// some set and reads
 		d1.Set([]byte("\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;"), []byte("zażółć gęślą jaźń"))
-		//d1.Set([]byte("bahdasht"), []byte("zażółć gęślą jaźń"))
 		d1.Set([]byte{2}, []byte("b"))
 		d1.Set([]byte{2}, []byte("c"))
 
@@ -36,14 +35,7 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 		_, err = d1.Get([]byte{3})
 		require.NoError(t, err)
 
-
 		interactions := []*delta.Interactions{d1.Interactions(), d2.Interactions()}
-
-		//var s string
-		//m := "\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;"
-		//bytes, _ := json.Marshal(m)
-		//_ = json.Unmarshal(bytes, &s)
-		//assert.Equal(t, m, s)
 
 		blockID := unittest.IdentifierFixture()
 

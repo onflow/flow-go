@@ -70,12 +70,12 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 	require.NoError(t, err)
 
 	return mock.GenericNode{
-		Log:     log,
-		Tracer:  tracer,
-		DB:      db,
-		State:   state,
-		Me:      me,
-		Net:     stub,
+		Log:    log,
+		Tracer: tracer,
+		DB:     db,
+		State:  state,
+		Me:     me,
+		Net:    stub,
 		DBDir:  dbDir,
 	}
 }
@@ -199,7 +199,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	_, err = bootstrap.BootstrapLedger(ls)
 	require.NoError(t, err)
 
-	err = bootstrap.BootstrapExecutionDatabase( node.DB, genesisHead)
+	err = bootstrap.BootstrapExecutionDatabase(node.DB, genesisHead)
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, chunkDataPackStorage, executionResults, node.DB)

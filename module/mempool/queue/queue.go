@@ -11,7 +11,6 @@ type Node struct {
 	Children []*Node
 }
 
-
 // Blockify becuase Blocker seems a bit off.
 // Make items behave like a block, so it can be queued
 type Blockify interface {

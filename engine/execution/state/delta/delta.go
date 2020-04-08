@@ -53,19 +53,19 @@ func (d Delta) Delete(key flow.RegisterID) {
 
 //handy container for sorting
 type idsValues struct {
-	ids []flow.RegisterID
+	ids    []flow.RegisterID
 	values []flow.RegisterValue
 }
 
-func (d* idsValues) Len() int {
+func (d *idsValues) Len() int {
 	return len(d.ids)
 }
 
-func (d* idsValues) Less(i, j int) bool {
+func (d *idsValues) Less(i, j int) bool {
 	return bytes.Compare(d.ids[i], d.ids[j]) < 0
 }
 
-func (d* idsValues) Swap(i, j int) {
+func (d *idsValues) Swap(i, j int) {
 	d.ids[i], d.ids[j] = d.ids[j], d.ids[i]
 	d.values[i], d.values[j] = d.values[j], d.values[i]
 }
@@ -74,9 +74,8 @@ func (d* idsValues) Swap(i, j int) {
 // ids are returned sorted, in ascending order
 func (d Delta) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 
-
 	data := idsValues{
-		ids: make([]flow.RegisterID, 0, len(d)),
+		ids:    make([]flow.RegisterID, 0, len(d)),
 		values: make([]flow.RegisterValue, 0, len(d)),
 	}
 
@@ -84,7 +83,6 @@ func (d Delta) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 		data.ids = append(data.ids, fromString(id))
 		data.values = append(data.values, d[id])
 	}
-
 
 	sort.Sort(&data)
 
@@ -124,9 +122,9 @@ func (d Delta) MarshalJSON() ([]byte, error) {
 
 func (d *Delta) UnmarshalJSON(data []byte) error {
 
-	m := make(map[string]flow.RegisterValue, 0)
+	m := make(map[string]flow.RegisterValue)
 
-	dd := make(Delta)
+	dd := make(map[string]flow.RegisterValue)
 
 	err := json.Unmarshal(data, &m)
 	if err != nil {

@@ -30,12 +30,11 @@ func BlockFixture() flow.Block {
 	return BlockWithParentFixture(&header)
 }
 
-
 func StateDeltaFixture() *messages.ExecutionStateDelta {
 	header := BlockHeaderFixture()
 	block := BlockWithParentFixture(&header)
 	return &messages.ExecutionStateDelta{
-		Block:      &block,
+		Block: &block,
 	}
 }
 
@@ -64,7 +63,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 		Payload: payload,
 	}
 	return &messages.ExecutionStateDelta{
-		Block:      &block,
+		Block: &block,
 	}
 }
 
@@ -80,7 +79,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 		ChainID:        "chain",
 		ParentID:       parent.ID(),
 		View:           rand.Uint64(),
-		Height:   parent.Height + 1,
+		Height:         parent.Height + 1,
 		ParentVoterIDs: IdentifierListFixture(4),
 		ParentVoterSig: SignatureFixture(),
 		ProposerID:     IdentifierFixture(),

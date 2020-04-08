@@ -17,16 +17,16 @@ func RetrieveNumber(number uint64, blockID *flow.Identifier) func(*badger.Txn) e
 }
 
 type HighestExecutedBlock struct {
-	Number uint64
+	Number  uint64
 	BlockID flow.Identifier
 }
 
 func InsertHighestExecutedBlockNumber(number uint64, blockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeHighestExecutedBlockNumber), HighestExecutedBlock{number,blockID})
+	return insert(makePrefix(codeHighestExecutedBlockNumber), HighestExecutedBlock{number, blockID})
 }
 
 func UpdateHighestExecutedBlockNumber(number uint64, blockID flow.Identifier) func(*badger.Txn) error {
-	return update(makePrefix(codeHighestExecutedBlockNumber), HighestExecutedBlock{number,blockID})
+	return update(makePrefix(codeHighestExecutedBlockNumber), HighestExecutedBlock{number, blockID})
 }
 
 func RetrieveHighestExecutedBlockNumber(number *uint64, blockID *flow.Identifier) func(*badger.Txn) error {

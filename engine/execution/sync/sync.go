@@ -18,17 +18,14 @@ type StateSynchronizer interface {
 
 func NewStateSynchronizer(
 	state state.ReadOnlyExecutionState,
-//registerDeltas storage.RegisterDeltas,
 ) StateSynchronizer {
 	return &stateSync{
 		execState: state,
-		//registerDeltas: registerDeltas,
 	}
 }
 
 type stateSync struct {
 	execState state.ReadOnlyExecutionState
-	//registerDeltas storage.RegisterDeltas
 }
 
 // walk the chain to find a path between blocks
@@ -48,7 +45,6 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", endID, err)
 	}
-
 
 	// start from higher block
 	highDelta := endDelta
@@ -84,7 +80,6 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 				return nil, fmt.Errorf("invalid request. Start block higher then lower on the same chain")
 			}
 
-			finalChainDelta = higherChainDelta
 			break
 		}
 

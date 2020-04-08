@@ -149,7 +149,7 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 func (e *Engine) Wait() {
-	e.wg.Wait() //wait for block execution
+	e.wg.Wait()     //wait for block execution
 	e.syncWg.Wait() // wait for sync
 }
 
@@ -437,10 +437,10 @@ func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *mess
 			//	Delta:   delta,
 			//}
 			//
-			time.Sleep(100*time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
 			spew.Dump(delta)
-			time.Sleep(100*time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 
 			err := e.syncConduit.Submit(delta, originID)
 			if err != nil {
@@ -576,9 +576,9 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 
 func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Interactions, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
 
-	time.Sleep(100*time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	spew.Dump(stateInteractions)
-	time.Sleep(100*time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	originalState := startState
 
@@ -777,10 +777,9 @@ func (e *Engine) handleExecutionStateDelta(executionStateDelta *messages.Executi
 
 	e.log.Debug().Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("received sync delta")
 
-	time.Sleep(100*time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	spew.Dump(executionStateDelta)
-	time.Sleep(100*time.Millisecond)
-
+	time.Sleep(100 * time.Millisecond)
 
 	return e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
 
@@ -827,7 +826,6 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 
 	defer e.syncWg.Done()
 
-
 	//TODO - validate state sync, reject invalid messages, change provider
 	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateInteractions, executionStateDelta.Events, executionStateDelta.StartState)
 	if err != nil {
@@ -847,7 +845,7 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 	// last block was saved
 	if targetBlockID == executionStateDelta.Block.ID() {
 
-		e.mempool.Run(func(_ *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
+		err = e.mempool.Run(func(_ *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
 			var syncedQueue *queue.Queue
 			hadQueue := false
 			for _, q := range orphanQueues.All() {
@@ -880,6 +878,10 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 			return nil
 		})
 
+		if err != nil {
+			e.log.Err(err).Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("error while processing final target sync block")
+		}
+
 		return
 	}
 
@@ -899,8 +901,8 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 				return fmt.Errorf("fatal error cannot add children block to sync queue: %w", err)
 			}
 
-				e.syncWg.Add(1)
-				go e.saveDelta(queue.Head.Item.(*messages.ExecutionStateDelta))
+			e.syncWg.Add(1)
+			go e.saveDelta(queue.Head.Item.(*messages.ExecutionStateDelta))
 		}
 		backdata.Rem(executionStateDelta.Block.ID())
 		return nil
@@ -914,7 +916,6 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 
 	e.log.Debug().Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("finished processing sync delta")
 }
-
 
 // generateChunkDataPack creates a chunk data pack
 func generateChunkDataPack(

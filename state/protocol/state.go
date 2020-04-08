@@ -26,7 +26,6 @@ type ReadOnlyState interface {
 
 // State allows, in addition to ReadOnlyState,  mutating the protocol state in a consistent manner.
 type State interface {
-
 	ReadOnlyState
 
 	// Mutate will create a mutator for the persistent protocol state. It allows

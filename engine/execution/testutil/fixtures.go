@@ -35,7 +35,6 @@ func DeployCounterContractTransaction() flow.TransactionBody {
 	}
 }
 
-
 func CreateCounterTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
@@ -68,5 +67,3 @@ func AddToCounterTransaction() flow.TransactionBody {
 		ScriptAccounts: []flow.Address{flow.RootAddress},
 	}
 }
-
-
