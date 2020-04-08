@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 )
 
 // PubSubDistributor is an example implementation of notifications.Consumer
@@ -26,7 +25,7 @@ type PubSubDistributor struct {
 	lock                           sync.RWMutex
 }
 
-func NewPubSubDistributor() notifications.Consumer {
+func NewPubSubDistributor() *PubSubDistributor {
 	return &PubSubDistributor{}
 }
 

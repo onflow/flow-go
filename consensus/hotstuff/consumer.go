@@ -1,4 +1,4 @@
-package notifications
+package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"

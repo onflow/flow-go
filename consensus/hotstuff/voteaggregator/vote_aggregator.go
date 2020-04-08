@@ -7,14 +7,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 type VoteAggregator struct {
 	logger                zerolog.Logger
-	notifier              notifications.Consumer
+	notifier              hotstuff.Consumer
 	viewState             hotstuff.ViewState
 	voteValidator         hotstuff.Validator
 	signer                hotstuff.Signer
@@ -28,7 +27,7 @@ type VoteAggregator struct {
 }
 
 // New creates an instance of vote aggregator
-func New(notifier notifications.Consumer, highestPrunedView uint64, viewState hotstuff.ViewState, voteValidator hotstuff.Validator, signer hotstuff.Signer) *VoteAggregator {
+func New(notifier hotstuff.Consumer, highestPrunedView uint64, viewState hotstuff.ViewState, voteValidator hotstuff.Validator, signer hotstuff.Signer) *VoteAggregator {
 	return &VoteAggregator{
 		logger:                zerolog.Logger{},
 		notifier:              notifier,
