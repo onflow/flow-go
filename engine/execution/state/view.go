@@ -14,6 +14,8 @@ type View struct {
 	// TODO: store reads as set
 	reads []flow.RegisterID
 	// SpocksSecret keeps the secret used for SPoCKs
+	// TODO we can add a flag to disable capturing SpocksSecret
+	// for views other than collection views to improve performance
 	spockSecret []byte
 	readFunc    GetRegisterFunc
 }
