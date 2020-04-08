@@ -21,6 +21,7 @@ import (
 type ComputationManager interface {
 	ExecuteScript([]byte, *flow.Header, *state.View) ([]byte, error)
 	ComputeBlock(block *entity.ExecutableBlock, view *state.View) (*execution.ComputationResult, error)
+	GetAccount(address flow.Address, blockHeader *flow.Header, view *state.View) (*flow.Account, error)
 }
 
 // Manager manages computation and execution
@@ -89,6 +90,16 @@ func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *state.View) 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
+
+	return result, nil
+}
+
+func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *state.View) (*flow.Account, error) {
+
+	result, err := e.vm.NewBlockContext(blockHeader).GetAccount(view, address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get accont (internal error): %w", err)
+	}
 
 	return result, nil
 }

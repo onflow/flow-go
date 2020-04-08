@@ -445,6 +445,22 @@ func (e *Engine) ExecuteScriptAtBlockID(script []byte, blockID flow.Identifier) 
 	return e.computationManager.ExecuteScript(script, block, blockView)
 }
 
+func (e *Engine) GetAccount(address flow.Address, blockID flow.Identifier) (*flow.Account, error) {
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+	block, err := e.state.AtBlockID(blockID).Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
+	}
+
+	blockView := e.execState.NewView(stateCommit)
+
+	return e.computationManager.GetAccount(address, block, blockView)
+}
+
 func (e *Engine) handleComputationResult(result *execution.ComputationResult, startState flow.StateCommitment) (flow.StateCommitment, error) {
 
 	e.log.Debug().
