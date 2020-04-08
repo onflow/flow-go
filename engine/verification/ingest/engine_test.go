@@ -64,6 +64,8 @@ type TestSuite struct {
 	chunkStateTracker    *mempool.ChunkStateTrackers
 	chunkDataPacks       *mempool.ChunkDataPacks
 	chunkDataPackTracker *mempool.ChunkDataPackTrackers
+	ingestedChunkIDs     *mempool.IngestedChunkIDs
+	ingestedResultIDs    *mempool.IngestedResultIDs
 	blockStorage         *storage.Blocks
 	// resources fixtures
 	collection    *flow.Collection
@@ -103,6 +105,8 @@ func (suite *TestSuite) SetupTest() {
 	suite.chunkStateTracker = &mempool.ChunkStateTrackers{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
 	suite.chunkDataPackTracker = &mempool.ChunkDataPackTrackers{}
+	suite.ingestedResultIDs = &mempool.IngestedResultIDs{}
+	suite.ingestedChunkIDs = &mempool.IngestedChunkIDs{}
 	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := test.CompleteExecutionResultFixture(suite.T(), 1)
@@ -150,6 +154,8 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.chunkStateTracker,
 		suite.chunkDataPacks,
 		suite.chunkDataPackTracker,
+		suite.ingestedChunkIDs,
+		suite.ingestedResultIDs,
 		suite.blockStorage,
 		suite.assigner)
 	require.Nil(suite.T(), err, "could not create an engine")
