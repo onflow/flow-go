@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -50,7 +51,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	require.Nil(t, err)
 
 	net.Start(context.Background())
-	defer net.Cleanup()
+	defer net.Stop()
 
 	// we will test against COL1
 	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
@@ -67,16 +68,20 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 		malformed := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
 		malformed.ReferenceBlockID = flow.ZeroID
 
+		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
+
 		err := client.SignAndSendTransaction(context.Background(), malformed)
-		assert.Error(t, err)
+		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
 
 	t.Run("missing script", func(t *testing.T) {
 		malformed := unittest.TransactionBodyFixture()
 		malformed.Script = nil
 
+		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
+
 		err := client.SignAndSendTransaction(context.Background(), malformed)
-		assert.Error(t, err)
+		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
 
 	t.Run("unparseable script", func(t *testing.T) {
