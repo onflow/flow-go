@@ -255,7 +255,7 @@ func createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string
 		HostConfig: &container.HostConfig{},
 	}
 
-	// get a temporary directory in the host. On macOS the default tmpb
+	// get a temporary directory in the host. On macOS the default tmp
 	// directory is NOT accessible to Docker by default, so we use /tmp
 	// instead.
 	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-integration-node")
