@@ -115,7 +115,12 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 				return nil, fmt.Errorf("shuffling verifiers failed: %w", err)
 			}
 		}
-		assignment.Add(chunks.ByIndex(uint64(i)), assignees)
+		// extracts chunk by index
+		chunk, ok := chunks.ByIndex(uint64(i))
+		if !ok {
+			return nil, fmt.Errorf("chunk out of range requested: %v", i)
+		}
+		assignment.Add(chunk, assignees)
 	}
 	return assignment, nil
 }

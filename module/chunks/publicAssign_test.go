@@ -43,10 +43,12 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	j := 0
 	for i := 0; i < size; i++ {
 
-		c := chunks.ByIndex(uint64(j))
+		c, ok := chunks.ByIndex(uint64(j))
+		require.True(a.T(), ok, "chunk out of range requested")
 		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
 		j++
-		c = chunks.ByIndex(uint64(j))
+		c, ok = chunks.ByIndex(uint64(j))
+		require.True(a.T(), ok, "chunk out of range requested")
 		assignment.Add(c, append(assignment.Verifiers(c), ids[i].NodeID))
 	}
 
@@ -57,9 +59,13 @@ func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	for i := 0; i < size; i++ {
 		assignedChunks := assignment.ByNodeID(ids[i].NodeID)
 		require.Len(a.T(), assignedChunks, 2)
-		require.Contains(a.T(), assignedChunks, chunks.ByIndex(uint64(j)).Index)
+		c, ok := chunks.ByIndex(uint64(j))
+		require.True(a.T(), ok, "chunk out of range requested")
+		require.Contains(a.T(), assignedChunks, c.Index)
 		j++
-		require.Contains(a.T(), assignedChunks, chunks.ByIndex(uint64(j)).Index)
+		c, ok = chunks.ByIndex(uint64(j))
+		require.True(a.T(), ok, "chunk out of range requested")
+		require.Contains(a.T(), assignedChunks, c.Index)
 	}
 
 }
@@ -73,7 +79,8 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	assignment := chmodels.NewAssignment()
 
 	// assigns first chunk to non-duplicate list of verifiers
-	c := chunks.ByIndex(uint64(0))
+	c, ok := chunks.ByIndex(uint64(0))
+	require.True(a.T(), ok, "chunk out of range requested")
 	assignment.Add(c, ids.NodeIDs())
 	require.Len(a.T(), assignment.Verifiers(c), size)
 
@@ -81,7 +88,8 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 	ids = append(ids, ids[0])
 	require.Len(a.T(), ids, size+1)
 	// assigns second chunk to a duplicate list of verifiers
-	c = chunks.ByIndex(uint64(1))
+	c, ok = chunks.ByIndex(uint64(1))
+	require.True(a.T(), ok, "chunk out of range requested")
 	assignment.Add(c, ids.NodeIDs())
 	// should be size not size + 1
 	require.Len(a.T(), assignment.Verifiers(c), size)

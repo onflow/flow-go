@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	mockdist "github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 )
 
@@ -37,8 +37,8 @@ func expectedTimeoutInfo(view uint64, mode model.TimeoutMode) interface{} {
 		})
 }
 
-func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mockdist.Consumer) {
-	notifier := &mockdist.Consumer{}
+func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mocks.Consumer) {
+	notifier := &mocks.Consumer{}
 	tc, err := timeout.NewConfig(
 		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),

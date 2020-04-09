@@ -8,24 +8,29 @@ import (
 // doesn't do anything.
 type NoopConsumer struct{}
 
-func (NoopConsumer) OnBlockIncorporated(*model.Block) {}
+func NewNoopConsumer() *NoopConsumer {
+	nc := &NoopConsumer{}
+	return nc
+}
 
-func (NoopConsumer) OnFinalizedBlock(*model.Block) {}
+func (*NoopConsumer) OnBlockIncorporated(*model.Block) {}
 
-func (NoopConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
+func (*NoopConsumer) OnFinalizedBlock(*model.Block) {}
 
-func (NoopConsumer) OnEnteringView(uint64) {}
+func (*NoopConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
-func (NoopConsumer) OnSkippedAhead(uint64) {}
+func (*NoopConsumer) OnEnteringView(uint64) {}
 
-func (NoopConsumer) OnStartingTimeout(*model.TimerInfo) {}
+func (*NoopConsumer) OnSkippedAhead(uint64) {}
 
-func (NoopConsumer) OnReachedTimeout(*model.TimerInfo) {}
+func (*NoopConsumer) OnStartingTimeout(*model.TimerInfo) {}
 
-func (NoopConsumer) OnQcIncorporated(*model.QuorumCertificate) {}
+func (*NoopConsumer) OnReachedTimeout(*model.TimerInfo) {}
 
-func (NoopConsumer) OnForkChoiceGenerated(uint64, *model.QuorumCertificate) {}
+func (*NoopConsumer) OnQcIncorporated(*model.QuorumCertificate) {}
 
-func (NoopConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
+func (*NoopConsumer) OnForkChoiceGenerated(uint64, *model.QuorumCertificate) {}
 
-func (NoopConsumer) OnInvalidVoteDetected(*model.Vote) {}
+func (*NoopConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
+
+func (*NoopConsumer) OnInvalidVoteDetected(*model.Vote) {}

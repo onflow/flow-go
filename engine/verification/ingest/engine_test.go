@@ -632,7 +632,9 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			// we have the assignment of chunk
 			a := chmodel.NewAssignment()
-			a.Add(suite.receipt.ExecutionResult.Chunks.ByIndex(0), flow.IdentifierList{verIdentity.NodeID})
+			chunk, ok := suite.receipt.ExecutionResult.Chunks.ByIndex(0)
+			require.True(suite.T(), ok, "chunk out of range requested")
+			a.Add(chunk, flow.IdentifierList{verIdentity.NodeID})
 			suite.assigner.On("Assign",
 				testifymock.Anything,
 				testifymock.Anything,
@@ -992,7 +994,9 @@ func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk)
 			vc, ok := args[0].(*verification.VerifiableChunk)
 			assert.True(t, ok)
 
-			vID := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex).ID()
+			chunk, ok := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex)
+			require.True(t, ok, "chunk out of range requested")
+			vID := chunk.ID()
 			// ensure there are no dupe chunks
 			_, alreadySeen := receivedChunks[vID]
 			if alreadySeen {
@@ -1003,7 +1007,9 @@ func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk)
 
 			// ensure the received chunk matches one we expect
 			for _, vc := range vChunks {
-				if vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex).ID() == vID {
+				chunk, ok := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex)
+				require.True(t, ok, "chunk out of range requested")
+				if chunk.ID() == vID {
 					// mark it as seen and decrement the waitgroup
 					receivedChunks[vID] = struct{}{}
 					wg.Done()
