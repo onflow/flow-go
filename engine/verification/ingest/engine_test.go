@@ -682,6 +682,9 @@ func (suite *TestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
 	// mocks tracker to return an error for this chunk ID
 	suite.chunkDataPackTracker.On("ByChunkID", chunkDataPack.ChunkID).
 		Return(nil, fmt.Errorf("does not exist"))
+	// engine has not yet ingested this chunk
+	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false)
+
 	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
 
 	// asserts that process of an untracked chunk data pack returns with an error
@@ -719,6 +722,10 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	// chunk data pack should be successfully added to mempool and the tracker should be removed
 	suite.chunkDataPacks.On("Add", &chunkDataPack).Return(nil).Once()
 	suite.chunkDataPackTracker.On("Rem", chunkDataPack.ChunkID).Return(true).Once()
+
+	// engine has not yet ingested this chunk
+	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false)
+	// suite.ingestedChunkIDs.On("Add", chunk).Return(nil)
 
 	// terminates call to checkPendingChunks as it is out of this test's scope
 	suite.authReceipts.On("All").Return(nil).Once()
