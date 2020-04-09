@@ -244,7 +244,7 @@ func (suite *TestSuite) TestIngestedResult() {
 func (suite *TestSuite) TestIngestedChunk() {
 	eng := suite.TestNewEngine()
 
-	// mocks this receipt's result as ingested
+	// mocks this chunk id
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
 
 	// nothing else is mocked, hence the process should simply return nil
