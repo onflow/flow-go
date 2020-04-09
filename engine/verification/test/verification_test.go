@@ -142,6 +142,7 @@ func TestHappyPath(t *testing.T) {
 
 	// flush the collection request
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
+	assert.True(t, ok)
 	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})

@@ -23,7 +23,7 @@ type View struct {
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
 		delta:       NewDelta(),
-		regTouchSet: make(map[string]bool, 0),
+		regTouchSet: make(map[string]bool),
 		spockSecret: make([]byte, 0),
 		readFunc:    readFunc,
 	}
