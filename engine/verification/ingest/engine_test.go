@@ -228,6 +228,30 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
+// TestIngestedResult evaluates the happy path of submitting an execution receipt with an already ingested result
+func (suite *TestSuite) TestIngestedResult() {
+	eng := suite.TestNewEngine()
+
+	// mocks this receipt's result as ingested
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(true)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), suite.receipt)
+	require.NoError(suite.T(), err)
+}
+
+// TestIngestedChunk evaluates the happy path of submitting a chunk data pack for an already ingested chunk
+func (suite *TestSuite) TestIngestedChunk() {
+	eng := suite.TestNewEngine()
+
+	// mocks this receipt's result as ingested
+	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), suite.chunkDataPack)
+	require.NoError(suite.T(), err)
+}
+
 // TestHandleReceipt_UnstakedSender evaluates sending an execution receipt from an unstaked node
 // it should go to the pending receipts and (later on) dropped from the cache
 // Todo dropping unauthenticated receipts from cache
@@ -261,7 +285,6 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("block does not exist")).Once()
 
-	// process should fail
 	err := eng.Process(unstakedIdentity, suite.receipt)
 	require.NoError(suite.T(), err)
 

@@ -579,12 +579,6 @@ func (e *Engine) checkPendingChunks() {
 				continue
 			}
 
-			// TODO add a tracker to clean the memory up from resources that have already been verified
-			// https://github.com/dapperlabs/flow-go/issues/2750
-			// clean up would be something like this:
-			// cleans the execution receipt from receipts mempool
-			// cleans block form blocks mempool
-
 			// marks this chunk as ingested
 			err = e.ingestedChunkIDs.Add(chunk)
 			if err != nil {
