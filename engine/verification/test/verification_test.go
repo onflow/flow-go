@@ -62,7 +62,7 @@ func TestHappyPath(t *testing.T) {
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
 	exeEngine := new(network.Engine)
-	assert.Nil(t, err)
+
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
 	exeChunkDataSeen := make(map[flow.Identifier]struct{})
@@ -98,9 +98,7 @@ func TestHappyPath(t *testing.T) {
 		// half of the chunks assigned to the verification node
 		// for each chunk the verification node contacts execution node
 		// once for chunk data pack
-		// once for chunk state
-		// total number of calls is then chunkNum/2 * 2 = chunkNum
-		Times(chunkNum)
+		Times(chunkNum / 2)
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
@@ -142,21 +140,8 @@ func TestHappyPath(t *testing.T) {
 		return verNode.AuthReceipts.Has(completeER.Receipt.ID())
 	}, time.Second, 50*time.Millisecond)
 
-	// flush the chunk state request
-	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
-	assert.True(t, ok)
-	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.ExecutionStateProvider
-	})
-
-	// flush the chunk state response
-	exeNet, ok := hub.GetNetwork(exeIdentity.NodeID)
-	assert.True(t, ok)
-	exeNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.ExecutionStateProvider
-	})
-
 	// flush the collection request
+	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
 	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})
@@ -167,6 +152,8 @@ func TestHappyPath(t *testing.T) {
 	colNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})
+
+	// TODO add chunk data pack request and response
 
 	// flush the result approval broadcast
 	verNet.DeliverAll(true)

@@ -27,7 +27,7 @@ type ExecutionState interface {
 	// PersistStateCommitment saves a state commitment by the given block ID.
 	PersistStateCommitment(flow.Identifier, flow.StateCommitment) error
 
-	// ChunkHeaderByChunkID retrieve a chunk data pack given the chunk ID.
+	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
 	// PersistChunkDataPack stores a chunk data pack by chunk ID.
 	PersistChunkDataPack(*flow.ChunkDataPack) error

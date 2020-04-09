@@ -769,8 +769,6 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 // the input ers list result in the test failing.
 func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []verification.CompleteExecutionResult) {
 	eng := new(network.Engine)
-	conduit, err := node.Net.Register(engine.ExecutionStateProvider, eng)
-	assert.Nil(t, err)
 	chunksConduit, err := node.Net.Register(engine.ChunkDataPackProvider, eng)
 	assert.Nil(t, err)
 
