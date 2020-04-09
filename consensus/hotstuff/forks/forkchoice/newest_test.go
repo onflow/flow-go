@@ -10,13 +10,11 @@ import (
 	hs "github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	mockdist "github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mockfinalizer "github.com/dapperlabs/flow-go/module/mock"
 )
-
-const VALIDATOR_SIZE uint32 = 7
 
 type ViewPair struct {
 	qcView    uint64
@@ -222,7 +220,7 @@ func TestForkBelowLockedHappyPath(t *testing.T) {
 
 // Verifies notification callbacks
 func TestOnQcIncorporated(t *testing.T) {
-	notifier := &mockdist.Consumer{}
+	notifier := &mocks.Consumer{}
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil)
 
 	finalizationCallback := &mockfinalizer.Finalizer{}
@@ -289,8 +287,8 @@ func generateBlocks(rootQC *model.QuorumCertificate, viewPairs ...ViewPair) *Blo
 	return blocks
 }
 
-func initNewestForkChoice(t *testing.T, view uint64) (hs.Forks, *mockdist.Consumer, *forks.BlockQC) {
-	notifier := &mockdist.Consumer{}
+func initNewestForkChoice(t *testing.T, view uint64) (hs.Forks, *mocks.Consumer, *forks.BlockQC) {
+	notifier := &mocks.Consumer{}
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil)
 	notifier.On("OnFinalizedBlock", mock.Anything).Return(nil)
 	notifier.On("OnForkChoiceGenerated", mock.Anything, mock.Anything).Return().Once()

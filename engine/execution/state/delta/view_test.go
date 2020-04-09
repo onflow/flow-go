@@ -90,6 +90,40 @@ func TestView_Set(t *testing.T) {
 		delta := v.Delta()
 		assert.False(t, delta.HasBeenDeleted(registerID))
 	})
+
+	t.Run("SpockSecret", func(t *testing.T) {
+		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+		registerID1 := make([]byte, 32)
+		copy(registerID1, "reg1")
+
+		registerID2 := make([]byte, 32)
+		copy(registerID2, "reg2")
+
+		registerID3 := make([]byte, 32)
+		copy(registerID3, "reg3")
+
+		// this part checks that spocks ordering be based
+		// on update orders and not registerIDs
+		v.Set(registerID2, flow.RegisterValue("1"))
+		v.Set(registerID3, flow.RegisterValue("2"))
+		v.Set(registerID1, flow.RegisterValue("3"))
+		b, err := v.Get(registerID1)
+		assert.NoError(t, err)
+		assert.Equal(t, b, flow.RegisterValue("3"))
+		// this part checks that delete functionality
+		// doesn't impact secret
+		v.Delete(registerID1)
+		// this part checks that it always update the
+		// intermediate values and not just the final values
+		v.Set(registerID1, flow.RegisterValue("4"))
+		v.Set(registerID1, flow.RegisterValue("5"))
+		v.Set(registerID3, flow.RegisterValue("6"))
+
+		s := v.SpockSecret()
+		assert.Equal(t, s, []byte("1233456"))
+	})
 }
 
 func TestView_Delete(t *testing.T) {
@@ -141,7 +175,7 @@ func TestView_Delete(t *testing.T) {
 	})
 }
 
-func TestView_ApplyDelta(t *testing.T) {
+func TestView_MergeView(t *testing.T) {
 	registerID1 := make([]byte, 32)
 	copy(registerID1, "fruit")
 
@@ -153,11 +187,11 @@ func TestView_ApplyDelta(t *testing.T) {
 			return nil, nil
 		})
 
-		d := delta.NewDelta()
-		d.Set(registerID1, flow.RegisterValue("apple"))
-		d.Set(registerID2, flow.RegisterValue("carrot"))
+		chView := v.NewChild()
+		chView.Set(registerID1, flow.RegisterValue("apple"))
+		chView.Set(registerID2, flow.RegisterValue("carrot"))
 
-		v.ApplyDelta(d)
+		v.MergeView(chView)
 
 		b1, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -176,9 +210,8 @@ func TestView_ApplyDelta(t *testing.T) {
 		v.Set(registerID1, flow.RegisterValue("apple"))
 		v.Set(registerID2, flow.RegisterValue("carrot"))
 
-		d := delta.NewDelta()
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		v.MergeView(chView)
 
 		b1, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -196,10 +229,9 @@ func TestView_ApplyDelta(t *testing.T) {
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 
-		d := delta.NewDelta()
-		d.Set(registerID2, flow.RegisterValue("carrot"))
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		chView.Set(registerID2, flow.RegisterValue("carrot"))
+		v.MergeView(chView)
 
 		b1, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -217,10 +249,9 @@ func TestView_ApplyDelta(t *testing.T) {
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 
-		d := delta.NewDelta()
-		d.Set(registerID1, flow.RegisterValue("orange"))
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		chView.Set(registerID1, flow.RegisterValue("orange"))
+		v.MergeView(chView)
 
 		b, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -235,10 +266,9 @@ func TestView_ApplyDelta(t *testing.T) {
 		v.Set(registerID1, flow.RegisterValue("apple"))
 		v.Delete(registerID1)
 
-		d := delta.NewDelta()
-		d.Set(registerID1, flow.RegisterValue("orange"))
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		chView.Set(registerID1, flow.RegisterValue("orange"))
+		v.MergeView(chView)
 
 		b, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -252,10 +282,9 @@ func TestView_ApplyDelta(t *testing.T) {
 
 		v.Set(registerID1, flow.RegisterValue("apple"))
 
-		d := delta.NewDelta()
-		d.Delete(registerID1)
-
-		v.ApplyDelta(d)
+		chView := v.NewChild()
+		chView.Delete(registerID1)
+		v.MergeView(chView)
 
 		b, err := v.Get(registerID1)
 		assert.NoError(t, err)
@@ -263,7 +292,7 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 }
 
-func TestView_Reads(t *testing.T) {
+func TestView_RegisterTouches(t *testing.T) {
 	registerID1 := make([]byte, 32)
 	copy(registerID1, "fruit")
 
@@ -275,28 +304,12 @@ func TestView_Reads(t *testing.T) {
 	})
 
 	t.Run("Empty", func(t *testing.T) {
-		reads := v.Reads()
-		assert.Empty(t, reads)
+		touches := v.RegisterTouches()
+		assert.Empty(t, touches)
 	})
 
-	t.Run("ValueInCache", func(t *testing.T) {
-		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-
-		v.Set(registerID1, flow.RegisterValue("apple"))
-
-		// cache reads are not recorded
-		_, err := v.Get(registerID1)
-		assert.NoError(t, err)
-
-		// read list should be empty
-		reads := v.Reads()
-		assert.Empty(t, reads)
-	})
-
-	t.Run("ValuesNotInCache", func(t *testing.T) {
-		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+	t.Run("Set and Get", func(t *testing.T) {
+		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			if bytes.Equal(key, registerID1) {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -311,13 +324,9 @@ func TestView_Reads(t *testing.T) {
 		_, err := v.Get(registerID1)
 		assert.NoError(t, err)
 
-		_, err = v.Get(registerID2)
-		assert.NoError(t, err)
+		v.Set(registerID2, flow.RegisterValue("apple"))
 
-		reads := v.Reads()
-		assert.Len(t, reads, 2)
-
-		assert.Equal(t, registerID1, reads[0])
-		assert.Equal(t, registerID2, reads[1])
+		touches := v.RegisterTouches()
+		assert.Len(t, touches, 2)
 	})
 }

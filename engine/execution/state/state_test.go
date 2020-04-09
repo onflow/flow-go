@@ -1,7 +1,6 @@
 package state_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -32,13 +31,13 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 				stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
 
-				chunkHeaders := new(storage.ChunkHeaders)
+
 
 				chunkDataPacks := new(storage.ChunkDataPacks)
 
 				executionResults := new(storage.ExecutionResults)
 
-				es := state.NewExecutionState(ls, stateCommitments, chunkHeaders, chunkDataPacks, executionResults, badgerDB)
+				es := state.NewExecutionState(ls, stateCommitments, chunkDataPacks, executionResults, badgerDB)
 
 				f(t, es)
 			})

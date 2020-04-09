@@ -22,7 +22,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -31,13 +30,13 @@ import (
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
-	Log    zerolog.Logger
-	Tracer trace.Tracer
-	DB     *badger.DB
-	State  protocol.State
-	Me     module.Local
-	Net    *stub.Network
-	DBDir  string
+	Log     zerolog.Logger
+	Metrics module.Metrics
+	DB      *badger.DB
+	State   protocol.State
+	Me      module.Local
+	Net     *stub.Network
+	DBDir   string
 }
 
 func (g *GenericNode) Done() {
@@ -111,8 +110,6 @@ type VerificationNode struct {
 	AuthCollections       mempool.Collections
 	PendingCollections    mempool.PendingCollections
 	CollectionTrackers    mempool.CollectionTrackers
-	ChunkStates           mempool.ChunkStates
-	ChunkStateTracker     mempool.ChunkStateTrackers
 	ChunkDataPacks        mempool.ChunkDataPacks
 	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
 	IngestEngine          *ingest.Engine

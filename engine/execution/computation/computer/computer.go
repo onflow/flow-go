@@ -70,7 +70,7 @@ func (e *blockComputer) executeBlock(
 
 		interactions[i] = collectionView.Interactions()
 
-		stateView.ApplyDelta(collectionView.Delta())
+		stateView.MergeView(collectionView)
 	}
 
 	return &execution.ComputationResult{
@@ -103,7 +103,7 @@ func (e *blockComputer) executeCollection(
 		}
 		events = append(events, txEvents...)
 		if result.Succeeded() {
-			collectionView.ApplyDelta(txView.Delta())
+			collectionView.MergeView(txView)
 		}
 	}
 

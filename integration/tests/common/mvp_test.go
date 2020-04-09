@@ -1,4 +1,4 @@
-package tests
+package common
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestMVP_Network(t *testing.T) {
@@ -52,13 +52,13 @@ func TestMVP_Network(t *testing.T) {
 	exeNodeAPIPort := exeContainer.Ports[testnet.ExeNodeAPIPort]
 	require.NotEqual(t, "", exeNodeAPIPort)
 
-	key, err := generateRandomKey()
+	key, err := unittest.AccountKeyFixture()
 	require.NoError(t, err)
 
-	colClient, err := testnet.NewClient(fmt.Sprintf(":%s", colNodeAPIPort), key)
+	colClient, err := testnet.NewClientWithKey(fmt.Sprintf(":%s", colNodeAPIPort), key)
 	require.NoError(t, err)
 
-	exeClient, err := testnet.NewClient(fmt.Sprintf(":%s", exeNodeAPIPort), key)
+	exeClient, err := testnet.NewClientWithKey(fmt.Sprintf(":%s", exeNodeAPIPort), key)
 	require.NoError(t, err)
 
 	runMVPTest(t, colClient, exeClient)
@@ -70,10 +70,10 @@ func TestMVP_Emulator(t *testing.T) {
 	// TODO - start an emulator instance
 	t.Skip()
 
-	key, err := getEmulatorKey()
+	key, err := unittest.EmulatorRootKey()
 	require.NoError(t, err)
 
-	c, err := testnet.NewClient(":3569", key)
+	c, err := testnet.NewClientWithKey(":3569", key)
 	require.NoError(t, err)
 
 	runMVPTest(t, c, c)
@@ -106,32 +106,4 @@ func runMVPTest(t *testing.T, colClient *testnet.Client, exeClient *testnet.Clie
 
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)
-}
-
-func deployCounter(ctx context.Context, client *testnet.Client) error {
-
-	contract := dsl.Contract{
-		Name: "Testing",
-		Members: []dsl.CadenceCode{
-			dsl.Resource{
-				Name: "Counter",
-				Code: `
-				pub var count: Int
-
-				init() {
-					self.count = 0
-				}
-				pub fun add(_ count: Int) {
-					self.count = self.count + count
-				}`,
-			},
-			dsl.Code(`
-				pub fun createCounter(): @Counter {
-					return <-create Counter()
-      			}`,
-			),
-		},
-	}
-
-	return client.DeployContract(ctx, contract)
 }

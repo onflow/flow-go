@@ -63,3 +63,19 @@ func (_m *BlockContext) ExecuteTransaction(ledger virtualmachine.Ledger, tx *flo
 
 	return r0, r1
 }
+
+// GetAccount provides a mock function with given fields: ledger, address
+func (_m *BlockContext) GetAccount(ledger virtualmachine.Ledger, address flow.Address) *flow.Account {
+	ret := _m.Called(ledger, address)
+
+	var r0 *flow.Account
+	if rf, ok := ret.Get(0).(func(virtualmachine.Ledger, flow.Address) *flow.Account); ok {
+		r0 = rf(ledger, address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Account)
+		}
+	}
+
+	return r0
+}

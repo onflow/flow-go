@@ -20,17 +20,12 @@ type ReadOnlyExecutionState interface {
 	NewView(flow.StateCommitment) *delta.View
 
 	GetRegisters(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, error)
-	GetChunkRegisters(flow.Identifier) (flow.Ledger, error)
-
 	GetRegistersWithProofs(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, []flow.StorageProof, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 
-	// ChunkHeaderByChunkID returns the chunk header for the provided chunk ID.
-	ChunkHeaderByChunkID(flow.Identifier) (*flow.ChunkHeader, error)
-
-	// ChunkHeaderByChunkID retrieve a chunk data pack given the chunk ID.
+	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
 
 	GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error)
@@ -70,7 +65,6 @@ type ExecutionState interface {
 type state struct {
 	ls               storage.Ledger
 	commits          storage.Commits
-	chunkHeaders     storage.ChunkHeaders
 	chunkDataPacks   storage.ChunkDataPacks
 	executionResults storage.ExecutionResults
 	db               *badger.DB
@@ -80,7 +74,6 @@ type state struct {
 func NewExecutionState(
 	ls storage.Ledger,
 	commits storage.Commits,
-	chunkHeaders storage.ChunkHeaders,
 	chunkDataPacks storage.ChunkDataPacks,
 	executionResult storage.ExecutionResults,
 	db *badger.DB,
@@ -88,7 +81,6 @@ func NewExecutionState(
 	return &state{
 		ls:               ls,
 		commits:          commits,
-		chunkHeaders:     chunkHeaders,
 		chunkDataPacks:   chunkDataPacks,
 		executionResults: executionResult,
 		db:               db,
@@ -147,42 +139,12 @@ func (s *state) GetRegistersWithProofs(
 	return s.ls.GetRegistersWithProof(registerIDs, commit)
 }
 
-func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) {
-	chunkHeader, err := s.ChunkHeaderByChunkID(chunkID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve chunk header: %w", err)
-	}
-
-	registerIDs := chunkHeader.RegisterIDs
-
-	registerValues, err := s.GetRegisters(chunkHeader.StartState, registerIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve chunk register values: %w", err)
-	}
-
-	l := make(flow.Ledger)
-
-	for i, registerID := range registerIDs {
-		l[string(registerID)] = registerValues[i]
-	}
-
-	return l, nil
-}
-
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	return s.commits.ByID(blockID)
 }
 
 func (s *state) PersistStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) error {
 	return s.commits.Store(blockID, commit)
-}
-
-func (s *state) ChunkHeaderByChunkID(chunkID flow.Identifier) (*flow.ChunkHeader, error) {
-	return s.chunkHeaders.ByID(chunkID)
-}
-
-func (s *state) PersistChunkHeader(c *flow.ChunkHeader) error {
-	return s.chunkHeaders.Store(c)
 }
 
 func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {

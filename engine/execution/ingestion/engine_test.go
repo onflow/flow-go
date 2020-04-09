@@ -192,9 +192,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 
 	for _, view := range computationResult.StateInteractions {
 		ctx.executionState.On("CommitDelta", view.Delta).Return(newStateCommitment, nil)
-		ctx.executionState.On("PersistChunkHeader", mock.MatchedBy(func(f *flow.ChunkHeader) bool {
-			return bytes.Equal(f.StartState, executableBlock.StartState)
-		})).Return(nil)
 		ctx.executionState.On("PersistChunkDataPack", mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
 			return bytes.Equal(f.StartState, executableBlock.StartState)
 		})).Return(nil)

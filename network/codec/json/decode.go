@@ -84,6 +84,7 @@ func decode(env Envelope) (interface{}, error) {
 
 	case CodeChunkDataPackRequest:
 		v = &messages.ChunkDataPackRequest{}
+
 	case CodeChunkDataPackResponse:
 		v = &messages.ChunkDataPackResponse{}
 
