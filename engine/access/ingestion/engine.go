@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -23,11 +22,11 @@ import (
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
 type Engine struct {
-	unit   *engine.Unit   // used to manage concurrency & shutdown
-	log    zerolog.Logger // used to log relevant actions with context
-	tracer trace.Tracer   // used to trace the data
-	state  protocol.State // used to access the  protocol state
-	me     module.Local   // used to access local node information
+	unit    *engine.Unit   // used to manage concurrency & shutdown
+	log     zerolog.Logger // used to log relevant actions with context
+	metrics module.Metrics // used to collect metrics
+	state   protocol.State // used to access the  protocol state
+	me      module.Local   // used to access local node information
 
 	// Conduits
 	collectionConduit network.Conduit
@@ -43,7 +42,7 @@ type Engine struct {
 func New(log zerolog.Logger,
 	net module.Network,
 	state protocol.State,
-	tracer trace.Tracer,
+	metrics module.Metrics,
 	me module.Local,
 	blocks storage.Blocks,
 	headers storage.Headers,
@@ -54,7 +53,7 @@ func New(log zerolog.Logger,
 	eng := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "ingestion").Logger(),
-		tracer:       tracer,
+		metrics:      metrics,
 		state:        state,
 		me:           me,
 		blocks:       blocks,

@@ -14,8 +14,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	realstore "github.com/dapperlabs/flow-go/storage"
@@ -52,7 +52,7 @@ func TestIngestEngine(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	log := zerolog.New(os.Stderr)
-	tracer, err := trace.NewTracer(log)
+	metrics, err := metrics.NewCollector(log)
 	require.NoError(suite.T(), err)
 
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -78,7 +78,7 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
 
-	eng, err := New(log, suite.net, suite.proto.state, tracer, suite.me, suite.blocks, suite.headers, suite.collections, suite.transactions)
+	eng, err := New(log, suite.net, suite.proto.state, metrics, suite.me, suite.blocks, suite.headers, suite.collections, suite.transactions)
 	require.NoError(suite.T(), err)
 	suite.eng = eng
 

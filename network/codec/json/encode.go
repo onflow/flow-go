@@ -71,10 +71,7 @@ func encode(v interface{}) (*Envelope, error) {
 
 	case *flow.ExecutionReceipt:
 		code = CodeExecutionRecipt
-	case *messages.ExecutionStateRequest:
-		code = CodeExecutionStateRequest
-	case *messages.ExecutionStateResponse:
-		code = CodeExecutionStateResponse
+
 	case *messages.ChunkDataPackRequest:
 		code = CodeChunkDataPackRequest
 	case *messages.ChunkDataPackResponse:

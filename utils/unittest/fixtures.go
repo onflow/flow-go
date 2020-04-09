@@ -498,14 +498,6 @@ func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 	}
 }
 
-func ChunkHeaderFixture() flow.ChunkHeader {
-	return flow.ChunkHeader{
-		ChunkID:     IdentifierFixture(),
-		StartState:  StateCommitmentFixture(),
-		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
-	}
-}
-
 func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 	return flow.ChunkDataPack{
 		ChunkID:         identifier,

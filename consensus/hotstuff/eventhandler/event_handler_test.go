@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -322,6 +323,7 @@ type EventHandlerSuite struct {
 	voteAggregator *VoteAggregator
 	voter          *Voter
 	validator      *BlacklistValidator
+	notifier       hotstuff.Consumer
 
 	initView    uint64
 	endView     uint64
@@ -344,6 +346,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.voteAggregator = NewVoteAggregator(es.T())
 	es.voter = NewVoter(es.T(), finalized)
 	es.validator = NewBlacklistValidator(es.T())
+	es.notifier = &notifications.NoopConsumer{}
 
 	eventhandler, err := eventhandler.New(
 		zerolog.Logger{},
@@ -354,7 +357,8 @@ func (es *EventHandlerSuite) SetupTest() {
 		es.viewState,
 		es.voteAggregator,
 		es.voter,
-		es.validator)
+		es.validator,
+		es.notifier)
 	require.NoError(es.T(), err)
 
 	es.eventhandler = eventhandler

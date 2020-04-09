@@ -49,8 +49,6 @@ type Engine struct {
 	blockStorage         storage.Blocks
 	checkChunksLock      sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
 	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
-	chunkStates          mempool.ChunkStates
-	chunkStateTrackers   mempool.ChunkStateTrackers // keeps track of chunk state requests that this engine made
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -65,8 +63,6 @@ func New(
 	authCollections mempool.Collections,
 	pendingCollections mempool.PendingCollections,
 	collectionTrackers mempool.CollectionTrackers,
-	chunkStates mempool.ChunkStates,
-	chunkStateTrackers mempool.ChunkStateTrackers,
 	chunkDataPacks mempool.ChunkDataPacks,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	ingestedChunkIDs mempool.IngestedChunkIDs,
@@ -86,8 +82,6 @@ func New(
 		authCollections:      authCollections,
 		pendingCollections:   pendingCollections,
 		collectionTrackers:   collectionTrackers,
-		chunkStates:          chunkStates,
-		chunkStateTrackers:   chunkStateTrackers,
 		chunkDataPacks:       chunkDataPacks,
 		chunkDataPackTackers: chunkDataPackTrackers,
 		ingestedChunkIDs:     ingestedChunkIDs,
@@ -174,8 +168,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.handleCollection(originID, resource)
 	case *messages.CollectionResponse:
 		return e.handleCollection(originID, &resource.Collection)
-	case *messages.ExecutionStateResponse:
-		return e.handleExecutionStateResponse(originID, resource)
 	case *messages.ChunkDataPackResponse:
 		return e.handleChunkDataPack(originID, &resource.Data)
 	default:
@@ -328,50 +320,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 	return nil
 }
 
-// handleExecutionStateResponse handles responses to our requests for execution
-// states for particular chunks. It adds the state to the mempool and checks for
-// pending receipts that are ready for verification.
-func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *messages.ExecutionStateResponse) error {
-	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("chunk_id", logging.ID(res.State.ChunkID)).
-		Msg("execution state received")
-
-	if e.ingestedChunkIDs.Has(res.State.ChunkID) {
-		// discards the state if it belongs to an already ingested chunk
-		return nil
-	}
-
-	// checks if this event is a reply of a prior request extracts the tracker
-	tracker, err := e.chunkStateTrackers.ByChunkID(res.State.ChunkID)
-	if err != nil {
-		return fmt.Errorf("no chunk state tracker available for chunk ID: %x", res.State.ChunkID)
-	}
-
-	// extracts list of verifier nodes id
-	//
-	id, err := e.state.AtBlockID(tracker.BlockID).Identity(originID)
-	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", id, err)
-	}
-
-	if id.Role != flow.RoleExecution {
-		return fmt.Errorf("invalid role for receiving execution state: %s", id.Role)
-	}
-
-	err = e.chunkStates.Add(&res.State)
-	if err != nil {
-		return fmt.Errorf("could not add execution state (chunk_id=%s): %w", res.State.ChunkID, err)
-	}
-
-	// removes chunk state tracker from mempool
-	e.chunkStateTrackers.Rem(res.State.ChunkID)
-
-	e.checkPendingChunks()
-
-	return nil
-}
-
 // requestCollection submits a request for the given collection to collection nodes.
 func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifier) error {
 	// checks collection does not have a tracker yet
@@ -407,47 +355,6 @@ func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifi
 	err = e.collectionsConduit.Submit(req, collNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
-	}
-
-	return nil
-}
-
-// requestExecutionState submits a request for the state required by the
-// given chunk to execution nodes.
-func (e *Engine) requestExecutionState(chunkID flow.Identifier, blockID flow.Identifier) error {
-	// checks chunk state does not have a tracker yet
-	if e.chunkStateTrackers.Has(chunkID) {
-		// chunk state has been already requested
-		// request is dropped
-		// TODO trackers should expire after a while for liveness
-		// https://github.com/dapperlabs/flow-go/issues/3054
-		return nil
-	}
-	// extracts list of execution node ids
-	//
-	exeNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		return fmt.Errorf("could not load execution node identities: %w", err)
-	}
-
-	req := &messages.ExecutionStateRequest{
-		ChunkID: chunkID,
-	}
-
-	err = e.stateConduit.Submit(req, exeNodes.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not submit request for execution state (chunk_id=%s): %w", chunkID, err)
-	}
-
-	// caches a tracker for successfully submitted requests
-	tracker := &trackers.ChunkStateTracker{
-		ChunkID: chunkID,
-		BlockID: blockID,
-	}
-	err = e.chunkStateTrackers.Add(tracker)
-	// Todo handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrEntityAlreadyExists {
-		return fmt.Errorf("could not store tracker of chunk state request in mempool: %w", err)
 	}
 
 	return nil
@@ -506,44 +413,6 @@ func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block
 	}
 
 	return block, true
-}
-
-// getChunkStateForReceipt checks the chunk state depended on by the given
-// execution receipt. If the chunk state is available locally, returns true
-// as well as the chunk data itself.
-// Otherwise, returns false and requests the chunk state
-func (e *Engine) getChunkStateForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkState, bool) {
-
-	log := e.log.With().
-		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
-		Hex("chunk_id", logging.ID(chunkID)).
-		Hex("receipt_id", logging.Entity(receipt)).
-		Logger()
-
-	if !e.chunkStates.Has(chunkID) {
-		// the chunk state is missing, the chunk cannot yet be verified
-		// TODO rate limit these requests
-		err := e.requestExecutionState(chunkID, receipt.ExecutionResult.BlockID)
-		if err != nil {
-			log.Error().
-				Err(err).
-				Hex("chunk_id", logging.ID(chunkID)).
-				Msg("could not request chunk state")
-		}
-		return nil, false
-	}
-
-	// chunk state exists and retrieved and returned
-	chunkState, err := e.chunkStates.ByID(chunkID)
-	if err != nil {
-		// couldn't get chunk state from mempool, the chunk cannot yet be verified
-		log.Error().
-			Err(err).
-			Hex("chunk_id", logging.ID(chunkID)).
-			Msg("could not get chunk")
-		return nil, false
-	}
-	return chunkState, true
 }
 
 // getChunkDataPackForReceipt checks the chunk data pack associated with a chunk ID and
@@ -664,11 +533,6 @@ func (e *Engine) checkPendingChunks() {
 		}
 
 		for _, chunk := range mychunks {
-			chunkState, chunkStateReady := e.getChunkStateForReceipt(receipt, chunk.ID())
-			if !chunkStateReady {
-				// can not verify a chunk without its state, moves to the next chunk
-				continue
-			}
 
 			// TODO replace chunk state with chunk data pack
 			chunkDatapack, chunkDataPackReady := e.getChunkDataPackForReceipt(receipt, chunk.ID())
@@ -701,7 +565,6 @@ func (e *Engine) checkPendingChunks() {
 				EndState:      endState,
 				Block:         block,
 				Collection:    collection,
-				ChunkState:    chunkState,
 				ChunkDataPack: chunkDatapack,
 			}
 

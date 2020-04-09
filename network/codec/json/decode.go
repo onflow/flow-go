@@ -74,14 +74,9 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeExecutionRecipt:
 		v = &flow.ExecutionReceipt{}
 
-	case CodeExecutionStateRequest:
-		v = &messages.ExecutionStateRequest{}
-
-	case CodeExecutionStateResponse:
-		v = &messages.ExecutionStateResponse{}
-
 	case CodeChunkDataPackRequest:
 		v = &messages.ChunkDataPackRequest{}
+
 	case CodeChunkDataPackResponse:
 		v = &messages.ChunkDataPackResponse{}
 

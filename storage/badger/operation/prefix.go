@@ -29,7 +29,7 @@ const (
 	codeExecutionResult = 24
 	// codeReceipt       = 25
 	// codeApproval      = 26
-	codeChunkHeader   = 27
+	// codeChunkHeader   = 27
 	codeChunkDataPack = 28
 	codeEvent         = 29
 
