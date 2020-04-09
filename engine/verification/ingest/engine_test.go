@@ -202,6 +202,13 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
 	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil).Once()
 
+	// engine has not yet ingested the result of this receipt yet
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+
+	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+		suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
+	}
+
 	// expect that we already have the receipt in the authenticated receipts mempool
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
@@ -245,6 +252,8 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, fmt.Errorf("unstaked node")).Once()
+	// engine has not yet ingested the result of this receipt
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
 
 	// receipt should go to the pending receipts mempool
 	suite.pendingReceipts.On("Add", suite.receipt).Return(nil).Once()
@@ -421,6 +430,8 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 }
 
 func (suite *TestSuite) TestHandleExecutionState_TrackedExecutionState() {
+	// TODO remove chunk state related tests
+	suite.T().Skip("Chunk state is on to be removed list")
 	eng := suite.TestNewEngine()
 	stateTracker := &tracker.ChunkStateTracker{
 		BlockID: suite.receipt.ExecutionResult.BlockID,
@@ -462,6 +473,9 @@ func (suite *TestSuite) TestHandleExecutionState_TrackedExecutionState() {
 // receiving a tracked execution stake from an unstaked sender
 // process should terminate with an error
 func (suite *TestSuite) TestHandleExecutionState_Tracked_UnstakedSender() {
+	// TODO remove chunk state related tests
+	suite.T().Skip("Chunk state is on to be removed list")
+
 	eng := suite.TestNewEngine()
 	stateTracker := &tracker.ChunkStateTracker{
 		BlockID: suite.receipt.ExecutionResult.BlockID,
@@ -497,6 +511,9 @@ func (suite *TestSuite) TestHandleExecutionState_Tracked_UnstakedSender() {
 }
 
 func (suite *TestSuite) TestHandleExecutionState_SenderWithWrongRole() {
+	// TODO remove chunk state related tests
+	suite.T().Skip("Chunk state is on to be removed list")
+
 	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
 
 	for _, role := range invalidRoles {
@@ -521,6 +538,8 @@ func (suite *TestSuite) TestHandleExecutionState_SenderWithWrongRole() {
 // TestChunkStateTracker_UntrackedChunkState tests that ingest engine process method returns an error
 // if it receives a ChunkStateTracker that does not have any tracker in the engine's mempool
 func (suite *TestSuite) TestChunkStateTracker_UntrackedChunkState() {
+	// TODO remove chunk state related tests
+	suite.T().Skip("Chunk state is on to be removed list")
 	suite.SetupTest()
 	eng := suite.TestNewEngine()
 
