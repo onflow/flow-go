@@ -90,7 +90,7 @@ func main() {
 			return matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prov, err = provider.New(node.Logger, node.Network, node.State, node.Me)
+			prov, err = provider.New(node.Logger, node.Metrics, node.Network, node.State, node.Me)
 			return prov, err
 		}).
 		Component("propagation engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -98,7 +98,7 @@ func main() {
 			return prop, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
+			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Metrics, node.Me)
 			return ing, err
 		}).
 		Component("consensus components", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

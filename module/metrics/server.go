@@ -29,6 +29,7 @@ func NewServer(log zerolog.Logger, port uint) *Server {
 		server: &http.Server{Addr: addr, Handler: mux},
 		log:    log,
 	}
+
 	return m
 }
 

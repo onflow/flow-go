@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/forkchoice"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
@@ -21,7 +22,9 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	consensusmetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 const (
@@ -32,10 +35,16 @@ const (
 
 // TODO: this needs to be integrated with proper configuration and bootstrapping.
 
-func NewParticipant(log zerolog.Logger, state protocol.State, me module.Local, builder module.Builder, updater module.Finalizer, signer hotstuff.Signer, communicator hotstuff.Communicator, selector flow.IdentityFilter, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*hotstuff.EventLoop, error) {
+func CreateConsumer(log zerolog.Logger, metrics module.Metrics, guarantees storage.Guarantees, seals storage.Seals) hotstuff.Consumer {
+	logConsumer := notifications.NewLogConsumer(log)
+	metricsConsumer := consensusmetrics.NewMetricsConsumer(metrics, guarantees, seals)
+	dis := pubsub.NewDistributor()
+	dis.AddConsumer(logConsumer)
+	dis.AddConsumer(metricsConsumer)
+	return dis
+}
 
-	// initialize notification consumer
-	notifier := notifications.NewLogConsumer(log)
+func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, state protocol.State, me module.Local, builder module.Builder, updater module.Finalizer, signer hotstuff.Signer, communicator hotstuff.Communicator, selector flow.IdentityFilter, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*hotstuff.EventLoop, error) {
 
 	// initialize view state
 	viewState, err := viewstate.New(state, me.NodeID(), selector)
@@ -93,13 +102,13 @@ func NewParticipant(log zerolog.Logger, state protocol.State, me module.Local, b
 	aggregator := voteaggregator.New(notifier, prunedView, viewState, validator, signer)
 
 	// initialize the event handler
-	handler, err := eventhandler.New(log, pacemaker, producer, forks, communicator, viewState, aggregator, voter, validator)
+	handler, err := eventhandler.New(log, pacemaker, producer, forks, communicator, viewState, aggregator, voter, validator, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event handler: %w", err)
 	}
 
 	// initialize and return the event loop
-	loop, err := hotstuff.NewEventLoop(log, handler)
+	loop, err := hotstuff.NewEventLoop(log, metrics, handler)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}

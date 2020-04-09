@@ -21,11 +21,13 @@ func TestOnBlockProposalValid(t *testing.T) {
 	state := &protocol.State{}
 	final := &protocol.Snapshot{}
 	con := &network.Conduit{}
+	metrics := newMetrics()
 
 	e := &Engine{
-		me:    me,
-		state: state,
-		con:   con,
+		me:      me,
+		state:   state,
+		con:     con,
+		metrics: metrics,
 	}
 
 	block := unittest.BlockFixture()
@@ -57,11 +59,13 @@ func TestOnBlockProposalRemoteOrigin(t *testing.T) {
 	state := &protocol.State{}
 	final := &protocol.Snapshot{}
 	con := &network.Conduit{}
+	metrics := newMetrics()
 
 	e := &Engine{
-		me:    me,
-		state: state,
-		con:   con,
+		me:      me,
+		state:   state,
+		con:     con,
+		metrics: metrics,
 	}
 
 	block := unittest.BlockFixture()
@@ -86,11 +90,13 @@ func TestOnBlockProposalIdentitiesError(t *testing.T) {
 	state := &protocol.State{}
 	final := &protocol.Snapshot{}
 	con := &network.Conduit{}
+	metrics := newMetrics()
 
 	e := &Engine{
-		me:    me,
-		state: state,
-		con:   con,
+		me:      me,
+		state:   state,
+		con:     con,
+		metrics: metrics,
 	}
 
 	block := unittest.BlockFixture()
@@ -116,11 +122,13 @@ func TestOnBlockProposalSubmitFail(t *testing.T) {
 	state := &protocol.State{}
 	final := &protocol.Snapshot{}
 	con := &network.Conduit{}
+	metrics := newMetrics()
 
 	e := &Engine{
-		me:    me,
-		state: state,
-		con:   con,
+		me:      me,
+		state:   state,
+		con:     con,
+		metrics: metrics,
 	}
 
 	block := unittest.BlockFixture()
@@ -144,4 +152,10 @@ func TestOnBlockProposalSubmitFail(t *testing.T) {
 	state.AssertExpectations(t)
 	final.AssertExpectations(t)
 	con.AssertExpectations(t)
+}
+
+func newMetrics() *module.Metrics {
+	metrics := &module.Metrics{}
+	metrics.On("StartBlockToSeal", mock.Anything).Return()
+	return metrics
 }
