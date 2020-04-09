@@ -62,9 +62,11 @@ func TestExecutionFlow(t *testing.T) {
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col1.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 				{
 					CollectionID: col2.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 			},
 		},
