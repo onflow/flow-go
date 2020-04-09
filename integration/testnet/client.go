@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// AccessClient is a GRPC client of the Observation API exposed by the Flow network.
+// AccessClient is a GRPC client of the Access API exposed by the Flow network.
 // NOTE: we use integration/client rather than sdk/client as a stopgap until
 // the SDK client is updated with the latest protobuf definitions.
 type Client struct {
@@ -20,6 +20,8 @@ type Client struct {
 	key    *flow.AccountPrivateKey
 }
 
+// NewClientWithKey returns a new client to an Access API listening at the given
+// address, using the given account key for signing transactions.
 func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error) {
 
 	client, err := client.NewAccessClient(addr)
@@ -34,6 +36,8 @@ func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error)
 	return tc, nil
 }
 
+// NewClient returns a new client to an Access API listening at the given
+// address, with a generated account key for signing transactions.
 func NewClient(addr string) (*Client, error) {
 	key, err := unittest.AccountKeyFixture()
 	if err != nil {
@@ -76,8 +80,8 @@ func (c *Client) SignTransaction(tx flow.TransactionBody) (flow.TransactionBody,
 	return tx, nil
 }
 
-// SendTransaction submits the transaction. The caller must set up the
-// transaction, including signing it.
+// SendTransaction submits the transaction to the Access API. The caller must
+// set up the transaction, including signing it.
 func (c *Client) SendTransaction(ctx context.Context, tx flow.TransactionBody) error {
 	return c.client.SendTransaction(ctx, tx)
 }
@@ -87,7 +91,7 @@ func (c *Client) SendTransaction(ctx context.Context, tx flow.TransactionBody) e
 func (c *Client) SignAndSendTransaction(ctx context.Context, tx flow.TransactionBody) error {
 	tx, err := c.SignTransaction(tx)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
 	return c.SendTransaction(ctx, tx)
@@ -99,7 +103,7 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, er
 
 	res, err := c.client.ExecuteScript(ctx, []byte(code))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not execute script: %w", err)
 	}
 
 	return res, nil
