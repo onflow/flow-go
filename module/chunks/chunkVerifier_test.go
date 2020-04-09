@@ -211,8 +211,8 @@ func (bc *blockContextMock) ExecuteScript(
 	return nil, nil
 }
 
-func (bc *blockContextMock) GetAccount(ledger virtualmachine.Ledger, address flow.Address) (*flow.Account, error) {
-	return nil, nil
+func (bc *blockContextMock) GetAccount(ledger virtualmachine.Ledger, address flow.Address) *flow.Account {
+	return nil
 }
 
 // virtualMachineMock is a mocked virtualMachine

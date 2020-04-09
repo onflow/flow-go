@@ -96,10 +96,6 @@ func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *state.View) 
 
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *state.View) (*flow.Account, error) {
 
-	result, err := e.vm.NewBlockContext(blockHeader).GetAccount(view, address)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get accont (internal error): %w", err)
-	}
-
+	result := e.vm.NewBlockContext(blockHeader).GetAccount(view, address)
 	return result, nil
 }
