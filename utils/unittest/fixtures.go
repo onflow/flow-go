@@ -28,6 +28,7 @@ func AccountSignatureFixture() flow.AccountSignature {
 	}
 }
 
+// AccountKeyFixture returns a randomly generated ECDSA/SHA3 account key.
 func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_P256)
 	_, err := rand.Read(seed)
