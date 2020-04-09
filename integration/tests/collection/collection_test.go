@@ -106,7 +106,8 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	})
 }
 
-func TestTransactionIngress_ValidTransaction(t *testing.T) {
+// test sending a single transaction
+func TestTransactionIngress_SingleCluster(t *testing.T) {
 
 	var (
 		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
@@ -123,7 +124,7 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
 	conf := testnet.NewNetworkConfig(nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, "col_valid_txns", conf)
+	net, err := testnet.PrepareFlowNetwork(t, "col_single_cluster", conf)
 	require.Nil(t, err)
 
 	net.Start(context.Background())
@@ -151,7 +152,7 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 		time.Sleep(10 * time.Second)
 
 		// TODO stop then start containers
-		err = net.StopContainers()
+		err = net.StopNetwork()
 		assert.Nil(t, err)
 
 		identities := net.Identities()
@@ -192,4 +193,32 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 
 		assert.True(t, foundTx)
 	})
+}
+
+func TestTransactionIngress_MultiCluster(t *testing.T) {
+
+	var (
+		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
+			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")
+		})
+		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
+			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
+		})
+		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
+			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000003")
+		})
+		colNode4 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
+			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000004")
+		})
+	)
+
+	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3, colNode4}, defaultOtherNodes()...)
+	conf := testnet.NewNetworkConfig(nodes)
+
+	net, err := testnet.PrepareFlowNetwork(t, "col_multi_cluster", conf)
+	require.Nil(t, err)
+
+	net.Start(context.Background())
+	defer net.Cleanup()
+
 }
