@@ -183,7 +183,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	collectionsStorage := storage.NewCollections(node.DB)
 	eventsStorage := storage.NewEvents(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
-	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
 
@@ -195,7 +194,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	_, err = bootstrap.BootstrapLedger(ls)
 	require.NoError(t, err)
 
-	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, chunkDataPackStorage, executionResults)
+	execState := state.NewExecutionState(ls, commitsStorage, chunkDataPackStorage, executionResults)
 
 	providerEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
 	require.NoError(t, err)
@@ -284,16 +283,6 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
-	if node.ChunkStates == nil {
-		node.ChunkStates, err = stdmap.NewChunkStates(1000)
-		require.Nil(t, err)
-	}
-
-	if node.ChunkStateTracker == nil {
-		node.ChunkStateTracker, err = stdmap.NewChunkStateTrackers(1000)
-		require.Nil(t, err)
-	}
-
 	if node.ChunkDataPacks == nil {
 		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
 		require.Nil(t, err)
@@ -327,8 +316,6 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.AuthCollections,
 			node.PendingCollections,
 			node.CollectionTrackers,
-			node.ChunkStates,
-			node.ChunkStateTracker,
 			node.ChunkDataPacks,
 			node.ChunkDataPackTrackers,
 			node.BlockStorage,

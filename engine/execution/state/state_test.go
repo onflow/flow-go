@@ -1,7 +1,6 @@
 package state_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -30,13 +29,11 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 			stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
 
-			chunkHeaders := new(storage.ChunkHeaders)
-
 			chunkDataPacks := new(storage.ChunkDataPacks)
 
 			executionResults := new(storage.ExecutionResults)
 
-			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders, chunkDataPacks, executionResults)
+			es := state.NewExecutionState(ls, stateCommitments, chunkDataPacks, executionResults)
 
 			f(t, es)
 		})
@@ -145,95 +142,4 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 		assert.Empty(t, b2)
 	}))
-}
-
-func TestState_GetChunkRegisters(t *testing.T) {
-	t.Run("non-existent chunk", func(t *testing.T) {
-		ls := new(storage.Ledger)
-		sc := new(storage.Commits)
-		ch := new(storage.ChunkHeaders)
-		cdp := new(storage.ChunkDataPacks)
-
-		er := new(storage.ExecutionResults)
-
-		chunkID := unittest.IdentifierFixture()
-
-		ch.On("ByID", chunkID).Return(nil, fmt.Errorf("storage error"))
-
-		es := state.NewExecutionState(ls, sc, ch, cdp, er)
-
-		ledger, err := es.GetChunkRegisters(chunkID)
-		assert.Nil(t, ledger)
-		assert.Error(t, err)
-
-		ch.AssertExpectations(t)
-		ls.AssertExpectations(t)
-		sc.AssertExpectations(t)
-		er.AssertExpectations(t)
-	})
-
-	t.Run("ledger storage error", func(t *testing.T) {
-		ls := new(storage.Ledger)
-		sc := new(storage.Commits)
-		ch := new(storage.ChunkHeaders)
-		cdp := new(storage.ChunkDataPacks)
-
-		er := new(storage.ExecutionResults)
-
-		chunkHeader := unittest.ChunkHeaderFixture()
-		chunkID := chunkHeader.ChunkID
-
-		registerIDs := chunkHeader.RegisterIDs
-
-		ch.On("ByID", chunkID).Return(&chunkHeader, nil)
-		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).
-			Return(nil, fmt.Errorf("storage error"))
-
-		es := state.NewExecutionState(ls, sc, ch, cdp, er)
-
-		registers, err := es.GetChunkRegisters(chunkID)
-		assert.Error(t, err)
-		assert.Nil(t, registers)
-
-		ch.AssertExpectations(t)
-		ls.AssertExpectations(t)
-		sc.AssertExpectations(t)
-		er.AssertExpectations(t)
-	})
-
-	t.Run("existing chunk", func(t *testing.T) {
-		ls := new(storage.Ledger)
-		sc := new(storage.Commits)
-		ch := new(storage.ChunkHeaders)
-		cdp := new(storage.ChunkDataPacks)
-
-		er := new(storage.ExecutionResults)
-
-		chunkHeader := unittest.ChunkHeaderFixture()
-		chunkID := chunkHeader.ChunkID
-
-		registerIDs := chunkHeader.RegisterIDs
-		registerValues := []flow.RegisterValue{{1}, {2}, {3}}
-
-		ch.On("ByID", chunkID).Return(&chunkHeader, nil)
-		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).Return(registerValues, nil)
-
-		es := state.NewExecutionState(ls, sc, ch, cdp, er)
-
-		actualRegisters, err := es.GetChunkRegisters(chunkID)
-		assert.NoError(t, err)
-
-		expectedRegisters := flow.Ledger{
-			string(registerIDs[0]): registerValues[0],
-			string(registerIDs[1]): registerValues[1],
-			string(registerIDs[2]): registerValues[2],
-		}
-
-		assert.Equal(t, expectedRegisters, actualRegisters)
-
-		ch.AssertExpectations(t)
-		ls.AssertExpectations(t)
-		sc.AssertExpectations(t)
-		er.AssertExpectations(t)
-	})
 }
