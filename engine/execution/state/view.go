@@ -41,6 +41,9 @@ func (v *View) NewChild() *View {
 func (v *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
 	value, exists := v.delta.Get(key)
 	if exists {
+		// every time we read a value (order preserving)
+		// we append the value to the end of the SpocksSecret byte slice
+		v.spockSecret = append(v.spockSecret, value...)
 		return value, nil
 	}
 
@@ -52,6 +55,9 @@ func (v *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
 	// capture register touch
 	v.regTouchSet[string(key)] = true
 
+	// every time we read a value (order preserving)
+	// we append the value to the end of the SpocksSecret byte slice
+	v.spockSecret = append(v.spockSecret, value...)
 	return value, nil
 }
 

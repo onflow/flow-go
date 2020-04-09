@@ -109,6 +109,7 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID2, flow.RegisterValue("1"))
 		v.Set(registerID3, flow.RegisterValue("2"))
 		v.Set(registerID1, flow.RegisterValue("3"))
+		v.Get(registerID1)
 		// this part checks that delete functionality
 		// doesn't impact secret
 		v.Delete(registerID1)
@@ -119,7 +120,7 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID3, flow.RegisterValue("6"))
 
 		s := v.SpockSecret()
-		assert.Equal(t, s, []byte("123456"))
+		assert.Equal(t, s, []byte("1233456"))
 	})
 }
 
