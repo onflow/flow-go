@@ -19,7 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	obs "github.com/dapperlabs/flow-go/engine/access/mock"
-	"github.com/dapperlabs/flow-go/engine/access/rpc"
+	handler2 "github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -74,7 +74,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		// create storage
 		collections := bstorage.NewCollections(db)
 		transactions := bstorage.NewTransactions(db)
-		handler := rpc.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions)
+		handler := handler2.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions)
 
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
 		sendReq := &access.SendTransactionRequest{
@@ -124,7 +124,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		err := db.Update(operation.InsertNumber(block2.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		handler := rpc.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil)
+		handler := handler2.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil)
 
 		assertHeaderResp := func(resp *access.BlockHeaderResponse, err error, header *flow.Header) {
 			require.NoError(suite.T(), err)
@@ -219,7 +219,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
-		handler := rpc.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, collections, transactions)
+		handler := handler2.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, collections, transactions)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
