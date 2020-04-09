@@ -234,7 +234,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		assert.True(t, result.Succeeded())
 		assert.NoError(t, result.Error)
 		require.Len(t, result.Events, 1)
-		assert.EqualValues(t, "flow.AccountCreated", result.Events[0].Type.ID())
+		assert.EqualValues(t, flow.EventAccountCreated, result.Events[0].Type.ID())
 
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 		value := fmt.Sprintf("%v", result.Events[0].Fields[0].Value)
@@ -254,9 +254,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
 
-			account, err := bc.GetAccount(ledger, address)
+			account := bc.GetAccount(ledger, address)
 
-			assert.NoError(t, err)
 			assert.Len(t, account.Keys, 1)
 			actualKey := account.Keys[0].PublicKey
 			assert.Equal(t, expectedKey, actualKey)
@@ -266,7 +265,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	// non-happy path - get an account that was never created
 	t.Run("get a non-existing account", func(t *testing.T) {
 		address := flow.HexToAddress(fmt.Sprintf("%d", count+1))
-		account, _ := bc.GetAccount(ledger, address)
+		account := bc.GetAccount(ledger, address)
 		assert.Nil(t, account)
 	})
 }
