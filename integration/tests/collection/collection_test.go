@@ -51,10 +51,8 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 
 	ctx := context.Background()
 
-	startCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	net.Start(startCtx)
-	cancel()
-	defer net.Stop()
+	net.Start(ctx)
+	defer net.Cleanup()
 
 	// we will test against COL1
 	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
@@ -133,9 +131,7 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 
 	ctx := context.Background()
 
-	startCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	net.Start(startCtx)
-	cancel()
+	net.Start(ctx)
 	defer net.Cleanup()
 
 	// we will test against COL1
