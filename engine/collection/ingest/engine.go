@@ -180,7 +180,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
 	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
-		return ErrIncompleteTransaction{missing: missingFields}
+		return ErrIncompleteTransaction{Missing: missingFields}
 	}
 
 	// TODO check account/payer signatures

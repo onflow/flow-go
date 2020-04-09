@@ -15,6 +15,7 @@ import (
 type ContainerConfig struct {
 	bootstrap.NodeInfo
 	ContainerName string
+	LogLevel      string
 }
 
 // ImageName returns the Docker image name for the given config.
