@@ -116,7 +116,8 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	})
 }
 
-// test sending a single transaction
+// test sending a single valid transaction to a single cluster
+// the transaction should be included in
 func TestTransactionIngress_SingleCluster(t *testing.T) {
 
 	var (
@@ -145,64 +146,61 @@ func TestTransactionIngress_SingleCluster(t *testing.T) {
 
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", port))
 
-	t.Run("valid transaction", func(t *testing.T) {
-		tx := unittest.TransactionBodyFixture()
-		tx, err := client.SignTransaction(tx)
+	tx := unittest.TransactionBodyFixture()
+	tx, err = client.SignTransaction(tx)
+	assert.Nil(t, err)
+	t.Log("sending transaction: ", tx.ID())
+
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+	err = client.SendTransaction(ctx, tx)
+	assert.Nil(t, err)
+
+	// wait for consensus to complete
+	//TODO we should listen for collection guarantees instead, but this is blocked
+	// ref: https://github.com/dapperlabs/flow-go/issues/3021
+	time.Sleep(10 * time.Second)
+
+	err = net.Remove()
+	assert.Nil(t, err)
+
+	identities := net.Identities()
+
+	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
+
+	// get database for COL1
+	db, err := colContainer1.DB()
+	require.Nil(t, err)
+
+	state, err := clusterstate.NewState(db, chainID)
+	assert.Nil(t, err)
+
+	// the transaction should be included in exactly one collection
+	head, err := state.Final().Head()
+	assert.Nil(t, err)
+
+	foundTx := false
+	for head.Height > 0 {
+		collection, err := state.AtBlockID(head.ID()).Collection()
 		assert.Nil(t, err)
-		t.Log("sending transaction: ", tx.ID())
 
-		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-		defer cancel()
-		err = client.SendTransaction(ctx, tx)
+		head, err = state.AtBlockID(head.ParentID).Head()
 		assert.Nil(t, err)
 
-		// wait for consensus to complete
-		//TODO we should listen for collection guarantees instead, but this is blocked
-		// ref: https://github.com/dapperlabs/flow-go/issues/3021
-		time.Sleep(10 * time.Second)
-
-		// TODO stop then start containers
-		err = net.StopNetwork()
-		assert.Nil(t, err)
-
-		identities := net.Identities()
-
-		chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
-
-		// get database for COL1
-		db, err := colContainer1.DB()
-		require.Nil(t, err)
-
-		state, err := clusterstate.NewState(db, chainID)
-		assert.Nil(t, err)
-
-		// the transaction should be included in exactly one collection
-		head, err := state.Final().Head()
-		assert.Nil(t, err)
-
-		foundTx := false
-		for head.Height > 0 {
-			collection, err := state.AtBlockID(head.ID()).Collection()
-			assert.Nil(t, err)
-
-			head, err = state.AtBlockID(head.ParentID).Head()
-			assert.Nil(t, err)
-
-			if collection.Len() == 0 {
-				continue
-			}
-
-			for _, txID := range collection.Transactions {
-				assert.Equal(t, tx.ID(), txID, "found unexpected transaction")
-				if txID == tx.ID() {
-					assert.False(t, foundTx, "found duplicate transaction")
-					foundTx = true
-				}
-			}
+		if collection.Len() == 0 {
+			continue
 		}
 
-		assert.True(t, foundTx)
-	})
+		for _, txID := range collection.Transactions {
+			assert.Equal(t, tx.ID(), txID, "found unexpected transaction")
+			if txID == tx.ID() {
+				assert.False(t, foundTx, "found duplicate transaction")
+				foundTx = true
+			}
+		}
+	}
+
+	assert.True(t, foundTx)
 }
 
 func TestTransactionIngress_MultiCluster(t *testing.T) {
