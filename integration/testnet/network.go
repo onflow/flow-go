@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
@@ -14,12 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 
+	"github.com/dapperlabs/testingdock"
+
 	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/dapperlabs/testingdock"
 )
 
 const (
@@ -151,6 +153,30 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 	}
 
 	return c
+}
+
+func WithID(id flow.Identifier) func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.Identifier = id
+	}
+}
+
+// WithIDInt sets the node ID so the hex representation matches the input.
+// Useful for having consistent and easily readable IDs in test logs.
+func WithIDInt(id uint) func(config *NodeConfig) {
+
+	idStr := strconv.Itoa(int(id))
+	// left pad ID with zeros
+	pad := make([]rune, 64-len(idStr))
+
+	// convert hex to ID
+	hex := string(pad) + idStr
+	flowID, err := flow.HexStringToIdentifier(hex)
+	if err != nil {
+		panic(err)
+	}
+
+	return WithID(flowID)
 }
 
 func WithLogLevel(level string) func(config *NodeConfig) {

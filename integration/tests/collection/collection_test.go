@@ -36,15 +36,9 @@ func defaultOtherNodes() []testnet.NodeConfig {
 // any collection.
 func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")
-		})
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
-		})
-		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000003")
-		})
+		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
+		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
+		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
 	)
 
 	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
