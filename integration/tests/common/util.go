@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// deployCounter deploys a counter contract using the given client.
 func deployCounter(ctx context.Context, client *testnet.Client) error {
 
 	contract := dsl.Contract{
@@ -40,6 +41,8 @@ func deployCounter(ctx context.Context, client *testnet.Client) error {
 	return client.DeployContract(ctx, contract)
 }
 
+// readCounter executes a script to read the value of a counter. The counter
+// must have been deployed and created.
 func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
 	script := dsl.Main{
@@ -61,6 +64,8 @@ func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 	return int(i.Value.Int64()), nil
 }
 
+// createCounter creates a counter instance in the root account. The counter
+// contract must first have been deployed.
 func createCounter(ctx context.Context, client *testnet.Client) error {
 
 	txDSL := dsl.Transaction{
@@ -78,5 +83,4 @@ func createCounter(ctx context.Context, client *testnet.Client) error {
 
 	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
 	return client.SendTransaction(ctx, tx)
-
 }

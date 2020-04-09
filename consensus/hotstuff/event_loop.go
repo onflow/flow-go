@@ -8,26 +8,28 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/dapperlabs/flow-go/module"
 )
 
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
 type EventLoop struct {
 	log          zerolog.Logger
 	eventHandler EventHandler
+	metrics      module.Metrics
 	proposals    chan *model.Proposal
 	votes        chan *model.Vote
 	started      *atomic.Bool
 }
 
 // NewEventLoop creates an instance of EventLoop.
-func NewEventLoop(log zerolog.Logger, eventHandler EventHandler) (*EventLoop, error) {
+func NewEventLoop(log zerolog.Logger, metrics module.Metrics, eventHandler EventHandler) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
 	votes := make(chan *model.Vote)
 
 	el := &EventLoop{
 		log:          log,
 		eventHandler: eventHandler,
+		metrics:      metrics,
 		proposals:    proposals,
 		votes:        votes,
 		started:      atomic.NewBool(false),
@@ -67,13 +69,12 @@ func (el *EventLoop) processEvent() error {
 		// measure how long it takes for a timeout event to go through
 		// eventloop and get handled
 		busyDuration := time.Since(t)
-		el.log.Debug().Dur("busy_duration", busyDuration).
-			Msg("busy duration to handle local timeout")
+		el.metrics.HotStuffBusyDuration(busyDuration)
 
 		// meansure how long the event loop was idle waiting for an
 		// incoming event
 		idleDuration := time.Since(idleStart)
-		el.log.Debug().Dur("idle_duration", idleDuration)
+		el.metrics.HotStuffIdleDuration(idleDuration)
 
 		err = el.eventHandler.OnLocalTimeout()
 	default:
@@ -87,21 +88,20 @@ func (el *EventLoop) processEvent() error {
 	select {
 	case t := <-timeoutChannel:
 		busyDuration := time.Since(t)
-		el.log.Debug().Dur("busy_duration", busyDuration).
-			Msg("busy duration to handle local timeout")
+		el.metrics.HotStuffBusyDuration(busyDuration)
 
 		idleDuration := time.Since(idleStart)
-		el.log.Debug().Dur("idle_duration", idleDuration)
+		el.metrics.HotStuffBusyDuration(idleDuration)
 
 		err = el.eventHandler.OnLocalTimeout()
 	case p := <-el.proposals:
 		idleDuration := time.Since(idleStart)
-		el.log.Debug().Dur("idle_duration", idleDuration)
+		el.metrics.HotStuffBusyDuration(idleDuration)
 
 		err = el.eventHandler.OnReceiveProposal(p)
 	case v := <-el.votes:
 		idleDuration := time.Since(idleStart)
-		el.log.Debug().Dur("idle_duration", idleDuration)
+		el.metrics.HotStuffBusyDuration(idleDuration)
 
 		err = el.eventHandler.OnReceiveVote(v)
 	}
@@ -117,10 +117,7 @@ func (el *EventLoop) OnReceiveProposal(proposal *model.Proposal) {
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
 	busyDuration := time.Since(received)
-	el.log.Debug().Hex("block_ID", logging.ID(proposal.Block.BlockID)).
-		Uint64("view", proposal.Block.View).
-		Dur("busy_duration", busyDuration).
-		Msg("busy duration to handle a proposal")
+	el.metrics.HotStuffBusyDuration(busyDuration)
 }
 
 // OnReceiveVote pushes the received vote to the votes channel
@@ -132,10 +129,7 @@ func (el *EventLoop) OnReceiveVote(vote *model.Vote) {
 	// the busy duration is measured as how long it takes from a vote being
 	// received to a vote being handled by the event handler.
 	busyDuration := time.Since(received)
-	el.log.Debug().Hex("vote_id", logging.ID(vote.BlockID)).
-		Uint64("view", vote.View).
-		Dur("busy_duration", busyDuration).
-		Msg("busy duration to handle a vote")
+	el.metrics.HotStuffBusyDuration(busyDuration)
 }
 
 // Start will start the event handler then enter the loop

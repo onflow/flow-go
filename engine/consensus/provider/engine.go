@@ -21,22 +21,24 @@ import (
 // to create a different underlying protocol for consensus nodes, which have a
 // higher priority to receive block proposals, and other nodes
 type Engine struct {
-	unit  *engine.Unit    // used for concurrency & shutdown
-	log   zerolog.Logger  // used to log relevant actions with context
-	con   network.Conduit // used to talk to other nodes on the network
-	state protocol.State  // used to access the  protocol state
-	me    module.Local    // used to access local node information
+	unit    *engine.Unit    // used for concurrency & shutdown
+	log     zerolog.Logger  // used to log relevant actions with context
+	metrics module.Metrics  // used to trace the duration of certain operations for metrics
+	con     network.Conduit // used to talk to other nodes on the network
+	state   protocol.State  // used to access the  protocol state
+	me      module.Local    // used to access local node information
 }
 
 // New creates a new block provider engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.Metrics, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "provider").Logger(),
-		state: state,
-		me:    me,
+		unit:    engine.NewUnit(),
+		log:     log.With().Str("engine", "provider").Logger(),
+		metrics: metrics,
+		state:   state,
+		me:      me,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -118,6 +120,9 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 		Hex("origin_id", originID[:]).
 		Hex("block_id", logging.Entity(block)).
 		Msg("block submitted")
+
+	// reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+	e.metrics.StartBlockToSeal(block.ID())
 
 	// currently, only accept blocks that come from our local consensus
 	localID := e.me.NodeID()

@@ -6,6 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
@@ -43,6 +46,8 @@ const (
 	ColNodeAPIPort = "col-ingress-port"
 	// ExeNodeAPIPort is the name used for the execution node API port.
 	ExeNodeAPIPort = "exe-api-port"
+	// AccessNodeAPIPort is the name used for the access node API port.
+	AccessNodeAPIPort = "access-api-port"
 )
 
 func init() {
@@ -51,11 +56,12 @@ func init() {
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	suite      *testingdock.Suite
-	config     NetworkConfig
-	cli        *dockerclient.Client
-	network    *testingdock.Network
-	Containers []*Container
+	suite       *testingdock.Suite
+	config      NetworkConfig
+	cli         *dockerclient.Client
+	network     *testingdock.Network
+	Containers  []*Container
+	AccessPorts map[string]string
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -152,13 +158,25 @@ func WithClusters(n uint) func(*NetworkConfig) {
 	}
 }
 
+func (n *NetworkConfig) Len() int {
+	return len(n.Nodes)
+}
+
+func (n *NetworkConfig) Less(i, j int) bool {
+	return n.Nodes[i].Role < n.Nodes[j].Role
+}
+
+func (n *NetworkConfig) Swap(i, j int) {
+	n.Nodes[i], n.Nodes[j] = n.Nodes[j], n.Nodes[i]
+}
+
 // NodeConfig defines the input config for a particular node, specified prior
 // to network creation.
 type NodeConfig struct {
 	Role       flow.Role
 	Stake      uint64
 	Identifier flow.Identifier
-	LogLevel   string
+	LogLevel   zerolog.Level
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -166,7 +184,7 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 		Role:       role,
 		Stake:      1000,                         // default stake
 		Identifier: unittest.IdentifierFixture(), // default random ID
-		LogLevel:   "debug",                      // log at debug by default
+		LogLevel:   zerolog.DebugLevel,           // log at debug by default
 	}
 
 	for _, apply := range opts {
@@ -176,9 +194,33 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 	return c
 }
 
+func WithID(id flow.Identifier) func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.Identifier = id
+	}
+}
+
+// WithIDInt sets the node ID so the hex representation matches the input.
+// Useful for having consistent and easily readable IDs in test logs.
+func WithIDInt(id uint) func(config *NodeConfig) {
+
+	idStr := strconv.Itoa(int(id))
+	// left pad ID with zeros
+	pad := strings.Repeat("0", 64-len(idStr))
+	hex := pad + idStr
+
+	// convert hex to ID
+	flowID, err := flow.HexStringToIdentifier(hex)
+	if err != nil {
+		panic(err)
+	}
+
+	return WithID(flowID)
+}
+
 func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
-		config.LogLevel = level.String()
+		config.LogLevel = level
 	}
 }
 
@@ -190,6 +232,9 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 	if nNodes == 0 {
 		return nil, fmt.Errorf("must specify at least one node")
 	}
+
+	// Sort so that access nodes start up last
+	sort.Sort(&networkConf)
 
 	// set up docker client
 	dockerClient, err := dockerclient.NewClientWithOpts(
@@ -254,11 +299,12 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 	}
 
 	flowNetwork := &FlowNetwork{
-		cli:        dockerClient,
-		config:     networkConf,
-		suite:      suite,
-		network:    network,
-		Containers: make([]*Container, 0, nNodes),
+		cli:         dockerClient,
+		config:      networkConf,
+		suite:       suite,
+		network:     network,
+		Containers:  make([]*Container, 0, nNodes),
+		AccessPorts: make(map[string]string),
 	}
 
 	// add each node to the network
@@ -333,7 +379,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 		nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 		nodeContainer.Ports[ColNodeAPIPort] = hostPort
-
+		net.AccessPorts[ColNodeAPIPort] = hostPort
 	case flow.RoleExecution:
 
 		hostPort := testingdock.RandomPort(t)
@@ -344,6 +390,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 		nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 		nodeContainer.Ports[ExeNodeAPIPort] = hostPort
+		net.AccessPorts[ExeNodeAPIPort] = hostPort
 
 		// create directories for execution state trie and values in the tmp
 		// host directory.
@@ -361,6 +408,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	suiteContainer := net.suite.Container(*opts)
 	net.network.After(suiteContainer)
 	nodeContainer.Container = suiteContainer
+	net.Containers = append(net.Containers, nodeContainer)
 
 	return nil
 }
@@ -405,7 +453,7 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 		containerConf := ContainerConfig{
 			NodeInfo:      info,
 			ContainerName: name,
-			LogLevel:      conf.LogLevel,
+			LogLevel:      conf.LogLevel.String(),
 		}
 
 		confs = append(confs, containerConf)

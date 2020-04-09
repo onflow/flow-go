@@ -28,6 +28,7 @@ func AccountSignatureFixture() flow.AccountSignature {
 	}
 }
 
+// AccountKeyFixture returns a randomly generated ECDSA/SHA3 account key.
 func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_P256)
 	_, err := rand.Read(seed)
@@ -533,14 +534,6 @@ func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 		Block:      &block,
 		Receipt:    &receipt,
 		Collection: &col,
-	}
-}
-
-func ChunkHeaderFixture() flow.ChunkHeader {
-	return flow.ChunkHeader{
-		ChunkID:     IdentifierFixture(),
-		StartState:  StateCommitmentFixture(),
-		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
 	}
 }
 

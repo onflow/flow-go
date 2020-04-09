@@ -11,6 +11,6 @@ import (
 type Tracer interface {
 	module.ReadyDoneAware
 	StartSpan(entity flow.Identifier, spanName string, opts ...opentracing.StartSpanOption) opentracing.Span
-	FinishSpan(entity flow.Identifier)
-	GetSpan(entity flow.Identifier) (opentracing.Span, bool)
+	FinishSpan(entity flow.Identifier, spanName string)
+	GetSpan(entity flow.Identifier, spanName string) (opentracing.Span, bool)
 }

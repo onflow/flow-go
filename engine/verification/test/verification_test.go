@@ -49,7 +49,9 @@ func TestHappyPath(t *testing.T) {
 	a := chmodel.NewAssignment()
 	for i := 0; i < chunkNum; i++ {
 		if isAssigned(i, chunkNum) {
-			a.Add(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
+			chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
+			require.True(t, ok, "chunk out of range requested")
+			a.Add(chunk, []flow.Identifier{verNode.Me.NodeID()})
 		}
 	}
 	assigner.On("Assign",
@@ -62,39 +64,19 @@ func TestHappyPath(t *testing.T) {
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
 	exeEngine := new(network.Engine)
-	exeChunkStateConduit, err := exeNode.Net.Register(engine.ExecutionStateProvider, exeEngine)
-	assert.Nil(t, err)
+
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
-	exeChunkStateSeen := make(map[flow.Identifier]struct{})
 	exeChunkDataSeen := make(map[flow.Identifier]struct{})
 
 	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			if req, ok := args[1].(*messages.ExecutionStateRequest); ok {
+			if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
 				require.True(t, ok)
 				for i := 0; i < chunkNum; i++ {
-					chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
-					if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
-						// each assigned chunk state should be requested only once
-						_, ok := exeChunkStateSeen[chunkID]
-						require.False(t, ok)
-						exeChunkStateSeen[chunkID] = struct{}{}
-
-						// publishes the execution state response to the network
-						res := &messages.ExecutionStateResponse{
-							State: *completeER.ChunkStates[i],
-						}
-						err := exeChunkStateConduit.Submit(res, verIdentity.NodeID)
-						assert.Nil(t, err)
-						return
-					}
-				}
-				require.Error(t, fmt.Errorf(" requested an unidentifed chunk state %v", req))
-			} else if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
-				require.True(t, ok)
-				for i := 0; i < chunkNum; i++ {
-					chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
+					chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
+					require.True(t, ok, "chunk out of range requested")
+					chunkID := chunk.ID()
 					if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
 						// each assigned chunk data pack should be requested only once
 						_, ok := exeChunkDataSeen[chunkID]
@@ -120,9 +102,7 @@ func TestHappyPath(t *testing.T) {
 		// half of the chunks assigned to the verification node
 		// for each chunk the verification node contacts execution node
 		// once for chunk data pack
-		// once for chunk state
-		// total number of calls is then chunkNum/2 * 2 = chunkNum
-		Times(chunkNum)
+		Times(chunkNum / 2)
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
@@ -164,30 +144,9 @@ func TestHappyPath(t *testing.T) {
 		return verNode.AuthReceipts.Has(completeER.Receipt.ID())
 	}, time.Second, 50*time.Millisecond)
 
-	// flush the chunk state request
+	// flush the collection request
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
 	assert.True(t, ok)
-	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.ExecutionStateProvider
-	})
-
-	// flush the chunk state response
-	exeNet, ok := hub.GetNetwork(exeIdentity.NodeID)
-	assert.True(t, ok)
-	exeNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.ExecutionStateProvider
-	})
-
-	// only assigned chunks state should be added to the mempool
-	for i := 0; i < chunkNum; i++ {
-		if isAssigned(i, chunkNum) {
-			assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
-		} else {
-			assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[i].ID()))
-		}
-	}
-
-	// flush the collection request
 	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})
@@ -198,6 +157,8 @@ func TestHappyPath(t *testing.T) {
 	colNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})
+
+	// TODO add chunk data pack request and response
 
 	// flush the result approval broadcast
 	verNet.DeliverAll(true)

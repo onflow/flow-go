@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -17,6 +18,8 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
+
+const defaultTimeout = 10 * time.Second
 
 // default set of non-collection nodes
 func defaultOtherNodes() []testnet.NodeConfig {
@@ -31,17 +34,14 @@ func defaultOtherNodes() []testnet.NodeConfig {
 	return []testnet.NodeConfig{conNode1, conNode2, conNode3, exeNode, verNode}
 }
 
+// Tests sending various invalid transactions to a single-cluster configuration
+// and ensures that they are rejected by the collection node and not included in
+// any collection.
 func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")
-		})
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
-		})
-		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000003")
-		})
+		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
+		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
+		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
 	)
 
 	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
@@ -50,7 +50,9 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	net, err := testnet.PrepareFlowNetwork(t, "col_invalid_txns", conf)
 	require.Nil(t, err)
 
-	net.Start(context.Background())
+	ctx := context.Background()
+
+	net.Start(ctx)
 	defer net.Cleanup()
 
 	// we will test against COL1
@@ -68,16 +70,24 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 		malformed := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
 		malformed.ReferenceBlockID = flow.ZeroID
 
-		err := client.SignAndSendTransaction(context.Background(), malformed)
-		assert.Error(t, err)
+		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
+
+		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+		err := client.SignAndSendTransaction(ctx, malformed)
+		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
 
 	t.Run("missing script", func(t *testing.T) {
 		malformed := unittest.TransactionBodyFixture()
 		malformed.Script = nil
 
-		err := client.SignAndSendTransaction(context.Background(), malformed)
-		assert.Error(t, err)
+		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
+
+		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+		err := client.SignAndSendTransaction(ctx, malformed)
+		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
 
 	t.Run("unparseable script", func(t *testing.T) {
@@ -110,15 +120,9 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 func TestTransactionIngress_SingleCluster(t *testing.T) {
 
 	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")
-		})
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
-		})
-		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000003")
-		})
+		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
+		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
+		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
 	)
 
 	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
@@ -127,7 +131,9 @@ func TestTransactionIngress_SingleCluster(t *testing.T) {
 	net, err := testnet.PrepareFlowNetwork(t, "col_single_cluster", conf)
 	require.Nil(t, err)
 
-	net.Start(context.Background())
+	ctx := context.Background()
+
+	net.Start(ctx)
 	defer net.Cleanup()
 
 	// we will test against COL1
@@ -145,10 +151,14 @@ func TestTransactionIngress_SingleCluster(t *testing.T) {
 		assert.Nil(t, err)
 		t.Log("sending transaction: ", tx.ID())
 
-		err = client.SendTransaction(context.Background(), tx)
+		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+		err = client.SendTransaction(ctx, tx)
 		assert.Nil(t, err)
 
 		// wait for consensus to complete
+		//TODO we should listen for collection guarantees instead, but this is blocked
+		// ref: https://github.com/dapperlabs/flow-go/issues/3021
 		time.Sleep(10 * time.Second)
 
 		// TODO stop then start containers
