@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
@@ -167,10 +168,10 @@ func WithIDInt(id uint) func(config *NodeConfig) {
 
 	idStr := strconv.Itoa(int(id))
 	// left pad ID with zeros
-	pad := make([]rune, 64-len(idStr))
+	pad := strings.Repeat("0", 64-len(idStr))
+	hex := pad + idStr
 
 	// convert hex to ID
-	hex := string(pad) + idStr
 	flowID, err := flow.HexStringToIdentifier(hex)
 	if err != nil {
 		panic(err)
