@@ -18,6 +18,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+const defaultTimeout = 5 * time.Second
+
 // default set of non-collection nodes
 func defaultOtherNodes() []testnet.NodeConfig {
 	var (
@@ -47,7 +49,11 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	net, err := testnet.PrepareFlowNetwork(t, "col_invalid_txns", conf)
 	require.Nil(t, err)
 
-	net.Start(context.Background())
+	ctx := context.Background()
+
+	startCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	net.Start(startCtx)
+	cancel()
 	defer net.Stop()
 
 	// we will test against COL1
@@ -67,7 +73,9 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 
 		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
 
-		err := client.SignAndSendTransaction(context.Background(), malformed)
+		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+		err := client.SignAndSendTransaction(ctx, malformed)
 		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
 
@@ -77,7 +85,9 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 
 		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
 
-		err := client.SignAndSendTransaction(context.Background(), malformed)
+		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+		err := client.SignAndSendTransaction(ctx, malformed)
 		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
 
@@ -127,7 +137,11 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 	net, err := testnet.PrepareFlowNetwork(t, "col_valid_txns", conf)
 	require.Nil(t, err)
 
-	net.Start(context.Background())
+	ctx := context.Background()
+
+	startCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	net.Start(startCtx)
+	cancel()
 	defer net.Cleanup()
 
 	// we will test against COL1
@@ -145,7 +159,9 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 		assert.Nil(t, err)
 		t.Log("sending transaction: ", tx.ID())
 
-		err = client.SendTransaction(context.Background(), tx)
+		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+		err = client.SendTransaction(ctx, tx)
 		assert.Nil(t, err)
 
 		// wait for consensus to complete
