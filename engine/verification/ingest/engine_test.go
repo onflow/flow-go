@@ -547,8 +547,6 @@ func (suite *TestSuite) TestChunkStateTracker_UntrackedChunkState() {
 // TestVerifyReady evaluates that the verifier engine should be called
 // when the receipt is ready regardless of
 // the order in which dependent resources are received.
-// TODO add mempool cleanup check after the functionality gets back
-// https://github.com/dapperlabs/flow-go/issues/2750
 func (suite *TestSuite) TestVerifyReady() {
 
 	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
@@ -598,6 +596,14 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.authCollections.On("Add", suite.collection).Return(nil)
 			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
+			// engine has not yet ingested this receipt and chunk
+			suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false).Once()
+
+			for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+				suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
+				suite.ingestedChunkIDs.On("Add", chunk).Return(nil)
+			}
+
 			// we have all dependencies
 			suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 
@@ -613,6 +619,7 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			suite.chunkStateTracker.On("ByChunkID", suite.chunkState.ID()).Return(stateTracker, nil)
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
+			suite.chunkDataPacks.On("Rem", suite.chunkDataPack.ID()).Return(true)
 
 			suite.authReceipts.On("Add", suite.receipt).Return(nil)
 			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)

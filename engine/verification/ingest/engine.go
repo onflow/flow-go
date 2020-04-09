@@ -748,7 +748,6 @@ func (e *Engine) checkPendingChunks() {
 
 			// cleans up resources of the ingested chunk from mempools
 			e.authCollections.Rem(collection.ID())
-			e.chunkStates.Rem(chunkState.ID())
 			e.chunkDataPacks.Rem(chunkDatapack.ID())
 
 		}
