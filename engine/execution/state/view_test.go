@@ -328,8 +328,5 @@ func TestView_RegisterTouches(t *testing.T) {
 
 		touches := v.RegisterTouches()
 		assert.Len(t, touches, 2)
-
-		assert.Equal(t, registerID1, touches[0])
-		assert.Equal(t, registerID2, touches[1])
 	})
 }
