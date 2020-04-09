@@ -663,21 +663,6 @@ func (e *Engine) checkPendingChunks() {
 			continue
 		}
 
-		if len(mychunks) == 0 {
-			// no un-ingested chunk remains with this receipt
-			// marks execution result as ingested
-			err := e.ingestedResultIDs.Add(&receipt.ExecutionResult)
-			if err != nil {
-				e.log.Error().
-					Err(err).
-					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-					Msg("could add ingested result to mempool")
-				continue
-			}
-			// removes receipt from mempool to avoid further iteration
-			e.authReceipts.Rem(receipt.ID())
-		}
-
 		for _, chunk := range mychunks {
 			chunkState, chunkStateReady := e.getChunkStateForReceipt(receipt, chunk.ID())
 			if !chunkStateReady {
@@ -746,11 +731,42 @@ func (e *Engine) checkPendingChunks() {
 					Msg("could not add chunk to ingested chunks mempool")
 			}
 
-			// cleans up resources of the ingested chunk from mempools
-			e.authCollections.Rem(collection.ID())
-			e.chunkDataPacks.Rem(chunkDatapack.ID())
-
+			// does resource cleanup
+			e.onChunkIngested(vchunk)
 		}
+	}
+}
+
+// onChunkIngested is called whenever a verifiable chunk is formed for a
+// chunk and is sent to the verify engine successfully.
+// It cleans up all resources associated with this chunk
+func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
+	// cleans up resources of the ingested chunk from mempools
+	e.authCollections.Rem(vc.Collection.ID())
+	e.chunkDataPacks.Rem(vc.ChunkDataPack.ID())
+
+	mychunks, err := e.myChunks(&vc.Receipt.ExecutionResult)
+	// extracts list of chunks assigned to this Verification node
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Hex("result_id", logging.Entity(vc.Receipt.ExecutionResult)).
+			Msg("could not fetch assigned chunks")
+		return
+	}
+
+	if len(mychunks) == 0 {
+		// no un-ingested chunk remains with this receipt
+		// marks execution result as ingested
+		err := e.ingestedResultIDs.Add(&vc.Receipt.ExecutionResult)
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Hex("result_id", logging.Entity(vc.Receipt.ExecutionResult)).
+				Msg("could add ingested result to mempool")
+		}
+		// removes receipt from mempool to avoid further iteration
+		e.authReceipts.Rem(vc.Receipt.ID())
 	}
 }
 
