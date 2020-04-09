@@ -109,7 +109,9 @@ func TestView_Set(t *testing.T) {
 		v.Set(registerID2, flow.RegisterValue("1"))
 		v.Set(registerID3, flow.RegisterValue("2"))
 		v.Set(registerID1, flow.RegisterValue("3"))
-		v.Get(registerID1)
+		b, err := v.Get(registerID1)
+		assert.NoError(t, err)
+		assert.Equal(t, b, flow.RegisterValue("3"))
 		// this part checks that delete functionality
 		// doesn't impact secret
 		v.Delete(registerID1)
