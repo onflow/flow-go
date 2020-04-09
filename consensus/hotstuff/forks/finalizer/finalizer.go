@@ -4,17 +4,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer/forest"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
 
 // Finalizer implements HotStuff finalization logic
 type Finalizer struct {
-	notifier notifications.FinalizationConsumer
+	notifier hotstuff.FinalizationConsumer
 	forest   forest.LevelledForest
 
 	finalizationCallback module.Finalizer
@@ -32,7 +32,7 @@ type ancestryChain struct {
 // ErrPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
 var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestry")
 
-func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, notifier notifications.FinalizationConsumer) (*Finalizer, error) {
+func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Finalizer, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
 		return nil, &model.ErrorConfiguration{Msg: "invalid root: root qc is not pointing to root block"}
 	}
@@ -185,7 +185,7 @@ func (r *Finalizer) checkForConflictingQCs(qc *model.QuorumCertificate) error {
 }
 
 // checkForDoubleProposal checks if Block is a double proposal. In case it is,
-// notifications.OnDoubleProposeDetected is triggered
+// notifier.OnDoubleProposeDetected is triggered
 func (r *Finalizer) checkForDoubleProposal(container *BlockContainer) {
 	it := r.forest.GetVerticesAtLevel(container.Block.View)
 	for it.HasNext() {
@@ -216,7 +216,7 @@ func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
 	r.updateLockedQc(ancestryChain)
 	err = r.updateFinalizedBlockQc(ancestryChain)
 	if err != nil {
-		return fmt.Errorf("updating finazlied block failed: %w", err)
+		return fmt.Errorf("updating finalized block failed: %w", err)
 	}
 	return nil
 }

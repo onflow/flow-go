@@ -8,6 +8,9 @@ import (
 
 	"github.com/dapperlabs/cadence/runtime"
 
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -291,6 +294,45 @@ func (r *TransactionContext) EmitEvent(event runtime.Event) {
 	r.events = append(r.events, event)
 }
 
+// GetAccount gets an account by address.
+//
+// The function returns nil if the specified account does not exist.
+func (r *TransactionContext) GetAccount(address flow.Address) *flow.Account {
+	accountID := address.Bytes()
+
+	err := r.checkAccountExists(accountID)
+	if err != nil {
+		return nil
+	}
+
+	balanceBytes, _ := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
+
+	code, _ := r.ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
+
+	publicKeys, err := r.getAccountPublicKeys(accountID)
+	if err != nil {
+		panic(err)
+	}
+
+	accountPublicKeys := make([]flow.AccountPublicKey, len(publicKeys))
+	for i, publicKey := range publicKeys {
+		accountPublicKey, err := decodePublicKey(publicKey)
+		if err != nil {
+			panic(err)
+		}
+
+		accountPublicKeys[i] = accountPublicKey
+	}
+
+	return &flow.Account{
+		Address: address,
+		Balance: balanceInt.Uint64(),
+		Code:    code,
+		Keys:    accountPublicKeys,
+	}
+}
+
 func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
 	for _, accountAddress := range r.GetSigningAccounts() {
 		if accountAddress == address {
@@ -349,4 +391,36 @@ func (r *TransactionContext) checkAccountExists(accountID []byte) error {
 	}
 
 	return fmt.Errorf("account with ID %s does not exist", accountID)
+}
+
+// TODO: replace once public key format changes @psiemens
+func decodePublicKey(b []byte) (a flow.AccountPublicKey, err error) {
+	var temp struct {
+		PublicKey []byte
+		SignAlgo  uint
+		HashAlgo  uint
+		Weight    uint
+	}
+
+	encoder := rlp.NewEncoder()
+
+	err = encoder.Decode(b, &temp)
+	if err != nil {
+		return a, err
+	}
+
+	signAlgo := crypto.SigningAlgorithm(temp.SignAlgo)
+	hashAlgo := hash.HashingAlgorithm(temp.HashAlgo)
+
+	publicKey, err := crypto.DecodePublicKey(signAlgo, temp.PublicKey)
+	if err != nil {
+		return a, err
+	}
+
+	return flow.AccountPublicKey{
+		PublicKey: publicKey,
+		SignAlgo:  signAlgo,
+		HashAlgo:  hashAlgo,
+		Weight:    int(temp.Weight),
+	}, nil
 }

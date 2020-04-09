@@ -6,8 +6,8 @@ import (
 
 	"go.uber.org/atomic"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 )
 
@@ -15,11 +15,11 @@ import (
 type FlowPaceMaker struct {
 	currentView    uint64
 	timeoutControl *timeout.Controller
-	notifier       notifications.Consumer
+	notifier       hotstuff.Consumer
 	started        *atomic.Bool
 }
 
-func New(startView uint64, timeoutController *timeout.Controller, notifier notifications.Consumer) (*FlowPaceMaker, error) {
+func New(startView uint64, timeoutController *timeout.Controller, notifier hotstuff.Consumer) (*FlowPaceMaker, error) {
 	if startView < 1 {
 		return nil, &model.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
 	}

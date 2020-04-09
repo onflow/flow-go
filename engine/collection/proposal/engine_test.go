@@ -14,8 +14,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	clusterstate "github.com/dapperlabs/flow-go/state/cluster/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -61,7 +61,7 @@ func TestProposalEngine(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	log := zerolog.New(os.Stderr)
-	tracer, err := trace.NewTracer(log)
+	metrics, err := metrics.NewCollector(log)
 	require.NoError(suite.T(), err)
 
 	me := unittest.IdentityFixture(func(idty *flow.Identity) { idty.Role = flow.RoleCollection })
@@ -105,7 +105,7 @@ func (suite *Suite) SetupTest() {
 	suite.cache = new(module.PendingClusterBlockBuffer)
 	suite.coldstuff = new(module.ColdStuff)
 
-	eng, err := proposal.New(log, suite.net, suite.me, suite.proto.state, suite.cluster.state, tracer, suite.ingest, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.cache)
+	eng, err := proposal.New(log, suite.net, suite.me, suite.proto.state, suite.cluster.state, metrics, suite.ingest, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.cache)
 	require.NoError(suite.T(), err)
 	suite.eng = eng.WithConsensus(suite.coldstuff)
 }

@@ -81,11 +81,10 @@ func main() {
 			return ledgerStorage, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			chunkHeaders := badger.NewChunkHeaders(node.DB)
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
 			stateCommitments = badger.NewCommits(node.DB)
-			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders, chunkDataPacks, executionResults)
+			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks, executionResults)
 			providerEngine, err = provider.New(
 				node.Logger,
 				node.Network,

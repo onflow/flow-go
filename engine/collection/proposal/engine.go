@@ -18,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -31,7 +30,7 @@ import (
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
-	tracer       trace.Tracer
+	metrics      module.Metrics
 	con          network.Conduit
 	me           module.Local
 	protoState   protocol.State // flow-wide protocol chain state
@@ -53,7 +52,7 @@ func New(
 	me module.Local,
 	protoState protocol.State,
 	clusterState cluster.State,
-	tracer trace.Tracer,
+	metrics module.Metrics,
 	ingest network.Engine,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
@@ -73,7 +72,7 @@ func New(
 		me:           me,
 		protoState:   protoState,
 		clusterState: clusterState,
-		tracer:       tracer,
+		metrics:      metrics,
 		ingest:       ingest,
 		pool:         pool,
 		transactions: transactions,
@@ -240,10 +239,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Int("collection_size", len(payload.Collection.Transactions)).
 		Msg("submitted proposal")
 
-	light := payload.Collection.Light()
-	trace.StartCollectionSpan(e.tracer, &light).
-		SetTag("node_type", "collection").
-		SetTag("node_id", e.me.NodeID().String())
+	e.metrics.StartCollectionToGuarantee(payload.Collection.Light())
 
 	return nil
 }

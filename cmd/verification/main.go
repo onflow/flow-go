@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
+	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
@@ -44,10 +44,8 @@ func main() {
 		authCollections      *stdmap.Collections
 		pendingCollections   *stdmap.PendingCollections
 		collectionTrackers   *stdmap.CollectionTrackers
-		chunkStates          *stdmap.ChunkStates
 		chunkDataPacks       *stdmap.ChunkDataPacks
 		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
-		chunkStateTracker    *stdmap.ChunkStateTrackers
 		verifierEng          *verifier.Engine
 		ingestEng            *ingest.Engine
 	)
@@ -87,14 +85,6 @@ func main() {
 			headerStorage = storage.NewHeaders(node.DB)
 			conPayloads = storage.NewPayloads(node.DB)
 			return nil
-		}).
-		Module("chunk states mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkStates, err = stdmap.NewChunkStates(chunkLimit)
-			return err
-		}).
-		Module("chunk state tracker mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkStateTracker, err = stdmap.NewChunkStateTrackers(chunkLimit)
-			return err
 		}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
@@ -138,8 +128,6 @@ func main() {
 				authCollections,
 				pendingCollections,
 				collectionTrackers,
-				chunkStates,
-				chunkStateTracker,
 				chunkDataPacks,
 				chunkDataPackTracker,
 				blockStorage,
@@ -164,14 +152,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := follower.New(node.Me,
-				node.State,
-				&node.GenesisBlock.Header,
-				node.GenesisQC,
-				verifier,
-				final,
-				ingestEng,
-				node.Logger)
+			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC, selector)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower

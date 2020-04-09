@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/follower"
+	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
@@ -49,12 +49,12 @@ func main() {
 			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of collections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
-			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
+			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
-			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "i", "localhost:9000", "the address (of the execution node) forward the script to")
+			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
-			collectionRPCConn, err := grpc.Dial(rpcConf.CollectionAddr)
+			collectionRPCConn, err := grpc.Dial(rpcConf.CollectionAddr, grpc.WithInsecure())
 			if err != nil {
 				return err
 			}
@@ -62,7 +62,7 @@ func main() {
 			return nil
 		}).
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
-			executionRPCConn, err := grpc.Dial(rpcConf.ExecutionAddr)
+			executionRPCConn, err := grpc.Dial(rpcConf.ExecutionAddr, grpc.WithInsecure())
 			if err != nil {
 				return err
 			}
@@ -81,7 +81,7 @@ func main() {
 			return nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, blocks, headers, collections, transactions)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, blocks, headers, collections, transactions)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -100,8 +100,9 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
 
-			// create a follower with the ingestEng as the finalization notification consumer
-			core, err := follower.New(node.Me, node.State, &node.GenesisBlock.Header, node.GenesisQC, verifier, final, ingestEng, node.Logger)
+			// creates a consensus follower with ingestEngine as the notifier
+			// so that it gets notified upon each new finalized block
+			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC, selector)
 			if err != nil {
 				// TODO for now we ignore failures in follower
 				// this is necessary for integration tests to run, until they are
