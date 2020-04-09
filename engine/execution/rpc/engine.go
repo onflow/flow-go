@@ -34,7 +34,7 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, e *ingestion.Engine, events storage.Events) *Engine {
+func New(log zerolog.Logger, config Config, e ingestion.IngestRPC, events storage.Events) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
@@ -89,7 +89,7 @@ func (e *Engine) serve() {
 // handler implements a subset of the Observation API.
 type handler struct {
 	execution.UnimplementedExecutionAPIServer
-	engine *ingestion.Engine
+	engine ingestion.IngestRPC
 	events storage.Events
 }
 
@@ -106,7 +106,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 
 	value, err := h.engine.ExecuteScriptAtBlockID(req.Script, blockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to execute script: %v", err)
 	}
 
 	res := &execution.ExecuteScriptResponse{
@@ -151,4 +151,36 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	return &execution.EventsResponse{
 		Events: events,
 	}, nil
+}
+
+func (h *handler) GetAccountForBlockID(_ context.Context,
+	req *execution.GetAccountRequest) (*execution.GetAccountResponse, error) {
+
+	blockID := &flow.Identifier{} // req.GetBlockId()
+	if blockID == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block ID")
+	}
+
+	address := req.GetAddress()
+	if address == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address")
+	}
+	flowAddress := flow.BytesToAddress(address)
+
+	value, err := h.engine.GetAccount(flowAddress, *blockID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
+	}
+
+	account, err := convert.AccountToMessage(value)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert account to message: %v", err)
+	}
+
+	res := &execution.GetAccountResponse{
+		Account: account,
+	}
+
+	return res, nil
+
 }

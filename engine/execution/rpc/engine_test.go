@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -145,4 +147,65 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// check that no storage calls was made
 		suite.events.AssertExpectations(suite.T())
 	})
+}
+
+// TestGetEventsForBlockIDs tests the GetEventsForBlockIDs API call
+func (suite *Suite) TestGetAccountForBlockIDs() {
+
+	id := unittest.IdentifierFixture()
+	rootAddress := flow.RootAddress
+
+	rootAccount := flow.Account{
+		Address: rootAddress,
+	}
+
+	mockEngine := new(mock.IngestRPC)
+	// TODO Change mockery.Anything to &id
+	mockEngine.On("GetAccount", rootAddress, mockery.Anything).Return(&rootAccount, nil).Once()
+
+	// create the handler
+	handler := &handler{
+		UnimplementedExecutionAPIServer: execution.UnimplementedExecutionAPIServer{},
+		engine:                          mockEngine,
+	}
+
+	createReq := func(id []byte, address []byte) *execution.GetAccountRequest {
+		return &execution.GetAccountRequest{
+			Address: address,
+			//BlockID: id,
+		}
+	}
+
+	suite.Run("happy path with valid request", func() {
+
+		req := createReq(id[:], rootAddress.Bytes())
+
+		resp, err := handler.GetAccountForBlockID(context.Background(), req)
+
+		suite.Require().NoError(err)
+		actualAccount := resp.GetAccount()
+		expectedAccount, err := convert.AccountToMessage(&rootAccount)
+		suite.Require().NoError(err)
+		suite.Require().Equal(*expectedAccount, *actualAccount)
+		mockEngine.AssertExpectations(suite.T())
+	})
+
+	//suite.Run("invalid request with nil block id", func() {
+	//
+	//	req := createReq(nil, rootAddress.Bytes())
+	//
+	//	_, err := handler.GetAccountForBlockID(context.Background(), req)
+	//
+	//	suite.Require().Error(err)
+	//})
+
+	suite.Run("invalid request with nil root address", func() {
+
+		req := createReq(id[:], nil)
+
+		_, err := handler.GetAccountForBlockID(context.Background(), req)
+
+		suite.Require().Error(err)
+	})
+
 }

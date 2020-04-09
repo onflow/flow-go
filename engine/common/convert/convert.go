@@ -158,3 +158,36 @@ func EventToMessage(e flow.Event) *entities.Event {
 		Payload:          e.Payload,
 	}
 }
+
+func AccountToMessage(a *flow.Account) (*entities.Account, error) {
+
+	keys := make([]*entities.AccountPublicKey, len(a.Keys))
+	for i, k := range a.Keys {
+		messageKey, err := AccountPublicKeyToMessage(k)
+		if err != nil {
+			return nil, err
+		}
+		keys[i] = messageKey
+	}
+
+	return &entities.Account{
+		Address: a.Address.Bytes(),
+		Balance: a.Balance,
+		Code:    a.Code,
+		Keys:    keys,
+	}, nil
+}
+
+func AccountPublicKeyToMessage(a flow.AccountPublicKey) (*entities.AccountPublicKey, error) {
+	publicKey, err := a.PublicKey.Encode()
+	if err != nil {
+		return nil, err
+	}
+
+	return &entities.AccountPublicKey{
+		PublicKey: publicKey,
+		SignAlgo:  uint32(a.SignAlgo),
+		HashAlgo:  uint32(a.HashAlgo),
+		Weight:    uint32(a.Weight),
+	}, nil
+}
