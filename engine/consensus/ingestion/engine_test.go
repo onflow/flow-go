@@ -6,9 +6,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
 	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -19,10 +21,13 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 	prop := &mocknetwork.Engine{}
 	state := &mockprotocol.State{}
 	final := &mockprotocol.Snapshot{}
+	metrics := &mockmodule.Metrics{}
+	metrics.On("StartCollectionToFinalized", mock.Anything).Return()
 
 	e := &Engine{
-		prop:  prop,
-		state: state,
+		prop:    prop,
+		state:   state,
+		metrics: metrics,
 	}
 
 	originID := unittest.IdentifierFixture()

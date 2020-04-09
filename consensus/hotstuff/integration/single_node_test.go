@@ -64,6 +64,7 @@ type SingleSuite struct {
 	// mocked modules
 	proto        *protocol.State
 	snapshot     *protocol.Snapshot
+	metrics      *module.Metrics
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	signer       *mocks.Signer
@@ -137,6 +138,11 @@ func (ss *SingleSuite) SetupTest() {
 	ss.proto.On("Final").Return(ss.snapshot)
 	ss.proto.On("AtNumber", mock.Anything).Return(ss.snapshot)
 	ss.proto.On("AtBlockID", mock.Anything).Return(ss.snapshot)
+
+	// set up the metrics mock
+	ss.metrics = &module.Metrics{}
+	ss.metrics.On("HotStuffBusyDuration", mock.Anything).Return()
+	ss.metrics.On("HotStuffIdleDuration", mock.Anything).Return()
 
 	// set up the module builder mock
 	ss.builder = &module.Builder{}
@@ -280,11 +286,11 @@ func (ss *SingleSuite) SetupTest() {
 	ss.voter = voter.New(ss.signer, ss.forks, ss.votedView)
 
 	// initialize the event handler
-	ss.handler, err = eventhandler.New(log, ss.pacemaker, ss.producer, ss.forks, ss.communicator, ss.viewstate, ss.aggregator, ss.voter, ss.validator)
+	ss.handler, err = eventhandler.New(log, ss.pacemaker, ss.producer, ss.forks, ss.communicator, ss.viewstate, ss.aggregator, ss.voter, ss.validator, notifier)
 	require.NoError(ss.T(), err)
 
 	// initialize and return the event loop
-	ss.loop, err = hotstuff.NewEventLoop(log, ss.handler)
+	ss.loop, err = hotstuff.NewEventLoop(log, ss.metrics, ss.handler)
 	require.NoError(ss.T(), err)
 }
 

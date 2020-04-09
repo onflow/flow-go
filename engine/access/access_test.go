@@ -207,6 +207,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
 		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
+		metrics := &mockmodule.Metrics{}
 
 		// initialize storage
 		blocks := bstorage.NewBlocks(db)
@@ -215,7 +216,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		transactions := bstorage.NewTransactions(db)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, nil, suite.me, blocks, headers, collections, transactions)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, metrics, suite.me, blocks, headers, collections, transactions)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
