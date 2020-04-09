@@ -31,6 +31,9 @@ func defaultOtherNodes() []testnet.NodeConfig {
 	return []testnet.NodeConfig{conNode1, conNode2, conNode3, exeNode, verNode}
 }
 
+// Tests sending various invalid transactions to a single-cluster configuration
+// and ensures that they are rejected by the collection node and not included in
+// any collection.
 func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	var (
 		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
