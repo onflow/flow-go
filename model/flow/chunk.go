@@ -118,15 +118,15 @@ func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
 }
 
 // ByIndex returns an entity from the list by index
-// Todo return a boolean for out of bound
-// https://github.com/dapperlabs/flow-go/issues/2796
-func (cl ChunkList) ByIndex(i uint64) *Chunk {
-	return cl[i]
-}
-
-// ByIndexWithProof returns an entity from the list by index and proof of membership
-func (cl ChunkList) ByIndexWithProof(i uint64) (*Chunk, Proof) {
-	return cl[i], nil
+// if requested chunk is within range of list, it returns chunk and true
+// if requested chunk is out of the range, it returns nil and false
+// boolean return value indicates whether requested chunk is within range
+func (cl ChunkList) ByIndex(i uint64) (*Chunk, bool) {
+	if i >= uint64(len(cl)) {
+		// index out of range
+		return nil, false
+	}
+	return cl[i], true
 }
 
 // Len returns the number of Chunks in the list. It is also part of the sort

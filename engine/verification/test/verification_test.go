@@ -49,7 +49,9 @@ func TestHappyPath(t *testing.T) {
 	a := chmodel.NewAssignment()
 	for i := 0; i < chunkNum; i++ {
 		if isAssigned(i, chunkNum) {
-			a.Add(completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)), []flow.Identifier{verNode.Me.NodeID()})
+			chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
+			require.True(t, ok, "chunk out of range requested")
+			a.Add(chunk, []flow.Identifier{verNode.Me.NodeID()})
 		}
 	}
 	assigner.On("Assign",
@@ -72,7 +74,9 @@ func TestHappyPath(t *testing.T) {
 			if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
 				require.True(t, ok)
 				for i := 0; i < chunkNum; i++ {
-					chunkID := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i)).ID()
+					chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
+					require.True(t, ok, "chunk out of range requested")
+					chunkID := chunk.ID()
 					if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
 						// each assigned chunk data pack should be requested only once
 						_, ok := exeChunkDataSeen[chunkID]
