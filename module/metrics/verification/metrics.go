@@ -32,7 +32,7 @@ func (c *Metrics) OnChunkVerificationStated(chunkID flow.Identifier) {
 func (c *Metrics) OnChunkVerificationFinished(chunkID flow.Identifier, blockID flow.Identifier) {
 	c.Lock()
 	defer c.Unlock()
-	c.tracer.FinishSpan(chunkID)
+	c.tracer.FinishSpan(chunkID, chunkExecutionSpanner)
 	// increases checked chunks for this block
 	incCheckedChecksCounter(blockID)
 
