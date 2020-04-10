@@ -64,9 +64,6 @@ type TestSuite struct {
 	chunkDataPack *flow.ChunkDataPack
 	assigner      *module.ChunkAssigner
 	collTracker   *tracker.CollectionTracker
-
-	// records unique chunk data pack requests to mock execution node
-	reqChunksExe map[flow.Identifier]struct{}
 }
 
 // Invoking this method executes all TestSuite tests.

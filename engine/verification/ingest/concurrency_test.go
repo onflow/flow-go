@@ -25,6 +25,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// testConcurrency evaluates behavior of verification node against receiving concurrent receipts from
+// different sources
 func TestConcurrency(t *testing.T) {
 	testcases := []struct {
 		erCount, // number of execution receipts
@@ -230,9 +232,16 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 	chunksConduit, err := node.Net.Register(engine.ChunkDataPackProvider, eng)
 	assert.Nil(t, err)
 
+	reqChunksExe := make(map[flow.Identifier]struct{})
+
 	eng.On("Process", verID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
+				if _, ok := reqChunksExe[req.ChunkID]; ok {
+					// duplicate request detected
+					t.Fail()
+				}
+				reqChunksExe[req.ChunkID] = struct{}{}
 				for _, er := range ers {
 					for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 						if chunk.ID() == req.ChunkID {
