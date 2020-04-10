@@ -236,11 +236,15 @@ func (suite *TestSuite) TestIngestedResult() {
 func (suite *TestSuite) TestIngestedChunk() {
 	eng := suite.TestNewEngine()
 
+	// creates a chunk fixture, its data pack, and the data pack response
+	chunk := unittest.ChunkFixture()
+	chunkDataPack := unittest.ChunkDataPackFixture(chunk.ID())
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: chunkDataPack}
 	// mocks this chunk id
-	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
+	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(true)
 
 	// nothing else is mocked, hence the process should simply return nil
-	err := eng.Process(unittest.IdentifierFixture(), suite.chunkDataPack)
+	err := eng.Process(unittest.IdentifierFixture(), chunkDataPackResponse)
 	require.NoError(suite.T(), err)
 }
 
