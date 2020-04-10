@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -161,8 +160,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	})
 }
 
-// TestGetEventsForBlockIDs tests the GetEventsForBlockIDs API call
-func (suite *Suite) TestGetAccountForBlockIDs() {
+// TestGetEventsForBlockID tests the GetEventsForBlockIDs API call
+func (suite *Suite) TestGetAccountForBlockID() {
 
 	id := unittest.IdentifierFixture()
 	rootAddress := flow.RootAddress
@@ -172,8 +171,7 @@ func (suite *Suite) TestGetAccountForBlockIDs() {
 	}
 
 	mockEngine := new(mock.IngestRPC)
-	// TODO Change mockery.Anything to &id
-	mockEngine.On("GetAccount", rootAddress, mockery.Anything).Return(&rootAccount, nil).Once()
+	mockEngine.On("GetAccount", rootAddress, id).Return(&rootAccount, nil).Once()
 
 	// create the handler
 	handler := &handler{
@@ -181,10 +179,10 @@ func (suite *Suite) TestGetAccountForBlockIDs() {
 		engine:                          mockEngine,
 	}
 
-	createReq := func(id []byte, address []byte) *execution.GetAccountRequest {
-		return &execution.GetAccountRequest{
+	createReq := func(id []byte, address []byte) *execution.GetAccountAtBlockIDRequest {
+		return &execution.GetAccountAtBlockIDRequest{
 			Address: address,
-			//BlockID: id,
+			BlockId: id,
 		}
 	}
 
@@ -192,7 +190,7 @@ func (suite *Suite) TestGetAccountForBlockIDs() {
 
 		req := createReq(id[:], rootAddress.Bytes())
 
-		resp, err := handler.GetAccountForBlockID(context.Background(), req)
+		resp, err := handler.GetAccountAtBlockID(context.Background(), req)
 
 		suite.Require().NoError(err)
 		actualAccount := resp.GetAccount()
@@ -202,20 +200,20 @@ func (suite *Suite) TestGetAccountForBlockIDs() {
 		mockEngine.AssertExpectations(suite.T())
 	})
 
-	//suite.Run("invalid request with nil block id", func() {
-	//
-	//	req := createReq(nil, rootAddress.Bytes())
-	//
-	//	_, err := handler.GetAccountForBlockID(context.Background(), req)
-	//
-	//	suite.Require().Error(err)
-	//})
+	suite.Run("invalid request with nil block id", func() {
+
+		req := createReq(nil, rootAddress.Bytes())
+
+		_, err := handler.GetAccountAtBlockID(context.Background(), req)
+
+		suite.Require().Error(err)
+	})
 
 	suite.Run("invalid request with nil root address", func() {
 
 		req := createReq(id[:], nil)
 
-		_, err := handler.GetAccountForBlockID(context.Background(), req)
+		_, err := handler.GetAccountAtBlockID(context.Background(), req)
 
 		suite.Require().Error(err)
 	})

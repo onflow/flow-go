@@ -90,7 +90,7 @@ func (e *Engine) serve() {
 // handler implements a subset of the Observation API.
 type handler struct {
 	execution.UnimplementedExecutionAPIServer
-	engine *ingestion.Engine
+	engine ingestion.IngestRPC
 	blocks storage.Blocks
 	events storage.Events
 }
@@ -170,13 +170,14 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	}, nil
 }
 
-func (h *handler) GetAccountForBlockID(_ context.Context,
-	req *execution.GetAccountRequest) (*execution.GetAccountResponse, error) {
+func (h *handler) GetAccountAtBlockID(_ context.Context,
+	req *execution.GetAccountAtBlockIDRequest) (*execution.GetAccountAtBlockIDResponse, error) {
 
-	blockID := &flow.Identifier{} // req.GetBlockId()
+	blockID := req.GetBlockId()
 	if blockID == nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block ID")
 	}
+	blockFlowID := flow.HashToID(blockID)
 
 	address := req.GetAddress()
 	if address == nil {
@@ -184,7 +185,7 @@ func (h *handler) GetAccountForBlockID(_ context.Context,
 	}
 	flowAddress := flow.BytesToAddress(address)
 
-	value, err := h.engine.GetAccount(flowAddress, *blockID)
+	value, err := h.engine.GetAccount(flowAddress, blockFlowID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
 	}
@@ -194,7 +195,7 @@ func (h *handler) GetAccountForBlockID(_ context.Context,
 		return nil, status.Errorf(codes.Internal, "failed to convert account to message: %v", err)
 	}
 
-	res := &execution.GetAccountResponse{
+	res := &execution.GetAccountAtBlockIDResponse{
 		Account: account,
 	}
 
