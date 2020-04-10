@@ -84,25 +84,25 @@ func runMVPTest(t *testing.T, colClient *testnet.Client, exeClient *testnet.Clie
 	ctx := context.Background()
 
 	// contract is not deployed, so script fails
-	counter, err := readCounter(ctx, exeClient)
+	counter, err := ReadCounter(ctx, exeClient)
 	require.Error(t, err)
 
-	err = deployCounter(ctx, colClient)
+	err = DeployCounter(ctx, colClient)
 	require.NoError(t, err)
 
 	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, exeClient)
+		counter, err = ReadCounter(ctx, exeClient)
 
 		return err == nil && counter == -3
 	}, 30*time.Second, time.Second)
 
-	err = createCounter(ctx, colClient)
+	err = CreateCounter(ctx, colClient)
 	require.NoError(t, err)
 
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, exeClient)
+		counter, err = ReadCounter(ctx, exeClient)
 
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)

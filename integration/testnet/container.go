@@ -9,6 +9,7 @@ import (
 	"github.com/docker/go-connections/nat"
 
 	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 // ContainerConfig represents configuration for a node container in the network.
@@ -74,4 +75,11 @@ func (c *Container) DB() (*badger.DB, error) {
 	dbPath := filepath.Join(c.DataDir, DefaultFlowDBDir)
 	db, err := badger.Open(badger.DefaultOptions(dbPath).WithLogger(nil))
 	return db, err
+}
+
+// ExecutionLedgerStorage returns the execution node's ledger storage/trie DB.
+func (c *Container) ExecutionLedgerStorage() (*ledger.TrieStorage, error) {
+	dbPath := filepath.Join(c.DataDir, DefaultExecutionRootDir)
+	ledgerStorage, err := ledger.NewTrieStorage(dbPath)
+	return ledgerStorage, err
 }

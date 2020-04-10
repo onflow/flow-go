@@ -12,8 +12,14 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+var (
+	CounterOwner      = "0x01"
+	CounterController = "Testing.Counter"
+	CounterKey        = "count"
+)
+
 // deployCounter deploys a counter contract using the given client.
-func deployCounter(ctx context.Context, client *testnet.Client) error {
+func DeployCounter(ctx context.Context, client *testnet.Client) error {
 
 	contract := dsl.Contract{
 		Name: "Testing",
@@ -33,7 +39,7 @@ func deployCounter(ctx context.Context, client *testnet.Client) error {
 			dsl.Code(`
 				pub fun createCounter(): @Counter {
 					return <-create Counter()
-      			}`,
+				}`,
 			),
 		},
 	}
@@ -43,7 +49,7 @@ func deployCounter(ctx context.Context, client *testnet.Client) error {
 
 // readCounter executes a script to read the value of a counter. The counter
 // must have been deployed and created.
-func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
+func ReadCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
 	script := dsl.Main{
 		ReturnType: "Int",
@@ -66,7 +72,7 @@ func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
 // createCounter creates a counter instance in the root account. The counter
 // contract must first have been deployed.
-func createCounter(ctx context.Context, client *testnet.Client) error {
+func CreateCounter(ctx context.Context, client *testnet.Client) error {
 
 	txDSL := dsl.Transaction{
 		Import: dsl.Import{Address: flow.RootAddress},
