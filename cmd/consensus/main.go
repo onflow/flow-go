@@ -3,7 +3,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -16,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -37,7 +41,9 @@ func main() {
 		chainID        string
 		minInterval    time.Duration
 		maxInterval    time.Duration
+
 		err            error
+		privateDKGData *bootstrap.DKGParticipantPriv
 		guarantees     mempool.Guarantees
 		receipts       mempool.Receipts
 		approvals      mempool.Approvals
@@ -56,6 +62,12 @@ func main() {
 			flags.StringVarP(&chainID, "chain-id", "C", flow.DefaultChainID, "the chain ID for the protocol chain")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
+		}).
+		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
+			// TODO inject this into HotStuff
+			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
+			_ = privateDKGData
+			return err
 		}).
 		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
@@ -78,7 +90,7 @@ func main() {
 			return matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prov, err = provider.New(node.Logger, node.Network, node.State, node.Me)
+			prov, err = provider.New(node.Logger, node.Metrics, node.Network, node.State, node.Me)
 			return prov, err
 		}).
 		Component("propagation engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -86,7 +98,7 @@ func main() {
 			return prop, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
+			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Metrics, node.Me)
 			return ing, err
 		}).
 		Component("consensus components", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -127,4 +139,19 @@ func main() {
 			return comp, nil
 		}).
 		Run()
+}
+
+func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
+	filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, myID)
+	data, err := ioutil.ReadFile(filepath.Join(path, filename))
+	if err != nil {
+		return nil, err
+	}
+
+	var priv bootstrap.DKGParticipantPriv
+	err = json.Unmarshal(data, &priv)
+	if err != nil {
+		return nil, err
+	}
+	return &priv, nil
 }

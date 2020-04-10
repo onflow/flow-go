@@ -429,25 +429,36 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 	return nil
 }
 
-func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
+func (e *Engine) ExecuteScriptAtBlockID(script []byte, blockID flow.Identifier) ([]byte, error) {
 
-	seal, err := e.state.Final().Seal()
+	stateCommit, err := e.execState.StateCommitmentByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest seal: %w", err)
+		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
 	}
-
-	stateCommit, err := e.execState.StateCommitmentByBlockID(seal.BlockID)
+	block, err := e.state.AtBlockID(blockID).Head()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", seal.BlockID, err)
-	}
-	block, err := e.state.AtBlockID(seal.BlockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sealed block (%s): %w", seal.BlockID, err)
+		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
 	}
 
 	blockView := e.execState.NewView(stateCommit)
 
 	return e.computationManager.ExecuteScript(script, block, blockView)
+}
+
+func (e *Engine) GetAccount(address flow.Address, blockID flow.Identifier) (*flow.Account, error) {
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+	block, err := e.state.AtBlockID(blockID).Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
+	}
+
+	blockView := e.execState.NewView(stateCommit)
+
+	return e.computationManager.GetAccount(address, block, blockView)
 }
 
 func (e *Engine) handleComputationResult(result *execution.ComputationResult, startState flow.StateCommitment) (flow.StateCommitment, error) {
@@ -470,16 +481,9 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		}
 		//
 		chunk := generateChunk(i, startState, endState)
-		//
-		chunkHeader := generateChunkHeader(chunk, view.Reads())
-		//
-		err = e.execState.PersistChunkHeader(chunkHeader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to save chunk header: %w", err)
-		}
 
 		// chunkDataPack
-		allRegisters := view.AllRegisters()
+		allRegisters := view.RegisterTouches()
 		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
 
 		if err != nil {
@@ -491,7 +495,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		if err != nil {
 			return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
 		}
-		//
+		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
 	}
@@ -545,18 +549,6 @@ func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flo
 		},
 		Index:    0,
 		EndState: endState,
-	}
-}
-
-// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
-func generateChunkHeader(
-	chunk *flow.Chunk,
-	registerIDs []flow.RegisterID,
-) *flow.ChunkHeader {
-	return &flow.ChunkHeader{
-		ChunkID:     chunk.ID(),
-		StartState:  chunk.StartState,
-		RegisterIDs: registerIDs,
 	}
 }
 

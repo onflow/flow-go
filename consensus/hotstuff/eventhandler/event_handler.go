@@ -26,6 +26,7 @@ type EventHandler struct {
 	voteAggregator hotstuff.VoteAggregator
 	voter          hotstuff.Voter
 	validator      hotstuff.Validator
+	notifier       hotstuff.Consumer
 }
 
 // New creates an EventHandler instance with initial components.
@@ -39,9 +40,10 @@ func New(
 	voteAggregator hotstuff.VoteAggregator,
 	voter hotstuff.Voter,
 	validator hotstuff.Validator,
+	notifier hotstuff.Consumer,
 ) (*EventHandler, error) {
 	e := &EventHandler{
-		log:            log.With().Str("hotstuff", "event_handler").Logger(),
+		log:            log.With().Str("hotstuff", "participant").Logger(),
 		paceMaker:      paceMaker,
 		blockProducer:  blockProducer,
 		forks:          forks,
@@ -50,6 +52,7 @@ func New(
 		voter:          voter,
 		validator:      validator,
 		viewState:      viewState,
+		notifier:       notifier,
 	}
 	return e, nil
 }
@@ -205,6 +208,9 @@ func (e *EventHandler) startNewView() error {
 	e.log.Info().
 		Uint64("cur_view", curView).
 		Msg("start new view")
+
+	e.notifier.OnEnteringView(curView)
+
 	e.pruneSubcomponents()
 
 	if e.viewState.IsSelfLeaderForView(curView) {

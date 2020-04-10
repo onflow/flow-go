@@ -23,6 +23,9 @@ type BlockContext interface {
 
 	// ExecuteScript computes the result of a read-only script.
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
+
+	// GetAccount looks up the flow account for the given address
+	GetAccount(ledger Ledger, address flow.Address) *flow.Account
 }
 
 type blockContext struct {
@@ -124,6 +127,14 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 		Value:    value,
 		Logs:     ctx.Logs(),
 	}, nil
+}
+
+func (bc *blockContext) GetAccount(ledger Ledger, address flow.Address) *flow.Account {
+	ctx := bc.newScriptContext(ledger)
+
+	account := ctx.GetAccount(address)
+
+	return account
 }
 
 // ConvertEvents creates flow.Events from runtime.events

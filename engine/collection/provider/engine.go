@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -26,7 +25,7 @@ import (
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
-	tracer       trace.Tracer
+	metrics      module.Metrics
 	con          network.Conduit
 	me           module.Local
 	state        protocol.State
@@ -35,11 +34,11 @@ type Engine struct {
 	transactions storage.Transactions
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, metrics module.Metrics, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "provider").Logger(),
-		tracer:       tracer,
+		metrics:      metrics,
 		me:           me,
 		state:        state,
 		pool:         pool,
@@ -207,7 +206,8 @@ func (e *Engine) onTransactionResponse(originID flow.Identifier, res *messages.T
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 
-	defer e.tracer.FinishSpan(guarantee.ID())
+	defer e.metrics.FinishCollectionToGuarantee(guarantee.ID())
+
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus nodes: %w", err)

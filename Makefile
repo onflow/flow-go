@@ -102,7 +102,6 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=state/cluster -case=underscore -output="state/cluster/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
-	GO111MODULE=on mockery -name '.*' -dir=module/trace -case=underscore -output="./module/trace/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/metrics -case=underscore -output="./module/metrics/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
@@ -112,10 +111,9 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/virtualmachine -case=underscore -output="./engine/execution/computation/virtualmachine/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'Consumer' -dir="./consensus/hotstuff/notifications/" -case=underscore -output="./consensus/hotstuff/notifications/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
-	GO111MODULE=on mockery -name 'AccessAPIClient' -dir=protobuf/services/access -case=underscore -output="./engine/observation/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'AccessAPIClient' -dir="./engine/access/mock/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
 
 
 # this ensures there is no unused dependency being added by accident
@@ -225,18 +223,18 @@ docker-build-verification-debug:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target debug \
 		-t gcr.io/dl-flow/verification-debug:latest -t "gcr.io/dl-flow/verification-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification-debug:$(IMAGE_TAG)" .
 
-.PHONY: docker-build-observation
-docker-build-observation:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=observation --target production \
-		-t gcr.io/dl-flow/observation:latest -t "gcr.io/dl-flow/observation:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/observation:$(IMAGE_TAG)" .
+.PHONY: docker-build-access
+docker-build-access:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=access --target production \
+		-t gcr.io/dl-flow/access:latest -t "gcr.io/dl-flow/access:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/access:$(IMAGE_TAG)" .
 
-.PHONY: docker-build-observation-debug
-docker-build-observation-debug:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=observation --target debug \
-		-t gcr.io/dl-flow/observation-debug:latest -t "gcr.io/dl-flow/observation-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/observation-debug:$(IMAGE_TAG)" .
+.PHONY: docker-build-access-debug
+docker-build-access-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=access --target debug \
+		-t gcr.io/dl-flow/access-debug:latest -t "gcr.io/dl-flow/access-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/access-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-observation
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access
 
 .PHONY: docker-push-collection
 docker-push-collection:
@@ -262,14 +260,14 @@ docker-push-verification:
 	docker push "gcr.io/dl-flow/verification:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/verification:$(IMAGE_TAG)"
 
-.PHONY: docker-push-observation
-docker-push-observation:
-	docker push gcr.io/dl-flow/observation:latest
-	docker push "gcr.io/dl-flow/observation:$(SHORT_COMMIT)"
-	docker push "gcr.io/dl-flow/observation:$(IMAGE_TAG)"
+.PHONY: docker-push-access
+docker-push-access:
+	docker push gcr.io/dl-flow/access:latest
+	docker push "gcr.io/dl-flow/access:$(SHORT_COMMIT)"
+	docker push "gcr.io/dl-flow/access:$(IMAGE_TAG)"
 
 .PHONY: docker-push-flow
-docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-observation
+docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access
 
 .PHONY: docker-run-collection
 docker-run-collection:
@@ -287,9 +285,9 @@ docker-run-execution:
 docker-run-verification:
 	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/verification:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries verification-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
-.PHONY: docker-run-observation
-docker-run-observation:
-	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/observation:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries observation-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+.PHONY: docker-run-access
+docker-run-access:
+	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/access:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries access-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 # Check if the go version is 1.13. flow-go only supports go 1.13
 .PHONY: check-go-version
