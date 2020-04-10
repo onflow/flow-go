@@ -99,19 +99,16 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 
 	// private key of the current node
 	x := &PrKeyBLS_BLS12381{
-		alg:    s.blsContext, // signer algo
-		scalar: s.x,          // the private share
+		scalar: s.x, // the private share
 	}
 	// Group public key
 	Y := &PubKeyBLS_BLS12381{
-		alg:   s.blsContext,
 		point: s.A[0],
 	}
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
 		y[i] = &PubKeyBLS_BLS12381{
-			alg:   s.blsContext,
 			point: p,
 		}
 	}

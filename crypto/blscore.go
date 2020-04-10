@@ -30,7 +30,7 @@ var valid = C.get_valid()
 var invalid = C.get_invalid()
 
 // init sets the context of BLS12381 curve
-func (a *BLS_BLS12381Algo) init() error {
+func (a *blsBLS12381Algo) init() error {
 	// sanity checks of lengths
 	if a.prKeyLength != PrKeyLenBLS_BLS12381 ||
 		a.pubKeyLength != PubKeyLenBLS_BLS12381 ||
@@ -51,7 +51,7 @@ func (a *BLS_BLS12381Algo) init() error {
 // reinit the context of BLS12381 curve assuming there was a previous call to init()
 // If the implementation evolves and relic has multiple contexts,
 // reinit should be called at every a. operation.
-func (a *BLS_BLS12381Algo) reinit() {
+func (a *blsBLS12381Algo) reinit() {
 	C.core_set(a.context.relicCtx)
 	C.precomputed_data_set(a.context.precCtx)
 }
@@ -168,7 +168,7 @@ func readPointG2(a *pointG2, src []byte) error {
 }
 
 // computes a bls signature
-func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
+func (a *blsBLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 	s := make([]byte, a.signatureLength)
 
 	C._blsSign((*C.uchar)(&s[0]),
@@ -179,7 +179,7 @@ func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 }
 
 // Checks the validity of a bls signature
-func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
+func (a *blsBLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
 	if len(s) != signatureLengthBLS_BLS12381 {
 		return false
 	}

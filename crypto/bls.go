@@ -5,16 +5,36 @@ package crypto
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
-// BLS_BLS12381Algo, embeds SignAlgo
-type BLS_BLS12381Algo struct {
+// blsBLS12381Algo, embeds SignAlgo
+type blsBLS12381Algo struct {
 	// points to Relic context of BLS12-381 with all the parameters
 	context ctx
 	// embeds commonSigner
 	*commonSigner
+}
+
+//  Once variables to use a unique instance
+var blsInstance *blsBLS12381Algo
+var once sync.Once
+
+func newBlsBLS12381() *blsBLS12381Algo {
+	once.Do(func() {
+		blsInstance = &(blsBLS12381Algo{
+			commonSigner: &commonSigner{
+				BLS_BLS12381,
+				prKeyLengthBLS_BLS12381,
+				pubKeyLengthBLS_BLS12381,
+				signatureLengthBLS_BLS12381,
+			},
+		})
+		blsInstance.init()
+	})
+	return blsInstance
 }
 
 // Sign signs an array of bytes
@@ -26,7 +46,7 @@ func (sk *PrKeyBLS_BLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, err
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
-	return sk.alg.blsSign(&sk.scalar, h), nil
+	return newBlsBLS12381().blsSign(&sk.scalar, h), nil
 }
 
 const BLS_KMACFunction = "H2C"
@@ -52,19 +72,18 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac hash.Hasher)
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
 
-	return pk.alg.blsVerify(&pk.point, s, h), nil
+	return newBlsBLS12381().blsVerify(&pk.point, s, h), nil
 }
 
 // generatePrivateKey generates a private key for BLS on BLS12381 curve
 // The minimum size of the input seed is 48 bytes (for a sceurity of 128 bits)
-func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
+func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	if len(seed) < KeyGenSeedMinLenBLS_BLS12381 {
 		return nil, fmt.Errorf("seed should be at least %d bytes",
 			KeyGenSeedMinLenBLS_BLS12381)
 	}
 
 	sk := &PrKeyBLS_BLS12381{
-		alg: a,
 		// public key is not computed
 		pk: nil,
 	}
@@ -74,13 +93,12 @@ func (a *BLS_BLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	return sk, nil
 }
 
-func (a *BLS_BLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
+func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
 	if len(privateKeyBytes) != prKeyLengthBLS_BLS12381 {
 		return nil, fmt.Errorf("the input length has to be equal to %d", prKeyLengthBLS_BLS12381)
 	}
 	sk := &PrKeyBLS_BLS12381{
-		alg: a,
-		pk:  nil,
+		pk: nil,
 	}
 	readScalar(&sk.scalar, privateKeyBytes)
 	if sk.scalar.checkMembershipZr() {
@@ -89,18 +107,16 @@ func (a *BLS_BLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey,
 	return nil, errors.New("the private key is not a valid BLS12-381 curve key")
 }
 
-func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
+func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
 	if len(publicKeyBytes) != pubKeyLengthBLS_BLS12381 {
 		return nil, fmt.Errorf("the input length has to be equal to %d", pubKeyLengthBLS_BLS12381)
 	}
-	pk := &PubKeyBLS_BLS12381{
-		alg: a,
-	}
+	var pk PubKeyBLS_BLS12381
 	if readPointG2(&pk.point, publicKeyBytes) != nil {
 		return nil, errors.New("the input slice does not encode a public key")
 	}
 	if pk.point.checkMembershipG2() {
-		return pk, nil
+		return &pk, nil
 	}
 	return nil, errors.New("the public key is not a valid BLS12-381 curve key")
 
@@ -108,8 +124,6 @@ func (a *BLS_BLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, er
 
 // PrKeyBLS_BLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
 type PrKeyBLS_BLS12381 struct {
-	// the signature algo
-	alg *BLS_BLS12381Algo
 	// public key
 	pk *PubKeyBLS_BLS12381
 	// private key data
@@ -117,23 +131,21 @@ type PrKeyBLS_BLS12381 struct {
 }
 
 func (sk *PrKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
-	return sk.alg.algo
+	return BLS_BLS12381
 }
 
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
-	return sk.alg.prKeyLength
+	return PrKeyLenBLS_BLS12381
 }
 
 // computePublicKey generates the public key corresponding to
 // the input private key. The function makes sure the piblic key
 // is valid in G2
 func (sk *PrKeyBLS_BLS12381) computePublicKey() {
-	newPk := &PubKeyBLS_BLS12381{
-		alg: sk.alg,
-	}
+	var newPk PubKeyBLS_BLS12381
 	// compute public key pk = g2^sk
 	_G2scalarGenMult(&(newPk.point), &(sk.scalar))
-	sk.pk = newPk
+	sk.pk = &newPk
 }
 
 func (sk *PrKeyBLS_BLS12381) PublicKey() PublicKey {
@@ -161,18 +173,16 @@ func (sk *PrKeyBLS_BLS12381) Equals(other PrivateKey) bool {
 // PubKeyBLS_BLS12381 is the public key of BLS using BLS12_381,
 // it implements PublicKey
 type PubKeyBLS_BLS12381 struct {
-	// the signature algo
-	alg *BLS_BLS12381Algo
 	// public key data
 	point pointG2
 }
 
 func (pk *PubKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
-	return pk.alg.algo
+	return BLS_BLS12381
 }
 
 func (pk *PubKeyBLS_BLS12381) KeySize() int {
-	return pk.alg.pubKeyLength
+	return PubKeyLenBLS_BLS12381
 }
 
 func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {
