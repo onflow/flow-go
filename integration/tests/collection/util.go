@@ -25,6 +25,7 @@ type StateChecker struct {
 	omits    []flow.Identifier
 }
 
+// NewStateChecker returns a state checker for the given state.
 func NewStateChecker(state cluster.State) *StateChecker {
 	checker := &StateChecker{
 		state:    state,
@@ -35,21 +36,28 @@ func NewStateChecker(state cluster.State) *StateChecker {
 	return checker
 }
 
+// ExpectTxCount adds an expectation for the total count of transactions in
+// the cluster state.
 func (checker *StateChecker) ExpectTxCount(n int) *StateChecker {
 	checker.count = n
 	return checker
 }
 
+// ExpectContainsTx adds an expectation that the given transaction exists in
+// the cluster state.
 func (checker *StateChecker) ExpectContainsTx(txID flow.Identifier) *StateChecker {
 	checker.contains = append(checker.contains, txID)
 	return checker
 }
 
+// ExpectOmitsTx adds an expectation that the given  transaction does not exist
+// in the cluster state.
 func (checker *StateChecker) ExpectOmitsTx(txID flow.Identifier) *StateChecker {
 	checker.omits = append(checker.omits, txID)
 	return checker
 }
 
+// Check checks all assertions against the cluster state.
 func (checker *StateChecker) Check(t *testing.T) {
 
 	// start at the state head
