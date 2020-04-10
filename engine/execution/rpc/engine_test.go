@@ -23,6 +23,7 @@ type Suite struct {
 	suite.Suite
 	log    zerolog.Logger
 	events *storage.Events
+	blocks *storage.Blocks
 }
 
 func TestHandler(t *testing.T) {
@@ -32,7 +33,7 @@ func TestHandler(t *testing.T) {
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.Logger{}
 	suite.events = new(storage.Events)
-
+	suite.blocks = new(storage.Blocks)
 }
 
 // TestGetEventsForBlockIDs tests the GetEventsForBlockIDs API call
@@ -40,27 +41,41 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	totalBlocks := 10
 	eventsPerBlock := 10
-	totalEvents := totalBlocks * eventsPerBlock
 
 	blockIDs := make([][]byte, totalBlocks)
-	events := make([]flow.Event, 0)
+	expectedResult := make([]*execution.EventsResponse_Result, totalBlocks)
 
 	// setup the events storage mock
 	for i := range blockIDs {
-		id := unittest.IdentifierFixture()
+		block := unittest.BlockFixture()
+		block.Height = uint64(i)
+		id := block.ID()
 		blockIDs[i] = id[:]
 		eventsForBlock := make([]flow.Event, eventsPerBlock)
+		eventMessages := make([]*entities.Event, eventsPerBlock)
 		for j := range eventsForBlock {
-			eventsForBlock[j] = unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture())
+			e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture())
+			eventsForBlock[j] = e
+			eventMessages[j] = convert.EventToMessage(e)
 		}
-		// expect one call for each block ID
+		// expect one call to lookup events for each block ID
 		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(eventsForBlock, nil).Once()
-		events = append(events, eventsForBlock...)
+
+		// expect one call to lookup each block
+		suite.blocks.On("ByID", id).Return(&block, nil).Once()
+
+		// create the expected result for this block
+		expectedResult[i] = &execution.EventsResponse_Result{
+			BlockId:     id[:],
+			BlockHeight: block.Height,
+			Events:      eventMessages,
+		}
 	}
 
 	// create the handler
 	handler := &handler{
 		UnimplementedExecutionAPIServer: execution.UnimplementedExecutionAPIServer{},
+		blocks:                          suite.blocks,
 		events:                          suite.events,
 	}
 
@@ -82,12 +97,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 		// check that a successful response is received
 		suite.Require().NoError(err)
-		actualEvents := resp.GetEvents()
-		expectedEvents := make([]*entities.Event, totalEvents)
-		for i, e := range events {
-			expectedEvents[i] = convert.EventToMessage(e)
-		}
-		suite.Require().ElementsMatch(expectedEvents, actualEvents)
+
+		actualResult := resp.GetResults()
+		suite.Require().ElementsMatch(expectedResult, actualResult)
 
 		// check that appropriate storage calls were made
 		suite.events.AssertExpectations(suite.T())

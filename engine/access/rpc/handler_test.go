@@ -231,8 +231,19 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	events := getEvents(10)
 
 	req := &access.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}
+
+	results := make([]*access.EventsResponse_Result, len(blockIDs))
+
+	for i := 0; i < len(blockIDs); i++ {
+		results[i] = &access.EventsResponse_Result{
+			BlockId:     blockIDs[i],
+			BlockHeight: uint64(i),
+			Events:      events,
+		}
+	}
+
 	expectedResp := access.EventsResponse{
-		Events: events,
+		Results: results,
 	}
 	ctx := context.Background()
 
@@ -279,12 +290,21 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		return ids
 	}
 
-	setupExecClient := func(events []*entities.Event) {
+	setupExecClient := func(events []*entities.Event) *access.EventsResponse {
 		execReq := &access.GetEventsForBlockIDsRequest{BlockIds: expBlockIDs, Type: string(flow.EventAccountCreated)}
-		execResp := access.EventsResponse{
-			Events: events,
+		results := make([]*access.EventsResponse_Result, len(expBlockIDs))
+		for i, id := range expBlockIDs {
+			results[i] = &access.EventsResponse_Result{
+				BlockId:     id,
+				BlockHeight: 0,
+				Events:      events[i:i],
+			}
 		}
-		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(&execResp, nil).Once()
+		expectedResp := &access.EventsResponse{
+			Results: results,
+		}
+		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(expectedResp, nil).Once()
+		return expectedResp
 	}
 
 	suite.Run("invalid request max height < min height", func() {
@@ -306,8 +326,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		// setup mocks
 		setupHeadHeight(headHeight)
 		expBlockIDs = setupStorage(minHeight, maxHeight)
-		expEvents := getEvents(10)
-		setupExecClient(expEvents)
+		expEvents := getEvents(len(expBlockIDs)) //one event per block (keeping it simple)
+		expectedResp := setupExecClient(expEvents)
 
 		// create handler
 		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
@@ -318,12 +338,12 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			Type:        string(flow.EventAccountCreated)}
 
 		// execute request
-		resp, err := handler.GetEventsForHeightRange(ctx, req)
+		actualResp, err := handler.GetEventsForHeightRange(ctx, req)
 
 		// check response
-		suite.checkResponse(resp, err)
+		suite.checkResponse(actualResp, err)
 		suite.assertAllExpectations()
-		suite.Require().Equal(expEvents, resp.GetEvents())
+		suite.Require().Equal(expectedResp, actualResp)
 	})
 
 	suite.Run("valid request with max_height > last_sealed_block_height", func() {
@@ -332,7 +352,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		expBlockIDs = setupStorage(minHeight, headHeight)
 
 		expEvents := getEvents(10)
-		setupExecClient(expEvents)
+		expectedResp := setupExecClient(expEvents)
 
 		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
 
@@ -341,11 +361,11 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			EndHeight:   maxHeight,
 			Type:        string(flow.EventAccountCreated)}
 
-		resp, err := handler.GetEventsForHeightRange(ctx, req)
+		actualResp, err := handler.GetEventsForHeightRange(ctx, req)
 
-		suite.checkResponse(resp, err)
+		suite.checkResponse(actualResp, err)
 		suite.assertAllExpectations()
-		suite.Require().Equal(expEvents, resp.GetEvents())
+		suite.Require().Equal(expectedResp, actualResp)
 	})
 
 }
