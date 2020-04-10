@@ -209,10 +209,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(filter.And(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}
@@ -245,10 +245,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(filter.And(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}

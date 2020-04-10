@@ -65,9 +65,9 @@ func (v *ViewState) DKGState() dkg.State {
 // `ViewState.consensusMembersFilter` (defined at construction time).
 func (v *ViewState) AllConsensusParticipants(blockID flow.Identifier) (flow.IdentityList, error) {
 	// create filters
-	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake(true)}
+	selector := filter.And(v.consensusMembersFilter, filter.HasStake(true))
 	// query all staked consensus participants
-	identities, err := v.protocolState.AtBlockID(blockID).Identities(filters...)
+	identities, err := v.protocolState.AtBlockID(blockID).Identities(selector)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
 	}
@@ -133,8 +133,8 @@ func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, 
 
 	// Retrieve full flow.Identity for each element in consensusNodeIDs:
 	// Select Identities at block via Filters: consensus participants, staked, element of consensusNodeIDs
-	filters := []flow.IdentityFilter{v.consensusMembersFilter, filter.HasStake(true), filter.HasNodeID(consensusNodeIDs...)}
-	consensusIdentities, err := v.protocolState.AtBlockID(blockID).Identities(filters...)
+	selector := filter.And(v.consensusMembersFilter, filter.HasStake(true), filter.HasNodeID(consensusNodeIDs...))
+	consensusIdentities, err := v.protocolState.AtBlockID(blockID).Identities(selector)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
 	}

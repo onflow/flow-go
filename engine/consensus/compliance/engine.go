@@ -182,10 +182,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(
+	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get consensus recipients: %w", err)
 	}
@@ -210,10 +210,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 func (e *Engine) BroadcastCommit(commit *model.Commit) error {
 
 	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.Final().Identities(
+	recipients, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get consensus recipients: %w", err)
 	}
