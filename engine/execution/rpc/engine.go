@@ -34,7 +34,7 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, e ingestion.IngestRPC, events storage.Events) *Engine {
+func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
@@ -43,6 +43,7 @@ func New(log zerolog.Logger, config Config, e ingestion.IngestRPC, events storag
 		handler: &handler{
 			UnimplementedExecutionAPIServer: execution.UnimplementedExecutionAPIServer{},
 			engine:                          e,
+			blocks:                          blocks,
 			events:                          events,
 		},
 		server: grpc.NewServer(),
@@ -89,7 +90,8 @@ func (e *Engine) serve() {
 // handler implements a subset of the Observation API.
 type handler struct {
 	execution.UnimplementedExecutionAPIServer
-	engine ingestion.IngestRPC
+	engine *ingestion.Engine
+	blocks storage.Blocks
 	events storage.Events
 }
 
@@ -131,25 +133,40 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 
 	eType := flow.EventType(reqEvent)
 
-	events := make([]*entities.Event, 0)
+	result := make([]*execution.EventsResponse_Result, len(blockIDs))
 
-	// collect all the events in events
-	for _, b := range blockIDs {
+	// collect all the events and create a EventsResponse_Result for each block
+	for i, b := range blockIDs {
 		bID := flow.HashToID(b)
 
+		// lookup events
 		blockEvents, err := h.events.ByBlockIDEventType(bID, eType)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 		}
 
-		for _, e := range blockEvents {
+		// convert events to event message
+		events := make([]*entities.Event, len(blockEvents))
+		for j, e := range blockEvents {
 			event := convert.EventToMessage(e)
-			events = append(events, event)
+			events[j] = event
+		}
+
+		// lookup block
+		block, err := h.blocks.ByID(bID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to lookup block: %v", err)
+		}
+
+		result[i] = &execution.EventsResponse_Result{
+			BlockId:     bID[:],
+			BlockHeight: block.Height,
+			Events:      events,
 		}
 	}
 
 	return &execution.EventsResponse{
-		Events: events,
+		Results: result,
 	}, nil
 }
 

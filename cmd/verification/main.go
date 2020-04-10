@@ -44,10 +44,8 @@ func main() {
 		authCollections      *stdmap.Collections
 		pendingCollections   *stdmap.PendingCollections
 		collectionTrackers   *stdmap.CollectionTrackers
-		chunkStates          *stdmap.ChunkStates
 		chunkDataPacks       *stdmap.ChunkDataPacks
 		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
-		chunkStateTracker    *stdmap.ChunkStateTrackers
 		verifierEng          *verifier.Engine
 		ingestEng            *ingest.Engine
 	)
@@ -87,14 +85,6 @@ func main() {
 			headerStorage = storage.NewHeaders(node.DB)
 			conPayloads = storage.NewPayloads(node.DB)
 			return nil
-		}).
-		Module("chunk states mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkStates, err = stdmap.NewChunkStates(chunkLimit)
-			return err
-		}).
-		Module("chunk state tracker mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkStateTracker, err = stdmap.NewChunkStateTrackers(chunkLimit)
-			return err
 		}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
@@ -138,8 +128,6 @@ func main() {
 				authCollections,
 				pendingCollections,
 				collectionTrackers,
-				chunkStates,
-				chunkStateTracker,
 				chunkDataPacks,
 				chunkDataPackTracker,
 				blockStorage,

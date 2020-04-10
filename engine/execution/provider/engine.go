@@ -31,7 +31,6 @@ type Engine struct {
 	state         protocol.State
 	execState     state.ExecutionState
 	me            module.Local
-	execStateCon  network.Conduit
 	chunksConduit network.Conduit
 }
 
@@ -51,11 +50,6 @@ func New(logger zerolog.Logger, net module.Network, state protocol.State, me mod
 		return nil, errors.Wrap(err, "could not register receipt provider engine")
 	}
 	eng.receiptCon = receiptCon
-
-	eng.execStateCon, err = net.Register(engine.ExecutionStateProvider, &eng)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not register execution state provider engine")
-	}
 
 	chunksConduit, err := net.Register(engine.ChunkDataPackProvider, &eng)
 	if err != nil {
@@ -99,10 +93,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		var err error
 		switch v := event.(type) {
-		case *messages.ExecutionStateRequest:
-			err = e.onExecutionStateRequest(originID, v)
 		case *messages.ChunkDataPackRequest:
-			err = e.handleChunkDataPackRequest(originID, v.ChunkID)
+			err = e.onChunkDataPackRequest(originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -113,49 +105,17 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages.ExecutionStateRequest) error {
+// onChunkDataPackRequest receives a request for the chunk data pack associated with chunkID from the
+// requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
+// requester.
+func (e *Engine) onChunkDataPackRequest(originID flow.Identifier, req *messages.ChunkDataPackRequest) error {
+	// extracts list of verifier nodes id
 	chunkID := req.ChunkID
-
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("received execution state request")
+		Msg("received chunk data pack request")
 
-	id, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", id, err)
-	}
-
-	if id.Role != flow.RoleVerification {
-		return fmt.Errorf("invalid role for requesting execution state: %s", id.Role)
-	}
-
-	registers, err := e.execState.GetChunkRegisters(chunkID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve chunk state (id=%s): %w", chunkID, err)
-	}
-
-	msg := &messages.ExecutionStateResponse{State: flow.ChunkState{
-		ChunkID:   chunkID,
-		Registers: registers,
-	}}
-
-	err = e.execStateCon.Submit(msg, id.NodeID)
-	if err != nil {
-		return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
-	}
-
-	return nil
-}
-
-// handleChunkDataPackRequest receives a request for the chunk data pack associated with chunkID from the
-// requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
-// requester.
-func (e *Engine) handleChunkDataPackRequest(originID flow.Identifier, chunkID flow.Identifier) error {
-	// extracts list of verifier nodes id
-	//
-	// TODO state extraction should be done based on block references
-	// https://github.com/dapperlabs/flow-go/issues/2787
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("invalid origin id (%s): %w", origin, err)

@@ -481,16 +481,9 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		}
 		//
 		chunk := generateChunk(i, startState, endState)
-		//
-		chunkHeader := generateChunkHeader(chunk, view.Reads())
-		//
-		err = e.execState.PersistChunkHeader(chunkHeader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to save chunk header: %w", err)
-		}
 
 		// chunkDataPack
-		allRegisters := view.AllRegisters()
+		allRegisters := view.RegisterTouches()
 		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
 
 		if err != nil {
@@ -502,7 +495,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		if err != nil {
 			return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
 		}
-		//
+		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
 	}
@@ -556,18 +549,6 @@ func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flo
 		},
 		Index:    0,
 		EndState: endState,
-	}
-}
-
-// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
-func generateChunkHeader(
-	chunk *flow.Chunk,
-	registerIDs []flow.RegisterID,
-) *flow.ChunkHeader {
-	return &flow.ChunkHeader{
-		ChunkID:     chunk.ID(),
-		StartState:  chunk.StartState,
-		RegisterIDs: registerIDs,
 	}
 }
 
