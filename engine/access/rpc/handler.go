@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -23,7 +24,7 @@ import (
 // All remaining calls are handled in this file (or not implemented yet)
 type Handler struct {
 	access.UnimplementedAccessAPIServer
-	executionRPC  access.AccessAPIClient
+	executionRPC  execution.ExecutionAPIClient
 	collectionRPC access.AccessAPIClient
 	log           zerolog.Logger
 	state         protocol.State
@@ -37,8 +38,8 @@ type Handler struct {
 
 func NewHandler(log zerolog.Logger,
 	s protocol.State,
-	e access.AccessAPIClient,
 	c access.AccessAPIClient,
+	e execution.ExecutionAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -62,7 +63,21 @@ func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.Pi
 }
 
 func (h *Handler) ExecuteScriptAtLatestBlock(ctx context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
-	return h.executionRPC.ExecuteScriptAtLatestBlock(ctx, req)
+	header, err := h.getLatestSealedHeader()
+	if err != nil {
+		return nil, err
+	}
+	blockID := header.ID()
+	resp, err := h.executionRPC.ExecuteScriptAtBlockID(ctx, &execution.ExecuteScriptAtBlockIDRequest{
+		BlockId: blockID[:],
+		Script:  req.GetScript(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &access.ExecuteScriptResponse{
+		Value: resp.GetValue(),
+	}, nil
 }
 
 func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {

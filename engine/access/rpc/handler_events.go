@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 )
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and the end block height (inclusive) that have the given type
@@ -52,12 +53,18 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 	}
 
 	// create a request to be sent to the execution node
-	fwdReq := &access.GetEventsForBlockIDsRequest{
+	fwdReq := &execution.GetEventsForBlockIDsRequest{
 		Type:     reqEvent,
 		BlockIds: blockIDs,
 	}
 
-	return h.executionRPC.GetEventsForBlockIDs(ctx, fwdReq)
+	resp, err := h.executionRPC.GetEventsForBlockIDs(ctx, fwdReq)
+	if err != nil {
+		return nil, err
+	}
+	return &access.EventsResponse{
+		Events: resp.GetEvents(),
+	}, nil
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -67,6 +74,17 @@ func (h *Handler) GetEventsForBlockIDs(ctx context.Context, req *access.GetEvent
 		return nil, status.Error(codes.InvalidArgument, "block IDs not specified")
 	}
 
+	// create a request to be sent to the execution node
+	fwdReq := &execution.GetEventsForBlockIDsRequest{
+		Type:     req.GetType(),
+		BlockIds: req.GetBlockIds(),
+	}
 	// forward the request to the execution node
-	return h.executionRPC.GetEventsForBlockIDs(ctx, req)
+	resp, err := h.executionRPC.GetEventsForBlockIDs(ctx, fwdReq)
+	if err != nil {
+		return nil, err
+	}
+	return &access.EventsResponse{
+		Events: resp.GetEvents(),
+	}, nil
 }

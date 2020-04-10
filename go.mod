@@ -3,19 +3,25 @@ module github.com/dapperlabs/flow-go
 go 1.13
 
 require (
+	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta
-	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2
+	github.com/dapperlabs/cadence v0.0.0-20200401151421-7c78a2da20a6
+	github.com/dapperlabs/flow-go-sdk v0.5.2 // indirect
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
+	github.com/dapperlabs/flow-go/integration v0.0.0-20200409200346-f0707af6d512
 	github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125
+	github.com/dapperlabs/testingdock v0.4.2
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
+	github.com/docker/distribution v2.7.1+incompatible // indirect
+	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
+	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.0
 	github.com/golang/protobuf v1.3.5
-	github.com/google/go-cmp v0.4.0 // indirect
+	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/ipfs/go-log v0.0.1
@@ -26,13 +32,10 @@ require (
 	github.com/libp2p/go-libp2p-swarm v0.2.2
 	github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 	github.com/libp2p/go-tcp-transport v0.1.1
-	github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381 // indirect
+	github.com/m4ksio/testingdock v0.4.1
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
-	github.com/onsi/ginkgo v1.10.1 // indirect
-	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
-	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.3.0
 	github.com/rs/zerolog v1.15.0
@@ -44,7 +47,6 @@ require (
 	github.com/thanhpk/randstr v1.0.4
 	github.com/tinylib/msgp v1.1.2 // indirect
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	github.com/whyrusleeping/go-logging v0.0.1
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad

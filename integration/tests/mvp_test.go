@@ -16,18 +16,18 @@ import (
 
 func TestMVP_Network(t *testing.T) {
 
-	t.Skip()
-
 	colNode := testnet.NewNodeConfig(flow.RoleCollection)
 	exeNode := testnet.NewNodeConfig(flow.RoleExecution)
 
 	net := []testnet.NodeConfig{
 		colNode,
+		testnet.NewNodeConfig(flow.RoleCollection),
 		exeNode,
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 	conf := testnet.NetworkConfig{Nodes: net}
 
@@ -42,26 +42,13 @@ func TestMVP_Network(t *testing.T) {
 	flowNetwork.Start(ctx)
 	defer flowNetwork.Stop()
 
-	colContainer, ok := flowNetwork.ContainerByID(colNode.Identifier)
-	require.True(t, ok)
-	colNodeAPIPort := colContainer.Ports[testnet.ColNodeAPIPort]
-	require.NotEqual(t, "", colNodeAPIPort)
-
-	exeContainer, ok := flowNetwork.ContainerByID(exeNode.Identifier)
-	require.True(t, ok)
-	exeNodeAPIPort := exeContainer.Ports[testnet.ExeNodeAPIPort]
-	require.NotEqual(t, "", exeNodeAPIPort)
-
 	key, err := generateRandomKey()
 	require.NoError(t, err)
 
-	colClient, err := testnet.NewClient(fmt.Sprintf(":%s", colNodeAPIPort), key)
+	accessClient, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]), key)
 	require.NoError(t, err)
 
-	exeClient, err := testnet.NewClient(fmt.Sprintf(":%s", exeNodeAPIPort), key)
-	require.NoError(t, err)
-
-	runMVPTest(t, colClient, exeClient)
+	runMVPTest(t, accessClient)
 }
 
 func TestMVP_Emulator(t *testing.T) {
@@ -76,33 +63,33 @@ func TestMVP_Emulator(t *testing.T) {
 	c, err := testnet.NewClient(":3569", key)
 	require.NoError(t, err)
 
-	runMVPTest(t, c, c)
+	runMVPTest(t, c)
 }
 
-func runMVPTest(t *testing.T, colClient *testnet.Client, exeClient *testnet.Client) {
+func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 
 	ctx := context.Background()
 
 	// contract is not deployed, so script fails
-	counter, err := readCounter(ctx, exeClient)
+	counter, err := readCounter(ctx, accessClient)
 	require.Error(t, err)
 
-	err = deployCounter(ctx, colClient)
+	err = deployCounter(ctx, accessClient)
 	require.NoError(t, err)
 
 	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, exeClient)
+		counter, err = readCounter(ctx, accessClient)
 
 		return err == nil && counter == -3
 	}, 30*time.Second, time.Second)
 
-	err = createCounter(ctx, colClient)
+	err = createCounter(ctx, accessClient)
 	require.NoError(t, err)
 
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, exeClient)
+		counter, err = readCounter(ctx, accessClient)
 
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)

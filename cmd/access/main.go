@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
@@ -34,7 +35,7 @@ func main() {
 		ingestEng       *ingestion.Engine
 		rpcConf         rpc.Config
 		collectionRPC   access.AccessAPIClient
-		executionRPC    access.AccessAPIClient
+		executionRPC    execution.ExecutionAPIClient
 		err             error
 		blocks          *storage.Blocks
 		headers         *storage.Headers
@@ -54,6 +55,8 @@ func main() {
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
+			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
+
 			collectionRPCConn, err := grpc.Dial(rpcConf.CollectionAddr, grpc.WithInsecure())
 			if err != nil {
 				return err
@@ -62,11 +65,13 @@ func main() {
 			return nil
 		}).
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
+			node.Logger.Info().Err(err).Msgf("Execution node Addr: %s", rpcConf.ExecutionAddr)
+
 			executionRPCConn, err := grpc.Dial(rpcConf.ExecutionAddr, grpc.WithInsecure())
 			if err != nil {
 				return err
 			}
-			executionRPC = access.NewAccessAPIClient(executionRPCConn)
+			executionRPC = execution.NewExecutionAPIClient(executionRPCConn)
 			return nil
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {

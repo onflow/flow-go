@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -34,7 +35,7 @@ func New(log zerolog.Logger,
 	state protocol.State,
 	config Config,
 	collectionRPC access.AccessAPIClient,
-	executionRPC access.AccessAPIClient,
+	executionRPC execution.ExecutionAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
