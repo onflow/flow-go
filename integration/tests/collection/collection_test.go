@@ -2,7 +2,6 @@ package collection
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -34,9 +33,9 @@ func defaultOtherNodes() []testnet.NodeConfig {
 	return []testnet.NodeConfig{conNode1, conNode2, conNode3, exeNode, verNode}
 }
 
-// Tests sending various invalid transactions to a single-cluster configuration
-// and ensures that they are rejected by the collection node and not included in
-// any collection.
+// Test sending various invalid transactions to a single-cluster configuration.
+// The transactions should be rejected by the collection node and not included
+// in any collection.
 func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	var (
 		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
@@ -59,11 +58,8 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
 	assert.True(t, ok)
 
-	port, ok := colContainer1.Ports[testnet.ColNodeAPIPort]
-	assert.True(t, ok)
-
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", port))
-	assert.Nil(t, err)
+	client, err := colContainer1.Client(testnet.ColNodeAPIPort)
+	require.Nil(t, err)
 
 	t.Run("missing reference block hash", func(t *testing.T) {
 		txDSL := unittest.TransactionDSLFixture()
@@ -116,8 +112,8 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	})
 }
 
-// test sending a single valid transaction to a single cluster
-// the transaction should be included in
+// Test sending a single valid transaction to a single cluster.
+// The transaction should be included in a collection.
 func TestTransactionIngress_SingleCluster(t *testing.T) {
 
 	var (
@@ -141,10 +137,8 @@ func TestTransactionIngress_SingleCluster(t *testing.T) {
 	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
 	assert.True(t, ok)
 
-	port, ok := colContainer1.Ports[testnet.ColNodeAPIPort]
-	assert.True(t, ok)
-
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", port))
+	client, err := colContainer1.Client(testnet.ColNodeAPIPort)
+	require.Nil(t, err)
 
 	tx := unittest.TransactionBodyFixture()
 	tx, err = client.SignTransaction(tx)
@@ -176,57 +170,77 @@ func TestTransactionIngress_SingleCluster(t *testing.T) {
 	assert.Nil(t, err)
 
 	// the transaction should be included in exactly one collection
-	head, err := state.Final().Head()
-	assert.Nil(t, err)
-
-	foundTx := false
-	for head.Height > 0 {
-		collection, err := state.AtBlockID(head.ID()).Collection()
-		assert.Nil(t, err)
-
-		head, err = state.AtBlockID(head.ParentID).Head()
-		assert.Nil(t, err)
-
-		if collection.Len() == 0 {
-			continue
-		}
-
-		for _, txID := range collection.Transactions {
-			assert.Equal(t, tx.ID(), txID, "found unexpected transaction")
-			if txID == tx.ID() {
-				assert.False(t, foundTx, "found duplicate transaction")
-				foundTx = true
-			}
-		}
-	}
-
-	assert.True(t, foundTx)
+	checker := NewStateChecker(state)
+	checker.
+		ExpectContainsTx(tx.ID()).
+		ExpectTxCount(1).
+		Check(t)
 }
 
+// Test sending a single valid transaction to multi-cluster configuration.
+//
+// We want to ensure that the transaction is routed to the appropriate cluster
+// and included in a collection in the appropriate cluster.
 func TestTransactionIngress_MultiCluster(t *testing.T) {
 
 	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")
-		})
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002")
-		})
-		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000003")
-		})
-		colNode4 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
-			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000004")
-		})
+		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
+		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
+		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
+		colNode4 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(4))
+		colNode5 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(5))
+		colNode6 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(6))
 	)
 
-	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3, colNode4}, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig(nodes)
+	const nClusters uint = 3
+
+	nodes := append(
+		[]testnet.NodeConfig{colNode1, colNode2, colNode3, colNode4, colNode5, colNode6},
+		defaultOtherNodes()...,
+	)
+	conf := testnet.NewNetworkConfig(nodes, testnet.WithClusters(nClusters))
 
 	net, err := testnet.PrepareFlowNetwork(t, "col_multi_cluster", conf)
 	require.Nil(t, err)
 
-	net.Start(context.Background())
+	ctx := context.Background()
+
+	net.Start(ctx)
 	defer net.Cleanup()
 
+	clusters := protocol.Clusters(nClusters, net.Identities())
+
+	t.Run("send tx to responsible cluster", func(t *testing.T) {
+
+		// pick a cluster to target
+		targetCluster := clusters.ByIndex(0)
+		targetIdentity, ok := targetCluster.ByIndex(0)
+		require.True(t, ok)
+
+		// pick a member of the cluster
+		targetNode, ok := net.ContainerByID(targetIdentity.NodeID)
+		require.True(t, ok)
+
+		// get a client pointing to the cluster member
+		client, err := targetNode.Client(testnet.ColNodeAPIPort)
+		require.Nil(t, err)
+
+		// create a transaction
+		tx := unittest.TransactionBodyFixture()
+		tx, err = client.SignTransaction(tx)
+		assert.Nil(t, err)
+
+		// submit the transaction
+		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+		err = client.SendTransaction(ctx, tx)
+		assert.Nil(t, err)
+
+		// wait for consensus to complete
+		time.Sleep(10 * time.Second)
+	})
+
+	t.Run("send tx to other cluster", func(t *testing.T) {})
+
+	t.Run("send tx to multiple other clusters", func(t *testing.T) {})
 }
