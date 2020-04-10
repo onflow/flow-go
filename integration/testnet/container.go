@@ -41,6 +41,16 @@ type Container struct {
 	opts    *testingdock.ContainerOpts
 }
 
+// Client returns a Access API to the given container on the given port.
+func (c *Container) Client(portName string) (*Client, error) {
+	port, ok := c.Ports[portName]
+	if !ok {
+		return nil, fmt.Errorf("could not find port (name=%s)", portName)
+	}
+
+	return NewClient(fmt.Sprintf(":%s", port))
+}
+
 // bindPort exposes the given container port and binds it to the given host port.
 // If no protocol is specified, assumes TCP.
 func (c *Container) bindPort(hostPort, containerPort string) {
