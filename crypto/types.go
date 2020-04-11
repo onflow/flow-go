@@ -30,14 +30,14 @@ const (
 	// Points compression: 1 for compressed, 0 for uncompressed
 	compression = 1
 	// the length is divided by 2 if compression is on
-	SignatureLenBLS_BLS12381 = fieldSize * (2 - compression)
-	PrKeyLenBLS_BLS12381     = 32
+	SignatureLenBlsBls12381 = fieldSize * (2 - compression)
+	PrKeyLenBlsBls12381     = 32
 	// the length is divided by 2 if compression is on
-	PubKeyLenBLS_BLS12381 = 2 * fieldSize * (2 - compression)
+	PubKeyLenBlsBls12381 = 2 * fieldSize * (2 - compression)
 	// Input length of the optimized SwU map to G1: 2*(P_size+security)
 	// security being 128 bits
-	OpSwUInputLenBLS_BLS12381    = 2 * (fieldSize + (securityBits / 8))
-	KeyGenSeedMinLenBLS_BLS12381 = PrKeyLenBLS_BLS12381 + (securityBits / 8)
+	opSwUInputLenBlsBls12381     = 2 * (fieldSize + (securityBits / 8))
+	KeyGenSeedMinLenBLS_BLS12381 = PrKeyLenBlsBls12381 + (securityBits / 8)
 
 	// ECDSA
 

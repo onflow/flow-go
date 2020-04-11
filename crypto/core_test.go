@@ -110,7 +110,7 @@ func BenchmarkG2(b *testing.B) {
 // Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {
 	_ = newBlsBLS12381()
-	input := make([]byte, OpSwUInputLenBLS_BLS12381)
+	input := make([]byte, opSwUInputLenBlsBls12381)
 	for i := 0; i < len(input); i++ {
 		input[i] = byte(i)
 	}
@@ -140,7 +140,7 @@ func TestOpSwuHashToG1(t *testing.T) {
 		"a21671a9cbbbf73c429d32bf9a07b64141118a00301d8a1a07de587818d788b37ed0b568c6ede80bd31426bafc142981",
 	}
 
-	output := make([]byte, SignatureLenBLS_BLS12381)
+	output := make([]byte, SignatureLenBlsBls12381)
 	for i, msg := range inputs {
 		input, _ := hex.DecodeString(msg)
 		OpSwUUnitTest(output, input)

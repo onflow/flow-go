@@ -117,7 +117,7 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 
 const (
 	complaintSize      = 1
-	complainAnswerSize = 1 + PrKeyLenBLS_BLS12381
+	complainAnswerSize = 1 + PrKeyLenBlsBls12381
 )
 
 func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {

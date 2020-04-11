@@ -51,7 +51,7 @@ const BLS_KMACFunction = "H2C"
 // tag is the domain separation tag
 func NewBLS_KMAC(tag string) hash.Hasher {
 	// the error is ignored as the parameter lengths are in the correct range of kmac
-	kmac, _ := hash.NewKMAC_128([]byte(tag), []byte("BLS_KMACFunction"), OpSwUInputLenBLS_BLS12381)
+	kmac, _ := hash.NewKMAC_128([]byte(tag), []byte("BLS_KMACFunction"), opSwUInputLenBlsBls12381)
 	return kmac
 }
 
@@ -130,7 +130,7 @@ func (sk *PrKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
 }
 
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
-	return PrKeyLenBLS_BLS12381
+	return PrKeyLenBlsBls12381
 }
 
 // computePublicKey generates the public key corresponding to
@@ -177,7 +177,7 @@ func (pk *PubKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
 }
 
 func (pk *PubKeyBLS_BLS12381) KeySize() int {
-	return PubKeyLenBLS_BLS12381
+	return PubKeyLenBlsBls12381
 }
 
 func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {

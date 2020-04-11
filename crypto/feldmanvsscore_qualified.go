@@ -59,7 +59,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
-		PrKeyLenBLS_BLS12381,
+		PrKeyLenBlsBls12381,
 	)
 	s.xReceived = true
 	if s.AReceived {
@@ -246,7 +246,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		// read the complainer private share
 		C.bn_read_bin((*C.bn_st)(&s.complaints[complainer].answer),
 			(*C.uchar)(&data[1]),
-			PrKeyLenBLS_BLS12381,
+			PrKeyLenBlsBls12381,
 		)
 		return
 	}
@@ -268,7 +268,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		// read the complainer private share
 		C.bn_read_bin((*C.bn_st)(&c.answer),
 			(*C.uchar)(&data[1]),
-			PrKeyLenBLS_BLS12381,
+			PrKeyLenBlsBls12381,
 		)
 		s.disqualified = s.checkComplaint(complainer, c)
 		if s.disqualified {

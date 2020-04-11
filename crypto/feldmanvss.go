@@ -79,10 +79,10 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 }
 
 const (
-	shareSize = PrKeyLenBLS_BLS12381
+	shareSize = PrKeyLenBlsBls12381
 	// the actual verifVectorSize depends on the state and should be:
-	// PubKeyLenBLS_BLS12381*(t+1)
-	verifVectorSize = PubKeyLenBLS_BLS12381
+	// PubKeyLenBlsBls12381*(t+1)
+	verifVectorSize = PubKeyLenBlsBls12381
 )
 
 func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {

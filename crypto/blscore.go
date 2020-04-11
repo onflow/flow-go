@@ -117,7 +117,7 @@ func hashToG1(data []byte) *pointG1 {
 func OpSwUUnitTest(output []byte, input []byte) {
 	C.opswu_test((*C.uchar)(&output[0]),
 		(*C.uchar)(&input[0]),
-		SignatureLenBLS_BLS12381)
+		SignatureLenBlsBls12381)
 }
 
 // sets a scalar to a small integer
@@ -162,7 +162,7 @@ func readPointG2(a *pointG2, src []byte) error {
 
 // computes a bls signature
 func (a *blsBLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
-	s := make([]byte, SignatureLenBLS_BLS12381)
+	s := make([]byte, SignatureLenBlsBls12381)
 
 	C._blsSign((*C.uchar)(&s[0]),
 		(*C.bn_st)(sk),
