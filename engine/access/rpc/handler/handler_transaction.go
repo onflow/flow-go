@@ -69,6 +69,38 @@ func (h *Handler) GetTransaction(_ context.Context, req *access.GetTransactionRe
 	return resp, nil
 }
 
+func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
+
+	blockID := flow.HashToID(req.Id)
+	// look up transaction from storage
+	tx, err := h.transactions.ByID(blockID)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	txID := tx.ID()
+
+	// get events for the transaction
+	events, err := h.getTransactionEventsFromExecutionNode(ctx, blockID[:], txID[:])
+	if err != nil {
+		return nil, err
+	}
+
+	// derive status of the transaction
+	status, err := h.deriveTransactionStatus(tx)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	// return result
+	resp := &access.TransactionResultResponse{
+		Status: status,
+		Events: events,
+	}
+
+	return resp, nil
+}
+
 // deriveTransactionStatus derives the transaction status based on current protocol state
 func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.TransactionStatus, error) {
 

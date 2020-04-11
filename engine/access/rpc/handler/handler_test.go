@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -31,7 +32,7 @@ type Suite struct {
 	headers      *storage.Headers
 	collections  *storage.Collections
 	transactions *storage.Transactions
-	execClient   *mockaccess.AccessAPIClient
+	execClient   *mockaccess.ExecutionAPIClient
 }
 
 func TestHandler(t *testing.T) {
@@ -47,7 +48,7 @@ func (suite *Suite) SetupTest() {
 	suite.headers = new(storage.Headers)
 	suite.transactions = new(storage.Transactions)
 	suite.collections = new(storage.Collections)
-	suite.execClient = new(mockaccess.AccessAPIClient)
+	suite.execClient = new(mockaccess.ExecutionAPIClient)
 }
 
 func (suite *Suite) TestPing() {
@@ -230,30 +231,44 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	blockIDs := getIDs(5)
 	events := getEvents(10)
 
-	req := &access.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}
-
-	results := make([]*access.EventsResponse_Result, len(blockIDs))
+	// create the expected results from execution node and access node
+	exeResults := make([]*execution.EventsResponse_Result, len(blockIDs))
+	accResults := make([]*access.EventsResponse_Result, len(blockIDs))
 
 	for i := 0; i < len(blockIDs); i++ {
-		results[i] = &access.EventsResponse_Result{
+		exeResults[i] = &execution.EventsResponse_Result{
+			BlockId:     blockIDs[i],
+			BlockHeight: uint64(i),
+			Events:      events,
+		}
+		accResults[i] = &access.EventsResponse_Result{
 			BlockId:     blockIDs[i],
 			BlockHeight: uint64(i),
 			Events:      events,
 		}
 	}
 
-	expectedResp := access.EventsResponse{
-		Results: results,
+	// create the execution node response
+	exeResp := execution.EventsResponse{
+		Results: exeResults,
 	}
+	// create the expected access node response
+	expectedResp := access.EventsResponse{
+		Results: accResults,
+	}
+
 	ctx := context.Background()
 
+	exeReq := &execution.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}
+
 	// expect one call to the executor api client
-	suite.execClient.On("GetEventsForBlockIDs", ctx, req).Return(&expectedResp, nil).Once()
+	suite.execClient.On("GetEventsForBlockIDs", ctx, exeReq).Return(&exeResp, nil).Once()
 
 	// create the handler
 	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, nil, nil, nil)
 
 	// execute request
+	req := &access.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}
 	acutalResponse, err := handler.GetEventsForBlockIDs(ctx, req)
 
 	// check response
@@ -291,10 +306,16 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	}
 
 	setupExecClient := func(events []*entities.Event) *access.EventsResponse {
-		execReq := &access.GetEventsForBlockIDsRequest{BlockIds: expBlockIDs, Type: string(flow.EventAccountCreated)}
+		execReq := &execution.GetEventsForBlockIDsRequest{BlockIds: expBlockIDs, Type: string(flow.EventAccountCreated)}
 		results := make([]*access.EventsResponse_Result, len(expBlockIDs))
+		exeResults := make([]*execution.EventsResponse_Result, len(expBlockIDs))
 		for i, id := range expBlockIDs {
 			results[i] = &access.EventsResponse_Result{
+				BlockId:     id,
+				BlockHeight: 0,
+				Events:      events[i:i],
+			}
+			exeResults[i] = &execution.EventsResponse_Result{
 				BlockId:     id,
 				BlockHeight: 0,
 				Events:      events[i:i],
@@ -303,7 +324,10 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		expectedResp := &access.EventsResponse{
 			Results: results,
 		}
-		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(expectedResp, nil).Once()
+		exeResp := &execution.EventsResponse{
+			Results: exeResults,
+		}
+		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(exeResp, nil).Once()
 		return expectedResp
 	}
 

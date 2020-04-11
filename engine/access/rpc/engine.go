@@ -3,6 +3,7 @@ package rpc
 import (
 	"net"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
@@ -34,8 +35,8 @@ type Engine struct {
 func New(log zerolog.Logger,
 	state protocol.State,
 	config Config,
+	executionRPC execution.ExecutionAPIClient,
 	collectionRPC access.AccessAPIClient,
-	executionRPC access.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -46,7 +47,7 @@ func New(log zerolog.Logger,
 	eng := &Engine{
 		log:     log,
 		unit:    engine.NewUnit(),
-		handler: handler.NewHandler(log, state, collectionRPC, executionRPC, blocks, headers, collections, transactions),
+		handler: handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions),
 		server:  grpc.NewServer(),
 		config:  config,
 	}
