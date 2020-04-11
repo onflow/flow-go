@@ -73,9 +73,9 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac hash.Hasher)
 // generatePrivateKey generates a private key for BLS on BLS12381 curve
 // The minimum size of the input seed is 48 bytes (for a sceurity of 128 bits)
 func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
-	if len(seed) < KeyGenSeedMinLenBLS_BLS12381 {
+	if len(seed) < KeyGenSeedMinLenBlsBls12381 {
 		return nil, fmt.Errorf("seed should be at least %d bytes",
-			KeyGenSeedMinLenBLS_BLS12381)
+			KeyGenSeedMinLenBlsBls12381)
 	}
 
 	sk := &PrKeyBLS_BLS12381{

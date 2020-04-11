@@ -12,9 +12,9 @@ import (
 
 // BLS tests
 func TestBLS_BLS12381(t *testing.T) {
-	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
+	seed := make([]byte, KeyGenSeedMinLenBlsBls12381)
 	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLS_BLS12381)
+	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
 	require.Nil(t, err)
@@ -41,9 +41,9 @@ func BenchmarkBLS_BLS12381Verify(b *testing.B) {
 
 // TestBLSEncodeDecode tests encoding and decoding of BLS keys
 func TestBLSEncodeDecode(t *testing.T) {
-	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
+	seed := make([]byte, KeyGenSeedMinLenBlsBls12381)
 	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLS_BLS12381)
+	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLS_BLS12381, seed)
 	assert.Nil(t, err, "the key generation has failed")
@@ -71,9 +71,9 @@ func TestBLSEncodeDecode(t *testing.T) {
 // TestBLSEquals tests equal for BLS keys
 func TestBLSEquals(t *testing.T) {
 	// generate a key pair
-	seed := make([]byte, KeyGenSeedMinLenBLS_BLS12381)
+	seed := make([]byte, KeyGenSeedMinLenBlsBls12381)
 	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLS_BLS12381)
+	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
 	require.NoError(t, err)
 	// first pair
 	sk1, err := GeneratePrivateKey(BLS_BLS12381, seed)
@@ -89,7 +89,7 @@ func TestBLSEquals(t *testing.T) {
 	pk3 := sk3.PublicKey()
 	// fourth pair after changing the seed
 	n, err = rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLS_BLS12381)
+	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
 	require.NoError(t, err)
 	sk4, err := GeneratePrivateKey(BLS_BLS12381, seed)
 	require.NoError(t, err)

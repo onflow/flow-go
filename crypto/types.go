@@ -36,8 +36,8 @@ const (
 	PubKeyLenBlsBls12381 = 2 * fieldSize * (2 - compression)
 	// Input length of the optimized SwU map to G1: 2*(P_size+security)
 	// security being 128 bits
-	opSwUInputLenBlsBls12381     = 2 * (fieldSize + (securityBits / 8))
-	KeyGenSeedMinLenBLS_BLS12381 = PrKeyLenBlsBls12381 + (securityBits / 8)
+	opSwUInputLenBlsBls12381    = 2 * (fieldSize + (securityBits / 8))
+	KeyGenSeedMinLenBlsBls12381 = PrKeyLenBlsBls12381 + (securityBits / 8)
 
 	// ECDSA
 

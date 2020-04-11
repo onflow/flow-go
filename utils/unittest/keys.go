@@ -32,9 +32,9 @@ func NetworkingKeys(n int) ([]crypto.PrivateKey, error) {
 }
 
 func StakingKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLS_BLS12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLenBlsBls12381)
 	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenBLS_BLS12381 {
+	if err != nil || n != crypto.KeyGenSeedMinLenBlsBls12381 {
 		return nil, err
 	}
 

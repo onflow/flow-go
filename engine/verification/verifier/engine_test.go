@@ -58,9 +58,9 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	// Mocks the signature oracle of the engine
 	//
 	// generates signing and verification keys
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLS_BLS12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLenBlsBls12381)
 	n, err := rand.Read(seed)
-	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBLS_BLS12381)
+	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBlsBls12381)
 	require.NoError(suite.T(), err)
 	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
 	require.NoError(suite.T(), err)
