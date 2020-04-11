@@ -7,13 +7,13 @@ import (
 )
 
 func NetworkingKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_P256)
+	seed := make([]byte, crypto.KeyGenSeedMinLenEcdsaP256)
 	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenECDSA_P256 {
+	if err != nil || n != crypto.KeyGenSeedMinLenEcdsaP256 {
 		return nil, err
 	}
 
-	sk, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, seed)
 	return sk, err
 }
 

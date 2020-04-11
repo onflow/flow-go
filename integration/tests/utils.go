@@ -62,12 +62,12 @@ func noopTransaction() dsl.Transaction {
 }
 
 func generateRandomKey() (*flow.AccountPrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_P256)
+	seed := make([]byte, crypto.KeyGenSeedMinLenEcdsaP256)
 	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenECDSA_P256 {
+	if err != nil || n != crypto.KeyGenSeedMinLenEcdsaP256 {
 		return nil, err
 	}
-	key, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
+	key, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, seed)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func generateRandomKey() (*flow.AccountPrivateKey, error) {
 }
 
 func getEmulatorKey() (*flow.AccountPrivateKey, error) {
-	key, err := crypto.DecodePrivateKey(crypto.ECDSA_P256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
+	key, err := crypto.DecodePrivateKey(crypto.EcdsaP256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
 	if err != nil {
 		return nil, err
 	}

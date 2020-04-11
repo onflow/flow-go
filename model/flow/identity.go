@@ -96,7 +96,7 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 		}
 	}
 	if m.NetworkPubKey != nil {
-		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSA_P256, m.NetworkPubKey); err != nil {
+		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.EcdsaP256, m.NetworkPubKey); err != nil {
 			return err
 		}
 	}

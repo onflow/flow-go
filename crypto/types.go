@@ -9,13 +9,13 @@ const (
 	// Supported signing algorithms
 	UnknownSigningAlgorithm SigningAlgorithm = iota
 	BLS_BLS12381
-	ECDSA_P256
-	ECDSA_SECp256k1
+	EcdsaP256
+	EcdsaSecp256k1
 )
 
 // String returns the string representation of this signing algorithm.
 func (f SigningAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_SECp256k1"}[f]
+	return [...]string{"UNKNOWN", "BLS_BLS12381", "EcdsaP256", "EcdsaSecp256k1"}[f]
 }
 
 const (
@@ -42,16 +42,16 @@ const (
 	// ECDSA
 
 	// NIST P256
-	SignatureLenECDSA_P256     = 64
-	PrKeyLenECDSA_P256         = 32
-	PubKeyLenECDSA_P256        = 64
-	KeyGenSeedMinLenECDSA_P256 = PrKeyLenECDSA_P256 + (securityBits / 8)
+	SignatureLenEcdsaP256     = 64
+	PrKeyLenEcdsaP256         = 32
+	PubKeyLenEcdsaP256        = 64
+	KeyGenSeedMinLenEcdsaP256 = PrKeyLenEcdsaP256 + (securityBits / 8)
 
 	// SEC p256k1
-	SignatureLenECDSA_SECp256k1     = 64
-	PrKeyLenECDSA_SECp256k1         = 32
-	PubKeyLenECDSA_SECp256k1        = 64
-	KeyGenSeedMinLenECDSA_SECp256k1 = PrKeyLenECDSA_SECp256k1 + (securityBits / 8)
+	SignatureLenEcdsaSecp256k1     = 64
+	PrKeyLenEcdsaSecp256k1         = 32
+	PubKeyLenEcdsaSecp256k1        = 64
+	KeyGenSeedMinLenEcdsaSecp256k1 = PrKeyLenEcdsaSecp256k1 + (securityBits / 8)
 
 	// DKG and Threshold Signatures
 	DKGMinSize       int = 3

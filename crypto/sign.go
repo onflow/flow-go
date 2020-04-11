@@ -31,9 +31,9 @@ type commonSigner struct {
 // newNonRelicSigner initializes a signer that does not depend on the Relic library.
 func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	switch algo {
-	case ECDSA_P256:
+	case EcdsaP256:
 		return newEcdsaP256(), nil
-	case ECDSA_SECp256k1:
+	case EcdsaSecp256k1:
 		return newEcdsaSecp256k1(), nil
 	default:
 		return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)

@@ -13,14 +13,14 @@ import (
 )
 
 func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
-	priv, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, seed)
+	priv, err := crypto.GeneratePrivateKey(crypto.EcdsaSecp256k1, seed)
 	if err != nil {
 		return flow.AccountPrivateKey{}, err
 	}
 
 	return flow.AccountPrivateKey{
 		PrivateKey: priv,
-		SignAlgo:   crypto.ECDSA_SECp256k1,
+		SignAlgo:   crypto.EcdsaSecp256k1,
 		HashAlgo:   hash.SHA2_256,
 	}, nil
 }

@@ -357,7 +357,7 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 			panic(err)
 		}
 		identity.StakingPubKey = stak.PublicKey()
-		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed())
+		netw, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, generateRandomSeed())
 		if err != nil {
 			panic(err)
 		}

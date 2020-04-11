@@ -84,7 +84,7 @@ func TestBLSEquals(t *testing.T) {
 	require.NoError(t, err)
 	pk2 := sk2.PublicKey()
 	// unrelated algo pair
-	sk3, err := GeneratePrivateKey(ECDSA_P256, seed)
+	sk3, err := GeneratePrivateKey(EcdsaP256, seed)
 	require.NoError(t, err)
 	pk3 := sk3.PublicKey()
 	// fourth pair after changing the seed
