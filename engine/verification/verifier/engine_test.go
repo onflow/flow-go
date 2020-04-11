@@ -62,7 +62,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	n, err := rand.Read(seed)
 	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBlsBls12381)
 	require.NoError(suite.T(), err)
-	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, seed)
 	require.NoError(suite.T(), err)
 	suite.sk = sk
 	// tag of hasher should be the same as the tag of engine's hasher

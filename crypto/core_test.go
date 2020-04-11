@@ -17,9 +17,9 @@ func TestDeterministicKeyGen(t *testing.T) {
 	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
 	require.NoError(t, err)
-	sk1, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	sk1, err := GeneratePrivateKey(BlsBls12381, seed)
 	require.Nil(t, err)
-	sk2, err := GeneratePrivateKey(BLS_BLS12381, seed)
+	sk2, err := GeneratePrivateKey(BlsBls12381, seed)
 	require.Nil(t, err)
 	assert.True(t, sk1.Equals(sk2), "private keys should be equal")
 }

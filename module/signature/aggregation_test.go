@@ -38,7 +38,7 @@ func createAggregation() (*AggregationProvider, crypto.PrivateKey, error) {
 	if n < len(seed) {
 		return nil, nil, fmt.Errorf("insufficient random bytes")
 	}
-	priv, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	priv, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, seed)
 	if err != nil {
 		return nil, nil, err
 	}

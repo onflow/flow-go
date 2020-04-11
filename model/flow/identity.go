@@ -91,7 +91,7 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 	iy.Stake = m.Stake
 	var err error
 	if m.StakingPubKey != nil {
-		if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLS_BLS12381, m.StakingPubKey); err != nil {
+		if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BlsBls12381, m.StakingPubKey); err != nil {
 			return err
 		}
 	}

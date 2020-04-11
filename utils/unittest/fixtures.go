@@ -352,7 +352,7 @@ func WithNodeID(b byte) func(*flow.Identity) {
 // WithRandomPublicKeys adds random public keys to an identity.
 func WithRandomPublicKeys() func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
+		stak, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, generateRandomSeed())
 		if err != nil {
 			panic(err)
 		}

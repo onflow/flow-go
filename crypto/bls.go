@@ -25,7 +25,7 @@ var once sync.Once
 func newBlsBLS12381() *blsBLS12381Algo {
 	once.Do(func() {
 		blsInstance = &(blsBLS12381Algo{
-			commonSigner: &commonSigner{BLS_BLS12381},
+			commonSigner: &commonSigner{BlsBls12381},
 		})
 		blsInstance.init()
 	})
@@ -126,7 +126,7 @@ type PrKeyBLS_BLS12381 struct {
 }
 
 func (sk *PrKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
-	return BLS_BLS12381
+	return BlsBls12381
 }
 
 func (sk *PrKeyBLS_BLS12381) KeySize() int {
@@ -173,7 +173,7 @@ type PubKeyBLS_BLS12381 struct {
 }
 
 func (pk *PubKeyBLS_BLS12381) Algorithm() SigningAlgorithm {
-	return BLS_BLS12381
+	return BlsBls12381
 }
 
 func (pk *PubKeyBLS_BLS12381) KeySize() int {

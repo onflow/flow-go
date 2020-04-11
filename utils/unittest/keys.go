@@ -38,7 +38,7 @@ func StakingKey() (crypto.PrivateKey, error) {
 		return nil, err
 	}
 
-	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, seed)
 	return sk, err
 }
 

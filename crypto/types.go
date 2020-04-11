@@ -8,14 +8,14 @@ type SigningAlgorithm int
 const (
 	// Supported signing algorithms
 	UnknownSigningAlgorithm SigningAlgorithm = iota
-	BLS_BLS12381
+	BlsBls12381
 	EcdsaP256
 	EcdsaSecp256k1
 )
 
 // String returns the string representation of this signing algorithm.
 func (f SigningAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "BLS_BLS12381", "EcdsaP256", "EcdsaSecp256k1"}[f]
+	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_SECp256k1"}[f]
 }
 
 const (

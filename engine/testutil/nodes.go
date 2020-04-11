@@ -57,7 +57,7 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 	seed, err := json.Marshal(identity)
 	require.NoError(t, err)
 	// creates signing key of the node
-	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, seed)
 	require.NoError(t, err)
 
 	me, err := local.New(identity, sk)
