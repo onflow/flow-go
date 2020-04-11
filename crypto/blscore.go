@@ -31,13 +31,6 @@ var invalid = C.get_invalid()
 
 // init sets the context of BLS12381 curve
 func (a *blsBLS12381Algo) init() error {
-	// sanity checks of lengths
-	if a.prKeyLength != PrKeyLenBLS_BLS12381 ||
-		a.pubKeyLength != PubKeyLenBLS_BLS12381 ||
-		a.signatureLength != SignatureLenBLS_BLS12381 {
-		return errors.New("BLS Lengths in types.go are not matching bls_include.h")
-	}
-
 	// Inits relic context and sets the B12_381 context
 	c := C.relic_init_BLS12_381()
 	if c == nil {
@@ -169,7 +162,7 @@ func readPointG2(a *pointG2, src []byte) error {
 
 // computes a bls signature
 func (a *blsBLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
-	s := make([]byte, a.signatureLength)
+	s := make([]byte, SignatureLenBLS_BLS12381)
 
 	C._blsSign((*C.uchar)(&s[0]),
 		(*C.bn_st)(sk),

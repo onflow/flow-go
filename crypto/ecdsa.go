@@ -32,13 +32,8 @@ var p256Once sync.Once
 func newEcdsaP256() *ecdsaAlgo {
 	p256Once.Do(func() {
 		p256Instance = &(ecdsaAlgo{
-			curve: elliptic.P256(),
-			commonSigner: &commonSigner{
-				ECDSA_P256,
-				PrKeyLenECDSA_P256,
-				PubKeyLenECDSA_P256,
-				SignatureLenECDSA_P256,
-			},
+			curve:        elliptic.P256(),
+			commonSigner: &commonSigner{ECDSA_P256},
 		})
 	})
 	return p256Instance
@@ -51,13 +46,8 @@ var secp256k1Once sync.Once
 func newEcdsaSecp256k1() *ecdsaAlgo {
 	secp256k1Once.Do(func() {
 		secp256k1Instance = &(ecdsaAlgo{
-			curve: secp256k1(),
-			commonSigner: &commonSigner{
-				ECDSA_SECp256k1,
-				PrKeyLenECDSA_SECp256k1,
-				PubKeyLenECDSA_SECp256k1,
-				SignatureLenECDSA_SECp256k1,
-			},
+			curve:        secp256k1(),
+			commonSigner: &commonSigner{ECDSA_SECp256k1},
 		})
 	})
 	return secp256k1Instance

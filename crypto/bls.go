@@ -25,12 +25,7 @@ var once sync.Once
 func newBlsBLS12381() *blsBLS12381Algo {
 	once.Do(func() {
 		blsInstance = &(blsBLS12381Algo{
-			commonSigner: &commonSigner{
-				BLS_BLS12381,
-				prKeyLengthBLS_BLS12381,
-				pubKeyLengthBLS_BLS12381,
-				signatureLengthBLS_BLS12381,
-			},
+			commonSigner: &commonSigner{BLS_BLS12381},
 		})
 		blsInstance.init()
 	})

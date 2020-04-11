@@ -25,10 +25,7 @@ type signer interface {
 
 // commonSigner holds the common data for all signers
 type commonSigner struct {
-	algo            SigningAlgorithm
-	prKeyLength     int
-	pubKeyLength    int
-	signatureLength int
+	algo SigningAlgorithm
 }
 
 // newNonRelicSigner initializes a signer that does not depend on the Relic library.
