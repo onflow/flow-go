@@ -1,7 +1,0 @@
-{
-  "Role": "consensus",
-  "Address": "example2.com",
-  "NodeID": "744398c13e1fdf5d3919c8c29c1faa3cb1ab3ddfcf481ffa55bcb5aaacc4cbff",
-  "NetworkPubKey": "6ZK+Esgm3nsNF42gzJ3scLygjRiN6NOU3clBkxSFWRqstnaP4t+4Wtx31aZvDgy/lCrB8wira/vPr0TDXOk2Mg==",
-  "StakingPubKey": "s84+YnQol7rhO0Xj+Rlr4gtCaN5latC36REaNlDCVrKpnC+Ruqsd1XtUPmfGwqfdFA9IxTu1Uu2ZkaFf81WfhG9z5+e+Z/B0rpsCJD2W3YAkwwKX0JWxAaOT3CbbAyq2"
-}
