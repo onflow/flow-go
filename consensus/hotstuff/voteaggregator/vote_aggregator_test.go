@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	notifications "github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
@@ -48,9 +47,12 @@ func (as *AggregatorSuite) SetupTest() {
 
 	// create a mocked snapshot
 	as.snapshot = &protomock.Snapshot{}
-	as.snapshot.On("Identities").Return(as.participants, nil)
-	as.snapshot.On("Identities", mock.Anything).Return(as.participants, nil)
-	as.snapshot.On("Identities", mock.Anything, mock.Anything).Return(as.participants, nil)
+	as.snapshot.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return as.participants.Filter(selector)
+		},
+		nil,
+	)
 	for _, participant := range as.participants {
 		as.snapshot.On("Identity", participant.NodeID).Return(participant, nil)
 	}
@@ -89,7 +91,7 @@ func (as *AggregatorSuite) SetupTest() {
 	as.validator = validator.New(as.viewstate, as.forks, as.signer)
 
 	// create the aggregator
-	as.aggregator = New(&notifications.Consumer{}, 0, as.viewstate, as.validator, as.signer)
+	as.aggregator = New(&mocks.Consumer{}, 0, as.viewstate, as.validator, as.signer)
 }
 
 func (as *AggregatorSuite) RegisterProposal(proposal *model.Proposal) {
@@ -280,7 +282,7 @@ func (as *AggregatorSuite) TestStaleProposerVote() {
 // should trigger notifier
 func (as *AggregatorSuite) TestDoubleVote() {
 	testview := uint64(5)
-	notifier := &notifications.Consumer{}
+	notifier := &mocks.Consumer{}
 	// mock two proposals at the same view
 	bp1 := newMockBlock(as, testview, as.participants[0].NodeID)
 	bp2 := newMockBlock(as, testview, as.participants[1].NodeID)
@@ -310,7 +312,7 @@ func (as *AggregatorSuite) TestDoubleVote() {
 // receive 4 invalid votes, and then the block, no QC should be built
 // should trigger the notifier when converting pending votes
 func (as *AggregatorSuite) TestInvalidVotesOnly() {
-	notifier := &notifications.Consumer{}
+	notifier := &mocks.Consumer{}
 	as.aggregator.notifier = notifier
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
@@ -333,7 +335,7 @@ func (as *AggregatorSuite) TestInvalidVotesOnly() {
 // receive 1 invalid vote, and 4 valid votes, and then the block, a QC should be built
 func (as *AggregatorSuite) TestVoteMixtureBeforeBlock() {
 	testView := uint64(5)
-	notifier := &notifications.Consumer{}
+	notifier := &mocks.Consumer{}
 	as.aggregator.notifier = notifier
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	// testing invalid pending votes
@@ -360,7 +362,7 @@ func (as *AggregatorSuite) TestVoteMixtureBeforeBlock() {
 // receive the block, and 3 valid vote, and 1 invalid vote, no QC should be built
 func (as *AggregatorSuite) TestVoteMixtureAfterBlock() {
 	testView := uint64(5)
-	notifier := &notifications.Consumer{}
+	notifier := &mocks.Consumer{}
 	as.aggregator.notifier = notifier
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	as.aggregator.StoreProposerVote(bp.ProposerVote())

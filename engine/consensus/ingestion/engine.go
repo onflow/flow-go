@@ -21,23 +21,25 @@ import (
 // link between collection nodes and consensus nodes and has a counterpart with
 // the same engine ID in the collection node.
 type Engine struct {
-	unit  *engine.Unit   // used to manage concurrency & shutdown
-	log   zerolog.Logger // used to log relevant actions with context
-	prop  network.Engine // used to process & propagate collections
-	state protocol.State // used to access the  protocol state
-	me    module.Local   // used to access local node information
+	unit    *engine.Unit   // used to manage concurrency & shutdown
+	log     zerolog.Logger // used to log relevant actions with context
+	metrics module.Metrics // used to report metrics
+	prop    network.Engine // used to process & propagate collections
+	state   protocol.State // used to access the  protocol state
+	me      module.Local   // used to access local node information
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, prop network.Engine, state protocol.State, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, prop network.Engine, state protocol.State, metrics module.Metrics, me module.Local) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "ingestion").Logger(),
-		prop:  prop,
-		state: state,
-		me:    me,
+		unit:    engine.NewUnit(),
+		log:     log.With().Str("engine", "ingestion").Logger(),
+		metrics: metrics,
+		prop:    prop,
+		state:   state,
+		me:      me,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -171,6 +173,8 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 		Hex("origin_id", originID[:]).
 		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("collection guarantee forwarded")
+
+	e.metrics.StartCollectionToFinalized(guarantee.ID())
 
 	return nil
 }

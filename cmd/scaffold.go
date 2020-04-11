@@ -22,10 +22,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/trace"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
@@ -45,7 +45,7 @@ type BaseConfig struct {
 	level        string
 	metricsPort  uint
 	nClusters    uint
-	bootstrapDir string
+	BootstrapDir string
 }
 
 type namedModuleFunc struct {
@@ -77,7 +77,7 @@ type FlowNodeBuilder struct {
 	flags          *pflag.FlagSet
 	name           string
 	Logger         zerolog.Logger
-	Tracer         trace.Tracer
+	Metrics        *metrics.Collector
 	DB             *badger.DB
 	Me             *local.Local
 	State          *protocol.State
@@ -103,7 +103,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
-	fnb.flags.StringVarP(&fnb.BaseConfig.bootstrapDir, "bootstrapdir", "b", "./bootstrap", "path to the bootstrap directory")
+	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "./bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
@@ -121,7 +121,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
 
-		ids, err := fnb.State.Final().Identities()
+		ids, err := fnb.State.Final().Identities(filter.Any)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
@@ -153,7 +153,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 		fnb.Logger.Fatal().Err(err).Msg("could not parse hex ID")
 	}
 
-	info, err := loadPrivateNodeInfo(fnb.BaseConfig.bootstrapDir, nodeID)
+	info, err := loadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
 	if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("failed to load private node info")
 	}
@@ -193,10 +193,10 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.DB = db
 }
 
-func (fnb *FlowNodeBuilder) initTracer() {
-	tracer, err := trace.NewTracer(fnb.Logger)
-	fnb.MustNot(err).Msg("could not initialize tracer")
-	fnb.Tracer = tracer
+func (fnb *FlowNodeBuilder) initMetrics() {
+	metrics, err := metrics.NewCollector(fnb.Logger)
+	fnb.MustNot(err).Msg("could not initialize metrics")
+	fnb.Metrics = metrics
 }
 
 func (fnb *FlowNodeBuilder) initState() {
@@ -211,18 +211,18 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Logger.Info().Msg("bootstrapping empty database")
 
 		// Load the rest of the genesis info, eventually needed for the consensus follower
-		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.bootstrapDir)
+		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
 
 		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.bootstrapDir)
+		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
 
-		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.bootstrapDir)
+		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 		}
@@ -244,7 +244,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
-	allIdentities, err := state.Final().Identities()
+	allIdentities, err := state.Final().Identities(filter.Any)
 	fnb.MustNot(err).Msg("could not retrieve finalized identities")
 	fnb.Logger.Debug().Msgf("known nodes: %v", allIdentities)
 
@@ -397,7 +397,7 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	fnb.initLogger()
 
-	fnb.initTracer()
+	fnb.initMetrics()
 
 	fnb.initDatabase()
 

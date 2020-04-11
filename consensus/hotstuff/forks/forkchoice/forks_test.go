@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	mockdist "github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mockfinalizer "github.com/dapperlabs/flow-go/module/mock"
@@ -129,21 +130,20 @@ func verifyStored(t *testing.T, block *model.Block, forks hotstuff.Forks) {
 	assert.True(t, found, fmt.Sprintf("Did not find block: %v", block.BlockID))
 }
 
-func initForks(t *testing.T, view uint64) (*forks.Forks, *mockfinalizer.Finalizer, *mockdist.Consumer, *forks.BlockQC) {
-	notifier := &mockdist.Consumer{}
+func initForks(t *testing.T, view uint64) (*forks.Forks, *mockfinalizer.Finalizer, *mocks.Consumer, *forks.BlockQC) {
+	notifier := &mocks.Consumer{}
 	finalizationCallback := &mockfinalizer.Finalizer{}
 
 	// construct Finalizer
 	root := makeRootBlock(t, view)
 	notifier.On("OnBlockIncorporated", root.Block).Return().Once()
 	fnlzr, err := finalizer.New(root, finalizationCallback, notifier)
+	require.NoError(t, err)
 
 	// construct ForkChoice
 	notifier.On("OnQcIncorporated", root.QC).Return().Once()
 	fc, err := NewNewestForkChoice(fnlzr, notifier)
-	if err != nil {
-		assert.Fail(t, err.Error())
-	}
+	require.NoError(t, err)
 
 	notifier.AssertExpectations(t)
 	return forks.New(fnlzr, fc), finalizationCallback, notifier, root
@@ -161,17 +161,6 @@ func qc(view uint64, id flow.Identifier) *model.QuorumCertificate {
 	return &model.QuorumCertificate{View: view, BlockID: id}
 }
 
-func makeChildBlock(blockView uint64, payloadHash flow.Identifier, parent *model.Block) *model.Block {
-	qcForParent := qc(parent.View, parent.BlockID)
-	id := computeID(blockView, qcForParent, payloadHash)
-	return &model.Block{
-		BlockID:     id,
-		View:        blockView,
-		QC:          qcForParent,
-		PayloadHash: payloadHash,
-	}
-}
-
 func makeBlock(blockView uint64, blockQC *model.QuorumCertificate, payloadHash flow.Identifier) *model.Block {
 	if blockQC == nil {
 		blockQC = qc(0, flow.Identifier{})
@@ -183,12 +172,6 @@ func makeBlock(blockView uint64, blockQC *model.QuorumCertificate, payloadHash f
 		QC:          blockQC,
 		PayloadHash: payloadHash,
 	}
-}
-
-func string2Identifyer(s string) flow.Identifier {
-	var identifier flow.Identifier
-	copy(identifier[:], []byte(s))
-	return identifier
 }
 
 // computeID is an INCOMPLETE STUB needed so we can test Forks.

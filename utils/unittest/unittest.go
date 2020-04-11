@@ -3,11 +3,13 @@ package unittest
 import (
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/dgraph-io/badger/v2/options"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
@@ -41,6 +43,19 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	case <-done:
 		return
 	}
+}
+
+// AssertErrSubstringMatch asserts that two errors match with substring
+// checking on the Error method (`expected` must be a substring of `actual`, to
+// account for the actual error being wrapped). Fails the test if either error
+// is nil.
+//
+// NOTE: This should only be used in cases where `errors.Is` cannot be, like
+// when errors are transmitted over the network without type information.
+func AssertErrSubstringMatch(t *testing.T, expected, actual error) {
+	assert.NotNil(t, expected)
+	assert.NotNil(t, actual)
+	assert.True(t, strings.Contains(actual.Error(), expected.Error()))
 }
 
 func TempDBDir(t *testing.T) string {

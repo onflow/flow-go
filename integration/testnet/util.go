@@ -14,12 +14,26 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// healthcheckGRPC returns a Docker healthcheck function that pings the GRPC
+// healthcheckAccessGRPC returns a Docker healthcheck function that pings the Access node GRPC
 // service exposed at the given port.
-func healthcheckGRPC(apiPort string) func() error {
+func healthcheckAccessGRPC(apiPort string) func() error {
 	return func() error {
 		fmt.Println("healthchecking...")
-		c, err := client.New(fmt.Sprintf(":%s", apiPort))
+		c, err := client.NewAccessClient(fmt.Sprintf(":%s", apiPort))
+		if err != nil {
+			return err
+		}
+
+		return c.Ping(context.Background())
+	}
+}
+
+// healthcheckExecutionGRPC returns a Docker healthcheck function that pings the Execution node GRPC
+// service exposed at the given port.
+func healthcheckExecutionGRPC(apiPort string) func() error {
+	return func() error {
+		fmt.Println("healthchecking...")
+		c, err := client.NewExecutionClient(fmt.Sprintf(":%s", apiPort))
 		if err != nil {
 			return err
 		}

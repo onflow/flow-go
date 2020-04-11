@@ -80,7 +80,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 		if result.Succeeded() {
 			// Delta captures all register updates and only
 			// applies them if TX is successful.
-			chunkView.ApplyDelta(txView.Delta())
+			chunkView.MergeView(txView)
 		}
 	}
 

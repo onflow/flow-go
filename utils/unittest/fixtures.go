@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -25,6 +26,25 @@ func AccountSignatureFixture() flow.AccountSignature {
 		Account:   AddressFixture(),
 		Signature: []byte{1, 2, 3, 4},
 	}
+}
+
+// AccountKeyFixture returns a randomly generated ECDSA/SHA3 account key.
+func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLenEcdsaP256)
+	_, err := rand.Read(seed)
+	if err != nil {
+		return nil, err
+	}
+	key, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, seed)
+	if err != nil {
+		return nil, err
+	}
+
+	return &flow.AccountPrivateKey{
+		PrivateKey: key,
+		SignAlgo:   key.Algorithm(),
+		HashAlgo:   hash.SHA3_256,
+	}, nil
 }
 
 func BlockFixture() flow.Block {
@@ -423,11 +443,13 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	tb := flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
 		ReferenceBlockID: IdentifierFixture(),
-		Nonce:            rand.Uint64(),
-		ComputeLimit:     10,
-		PayerAccount:     AddressFixture(),
-		ScriptAccounts:   []flow.Address{AddressFixture()},
-		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
+		//Nonce:            rand.Uint64(),
+		Nonce: 0,
+		//ComputeLimit:     10,
+		ComputeLimit:   0,
+		PayerAccount:   AddressFixture(),
+		ScriptAccounts: []flow.Address{AddressFixture()},
+		Signatures:     []flow.AccountSignature{AccountSignatureFixture()},
 	}
 
 	for _, apply := range opts {
@@ -435,6 +457,23 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	}
 
 	return tb
+}
+
+func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {
+	return func(tx *flow.TransactionBody) {
+		tx.Script = []byte(txDSL.ToCadence())
+	}
+}
+
+func TransactionDSLFixture() dsl.Transaction {
+	return dsl.Transaction{
+		Import: dsl.Import{Address: flow.RootAddress},
+		Content: dsl.Prepare{
+			Content: dsl.Code(`
+				pub fun main() {}
+			`),
+		},
+	}
 }
 
 // VerifiableChunk returns a complete verifiable chunk with an
@@ -498,14 +537,6 @@ func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 	}
 }
 
-func ChunkHeaderFixture() flow.ChunkHeader {
-	return flow.ChunkHeader{
-		ChunkID:     IdentifierFixture(),
-		StartState:  StateCommitmentFixture(),
-		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
-	}
-}
-
 func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 	return flow.ChunkDataPack{
 		ChunkID:         identifier,
@@ -539,4 +570,19 @@ func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint
 		Payload:          []byte{},
 		TransactionID:    txID,
 	}
+}
+
+func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
+
+	// TODO seems this key literal doesn't decode anymore
+	emulatorRootKey, err := crypto.DecodePrivateKey(crypto.EcdsaP256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
+	if err != nil {
+		return nil, err
+	}
+
+	return &flow.AccountPrivateKey{
+		PrivateKey: emulatorRootKey,
+		SignAlgo:   emulatorRootKey.Algorithm(),
+		HashAlgo:   hash.SHA3_256,
+	}, nil
 }

@@ -137,7 +137,7 @@ type TransactionField int
 const (
 	TransactionFieldUnknown TransactionField = iota
 	TransactionFieldScript
-	TransactionFieldRefBlockHash
+	TransactionFieldRefBlockID
 	TransactionFieldNonce
 	TransactionFieldComputeLimit
 	TransactionFieldPayerAccount
@@ -157,10 +157,9 @@ func (tx *TransactionBody) MissingFields() []string {
 		missingFields = append(missingFields, TransactionFieldScript.String())
 	}
 
-	// TODO: need to refactor tests to include ReferenceBlockHash field (i.e. b.GetLatestBlock().Hash() should do)
-	// if len(tx.ReferenceBlockHash) == 0 {
-	// 	missingFields = append(missingFields, TransactionFieldRefBlockHash.String())
-	// }
+	if tx.ReferenceBlockID == ZeroID {
+		missingFields = append(missingFields, TransactionFieldRefBlockID.String())
+	}
 
 	if tx.PayerAccount == ZeroAddress {
 		missingFields = append(missingFields, TransactionFieldPayerAccount.String())

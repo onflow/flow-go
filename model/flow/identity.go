@@ -14,7 +14,7 @@ import (
 )
 
 // rxid is the regex for parsing node identity entries.
-var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|observation)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
+var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
 // Identity represents a node identity.
 type Identity struct {
@@ -130,14 +130,12 @@ type IdentityOrder func(*Identity, *Identity) bool
 type IdentityList []*Identity
 
 // Filter will apply a filter to the identity list.
-func (il IdentityList) Filter(filters ...IdentityFilter) IdentityList {
+func (il IdentityList) Filter(filter IdentityFilter) IdentityList {
 	var dup IdentityList
 IDLoop:
 	for _, identity := range il {
-		for _, filter := range filters {
-			if !filter(identity) {
-				continue IDLoop
-			}
+		if !filter(identity) {
+			continue IDLoop
 		}
 		dup = append(dup, identity)
 	}

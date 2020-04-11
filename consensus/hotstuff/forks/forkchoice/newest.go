@@ -3,10 +3,10 @@ package forkchoice
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 )
 
 // NewestForkChoice implements HotStuff's original fork choice rule:
@@ -17,10 +17,10 @@ type NewestForkChoice struct {
 	// preferredParent.QC called 'GenericQC' in 'Chained HotStuff Protocol' https://arxiv.org/abs/1803.05069v6
 	preferredParent *forks.BlockQC
 	finalizer       *finalizer.Finalizer
-	notifier        notifications.Consumer
+	notifier        hotstuff.Consumer
 }
 
-func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier notifications.Consumer) (*NewestForkChoice, error) {
+func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier hotstuff.Consumer) (*NewestForkChoice, error) {
 
 	// build the initial block-QC pair
 	// NOTE: I don't like this structure because it stores view and block ID in two separate places; this means

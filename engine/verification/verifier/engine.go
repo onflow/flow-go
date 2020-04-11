@@ -142,7 +142,11 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	}
 
 	// extracts chunk ID
-	chunkID := chunk.Receipt.ExecutionResult.Chunks.ByIndex(chunk.ChunkIndex).ID()
+	ch, ok := chunk.Receipt.ExecutionResult.Chunks.ByIndex(chunk.ChunkIndex)
+	if !ok {
+		return fmt.Errorf("chunk out of range requested: %v", chunk.ChunkIndex)
+	}
+	chunkID := ch.ID()
 
 	// execute the assigned chunk
 	chFault, err := e.chVerif.Verify(chunk)
