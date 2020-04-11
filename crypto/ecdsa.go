@@ -250,7 +250,7 @@ func (pk *PubKeyECDSA) KeySize() int {
 	return 2 * bitsToBytes((pk.goPubKey.Params().P).BitLen())
 }
 
-// given a public key (x,y), returns a raw encoding bytes(x)||bytes(y)
+// given a public key (x,y), returns a raw uncompressed encoding bytes(x)||bytes(y)
 func (pk *PubKeyECDSA) rawEncode() []byte {
 	xBytes := pk.goPubKey.X.Bytes()
 	yBytes := pk.goPubKey.Y.Bytes()
@@ -263,7 +263,7 @@ func (pk *PubKeyECDSA) rawEncode() []byte {
 }
 
 // Encode returns a byte representation of a public key.
-// a simple raw encoding X||Y is used for all curves
+// a simple uncompressed raw encoding X||Y is used for all curves
 // X and Y are the big endian byte encoding of the x and y coordinate of the public key
 func (pk *PubKeyECDSA) Encode() ([]byte, error) {
 	return pk.rawEncode(), nil
