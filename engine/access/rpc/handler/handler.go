@@ -130,8 +130,8 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 	latestBlockID := latestHeader.ID()
 
 	exeReq := execution.GetAccountAtBlockIDRequest{
+		Address: address,
 		BlockId: latestBlockID[:],
-		Address: nil,
 	}
 
 	exeResp, err := h.executionRPC.GetAccountAtBlockID(ctx, &exeReq)

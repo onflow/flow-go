@@ -394,6 +394,61 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 }
 
+func (suite *Suite) TestGetAccount() {
+
+	address := []byte{1}
+	account := &entities.Account{
+		Address: address,
+	}
+	ctx := context.Background()
+
+	// setup the latest sealed block
+	header := unittest.BlockHeaderFixture() // create a mock header
+	seal := unittest.SealFixture()          // create a mock seal
+	seal.BlockID = header.ID()              // make the seal point to the header
+	suite.snapshot.On("Seal").Return(seal, nil).Once()
+	suite.headers.On("ByBlockID", header.ID()).Return(&header, nil).Once()
+
+	// create the expected execution API request
+	blockID := header.ID()
+	exeReq := &execution.GetAccountAtBlockIDRequest{
+		BlockId: blockID[:],
+		Address: address,
+	}
+
+	// create the expected execution API response
+	exeResp := &execution.GetAccountAtBlockIDResponse{
+		Account: account,
+	}
+
+	// setup the execution client mock
+	suite.execClient.On("GetAccountAtBlockID", ctx, exeReq).Return(exeResp, nil).Once()
+
+	// create the handler with the mock
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil)
+
+	suite.Run("happy path - valid request and valid response", func() {
+		expectedResp := &access.GetAccountResponse{
+			Account: account,
+		}
+		req := &access.GetAccountRequest{
+			Address: address,
+		}
+		actualResp, err := handler.GetAccount(ctx, req)
+		suite.checkResponse(actualResp, err)
+		suite.assertAllExpectations()
+		suite.Require().Equal(expectedResp, actualResp)
+	})
+
+	suite.Run("invalid request with nil address", func() {
+		req := &access.GetAccountRequest{
+			Address: nil,
+		}
+		_, err := handler.GetAccount(ctx, req)
+		suite.Require().Error(err)
+	})
+}
+
 func (suite *Suite) assertAllExpectations() {
 	suite.snapshot.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
