@@ -171,16 +171,16 @@ func (h *handler) GetEventsForBlockIDTransactionID(_ context.Context,
 		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id")
 	}
 
-	bID := flow.HashToID(reqBlockID)
-	tID := flow.HashToID(reqTxID)
+	blockID := flow.HashToID(reqBlockID)
+	txID := flow.HashToID(reqTxID)
 
 	// lookup events by block id and transaction ID
-	blockEvents, err := h.events.ByBlockIDTransactionID(bID, tID)
+	blockEvents, err := h.events.ByBlockIDTransactionID(blockID, txID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 	}
 
-	result, err := h.eventResult(bID, blockEvents)
+	result, err := h.eventResult(blockID, blockEvents)
 	if err != nil {
 		return nil, err
 	}
