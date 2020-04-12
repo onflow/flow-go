@@ -348,10 +348,11 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 
 		nodeContainer.bindPort(hostPort, containerPort)
 
-		nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+		ingress := fmt.Sprintf("%s:9000", nodeContainer.Name())
+		nodeContainer.addFlag("ingress-addr", ingress)
 		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 		nodeContainer.Ports[ColNodeAPIPort] = hostPort
-		f.AccessPorts[ColNodeAPIPort] = hostPort
+		f.AccessPorts[ColNodeAPIPort] = ingress
 	case flow.RoleExecution:
 
 		hostPort := testingdock.RandomPort(t)
@@ -359,10 +360,11 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 
 		nodeContainer.bindPort(hostPort, containerPort)
 
-		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+		ingress := fmt.Sprintf("%s:9000", nodeContainer.Name())
+		nodeContainer.addFlag("rpc-addr", ingress)
 		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 		nodeContainer.Ports[ExeNodeAPIPort] = hostPort
-		f.AccessPorts[ExeNodeAPIPort] = hostPort
+		f.AccessPorts[ExeNodeAPIPort] = ingress
 
 		// create directories for execution state trie and values in the tmp
 		// host directory.
@@ -383,8 +385,8 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 		nodeContainer.bindPort(hostPort, containerPort)
 
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.addFlag("ingress-addr", fmt.Sprintf(":%s", nodeContainer.Ports[ColNodeAPIPort]))
-		nodeContainer.addFlag("script-addr", fmt.Sprintf(":%s", nodeContainer.Ports[ExeNodeAPIPort]))
+		nodeContainer.addFlag("ingress-addr", f.AccessPorts[ColNodeAPIPort])
+		nodeContainer.addFlag("script-addr", f.AccessPorts[ExeNodeAPIPort])
 		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 		nodeContainer.Ports[AccessNodeAPIPort] = hostPort
 	}
