@@ -171,7 +171,6 @@ func (suite *Suite) TestGetAccountForBlockID() {
 	}
 
 	mockEngine := new(mock.IngestRPC)
-	mockEngine.On("GetAccount", rootAddress, id).Return(&rootAccount, nil).Once()
 
 	// create the handler
 	handler := &handler{
@@ -187,6 +186,9 @@ func (suite *Suite) TestGetAccountForBlockID() {
 	}
 
 	suite.Run("happy path with valid request", func() {
+
+		// setup mock expectations
+		mockEngine.On("GetAccount", rootAddress, id).Return(&rootAccount, nil).Once()
 
 		req := createReq(id[:], rootAddress.Bytes())
 
