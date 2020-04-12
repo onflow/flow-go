@@ -54,6 +54,7 @@ func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 
 			lbytes, err := lpk.Raw()
 			lbytes = lbytes[offset[j] : offset[j]+prKeyLen[j]]
+			require.NoError(k.T(), err)
 
 			// compare the raw bytes
 			require.Equal(k.T(), fbytes, lbytes)
