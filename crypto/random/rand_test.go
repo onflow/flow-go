@@ -42,7 +42,7 @@ func TestRandomPermutationSubset(t *testing.T) {
 	seed := make([]byte, 16)
 	// test a zero seed
 	rng, err := NewRand(seed)
-	require.Error(t, err)
+	require.NoError(t, err)
 	// fix thee seed
 	seed[0] = 45
 	rng, err = NewRand(seed)
