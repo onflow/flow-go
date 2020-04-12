@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/testingdock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/testingdock"
 
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/integration/testnet"
@@ -33,6 +34,7 @@ func TestMVP_Network(t *testing.T) {
 
 	// Enable verbose logging
 	testingdock.Verbose = true
+	testingdock.SpawnSequential = true
 
 	ctx := context.Background()
 
@@ -80,6 +82,11 @@ func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
 		counter, err = readCounter(ctx, accessClient)
+
+		if err != nil {
+			fmt.Println("Error executing script")
+			fmt.Println(err)
+		}
 
 		return err == nil && counter == -3
 	}, 30*time.Second, time.Second)

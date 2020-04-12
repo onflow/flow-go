@@ -43,6 +43,16 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeBlockVote
 	case *coldstuff.Commit:
 		code = CodeBlockCommit
+	case *messages.SyncRequest:
+		code = CodeSyncRequest
+	case *messages.SyncResponse:
+		code = CodeSyncResponse
+	case *messages.RangeRequest:
+		code = CodeRangeRequest
+	case *messages.BatchRequest:
+		code = CodeBatchRequest
+	case *messages.BlockResponse:
+		code = CodeBlockResponse
 
 	// Cluster consensus
 	case *messages.ClusterBlockProposal:

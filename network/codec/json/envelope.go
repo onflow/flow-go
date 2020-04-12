@@ -18,6 +18,11 @@ const (
 	// consensus
 	CodeBlockProposal
 	CodeBlockVote
+	CodeSyncRequest
+	CodeSyncResponse
+	CodeRangeRequest
+	CodeBatchRequest
+	CodeBlockResponse
 	CodeBlockCommit // coldstuff-only
 
 	// cluster consensus

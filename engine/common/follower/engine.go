@@ -124,6 +124,10 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
 		return e.onBlockProposal(originID, v)
+	case *flow.Block:
+		// Follower received a block, pour it down the sync
+		e.sync.RequestBlock(v.ID())
+		return nil
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}

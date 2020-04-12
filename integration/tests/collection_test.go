@@ -18,7 +18,7 @@ import (
 )
 
 func TestCollection(t *testing.T) {
-
+	t.Skip()
 	var (
 		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, func(c *testnet.NodeConfig) {
 			c.Identifier, _ = flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")

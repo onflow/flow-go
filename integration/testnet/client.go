@@ -42,11 +42,11 @@ func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) e
 			Content: dsl.UpdateAccountCode{Code: contract.ToCadence()},
 		},
 	}
-
-	return c.SendTransaction(ctx, code)
+	rootAddress := flow.BytesToAddress(big.NewInt(1).Bytes())
+	return c.SendTransaction(ctx, code, rootAddress)
 }
 
-func (c *Client) SendTransaction(ctx context.Context, code dsl.Transaction) error {
+func (c *Client) SendTransaction(ctx context.Context, code dsl.Transaction, scriptAccounts ...flow.Address) error {
 
 	codeStr := code.ToCadence()
 
@@ -55,6 +55,7 @@ func (c *Client) SendTransaction(ctx context.Context, code dsl.Transaction) erro
 		Script:           []byte(codeStr),
 		ReferenceBlockID: unittest.IdentifierFixture(),
 		PayerAccount:     rootAddress,
+		ScriptAccounts:   scriptAccounts,
 	}
 
 	sig, err := signTransaction(tx, c.key.PrivateKey)

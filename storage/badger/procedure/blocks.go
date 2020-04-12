@@ -225,6 +225,13 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 			return fmt.Errorf("could not index commit: %w", err)
 		}
 
+		fmt.Println("GENESIS ID")
+		fmt.Println(genesis.ID())
+		fmt.Println("FIRST RESULT")
+		fmt.Println(result.ID())
+		fmt.Println(result)
+		fmt.Println("FIRST RESULT==========")
+
 		// insert first execution result
 		err = operation.InsertExecutionResult(&result)(tx)
 		if err != nil {
