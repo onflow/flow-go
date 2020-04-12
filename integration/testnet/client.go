@@ -2,7 +2,6 @@ package testnet
 
 import (
 	"context"
-	"math/big"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -42,33 +41,8 @@ func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) e
 			Content: dsl.UpdateAccountCode{Code: contract.ToCadence()},
 		},
 	}
-	rootAddress := flow.BytesToAddress(big.NewInt(1).Bytes())
-	return c.SendTransaction(ctx, code, rootAddress)
-}
 
-func (c *Client) SendTransaction(ctx context.Context, code dsl.Transaction, scriptAccounts ...flow.Address) error {
-
-	codeStr := code.ToCadence()
-
-	rootAddress := flow.BytesToAddress(big.NewInt(1).Bytes())
-	tx := flow.TransactionBody{
-		Script:           []byte(codeStr),
-		ReferenceBlockID: unittest.IdentifierFixture(),
-		PayerAccount:     rootAddress,
-		ScriptAccounts:   scriptAccounts,
-	}
-
-	sig, err := signTransaction(tx, c.key.PrivateKey)
-	if err != nil {
-		return err
-	}
-
-	accountSig := flow.AccountSignature{
-		Account:   rootAddress,
-		Signature: sig.Bytes(),
-	}
-
-	tx.Signatures = append(tx.Signatures, accountSig)
+	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(code))
 
 	return c.client.SendTransaction(ctx, tx)
 }

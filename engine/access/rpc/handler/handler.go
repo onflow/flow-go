@@ -1,4 +1,4 @@
-package rpc
+package handler
 
 import (
 	"context"
@@ -21,9 +21,8 @@ import (
 // Transaction related calls are handled in handler handler_transaction
 // Block Header related calls are handled in handler handler_block_header
 // Block details related calls are handled in handler handler_block_details
-// All remaining calls are handled in this file (or not implemented yet)
+// All remaining calls are handled in this file
 type Handler struct {
-	access.UnimplementedAccessAPIServer
 	executionRPC  execution.ExecutionAPIClient
 	collectionRPC access.AccessAPIClient
 	log           zerolog.Logger
@@ -36,24 +35,25 @@ type Handler struct {
 	transactions storage.Transactions
 }
 
+var _ access.AccessAPIServer = &Handler{}
+
 func NewHandler(log zerolog.Logger,
 	s protocol.State,
-	c access.AccessAPIClient,
 	e execution.ExecutionAPIClient,
+	c access.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions) *Handler {
 	return &Handler{
-		executionRPC:                 e,
-		collectionRPC:                c,
-		blocks:                       blocks,
-		headers:                      headers,
-		collections:                  collections,
-		transactions:                 transactions,
-		state:                        s,
-		log:                          log,
-		UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+		executionRPC:  e,
+		collectionRPC: c,
+		blocks:        blocks,
+		headers:       headers,
+		collections:   collections,
+		transactions:  transactions,
+		state:         s,
+		log:           log,
 	}
 }
 
@@ -128,6 +128,39 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollection
 		Collection: ce,
 	}
 	return resp, nil
+}
+
+func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
+
+	address := req.GetAddress()
+
+	if address == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid address")
+	}
+
+	// get the latest sealed header
+	latestHeader, err := h.getLatestSealedHeader()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
+	}
+
+	// get the block id of the latest sealed header
+	latestBlockID := latestHeader.ID()
+
+	exeReq := execution.GetAccountAtBlockIDRequest{
+		Address: address,
+		BlockId: latestBlockID[:],
+	}
+
+	exeResp, err := h.executionRPC.GetAccountAtBlockID(ctx, &exeReq)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
+	}
+
+	return &access.GetAccountResponse{
+		Account: exeResp.GetAccount(),
+	}, nil
+
 }
 
 func convertStorageError(err error) error {

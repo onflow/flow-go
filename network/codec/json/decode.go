@@ -35,7 +35,7 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeResponse:
 		v = &trickle.Response{}
 
-	// Consensus
+	// consensus
 	case CodeBlockProposal:
 		v = &messages.BlockProposal{}
 	case CodeBlockVote:
@@ -53,7 +53,7 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeBlockCommit:
 		v = &coldstuff.Commit{}
 
-	// Cluster consensus
+	// cluster consensus
 	case CodeClusterBlockProposal:
 		v = &messages.ClusterBlockProposal{}
 	case CodeClusterBlockVote:
@@ -62,6 +62,18 @@ func decode(env Envelope) (interface{}, error) {
 		v = &messages.ClusterBlockRequest{}
 	case CodeClusterBlockResponse:
 		v = &messages.ClusterBlockResponse{}
+
+	// protocol state sync
+	case CodeSyncRequest:
+		v = &messages.SyncRequest{}
+	case CodeSyncResponse:
+		v = &messages.SyncResponse{}
+	case CodeRangeRequest:
+		v = &messages.RangeRequest{}
+	case CodeBatchRequest:
+		v = &messages.BatchRequest{}
+	case CodeBlockResponse:
+		v = &messages.BlockResponse{}
 
 	case CodeCollectionGuarantee:
 		v = &flow.CollectionGuarantee{}
@@ -81,17 +93,12 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeEcho:
 		v = &message.Echo{}
 
-	case CodeExecutionRecipt:
+	case CodeExecutionReceipt:
 		v = &flow.ExecutionReceipt{}
-
-	case CodeExecutionStateRequest:
-		v = &messages.ExecutionStateRequest{}
-
-	case CodeExecutionStateResponse:
-		v = &messages.ExecutionStateResponse{}
 
 	case CodeChunkDataPackRequest:
 		v = &messages.ChunkDataPackRequest{}
+
 	case CodeChunkDataPackResponse:
 		v = &messages.ChunkDataPackResponse{}
 

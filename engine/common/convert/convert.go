@@ -24,6 +24,9 @@ func AccountSignatureToMessage(a flow.AccountSignature) *entities.AccountSignatu
 	}
 }
 
+// NOTE: transaction conversion is NOT symmetric if certain fields are set, as
+// not all fields are included in the protobuf message.
+// If `Nonce` or `ComputeLimit` are non-zero, then conversion is not reversible.
 func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error) {
 	if m == nil {
 		return flow.TransactionBody{}, fmt.Errorf("message is empty")
@@ -48,6 +51,9 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 	}, nil
 }
 
+// NOTE: transaction conversion is NOT symmetric if certain fields are set, as
+// not all fields are included in the protobuf message.
+// If `Nonce` or `ComputeLimit` are non-zero, then conversion is not reversible.
 func TransactionToMessage(t flow.TransactionBody) *entities.Transaction {
 	scriptAccounts := make([][]byte, len(t.ScriptAccounts))
 	for i, account := range t.ScriptAccounts {
@@ -157,4 +163,37 @@ func EventToMessage(e flow.Event) *entities.Event {
 		EventIndex:       e.EventIndex,
 		Payload:          e.Payload,
 	}
+}
+
+func AccountToMessage(a *flow.Account) (*entities.Account, error) {
+
+	keys := make([]*entities.AccountPublicKey, len(a.Keys))
+	for i, k := range a.Keys {
+		messageKey, err := AccountPublicKeyToMessage(k)
+		if err != nil {
+			return nil, err
+		}
+		keys[i] = messageKey
+	}
+
+	return &entities.Account{
+		Address: a.Address.Bytes(),
+		Balance: a.Balance,
+		Code:    a.Code,
+		Keys:    keys,
+	}, nil
+}
+
+func AccountPublicKeyToMessage(a flow.AccountPublicKey) (*entities.AccountPublicKey, error) {
+	publicKey, err := a.PublicKey.Encode()
+	if err != nil {
+		return nil, err
+	}
+
+	return &entities.AccountPublicKey{
+		PublicKey: publicKey,
+		SignAlgo:  uint32(a.SignAlgo),
+		HashAlgo:  uint32(a.HashAlgo),
+		Weight:    uint32(a.Weight),
+	}, nil
 }

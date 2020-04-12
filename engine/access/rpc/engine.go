@@ -6,10 +6,13 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -25,8 +28,8 @@ type Config struct {
 type Engine struct {
 	unit    *engine.Unit
 	log     zerolog.Logger
-	handler *Handler     // the gRPC service implementation
-	server  *grpc.Server // the gRPC server
+	handler *handler.Handler // the gRPC service implementation
+	server  *grpc.Server     // the gRPC server
 	config  Config
 }
 
@@ -34,8 +37,8 @@ type Engine struct {
 func New(log zerolog.Logger,
 	state protocol.State,
 	config Config,
-	collectionRPC access.AccessAPIClient,
 	executionRPC execution.ExecutionAPIClient,
+	collectionRPC access.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -46,7 +49,7 @@ func New(log zerolog.Logger,
 	eng := &Engine{
 		log:     log,
 		unit:    engine.NewUnit(),
-		handler: NewHandler(log, state, collectionRPC, executionRPC, blocks, headers, collections, transactions),
+		handler: handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions),
 		server:  grpc.NewServer(),
 		config:  config,
 	}

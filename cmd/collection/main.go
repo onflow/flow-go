@@ -35,6 +35,11 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+const (
+	proposalInterval = time.Second * 2
+	proposalTimeout  = time.Second * 4
+)
+
 func main() {
 
 	var (
@@ -187,7 +192,7 @@ func main() {
 				return clusterState.Final().Head()
 			}
 
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, 3*time.Second, 6*time.Second, head)
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, proposalInterval, proposalTimeout, head)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}

@@ -34,16 +34,16 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, e *ingestion.Engine, events storage.Events) *Engine {
+func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			UnimplementedExecutionAPIServer: execution.UnimplementedExecutionAPIServer{},
-			engine:                          e,
-			events:                          events,
+			engine: e,
+			blocks: blocks,
+			events: events,
 		},
 		server: grpc.NewServer(),
 		config: config,
@@ -88,10 +88,12 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	execution.UnimplementedExecutionAPIServer
-	engine *ingestion.Engine
+	engine ingestion.IngestRPC
+	blocks storage.Blocks
 	events storage.Events
 }
+
+var _ execution.ExecutionAPIServer = &handler{}
 
 // Ping responds to requests when the server is up.
 func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execution.PingResponse, error) {
@@ -106,7 +108,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 
 	value, err := h.engine.ExecuteScriptAtBlockID(req.Script, blockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to execute script: %v", err)
 	}
 
 	res := &execution.ExecuteScriptResponse{
@@ -131,24 +133,120 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 
 	eType := flow.EventType(reqEvent)
 
-	events := make([]*entities.Event, 0)
+	results := make([]*execution.EventsResponse_Result, len(blockIDs))
 
-	// collect all the events in events
-	for _, b := range blockIDs {
+	// collect all the events and create a EventsResponse_Result for each block
+	for i, b := range blockIDs {
 		bID := flow.HashToID(b)
 
+		// lookup events
 		blockEvents, err := h.events.ByBlockIDEventType(bID, eType)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 		}
 
-		for _, e := range blockEvents {
-			event := convert.EventToMessage(e)
-			events = append(events, event)
+		result, err := h.eventResult(bID, blockEvents)
+		if err != nil {
+			return nil, err
 		}
+		results[i] = result
+
 	}
 
 	return &execution.EventsResponse{
-		Events: events,
+		Results: results,
 	}, nil
+}
+
+func (h *handler) GetEventsForBlockIDTransactionID(_ context.Context,
+	req *execution.GetEventsForBlockIDTransactionIDRequest) (*execution.EventsResponse, error) {
+
+	reqBlockID := req.GetBlockId()
+	if reqBlockID == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id")
+	}
+
+	reqTxID := req.GetTransactionId()
+	if reqTxID == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id")
+	}
+
+	blockID := flow.HashToID(reqBlockID)
+	txID := flow.HashToID(reqTxID)
+
+	// lookup events by block id and transaction ID
+	blockEvents, err := h.events.ByBlockIDTransactionID(blockID, txID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+	}
+
+	result, err := h.eventResult(blockID, blockEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	results := []*execution.EventsResponse_Result{
+		result,
+	}
+
+	return &execution.EventsResponse{
+		Results: results,
+	}, nil
+}
+
+// eventResult creates EventsResponse_Result from flow.Event for the given blockID
+func (h *handler) eventResult(blockID flow.Identifier,
+	flowEvents []flow.Event) (*execution.EventsResponse_Result, error) {
+
+	// convert events to event message
+	events := make([]*entities.Event, len(flowEvents))
+	for i, e := range flowEvents {
+		event := convert.EventToMessage(e)
+		events[i] = event
+	}
+
+	// lookup block
+	block, err := h.blocks.ByID(blockID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to lookup block: %v", err)
+	}
+
+	return &execution.EventsResponse_Result{
+		BlockId:     blockID[:],
+		BlockHeight: block.Height,
+		Events:      events,
+	}, nil
+}
+
+func (h *handler) GetAccountAtBlockID(_ context.Context,
+	req *execution.GetAccountAtBlockIDRequest) (*execution.GetAccountAtBlockIDResponse, error) {
+
+	blockID := req.GetBlockId()
+	if blockID == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block ID")
+	}
+	blockFlowID := flow.HashToID(blockID)
+
+	address := req.GetAddress()
+	if address == nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address")
+	}
+	flowAddress := flow.BytesToAddress(address)
+
+	value, err := h.engine.GetAccount(flowAddress, blockFlowID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
+	}
+
+	account, err := convert.AccountToMessage(value)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert account to message: %v", err)
+	}
+
+	res := &execution.GetAccountAtBlockIDResponse{
+		Account: account,
+	}
+
+	return res, nil
+
 }

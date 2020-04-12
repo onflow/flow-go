@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 
@@ -131,7 +132,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, collectionRPC, executionRPC, blocks, headers, collections, transactions)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, blocks, headers, collections, transactions)
 			return rpcEng, nil
 		}).
 		Run()

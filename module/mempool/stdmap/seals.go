@@ -28,12 +28,14 @@ func NewSeals(limit uint) (*Seals, error) {
 
 // Add adds an block seal to the mempool.
 func (s *Seals) Add(seal *flow.Seal) error {
-	err := s.Backend.Add(seal)
-	if err != nil {
-		return err
-	}
-	s.byPrevious[string(seal.PreviousState)] = seal.ID()
-	return nil
+	return s.Backend.Run(func(backend *Backdata) error {
+		err := backend.Add(seal)
+		if err != nil {
+			return err
+		}
+		s.byPrevious[string(seal.PreviousState)] = seal.ID()
+		return nil
+	})
 }
 
 // ByID returns the block seal with the given ID from the mempool.
@@ -52,11 +54,23 @@ func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 // ByPreviousState returns the block seal associated with the given parent state
 // commitment.
 func (s *Seals) ByPreviousState(commit flow.StateCommitment) (*flow.Seal, error) {
-	sealID, ok := s.byPrevious[string(commit)]
-	if !ok {
-		return nil, mempool.ErrEntityNotFound
-	}
-	return s.ByID(sealID)
+
+	var seal *flow.Seal
+	err := s.Backend.Run(func(backend *Backdata) error {
+		sealID, ok := s.byPrevious[string(commit)]
+		if !ok {
+			return mempool.ErrEntityNotFound
+		}
+		byID, err := s.ByID(sealID)
+		if err != nil {
+			return err
+		}
+
+		seal = byID
+		return nil
+	})
+
+	return seal, err
 }
 
 // All returns all block seals from the pool.

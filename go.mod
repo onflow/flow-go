@@ -5,12 +5,10 @@ go 1.13
 require (
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta
-	github.com/dapperlabs/cadence v0.0.0-20200401151421-7c78a2da20a6
-	github.com/dapperlabs/flow-go-sdk v0.5.2 // indirect
+	github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
-	github.com/dapperlabs/flow-go/integration v0.0.0-20200409200346-f0707af6d512
-	github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125
-	github.com/dapperlabs/testingdock v0.4.2
+	github.com/dapperlabs/flow-go/integration v0.0.0-20200406190816-e4c4d2b5219c
+	github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/docker/distribution v2.7.1+incompatible // indirect
@@ -21,7 +19,6 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.0
 	github.com/golang/protobuf v1.3.5
-	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/ipfs/go-log v0.0.1

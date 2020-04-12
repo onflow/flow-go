@@ -25,6 +25,13 @@ const (
 	CodeBlockResponse
 	CodeBlockCommit // coldstuff-only
 
+	// protocol state sync
+	CodeSyncRequest
+	CodeSyncResponse
+	CodeRangeRequest
+	CodeBatchRequest
+	CodeBlockResponse
+
 	// cluster consensus
 	CodeClusterBlockProposal
 	CodeClusterBlockVote
@@ -40,7 +47,7 @@ const (
 	CodeCollectionRequest
 	CodeCollectionResponse
 
-	CodeExecutionRecipt
+	CodeExecutionReceipt
 
 	CodeExecutionStateRequest
 	CodeExecutionStateResponse
