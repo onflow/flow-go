@@ -68,6 +68,7 @@ type Metrics interface {
 	// OnChunkVerificationStated is called whenever the verification of a chunk is started
 	// it starts the timer to record the execution time
 	OnChunkVerificationStated(chunkID flow.Identifier)
+
 	// OnChunkVerificationFinished is called whenever chunkID verification gets finished
 	// it finishes recording the duration of execution and increases number of checked chunks for the blockID
 	OnChunkVerificationFinished(chunkID flow.Identifier, blockID flow.Identifier)

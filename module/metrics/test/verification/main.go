@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -45,7 +46,21 @@ func sendMetrics(log zerolog.Logger) {
 	}
 	for i := 0; i < 100; i++ {
 		blockID := unittest.BlockFixture().ID()
+		chunkID := unittest.ChunkFixture().ID()
 		metrics.OnResultApproval(blockID)
-		metrics.OnChunkVerificationStated(blockID)
+		metrics.OnChunkVerificationStated(chunkID)
+
+		// adds a synthetic 1 s delay for verification duration
+		time.Sleep(1 * time.Second)
+		metrics.OnChunkVerificationFinished(chunkID, blockID)
+		metrics.OnResultApproval(blockID)
+
+		// storage tests
+		metrics.OnStorageAdded(100)
+		metrics.OnChunkDataAdded(chunkID, 10)
+		// adds a synthetic 10 ms delay between adding an removing storage
+		time.Sleep(10 * time.Millisecond)
+		metrics.OnStorageRemoved(100)
+		metrics.OnChunkDataRemoved(chunkID, 10)
 	}
 }

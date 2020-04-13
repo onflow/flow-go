@@ -4,12 +4,7 @@ This demo runs a local tracer server with a Prometheus server interacting with i
 ```
 brew install prometheus
 ```
-2. Launch a metrics server in local, which exposes the metrics data via the `/metrics` endpoint.
-```
-go run module/metrics/test/local.go
-```
-The above command launches a metrics server in local with port 9090
-
+2. Launch a metrics server in `demo/main`, which exposes the metrics data via the `/metrics` endpoint and launches a metrics server in local with port 9090
 
 3. Launch the prometheus server to scrape the metrics from our local metrics server
 ```

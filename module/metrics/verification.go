@@ -7,6 +7,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// a duration metrics
+// time it takes to re-execute a chunk and verify its computation results
 const chunkExecutionSpanner = "chunk_execution_duration"
 
 // contains set of functions interacting with the Prometheus server
