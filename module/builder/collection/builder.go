@@ -122,7 +122,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 				continue
 			}
 
-			// add ONLY non-conflicting transaction IDs to the final payload
+			// add ONLY non-conflicting transaction to the final payload
 			nextTx, err := b.transactions.ByID(txID)
 			if err != nil {
 				return fmt.Errorf("could not get transaction: %w", err)
