@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -259,7 +260,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	for _, blockID := range req.BlockIDs {
 		block, err := e.blocks.ByID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not get block by ID (%x): %w", blockID, err)
+			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
 		blocks = append(blocks, block)
 	}
@@ -315,6 +316,11 @@ func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 	e.Lock()
 	defer e.Unlock()
 
+	// Do not bother with the zero ID
+	if blockID == flow.ZeroID {
+		return
+	}
+
 	// if we already have the blockID, skip
 	_, ok := e.blockIDs[blockID]
 	if ok {
@@ -349,7 +355,8 @@ func (e *Engine) processIncomingBlock(block *flow.Block) {
 	// delete from the queue and forward
 	delete(e.heights, block.Height)
 	delete(e.blockIDs, blockID)
-	e.comp.SubmitLocal(block)
+
+	e.comp.SubmitLocal(&events.SyncedBlock{Block: block})
 }
 
 // checkLoop will regularly scan for items that need requesting.

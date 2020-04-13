@@ -3,6 +3,9 @@
 package propagation
 
 import (
+	goerrors "errors"
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -114,6 +117,11 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	err := e.storeGuarantee(guarantee)
 	if err != nil {
+		if goerrors.Is(err, mempool.ErrEntityAlreadyExists) {
+			// TODO: determine if we still want to propogate the guarantee, for now we won't
+			return nil
+		}
+
 		return errors.Wrap(err, "could not store guarantee")
 	}
 
@@ -140,7 +148,7 @@ func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 	// add the collection guarantee to our memory pool (also checks existence)
 	err := e.pool.Add(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not add guarantee to mempool")
+		return fmt.Errorf("could not add guarantee to mempool: %w", err)
 	}
 
 	e.log.Info().

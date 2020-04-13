@@ -18,11 +18,6 @@ const (
 	// consensus
 	CodeBlockProposal
 	CodeBlockVote
-	CodeSyncRequest
-	CodeSyncResponse
-	CodeRangeRequest
-	CodeBatchRequest
-	CodeBlockResponse
 	CodeBlockCommit // coldstuff-only
 
 	// protocol state sync
@@ -46,6 +41,9 @@ const (
 
 	CodeCollectionRequest
 	CodeCollectionResponse
+
+	CodeTransactionRequest
+	CodeTransactionResponse
 
 	CodeExecutionReceipt
 

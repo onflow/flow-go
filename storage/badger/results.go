@@ -22,9 +22,6 @@ func NewExecutionResults(db *badger.DB) *ExecutionResults {
 
 func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
 	return r.db.Update(func(tx *badger.Txn) error {
-		fmt.Println("--------")
-		fmt.Println("Storing result:", result.ID(), result)
-		fmt.Println("--------")
 
 		err := operation.InsertExecutionResult(result)(tx)
 		if err != nil {
@@ -58,9 +55,6 @@ func (r *ExecutionResults) Lookup(blockID flow.Identifier) (flow.Identifier, err
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	var result flow.ExecutionResult
-	fmt.Println("========")
-	fmt.Println("Execution Result ID:", resultID)
-	fmt.Println("========")
 	err := r.db.View(func(tx *badger.Txn) error {
 		return operation.RetrieveExecutionResult(resultID, &result)(tx)
 	})

@@ -240,9 +240,6 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 	for _, receipt := range receipts {
 		results[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
 		votes[receipt.ExecutionResult.ID()] = make(map[uint64]uint64)
-		fmt.Println("1++++++++++")
-		fmt.Println("RESULT", receipt.ExecutionResult.ID())
-		fmt.Println("Parent", receipt.ExecutionResult.PreviousResultID)
 	}
 
 	// tally all the approvals for the given results and chunks
@@ -262,7 +259,7 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 	// check if any result reached the threshold on all chunks
 	total := approvers.TotalStake()
 	threshold := (total * 2) / 3 // TODO: precise rounding
-ResultLoop:
+	// ResultLoop:
 	for resultID, chunkVotes := range votes {
 		result := results[resultID]
 
@@ -274,8 +271,10 @@ ResultLoop:
 					Uint64("threshold", threshold).
 					Uint64("voted", voted).
 					Hex("result_id", resultID[:]).
-					Msg("result skipping result due chunk not meeting threshold")
-				continue ResultLoop
+					Msg("skipping result due to chunk not meeting threshold")
+				// TODO: Once verification successfully sends result approvals,
+				// We should start skipping when we don't have enough approvals
+				// continue ResultLoop
 			}
 		}
 

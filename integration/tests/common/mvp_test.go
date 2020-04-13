@@ -44,10 +44,7 @@ func TestMVP_Network(t *testing.T) {
 	flowNetwork.Start(ctx)
 	defer flowNetwork.Stop()
 
-	key, err := generateRandomKey()
-	require.NoError(t, err)
-
-	accessClient, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]), key)
+	accessClient, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]))
 	require.NoError(t, err)
 
 	runMVPTest(t, accessClient)
@@ -87,9 +84,8 @@ func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 			fmt.Println("Error executing script")
 			fmt.Println(err)
 		}
-
 		return err == nil && counter == -3
-	}, 30*time.Second, time.Second)
+	}, 60*time.Second, time.Second)
 
 	err = createCounter(ctx, accessClient)
 	require.NoError(t, err)

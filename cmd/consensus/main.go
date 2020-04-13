@@ -61,7 +61,7 @@ func main() {
 			flags.UintVar(&sealLimit, "seal-limit", 100000, "maximum number of block seals in the memory pool")
 			flags.StringVarP(&chainID, "chain-id", "C", flow.DefaultChainID, "the chain ID for the protocol chain")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
-			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
+			flags.DurationVar(&maxInterval, "max-interval", 300*time.Second, "the maximum amount of time between two blocks")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			// TODO inject this into HotStuff
@@ -130,7 +130,7 @@ func main() {
 				builder.WithMaxInterval(maxInterval),
 			)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, comp, build, final, memberFilter, 3*time.Second, 6*time.Second, head)
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, comp, build, final, memberFilter, 3*time.Second, 10*time.Second, head)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize coldstuff engine: %w", err)
 			}

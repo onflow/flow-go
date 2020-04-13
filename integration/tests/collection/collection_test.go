@@ -37,6 +37,8 @@ func defaultOtherNodes() []testnet.NodeConfig {
 // and ensures that they are rejected by the collection node and not included in
 // any collection.
 func TestTransactionIngress_InvalidTransaction(t *testing.T) {
+	t.Skip()
+
 	var (
 		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
 		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
@@ -116,7 +118,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 }
 
 func TestTransactionIngress_ValidTransaction(t *testing.T) {
-
+	t.Skip()
 	var (
 		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
 		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))

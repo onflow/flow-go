@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -62,29 +63,16 @@ func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.Pi
 	return &access.PingResponse{}, nil
 }
 
-func (h *Handler) ExecuteScriptAtLatestBlock(ctx context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
-	header, err := h.getLatestSealedHeader()
-	if err != nil {
-		return nil, err
-	}
-	blockID := header.ID()
-	resp, err := h.executionRPC.ExecuteScriptAtBlockID(ctx, &execution.ExecuteScriptAtBlockIDRequest{
-		BlockId: blockID[:],
-		Script:  req.GetScript(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &access.ExecuteScriptResponse{
-		Value: resp.GetValue(),
-	}, nil
-}
-
 func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {
 	// lookup the latest seal to get latest blockid
 	seal, err := h.state.Final().Seal()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get latest sealed block ID: %w", err)
+	}
+
+	if seal.BlockID == flow.ZeroID {
+		// TODO: Figure out how to handle the very first seal, for now, just using latest finalized for script
+		return h.state.Final().Head()
 	}
 	// query header storage for that blockid
 	return h.headers.ByBlockID(seal.BlockID)

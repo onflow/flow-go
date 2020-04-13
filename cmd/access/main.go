@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 
@@ -11,19 +10,13 @@ import (
 	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
-	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
-	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -80,6 +73,7 @@ func main() {
 			headers = storage.NewHeaders(node.DB)
 			collections = storage.NewCollections(node.DB)
 			transactions = storage.NewTransactions(node.DB)
+			payloads = storage.NewPayloads(node.DB)
 			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -91,31 +85,34 @@ func main() {
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// create a finalizer that will handle updating the protocol
-			// state when the follower detects newly finalized blocks
-			final := followerfinalizer.NewFinalizer(node.DB)
+			// // create a finalizer that will handle updating the protocol
+			// // state when the follower detects newly finalized blocks
+			// final := followerfinalizer.NewFinalizer(node.DB)
 
-			// initialize the staking & beacon verifiers, signature joiner
-			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
-			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-			merger := signature.NewCombiner()
+			// // initialize the staking & beacon verifiers, signature joiner
+			// staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			// beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			// merger := signature.NewCombiner()
 
-			// define the node set that is valid as signers
-			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+			// // define the node set that is valid as signers
+			// selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
 
-			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+			// // initialize the verifier for the protocol consensus
+			// verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
 
-			// creates a consensus follower with ingestEngine as the notifier
-			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC, selector)
-			if err != nil {
-				// TODO for now we ignore failures in follower
-				// this is necessary for integration tests to run, until they are
-				// updated to generate/use valid genesis QC and DKG files.
-				// ref https://github.com/dapperlabs/flow-go/issues/3057
-				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
-			}
+			// // creates a consensus follower with ingestEngine as the notifier
+			// // so that it gets notified upon each new finalized block
+			// core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC, selector)
+			// if err != nil {
+			// 	// TODO for now we ignore failures in follower
+			// 	// this is necessary for integration tests to run, until they are
+			// 	// updated to generate/use valid genesis QC and DKG files.
+			// 	// ref https://github.com/dapperlabs/flow-go/issues/3057
+			// 	node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
+			// }
+
+			// TODO: replace coldstuff follower with hotstuff follower when integrating hotstuff
+			core := coldstuff.NewFollower(node.Logger, node.State, node.Me)
 
 			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.State, headers, payloads, conCache, core)
 			if err != nil {

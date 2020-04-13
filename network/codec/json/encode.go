@@ -43,16 +43,6 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeBlockVote
 	case *coldstuff.Commit:
 		code = CodeBlockCommit
-	case *messages.SyncRequest:
-		code = CodeSyncRequest
-	case *messages.SyncResponse:
-		code = CodeSyncResponse
-	case *messages.RangeRequest:
-		code = CodeRangeRequest
-	case *messages.BatchRequest:
-		code = CodeBatchRequest
-	case *messages.BlockResponse:
-		code = CodeBlockResponse
 
 	// protocol state sync
 	case *messages.SyncRequest:
@@ -90,6 +80,11 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeCollectionRequest
 	case *messages.CollectionResponse:
 		code = CodeCollectionResponse
+
+	case *messages.TransactionRequest:
+		code = CodeTransactionRequest
+	case *messages.TransactionResponse:
+		code = CodeTransactionResponse
 
 	case *flow.ExecutionReceipt:
 		code = CodeExecutionReceipt

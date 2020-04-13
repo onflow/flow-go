@@ -40,16 +40,6 @@ func decode(env Envelope) (interface{}, error) {
 		v = &messages.BlockProposal{}
 	case CodeBlockVote:
 		v = &messages.BlockVote{}
-	case CodeSyncRequest:
-		v = &messages.SyncRequest{}
-	case CodeSyncResponse:
-		v = &messages.SyncResponse{}
-	case CodeRangeRequest:
-		v = &messages.RangeRequest{}
-	case CodeBatchRequest:
-		v = &messages.BatchRequest{}
-	case CodeBlockResponse:
-		v = &messages.BlockResponse{}
 	case CodeBlockCommit:
 		v = &coldstuff.Commit{}
 
@@ -81,6 +71,10 @@ func decode(env Envelope) (interface{}, error) {
 		v = &flow.TransactionBody{}
 	case CodeTransaction:
 		v = &flow.Transaction{}
+	case CodeTransactionRequest:
+		v = &messages.TransactionRequest{}
+	case CodeTransactionResponse:
+		v = &messages.TransactionResponse{}
 
 	case CodeBlock:
 		v = &flow.Block{}

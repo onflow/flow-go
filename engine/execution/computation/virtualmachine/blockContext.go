@@ -78,11 +78,7 @@ func (bc *blockContext) ExecuteTransaction(
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
 
-	fmt.Println("EXECUTE TRANSACTION")
-	fmt.Println(string(tx.Script))
 	err := bc.vm.executeTransaction(tx.Script, ctx, location)
-	fmt.Println("EXECUTE TRANSACTION ERR")
-	fmt.Println(err)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts

@@ -2,6 +2,7 @@ package testnet
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -19,7 +20,9 @@ type Client struct {
 	key    *flow.AccountPrivateKey
 }
 
-func NewClient(addr string, key *flow.AccountPrivateKey) (*Client, error) {
+// NewClientWithKey returns a new client to an Access API listening at the given
+// address, using the given account key for signing transactions.
+func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error) {
 
 	client, err := client.NewAccessClient(addr)
 	if err != nil {
@@ -31,6 +34,17 @@ func NewClient(addr string, key *flow.AccountPrivateKey) (*Client, error) {
 		key:    key,
 	}
 	return tc, nil
+}
+
+// NewClient returns a new client to an Access API listening at the given
+// address, with a generated account key for signing transactions.
+func NewClient(addr string) (*Client, error) {
+	key, err := unittest.AccountKeyFixture()
+	if err != nil {
+		return nil, fmt.Errorf("could not generate key for client")
+	}
+
+	return NewClientWithKey(addr, key)
 }
 
 func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) error {
@@ -45,6 +59,38 @@ func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) e
 	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(code))
 
 	return c.client.SendTransaction(ctx, tx)
+}
+
+// SignTransaction signs the transaction using the configured key and the root
+// account, returning the signed transaction.
+func (c *Client) SignTransaction(tx flow.TransactionBody) (flow.TransactionBody, error) {
+	sig, err := signTransaction(tx, c.key.PrivateKey)
+	if err != nil {
+		return flow.TransactionBody{}, err
+	}
+
+	accountSig := flow.AccountSignature{
+		Account:   flow.RootAddress,
+		Signature: sig,
+	}
+	tx.Signatures = append(tx.Signatures, accountSig)
+
+	return tx, nil
+}
+
+func (c *Client) SendTransaction(ctx context.Context, tx flow.TransactionBody) error {
+	return c.client.SendTransaction(ctx, tx)
+}
+
+// SignAndSendTransaction signs, then sends, a transaction. I bet you didn't
+// see that one coming.
+func (c *Client) SignAndSendTransaction(ctx context.Context, tx flow.TransactionBody) error {
+	tx, err := c.SignTransaction(tx)
+	if err != nil {
+		return fmt.Errorf("could not sign transaction: %w", err)
+	}
+
+	return c.SendTransaction(ctx, tx)
 }
 
 func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, error) {
