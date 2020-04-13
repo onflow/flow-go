@@ -24,7 +24,7 @@ type ExecutionStateSyncRequest struct {
 
 type ExecutionStateDelta struct {
 	Block             *flow.Block
-	StateInteractions []*delta.Interactions
+	StateInteractions []*delta.Snapshot
 	StartState        flow.StateCommitment
 	EndState          flow.StateCommitment
 	Events            []flow.Event

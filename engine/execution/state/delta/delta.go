@@ -21,16 +21,10 @@ func NewDelta() Delta {
 // store
 func toString(key []byte) string {
 	return string(key)
-	//return hex.EncodeToString(key)
 }
 
 func fromString(key string) flow.RegisterID {
 	return []byte(key)
-	//s, err := hex.DecodeString(key)
-	//if err != nil {
-	//	panic(fmt.Sprintf("undecodable data passed to `fromString` (%s): %s", key, err))
-	//}
-	//return s
 }
 
 // Get reads a register value from this delta.

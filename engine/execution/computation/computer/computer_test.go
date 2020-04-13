@@ -39,7 +39,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		result, err := exe.ExecuteBlock(block, view)
 		assert.NoError(t, err)
-		assert.Len(t, result.StateInteractions, 1)
+		assert.Len(t, result.StateSnapshots, 1)
 
 		vm.AssertExpectations(t)
 		bc.AssertExpectations(t)
@@ -77,7 +77,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 
 		//chunk count should match collection count
-		assert.Len(t, result.StateInteractions, collectionCount)
+		assert.Len(t, result.StateSnapshots, collectionCount)
 
 		// all events should have been collected
 		assert.Len(t, result.Events, totalEventCount)

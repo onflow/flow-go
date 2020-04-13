@@ -7,10 +7,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertExecutionStateInteractions(blockID flow.Identifier, interactions []*delta.Interactions) func(*badger.Txn) error {
+func InsertExecutionStateInteractions(blockID flow.Identifier, interactions []*delta.Snapshot) func(*badger.Txn) error {
 	return insert(makePrefix(codeExecutionStateInteractions, blockID), interactions)
 }
 
-func RetrieveExecutionStateInteractions(blockID flow.Identifier, interactions *[]*delta.Interactions) func(*badger.Txn) error {
+func RetrieveExecutionStateInteractions(blockID flow.Identifier, interactions *[]*delta.Snapshot) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeExecutionStateInteractions, blockID), interactions)
 }

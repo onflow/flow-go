@@ -25,29 +25,29 @@ func StateViewFixture() *delta.View {
 	})
 }
 
-func StateInteractionsFixture() *delta.Interactions {
+func StateInteractionsFixture() *delta.Snapshot {
 	return delta.NewView(nil).Interactions()
 }
 
 func ComputationResultFixture(n int) *execution.ComputationResult {
-	stateViews := make([]*delta.Interactions, n)
+	stateViews := make([]*delta.Snapshot, n)
 	for i := 0; i < n; i++ {
 		stateViews[i] = StateInteractionsFixture()
 	}
 	return &execution.ComputationResult{
-		ExecutableBlock:   unittest.ExecutableBlockFixture(n),
-		StateInteractions: stateViews,
+		ExecutableBlock: unittest.ExecutableBlockFixture(n),
+		StateSnapshots:  stateViews,
 	}
 }
 
 func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *execution.ComputationResult {
 	n := len(completeBlock.CompleteCollections)
-	stateViews := make([]*delta.Interactions, n)
+	stateViews := make([]*delta.Snapshot, n)
 	for i := 0; i < n; i++ {
 		stateViews[i] = StateInteractionsFixture()
 	}
 	return &execution.ComputationResult{
-		ExecutableBlock:   completeBlock,
-		StateInteractions: stateViews,
+		ExecutableBlock: completeBlock,
+		StateSnapshots:  stateViews,
 	}
 }

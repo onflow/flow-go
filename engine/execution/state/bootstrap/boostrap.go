@@ -35,7 +35,7 @@ func BootstrapExecutionDatabase(db *badger.DB, genesis *flow.Header) error {
 			return err
 		}
 
-		views := make([]*delta.Interactions, 0)
+		views := make([]*delta.Snapshot, 0)
 		err = operation.InsertExecutionStateInteractions(genesis.ID(), views)(txn)
 		if err != nil {
 			return err

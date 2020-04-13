@@ -49,15 +49,12 @@ type ExecutionState interface {
 	// PersistStateCommitment saves a state commitment by the given block ID.
 	PersistStateCommitment(flow.Identifier, flow.StateCommitment) error
 
-	// PersistChunkHeader saves a chunk header by chunk ID.
-	PersistChunkHeader(*flow.ChunkHeader) error
-
 	// PersistChunkDataPack stores a chunk data pack by chunk ID.
 	PersistChunkDataPack(*flow.ChunkDataPack) error
 
 	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
 
-	PersistStateInteractions(blockID flow.Identifier, views []*delta.Interactions) error
+	PersistStateInteractions(blockID flow.Identifier, views []*delta.Snapshot) error
 
 	UpdateHighestExecutedBlockIfHigher(header *flow.Header) error
 }
@@ -169,7 +166,7 @@ func (s *state) PersistExecutionResult(blockID flow.Identifier, result flow.Exec
 	return s.executionResults.Index(blockID, result.ID())
 }
 
-func (s *state) PersistStateInteractions(blockID flow.Identifier, views []*delta.Interactions) error {
+func (s *state) PersistStateInteractions(blockID flow.Identifier, views []*delta.Snapshot) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		return operation.InsertExecutionStateInteractions(blockID, views)(txn)
 	})
@@ -179,7 +176,7 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 	var block flow.Block
 	var startStateCommitment flow.StateCommitment
 	var endStateCommitment flow.StateCommitment
-	var stateInteractions []*delta.Interactions
+	var stateInteractions []*delta.Snapshot
 	var events []flow.Event
 	err := s.db.View(func(txn *badger.Txn) error {
 		err := procedure.RetrieveBlock(blockID, &block)(txn)

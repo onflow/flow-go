@@ -225,11 +225,11 @@ func (_m *ExecutionState) PersistStateCommitment(_a0 flow.Identifier, _a1 []byte
 }
 
 // PersistStateInteractions provides a mock function with given fields: blockID, views
-func (_m *ExecutionState) PersistStateInteractions(blockID flow.Identifier, views []*delta.Interactions) error {
+func (_m *ExecutionState) PersistStateInteractions(blockID flow.Identifier, views []*delta.Snapshot) error {
 	ret := _m.Called(blockID, views)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []*delta.Interactions) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []*delta.Snapshot) error); ok {
 		r0 = rf(blockID, views)
 	} else {
 		r0 = ret.Error(0)

@@ -35,14 +35,14 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 		_, err = d1.Get([]byte{3})
 		require.NoError(t, err)
 
-		interactions := []*delta.Interactions{d1.Interactions(), d2.Interactions()}
+		interactions := []*delta.Snapshot{d1.Interactions(), d2.Interactions()}
 
 		blockID := unittest.IdentifierFixture()
 
 		err = db.Update(InsertExecutionStateInteractions(blockID, interactions))
 		require.Nil(t, err)
 
-		var readInteractions []*delta.Interactions
+		var readInteractions []*delta.Snapshot
 
 		err = db.View(RetrieveExecutionStateInteractions(blockID, &readInteractions))
 		require.NoError(t, err)
@@ -50,6 +50,5 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 		assert.Equal(t, interactions, readInteractions)
 
 		assert.Equal(t, d1.Delta(), d1.Interactions().Delta)
-		assert.Equal(t, d1.Reads(), d1.Interactions().Reads)
 	})
 }

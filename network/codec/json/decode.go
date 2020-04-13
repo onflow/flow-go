@@ -73,10 +73,10 @@ func decode(env Envelope) (interface{}, error) {
 
 	case CodeExecutionReceipt:
 		v = &flow.ExecutionReceipt{}
-	case CodeExecutionStateRequest:
-		v = &messages.ExecutionStateRequest{}
-	case CodeExecutionStateResponse:
-		v = &messages.ExecutionStateResponse{}
+	//case CodeExecutionStateRequest:
+	//	v = &messages.ExecutionStateRequest{}
+	//case CodeExecutionStateResponse:
+	//	v = &messages.ExecutionStateResponse{}
 	case CodeExecutionStateSyncRequest:
 		v = &messages.ExecutionStateSyncRequest{}
 	case CodeExecutionStateDelta:

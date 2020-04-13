@@ -50,7 +50,7 @@ func (e *blockComputer) executeBlock(
 
 	collections := block.Collections()
 
-	interactions := make([]*delta.Interactions, len(collections))
+	interactions := make([]*delta.Snapshot, len(collections))
 
 	events := make([]flow.Event, 0)
 
@@ -74,9 +74,9 @@ func (e *blockComputer) executeBlock(
 	}
 
 	return &execution.ComputationResult{
-		ExecutableBlock:   block,
-		StateInteractions: interactions,
-		Events:            events,
+		ExecutableBlock: block,
+		StateSnapshots:  interactions,
+		Events:          events,
 	}, nil
 }
 

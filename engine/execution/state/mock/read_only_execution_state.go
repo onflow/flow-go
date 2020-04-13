@@ -35,52 +35,6 @@ func (_m *ReadOnlyExecutionState) ChunkDataPackByChunkID(_a0 flow.Identifier) (*
 	return r0, r1
 }
 
-// ChunkHeaderByChunkID provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) ChunkHeaderByChunkID(_a0 flow.Identifier) (*flow.ChunkHeader, error) {
-	ret := _m.Called(_a0)
-
-	var r0 *flow.ChunkHeader
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ChunkHeader); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ChunkHeader)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(_a0)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetChunkRegisters provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) GetChunkRegisters(_a0 flow.Identifier) (flow.Ledger, error) {
-	ret := _m.Called(_a0)
-
-	var r0 flow.Ledger
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Ledger); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Ledger)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(_a0)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetExecutionResultID provides a mock function with given fields: blockID
 func (_m *ReadOnlyExecutionState) GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error) {
 	ret := _m.Called(blockID)

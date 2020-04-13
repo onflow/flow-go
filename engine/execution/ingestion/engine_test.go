@@ -181,7 +181,7 @@ func TestValidatingCollectionResponse(t *testing.T) {
 func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *entity.ExecutableBlock, previousExecutionResultID flow.Identifier) {
 	computationResult := executionUnittest.ComputationResultForBlockFixture(executableBlock)
 	newStateCommitment := unittest.StateCommitmentFixture()
-	if len(computationResult.StateInteractions) == 0 { //if block was empty, no new state commitment is produced
+	if len(computationResult.StateSnapshots) == 0 { //if block was empty, no new state commitment is produced
 		newStateCommitment = executableBlock.StartState
 	}
 	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
@@ -190,7 +190,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 
 	ctx.executionState.On("PersistStateInteractions", executableBlock.Block.ID(), mock.Anything).Return(nil)
 
-	for _, view := range computationResult.StateInteractions {
+	for _, view := range computationResult.StateSnapshots {
 		ctx.executionState.On("CommitDelta", view.Delta).Return(newStateCommitment, nil)
 		ctx.executionState.On("PersistChunkDataPack", mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
 			return bytes.Equal(f.StartState, executableBlock.StartState)

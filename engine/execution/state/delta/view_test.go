@@ -92,7 +92,7 @@ func TestView_Set(t *testing.T) {
 	})
 
 	t.Run("SpockSecret", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 		registerID1 := make([]byte, 32)
@@ -304,12 +304,12 @@ func TestView_RegisterTouches(t *testing.T) {
 	})
 
 	t.Run("Empty", func(t *testing.T) {
-		touches := v.RegisterTouches()
+		touches := v.Interactions().RegisterTouches()
 		assert.Empty(t, touches)
 	})
 
 	t.Run("Set and Get", func(t *testing.T) {
-		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			if bytes.Equal(key, registerID1) {
 				return flow.RegisterValue("orange"), nil
 			}
@@ -326,7 +326,7 @@ func TestView_RegisterTouches(t *testing.T) {
 
 		v.Set(registerID2, flow.RegisterValue("apple"))
 
-		touches := v.RegisterTouches()
+		touches := v.Interactions().RegisterTouches()
 		assert.Len(t, touches, 2)
 	})
 }

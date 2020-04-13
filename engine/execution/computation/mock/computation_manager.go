@@ -60,11 +60,11 @@ func (_m *ComputationManager) ExecuteScript(_a0 []byte, _a1 *flow.Header, _a2 *d
 }
 
 // GetAccount provides a mock function with given fields: address, blockHeader, view
-func (_m *ComputationManager) GetAccount(address flow.Address, blockHeader *flow.Header, view *state.View) (*flow.Account, error) {
+func (_m *ComputationManager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
 	ret := _m.Called(address, blockHeader, view)
 
 	var r0 *flow.Account
-	if rf, ok := ret.Get(0).(func(flow.Address, *flow.Header, *state.View) *flow.Account); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, *flow.Header, *delta.View) *flow.Account); ok {
 		r0 = rf(address, blockHeader, view)
 	} else {
 		if ret.Get(0) != nil {
@@ -73,7 +73,7 @@ func (_m *ComputationManager) GetAccount(address flow.Address, blockHeader *flow
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Address, *flow.Header, *state.View) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Address, *flow.Header, *delta.View) error); ok {
 		r1 = rf(address, blockHeader, view)
 	} else {
 		r1 = ret.Error(1)

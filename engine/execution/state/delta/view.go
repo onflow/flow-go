@@ -21,8 +21,8 @@ type View struct {
 	readFunc    GetRegisterFunc
 }
 
-// Interactions is set of interactions with the register
-type Interactions struct {
+// Snapshot is set of interactions with the register
+type Snapshot struct {
 	Delta Delta
 	Reads []flow.RegisterID
 }
@@ -37,28 +37,28 @@ func NewView(readFunc GetRegisterFunc) *View {
 	}
 }
 
-// Interactions returns copy of current state of interactions with a View
-func (r *View) Interactions() *Interactions {
+// Snapshot returns copy of current state of interactions with a View
+func (r *View) Interactions() *Snapshot {
 
 	var delta = make(Delta, len(r.delta))
-	var reads = make([]flow.RegisterID, len(r.reads))
+	var reads = make([]flow.RegisterID, 0, len(r.regTouchSet))
 
 	//copy data
 	for s, value := range r.delta {
 		delta[s] = value
 	}
-	for i := range r.reads {
-		reads[i] = r.reads[i]
+	for key, _ := range r.regTouchSet {
+		reads = append(reads, []byte(key))
 	}
 
-	return &Interactions{
+	return &Snapshot{
 		Delta: delta,
 		Reads: reads,
 	}
 }
 
 // AllRegisters returns all the register IDs ether in read or delta
-func (r *Interactions) AllRegisters() []flow.RegisterID {
+func (r *Snapshot) AllRegisters() []flow.RegisterID {
 	set := make(map[string]bool, len(r.Reads)+len(r.Delta))
 	for _, reg := range r.Reads {
 		set[string(reg)] = true
@@ -130,7 +130,7 @@ func (v *View) Delta() Delta {
 // TODO rename this, this is not actually a merge as we can't merge
 // readFunc s.
 func (v *View) MergeView(child *View) {
-	for k := range child.RegisterTouches() {
+	for k := range child.Interactions().RegisterTouches() {
 		v.regTouchSet[string(k)] = true
 	}
 	// SpockSecret is order aware
@@ -138,11 +138,13 @@ func (v *View) MergeView(child *View) {
 	v.delta.MergeWith(child.delta)
 }
 
+
+
 // RegisterTouches returns the register IDs touched by this view (either read or write)
-func (v *View) RegisterTouches() []flow.RegisterID {
-	ret := make([]flow.RegisterID, 0, len(v.regTouchSet))
-	for r := range v.regTouchSet {
-		ret = append(ret, flow.RegisterID(r))
+func (r *Snapshot) RegisterTouches() []flow.RegisterID {
+	ret := make([]flow.RegisterID, 0, len(r.Reads))
+	for _, r := range r.Reads {
+		ret = append(ret, r)
 	}
 	return ret
 }

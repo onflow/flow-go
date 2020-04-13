@@ -559,7 +559,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
-	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateInteractions, result.Events, startState)
+	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateSnapshots, result.Events, startState)
 	if err != nil {
 		return nil, err
 	}
@@ -572,7 +572,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
 
-func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Interactions, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Snapshot, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
 
 	originalState := startState
 
