@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -52,7 +53,7 @@ const (
 
 func init() {
 	testingdock.Verbose = true
-	testingdock.SpawnSequential = true
+	//testingdock.SpawnSequential = true
 }
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
@@ -218,6 +219,22 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 	}
 
 	return c
+}
+
+// NewNodeConfigSet creates a set of node configs with the given role. The nodes
+// are given sequential IDs with a common prefix to make reading logs easier.
+func NewNodeConfigSet(n int, role flow.Role, opts ...func(*NodeConfig)) []NodeConfig {
+
+	// each node in the set has a common 4-digit prefix, separated from their
+	// index with a `0` character
+	idPrefix := rand.Intn(10000) * 100
+
+	confs := make([]NodeConfig, n)
+	for i := 0; i < n; i++ {
+		confs[i] = NewNodeConfig(role, append(opts, WithIDInt(uint(idPrefix+i+1)))...)
+	}
+
+	return confs
 }
 
 func WithID(id flow.Identifier) func(config *NodeConfig) {
