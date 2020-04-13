@@ -285,7 +285,7 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 //
 // The transaction should be routed to the responsible cluster and should be
 // included in a collection in only the responsible cluster's state.
-func TestTxIngress_OtherCluster(t *testing.T) {
+func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 
 	const nClusters uint = 3
 
