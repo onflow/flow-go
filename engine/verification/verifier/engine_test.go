@@ -21,7 +21,6 @@ import (
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -36,8 +35,8 @@ type VerifierEngineTestSuite struct {
 	me      *MockLocal
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
-	conduit *network.Conduit // mocks conduit for submitting result approvals
-	metrics module.Metrics   // mocks performance monitoring metrics
+	conduit *network.Conduit    // mocks conduit for submitting result approvals
+	metrics *mockmodule.Metrics // mocks performance monitoring metrics
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -57,6 +56,14 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 		Once()
 
 	suite.state.On("Final").Return(suite.ss)
+
+	// mocks metrics
+	suite.metrics.On("OnChunkVerificationStated", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {})
+	suite.metrics.On("OnChunkVerificationFinished", testifymock.Anything, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {})
+	suite.metrics.On("OnResultApproval", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {})
 
 	// Mocks the signature oracle of the engine
 	//
