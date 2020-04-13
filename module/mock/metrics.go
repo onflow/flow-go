@@ -62,6 +62,41 @@ func (_m *Metrics) NewestKnownQC(view uint64) {
 	_m.Called(view)
 }
 
+// OnChunkDataAdded provides a mock function with given fields: chunkID, size
+func (_m *Metrics) OnChunkDataAdded(chunkID flow.Identifier, size float64) {
+	_m.Called(chunkID, size)
+}
+
+// OnChunkDataRemoved provides a mock function with given fields: chunkID, size
+func (_m *Metrics) OnChunkDataRemoved(chunkID flow.Identifier, size float64) {
+	_m.Called(chunkID, size)
+}
+
+// OnChunkVerificationFinished provides a mock function with given fields: chunkID, blockID
+func (_m *Metrics) OnChunkVerificationFinished(chunkID flow.Identifier, blockID flow.Identifier) {
+	_m.Called(chunkID, blockID)
+}
+
+// OnChunkVerificationStated provides a mock function with given fields: chunkID
+func (_m *Metrics) OnChunkVerificationStated(chunkID flow.Identifier) {
+	_m.Called(chunkID)
+}
+
+// OnResultApproval provides a mock function with given fields: blockID
+func (_m *Metrics) OnResultApproval(blockID flow.Identifier) {
+	_m.Called(blockID)
+}
+
+// OnStorageAdded provides a mock function with given fields: size
+func (_m *Metrics) OnStorageAdded(size float64) {
+	_m.Called(size)
+}
+
+// OnStorageRemoved provides a mock function with given fields: size
+func (_m *Metrics) OnStorageRemoved(size float64) {
+	_m.Called(size)
+}
+
 // SealsInFinalizedBlock provides a mock function with given fields: count
 func (_m *Metrics) SealsInFinalizedBlock(count int) {
 	_m.Called(count)
