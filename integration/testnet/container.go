@@ -51,6 +51,16 @@ func (c *Container) Client(portName string) (*Client, error) {
 	return NewClient(fmt.Sprintf(":%s", port))
 }
 
+// Addr returns the host-accessible listening address of the container for the
+// given port name.
+func (c *Container) Addr(portName string) string {
+	port, ok := c.Ports[portName]
+	if !ok {
+		panic("could not find port " + portName)
+	}
+	return fmt.Sprintf(":%s", port)
+}
+
 // bindPort exposes the given container port and binds it to the given host port.
 // If no protocol is specified, assumes TCP.
 func (c *Container) bindPort(hostPort, containerPort string) {
