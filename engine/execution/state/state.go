@@ -20,17 +20,12 @@ type ReadOnlyExecutionState interface {
 	NewView(flow.StateCommitment) *delta.View
 
 	GetRegisters(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, error)
-	GetChunkRegisters(flow.Identifier) (flow.Ledger, error)
-
 	GetRegistersWithProofs(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, []flow.StorageProof, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 
-	// ChunkHeaderByChunkID returns the chunk header for the provided chunk ID.
-	ChunkHeaderByChunkID(flow.Identifier) (*flow.ChunkHeader, error)
-
-	// ChunkHeaderByChunkID retrieve a chunk data pack given the chunk ID.
+	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
 
 	GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error)
@@ -54,15 +49,12 @@ type ExecutionState interface {
 	// PersistStateCommitment saves a state commitment by the given block ID.
 	PersistStateCommitment(flow.Identifier, flow.StateCommitment) error
 
-	// PersistChunkHeader saves a chunk header by chunk ID.
-	PersistChunkHeader(*flow.ChunkHeader) error
-
 	// PersistChunkDataPack stores a chunk data pack by chunk ID.
 	PersistChunkDataPack(*flow.ChunkDataPack) error
 
 	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
 
-	PersistStateInteractions(blockID flow.Identifier, views []*delta.Interactions) error
+	PersistStateInteractions(blockID flow.Identifier, views []*delta.Snapshot) error
 
 	UpdateHighestExecutedBlockIfHigher(header *flow.Header) error
 }
@@ -70,7 +62,6 @@ type ExecutionState interface {
 type state struct {
 	ls               storage.Ledger
 	commits          storage.Commits
-	chunkHeaders     storage.ChunkHeaders
 	chunkDataPacks   storage.ChunkDataPacks
 	executionResults storage.ExecutionResults
 	db               *badger.DB
@@ -80,7 +71,6 @@ type state struct {
 func NewExecutionState(
 	ls storage.Ledger,
 	commits storage.Commits,
-	chunkHeaders storage.ChunkHeaders,
 	chunkDataPacks storage.ChunkDataPacks,
 	executionResult storage.ExecutionResults,
 	db *badger.DB,
@@ -88,7 +78,6 @@ func NewExecutionState(
 	return &state{
 		ls:               ls,
 		commits:          commits,
-		chunkHeaders:     chunkHeaders,
 		chunkDataPacks:   chunkDataPacks,
 		executionResults: executionResult,
 		db:               db,
@@ -147,42 +136,12 @@ func (s *state) GetRegistersWithProofs(
 	return s.ls.GetRegistersWithProof(registerIDs, commit)
 }
 
-func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) {
-	chunkHeader, err := s.ChunkHeaderByChunkID(chunkID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve chunk header: %w", err)
-	}
-
-	registerIDs := chunkHeader.RegisterIDs
-
-	registerValues, err := s.GetRegisters(chunkHeader.StartState, registerIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve chunk register values: %w", err)
-	}
-
-	l := make(flow.Ledger)
-
-	for i, registerID := range registerIDs {
-		l[string(registerID)] = registerValues[i]
-	}
-
-	return l, nil
-}
-
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	return s.commits.ByID(blockID)
 }
 
 func (s *state) PersistStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) error {
 	return s.commits.Store(blockID, commit)
-}
-
-func (s *state) ChunkHeaderByChunkID(chunkID flow.Identifier) (*flow.ChunkHeader, error) {
-	return s.chunkHeaders.ByID(chunkID)
-}
-
-func (s *state) PersistChunkHeader(c *flow.ChunkHeader) error {
-	return s.chunkHeaders.Store(c)
 }
 
 func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
@@ -207,7 +166,7 @@ func (s *state) PersistExecutionResult(blockID flow.Identifier, result flow.Exec
 	return s.executionResults.Index(blockID, result.ID())
 }
 
-func (s *state) PersistStateInteractions(blockID flow.Identifier, views []*delta.Interactions) error {
+func (s *state) PersistStateInteractions(blockID flow.Identifier, views []*delta.Snapshot) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		return operation.InsertExecutionStateInteractions(blockID, views)(txn)
 	})
@@ -217,7 +176,7 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 	var block flow.Block
 	var startStateCommitment flow.StateCommitment
 	var endStateCommitment flow.StateCommitment
-	var stateInteractions []*delta.Interactions
+	var stateInteractions []*delta.Snapshot
 	var events []flow.Event
 	err := s.db.View(func(txn *badger.Txn) error {
 		err := procedure.RetrieveBlock(blockID, &block)(txn)

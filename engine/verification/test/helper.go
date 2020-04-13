@@ -16,7 +16,6 @@ import (
 // chunkCount determines the number of chunks inside each receipt
 func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.CompleteExecutionResult {
 	chunks := make([]*flow.Chunk, 0)
-	chunkStates := make([]*flow.ChunkState, 0, chunkCount)
 	collections := make([]*flow.Collection, 0, chunkCount)
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
@@ -60,13 +59,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 			}
 			chunks = append(chunks, chunk)
 
-			// creates a chunk state
-			chunkState := &flow.ChunkState{
-				ChunkID:   chunk.ID(),
-				Registers: flow.Ledger{},
-			}
-			chunkStates = append(chunkStates, chunkState)
-
 			// creates a chunk data pack for the chunk
 			chunkDataPack := flow.ChunkDataPack{
 				ChunkID:         chunk.ID(),
@@ -105,7 +97,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		Receipt:        &receipt,
 		Block:          &block,
 		Collections:    collections,
-		ChunkStates:    chunkStates,
 		ChunkDataPacks: chunkDataPacks,
 	}
 }

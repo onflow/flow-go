@@ -18,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -31,7 +30,7 @@ import (
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
-	tracer       trace.Tracer
+	metrics      module.Metrics
 	con          network.Conduit
 	me           module.Local
 	protoState   protocol.State // flow-wide protocol chain state
@@ -53,7 +52,7 @@ func New(
 	me module.Local,
 	protoState protocol.State,
 	clusterState cluster.State,
-	tracer trace.Tracer,
+	metrics module.Metrics,
 	provider network.Engine,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
@@ -73,7 +72,7 @@ func New(
 		me:           me,
 		protoState:   protoState,
 		clusterState: clusterState,
-		tracer:       tracer,
+		metrics:      metrics,
 		provider:     provider,
 		pool:         pool,
 		transactions: transactions,
@@ -210,10 +209,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(filter.And(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}
@@ -229,20 +228,14 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not broadcast proposal: %w", err)
 	}
 
-	final, _ := e.clusterState.Final().Head()
-
 	e.log.Debug().
 		Hex("block_id", logging.ID(header.ID())).
 		Uint64("block_height", header.Height).
 		Hex("parent_id", logging.ID(header.ParentID)).
-		Hex("final_id", logging.ID(final.ID())).
-		Uint64("final_height", final.Height).
 		Int("collection_size", len(payload.Collection.Transactions)).
 		Msg("submitted proposal")
 
-	trace.StartCollectionSpan(e.tracer, &payload.Collection).
-		SetTag("node_type", "collection").
-		SetTag("node_id", e.me.NodeID().String())
+	e.metrics.StartCollectionToGuarantee(payload.Collection)
 
 	return nil
 }
@@ -252,10 +245,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(filter.And(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}

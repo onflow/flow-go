@@ -93,8 +93,9 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 
-	snapshot.On("Identities", mock.Anything).Return(func(f ...flow.IdentityFilter) flow.IdentityList {
-		return identityList.Filter(f...)
+
+	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
+		return identityList.Filter(selector)
 	}, nil)
 
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
@@ -126,7 +127,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *entity.ExecutableBlock, previousExecutionResultID flow.Identifier) {
 	computationResult := executionUnittest.ComputationResultForBlockFixture(executableBlock)
 	newStateCommitment := unittest.StateCommitmentFixture()
-	if len(computationResult.StateInteractions) == 0 { //if block was empty, no new state commitment is produced
+	if len(computationResult.StateSnapshots) == 0 { //if block was empty, no new state commitment is produced
 		newStateCommitment = executableBlock.StartState
 	}
 	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
@@ -135,12 +136,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 
 	ctx.executionState.On("PersistStateInteractions", executableBlock.Block.ID(), mock.Anything).Return(nil)
 
-	for _, view := range computationResult.StateInteractions {
+	for _, view := range computationResult.StateSnapshots {
 		ctx.executionState.On("CommitDelta", view.Delta, executableBlock.StartState).Return(newStateCommitment, nil)
-		ctx.executionState.On("PersistChunkHeader", mock.MatchedBy(func(f *flow.ChunkHeader) bool {
-			return bytes.Equal(f.StartState, executableBlock.StartState)
-		})).Return(nil)
-
 		ctx.executionState.On("GetRegistersWithProofs", mock.Anything, mock.Anything).Return(nil, nil, nil)
 
 		ctx.executionState.On("PersistChunkDataPack", mock.MatchedBy(func(f *flow.ChunkDataPack) bool {

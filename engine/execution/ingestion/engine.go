@@ -540,13 +540,29 @@ func (e *Engine) ExecuteScriptAtBlockID(script []byte, blockID flow.Identifier) 
 	return e.computationManager.ExecuteScript(script, block, blockView)
 }
 
+func (e *Engine) GetAccount(address flow.Address, blockID flow.Identifier) (*flow.Account, error) {
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+	block, err := e.state.AtBlockID(blockID).Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
+	}
+
+	blockView := e.execState.NewView(stateCommit)
+
+	return e.computationManager.GetAccount(address, block, blockView)
+}
+
 func (e *Engine) handleComputationResult(result *execution.ComputationResult, startState flow.StateCommitment) (flow.StateCommitment, error) {
 
 	e.log.Debug().
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
-	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateInteractions, result.Events, startState)
+	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateSnapshots, result.Events, startState)
 	if err != nil {
 		return nil, err
 	}
@@ -559,7 +575,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
 
-func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Interactions, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Snapshot, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
 
 	originalState := startState
 
@@ -582,16 +598,9 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 		}
 		//
 		chunk := generateChunk(i, startState, endState)
-		//
-		chunkHeader := generateChunkHeader(chunk, view.Reads)
-		//
-		err = e.execState.PersistChunkHeader(chunkHeader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to save chunk header: %w", err)
-		}
 
 		// chunkDataPack
-		allRegisters := view.AllRegisters()
+		allRegisters := view.RegisterTouches()
 		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
 
 		if err != nil {
@@ -603,7 +612,7 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 		if err != nil {
 			return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
 		}
-		//
+		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
 	}
@@ -667,18 +676,6 @@ func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flo
 	}
 }
 
-// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
-func generateChunkHeader(
-	chunk *flow.Chunk,
-	registerIDs []flow.RegisterID,
-) *flow.ChunkHeader {
-	return &flow.ChunkHeader{
-		ChunkID:     chunk.ID(),
-		StartState:  chunk.StartState,
-		RegisterIDs: registerIDs,
-	}
-}
-
 // generateExecutionResultForBlock creates new ExecutionResult for a block from
 // the provided chunk results.
 func (e *Engine) generateExecutionResultForBlock(
@@ -727,7 +724,7 @@ func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 
 	e.log.Debug().Msgf("sync from height %d to height %d", lastExecutedHeight, firstKnown.Block.Height-1)
 
-	otherNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter())
+	otherNodes, err := e.state.Final().Identities(filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter()))
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("error while finding other execution nodes identities")
 		return

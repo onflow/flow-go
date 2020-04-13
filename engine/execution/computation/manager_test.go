@@ -71,6 +71,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotEmpty(t, view.Delta())
-	require.Len(t, returnedComputationResult.StateInteractions, 1)
-	assert.NotEmpty(t, returnedComputationResult.StateInteractions[0].Delta)
+	require.Len(t, returnedComputationResult.StateSnapshots, 1)
+	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
 }

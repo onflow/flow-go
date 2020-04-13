@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -148,7 +149,7 @@ func TestIdentity(t *testing.T) {
 		state := State{db: db}
 
 		t.Run("works before finalized state", func(t *testing.T) {
-			actual, err := state.AtNumber(0).Identities()
+			actual, err := state.AtNumber(0).Identities(filter.Any)
 			require.NoError(t, err)
 			expected := flow.IdentityList{ids[0], ids[1]}
 			ids[0].Stake = 100
@@ -157,7 +158,7 @@ func TestIdentity(t *testing.T) {
 		})
 
 		t.Run("works after finalized state", func(t *testing.T) {
-			actual, err := state.AtNumber(3).Identities()
+			actual, err := state.AtNumber(3).Identities(filter.Any)
 			require.NoError(t, err)
 			expected := flow.IdentityList{ids[0], ids[1], ids[2]}
 			ids[0].Stake = 0 // hot stuff keeps identities with 0 stake in identities list

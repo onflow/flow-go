@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	mk "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	nmock "github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -36,7 +35,7 @@ type TestPaceMaker struct {
 	t *testing.T
 }
 
-func NewTestPaceMaker(t *testing.T, startView uint64, timeoutController *timeout.Controller, notifier notifications.Consumer) *TestPaceMaker {
+func NewTestPaceMaker(t *testing.T, startView uint64, timeoutController *timeout.Controller, notifier hotstuff.Consumer) *TestPaceMaker {
 	p, err := pacemaker.New(startView, timeoutController, notifier)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +69,7 @@ func (p *TestPaceMaker) OnTimeout() *model.NewViewEvent {
 
 // using a real pacemaker for testing event handler
 func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
-	notifier := &nmock.Consumer{}
+	notifier := &mocks.Consumer{}
 	tc, err := timeout.NewConfig(
 		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
@@ -81,9 +80,9 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 		t.Fail()
 	}
 	pm := NewTestPaceMaker(t, view, timeout.NewController(tc), notifier)
-	notifier.On("OnStartingTimeout", mk.Anything).Return()
-	notifier.On("OnSkippedAhead", mk.Anything).Return()
-	notifier.On("OnReachedTimeout", mk.Anything).Return()
+	notifier.On("OnStartingTimeout", mock.Anything).Return()
+	notifier.On("OnSkippedAhead", mock.Anything).Return()
+	notifier.On("OnReachedTimeout", mock.Anything).Return()
 	pm.Start()
 	return pm
 }
@@ -324,6 +323,7 @@ type EventHandlerSuite struct {
 	voteAggregator *VoteAggregator
 	voter          *Voter
 	validator      *BlacklistValidator
+	notifier       hotstuff.Consumer
 
 	initView    uint64
 	endView     uint64
@@ -340,12 +340,13 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.forks = NewForks(es.T(), finalized)
 	es.blockProducer = &BlockProducer{}
 	es.communicator = &mocks.Communicator{}
-	es.communicator.On("BroadcastProposal", mk.Anything).Return(nil)
-	es.communicator.On("SendVote", mk.Anything, mk.Anything, mk.Anything, mk.Anything, mk.Anything).Return(nil)
+	es.communicator.On("BroadcastProposal", mock.Anything).Return(nil)
+	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	es.viewState = NewViewState()
 	es.voteAggregator = NewVoteAggregator(es.T())
 	es.voter = NewVoter(es.T(), finalized)
 	es.validator = NewBlacklistValidator(es.T())
+	es.notifier = &notifications.NoopConsumer{}
 
 	eventhandler, err := eventhandler.New(
 		zerolog.Logger{},
@@ -356,7 +357,8 @@ func (es *EventHandlerSuite) SetupTest() {
 		es.viewState,
 		es.voteAggregator,
 		es.voter,
-		es.validator)
+		es.validator,
+		es.notifier)
 	require.NoError(es.T(), err)
 
 	es.eventhandler = eventhandler

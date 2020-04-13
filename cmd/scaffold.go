@@ -22,10 +22,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/trace"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
@@ -77,7 +77,7 @@ type FlowNodeBuilder struct {
 	flags          *pflag.FlagSet
 	name           string
 	Logger         zerolog.Logger
-	Tracer         trace.Tracer
+	Metrics        *metrics.Collector
 	DB             *badger.DB
 	Me             *local.Local
 	State          *protocol.State
@@ -121,7 +121,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
 
-		ids, err := fnb.State.Final().Identities()
+		ids, err := fnb.State.Final().Identities(filter.Any)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
@@ -193,10 +193,10 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.DB = db
 }
 
-func (fnb *FlowNodeBuilder) initTracer() {
-	tracer, err := trace.NewTracer(fnb.Logger)
-	fnb.MustNot(err).Msg("could not initialize tracer")
-	fnb.Tracer = tracer
+func (fnb *FlowNodeBuilder) initMetrics() {
+	metrics, err := metrics.NewCollector(fnb.Logger)
+	fnb.MustNot(err).Msg("could not initialize metrics")
+	fnb.Metrics = metrics
 }
 
 func (fnb *FlowNodeBuilder) initState() {
@@ -244,7 +244,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
-	allIdentities, err := state.Final().Identities()
+	allIdentities, err := state.Final().Identities(filter.Any)
 	fnb.MustNot(err).Msg("could not retrieve finalized identities")
 	fnb.Logger.Debug().Msgf("known nodes: %v", allIdentities)
 
@@ -397,7 +397,7 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	fnb.initLogger()
 
-	fnb.initTracer()
+	fnb.initMetrics()
 
 	fnb.initDatabase()
 

@@ -30,7 +30,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/trace"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
@@ -66,17 +66,17 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 
 	stub := stub.NewNetwork(state, me, hub)
 
-	tracer, err := trace.NewTracer(log)
+	metrics, err := metrics.NewCollector(log)
 	require.NoError(t, err)
 
 	return mock.GenericNode{
-		Log:    log,
-		Tracer: tracer,
-		DB:     db,
-		State:  state,
-		Me:     me,
-		Net:    stub,
-		DBDir:  dbDir,
+		Log:     log,
+		Metrics: metrics,
+		DB:      db,
+		State:   state,
+		Me:      me,
+		Net:     stub,
+		DBDir:   dbDir,
 	}
 }
 
@@ -91,10 +91,10 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	collections := storage.NewCollections(node.DB)
 	transactions := storage.NewTransactions(node.DB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool)
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool)
 	require.Nil(t, err)
 
-	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool, collections, transactions)
+	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool, collections, transactions)
 	require.Nil(t, err)
 
 	return mock.CollectionNode{
@@ -142,7 +142,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	propagationEngine, err := propagation.New(node.Log, node.Net, node.State, node.Me, guarantees)
 	require.NoError(t, err)
 
-	ingestionEngine, err := consensusingest.New(node.Log, node.Net, propagationEngine, node.State, node.Me)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Net, propagationEngine, node.State, node.Metrics, node.Me)
 	require.Nil(t, err)
 
 	matchingEngine, err := matching.New(node.Log, node.Net, node.State, node.Me, results, receipts, approvals, seals)
@@ -184,7 +184,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	collectionsStorage := storage.NewCollections(node.DB)
 	eventsStorage := storage.NewEvents(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
-	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
 
@@ -202,7 +201,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	err = bootstrap.BootstrapExecutionDatabase(node.DB, genesisHead)
 	require.NoError(t, err)
 
-	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage, chunkDataPackStorage, executionResults, node.DB)
+	execState := state.NewExecutionState(ls, commitsStorage, chunkDataPackStorage, executionResults, node.DB)
 
 	stateSync := sync.NewStateSynchronizer(execState)
 
@@ -294,16 +293,6 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		require.Nil(t, err)
 	}
 
-	if node.ChunkStates == nil {
-		node.ChunkStates, err = stdmap.NewChunkStates(1000)
-		require.Nil(t, err)
-	}
-
-	if node.ChunkStateTracker == nil {
-		node.ChunkStateTracker, err = stdmap.NewChunkStateTrackers(1000)
-		require.Nil(t, err)
-	}
-
 	if node.ChunkDataPacks == nil {
 		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
 		require.Nil(t, err)
@@ -337,8 +326,6 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.AuthCollections,
 			node.PendingCollections,
 			node.CollectionTrackers,
-			node.ChunkStates,
-			node.ChunkStateTracker,
 			node.ChunkDataPacks,
 			node.ChunkDataPackTrackers,
 			node.BlockStorage,
