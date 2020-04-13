@@ -70,3 +70,7 @@ func (c *AccessClient) ExecuteScript(ctx context.Context, script []byte) ([]byte
 
 	return res.GetValue(), nil
 }
+
+func (c *AccessClient) GetRPCClient() *access.AccessAPIClient {
+	return &c.rpcClient
+}

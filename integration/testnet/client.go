@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/client"
@@ -118,4 +120,8 @@ func signTransaction(tx flow.TransactionBody, privateKey crypto.PrivateKey) (cry
 	}
 	b := transaction.Singularity()
 	return privateKey.Sign(b, hasher)
+}
+
+func (c *Client) GetClient() *access.AccessAPIClient {
+	return c.client.GetRPCClient()
 }
