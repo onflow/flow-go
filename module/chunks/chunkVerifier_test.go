@@ -1,6 +1,7 @@
 package chunks
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/dapperlabs/cadence/runtime"
@@ -23,7 +24,7 @@ type ChunkVerifierTestSuite struct {
 // Make sure variables are set properly
 // SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupTest() {
-	s.verifier = NewChunkVerifier(newVirtualMachineMock())
+	s.verifier = NewChunkVerifier(&virtualMachineMock{})
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -66,6 +67,9 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	assert.True(s.T(), ok)
 }
 
+// TestWrongEndState tests verification covering the case
+// the state commitment computed after updating the partial trie
+// doesn't match the one provided by the chunks
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("wrongEndState"))
 	assert.NotNil(s.T(), vch)
@@ -76,6 +80,33 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	assert.True(s.T(), ok)
 }
 
+// TestFailedTx tests verification behaviour in case
+// of failed transaction. if a transaction fails, it shouldn't
+// change the state commitment.
+func (s *ChunkVerifierTestSuite) TestFailedTx() {
+	vch := GetBaselineVerifiableChunk(s.T(), []byte("failedTx"))
+	assert.NotNil(s.T(), vch)
+	chFaults, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.Nil(s.T(), chFaults)
+}
+
+// TestEmptyCollection tests verification behaviour if a
+// collection doesn't have any transaction.
+func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
+	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
+	assert.NotNil(s.T(), vch)
+	col := unittest.CollectionFixture(0)
+	vch.Collection = &col
+	vch.EndState = vch.ChunkDataPack.StartState
+	chFaults, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.Nil(s.T(), chFaults)
+}
+
+// GetBaselineVerifiableChunk returns a verifiable chunk and sets the script
+// of a transaction in the middle of the collection to some value to signal the
+// mocked vm on what to return as tx exec outcome.
 func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunk {
 	// Collection setup
 
@@ -182,8 +213,20 @@ func (bc *blockContextMock) ExecuteTransaction(
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
 			Events:        []runtime.Event{},
-			Logs:          []string{"log1", "log2"}, // []string
-			Error:         nil,                      // inside the runtime (e.g. div by zero, access account)
+			Logs:          []string{"log1", "log2"},
+			Error:         nil,
+			GasUsed:       0,
+		}
+	case "failedTx":
+		id1 := make([]byte, 32)
+		UpdatedValue1 := []byte{'F'}
+		// add updates to the ledger
+		ledger.Set(id1, UpdatedValue1)
+		txRes = virtualmachine.TransactionResult{
+			TransactionID: unittest.IdentifierFixture(),
+			Events:        []runtime.Event{},
+			Logs:          nil,
+			Error:         errors.New("runtime error"), // inside the runtime (e.g. div by zero, access account)
 			GasUsed:       0,
 		}
 	default:
@@ -196,8 +239,8 @@ func (bc *blockContextMock) ExecuteTransaction(
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
 			Events:        []runtime.Event{},
-			Logs:          []string{"log1", "log2"}, // []string
-			Error:         nil,                      // inside the runtime (e.g. div by zero, access account)
+			Logs:          []string{"log1", "log2"},
+			Error:         nil,
 			GasUsed:       0,
 		}
 	}
@@ -217,11 +260,6 @@ func (bc *blockContextMock) GetAccount(ledger virtualmachine.Ledger, address flo
 
 // virtualMachineMock is a mocked virtualMachine
 type virtualMachineMock struct {
-}
-
-func newVirtualMachineMock() *virtualMachineMock {
-	// TODO set execution outcome
-	return &virtualMachineMock{}
 }
 
 func (vm *virtualMachineMock) NewBlockContext(header *flow.Header) virtualmachine.BlockContext {
