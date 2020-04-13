@@ -38,6 +38,11 @@ func NewPublicAssignment(alpha int) (*PublicAssignment, error) {
 	}, nil
 }
 
+// Size returns number of assignments
+func (p *PublicAssignment) Size() uint {
+	return p.assignments.Size()
+}
+
 // Assign receives identity list of verifier nodes, chunk lists and a random generator
 // it returns a chunk assignment
 func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkmodels.Assignment, error) {

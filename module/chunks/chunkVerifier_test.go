@@ -1,4 +1,4 @@
-package chunks
+package chunks_test
 
 import (
 	"errors"
@@ -12,19 +12,20 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	chModels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 type ChunkVerifierTestSuite struct {
 	suite.Suite
-	verifier *ChunkVerifier
+	verifier *chunks.ChunkVerifier
 }
 
 // Make sure variables are set properly
 // SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupTest() {
-	s.verifier = NewChunkVerifier(&virtualMachineMock{})
+	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{})
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
