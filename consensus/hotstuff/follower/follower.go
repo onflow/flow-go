@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -20,27 +19,23 @@ import (
 //
 // CAUTION: Follower is NOT CONCURRENCY safe
 type FollowerLogic struct {
-	log                  zerolog.Logger
-	validator            hotstuff.Validator
-	finalizationLogic    forks.Finalizer
-	finalizationCallback module.Finalizer
-	notifier             hotstuff.FinalizationConsumer
+	log               zerolog.Logger
+	validator         hotstuff.Validator
+	finalizationLogic forks.Finalizer
+	notifier          hotstuff.FinalizationConsumer
 }
 
 func New(
 	log zerolog.Logger,
 	validator hotstuff.Validator,
-	finalizationCallback module.Finalizer,
-	viewstate hotstuff.ViewState,
 	finalizationLogic forks.Finalizer,
 	notifier hotstuff.FinalizationConsumer,
 ) (*FollowerLogic, error) {
 	return &FollowerLogic{
-		log:                  log.With().Str("hotstuff", "follower").Logger(),
-		validator:            validator,
-		finalizationCallback: finalizationCallback,
-		finalizationLogic:    finalizationLogic,
-		notifier:             notifier,
+		log:               log.With().Str("hotstuff", "follower").Logger(),
+		validator:         validator,
+		finalizationLogic: finalizationLogic,
+		notifier:          notifier,
 	}, nil
 }
 

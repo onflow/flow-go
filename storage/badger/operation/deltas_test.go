@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -95,7 +96,7 @@ func TestDeltasTraverse(t *testing.T) {
 			return nil
 		}
 
-		err := db.View(TraverseDeltas(0, 4, nil, process))
+		err := db.View(TraverseDeltas(0, 4, filter.Any, process))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)

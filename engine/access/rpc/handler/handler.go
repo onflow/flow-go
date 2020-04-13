@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -20,10 +20,9 @@ import (
 // Transaction related calls are handled in handler handler_transaction
 // Block Header related calls are handled in handler handler_block_header
 // Block details related calls are handled in handler handler_block_details
-// All remaining calls are handled in this file (or not implemented yet)
+// All remaining calls are handled in this file
 type Handler struct {
-	access.UnimplementedAccessAPIServer
-	executionRPC  access.AccessAPIClient
+	executionRPC  execution.ExecutionAPIClient
 	collectionRPC access.AccessAPIClient
 	log           zerolog.Logger
 	state         protocol.State
@@ -35,34 +34,31 @@ type Handler struct {
 	transactions storage.Transactions
 }
 
+var _ access.AccessAPIServer = &Handler{}
+
 func NewHandler(log zerolog.Logger,
 	s protocol.State,
-	e access.AccessAPIClient,
+	e execution.ExecutionAPIClient,
 	c access.AccessAPIClient,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions) *Handler {
 	return &Handler{
-		executionRPC:                 e,
-		collectionRPC:                c,
-		blocks:                       blocks,
-		headers:                      headers,
-		collections:                  collections,
-		transactions:                 transactions,
-		state:                        s,
-		log:                          log,
-		UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+		executionRPC:  e,
+		collectionRPC: c,
+		blocks:        blocks,
+		headers:       headers,
+		collections:   collections,
+		transactions:  transactions,
+		state:         s,
+		log:           log,
 	}
 }
 
 // Ping responds to requests when the server is up.
 func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
 	return &access.PingResponse{}, nil
-}
-
-func (h *Handler) ExecuteScriptAtLatestBlock(ctx context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
-	return h.executionRPC.ExecuteScriptAtLatestBlock(ctx, req)
 }
 
 func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {
@@ -113,6 +109,39 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollection
 		Collection: ce,
 	}
 	return resp, nil
+}
+
+func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
+
+	address := req.GetAddress()
+
+	if address == nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid address")
+	}
+
+	// get the latest sealed header
+	latestHeader, err := h.getLatestSealedHeader()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
+	}
+
+	// get the block id of the latest sealed header
+	latestBlockID := latestHeader.ID()
+
+	exeReq := execution.GetAccountAtBlockIDRequest{
+		Address: address,
+		BlockId: latestBlockID[:],
+	}
+
+	exeResp, err := h.executionRPC.GetAccountAtBlockID(ctx, &exeReq)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
+	}
+
+	return &access.GetAccountResponse{
+		Account: exeResp.GetAccount(),
+	}, nil
+
 }
 
 func convertStorageError(err error) error {
