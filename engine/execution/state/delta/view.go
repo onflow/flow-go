@@ -47,7 +47,7 @@ func (r *View) Interactions() *Snapshot {
 	for s, value := range r.delta {
 		delta[s] = value
 	}
-	for key, _ := range r.regTouchSet {
+	for key := range r.regTouchSet {
 		reads = append(reads, []byte(key))
 	}
 
@@ -138,14 +138,10 @@ func (v *View) MergeView(child *View) {
 	v.delta.MergeWith(child.delta)
 }
 
-
-
 // RegisterTouches returns the register IDs touched by this view (either read or write)
 func (r *Snapshot) RegisterTouches() []flow.RegisterID {
 	ret := make([]flow.RegisterID, 0, len(r.Reads))
-	for _, r := range r.Reads {
-		ret = append(ret, r)
-	}
+	ret = append(ret, r.Reads...)
 	return ret
 }
 

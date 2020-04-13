@@ -721,7 +721,7 @@ func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 
 	e.log.Debug().Msgf("sync from height %d to height %d", lastExecutedHeight, firstKnown.Block.Height-1)
 
-	otherNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter())
+	otherNodes, err := e.state.Final().Identities(filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter()))
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("error while finding other execution nodes identities")
 		return
