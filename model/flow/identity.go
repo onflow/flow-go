@@ -130,14 +130,12 @@ type IdentityOrder func(*Identity, *Identity) bool
 type IdentityList []*Identity
 
 // Filter will apply a filter to the identity list.
-func (il IdentityList) Filter(filters ...IdentityFilter) IdentityList {
+func (il IdentityList) Filter(filter IdentityFilter) IdentityList {
 	var dup IdentityList
 IDLoop:
 	for _, identity := range il {
-		for _, filter := range filters {
-			if !filter(identity) {
-				continue IDLoop
-			}
+		if !filter(identity) {
+			continue IDLoop
 		}
 		dup = append(dup, identity)
 	}
