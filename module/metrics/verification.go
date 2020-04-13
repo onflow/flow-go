@@ -14,20 +14,24 @@ const chunkExecutionSpanner = "chunk_execution_duration"
 // contains set of functions interacting with the Prometheus server
 var (
 	chunksCheckedPerBlock = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "chunks_checked_per_block",
-		Help: "The number of chunks checked per block",
+		Name:      "chunks_checked_per_block",
+		Namespace: "verification",
+		Help:      "The number of chunks checked per block",
 	}, []string{"name"})
 	resultApprovalsPerBlock = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "result_approvals_per_block",
-		Help: "The number of emitted result approvals per block (i.e., number of approved chunks)",
+		Name:      "result_approvals_per_block",
+		Namespace: "verification",
+		Help:      "The number of emitted result approvals per block (i.e., number of approved chunks)",
 	}, []string{"name"})
 	totalStorage = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "total_size",
-		Help: "the duration of how long hotstuff's event loop has been busy processing one event",
+		Name:      "total_size",
+		Namespace: "verification",
+		Help:      "the duration of how long hotstuff's event loop has been busy processing one event",
 	})
 	storagePerChunk = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "storage_per_chunk",
-		Help: "storage per chunk data",
+		Name:      "storage_per_chunk",
+		Namespace: "verification",
+		Help:      "storage per chunk data",
 	}, []string{"name"})
 )
 
