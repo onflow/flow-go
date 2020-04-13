@@ -22,7 +22,7 @@ const (
 	// the timeout for individual actions (eg. send a transaction)
 	defaultTimeout = 10 * time.Second
 	// the period we wait to give consensus/routing time to complete
-	waitTime = 5 * time.Second
+	waitTime = 20 * time.Second
 )
 
 // default set of non-collection nodes
