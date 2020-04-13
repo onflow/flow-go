@@ -10,6 +10,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/go-connections/nat"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 )
@@ -23,7 +24,7 @@ var (
 type ContainerConfig struct {
 	bootstrap.NodeInfo
 	ContainerName string
-	LogLevel      string
+	LogLevel      zerolog.Level
 }
 
 // ImageName returns the Docker image name for the given config.

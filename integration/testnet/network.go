@@ -471,7 +471,7 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 		containerConf := ContainerConfig{
 			NodeInfo:      info,
 			ContainerName: name,
-			LogLevel:      conf.LogLevel.String(),
+			LogLevel:      conf.LogLevel,
 		}
 
 		confs = append(confs, containerConf)
