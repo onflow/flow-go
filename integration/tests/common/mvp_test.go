@@ -40,7 +40,7 @@ func TestMVP_Network(t *testing.T) {
 	require.NoError(t, err)
 
 	flowNetwork.Start(ctx)
-	defer flowNetwork.Stop()
+	defer flowNetwork.Remove()
 
 	colContainer, ok := flowNetwork.ContainerByID(colNode.Identifier)
 	require.True(t, ok)

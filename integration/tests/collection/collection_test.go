@@ -18,7 +18,12 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const defaultTimeout = 10 * time.Second
+const (
+	// the timeout for individual actions (eg. send a transaction)
+	defaultTimeout = 10 * time.Second
+	// the period we wait to give consensus/routing time to complete
+	waitTime = 10 * time.Second
+)
 
 // default set of non-collection nodes
 func defaultOtherNodes() []testnet.NodeConfig {
@@ -153,9 +158,9 @@ func TestTransactionIngress_SingleCluster(t *testing.T) {
 	// wait for consensus to complete
 	//TODO we should listen for collection guarantees instead, but this is blocked
 	// ref: https://github.com/dapperlabs/flow-go/issues/3021
-	time.Sleep(10 * time.Second)
+	time.Sleep(waitTime)
 
-	err = net.Remove()
+	err = net.Stop()
 	assert.Nil(t, err)
 
 	identities := net.Identities()
@@ -170,11 +175,11 @@ func TestTransactionIngress_SingleCluster(t *testing.T) {
 	assert.Nil(t, err)
 
 	// the transaction should be included in exactly one collection
-	checker := NewStateChecker(state)
+	checker := unittest.NewClusterStateChecker(state)
 	checker.
 		ExpectContainsTx(tx.ID()).
 		ExpectTxCount(1).
-		Check(t)
+		Assert(t)
 }
 
 // Test sending a single valid transaction to multi-cluster configuration.
@@ -210,6 +215,8 @@ func TestTransactionIngress_MultiCluster(t *testing.T) {
 
 	clusters := protocol.Clusters(nClusters, net.Identities())
 
+	// Send the transaction to the cluster that is responsible for it. It
+	// should be included in a collection in only that cluster.
 	t.Run("send tx to responsible cluster", func(t *testing.T) {
 
 		// pick a cluster to target
@@ -237,7 +244,30 @@ func TestTransactionIngress_MultiCluster(t *testing.T) {
 		assert.Nil(t, err)
 
 		// wait for consensus to complete
-		time.Sleep(10 * time.Second)
+		time.Sleep(waitTime)
+
+		err = net.Pause()
+		require.Nil(t, err)
+		//defer func() {
+		//	err = net.Unpause()
+		//	require.Nil(t, err)
+		//}()
+
+		chainID := protocol.ChainIDForCluster(targetCluster)
+
+		// get database for target node
+		db, err := targetNode.DB()
+		require.Nil(t, err)
+
+		state, err := clusterstate.NewState(db, chainID)
+		require.Nil(t, err)
+
+		// the transaction should be included in exactly one collection
+		checker := unittest.NewClusterStateChecker(state)
+		checker.
+			ExpectContainsTx(tx.ID()).
+			ExpectTxCount(1).
+			Assert(t)
 	})
 
 	t.Run("send tx to other cluster", func(t *testing.T) {})

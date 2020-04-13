@@ -52,6 +52,7 @@ const (
 
 func init() {
 	testingdock.Verbose = true
+	testingdock.SpawnSequential = true
 }
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
@@ -78,11 +79,11 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	net.suite.Start(ctx)
 }
 
-// Stop stops the network and cleans up all resources. If you need to inspect
+// Remove stops the network and cleans up all resources. If you need to inspect
 // state, first stop the containers, then check state, then clean up resources.
-func (net *FlowNetwork) Stop() error {
+func (net *FlowNetwork) Remove() error {
 
-	err := net.Remove()
+	err := net.Stop()
 	if err != nil {
 		return fmt.Errorf("could not stop network: %w", err)
 	}
@@ -95,15 +96,40 @@ func (net *FlowNetwork) Stop() error {
 	return nil
 }
 
-// Remove disconnects and stops all containers in the network, then
+// Stop disconnects and stops all containers in the network, then
 // removes the network.
-func (net *FlowNetwork) Remove() error {
+func (net *FlowNetwork) Stop() error {
 
 	err := net.suite.Close()
 	if err != nil {
 		return fmt.Errorf("could not stop containers: %w", err)
 	}
 
+	return nil
+}
+
+// Pause stops all containers in the network, preserving their state.
+func (net *FlowNetwork) Pause() error {
+
+	for _, c := range net.Containers {
+		err := c.Pause()
+		if err != nil {
+			return fmt.Errorf("could not pause container (id=%s): %w", c.ID, err)
+		}
+	}
+	return nil
+}
+
+// Unpause restarts all containers in the network after they have been paused.
+// State from before pausing is preserved.
+func (net *FlowNetwork) Unpause() error {
+
+	for _, c := range net.Containers {
+		err := c.Start()
+		if err != nil {
+			return fmt.Errorf("could not unpause container (id=%s): %w", c.ID, err)
+		}
+	}
 	return nil
 }
 

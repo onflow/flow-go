@@ -95,11 +95,13 @@ func (c *Container) DB() (*badger.DB, error) {
 	return db, err
 }
 
-// Stop stops this container temporarily, preserving its state. It can be
+// Pause stops this container temporarily, preserving its state. It can be
 // re-started with Start.
-func (c *Container) Stop() error {
+func (c *Container) Pause() error {
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
+
+	fmt.Println("pausing ", c.ID)
 
 	err := c.net.cli.ContainerStop(ctx, c.ID, &checkContainerTimeout)
 	if err != nil {
@@ -114,7 +116,7 @@ func (c *Container) Stop() error {
 	return nil
 }
 
-// Start starts this container that has been stopped temporarily with Stop,
+// Start starts this container that has been stopped temporarily with Pause,
 // preserving existing state.
 func (c *Container) Start() error {
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
