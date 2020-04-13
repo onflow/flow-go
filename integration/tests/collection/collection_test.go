@@ -164,7 +164,6 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	assert.Nil(t, err)
 
 	identities := net.Identities()
-
 	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
 
 	// get database for COL1

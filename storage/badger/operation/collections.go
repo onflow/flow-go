@@ -28,18 +28,19 @@ func RemoveCollection(collID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeCollection, collID))
 }
 
-// IndexCollection indexes the transactions within the collection payload of a block.
-func IndexCollectionPayload(height uint64, blockID, parentID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexCollection, height, blockID, parentID), collection.Transactions)
+// IndexCollectionPayload indexes the transactions within the collection payload
+// of a cluster block.
+func IndexCollectionPayload(height uint64, blockID, parentID flow.Identifier, txIDs []flow.Identifier) func(*badger.Txn) error {
+	return insert(toPayloadIndex(codeIndexCollection, height, blockID, parentID), txIDs)
 }
 
-// LookupCollection looks up the collection for a given payload.
-func LookupCollectionPayload(height uint64, blockID, parentID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexCollection, height, blockID, parentID), &collection.Transactions)
+// LookupCollection looks up the collection for a given cluster payload.
+func LookupCollectionPayload(height uint64, blockID, parentID flow.Identifier, txIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(toPayloadIndex(codeIndexCollection, height, blockID, parentID), txIDs)
 }
 
-// VerifyCollectionPayload verifies that the candidate transaction IDs
-//// don't exist in any ancestor block.
+// VerifyCollectionPayload verifies that the candidate transaction IDs don't
+// exist in any ancestor block.
 func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flow.Identifier) func(*badger.Txn) error {
 	return iterate(makePrefix(codeIndexCollection, height), makePrefix(codeIndexCollection, uint64(0)), validatepayload(blockID, txIDs))
 }

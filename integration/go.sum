@@ -104,6 +104,8 @@ github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2/go.mod h1:WgzAW
 github.com/dapperlabs/flow-go/integration v0.0.0-20200406190816-e4c4d2b5219c/go.mod h1:U1t9nUsu42c36UV2Q3tGFCIk0YtPiyTU4eqR38lVm1I=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125 h1:Zc17Y/8ycLcVd1T/tsiho0k9XVq+SxCHhYBuzkn5kkQ=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125/go.mod h1:ThpXZwEduNJCzmpEVEUy3Ml5dDAWttnzlBJPTOSAin0=
+github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679 h1:rOzL+A6plLZY0XwvrUu089U2LTKiyGIdr/F4pknuQYY=
+github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679/go.mod h1:ThpXZwEduNJCzmpEVEUy3Ml5dDAWttnzlBJPTOSAin0=
 github.com/dapperlabs/testingdock v0.4.2 h1:9xlcsGRw4Jfyvz2eO8EH1T1wlLfOFTv1WXKf9sxBDwk=
 github.com/dapperlabs/testingdock v0.4.2/go.mod h1:S45YfB1J1mbOeLHhJROx3dFZfMCVSxTgSU9vZ15Oq18=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

@@ -43,7 +43,7 @@ type Suite struct {
 	me           *module.Local
 	net          *module.Network
 	con          *network.Conduit
-	provider     *network.Engine
+	ingest       *network.Engine
 	pool         *mempool.Transactions
 	transactions *storage.Transactions
 	headers      *storage.Headers
@@ -95,7 +95,7 @@ func (suite *Suite) SetupTest() {
 	suite.con = new(network.Conduit)
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
 
-	suite.provider = new(network.Engine)
+	suite.ingest = new(network.Engine)
 	suite.pool = new(mempool.Transactions)
 	suite.transactions = new(storage.Transactions)
 	suite.headers = new(storage.Headers)
@@ -105,7 +105,7 @@ func (suite *Suite) SetupTest() {
 	suite.cache = new(module.PendingClusterBlockBuffer)
 	suite.coldstuff = new(module.ColdStuff)
 
-	eng, err := proposal.New(log, suite.net, suite.me, suite.proto.state, suite.cluster.state, metrics, suite.provider, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.cache)
+	eng, err := proposal.New(log, suite.net, suite.me, suite.proto.state, suite.cluster.state, metrics, suite.ingest, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.cache)
 	require.NoError(suite.T(), err)
 	suite.eng = eng.WithConsensus(suite.coldstuff)
 }
@@ -146,7 +146,7 @@ func (suite *Suite) TestHandleProposal() {
 	suite.coldstuff.AssertExpectations(suite.T())
 }
 
-func (suite *Suite) TestHandleProposalWithUnknownTransactions() {
+func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	originID := unittest.IdentifierFixture()
 	parent := unittest.ClusterBlockFixture()
 	block := unittest.ClusterBlockWithParent(&parent)
@@ -158,26 +158,33 @@ func (suite *Suite) TestHandleProposalWithUnknownTransactions() {
 
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
-	// we are missing some transactions
+	// we are missing all the transactions
 	suite.pool.On("Has", mock.Anything).Return(false)
-	// the missing transaction(s) should be requested
-	for _, txID := range block.Payload.Collection.Transactions {
-		req := &messages.SubmitTransactionRequest{
-			Request: messages.TransactionRequest{ID: txID},
-		}
-		suite.provider.On("SubmitLocal", req).Once()
+	// the missing transactions should be verified
+	for _, tx := range block.Payload.Collection.Transactions {
+		// all the transactions are valid
+		suite.ingest.On("ProcessLocal", tx).Return(nil).Once()
 	}
 
-	err := suite.eng.Process(originID, proposal)
-	suite.Assert().Error(err)
+	// should store payload and header
+	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Once()
+	suite.headers.On("Store", mock.Anything).Return(nil).Once()
+	// should extend state with new block
+	suite.cluster.mutator.On("Extend", block.ID()).Return(nil).Once()
+	// should submit to consensus algo
+	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.View).Once()
+	// we don't have any cached children
+	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 
-	// should not store block
-	suite.headers.AssertNotCalled(suite.T(), "Store", mock.Anything)
-	suite.payloads.AssertNotCalled(suite.T(), "Store", mock.Anything, mock.Anything)
-	// transactions should have been requested
-	suite.provider.AssertExpectations(suite.T())
-	// proposal should not have been submitted to consensus algo
-	suite.coldstuff.AssertNotCalled(suite.T(), "SubmitProposal", mock.Anything, mock.Anything)
+	err := suite.eng.Process(originID, proposal)
+	suite.Assert().Nil(err)
+
+	// should store block
+	suite.headers.AssertExpectations(suite.T())
+	suite.payloads.AssertExpectations(suite.T())
+	// transactions should have been validated
+	suite.ingest.AssertExpectations(suite.T())
+	suite.coldstuff.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestHandlePendingProposal() {
