@@ -42,13 +42,10 @@ func defaultOtherNodes() []testnet.NodeConfig {
 // The transactions should be rejected by the collection node and not included
 // in any collection.
 func TestTransactionIngress_InvalidTransaction(t *testing.T) {
-	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
-		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
-	)
 
-	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
+	colNodeConfigs := testnet.NewNodeConfigSet(3, flow.RoleCollection)
+	colNodeConfig1 := colNodeConfigs[0]
+	nodes := append(colNodeConfigs, defaultOtherNodes()...)
 	conf := testnet.NewNetworkConfig(nodes)
 
 	net, err := testnet.PrepareFlowNetwork(t, "col_txingress_invalidtx", conf)
@@ -60,10 +57,10 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	defer net.Cleanup()
 
 	// we will test against COL1
-	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
+	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
 	assert.True(t, ok)
 
-	client, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort))
+	client, err := testnet.NewClient(colNode1.Addr(testnet.ColNodeAPIPort))
 	require.Nil(t, err)
 
 	t.Run("missing reference block hash", func(t *testing.T) {
