@@ -23,7 +23,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	verificationmetrics "github.com/dapperlabs/flow-go/module/metrics/verification"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -49,7 +48,6 @@ func main() {
 		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
 		verifierEng          *verifier.Engine
 		ingestEng            *ingest.Engine
-		verificationMetrics  *verificationmetrics.VerificationMetrics
 	)
 
 	cmd.FlowNode("verification").
@@ -101,16 +99,11 @@ func main() {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
-		Module("node metrics", func(node *cmd.FlowNodeBuilder) error {
-			// veification metrics tracker
-			verificationMetrics, err = verificationmetrics.NewVerificationMetrics(node.Logger)
-			return err
-		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 			chunkVerifier := chunks.NewChunkVerifier(vm)
-			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, verificationMetrics)
+			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, node.Metrics)
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
