@@ -41,8 +41,6 @@ func (c *Collector) OnChunkVerificationStarted(chunkID flow.Identifier) {
 // OnChunkVerificationFinished is called whenever chunkID verification gets finished
 // it finishes recording the duration of execution and increases number of checked chunks for the blockID
 func (c *Collector) OnChunkVerificationFinished(chunkID flow.Identifier, blockID flow.Identifier) {
-	c.Lock()
-	defer c.Unlock()
 	c.tracer.FinishSpan(chunkID, chunkExecutionSpanner)
 	// increases the checked chunks counter for blockID
 	// checked chunks are the ones with a chunk data pack disseminated from
@@ -54,8 +52,6 @@ func (c *Collector) OnChunkVerificationFinished(chunkID flow.Identifier, blockID
 // OnResultApproval is called whenever a result approval for block ID is emitted
 // it increases the result approval counter for this chunk
 func (c *Collector) OnResultApproval(blockID flow.Identifier) {
-	c.Lock()
-	defer c.Unlock()
 	// increases the counter of disseminated result approvals
 	// for the blockID by one. Each result approval corresponds to a single chunk of the block
 	// the approvals disseminated by verifier engine
@@ -66,8 +62,6 @@ func (c *Collector) OnResultApproval(blockID flow.Identifier) {
 // OnStorageAdded is called whenever something is added to the persistent (on disk) storage
 // of verification node. It records the size of stored object.
 func (c *Collector) OnStorageAdded(size float64) {
-	c.Lock()
-	defer c.Unlock()
 	// updates the size of on disk storage overhead of the
 	// verification node by value.
 	// Todo wire this up to do monitoring
@@ -79,8 +73,6 @@ func (c *Collector) OnStorageAdded(size float64) {
 // OnStorageRemoved is called whenever something is removed from the persistent (on disk) storage
 // of verification node. It records the size of stored object.
 func (c *Collector) OnStorageRemoved(size float64) {
-	c.Lock()
-	defer c.Unlock()
 	if size > 0 {
 		size *= -1
 	}
@@ -94,8 +86,6 @@ func (c *Collector) OnStorageRemoved(size float64) {
 // OnChunkDataAdded is called whenever something is added to related to chunkID to the in-memory mempools
 // of verification node. It records the size of stored object.
 func (c *Collector) OnChunkDataAdded(chunkID flow.Identifier, size float64) {
-	c.Lock()
-	defer c.Unlock()
 	// UpdateStoragePerChunk updates the size of on memory overhead of the
 	// verification per chunk ID.
 	// Todo wire this up to do monitoring
@@ -107,8 +97,6 @@ func (c *Collector) OnChunkDataAdded(chunkID flow.Identifier, size float64) {
 // OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
 // of verification node. It records the size of stored object.
 func (c *Collector) OnChunkDataRemoved(chunkID flow.Identifier, size float64) {
-	c.Lock()
-	defer c.Unlock()
 	if size > 0 {
 		size *= -1
 	}
