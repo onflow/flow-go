@@ -26,14 +26,14 @@ import (
 // constructing a partial trie, executing transactions and check the final state commitment and
 // other chunk meta data (e.g. tx count)
 type Engine struct {
-	unit    *engine.Unit                // used to control startup/shutdown
-	log     zerolog.Logger              // used to log relevant actions
-	conduit network.Conduit             // used to propagate result approvals
-	me      module.Local                // used to access local node information
-	state   protocol.State              // used to access the protocol state
-	rah     hash.Hasher                 // used as hasher to sign the result approvals
-	chVerif module.ChunkVerifier        // used to verify chunks
-	mc      metrics.VerificationMetrics // used to capture the performance metrics
+	unit    *engine.Unit         // used to control startup/shutdown
+	log     zerolog.Logger       // used to log relevant actions
+	conduit network.Conduit      // used to propagate result approvals
+	me      module.Local         // used to access local node information
+	state   protocol.State       // used to access the protocol state
+	rah     hash.Hasher          // used as hasher to sign the result approvals
+	chVerif module.ChunkVerifier // used to verify chunks
+	mc      module.Metrics       // used to capture the performance metrics
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -43,7 +43,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	chVerif module.ChunkVerifier,
-	mc metrics.VerificationMetrics,
+	mc module.Metrics,
 ) (*Engine, error) {
 
 	e := &Engine{
