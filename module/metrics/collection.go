@@ -2,8 +2,6 @@ package metrics
 
 import (
 	"github.com/opentracing/opentracing-go"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -19,19 +17,6 @@ const (
 	// from a transaction received being included
 	// to being included in a collection guarantee
 	collectionTransactionToCollectionGuarantee = "collection_transaction_to_collection_guarantee"
-)
-
-var (
-	collectionsPerBlock = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "collections_per_block",
-		Namespace: "consensus",
-		Help:      "the number of collections per block",
-	})
-	collectionsPerFinalizedBlockCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "collections_per_finalized_block",
-		Namespace: "consensus",
-		Help:      "The number of collections included in the finalized block",
-	})
 )
 
 // StartCollectionToGuarantee starts a span to trace the duration of a collection
