@@ -389,6 +389,9 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 		nodeContainer.Ports[AccessNodeAPIPort] = hostPort
 		f.AccessPorts[AccessNodeAPIPort] = hostPort
+
+	case flow.RoleVerification:
+		nodeContainer.addFlag("alpha", "1")
 	}
 
 	suiteContainer := suite.Container(*opts)
