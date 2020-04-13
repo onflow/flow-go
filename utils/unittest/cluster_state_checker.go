@@ -84,7 +84,7 @@ func (checker *ClusterStateChecker) Assert(t *testing.T) {
 			continue
 		}
 
-		for _, txID := range collection.Transactions {
+		for _, txID := range collection.Light().Transactions {
 			count++
 
 			_, isDupe := transactions[txID]
