@@ -13,51 +13,28 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// main runs a local tracer server on the machine and starts monitoring some metrics for sake of demo
 func main() {
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+	port := 3030
+	server := metrics.NewServer(logger, uint(port))
+	exitSig := make(chan os.Signal, 1)
+	signal.Notify(exitSig, os.Interrupt, syscall.SIGTERM)
 
-	// Go signal notification works by sending `os.Signal`
-	// values on a channel. We'll create a channel to
-	// receive these notifications (we'll also make one to
-	// notify us when the program can exit).
-	sigs := make(chan os.Signal, 1)
-	done := make(chan bool, 1)
+	<-server.Ready()
 
-	// `signal.Notify` registers the given channel to
-	// receive notifications of the specified signals.
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-	// This goroutine executes a blocking receive for
-	// signals. When it gets one it'll print it out
-	// and then notify the program that it can finish.
 	go func() {
-		sig := <-sigs
-		fmt.Println()
-		fmt.Println(sig)
-		done <- true
+		sendMetrics(logger)
 	}()
 
-	// The program will wait here until it gets the
-	// expected signal (as indicated by the goroutine
-	// above sending a value on `done`) and then exit.
-	fmt.Println("awaiting signal")
-	<-done
-	fmt.Println("exiting")
-}
+	fmt.Printf("server is ready, port: %v\n", port)
+	fmt.Printf("launch prometheus server: \n" +
+		"prometheus --config.file=../flow-go/module/metrics/test/prometheus.yml\n" +
+		"then open http://localhost:9090 to monitor the collected metrics\n")
 
-// Demo runs a local tracer server on the machine and starts monitoring some metrics for sake of demo
-func Demo(logger zerolog.Logger, port int, exit chan os.Signal) {
-	// creates a tracer server
-	server := metrics.NewServer(logger, uint(port))
-	<-server.Ready()
-	log.Info().Msg(fmt.Sprintf("server is ready, port: %v", port))
-
-	// executes experiment
-	go sendMetrics(logger)
-
-	<-exit
+	<-exitSig
 	log.Warn().Msg("component startup aborted")
 	os.Exit(1)
-
 }
 
 // sendMetrics increases result approvals counter and checked chunks counter 100 times each
