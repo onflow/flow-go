@@ -160,7 +160,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	})
 }
 
-// TestGetEventsForBlockID tests the GetEventsForBlockIDs API call
+// Test GetAccountAtBlockID tests the GetAccountAtBlockID API call
 func (suite *Suite) TestGetAccountForBlockID() {
 
 	id := unittest.IdentifierFixture()
