@@ -33,9 +33,9 @@ var (
 
 // VerificationMetrics implements an interface of event handlers that are called upon certain events to capture
 // metrics for sake of monitoring
-// OnChunkVerificationStated is called whenever the verification of a chunk is started
+// OnChunkVerificationStarted is called whenever the verification of a chunk is started
 // it starts the timer to record the execution time
-func (c *Collector) OnChunkVerificationStated(chunkID flow.Identifier) {
+func (c *Collector) OnChunkVerificationStarted(chunkID flow.Identifier) {
 	// starts spanner tracer for this chunk ID
 	c.tracer.StartSpan(chunkID, chunkExecutionSpanner)
 }

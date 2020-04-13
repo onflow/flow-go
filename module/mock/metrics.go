@@ -77,8 +77,8 @@ func (_m *Metrics) OnChunkVerificationFinished(chunkID flow.Identifier, blockID 
 	_m.Called(chunkID, blockID)
 }
 
-// OnChunkVerificationStated provides a mock function with given fields: chunkID
-func (_m *Metrics) OnChunkVerificationStated(chunkID flow.Identifier) {
+// OnChunkVerificationStarted provides a mock function with given fields: chunkID
+func (_m *Metrics) OnChunkVerificationStarted(chunkID flow.Identifier) {
 	_m.Called(chunkID)
 }
 

@@ -58,7 +58,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.state.On("Final").Return(suite.ss)
 
 	// mocks metrics
-	suite.metrics.On("OnChunkVerificationStated", testifymock.Anything).
+	suite.metrics.On("OnChunkVerificationStarted", testifymock.Anything).
 		Run(func(args testifymock.Arguments) {})
 	suite.metrics.On("OnChunkVerificationFinished", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {})

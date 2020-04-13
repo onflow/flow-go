@@ -265,7 +265,7 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.VerifiableChunk) error {
 	// starts verification performance metrics trackers
 	if ch.ChunkDataPack != nil {
-		e.mc.OnChunkVerificationStated(ch.ChunkDataPack.ChunkID)
+		e.mc.OnChunkVerificationStarted(ch.ChunkDataPack.ChunkID)
 	}
 	// starts verification of chunk
 	err := e.verify(originID, ch)

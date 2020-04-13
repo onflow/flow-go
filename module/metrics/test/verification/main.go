@@ -48,7 +48,7 @@ func sendMetrics(log zerolog.Logger) {
 		blockID := unittest.BlockFixture().ID()
 		chunkID := unittest.ChunkFixture().ID()
 		metrics.OnResultApproval(blockID)
-		metrics.OnChunkVerificationStated(chunkID)
+		metrics.OnChunkVerificationStarted(chunkID)
 
 		// adds a synthetic 1 s delay for verification duration
 		time.Sleep(1 * time.Second)

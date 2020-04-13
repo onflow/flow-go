@@ -65,9 +65,9 @@ type Metrics interface {
 
 	// Verification Metrics
 
-	// OnChunkVerificationStated is called whenever the verification of a chunk is started
+	// OnChunkVerificationStarted is called whenever the verification of a chunk is started
 	// it starts the timer to record the execution time
-	OnChunkVerificationStated(chunkID flow.Identifier)
+	OnChunkVerificationStarted(chunkID flow.Identifier)
 
 	// OnChunkVerificationFinished is called whenever chunkID verification gets finished
 	// it finishes recording the duration of execution and increases number of checked chunks for the blockID
@@ -81,7 +81,7 @@ type Metrics interface {
 	// of verification node. It records the size of stored object.
 	OnStorageAdded(size float64)
 
-	// OnStorageAdded is called whenever something is removed from the persistent (on disk) storage
+	// OnStorageRemoved is called whenever something is removed from the persistent (on disk) storage
 	// of verification node. It records the size of stored object.
 	OnStorageRemoved(size float64)
 
