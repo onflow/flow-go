@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"sync"
+
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -9,6 +11,7 @@ import (
 // Collector is a metrics collector for monitoring purpose.
 // It provides methods for collecting metrics data.
 type Collector struct {
+	sync.RWMutex
 	tracer trace.Tracer
 }
 

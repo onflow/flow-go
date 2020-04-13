@@ -302,9 +302,9 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		rt := runtime.NewInterpreterRuntime()
 		vm := virtualmachine.New(rt)
 		chunkVerifier := chunks.NewChunkVerifier(vm)
-		node.Tracer, err = trace.NewTracer(node.Log)
+
 		require.NoError(t, err)
-		mc := verification.NewMetrics(node.Tracer)
+		mc := verification.NewVerificationMetrics(node.Log)
 		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, chunkVerifier, mc)
 		require.Nil(t, err)
 	}
