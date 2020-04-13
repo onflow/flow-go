@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
@@ -98,7 +97,7 @@ func New(
 
 	e.chunksConduit, err = net.Register(engine.ChunkDataPackProvider, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register chunk data pack provider engine")
+		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
 
 	_, err = net.Register(engine.ExecutionReceiptProvider, e)

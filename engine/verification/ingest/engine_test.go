@@ -1,12 +1,12 @@
 package ingest_test
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
