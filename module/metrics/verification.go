@@ -31,8 +31,6 @@ var (
 	}, []string{"name"})
 )
 
-// VerificationMetrics implements an interface of event handlers that are called upon certain events to capture
-// metrics for sake of monitoring
 // OnChunkVerificationStarted is called whenever the verification of a chunk is started
 // it starts the timer to record the execution time
 func (c *Collector) OnChunkVerificationStarted(chunkID flow.Identifier) {
@@ -78,7 +76,7 @@ func (c *Collector) OnStorageAdded(size float64) {
 
 }
 
-// OnStorageAdded is called whenever something is removed from the persistent (on disk) storage
+// OnStorageRemoved is called whenever something is removed from the persistent (on disk) storage
 // of verification node. It records the size of stored object.
 func (c *Collector) OnStorageRemoved(size float64) {
 	c.Lock()
