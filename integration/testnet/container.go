@@ -41,18 +41,8 @@ type Container struct {
 	opts    *testingdock.ContainerOpts
 }
 
-// Client returns a Access API to the given container on the given port.
-func (c *Container) Client(portName string) (*Client, error) {
-	port, ok := c.Ports[portName]
-	if !ok {
-		return nil, fmt.Errorf("could not find port (name=%s)", portName)
-	}
-
-	return NewClient(fmt.Sprintf(":%s", port))
-}
-
 // Addr returns the host-accessible listening address of the container for the
-// given port name.
+// given port name. Panics if the port does not exist.
 func (c *Container) Addr(portName string) string {
 	port, ok := c.Ports[portName]
 	if !ok {
@@ -108,10 +98,14 @@ func (c *Container) DB() (*badger.DB, error) {
 // Pause stops this container temporarily, preserving its state. It can be
 // re-started with Start.
 func (c *Container) Pause() error {
+
+	//TODO
+	// update testingdock to remove autoremove option
+	// ref https://github.com/dapperlabs/testingdock/blob/master/container.go#L132
+	panic("not supported")
+
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
-
-	fmt.Println("pausing ", c.ID)
 
 	err := c.net.cli.ContainerStop(ctx, c.ID, &checkContainerTimeout)
 	if err != nil {
@@ -129,6 +123,12 @@ func (c *Container) Pause() error {
 // Start starts this container that has been stopped temporarily with Pause,
 // preserving existing state.
 func (c *Container) Start() error {
+
+	//TODO
+	// update testingdock to remove autoremove option
+	// ref https://github.com/dapperlabs/testingdock/blob/master/container.go#L132
+	panic("not supported")
+
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
 
