@@ -13,26 +13,26 @@ const chunkExecutionSpanner = "chunk_execution_duration"
 
 // contains set of functions interacting with the Prometheus server
 var (
-	chunksCheckedPerBlock = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name:      "chunks_checked_per_block",
+	chunksCheckedPerBlock = promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "verifications_chunks_checked_per_block",
 		Namespace: "verification",
 		Help:      "The number of chunks checked per block",
-	}, []string{"name"})
-	resultApprovalsPerBlock = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name:      "result_approvals_per_block",
+	})
+	resultApprovalsPerBlock = promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "verifications_result_approvals_per_block",
 		Namespace: "verification",
 		Help:      "The number of emitted result approvals per block (i.e., number of approved chunks)",
-	}, []string{"name"})
-	totalStorage = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "total_size",
-		Namespace: "verification",
-		Help:      "the duration of how long hotstuff's event loop has been busy processing one event",
 	})
-	storagePerChunk = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name:      "storage_per_chunk",
+	totalStorage = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "verifications_total_size",
+		Namespace: "verification",
+		Help:      "total storage of the verification node",
+	})
+	storagePerChunk = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "verifications_storage_per_chunk",
 		Namespace: "verification",
 		Help:      "storage per chunk data",
-	}, []string{"name"})
+	})
 )
 
 // OnChunkVerificationStarted is called whenever the verification of a chunk is started
