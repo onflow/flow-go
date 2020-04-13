@@ -109,31 +109,6 @@ func (net *FlowNetwork) Stop() error {
 	return nil
 }
 
-// Pause stops all containers in the network, preserving their state.
-func (net *FlowNetwork) Pause() error {
-
-	for _, c := range net.Containers {
-		err := c.Pause()
-		if err != nil {
-			return fmt.Errorf("could not pause container (id=%s): %w", c.ID, err)
-		}
-	}
-	return nil
-}
-
-// Unpause restarts all containers in the network after they have been paused.
-// State from before pausing is preserved.
-func (net *FlowNetwork) Unpause() error {
-
-	for _, c := range net.Containers {
-		err := c.Start()
-		if err != nil {
-			return fmt.Errorf("could not unpause container (id=%s): %w", c.ID, err)
-		}
-	}
-	return nil
-}
-
 // Cleanup cleans up all temporary files used by the network.
 func (net *FlowNetwork) Cleanup() error {
 
