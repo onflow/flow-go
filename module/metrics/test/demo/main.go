@@ -1,10 +1,3 @@
-// Sometimes we'd like our Go programs to intelligently
-// handle [Unix signals](http://en.wikipedia.org/wiki/Unix_signal).
-// For example, we might want a server to gracefully
-// shutdown when it receives a `SIGTERM`, or a command-line
-// tool to stop processing input if it receives a `SIGINT`.
-// Here's how to handle signals in Go with channels.
-
 package main
 
 import (
@@ -12,6 +5,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
+	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func main() {
@@ -43,4 +42,33 @@ func main() {
 	fmt.Println("awaiting signal")
 	<-done
 	fmt.Println("exiting")
+}
+
+// Demo runs a local tracer server on the machine and starts monitoring some metrics for sake of demo
+func Demo(logger zerolog.Logger, port int, exit chan os.Signal) {
+	// creates a tracer server
+	server := metrics.NewServer(logger, uint(port))
+	<-server.Ready()
+	log.Info().Msg(fmt.Sprintf("server is ready, port: %v", port))
+
+	// executes experiment
+	go sendMetrics(logger)
+
+	<-exit
+	log.Warn().Msg("component startup aborted")
+	os.Exit(1)
+
+}
+
+// sendMetrics increases result approvals counter and checked chunks counter 100 times each
+func sendMetrics(log zerolog.Logger) {
+	metrics, err := metrics.NewCollector(log)
+	if err != nil {
+		panic(err)
+	}
+	for i := 0; i < 100; i++ {
+		blockID := unittest.BlockFixture().ID()
+		metrics.OnResultApproval(blockID)
+		metrics.OnChunkVerificationStated(blockID)
+	}
 }
