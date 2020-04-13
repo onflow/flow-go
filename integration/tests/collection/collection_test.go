@@ -63,7 +63,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
 	assert.True(t, ok)
 
-	client, err := colContainer1.Client(testnet.ColNodeAPIPort)
+	client, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort))
 	require.Nil(t, err)
 
 	t.Run("missing reference block hash", func(t *testing.T) {
@@ -121,13 +121,9 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 // The transaction should be included in a collection.
 func TestTxIngress_SingleCluster(t *testing.T) {
 
-	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
-		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
-	)
-
-	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
+	colNodeConfigs := testnet.NewNodeConfigSet(3, flow.RoleCollection)
+	colNodeConfig1 := colNodeConfigs[0]
+	nodes := append(colNodeConfigs, defaultOtherNodes()...)
 	conf := testnet.NewNetworkConfig(nodes)
 
 	net, err := testnet.PrepareFlowNetwork(t, "col_txingress_singlecluster", conf)
@@ -139,10 +135,10 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	defer net.Cleanup()
 
 	// we will test against COL1
-	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
+	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
 	assert.True(t, ok)
 
-	client, err := colContainer1.Client(testnet.ColNodeAPIPort)
+	client, err := testnet.NewClient(colNode1.Addr(testnet.ColNodeAPIPort))
 	require.Nil(t, err)
 
 	tx := unittest.TransactionBodyFixture()
@@ -167,7 +163,7 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
 
 	// get database for COL1
-	db, err := colContainer1.DB()
+	db, err := colNode1.DB()
 	require.Nil(t, err)
 
 	state, err := clusterstate.NewState(db, chainID)
@@ -215,7 +211,7 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 	require.True(t, ok)
 
 	// get a client pointing to the cluster member
-	client, err := targetNode.Client(testnet.ColNodeAPIPort)
+	client, err := testnet.NewClient(targetNode.Addr(testnet.ColNodeAPIPort))
 	require.Nil(t, err)
 
 	// create a transaction for the target cluster
