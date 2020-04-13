@@ -161,7 +161,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 }
 
 // Test GetAccountAtBlockID tests the GetAccountAtBlockID API call
-func (suite *Suite) TestGetAccountForBlockID() {
+func (suite *Suite) TestGetAccountAtBlockID() {
 
 	id := unittest.IdentifierFixture()
 	rootAddress := flow.RootAddress
