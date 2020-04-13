@@ -70,7 +70,7 @@ func TestClusterRouting(t *testing.T) {
 		tx := unittest.TransactionForCluster(clusters, localCluster)
 
 		// submit transaction locally to test storing
-		err = localNode.IngestionEngine.ProcessLocal(tx)
+		err = localNode.IngestionEngine.ProcessLocal(&tx)
 		assert.NoError(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -106,7 +106,7 @@ func TestClusterRouting(t *testing.T) {
 		tx := unittest.TransactionForCluster(clusters, remoteCluster)
 
 		// submit transaction locally to test propagation
-		err = localNode.IngestionEngine.ProcessLocal(tx)
+		err = localNode.IngestionEngine.ProcessLocal(&tx)
 		assert.NoError(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -142,7 +142,7 @@ func TestClusterRouting(t *testing.T) {
 		tx := unittest.TransactionForCluster(clusters, targetCluster)
 
 		// submit transaction with remote origin to test non-propagation
-		err = localNode.IngestionEngine.Process(remoteNode.Me.NodeID(), tx)
+		err = localNode.IngestionEngine.Process(remoteNode.Me.NodeID(), &tx)
 		assert.NoError(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -179,7 +179,7 @@ func TestClusterRouting(t *testing.T) {
 		tx.Script = nil
 
 		// submit transaction locally (should not be relevant)
-		err = localNode.IngestionEngine.ProcessLocal(tx)
+		err = localNode.IngestionEngine.ProcessLocal(&tx)
 		assert.Error(t, err)
 
 		// flush the network to make sure all messages are sent
