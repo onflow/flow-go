@@ -106,6 +106,7 @@ func main() {
 			node.Logger.Info().
 				Hex("genesis_id", logging.ID(genesis.ID())).
 				Str("cluster_id", clusterID).
+				Str("cluster_members", fmt.Sprintf("%v", myCluster.NodeIDs())).
 				Msg("bootstrapped cluster state")
 
 			// bootstrap cluster consensus state
