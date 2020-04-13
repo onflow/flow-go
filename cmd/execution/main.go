@@ -30,6 +30,7 @@ func main() {
 	var (
 		stateCommitments   storage.Commits
 		ledgerStorage      storage.Ledger
+		blocks             storage.Blocks
 		events             storage.Events
 		providerEngine     *provider.Engine
 		computationManager *computation.Manager
@@ -96,7 +97,7 @@ func main() {
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			blocks := badger.NewBlocks(node.DB)
+			blocks = badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 			payloads := badger.NewPayloads(node.DB)
 			events := badger.NewEvents(node.DB)
@@ -116,7 +117,7 @@ func main() {
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, events)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events)
 			return rpcEng, nil
 		}).Run()
 

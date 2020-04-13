@@ -1,9 +1,10 @@
-package rpc
+package handler
 
 import (
 	"context"
 	"testing"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -31,7 +32,7 @@ type Suite struct {
 	headers      *storage.Headers
 	collections  *storage.Collections
 	transactions *storage.Transactions
-	execClient   *mockaccess.AccessAPIClient
+	execClient   *mockaccess.ExecutionAPIClient
 }
 
 func TestHandler(t *testing.T) {
@@ -47,7 +48,7 @@ func (suite *Suite) SetupTest() {
 	suite.headers = new(storage.Headers)
 	suite.transactions = new(storage.Transactions)
 	suite.collections = new(storage.Collections)
-	suite.execClient = new(mockaccess.AccessAPIClient)
+	suite.execClient = new(mockaccess.ExecutionAPIClient)
 }
 
 func (suite *Suite) TestPing() {
@@ -230,19 +231,44 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	blockIDs := getIDs(5)
 	events := getEvents(10)
 
-	req := &access.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}
-	expectedResp := access.EventsResponse{
-		Events: events,
+	// create the expected results from execution node and access node
+	exeResults := make([]*execution.EventsResponse_Result, len(blockIDs))
+	accResults := make([]*access.EventsResponse_Result, len(blockIDs))
+
+	for i := 0; i < len(blockIDs); i++ {
+		exeResults[i] = &execution.EventsResponse_Result{
+			BlockId:     blockIDs[i],
+			BlockHeight: uint64(i),
+			Events:      events,
+		}
+		accResults[i] = &access.EventsResponse_Result{
+			BlockId:     blockIDs[i],
+			BlockHeight: uint64(i),
+			Events:      events,
+		}
 	}
+
+	// create the execution node response
+	exeResp := execution.EventsResponse{
+		Results: exeResults,
+	}
+	// create the expected access node response
+	expectedResp := access.EventsResponse{
+		Results: accResults,
+	}
+
 	ctx := context.Background()
 
+	exeReq := &execution.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}
+
 	// expect one call to the executor api client
-	suite.execClient.On("GetEventsForBlockIDs", ctx, req).Return(&expectedResp, nil).Once()
+	suite.execClient.On("GetEventsForBlockIDs", ctx, exeReq).Return(&exeResp, nil).Once()
 
 	// create the handler
 	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, nil, nil, nil)
 
 	// execute request
+	req := &access.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}
 	acutalResponse, err := handler.GetEventsForBlockIDs(ctx, req)
 
 	// check response
@@ -279,12 +305,32 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		return ids
 	}
 
-	setupExecClient := func(events []*entities.Event) {
-		execReq := &access.GetEventsForBlockIDsRequest{BlockIds: expBlockIDs, Type: string(flow.EventAccountCreated)}
-		execResp := access.EventsResponse{
-			Events: events,
+	setupExecClient := func() *access.EventsResponse {
+		execReq := &execution.GetEventsForBlockIDsRequest{BlockIds: expBlockIDs, Type: string(flow.EventAccountCreated)}
+		results := make([]*access.EventsResponse_Result, len(expBlockIDs))
+		exeResults := make([]*execution.EventsResponse_Result, len(expBlockIDs))
+		for i, id := range expBlockIDs {
+			e := getEvents(1)
+			h := uint64(5) // an arbitrary height
+			results[i] = &access.EventsResponse_Result{
+				BlockId:     id,
+				BlockHeight: h,
+				Events:      e,
+			}
+			exeResults[i] = &execution.EventsResponse_Result{
+				BlockId:     id,
+				BlockHeight: h,
+				Events:      e,
+			}
 		}
-		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(&execResp, nil).Once()
+		expectedResp := &access.EventsResponse{
+			Results: results,
+		}
+		exeResp := &execution.EventsResponse{
+			Results: exeResults,
+		}
+		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(exeResp, nil).Once()
+		return expectedResp
 	}
 
 	suite.Run("invalid request max height < min height", func() {
@@ -306,8 +352,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		// setup mocks
 		setupHeadHeight(headHeight)
 		expBlockIDs = setupStorage(minHeight, maxHeight)
-		expEvents := getEvents(10)
-		setupExecClient(expEvents)
+		expectedResp := setupExecClient()
 
 		// create handler
 		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
@@ -318,21 +363,19 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			Type:        string(flow.EventAccountCreated)}
 
 		// execute request
-		resp, err := handler.GetEventsForHeightRange(ctx, req)
+		actualResp, err := handler.GetEventsForHeightRange(ctx, req)
 
 		// check response
-		suite.checkResponse(resp, err)
+		suite.checkResponse(actualResp, err)
 		suite.assertAllExpectations()
-		suite.Require().Equal(expEvents, resp.GetEvents())
+		suite.Require().Equal(expectedResp, actualResp)
 	})
 
 	suite.Run("valid request with max_height > last_sealed_block_height", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
 		expBlockIDs = setupStorage(minHeight, headHeight)
-
-		expEvents := getEvents(10)
-		setupExecClient(expEvents)
+		expectedResp := setupExecClient()
 
 		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
 
@@ -341,13 +384,68 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			EndHeight:   maxHeight,
 			Type:        string(flow.EventAccountCreated)}
 
-		resp, err := handler.GetEventsForHeightRange(ctx, req)
+		actualResp, err := handler.GetEventsForHeightRange(ctx, req)
 
-		suite.checkResponse(resp, err)
+		suite.checkResponse(actualResp, err)
 		suite.assertAllExpectations()
-		suite.Require().Equal(expEvents, resp.GetEvents())
+		suite.Require().Equal(expectedResp, actualResp)
 	})
 
+}
+
+func (suite *Suite) TestGetAccount() {
+
+	address := []byte{1}
+	account := &entities.Account{
+		Address: address,
+	}
+	ctx := context.Background()
+
+	// setup the latest sealed block
+	header := unittest.BlockHeaderFixture() // create a mock header
+	seal := unittest.SealFixture()          // create a mock seal
+	seal.BlockID = header.ID()              // make the seal point to the header
+	suite.snapshot.On("Seal").Return(seal, nil).Once()
+	suite.headers.On("ByBlockID", header.ID()).Return(&header, nil).Once()
+
+	// create the expected execution API request
+	blockID := header.ID()
+	exeReq := &execution.GetAccountAtBlockIDRequest{
+		BlockId: blockID[:],
+		Address: address,
+	}
+
+	// create the expected execution API response
+	exeResp := &execution.GetAccountAtBlockIDResponse{
+		Account: account,
+	}
+
+	// setup the execution client mock
+	suite.execClient.On("GetAccountAtBlockID", ctx, exeReq).Return(exeResp, nil).Once()
+
+	// create the handler with the mock
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil)
+
+	suite.Run("happy path - valid request and valid response", func() {
+		expectedResp := &access.GetAccountResponse{
+			Account: account,
+		}
+		req := &access.GetAccountRequest{
+			Address: address,
+		}
+		actualResp, err := handler.GetAccount(ctx, req)
+		suite.checkResponse(actualResp, err)
+		suite.assertAllExpectations()
+		suite.Require().Equal(expectedResp, actualResp)
+	})
+
+	suite.Run("invalid request with nil address", func() {
+		req := &access.GetAccountRequest{
+			Address: nil,
+		}
+		_, err := handler.GetAccount(ctx, req)
+		suite.Require().Error(err)
+	})
 }
 
 func (suite *Suite) assertAllExpectations() {

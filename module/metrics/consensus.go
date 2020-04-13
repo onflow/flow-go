@@ -33,6 +33,16 @@ var (
 		Namespace: "consensus",
 		Help:      "The number of finalized blocks",
 	})
+	collectionsPerBlock = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "collections_per_block",
+		Namespace: "consensus",
+		Help:      "the number of collections per block",
+	})
+	collectionsPerFinalizedBlockCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "collections_per_finalized_block",
+		Namespace: "consensus",
+		Help:      "The number of collections included in the finalized block",
+	})
 	hotstuffBusyDuration = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "hotstuff_busy_duration",
 		Namespace: "consensus",
