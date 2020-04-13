@@ -47,14 +47,16 @@ func ChainIDForCluster(cluster flow.IdentityList) string {
 
 func Clusters(nClusters uint, identities flow.IdentityList) *flow.ClusterList {
 
+	filtered := identities.Filter(filter.HasRole(flow.RoleCollection))
+
 	// order the identities by node ID
-	sort.Slice(identities.Filter(filter.HasRole(flow.RoleCollection)), func(i, j int) bool {
+	sort.Slice(filtered, func(i, j int) bool {
 		return order.ByNodeIDAsc(identities[i], identities[j])
 	})
 
 	// create the desired number of clusters and assign nodes
 	clusters := flow.NewClusterList(nClusters)
-	for i, identity := range identities {
+	for i, identity := range filtered {
 		index := uint(i) % nClusters
 		clusters.Add(index, identity)
 	}
