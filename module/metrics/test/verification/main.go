@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// main runs a local tracer server on the machine and starts monitoring some metrics for sake of demo
+// main runs a local tracer server on the machine and starts monitoring some metrics for sake of verification
 func main() {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	port := 3030
