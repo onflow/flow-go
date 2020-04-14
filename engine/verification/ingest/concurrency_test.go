@@ -61,12 +61,12 @@ func TestConcurrency(t *testing.T) {
 		{
 			erCount:     1,
 			senderCount: 10,
-			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
+			chunksNum:   10,
 		},
 		{
 			erCount:     3,
 			senderCount: 1,
-			chunksNum:   5, // choosing a higher number makes the test longer and longer timeout needed
+			chunksNum:   5,
 		},
 		{
 			erCount:     3,
