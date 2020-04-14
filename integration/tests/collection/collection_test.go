@@ -46,9 +46,9 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	colNodeConfigs := testnet.NewNodeConfigSet(3, flow.RoleCollection)
 	colNodeConfig1 := colNodeConfigs[0]
 	nodes := append(colNodeConfigs, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig(nodes)
+	conf := testnet.NewNetworkConfig("col_txingress_invalidtx", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, "col_txingress_invalidtx", conf)
+	net, err := testnet.PrepareFlowNetwork(t, conf)
 	require.Nil(t, err)
 
 	ctx := context.Background()
@@ -121,9 +121,9 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	colNodeConfigs := testnet.NewNodeConfigSet(3, flow.RoleCollection)
 	colNodeConfig1 := colNodeConfigs[0]
 	nodes := append(colNodeConfigs, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig(nodes)
+	conf := testnet.NewNetworkConfig("col_txingress_singlecluster", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, "col_txingress_singlecluster", conf)
+	net, err := testnet.PrepareFlowNetwork(t, conf)
 	require.Nil(t, err)
 
 	ctx := context.Background()
@@ -186,9 +186,9 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 	colNodes := testnet.NewNodeConfigSet(6, flow.RoleCollection)
 
 	nodes := append(colNodes, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig(nodes, testnet.WithClusters(nClusters))
+	conf := testnet.NewNetworkConfig("col_txingres_multicluster_correct_cluster", nodes, testnet.WithClusters(nClusters))
 
-	net, err := testnet.PrepareFlowNetwork(t, "col_txingres_multicluster_correct_cluster", conf)
+	net, err := testnet.PrepareFlowNetwork(t, conf)
 	require.Nil(t, err)
 
 	ctx := context.Background()
@@ -292,9 +292,9 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 	colNodes := testnet.NewNodeConfigSet(6, flow.RoleCollection)
 
 	nodes := append(colNodes, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig(nodes, testnet.WithClusters(nClusters))
+	conf := testnet.NewNetworkConfig("col_txingress_multicluster_othercluster", nodes, testnet.WithClusters(nClusters))
 
-	net, err := testnet.PrepareFlowNetwork(t, "col_txingress_multicluster_othercluster", conf)
+	net, err := testnet.PrepareFlowNetwork(t, conf)
 	require.Nil(t, err)
 
 	ctx := context.Background()

@@ -29,14 +29,14 @@ func TestMVP_Network(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleVerification),
 	}
-	conf := testnet.NewNetworkConfig(net)
+	conf := testnet.NewNetworkConfig("mvp", net)
 
 	// Enable verbose logging
 	testingdock.Verbose = true
 
 	ctx := context.Background()
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(t, "mvp", conf)
+	flowNetwork, err := testnet.PrepareFlowNetwork(t, conf)
 	require.NoError(t, err)
 
 	flowNetwork.Start(ctx)

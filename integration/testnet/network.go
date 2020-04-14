@@ -77,6 +77,10 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
+
+	// makes it easier to see logs for a specific test case
+	fmt.Println(">>>> starting network: ", net.config.Name)
+
 	net.suite.Start(ctx)
 }
 
@@ -100,6 +104,8 @@ func (net *FlowNetwork) Remove() error {
 // Stop disconnects and stops all containers in the network, then
 // removes the network.
 func (net *FlowNetwork) Stop() error {
+
+	fmt.Println("<<<< stopping network: ", net.config.Name)
 
 	err := net.suite.Close()
 	if err != nil {
@@ -138,10 +144,11 @@ func (net *FlowNetwork) ContainerByID(id flow.Identifier) (*Container, bool) {
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
 	Nodes     []NodeConfig
+	Name      string
 	NClusters uint
 }
 
-func NewNetworkConfig(nodes []NodeConfig, opts ...func(*NetworkConfig)) NetworkConfig {
+func NewNetworkConfig(name string, nodes []NodeConfig, opts ...func(*NetworkConfig)) NetworkConfig {
 	c := NetworkConfig{
 		Nodes:     nodes,
 		NClusters: 1, // default to 1 cluster
@@ -242,10 +249,9 @@ func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 	}
 }
 
-func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*FlowNetwork, error) {
+func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, error) {
 
-	// makes it easier to see logs for a specific test case
-	t.Log(">>>> preparing network: " + name)
+	name := networkConf.Name
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
