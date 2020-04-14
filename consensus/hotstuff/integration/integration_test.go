@@ -19,18 +19,18 @@ func TestSingleInstance(t *testing.T) {
 	// NOTE: currently, the HotStuff logic will infinitely call back on itself
 	// with a single instance, leading to a boundlessly growing call stack,
 	// which slows down the mocks significantly due to splitting the callstack
-	// to find the calling function name; we thus limit it to 128 for now
-	finalView := uint64(128)
+	// to find the calling function name; we thus keep it low for now
+	finalView := uint64(80)
 	in := NewInstance(t,
-		WithStopCondition(ViewReached(finalView)),
+		WithStopCondition(ViewFinalized(finalView)),
 	)
 
-	// start and check we have reached stop condition
-	err := in.loop.Start()
-	require.True(t, errors.Is(err, errStopCondition))
+	// run the event handler until we reach a stop condition
+	err := in.Run()
+	require.True(t, errors.Is(err, errStopCondition), "should run until stop condition")
 
 	// check if forks and pacemaker are in expected view state
-	assert.Equal(t, finalView-3, in.forks.FinalizedView(), "finalized view should be three lower than current view")
+	assert.Equal(t, finalView, in.forks.FinalizedView(), "finalized view should be three lower than current view")
 }
 
 func TestThreeInstances(t *testing.T) {
@@ -41,7 +41,7 @@ func TestThreeInstances(t *testing.T) {
 	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
 	// number low here
 	num := 3
-	finalView := uint64(128)
+	finalView := uint64(1000)
 
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
@@ -57,7 +57,7 @@ func TestThreeInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(ViewReached(finalView)),
+			WithStopCondition(ViewFinalized(finalView)),
 		)
 		instances = append(instances, in)
 	}
@@ -65,13 +65,13 @@ func TestThreeInstances(t *testing.T) {
 	// connect the communicators of the instances together
 	Connect(instances)
 
-	// start all three instances and wait for them to wrap up
+	// start the instances and wait for them to finish
 	var wg sync.WaitGroup
 	for _, in := range instances {
 		wg.Add(1)
 		go func(in *Instance) {
-			err := in.loop.Start()
-			require.True(t, errors.Is(err, errStopCondition))
+			err := in.Run()
+			require.True(t, errors.Is(err, errStopCondition), "should run until stop condition")
 			wg.Done()
 		}(in)
 	}
@@ -94,7 +94,7 @@ func TestSevenInstances(t *testing.T) {
 	// number low here
 	numPass := 5
 	numFail := 2
-	finalView := uint64(128)
+	finalView := uint64(500)
 
 	// generate the seven hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
@@ -110,7 +110,7 @@ func TestSevenInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(ViewReached(finalView)),
+			WithStopCondition(ViewFinalized(finalView)),
 		)
 		instances = append(instances, in)
 	}
@@ -122,7 +122,7 @@ func TestSevenInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(ViewReached(finalView)),
+			WithStopCondition(ViewFinalized(finalView)),
 			WithOutgoingVotes(BlockAllVotes),
 		)
 		instances = append(instances, in)
@@ -131,13 +131,13 @@ func TestSevenInstances(t *testing.T) {
 	// connect the communicators of the instances together
 	Connect(instances)
 
-	// start all seven instances and wait for them to wrap up
+	// start the instances and wait for them to finish
 	var wg sync.WaitGroup
 	for _, in := range instances {
 		wg.Add(1)
 		go func(in *Instance) {
-			err := in.loop.Start()
-			require.True(t, errors.Is(err, errStopCondition))
+			err := in.Run()
+			require.True(t, errors.Is(err, errStopCondition), "should run until stop condition")
 			wg.Done()
 		}(in)
 	}

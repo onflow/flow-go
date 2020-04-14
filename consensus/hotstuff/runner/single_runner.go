@@ -69,6 +69,11 @@ func (s *SingleRunner) Abort() <-chan struct{} {
 	return s.shutdownCompleted
 }
 
+// Completed() will wait for the SingleRunner to stop running. It will not initialize a shutdown.
+func (s *SingleRunner) Completed() <-chan struct{} {
+	return s.shutdownCompleted
+}
+
 // unsafeCommenceShutdown executes the shutdown logic once but is not concurrency safe
 func (s *SingleRunner) unsafeCommenceShutdown() {
 	if !s.shutdownCommenced {
