@@ -318,12 +318,12 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 	}
 
 	if node.IngestedChunkIDs == nil {
-		node.IngestedChunkIDs, err = stdmap.NewIngestedChunkIDs(1000)
+		node.IngestedChunkIDs, err = stdmap.NewIdentifiers(1000)
 		require.Nil(t, err)
 	}
 
 	if node.IngestedResultIDs == nil {
-		node.IngestedResultIDs, err = stdmap.NewIngestedResultIDs(1000)
+		node.IngestedResultIDs, err = stdmap.NewIdentifiers(1000)
 		require.Nil(t, err)
 	}
 

@@ -54,8 +54,8 @@ type TestSuite struct {
 	collectionTrackers   *mempool.CollectionTrackers
 	chunkDataPacks       *mempool.ChunkDataPacks
 	chunkDataPackTracker *mempool.ChunkDataPackTrackers
-	ingestedChunkIDs     *mempool.IngestedChunkIDs
-	ingestedResultIDs    *mempool.IngestedResultIDs
+	ingestedChunkIDs     *mempool.Identifiers
+	ingestedResultIDs    *mempool.Identifiers
 	blockStorage         *storage.Blocks
 	// resources fixtures
 	collection    *flow.Collection
@@ -92,8 +92,8 @@ func (suite *TestSuite) SetupTest() {
 	suite.collectionTrackers = &mempool.CollectionTrackers{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
 	suite.chunkDataPackTracker = &mempool.ChunkDataPackTrackers{}
-	suite.ingestedResultIDs = &mempool.IngestedResultIDs{}
-	suite.ingestedChunkIDs = &mempool.IngestedChunkIDs{}
+	suite.ingestedResultIDs = &mempool.Identifiers{}
+	suite.ingestedChunkIDs = &mempool.Identifiers{}
 	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := test.CompleteExecutionResultFixture(suite.T(), 1)
@@ -485,7 +485,7 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			for _, chunk := range suite.receipt.ExecutionResult.Chunks {
 				suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
-				suite.ingestedChunkIDs.On("Add", chunk).Return(nil)
+				suite.ingestedChunkIDs.On("Add", chunk.ID()).Return(nil)
 			}
 
 			// we have all dependencies

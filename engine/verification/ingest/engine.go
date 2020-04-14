@@ -44,8 +44,8 @@ type Engine struct {
 	collectionTrackers   mempool.CollectionTrackers    // keeps track of collection requests that this engine made
 	chunkDataPacks       mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
 	chunkDataPackTackers mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
-	ingestedResultIDs    mempool.IngestedResultIDs     // keeps ids of ingested execution results
-	ingestedChunkIDs     mempool.IngestedChunkIDs      // keeps ids of ingested chunks
+	ingestedResultIDs    mempool.Identifiers           // keeps ids of ingested execution results
+	ingestedChunkIDs     mempool.Identifiers           // keeps ids of ingested chunks
 	blockStorage         storage.Blocks
 	checkChunksLock      sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
 	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
@@ -65,8 +65,8 @@ func New(
 	collectionTrackers mempool.CollectionTrackers,
 	chunkDataPacks mempool.ChunkDataPacks,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
-	ingestedChunkIDs mempool.IngestedChunkIDs,
-	ingestedResultIDs mempool.IngestedResultIDs,
+	ingestedChunkIDs mempool.Identifiers,
+	ingestedResultIDs mempool.Identifiers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
 ) (*Engine, error) {
@@ -580,7 +580,7 @@ func (e *Engine) checkPendingChunks() {
 			}
 
 			// marks this chunk as ingested
-			err = e.ingestedChunkIDs.Add(chunk)
+			err = e.ingestedChunkIDs.Add(chunk.ID())
 			if err != nil {
 				e.log.Error().
 					Err(err).
@@ -615,7 +615,7 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 	if len(mychunks) == 0 {
 		// no un-ingested chunk remains with this receipt
 		// marks execution result as ingested
-		err := e.ingestedResultIDs.Add(&vc.Receipt.ExecutionResult)
+		err := e.ingestedResultIDs.Add(vc.Receipt.ExecutionResult.ID())
 		if err != nil {
 			e.log.Error().
 				Err(err).

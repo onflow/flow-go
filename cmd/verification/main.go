@@ -46,8 +46,8 @@ func main() {
 		collectionTrackers   *stdmap.CollectionTrackers
 		chunkDataPacks       *stdmap.ChunkDataPacks
 		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
-		ingestedChunkIDs     *stdmap.IngestedChunkIDs
-		ingestedResultIDs    *stdmap.IngestedResultIDs
+		ingestedChunkIDs     *stdmap.Identifiers
+		ingestedResultIDs    *stdmap.Identifiers
 		verifierEng          *verifier.Engine
 		ingestEng            *ingest.Engine
 	)
@@ -97,11 +97,11 @@ func main() {
 			return err
 		}).
 		Module("ingested chunk ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			ingestedChunkIDs, err = stdmap.NewIngestedChunkIDs(chunkLimit)
+			ingestedChunkIDs, err = stdmap.NewIdentifiers(chunkLimit)
 			return err
 		}).
 		Module("ingested result ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			ingestedResultIDs, err = stdmap.NewIngestedResultIDs(receiptLimit)
+			ingestedResultIDs, err = stdmap.NewIdentifiers(receiptLimit)
 			return err
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
