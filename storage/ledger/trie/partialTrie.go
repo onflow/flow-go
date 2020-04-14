@@ -85,6 +85,12 @@ func NewPSMT(
 		proof := proofholder.proofs[i]
 		inclusion := proofholder.inclusions[i]
 
+		// check key size
+		if len(key) != (height-1)/8 {
+			return nil, fmt.Errorf("key [%x] size (%d) doesn't match the trie height (%d)", key, len(key), height)
+
+		}
+
 		// we keep track of our progress through proofs by proofIndex
 		proofIndex := 0
 
@@ -106,7 +112,7 @@ func NewPSMT(
 				if currentNode.lChild == nil { // check left child
 					currentNode.lChild = newNode(v, currentNode.height-1)
 				} else if !bytes.Equal(currentNode.lChild.ComputeValue(), v) {
-					return nil, fmt.Errorf("incompatible proof (left node value doesn't match)")
+					return nil, fmt.Errorf("incompatible proof (left node value doesn't match) expected [%x], got [%x]", currentNode.lChild.ComputeValue(), v)
 				}
 				if currentNode.rChild == nil { // create the right child if not exist
 					currentNode.rChild = newNode(nil, currentNode.height-1)
@@ -116,7 +122,7 @@ func NewPSMT(
 				if currentNode.rChild == nil { // check right child
 					currentNode.rChild = newNode(v, currentNode.height-1)
 				} else if !bytes.Equal(currentNode.rChild.ComputeValue(), v) {
-					return nil, fmt.Errorf("incompatible proof (right node value doesn't match)")
+					return nil, fmt.Errorf("incompatible proof (right node value doesn't match) expected [%x], got [%x]", currentNode.rChild.ComputeValue(), v)
 				}
 				if currentNode.lChild == nil { // create the left child if not exist
 					currentNode.lChild = newNode(nil, currentNode.height-1)
@@ -147,7 +153,7 @@ func NewPSMT(
 						currentNode.lChild = newNode(v, currentNode.height-1)
 					}
 					if !bytes.Equal(currentNode.lChild.ComputeValue(), v) {
-						return nil, fmt.Errorf("incompatible proof (left node value doesn't match)")
+						return nil, fmt.Errorf("incompatible proof (left node value doesn't match) expected [%x], got [%x]", currentNode.lChild.ComputeValue(), v)
 					}
 					currentNode = currentNode.rChild
 				} else { // left branching
@@ -158,7 +164,7 @@ func NewPSMT(
 						currentNode.rChild = newNode(v, currentNode.height-1)
 					}
 					if !bytes.Equal(currentNode.rChild.ComputeValue(), v) {
-						return nil, fmt.Errorf("incompatible proof (left node value doesn't match)")
+						return nil, fmt.Errorf("incompatible proof (left node value doesn't match) expected [%x], got [%x]", currentNode.rChild.ComputeValue(), v)
 					}
 					currentNode = currentNode.lChild
 				}
@@ -171,7 +177,7 @@ func NewPSMT(
 	}
 	// check if the state commitment matches the root value of the partial trie
 	if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
-		return nil, fmt.Errorf("rootNode hash doesn't match the proofs")
+		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.ComputeValue(), rootValue)
 	}
 	return &psmt, nil
 }

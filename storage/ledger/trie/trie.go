@@ -355,6 +355,7 @@ func NewSMT(
 	// check for possible key length collisions
 	// we determine number of children of a node by length of data
 	// so those particular values can cause confusion
+
 	if height == childHashLen {
 		return nil, fmt.Errorf("height of SMT must not be %d", childHashLen)
 	}
@@ -462,6 +463,13 @@ func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool,
 // If the trusted flag is true, it is just a read from the database
 // If trusted is false, then we check to see if the key exists in the trie
 func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHolder, error) {
+
+	// check key sizes
+	for _, k := range keys {
+		if len(k) != (s.height-1)/8 {
+			return nil, nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
+		}
+	}
 
 	flags := make([][]byte, len(keys))
 	proofs := make([][][]byte, len(keys))
@@ -882,6 +890,13 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	t, err := s.forest.Get(root)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tree: %w", err)
+	}
+
+	// check key sizes
+	for _, k := range keys {
+		if len(k) != (s.height-1)/8 {
+			return nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
+		}
 	}
 
 	batcher := t.database.NewBatcher()
