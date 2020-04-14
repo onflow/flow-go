@@ -1,4 +1,4 @@
-package rpc
+package engine
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/engine"
-	protobuf "github.com/dapperlabs/flow-go/integration/ghost/protobuf"
+	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -20,8 +20,8 @@ type Config struct {
 	ListenAddr string
 }
 
-// Engine implements a gRPC server for the Ghost Node
-type Engine struct {
+// RPC implements a gRPC server for the Ghost Node
+type RPC struct {
 	unit    *engine.Unit
 	log     zerolog.Logger
 	handler *Handler     // the gRPC service implementation
@@ -30,20 +30,23 @@ type Engine struct {
 	me      module.Local
 	codec   network.Codec
 
-	// the channel between the engine (producer) and the handler (consumer). The engine receives libp2p messages and
-	// writes it to the channel as bytes. The Handler reads from the channel and returns it as GRPC stream to the client
-	messages chan []byte
+	// the channel between the engine (producer) and the handler (consumer). The rpc engine receives libp2p messages,
+	// converts it to a flow messages and writes it to the channel.
+	// The Handler reads from the channel and returns it as GRPC stream to the client
+	messages chan ghost.FlowMessage
 }
 
 // New returns a new RPC engine.
-func New(net module.Network, log zerolog.Logger, me module.Local, config Config) (*Engine, error) {
+func New(net module.Network, log zerolog.Logger, me module.Local, config Config) (*RPC, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
-	messages := make(chan []byte, 100)
+	// create a channel to buffer messages in case the consumer is slow
+	messages := make(chan ghost.FlowMessage, 100)
+
 	codec := jsoncodec.NewCodec()
 
-	eng := &Engine{
+	eng := &RPC{
 		log:      log,
 		unit:     engine.NewUnit(),
 		me:       me,
@@ -55,13 +58,13 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 
 	conduitMap, err := registerConduits(net, eng)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Engine: %w", err)
+		return nil, fmt.Errorf("failed to initialize RPC: %w", err)
 	}
 
 	handler := NewHandler(log, conduitMap, messages, codec)
 	eng.handler = handler
 
-	protobuf.RegisterGhostNodeAPIServer(eng.server, eng.handler)
+	ghost.RegisterGhostNodeAPIServer(eng.server, eng.handler)
 
 	return eng, nil
 }
@@ -92,26 +95,26 @@ func registerConduits(net module.Network, eng network.Engine) (map[int]network.C
 // Ready returns a ready channel that is closed once the engine has fully
 // started. The RPC engine is ready when the gRPC server has successfully
 // started.
-func (e *Engine) Ready() <-chan struct{} {
+func (e *RPC) Ready() <-chan struct{} {
 	e.unit.Launch(e.serve)
 	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // It sends a signal to stop the gRPC server, then closes the channel.
-func (e *Engine) Done() <-chan struct{} {
+func (e *RPC) Done() <-chan struct{} {
 	return e.unit.Done(e.server.GracefulStop)
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
+func (e *RPC) SubmitLocal(event interface{}) {
 	e.Submit(e.me.NodeID(), event)
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *RPC) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -121,19 +124,19 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
+func (e *RPC) ProcessLocal(event interface{}) error {
 	return e.Process(e.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *RPC) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
 }
 
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+func (e *RPC) process(originID flow.Identifier, event interface{}) error {
 
 	// json encode the message into bytes
 	encodedMsg, err := e.codec.Encode(event)
@@ -141,9 +144,15 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return fmt.Errorf("failed to encode message: %v", err)
 	}
 
+	// create a protobuf message
+	flowMessage := ghost.FlowMessage{
+		SenderID: originID[:],
+		Message:  encodedMsg,
+	}
+
 	// write it to the channel
 	select {
-	case e.messages <- encodedMsg:
+	case e.messages <- flowMessage:
 	default:
 		return fmt.Errorf("dropping message since queue is full: %v", err)
 	}
@@ -153,7 +162,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // serve starts the gRPC server .
 //
 // When this function returns, the server is considered ready.
-func (e *Engine) serve() {
+func (e *RPC) serve() {
 	e.log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
 
 	l, err := net.Listen("tcp", e.config.ListenAddr)

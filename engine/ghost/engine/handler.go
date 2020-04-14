@@ -1,4 +1,4 @@
-package rpc
+package engine
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	protobuf "github.com/dapperlabs/flow-go/integration/ghost/protobuf"
+	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 )
@@ -17,13 +17,13 @@ import (
 type Handler struct {
 	log        zerolog.Logger
 	conduitMap map[int]network.Conduit
-	msgChan    chan []byte
+	msgChan    chan ghost.FlowMessage
 	codec      network.Codec
 }
 
-var _ protobuf.GhostNodeAPIServer = Handler{}
+var _ ghost.GhostNodeAPIServer = Handler{}
 
-func NewHandler(log zerolog.Logger, conduitMap map[int]network.Conduit, msgChan chan []byte, codec network.Codec) *Handler {
+func NewHandler(log zerolog.Logger, conduitMap map[int]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
 	return &Handler{
 		log:        log,
 		conduitMap: conduitMap,
@@ -32,7 +32,7 @@ func NewHandler(log zerolog.Logger, conduitMap map[int]network.Conduit, msgChan 
 	}
 }
 
-func (h Handler) SendEvent(_ context.Context, req *protobuf.SendEventRequest) (*empty.Empty, error) {
+func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*empty.Empty, error) {
 
 	channelID := req.GetChannelId()
 
@@ -63,26 +63,19 @@ func (h Handler) SendEvent(_ context.Context, req *protobuf.SendEventRequest) (*
 }
 
 // Subscribe streams ALL the libp2p network messages over GRPC
-func (h Handler) Subscribe(_ *protobuf.SubscribeRequest, stream protobuf.GhostNodeAPI_SubscribeServer) error {
+func (h Handler) Subscribe(_ *ghost.SubscribeRequest, stream ghost.GhostNodeAPI_SubscribeServer) error {
 	for {
 
 		// read the network message from the channel
-		msg, ok := <-h.msgChan
+		flowMessage, ok := <-h.msgChan
 		if !ok {
 			return nil
 		}
 
-		// create a protobuf message
-		flowMessage := &protobuf.FlowMessage{
-			Message: msg,
-		}
-
 		// send it to the client
-		err := stream.Send(flowMessage)
+		err := stream.Send(&flowMessage)
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to stream message: %v", err)
 		}
-
-		// TODO: Add timeout (and reset it after every message processed)
 	}
 }

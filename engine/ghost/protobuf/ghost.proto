@@ -25,5 +25,6 @@ message SendEventRequest {
 }
 
 message FlowMessage {
-    bytes message = 1;
+    bytes senderID = 1;
+    bytes message = 2;
 }
