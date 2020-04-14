@@ -273,7 +273,9 @@ func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.Ve
 		return err
 	}
 	// closes verification performance metrics trackers
-	e.mc.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)
+	if ch.ChunkDataPack != nil {
+		e.mc.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)
+	}
 
 	return nil
 }
