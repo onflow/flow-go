@@ -10,6 +10,7 @@ type Mempool struct {
 	BlockByCollection *stdmap.BlockByCollections
 	ExecutionQueue    *stdmap.Queues
 	OrphanQueue       *stdmap.Queues
+	SyncQueues        *stdmap.Queues
 }
 
 func (m *Mempool) Run(f func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueue *stdmap.QueuesBackdata, orphanQueue *stdmap.QueuesBackdata) error) error {
@@ -27,6 +28,7 @@ func newMempool() *Mempool {
 		BlockByCollection: stdmap.NewBlockByCollections(),
 		ExecutionQueue:    stdmap.NewQueues(),
 		OrphanQueue:       stdmap.NewQueues(),
+		SyncQueues:        stdmap.NewQueues(),
 	}
 
 	return m

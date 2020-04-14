@@ -13,8 +13,9 @@ import (
 	engineCommon "github.com/dapperlabs/flow-go/engine"
 	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
 	provider "github.com/dapperlabs/flow-go/engine/execution/provider/mock"
-	realState "github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
+	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -59,6 +60,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
 	collectionConduit := network.NewMockConduit(ctrl)
+	syncConduit := network.NewMockConduit(ctrl)
 
 	me := module.NewMockLocal(ctrl)
 	me.EXPECT().NodeID().Return(myself).AnyTimes()
@@ -71,7 +73,6 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	providerEngine := new(provider.ProviderEngine)
 	protocolState := new(protocol.State)
 	executionState := new(state.ExecutionState)
-	mutator := new(protocol.Mutator)
 	snapshot := new(protocol.Snapshot)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
@@ -81,8 +82,6 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 		return identityList.Filter(selector)
 	}, nil)
 
-	protocolState.On("Mutate").Return(mutator).Maybe()
-	mutator.On("Finalize", mock.Anything).Return(nil)
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
@@ -91,8 +90,9 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState)
+	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21)
 	require.NoError(t, err)
 
 	f(testingContext{
@@ -179,17 +179,19 @@ func TestValidatingCollectionResponse(t *testing.T) {
 }
 
 func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *entity.ExecutableBlock, previousExecutionResultID flow.Identifier) {
-	computationResult := unittest.ComputationResultForBlockFixture(executableBlock)
+	computationResult := executionUnittest.ComputationResultForBlockFixture(executableBlock)
 	newStateCommitment := unittest.StateCommitmentFixture()
-	if len(computationResult.StateViews) == 0 { //if block was empty, no new state commitment is produced
+	if len(computationResult.StateSnapshots) == 0 { //if block was empty, no new state commitment is produced
 		newStateCommitment = executableBlock.StartState
 	}
-	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(realState.View))
+	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
 
 	ctx.computationManager.On("ComputeBlock", executableBlock, mock.Anything).Return(computationResult, nil).Once()
 
-	for _, view := range computationResult.StateViews {
-		ctx.executionState.On("CommitDelta", view.Delta()).Return(newStateCommitment, nil)
+	ctx.executionState.On("PersistStateInteractions", executableBlock.Block.ID(), mock.Anything).Return(nil)
+
+	for _, view := range computationResult.StateSnapshots {
+		ctx.executionState.On("CommitDelta", view.Delta).Return(newStateCommitment, nil)
 		ctx.executionState.On("PersistChunkDataPack", mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
 			return bytes.Equal(f.StartState, executableBlock.StartState)
 		})).Return(nil)
@@ -198,6 +200,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 	ctx.executionState.On("GetExecutionResultID", executableBlock.Block.ParentID).Return(func(blockID flow.Identifier) flow.Identifier {
 		return previousExecutionResultID
 	}, nil)
+
+	ctx.executionState.On("UpdateHighestExecutedBlockIfHigher", &executableBlock.Block.Header).Return(nil)
 
 	ctx.executionState.On("PersistExecutionResult", executableBlock.Block.ID(), mock.MatchedBy(func(er flow.ExecutionResult) bool {
 		return er.BlockID == executableBlock.Block.ID() && er.PreviousResultID == previousExecutionResultID
@@ -250,7 +254,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	execState.On("GetExecutionResultID", executableBlock.Block.ParentID).Return(previousExecutionResultID, nil)
 	execState.On("PersistExecutionResult", executableBlock.Block.ID(), mock.Anything).Return(nil)
 
-	er, err := e.generateExecutionResultForBlock(executableBlock, nil, endState)
+	er, err := e.generateExecutionResultForBlock(executableBlock.Block, nil, endState)
 	assert.NoError(t, err)
 
 	assert.Equal(t, previousExecutionResultID, er.PreviousResultID)
@@ -263,9 +267,9 @@ func TestBlockOutOfOrder(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
 		executableBlockA := unittest.ExecutableBlockFixture(0)
-		executableBlockB := unittest.ExecutableBlockFixtureWithParent(0, executableBlockA.Block.ID())
-		executableBlockC := unittest.ExecutableBlockFixtureWithParent(0, executableBlockA.Block.ID())
-		executableBlockD := unittest.ExecutableBlockFixtureWithParent(0, executableBlockC.Block.ID())
+		executableBlockB := unittest.ExecutableBlockFixtureWithParent(0, &executableBlockA.Block.Header)
+		executableBlockC := unittest.ExecutableBlockFixtureWithParent(0, &executableBlockA.Block.Header)
+		executableBlockD := unittest.ExecutableBlockFixtureWithParent(0, &executableBlockC.Block.Header)
 		executableBlockA.StartState = unittest.StateCommitmentFixture()
 
 		// blocks has no collections, so state is essentially the same
@@ -342,7 +346,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		// Add all data needed for execution of script
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ID()).Return(executableBlock.StartState, nil)
 		ctx.state.On("AtBlockID", executableBlock.Block.ID()).Return(snapshot)
-		view := new(realState.View)
+		view := new(delta.View)
 		ctx.executionState.On("NewView", executableBlock.StartState).Return(view)
 
 		// Successful call to computation manager

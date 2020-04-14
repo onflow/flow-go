@@ -121,19 +121,16 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 
 	// private key of the current node
 	x := &PrKeyBLS_BLS12381{
-		alg:    s.fvss[0].blsContext, // signer algo
-		scalar: *jointx,              // the private share
+		scalar: *jointx, // the private share
 	}
 	// Group public key
 	Y := &PubKeyBLS_BLS12381{
-		alg:   s.fvss[0].blsContext,
 		point: *jointPublicKey,
 	}
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range jointy {
 		y[i] = &PubKeyBLS_BLS12381{
-			alg:   s.fvss[0].blsContext,
 			point: p,
 		}
 	}
