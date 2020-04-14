@@ -36,7 +36,8 @@ type VerifierEngineTestSuite struct {
 	me      *MockLocal
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
-	conduit *network.Conduit // mocks conduit for submitting result approvals
+	conduit *network.Conduit    // mocks conduit for submitting result approvals
+	metrics *mockmodule.Metrics // mocks performance monitoring metrics
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -49,12 +50,21 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.net = &mockmodule.Network{}
 	suite.ss = &protocol.Snapshot{}
 	suite.conduit = &network.Conduit{}
+	suite.metrics = &mockmodule.Metrics{}
 
 	suite.net.On("Register", uint8(engine.ApprovalProvider), testifymock.Anything).
 		Return(suite.conduit, nil).
 		Once()
 
 	suite.state.On("Final").Return(suite.ss)
+
+	// mocks metrics
+	suite.metrics.On("OnChunkVerificationStarted", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {})
+	suite.metrics.On("OnChunkVerificationFinished", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {})
+	suite.metrics.On("OnResultApproval").
+		Run(func(args testifymock.Arguments) {})
 
 	// Mocks the signature oracle of the engine
 	//
@@ -72,7 +82,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 }
 
 func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
-	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me, ChunkVerifierMock{})
+	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me, ChunkVerifierMock{}, suite.metrics)
 	require.Nil(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
