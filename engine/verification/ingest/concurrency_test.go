@@ -36,42 +36,41 @@ func TestConcurrency(t *testing.T) {
 		{
 			erCount:     1,
 			senderCount: 1,
-			chunksNum:   1,
+			chunksNum:   2,
 		}, {
 			erCount:     1,
 			senderCount: 10,
-			chunksNum:   1,
+			chunksNum:   2,
 		},
 		{
 			erCount:     10,
 			senderCount: 1,
-			chunksNum:   1,
+			chunksNum:   2,
 		},
 		{
 			erCount:     5,
 			senderCount: 10,
-			chunksNum:   1,
+			chunksNum:   2,
 		},
-		// multiple chunks receipts
 		{
 			erCount:     1,
 			senderCount: 1,
-			chunksNum:   5, // choosing a higher number makes the test longer and longer timeout needed
+			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
 		},
 		{
 			erCount:     1,
 			senderCount: 10,
-			chunksNum:   10,
+			chunksNum:   20,
 		},
 		{
 			erCount:     3,
 			senderCount: 1,
-			chunksNum:   5,
+			chunksNum:   10,
 		},
 		{
 			erCount:     3,
 			senderCount: 5,
-			chunksNum:   2, // choosing a higher number makes the test longer and longer timeout needed
+			chunksNum:   4,
 		},
 	}
 
@@ -262,9 +261,10 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 
 }
 
-// setupMockVerifierEng sets up a mock verifier engine that asserts that a set
-// of chunks are delivered to it exactly once each.
-// Returns the mock engine and a wait group that unblocks when all ERs are received.
+// setupMockVerifierEng sets up a mock verifier engine that asserts the followings:
+// - that a set of chunks are delivered to it.
+// - that each chunk is delivered exactly once
+// setupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
 func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk) (*network.Engine, *sync.WaitGroup) {
 	eng := new(network.Engine)
 
@@ -276,20 +276,31 @@ func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk)
 		// check one verifiable chunk at a time to ensure dupe checking works
 		mu sync.Mutex
 	)
-	wg.Add(len(vChunks))
+
+	// computes expected number of assigned chunks
+	expected := 0
+	for _, c := range vChunks {
+		if isAssigned(c.ChunkIndex) {
+			expected++
+		}
+	}
+	wg.Add(expected)
 
 	eng.On("ProcessLocal", testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			mu.Lock()
 			defer mu.Unlock()
 
+			// the received entity should be a verifiable chunk
 			vc, ok := args[0].(*verification.VerifiableChunk)
 			assert.True(t, ok)
 
+			// retrieves the content of received chunk
 			chunk, ok := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex)
 			require.True(t, ok, "chunk out of range requested")
 			vID := chunk.ID()
-			// ensure there are no dupe chunks
+
+			// verifies that it has not seen this chunk before
 			_, alreadySeen := receivedChunks[vID]
 			if alreadySeen {
 				t.Logf("received duplicated chunk (id=%s)", vID)
@@ -326,15 +337,23 @@ func NewMockAssigner(id flow.Identifier) *MockAssigner {
 	return &MockAssigner{me: id}
 }
 
-// Assign assigns all input chunks to the verifer node
+// Assign assigns all input chunks to the verifier node
 func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chmodel.Assignment, error) {
 	if len(chunks) == 0 {
 		return nil, fmt.Errorf("assigner called with empty chunk list")
 	}
 	a := chmodel.NewAssignment()
 	for _, c := range chunks {
-		a.Add(c, flow.IdentifierList{m.me})
+		if isAssigned(c.Index) {
+			a.Add(c, flow.IdentifierList{m.me})
+		}
 	}
 
 	return a, nil
+}
+
+// isAssigned is a helper function that returns true for the even chunk indices
+func isAssigned(chunkIndex uint64) bool {
+	answer := chunkIndex%2 == 0
+	return answer
 }
