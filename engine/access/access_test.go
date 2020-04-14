@@ -11,10 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
-
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
