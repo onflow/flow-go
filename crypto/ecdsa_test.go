@@ -14,12 +14,12 @@ import (
 // ECDSA tests
 func TestECDSA(t *testing.T) {
 	ECDSAcurves := []SigningAlgorithm{
-		ECDSA_P256,
-		ECDSA_SECp256k1,
+		EcdsaP256,
+		EcdsaSecp256k1,
 	}
 	ECDSAseedLen := []int{
-		KeyGenSeedMinLenECDSA_P256,
-		KeyGenSeedMinLenECDSA_SECp256k1,
+		KeyGenSeedMinLenEcdsaP256,
+		KeyGenSeedMinLenEcdsaSecp256k1,
 	}
 	for i, curve := range ECDSAcurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
@@ -40,27 +40,27 @@ func TestECDSA(t *testing.T) {
 }
 
 // Signing bench
-func BenchmarkECDSA_P256Sign(b *testing.B) {
+func BenchmarkEcdsaP256Sign(b *testing.B) {
 	halg := hash.NewSHA3_256()
-	benchSign(b, ECDSA_P256, halg)
+	benchSign(b, EcdsaP256, halg)
 }
 
 // Verifying bench
-func BenchmarkECDSA_P256Verify(b *testing.B) {
+func BenchmarkEcdsaP256Verify(b *testing.B) {
 	halg := hash.NewSHA3_256()
-	benchVerify(b, ECDSA_P256, halg)
+	benchVerify(b, EcdsaP256, halg)
 }
 
 // Signing bench
-func BenchmarkECDSA_SECp256k1Sign(b *testing.B) {
+func BenchmarkEcdsaSecp256k1Sign(b *testing.B) {
 	halg := hash.NewSHA3_256()
-	benchSign(b, ECDSA_SECp256k1, halg)
+	benchSign(b, EcdsaSecp256k1, halg)
 }
 
 // Verifying bench
-func BenchmarkECDSA_SECp256k1Verify(b *testing.B) {
+func BenchmarkEcdsaSecp256k1Verify(b *testing.B) {
 	halg := hash.NewSHA3_256()
-	benchVerify(b, ECDSA_SECp256k1, halg)
+	benchVerify(b, EcdsaSecp256k1, halg)
 }
 
 // ECDSA tests
@@ -68,12 +68,12 @@ func BenchmarkECDSA_SECp256k1Verify(b *testing.B) {
 // TestBLSEncodeDecode tests encoding and decoding of ECDSA keys
 func TestECDSAEncodeDecode(t *testing.T) {
 	ECDSAcurves := []SigningAlgorithm{
-		ECDSA_P256,
-		ECDSA_SECp256k1,
+		EcdsaP256,
+		EcdsaSecp256k1,
 	}
 	ECDSAseedLen := []int{
-		KeyGenSeedMinLenECDSA_P256,
-		KeyGenSeedMinLenECDSA_SECp256k1,
+		KeyGenSeedMinLenEcdsaP256,
+		KeyGenSeedMinLenEcdsaSecp256k1,
 	}
 
 	for i, curve := range ECDSAcurves {
@@ -110,12 +110,12 @@ func TestECDSAEncodeDecode(t *testing.T) {
 // TestECDSAEquals tests equal for ECDSA keys
 func TestECDSAEquals(t *testing.T) {
 	ECDSAcurves := []SigningAlgorithm{
-		ECDSA_P256,
-		ECDSA_SECp256k1,
+		EcdsaP256,
+		EcdsaSecp256k1,
 	}
 	ECDSAseedLen := []int{
-		KeyGenSeedMinLenECDSA_P256,
-		KeyGenSeedMinLenECDSA_SECp256k1,
+		KeyGenSeedMinLenEcdsaP256,
+		KeyGenSeedMinLenEcdsaSecp256k1,
 	}
 
 	for i, curve := range ECDSAcurves {

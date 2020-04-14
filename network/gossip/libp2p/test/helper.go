@@ -141,7 +141,7 @@ func (s *SnapshotMock) Seal() (flow.Seal, error) {
 
 // GenerateNetworkingKey generates a Flow ECDSA key using the given seed
 func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_SECp256k1)
+	seed := make([]byte, crypto.KeyGenSeedMinLenEcdsaSecp256k1)
 	copy(seed, s[:])
-	return crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, seed)
+	return crypto.GeneratePrivateKey(crypto.EcdsaSecp256k1, seed)
 }

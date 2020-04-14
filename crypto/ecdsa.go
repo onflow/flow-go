@@ -12,16 +12,45 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
-// ECDSAalgo embeds SignAlgo
-type ECDSAalgo struct {
+// ecdsaAlgo embeds SignAlgo
+type ecdsaAlgo struct {
 	// elliptic curve
 	curve elliptic.Curve
 	// embeds commonSigner
 	*commonSigner
+}
+
+//  Once variables to use a unique instance
+var p256Instance *ecdsaAlgo
+var p256Once sync.Once
+
+func newEcdsaP256() *ecdsaAlgo {
+	p256Once.Do(func() {
+		p256Instance = &(ecdsaAlgo{
+			curve:        elliptic.P256(),
+			commonSigner: &commonSigner{EcdsaP256},
+		})
+	})
+	return p256Instance
+}
+
+//  Once variables to use a unique instance
+var secp256k1Instance *ecdsaAlgo
+var secp256k1Once sync.Once
+
+func newEcdsaSecp256k1() *ecdsaAlgo {
+	secp256k1Once.Do(func() {
+		secp256k1Instance = &(ecdsaAlgo{
+			curve:        secp256k1(),
+			commonSigner: &commonSigner{EcdsaSecp256k1},
+		})
+	})
+	return secp256k1Instance
 }
 
 func bitsToBytes(bits int) int {
@@ -97,7 +126,7 @@ func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *goecdsa.PrivateKey {
 
 // GeneratePrKey generates a private key for ECDSA
 // This is only a test function!
-func (a *ECDSAalgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
+func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
 	// extra 128 bits to reduce the modular reduction bias
 	minSeedLen := Nlen + (securityBits / 8)
@@ -108,7 +137,7 @@ func (a *ECDSAalgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	return &PrKeyECDSA{a, sk}, nil
 }
 
-func (a *ECDSAalgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
+func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
 	if len(der) != Nlen {
 		return nil, errors.New("raw private key is not valid")
@@ -124,9 +153,9 @@ func (a *ECDSAalgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	return &PrKeyECDSA{a, &priv}, nil
 }
 
-func (a *ECDSAalgo) decodePrivateKey(der []byte) (PrivateKey, error) {
+func (a *ecdsaAlgo) decodePrivateKey(der []byte) (PrivateKey, error) {
 	// NIST curves case
-	if a.algo == ECDSA_P256 {
+	if a.algo == EcdsaP256 {
 		sk, err := x509.ParseECPrivateKey(der)
 		if err != nil {
 			return nil, fmt.Errorf("decode private key failed: %w", err)
@@ -134,13 +163,13 @@ func (a *ECDSAalgo) decodePrivateKey(der []byte) (PrivateKey, error) {
 		return &PrKeyECDSA{a, sk}, nil
 	}
 	// non-NIST curves
-	if a.algo == ECDSA_SECp256k1 {
+	if a.algo == EcdsaSecp256k1 {
 		return a.rawDecodePrivateKey(der)
 	}
 	return nil, errors.New("curve is not supported")
 }
 
-func (a *ECDSAalgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
+func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	Plen := bitsToBytes((a.curve.Params().P).BitLen())
 	if len(der) != 2*Plen {
 		return nil, errors.New("raw public key is not valid")
@@ -157,9 +186,9 @@ func (a *ECDSAalgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	return &PubKeyECDSA{a, &pk}, nil
 }
 
-func (a *ECDSAalgo) decodePublicKey(der []byte) (PublicKey, error) {
+func (a *ecdsaAlgo) decodePublicKey(der []byte) (PublicKey, error) {
 	// NIST curves case
-	if a.algo == ECDSA_P256 {
+	if a.algo == EcdsaP256 {
 		i, err := x509.ParsePKIXPublicKey(der)
 		if err != nil {
 			return nil, fmt.Errorf("decode public key failed: %w", err)
@@ -171,7 +200,7 @@ func (a *ECDSAalgo) decodePublicKey(der []byte) (PublicKey, error) {
 		}, nil
 	}
 	// non-NIST curves
-	if a.algo == ECDSA_SECp256k1 {
+	if a.algo == EcdsaSecp256k1 {
 		return a.rawDecodePublicKey(der)
 	}
 	return nil, errors.New("curve is not supported")
@@ -180,7 +209,7 @@ func (a *ECDSAalgo) decodePublicKey(der []byte) (PublicKey, error) {
 // PrKeyECDSA is the private key of ECDSA, it implements PrivateKey
 type PrKeyECDSA struct {
 	// the signature algo
-	alg *ECDSAalgo
+	alg *ecdsaAlgo
 	// private key (including the public key)
 	goPrKey *goecdsa.PrivateKey
 }
@@ -218,11 +247,11 @@ func (sk *PrKeyECDSA) rawEncode() ([]byte, error) {
 // while a simple raw encoding is used in the case of SEC2 curves
 func (sk *PrKeyECDSA) Encode() ([]byte, error) {
 	// NIST curves case
-	if sk.Algorithm() == ECDSA_P256 {
+	if sk.Algorithm() == EcdsaP256 {
 		return x509.MarshalECPrivateKey(sk.goPrKey)
 	}
 	// non-NIST curves
-	if sk.Algorithm() == ECDSA_SECp256k1 {
+	if sk.Algorithm() == EcdsaSecp256k1 {
 		return sk.rawEncode()
 	}
 	return nil, errors.New("curve is not supported")
@@ -244,7 +273,7 @@ func (sk *PrKeyECDSA) Equals(other PrivateKey) bool {
 // PubKeyECDSA is the public key of ECDSA, it implements PublicKey
 type PubKeyECDSA struct {
 	// the signature algo
-	alg *ECDSAalgo
+	alg *ecdsaAlgo
 	// public key data
 	goPubKey *goecdsa.PublicKey
 }
@@ -276,11 +305,11 @@ func (pk *PubKeyECDSA) rawEncode() ([]byte, error) {
 // while a simple raw encoding is used in the case of SEC2 curves
 func (pk *PubKeyECDSA) Encode() ([]byte, error) {
 	// NIST curves case
-	if pk.Algorithm() == ECDSA_P256 {
+	if pk.Algorithm() == EcdsaP256 {
 		return x509.MarshalPKIXPublicKey(pk.goPubKey)
 	}
 	// non-NIST curves
-	if pk.Algorithm() == ECDSA_SECp256k1 {
+	if pk.Algorithm() == EcdsaSecp256k1 {
 		return pk.rawEncode()
 	}
 	return nil, errors.New("curve is not supported")

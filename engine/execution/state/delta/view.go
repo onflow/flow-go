@@ -1,6 +1,8 @@
-package state
+package delta
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 // GetRegisterFunc is a function that returns the value for a register.
 type GetRegisterFunc func(key flow.RegisterID) (flow.RegisterValue, error)
@@ -19,6 +21,12 @@ type View struct {
 	readFunc    GetRegisterFunc
 }
 
+// Snapshot is set of interactions with the register
+type Snapshot struct {
+	Delta Delta
+	Reads []flow.RegisterID
+}
+
 // NewView instantiates a new ledger view with the provided read function.
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
@@ -27,6 +35,42 @@ func NewView(readFunc GetRegisterFunc) *View {
 		spockSecret: make([]byte, 0),
 		readFunc:    readFunc,
 	}
+}
+
+// Snapshot returns copy of current state of interactions with a View
+func (r *View) Interactions() *Snapshot {
+
+	var delta = make(Delta, len(r.delta))
+	var reads = make([]flow.RegisterID, 0, len(r.regTouchSet))
+
+	//copy data
+	for s, value := range r.delta {
+		delta[s] = value
+	}
+	for key := range r.regTouchSet {
+		reads = append(reads, []byte(key))
+	}
+
+	return &Snapshot{
+		Delta: delta,
+		Reads: reads,
+	}
+}
+
+// AllRegisters returns all the register IDs ether in read or delta
+func (r *Snapshot) AllRegisters() []flow.RegisterID {
+	set := make(map[string]bool, len(r.Reads)+len(r.Delta))
+	for _, reg := range r.Reads {
+		set[string(reg)] = true
+	}
+	for _, reg := range r.Delta.RegisterIDs() {
+		set[string(reg)] = true
+	}
+	ret := make([]flow.RegisterID, 0, len(set))
+	for r := range set {
+		ret = append(ret, flow.RegisterID(r))
+	}
+	return ret
 }
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
@@ -86,7 +130,7 @@ func (v *View) Delta() Delta {
 // TODO rename this, this is not actually a merge as we can't merge
 // readFunc s.
 func (v *View) MergeView(child *View) {
-	for k := range child.RegisterTouches() {
+	for k := range child.Interactions().RegisterTouches() {
 		v.regTouchSet[string(k)] = true
 	}
 	// SpockSecret is order aware
@@ -95,11 +139,9 @@ func (v *View) MergeView(child *View) {
 }
 
 // RegisterTouches returns the register IDs touched by this view (either read or write)
-func (v *View) RegisterTouches() []flow.RegisterID {
-	ret := make([]flow.RegisterID, 0, len(v.regTouchSet))
-	for r := range v.regTouchSet {
-		ret = append(ret, flow.RegisterID(r))
-	}
+func (r *Snapshot) RegisterTouches() []flow.RegisterID {
+	ret := make([]flow.RegisterID, 0, len(r.Reads))
+	ret = append(ret, r.Reads...)
 	return ret
 }
 

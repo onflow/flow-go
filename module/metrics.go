@@ -62,4 +62,34 @@ type Metrics interface {
 
 	// NewestKnownQC reports Metrics C9: View of Newest Known QC
 	NewestKnownQC(view uint64)
+
+	// Verification Metrics
+
+	// OnChunkVerificationStarted is called whenever the verification of a chunk is started
+	// it starts the timer to record the execution time
+	OnChunkVerificationStarted(chunkID flow.Identifier)
+
+	// OnChunkVerificationFinished is called whenever chunkID verification gets finished
+	// it records the duration of execution and increases number of checked chunks
+	OnChunkVerificationFinished(chunkID flow.Identifier)
+
+	// OnResultApproval is called whenever a result approval for is emitted
+	// it increases the result approval counter for this chunk
+	OnResultApproval()
+
+	// OnStorageAdded is called whenever something is added to the persistent (on disk) storage
+	// of verification node. It records the size of stored object.
+	OnStorageAdded(size float64)
+
+	// OnStorageRemoved is called whenever something is removed from the persistent (on disk) storage
+	// of verification node. It records the size of stored object.
+	OnStorageRemoved(size float64)
+
+	// OnChunkDataAdded is called whenever something is added to related to chunkID to the in-memory mempools
+	// of verification node. It records the size of stored object.
+	OnChunkDataAdded(chunkID flow.Identifier, size float64)
+
+	// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
+	// of verification node. It records the size of stored object.
+	OnChunkDataRemoved(chunkID flow.Identifier, size float64)
 }
