@@ -3,9 +3,11 @@ package common
 import (
 	"bytes"
 	"context"
+	"fmt"
 
 	encoding "github.com/dapperlabs/cadence/encoding/xdr"
 
+	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -83,4 +85,20 @@ func createCounter(ctx context.Context, client *testnet.Client) error {
 
 	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
 	return client.SendTransaction(ctx, tx)
+}
+
+func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, error) {
+
+	if !ghostContainer.Config.Ghost {
+		return nil, fmt.Errorf("container is a not a ghost node container")
+	}
+
+	ghostPort, ok := ghostContainer.Ports[testnet.GhostNodeAPIPort]
+	if !ok {
+		return nil, fmt.Errorf("ghost node API port not found")
+	}
+
+	addr := fmt.Sprintf(":%s", ghostPort)
+
+	return client.NewGhostClient(addr)
 }
