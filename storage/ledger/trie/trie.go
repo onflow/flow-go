@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/dapperlabs/flow-go/utils/io"
 )
 
 var nilChild []byte = make([]byte, 32)
@@ -222,6 +223,10 @@ func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
 
 	db, err := leveldb.NewLevelDB(treePath)
 	return db, err
+}
+
+func (f *forest) Size() (int64, error) {
+	return io.DirSize(f.dbDir)
 }
 
 // SMT is a Basic Sparse Merkle Tree struct
@@ -1146,6 +1151,10 @@ func (s *SMT) SafeClose() {
 
 func (s *SMT) IsSnapshot(t *tree) bool {
 	return t.height%s.snapshotInterval == 0
+}
+
+func (s *SMT) Size() (int64, error) {
+	return s.forest.Size()
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.

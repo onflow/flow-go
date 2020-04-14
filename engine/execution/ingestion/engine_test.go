@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -85,6 +86,8 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
+	metrics, err := metrics.NewCollector(log)
+	require.NoError(t, err)
 
 	var engine *Engine
 
@@ -92,7 +95,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21)
+	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21, metrics)
 	require.NoError(t, err)
 
 	f(testingContext{

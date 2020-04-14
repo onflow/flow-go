@@ -1,10 +1,18 @@
 ## How to test the code that collections metrics data?
 
-1. Launch a metrics server in local, which exposes the metrics data via the `/metrics` endpoint.
+1. Launch a local metrics server, which exposes the metrics data via the `/metrics` endpoint.
+
+You can choose one of the following:
 ```
-go run module/metrics/test/local.go
+go run module/metrics/test/collection/main.go
 ```
-The above command launches a metrics server in local with port 9090
+```
+go run module/metrics/test/execution/main.go
+```
+```
+go run module/metrics/test/verification/main.go
+```
+The above commands each launch a metrics server on localhost with port 9090
 
 2. Install the prometheus server
 ```

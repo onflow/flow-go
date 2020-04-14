@@ -10,11 +10,11 @@ type Metrics interface {
 	// Collection Metrics
 
 	// StartCollectionToGuarantee starts a span to trace the duration of a collection
-	// from being created to being submitted as a colleciton guarantee
+	// from being created to being submitted as a collection guarantee
 	StartCollectionToGuarantee(collection flow.LightCollection)
 
 	// FinishCollectionToGuarantee finishes a span to trace the duration of a collection
-	// from being created to being submitted as a colleciton guarantee
+	// from being created to being submitted as a collection guarantee
 	FinishCollectionToGuarantee(collectionID flow.Identifier)
 
 	// StartTransactionToCollectionGuarantee starts a span to trace the duration of a transaction
@@ -92,4 +92,26 @@ type Metrics interface {
 	// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
 	// of verification node. It records the size of stored object.
 	OnChunkDataRemoved(chunkID flow.Identifier, size float64)
+
+	// Execution Metrics
+
+	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
+	// from being received for execution to execution being finished
+	StartBlockReceivedToExecuted(blockID flow.Identifier)
+
+	// FinishBlockReceivedToExecuted finishes a span to trace the duration of a block
+	// from being received for execution to execution being finished
+	FinishBlockReceivedToExecuted(blockID flow.Identifier)
+
+	// ExecutionCPUCyclesPerBlock reports number of cpu cylces used per block
+	ExecutionCPUCyclesPerBlock(cycles uint64)
+
+	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
+	ExecutionStateReadsPerBlock(reads uint64)
+
+	// ExecutionStorageDiskTotal reports the total storage size on disk in GiB
+	ExecutionStorageDiskTotal(gib int64)
+
+	// ExecutionStorageStateCommitment reports the storage size of a state commitment in GiB
+	ExecutionStorageStateCommitment(gib int64)
 }

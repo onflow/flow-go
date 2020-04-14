@@ -123,6 +123,7 @@ func main() {
 				providerEngine,
 				executionState,
 				6, //TODO - config param maybe?
+				node.Metrics,
 			)
 			return ingestionEng, err
 		}).

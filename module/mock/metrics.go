@@ -22,9 +22,34 @@ func (_m *Metrics) CollectionsPerBlock(count int) {
 	_m.Called(count)
 }
 
+// ExecutionCPUCyclesPerBlock provides a mock function with given fields: cycles
+func (_m *Metrics) ExecutionCPUCyclesPerBlock(cycles uint64) {
+	_m.Called(cycles)
+}
+
+// ExecutionStateReadsPerBlock provides a mock function with given fields: reads
+func (_m *Metrics) ExecutionStateReadsPerBlock(reads uint64) {
+	_m.Called(reads)
+}
+
+// ExecutionStorageDiskTotal provides a mock function with given fields: gib
+func (_m *Metrics) ExecutionStorageDiskTotal(gib int64) {
+	_m.Called(gib)
+}
+
+// ExecutionStorageStateCommitment provides a mock function with given fields: gib
+func (_m *Metrics) ExecutionStorageStateCommitment(gib int64) {
+	_m.Called(gib)
+}
+
 // FinalizedBlocks provides a mock function with given fields: count
 func (_m *Metrics) FinalizedBlocks(count int) {
 	_m.Called(count)
+}
+
+// FinishBlockReceivedToExecuted provides a mock function with given fields: blockID
+func (_m *Metrics) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
+	_m.Called(blockID)
 }
 
 // FinishBlockToSeal provides a mock function with given fields: blockID
@@ -100,6 +125,11 @@ func (_m *Metrics) OnStorageRemoved(size float64) {
 // SealsInFinalizedBlock provides a mock function with given fields: count
 func (_m *Metrics) SealsInFinalizedBlock(count int) {
 	_m.Called(count)
+}
+
+// StartBlockReceivedToExecuted provides a mock function with given fields: blockID
+func (_m *Metrics) StartBlockReceivedToExecuted(blockID flow.Identifier) {
+	_m.Called(blockID)
 }
 
 // StartBlockToSeal provides a mock function with given fields: blockID

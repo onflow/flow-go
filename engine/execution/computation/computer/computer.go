@@ -50,6 +50,9 @@ func (e *blockComputer) executeBlock(
 
 	collections := block.Collections()
 
+	var gasUsed uint64
+	var stateReads uint64
+
 	interactions := make([]*delta.Snapshot, len(collections))
 
 	events := make([]flow.Event, 0)
@@ -60,10 +63,13 @@ func (e *blockComputer) executeBlock(
 
 		collectionView := stateView.NewChild()
 
-		collEvents, nextIndex, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
+		collEvents, nextIndex, gas, state, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
+
+		gasUsed += gas
+		stateReads += state
 
 		txIndex = nextIndex
 		events = append(events, collEvents...)
@@ -77,6 +83,8 @@ func (e *blockComputer) executeBlock(
 		ExecutableBlock: block,
 		StateSnapshots:  interactions,
 		Events:          events,
+		GasUsed:         gasUsed,
+		StateReads:      stateReads,
 	}, nil
 }
 
@@ -85,21 +93,25 @@ func (e *blockComputer) executeCollection(
 	blockCtx virtualmachine.BlockContext,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
-) ([]flow.Event, uint32, error) {
+) ([]flow.Event, uint32, uint64, uint64, error) {
 	var events []flow.Event
+	var gasUsed uint64
+	var stateReads uint64
 	for _, tx := range collection.Transactions {
 		txView := collectionView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
 			txIndex++
-			return nil, txIndex, fmt.Errorf("failed to execute transaction: %w", err)
+			return nil, txIndex, 0, 0, fmt.Errorf("failed to execute transaction: %w", err)
 		}
 		txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
 		txIndex++
+		gasUsed += result.GasUsed
+		stateReads += result.StateReads
 
 		if err != nil {
-			return nil, txIndex, fmt.Errorf("failed to create flow events: %w", err)
+			return nil, txIndex, 0, 0, fmt.Errorf("failed to create flow events: %w", err)
 		}
 		events = append(events, txEvents...)
 		if result.Succeeded() {
@@ -107,5 +119,5 @@ func (e *blockComputer) executeCollection(
 		}
 	}
 
-	return events, txIndex, nil
+	return events, txIndex, gasUsed, stateReads, nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
+	"github.com/dapperlabs/flow-go/utils/io"
 )
 
 var _ databases.DAL = &LevelDB{}
@@ -215,6 +216,11 @@ func (s *LevelDB) PruneDB(next databases.DAL) error {
 	}
 
 	return nil
+}
+
+// Size returns the size of the current LevelDB on disk
+func (s *LevelDB) Size() (int64, error) {
+	return io.DirSize(s.path)
 }
 
 // TODO Replace copyKVDB and copyTDB with a single function
