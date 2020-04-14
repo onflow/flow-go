@@ -244,6 +244,9 @@ func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 
 func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*FlowNetwork, error) {
 
+	// makes it easier to see logs for a specific test case
+	t.Log(">>>> preparing network: " + name)
+
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 
