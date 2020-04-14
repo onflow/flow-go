@@ -15,7 +15,6 @@ import (
 )
 
 // Handler handles the GRPC calls from a client
-// Handler handles the GRPC calls from a client
 type Handler struct {
 	log        zerolog.Logger
 	conduitMap map[int]network.Conduit

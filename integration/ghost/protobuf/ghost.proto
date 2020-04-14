@@ -5,7 +5,7 @@ import "google/protobuf/empty.proto";
 package ghost;
 
 
-// GhostNodeAPI is the API expose by the Ghost node
+// GhostNodeAPI is the API exposed by the Ghost node
 service GhostNodeAPI {
 
     // SendEvent submits and event to the internal Flow Libp2p network

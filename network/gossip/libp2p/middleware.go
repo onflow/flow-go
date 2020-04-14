@@ -67,7 +67,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 
 	if len(validators) == 0 {
 		// add default validators to filter out unwanted messages received by this node
-		validators = defaultValidators()
+		validators = defaultValidators(log, flowID)
 	}
 
 	// create the node entity and inject dependencies & config
