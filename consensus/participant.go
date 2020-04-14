@@ -22,19 +22,17 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, state protocol.State,
-	me module.Local, builder module.Builder, updater module.Finalizer, signer hotstuff.Signer,
+func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, headers storage.Headers,
+	state protocol.State, me module.Local, builder module.Builder, updater module.Finalizer, signer hotstuff.Signer,
 	communicator hotstuff.Communicator, selector flow.IdentityFilter, rootHeader *flow.Header,
 	rootQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
 
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
 	cfg := ParticipantConfig{
-		ViewStart:                  1,
-		ViewPruned:                 0,
-		ViewVoted:                  0,
 		TimeoutInitial:             time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
 		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
 		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
@@ -77,6 +75,18 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		return nil, fmt.Errorf("could not initialize fork choice: %w", err)
 	}
 
+	// initialize the forks manager
+	forks := forks.New(finalizer, forkchoice)
+
+	// initialize the validator
+	validator := validator.New(viewState, forks, signer)
+
+	// recover the hotstuff state
+	lastProcessed, err := Recover(log, forks, validator, headers, state)
+	if err != nil {
+		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
+	}
+
 	// initialize the timeout config
 	timeoutConfig, err := timeout.NewConfig(
 		cfg.TimeoutInitial,
@@ -91,7 +101,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-	pacemaker, err := pacemaker.New(cfg.ViewStart, controller, notifier)
+	pacemaker, err := pacemaker.New(lastProcessed+1, controller, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
@@ -102,18 +112,11 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		return nil, fmt.Errorf("could not initialize block producer: %w", err)
 	}
 
-	// initialize the forks manager
-	forks := forks.New(finalizer, forkchoice)
-
 	// initialize the voter
-	// TODO: load last voted view
-	voter := voter.New(signer, forks, cfg.ViewVoted)
-
-	// initialize the validator
-	validator := validator.New(viewState, forks, signer)
+	voter := voter.New(signer, forks, lastProcessed+1)
 
 	// initialize the vote aggregator
-	aggregator := voteaggregator.New(notifier, cfg.ViewPruned, viewState, validator, signer)
+	aggregator := voteaggregator.New(notifier, lastProcessed, viewState, validator, signer)
 
 	// initialize the event handler
 	handler, err := eventhandler.New(log, pacemaker, producer, forks, communicator, viewState, aggregator, voter, validator, notifier)
