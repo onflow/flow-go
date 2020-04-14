@@ -260,9 +260,6 @@ func (e *EventHandler) startNewView() error {
 			// 1) the network layer double checks the proposal, and the check failed.
 			// 2) the network layer had some exception encoding the proposal
 			/// ...
-			log.Warn().
-				Err(err).
-				Msg("could not broadcast proposal")
 
 			return fmt.Errorf("can not broadcast the new proposal (%x) for view (%v): %w", block.BlockID, block.View, err)
 		}

@@ -2,6 +2,7 @@ package integration
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -46,7 +47,7 @@ func TestThreeInstances(t *testing.T) {
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(10*time.Second, 10*time.Second, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(1*time.Second, 1*time.Second, 0.5, 1.5, 1*time.Second)
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
@@ -81,8 +82,13 @@ func TestThreeInstances(t *testing.T) {
 	in1 := instances[0]
 	in2 := instances[1]
 	in3 := instances[2]
+	// verify progress has been made
+	assert.Equal(t, finalView-4, in1.forks.FinalizedBlock().View, "the first instance 's finalized view should be four lower than current view")
+	// verify same progresses have been made
 	assert.Equal(t, in1.forks.FinalizedBlock(), in2.forks.FinalizedBlock(), "second instance should have same finalized block as first instance")
 	assert.Equal(t, in1.forks.FinalizedBlock(), in3.forks.FinalizedBlock(), "third instance should have same finalized block as first instance")
+	assert.Equal(t, FinalizedViews(in1), FinalizedViews(in2))
+	assert.Equal(t, FinalizedViews(in1), FinalizedViews(in3))
 }
 
 func TestSevenInstances(t *testing.T) {
@@ -100,7 +106,7 @@ func TestSevenInstances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(10*time.Second, 10*time.Second, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(1*time.Second, 1*time.Second, 0.5, 1.5, 1*time.Second)
 	require.NoError(t, err)
 
 	// set up five instances that work fully
@@ -115,7 +121,80 @@ func TestSevenInstances(t *testing.T) {
 		instances = append(instances, in)
 	}
 
-	// set up two instances which can't vote
+	// set up two instances which can't vote, nor propose
+	for n := numPass; n < numPass+numFail; n++ {
+		in := NewInstance(t,
+			WithRoot(root),
+			WithParticipants(participants),
+			WithLocalID(participants[n].NodeID),
+			WithTimeouts(timeouts),
+			WithStopCondition(ViewReached(finalView)),
+			WithOutgoingVotes(BlockAllVotes),
+			WithOutgoingProposals(BlockAllProposals),
+			WithIncomingProposals(BlockAllProposals),
+		)
+		instances = append(instances, in)
+	}
+
+	// connect the communicators of the instances together
+	Connect(instances)
+
+	// start all seven instances and wait for them to wrap up
+	var wg sync.WaitGroup
+	for _, in := range instances {
+		wg.Add(1)
+		go func(in *Instance) {
+			err := in.loop.Start()
+			require.True(t, errors.Is(err, errStopCondition))
+			wg.Done()
+		}(in)
+	}
+	wg.Wait()
+
+	// check that all instances have the same finalized block
+	ref := instances[0]
+	assert.Less(t, finalView-uint64(2*numPass+numFail), ref.forks.FinalizedBlock().View, "expect instance 0 should made enough progress, but didn't")
+	for i := 1; i < numPass; i++ {
+		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")
+	}
+
+	for i := 1; i < numPass; i++ {
+		in := instances[i]
+		fmt.Printf("instance %v 's finalized views are: %v\n", i, FinalizedViews(in))
+	}
+}
+
+func TestFourInstances(t *testing.T) {
+
+	// test parameters
+	// NOTE: block finalization seems to be rather slow on CI at the moment,
+	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
+	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
+	// number low here
+	numPass := 3
+	numFail := 1
+	finalView := uint64(30)
+
+	// generate the seven hotstuff participants
+	participants := unittest.IdentityListFixture(numPass + numFail)
+	instances := make([]*Instance, 0, numPass+numFail)
+	root := DefaultRoot()
+	timeouts, err := timeout.NewConfig(1*time.Second, 1*time.Second, 0.5, 1.5, 1*time.Second)
+	require.NoError(t, err)
+
+	// set up three instances that work fully
+	for n := 0; n < numPass; n++ {
+		in := NewInstance(t,
+			WithRoot(root),
+			WithParticipants(participants),
+			WithLocalID(participants[n].NodeID),
+			WithTimeouts(timeouts),
+			WithStopCondition(ViewReached(finalView)),
+		)
+		instances = append(instances, in)
+	}
+
+	// set up one instance which can't vote, nor propose
 	for n := numPass; n < numPass+numFail; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
@@ -124,6 +203,8 @@ func TestSevenInstances(t *testing.T) {
 			WithTimeouts(timeouts),
 			WithStopCondition(ViewFinalized(finalView)),
 			WithOutgoingVotes(BlockAllVotes),
+			WithOutgoingProposals(BlockAllProposals),
+			WithIncomingProposals(BlockAllProposals),
 		)
 		instances = append(instances, in)
 	}
@@ -145,7 +226,13 @@ func TestSevenInstances(t *testing.T) {
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
-	for i := 1; i < len(instances); i++ {
+	finalizedViews := FinalizedViews(ref)
+	// assert.Less(t, finalView-uint64(2*numPass+numFail), ref.forks.FinalizedBlock().View, "expect instance 0 should made enough progress, but didn't")
+	fmt.Printf("fianl view: %v\n", ref.forks.FinalizedBlock().View)
+	for i := 1; i < numPass; i++ {
+		fmt.Printf("fianl view: %v\n", instances[i].forks.FinalizedBlock().View)
 		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")
+		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance")
+		fmt.Printf("instance %d 's finalized view: %v\n", i, FinalizedViews(instances[i]))
 	}
 }
