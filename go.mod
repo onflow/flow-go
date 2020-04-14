@@ -3,7 +3,6 @@ module github.com/dapperlabs/flow-go
 go 1.13
 
 require (
-	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
@@ -11,9 +10,6 @@ require (
 	github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
-	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
-	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896
 	github.com/gogo/protobuf v1.3.1
@@ -29,7 +25,6 @@ require (
 	github.com/libp2p/go-libp2p-swarm v0.2.2
 	github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 	github.com/libp2p/go-tcp-transport v0.1.1
-	github.com/m4ksio/testingdock v0.4.1
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/opentracing/opentracing-go v1.1.0
@@ -48,7 +43,6 @@ require (
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
 	google.golang.org/grpc v1.28.0
-	gotest.tools v2.2.0+incompatible
 	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )
 

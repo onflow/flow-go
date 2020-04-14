@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
@@ -19,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
-	obs "github.com/dapperlabs/flow-go/engine/access/mock"
+	accessmock "github.com/dapperlabs/flow-go/engine/access/mock"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -38,8 +39,8 @@ type Suite struct {
 	snapshot           *protocol.Snapshot
 	log                zerolog.Logger
 	net                *mockmodule.Network
-	collClient         *obs.AccessAPIClient
-	execClient         *obs.ExecutionAPIClient
+	collClient         *accessmock.AccessAPIClient
+	execClient         *accessmock.ExecutionAPIClient
 	collectionsConduit *networkmock.Conduit
 	me                 *mockmodule.Local
 }
@@ -55,8 +56,8 @@ func (suite *Suite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.collClient = new(obs.AccessAPIClient)
-	suite.execClient = new(obs.ExecutionAPIClient)
+	suite.collClient = new(accessmock.AccessAPIClient)
+	suite.execClient = new(accessmock.ExecutionAPIClient)
 	suite.net = new(mockmodule.Network)
 	suite.collectionsConduit = &networkmock.Conduit{}
 	suite.me = new(mockmodule.Local)

@@ -37,7 +37,6 @@ func defaultOtherNodes() []testnet.NodeConfig {
 // and ensures that they are rejected by the collection node and not included in
 // any collection.
 func TestTransactionIngress_InvalidTransaction(t *testing.T) {
-	t.Skip()
 
 	var (
 		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
@@ -118,7 +117,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 }
 
 func TestTransactionIngress_ValidTransaction(t *testing.T) {
-	t.Skip()
+
 	var (
 		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
 		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
@@ -159,7 +158,7 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 		// wait for consensus to complete
 		//TODO we should listen for collection guarantees instead, but this is blocked
 		// ref: https://github.com/dapperlabs/flow-go/issues/3021
-		time.Sleep(10 * time.Second)
+		time.Sleep(20 * time.Second)
 
 		// TODO stop then start containers
 		err = net.StopContainers()
@@ -192,9 +191,9 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 				continue
 			}
 
-			for _, txID := range collection.Transactions {
-				assert.Equal(t, tx.ID(), txID, "found unexpected transaction")
-				if txID == tx.ID() {
+			for _, colTx := range collection.Transactions {
+				assert.Equal(t, tx.ID(), colTx.ID(), "found unexpected transaction")
+				if colTx.ID() == tx.ID() {
 					assert.False(t, foundTx, "found duplicate transaction")
 					foundTx = true
 				}

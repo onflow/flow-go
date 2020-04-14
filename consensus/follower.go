@@ -49,7 +49,7 @@ func NewFollower(log zerolog.Logger, state protocol.State, me module.Local, upda
 	validator := validator.New(viewState, finalizer, verifier)
 
 	// initialize the follower logic
-	logic, err := follower.New(log, validator, updater, viewState, finalizer, notifier)
+	logic, err := follower.New(log, validator, finalizer, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower logic: %w", err)
 	}

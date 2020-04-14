@@ -14,9 +14,7 @@ func Genesis() *Block {
 		ParentID:  flow.ZeroID,
 	}
 
-	payload := Payload{
-		Collection: flow.LightCollection{},
-	}
+	payload := EmptyPayload()
 
 	header.PayloadHash = payload.Hash()
 
@@ -44,14 +42,22 @@ func (b *Block) SetPayload(payload Payload) {
 // Payload is the payload for blocks in collection node cluster consensus.
 // It contains only a single collection.
 type Payload struct {
-	Collection flow.LightCollection
+	Collection flow.Collection
+}
+
+func EmptyPayload() Payload {
+	return PayloadFromTransactions()
 }
 
 // PayloadFromTransactions creates a payload given a list of transaction hashes.
-func PayloadFromTransactions(txHashes []flow.Identifier) Payload {
+func PayloadFromTransactions(transactions ...*flow.TransactionBody) Payload {
+	// avoid a nil transaction list
+	if len(transactions) == 0 {
+		transactions = []*flow.TransactionBody{}
+	}
 	return Payload{
-		Collection: flow.LightCollection{
-			Transactions: txHashes,
+		Collection: flow.Collection{
+			Transactions: transactions,
 		},
 	}
 }

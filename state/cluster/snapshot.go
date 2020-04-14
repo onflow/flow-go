@@ -10,7 +10,7 @@ type Snapshot interface {
 
 	// Collection returns the collection generated in this step of the cluster
 	// state history.
-	Collection() (*flow.LightCollection, error)
+	Collection() (*flow.Collection, error)
 
 	// Head returns the latest block at the selected point of the cluster state
 	// history. If the snapshot was selected by block ID, returns the header

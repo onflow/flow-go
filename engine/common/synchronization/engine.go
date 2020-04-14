@@ -397,10 +397,10 @@ func (e *Engine) pollHeight() error {
 	}
 
 	// get all of the consensus nodes from the state
-	identities, err := e.state.Final().Identities(
+	identities, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not send get consensus identities: %w", err)
 	}
@@ -497,10 +497,10 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 
 	// get all of the consensus nodes from the state
 	// NOTE: does this still make sense for the follower?
-	identities, err := e.state.Final().Identities(
+	identities, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not send get consensus identities: %w", err)
 	}

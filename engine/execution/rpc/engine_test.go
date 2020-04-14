@@ -159,8 +159,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	})
 }
 
-// TestGetEventsForBlockID tests the GetEventsForBlockIDs API call
-func (suite *Suite) TestGetAccountForBlockID() {
+// Test GetAccountAtBlockID tests the GetAccountAtBlockID API call
+func (suite *Suite) TestGetAccountAtBlockID() {
 
 	id := unittest.IdentifierFixture()
 	rootAddress := flow.RootAddress
@@ -219,7 +219,7 @@ func (suite *Suite) TestGetAccountForBlockID() {
 	})
 }
 
-// TestGetEventsForBlockIDs tests the GetEventsForBlockIDTransactionID API call
+// TestGetEventsForBlockIDTransactionID tests the GetEventsForBlockIDTransactionID API call
 func (suite *Suite) TestGetEventsForBlockIDTransactionID() {
 
 	totalEvents := 10

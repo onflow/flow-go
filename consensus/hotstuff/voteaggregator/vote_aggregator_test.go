@@ -47,9 +47,12 @@ func (as *AggregatorSuite) SetupTest() {
 
 	// create a mocked snapshot
 	as.snapshot = &protomock.Snapshot{}
-	as.snapshot.On("Identities").Return(as.participants, nil)
-	as.snapshot.On("Identities", mock.Anything).Return(as.participants, nil)
-	as.snapshot.On("Identities", mock.Anything, mock.Anything).Return(as.participants, nil)
+	as.snapshot.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return as.participants.Filter(selector)
+		},
+		nil,
+	)
 	for _, participant := range as.participants {
 		as.snapshot.On("Identity", participant.NodeID).Return(participant, nil)
 	}

@@ -225,10 +225,10 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 
 	// get the list of approvers so we can tally their votes
 	// get all execution node identities from the state
-	approvers, err := e.state.AtBlockID(blockID).Identities(
+	approvers, err := e.state.AtBlockID(blockID).Identities(filter.And(
 		filter.HasStake(true),
 		filter.HasRole(flow.RoleVerification),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get verifier identities: %w", err)
 	}

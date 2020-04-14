@@ -162,10 +162,10 @@ func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 
 	// select all the collection nodes on the network as our targets
-	ids, err := e.state.Final().Identities(
+	ids, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get identities: %w", err)
 	}

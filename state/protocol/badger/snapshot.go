@@ -28,7 +28,7 @@ type Snapshot struct {
 
 // Identities retrieves all active ids at the given snapshot and
 // applies the given filters.
-func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
+func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 
 	// execute the transaction that retrieves everything
 	var identities flow.IdentityList
@@ -54,7 +54,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 		}
 
 		// get finalized stakes within the boundary
-		deltas, err := computeFinalizedDeltas(tx, boundary, filters)
+		deltas, err := computeFinalizedDeltas(tx, boundary, selector)
 		if err != nil {
 			return fmt.Errorf("could not compute finalized stakes: %w", err)
 		}
@@ -83,10 +83,8 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 
 				// manually add the deltas for valid ids
 				for _, identity := range identities {
-					for _, filter := range filters {
-						if !filter(identity) {
-							continue
-						}
+					if !selector(identity) {
+						continue
 					}
 					deltas[identity.NodeID] += int64(identity.Stake)
 				}
@@ -120,7 +118,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 
 		// apply filters again to filter on stuff that wasn't available while
 		// running through the delta index in the key-value store
-		identities = identities.Filter(filters...)
+		identities = identities.Filter(selector)
 
 		sort.Slice(identities, func(i int, j int) bool {
 			return order.ByNodeIDAsc(identities[i], identities[j])
@@ -321,11 +319,11 @@ func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
 	return unfinalizedBlockIDs, nil
 }
 
-func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, filters []flow.IdentityFilter) (map[flow.Identifier]int64, error) {
+func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, selector flow.IdentityFilter) (map[flow.Identifier]int64, error) {
 
 	// define start and end prefixes for the range scan
 	deltas := make(map[flow.Identifier]int64)
-	err := operation.TraverseDeltas(0, boundary, filters, func(nodeID flow.Identifier, delta int64) error {
+	err := operation.TraverseDeltas(0, boundary, selector, func(nodeID flow.Identifier, delta int64) error {
 		deltas[nodeID] += delta
 		return nil
 	})(tx)
