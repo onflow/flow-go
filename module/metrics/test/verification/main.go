@@ -45,15 +45,14 @@ func sendMetrics(log zerolog.Logger) {
 		panic(err)
 	}
 	for i := 0; i < 100; i++ {
-		blockID := unittest.BlockFixture().ID()
 		chunkID := unittest.ChunkFixture().ID()
-		metrics.OnResultApproval(blockID)
+		metrics.OnResultApproval()
 		metrics.OnChunkVerificationStarted(chunkID)
 
 		// adds a synthetic 1 s delay for verification duration
 		time.Sleep(1 * time.Second)
-		metrics.OnChunkVerificationFinished(chunkID, blockID)
-		metrics.OnResultApproval(blockID)
+		metrics.OnChunkVerificationFinished(chunkID)
+		metrics.OnResultApproval()
 
 		// storage tests
 		metrics.OnStorageAdded(100)

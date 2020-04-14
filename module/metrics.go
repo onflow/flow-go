@@ -70,12 +70,12 @@ type Metrics interface {
 	OnChunkVerificationStarted(chunkID flow.Identifier)
 
 	// OnChunkVerificationFinished is called whenever chunkID verification gets finished
-	// it finishes recording the duration of execution and increases number of checked chunks for the blockID
-	OnChunkVerificationFinished(chunkID flow.Identifier, blockID flow.Identifier)
+	// it records the duration of execution and increases number of checked chunks
+	OnChunkVerificationFinished(chunkID flow.Identifier)
 
-	// OnResultApproval is called whenever a result approval for block ID is emitted
+	// OnResultApproval is called whenever a result approval for is emitted
 	// it increases the result approval counter for this chunk
-	OnResultApproval(blockID flow.Identifier)
+	OnResultApproval()
 
 	// OnStorageAdded is called whenever something is added to the persistent (on disk) storage
 	// of verification node. It records the size of stored object.

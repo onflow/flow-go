@@ -14,25 +14,25 @@ const chunkExecutionSpanner = "chunk_execution_duration"
 // contains set of functions interacting with the Prometheus server
 var (
 	chunksCheckedPerBlock = promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "verifications_chunks_checked_per_block",
+		Name:      "verifications_chunks_checked",
 		Namespace: "verification",
-		Help:      "The number of chunks checked per block",
+		Help:      "The total number of chunks checked",
 	})
 	resultApprovalsPerBlock = promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "verifications_result_approvals_per_block",
+		Name:      "verifications_result_approvals",
 		Namespace: "verification",
-		Help:      "The number of emitted result approvals per block (i.e., number of approved chunks)",
+		Help:      "The total number of emitted result approvals",
 	})
 	totalStorage = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "verifications_total_size",
 		Namespace: "verification",
-		Help:      "total storage of the verification node",
+		Help:      "total storage on disk",
 	})
-	storagePerChunk = promauto.NewGauge(prometheus.GaugeOpts{
+	storagePerChunk = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name:      "verifications_storage_per_chunk",
 		Namespace: "verification",
 		Help:      "storage per chunk data",
-	})
+	}, []string{"name"})
 )
 
 // OnChunkVerificationStarted is called whenever the verification of a chunk is started
@@ -43,23 +43,23 @@ func (c *Collector) OnChunkVerificationStarted(chunkID flow.Identifier) {
 }
 
 // OnChunkVerificationFinished is called whenever chunkID verification gets finished
-// it finishes recording the duration of execution and increases number of checked chunks for the blockID
-func (c *Collector) OnChunkVerificationFinished(chunkID flow.Identifier, blockID flow.Identifier) {
+// it finishes recording the duration of execution and increases number of checked chunks
+func (c *Collector) OnChunkVerificationFinished(chunkID flow.Identifier) {
 	c.tracer.FinishSpan(chunkID, chunkExecutionSpanner)
-	// increases the checked chunks counter for blockID
+	// increases the checked chunks counter
 	// checked chunks are the ones with a chunk data pack disseminated from
 	// ingest to verifier engine
-	chunksCheckedPerBlock.WithLabelValues(blockID.String()).Inc()
+	chunksCheckedPerBlock.Inc()
 
 }
 
-// OnResultApproval is called whenever a result approval for block ID is emitted
+// OnResultApproval is called whenever a result approval is emitted
 // it increases the result approval counter for this chunk
-func (c *Collector) OnResultApproval(blockID flow.Identifier) {
+func (c *Collector) OnResultApproval() {
 	// increases the counter of disseminated result approvals
-	// for the blockID by one. Each result approval corresponds to a single chunk of the block
+	// fo by one. Each result approval corresponds to a single chunk of the block
 	// the approvals disseminated by verifier engine
-	resultApprovalsPerBlock.WithLabelValues(blockID.String()).Inc()
+	resultApprovalsPerBlock.Inc()
 
 }
 

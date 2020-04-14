@@ -212,7 +212,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 		Hex("execution receipt", logging.Entity(chunk.Receipt)).
 		Msg("result approval submitted")
 	// tracks number of emitted result approvals for this block
-	e.mc.OnResultApproval(chunk.Block.ID())
+	e.mc.OnResultApproval()
 
 	return nil
 }
@@ -273,10 +273,7 @@ func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.Ve
 		return err
 	}
 	// closes verification performance metrics trackers
-	if ch.ChunkDataPack != nil && ch.Receipt != nil {
-		chunkID := ch.ChunkDataPack.ChunkID
-		blockID := ch.Receipt.ExecutionResult.ExecutionResultBody.BlockID
-		e.mc.OnChunkVerificationFinished(chunkID, blockID)
-	}
+	e.mc.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)
+
 	return nil
 }
