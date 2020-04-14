@@ -522,7 +522,7 @@ func (e *Engine) checkPendingChunks() {
 			continue
 		}
 
-		mychunks, err := e.myChunks(&receipt.ExecutionResult)
+		mychunks, err := e.myUningestedChunks(&receipt.ExecutionResult)
 		// extracts list of chunks assigned to this Verification node
 		if err != nil {
 			e.log.Error().
@@ -602,7 +602,7 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 	e.authCollections.Rem(vc.Collection.ID())
 	e.chunkDataPacks.Rem(vc.ChunkDataPack.ID())
 
-	mychunks, err := e.myChunks(&vc.Receipt.ExecutionResult)
+	mychunks, err := e.myUningestedChunks(&vc.Receipt.ExecutionResult)
 	// extracts list of chunks assigned to this Verification node
 	if err != nil {
 		e.log.Error().
@@ -627,10 +627,10 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 	}
 }
 
-// myChunks returns the list of chunks in the chunk list that this verifier node
+// myUningestedChunks returns the list of chunks in the chunk list that this verifier node
 // is assigned to, and are not ingested yet. A chunk is ingested once a verifiable chunk is
 // formed out of it and is passed to verify engine
-func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
+func (e *Engine) myUningestedChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 
 	// extracts list of verifier nodes id
 	//
