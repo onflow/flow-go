@@ -151,6 +151,7 @@ type NetworkConfig struct {
 func NewNetworkConfig(name string, nodes []NodeConfig, opts ...func(*NetworkConfig)) NetworkConfig {
 	c := NetworkConfig{
 		Nodes:     nodes,
+		Name:      name,
 		NClusters: 1, // default to 1 cluster
 	}
 
@@ -251,8 +252,6 @@ func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, error) {
 
-	name := networkConf.Name
-
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 
@@ -270,11 +269,11 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, 
 	)
 	require.Nil(t, err)
 
-	suite, _ := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{
+	suite, _ := testingdock.GetOrCreateSuite(t, networkConf.Name, testingdock.SuiteOpts{
 		Client: dockerClient,
 	})
 	network := suite.Network(testingdock.NetworkOpts{
-		Name: name,
+		Name: networkConf.Name,
 	})
 
 	// generate staking and networking keys for each configured node
