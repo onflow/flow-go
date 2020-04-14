@@ -25,8 +25,11 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// testConcurrency evaluates behavior of verification node against receiving concurrent receipts from
-// different sources
+// testConcurrency evaluates behavior of verification node against:
+// - ingest engine receives concurrent receipts from different sources
+// - not all chunks of the receipts are assigned to the ingest engine
+// - for each assigned chunk ingest engine emits a single result approval to verify engine only once
+// (even in presence of duplication)
 func TestConcurrency(t *testing.T) {
 	testcases := []struct {
 		erCount, // number of execution receipts
