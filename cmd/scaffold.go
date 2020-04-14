@@ -102,6 +102,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "./bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
@@ -116,7 +117,12 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		codec := jsoncodec.NewCodec()
 
-		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID(), fnb.networkKey)
+		myAddr := fnb.Me.Address()
+		if fnb.BaseConfig.bindAddr != notSet {
+			myAddr = fnb.BaseConfig.bindAddr
+		}
+
+		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(), fnb.networkKey)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
