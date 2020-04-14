@@ -155,8 +155,8 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 	// checks the cache for deduplication
 	if n.rcache.Seen(message.EventID, message.ChannelID) {
 		// drops duplicate message
-		// n.logger.Debug().Bytes("event ID", message.EventID).
-		// 	Msg(" dropping message due to duplication")
+		n.logger.Debug().Bytes("event ID", message.EventID).
+			Msg(" dropping message due to duplication")
 		return nil
 	}
 	n.rcache.Add(message.EventID, message.ChannelID)

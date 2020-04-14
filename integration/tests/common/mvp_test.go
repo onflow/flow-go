@@ -81,10 +81,6 @@ func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 	require.Eventually(t, func() bool {
 		counter, err = readCounter(ctx, accessClient)
 
-		if err != nil {
-			fmt.Println("Error executing script")
-			fmt.Println(err)
-		}
 		return err == nil && counter == -3
 	}, 60*time.Second, time.Second)
 

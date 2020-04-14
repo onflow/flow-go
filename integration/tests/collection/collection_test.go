@@ -53,7 +53,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Cleanup()
+	defer net.Stop()
 
 	// we will test against COL1
 	colContainer1, ok := net.ContainerByID(colNode1.Identifier)

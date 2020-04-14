@@ -130,7 +130,7 @@ func main() {
 				builder.WithMaxInterval(maxInterval),
 			)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, comp, build, final, memberFilter, 3*time.Second, 10*time.Second, head)
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, comp, build, final, memberFilter, 3*time.Second, 6*time.Second, head)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize coldstuff engine: %w", err)
 			}
