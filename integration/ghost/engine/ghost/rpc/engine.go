@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
+	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -27,6 +28,7 @@ type Engine struct {
 	server  *grpc.Server // the gRPC server
 	config  Config
 	me      module.Local
+	codec   network.Codec
 
 	// the channel between the engine (producer) and the handler (consumer). The engine receives libp2p messages and
 	// writes it to the channel as bytes. The Handler reads from the channel and returns it as GRPC stream to the client
@@ -39,6 +41,7 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 	log = log.With().Str("engine", "rpc").Logger()
 
 	messages := make(chan []byte, 100)
+	codec := jsoncodec.NewCodec()
 
 	eng := &Engine{
 		log:      log,
@@ -47,6 +50,7 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 		server:   grpc.NewServer(),
 		config:   config,
 		messages: messages,
+		codec:    codec,
 	}
 
 	conduitMap, err := registerConduits(net, eng)
@@ -54,7 +58,7 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 		return nil, fmt.Errorf("failed to initialize Engine: %w", err)
 	}
 
-	handler := NewHandler(log, conduitMap, messages)
+	handler := NewHandler(log, conduitMap, messages, codec)
 	eng.handler = handler
 
 	protobuf.RegisterGhostNodeAPIServer(eng.server, eng.handler)
@@ -130,6 +134,19 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+
+	// json encode the message into bytes
+	encodedMsg, err := e.codec.Encode(event)
+	if err != nil {
+		return fmt.Errorf("failed to encode message: %v", err)
+	}
+
+	// write it to the channel
+	select {
+	case e.messages <- encodedMsg:
+	default:
+		return fmt.Errorf("dropping message since queue is full: %v", err)
+	}
 	return nil
 }
 

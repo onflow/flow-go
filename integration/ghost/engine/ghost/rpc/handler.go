@@ -11,7 +11,6 @@ import (
 	protobuf "github.com/dapperlabs/flow-go/integration/ghost/protobuf"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
-	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 )
 
 // Handler handles the GRPC calls from a client
@@ -24,12 +23,12 @@ type Handler struct {
 
 var _ protobuf.GhostNodeAPIServer = Handler{}
 
-func NewHandler(log zerolog.Logger, conduitMap map[int]network.Conduit, msgChan chan []byte) *Handler {
+func NewHandler(log zerolog.Logger, conduitMap map[int]network.Conduit, msgChan chan []byte, codec network.Codec) *Handler {
 	return &Handler{
 		log:        log,
 		conduitMap: conduitMap,
 		msgChan:    msgChan,
-		codec:      jsoncodec.NewCodec(),
+		codec:      codec,
 	}
 }
 
@@ -73,18 +72,13 @@ func (h Handler) Subscribe(_ *protobuf.SubscribeRequest, stream protobuf.GhostNo
 			return nil
 		}
 
-		// json encode the message into bytes
-		encodedMsg, err := h.codec.Encode(msg)
-		if err != nil {
-			return status.Errorf(codes.Internal, "failed to encode message: %v", err)
-		}
-
+		// create a protobuf message
 		flowMessage := &protobuf.FlowMessage{
-			Message: encodedMsg,
+			Message: msg,
 		}
 
 		// send it to the client
-		err = stream.Send(flowMessage)
+		err := stream.Send(flowMessage)
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to stream message: %v", err)
 		}
