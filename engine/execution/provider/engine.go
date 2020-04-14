@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -28,13 +29,21 @@ type Engine struct {
 	unit          *engine.Unit
 	log           zerolog.Logger
 	receiptCon    network.Conduit
-	state         protocol.State
-	execState     state.ExecutionState
+	state         protocol.ReadOnlyState
+	execState     state.ReadOnlyExecutionState
 	me            module.Local
 	chunksConduit network.Conduit
 }
 
-func New(logger zerolog.Logger, net module.Network, state protocol.State, me module.Local, execState state.ExecutionState) (*Engine, error) {
+func New(
+	logger zerolog.Logger,
+	net module.Network,
+	state protocol.ReadOnlyState,
+	me module.Local,
+	execState state.ReadOnlyExecutionState,
+	stateSync sync.StateSynchronizer,
+) (*Engine, error) {
+
 	log := logger.With().Str("engine", "receipts").Logger()
 
 	eng := Engine{
@@ -45,11 +54,12 @@ func New(logger zerolog.Logger, net module.Network, state protocol.State, me mod
 		execState: execState,
 	}
 
-	receiptCon, err := net.Register(engine.ExecutionReceiptProvider, &eng)
+	var err error
+
+	eng.receiptCon, err = net.Register(engine.ExecutionReceiptProvider, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register receipt provider engine")
 	}
-	eng.receiptCon = receiptCon
 
 	chunksConduit, err := net.Register(engine.ChunkDataPackProvider, &eng)
 	if err != nil {

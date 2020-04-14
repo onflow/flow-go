@@ -5,14 +5,14 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(*entity.ExecutableBlock, *state.View) (*execution.ComputationResult, error)
+	ExecuteBlock(*entity.ExecutableBlock, *delta.View) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -29,7 +29,7 @@ func NewBlockComputer(vm virtualmachine.VirtualMachine) BlockComputer {
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockComputer) ExecuteBlock(
 	block *entity.ExecutableBlock,
-	stateView *state.View,
+	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 	results, err := e.executeBlock(block, stateView)
 	if err != nil {
@@ -43,14 +43,14 @@ func (e *blockComputer) ExecuteBlock(
 
 func (e *blockComputer) executeBlock(
 	block *entity.ExecutableBlock,
-	stateView *state.View,
+	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
 	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
 
 	collections := block.Collections()
 
-	views := make([]*state.View, len(collections))
+	interactions := make([]*delta.Snapshot, len(collections))
 
 	events := make([]flow.Event, 0)
 
@@ -68,14 +68,14 @@ func (e *blockComputer) executeBlock(
 		txIndex = nextIndex
 		events = append(events, collEvents...)
 
-		views[i] = collectionView
+		interactions[i] = collectionView.Interactions()
 
 		stateView.MergeView(collectionView)
 	}
 
 	return &execution.ComputationResult{
 		ExecutableBlock: block,
-		StateViews:      views,
+		StateSnapshots:  interactions,
 		Events:          events,
 	}, nil
 }
@@ -83,7 +83,7 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeCollection(
 	txIndex uint32,
 	blockCtx virtualmachine.BlockContext,
-	collectionView *state.View,
+	collectionView *delta.View,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, uint32, error) {
 	var events []flow.Event

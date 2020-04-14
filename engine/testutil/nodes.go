@@ -21,6 +21,7 @@ import (
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
@@ -39,7 +40,7 @@ import (
 )
 
 func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
-	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 
 	db, dbDir := unittest.TempBadgerDB(t)
 
@@ -175,7 +176,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 	return nodes
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity) mock.ExecutionNode {
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64) mock.ExecutionNode {
 	node := GenericNode(t, hub, identity, identities)
 
 	blocksStorage := storage.NewBlocks(node.DB)
@@ -191,12 +192,20 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	ls, err := ledger.NewTrieStorage(dbDir)
 	require.NoError(t, err)
 
+	genesisHead, err := node.State.Final().Head()
+	require.NoError(t, err)
+
 	_, err = bootstrap.BootstrapLedger(ls)
 	require.NoError(t, err)
 
-	execState := state.NewExecutionState(ls, commitsStorage, chunkDataPackStorage, executionResults)
+	err = bootstrap.BootstrapExecutionDatabase(node.DB, genesisHead)
+	require.NoError(t, err)
 
-	providerEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
+	execState := state.NewExecutionState(ls, commitsStorage, chunkDataPackStorage, executionResults, node.DB)
+
+	stateSync := sync.NewStateSynchronizer(execState)
+
+	providerEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState, stateSync)
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
@@ -223,6 +232,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computationEngine,
 		providerEngine,
 		execState,
+		syncThreshold,
 	)
 	require.NoError(t, err)
 
@@ -233,7 +243,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		ReceiptsEngine:  providerEngine,
 		BadgerDB:        node.DB,
 		VM:              vm,
-		State:           execState,
+		ExecutionState:  execState,
 		Ledger:          ls,
 		LevelDbDir:      dbDir,
 	}
@@ -301,7 +311,9 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 		rt := runtime.NewInterpreterRuntime()
 		vm := virtualmachine.New(rt)
 		chunkVerifier := chunks.NewChunkVerifier(vm)
-		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, chunkVerifier)
+
+		require.NoError(t, err)
+		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, chunkVerifier, node.Metrics)
 		require.Nil(t, err)
 	}
 

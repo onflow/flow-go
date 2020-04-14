@@ -1,7 +1,7 @@
 package execution
 
 import (
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
@@ -11,12 +11,12 @@ import (
 
 type ComputationOrder struct {
 	Block      *entity.ExecutableBlock
-	View       *state.View
+	View       *delta.View
 	StartState flow.StateCommitment
 }
 
 type ComputationResult struct {
 	ExecutableBlock *entity.ExecutableBlock
-	StateViews      []*state.View
+	StateSnapshots  []*delta.Snapshot
 	Events          []flow.Event
 }
