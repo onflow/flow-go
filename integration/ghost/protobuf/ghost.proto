@@ -1,8 +1,29 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 package ghost;
 
-service GhostSender {
 
+// GhostNodeAPI is the API expose by the Ghost node
+service GhostNodeAPI {
+
+    // SendEvent submits and event to the internal Flow Libp2p network
+    rpc SendEvent (SendEventRequest) returns (google.protobuf.Empty);
+
+    // Subscribe returns all network messages
+    rpc Subscribe (SubscribeRequest) returns (stream FlowMessage);
 }
 
+message SubscribeRequest {
+}
+
+message SendEventRequest {
+    uint32 channel_id = 1;
+    bytes message = 2;
+    repeated bytes targetID  = 3;
+}
+
+message FlowMessage {
+    bytes message = 1;
+}

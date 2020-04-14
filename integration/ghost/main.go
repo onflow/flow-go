@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-
 	var (
 		rpcConf rpc.Config
 	)
@@ -19,8 +18,8 @@ func main() {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf)
-			return rpcEng, nil
+			rpcEng, err := rpc.New(node.Network, node.Logger, node.Me, rpcConf)
+			return rpcEng, err
 		}).
 		Run()
 }
