@@ -20,8 +20,8 @@ import (
 type ecdsaAlgo struct {
 	// elliptic curve
 	curve elliptic.Curve
-	// embeds commonSigner
-	*commonSigner
+	// the signing algo
+	algo SigningAlgorithm
 }
 
 //  Once variables to use a unique instance
@@ -31,8 +31,8 @@ var p256Once sync.Once
 func newEcdsaP256() *ecdsaAlgo {
 	p256Once.Do(func() {
 		p256Instance = &(ecdsaAlgo{
-			curve:        elliptic.P256(),
-			commonSigner: &commonSigner{EcdsaP256},
+			curve: elliptic.P256(),
+			algo:  EcdsaP256,
 		})
 	})
 	return p256Instance
@@ -45,8 +45,8 @@ var secp256k1Once sync.Once
 func newEcdsaSecp256k1() *ecdsaAlgo {
 	secp256k1Once.Do(func() {
 		secp256k1Instance = &(ecdsaAlgo{
-			curve:        secp256k1(),
-			commonSigner: &commonSigner{EcdsaSecp256k1},
+			curve: secp256k1(),
+			algo:  EcdsaSecp256k1,
 		})
 	})
 	return secp256k1Instance

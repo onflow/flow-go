@@ -120,17 +120,17 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	jointx, jointPublicKey, jointy := s.sumUpQualifiedKeys(s.size - disqualifiedTotal)
 
 	// private key of the current node
-	x := &PrKeyBLS_BLS12381{
+	x := &PrKeyBlsBls12381{
 		scalar: *jointx, // the private share
 	}
 	// Group public key
-	Y := &PubKeyBLS_BLS12381{
+	Y := &PubKeyBlsBls12381{
 		point: *jointPublicKey,
 	}
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range jointy {
-		y[i] = &PubKeyBLS_BLS12381{
+		y[i] = &PubKeyBlsBls12381{
 			point: p,
 		}
 	}

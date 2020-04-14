@@ -11,7 +11,7 @@ import (
 )
 
 // BLS tests
-func TestBLS_BLS12381(t *testing.T) {
+func TestBlsBls12381(t *testing.T) {
 	seed := make([]byte, KeyGenSeedMinLenBlsBls12381)
 	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
@@ -28,13 +28,13 @@ func TestBLS_BLS12381(t *testing.T) {
 }
 
 // Signing bench
-func BenchmarkBLS_BLS12381Sign(b *testing.B) {
+func BenchmarkBlsBls12381Sign(b *testing.B) {
 	halg := NewBLS_KMAC("bench tag")
 	benchSign(b, BlsBls12381, halg)
 }
 
 // Verifying bench
-func BenchmarkBLS_BLS12381Verify(b *testing.B) {
+func BenchmarkBlsBls12381Verify(b *testing.B) {
 	halg := NewBLS_KMAC("bench tag")
 	benchVerify(b, BlsBls12381, halg)
 }

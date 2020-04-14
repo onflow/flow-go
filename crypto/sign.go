@@ -23,11 +23,6 @@ type signer interface {
 	decodePublicKey([]byte) (PublicKey, error)
 }
 
-// commonSigner holds the common data for all signers
-type commonSigner struct {
-	algo SigningAlgorithm
-}
-
 // newNonRelicSigner initializes a signer that does not depend on the Relic library.
 func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	switch algo {
