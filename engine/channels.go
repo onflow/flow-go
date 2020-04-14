@@ -25,6 +25,7 @@ const (
 	ExecutionStateProvider   = 101
 	ExecutionComputer        = 102
 	ChunkDataPackProvider    = 103
+	ExecutionSync            = 104
 
 	// Verification 150-199
 	ApprovalProvider = 150

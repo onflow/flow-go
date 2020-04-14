@@ -26,7 +26,7 @@ type Follower struct {
 }
 
 func (f *Follower) SubmitProposal(proposal *flow.Header, parentView uint64) {
-	f.state.Mutate().Finalize(proposal.ID())
+	_ = f.state.Mutate().Finalize(proposal.ID())
 }
 
 func (f *Follower) Ready() <-chan struct{} {

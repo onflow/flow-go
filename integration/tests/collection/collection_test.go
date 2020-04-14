@@ -187,7 +187,7 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 			head, err = state.AtBlockID(head.ParentID).Head()
 			assert.Nil(t, err)
 
-			if collection.Len() == 0 {
+			if len(collection.Transactions) == 0 {
 				continue
 			}
 

@@ -5,7 +5,6 @@ package badger
 import (
 	"encoding/binary"
 	"fmt"
-	"math"
 	"sort"
 
 	"github.com/dgraph-io/badger/v2"
@@ -203,32 +202,7 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 }
 
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// set the number to boundary if it's at max uint64
-		if s.number == math.MaxUint64 {
-			err := operation.RetrieveBoundary(&s.number)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve boundary: %w", err)
-			}
-		}
-
-		// check if hash is nil and try to get it from height
-		if s.blockID == flow.ZeroID {
-			err := operation.RetrieveNumber(s.number, &s.blockID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve hash (%d): %w", s.number, err)
-			}
-		}
-
-		// get the height for our desired target hash
-		err := operation.RetrieveHeader(s.blockID, head)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve header (%x): %w", s.blockID, err)
-		}
-
-		return nil
-	}
+	return procedure.RetrieveHeader(&s.number, &s.blockID, head)
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {

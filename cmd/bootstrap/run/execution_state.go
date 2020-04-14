@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -36,7 +37,7 @@ func GenerateExecutionState(dbDir string, priv flow.AccountPrivateKey) (flow.Sta
 }
 
 func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	view := state.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
+	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
 	err := createRootAccount(view, priv)
 	if err != nil {
@@ -51,7 +52,7 @@ func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.S
 	return newStateCommitment, nil
 }
 
-func createRootAccount(view *state.View, privateKey flow.AccountPrivateKey) error {
+func createRootAccount(view *delta.View, privateKey flow.AccountPrivateKey) error {
 	publicKeyBytes, err := flow.EncodeAccountPublicKey(privateKey.PublicKey(1000))
 	if err != nil {
 		return fmt.Errorf("cannot encode public key of hardcoded private key: %w", err)

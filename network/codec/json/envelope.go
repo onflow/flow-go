@@ -46,9 +46,10 @@ const (
 	CodeTransactionResponse
 
 	CodeExecutionReceipt
-
 	CodeExecutionStateRequest
 	CodeExecutionStateResponse
+	CodeExecutionStateSyncRequest
+	CodeExecutionStateDelta
 	CodeChunkDataPackRequest
 	CodeChunkDataPackResponse
 )
