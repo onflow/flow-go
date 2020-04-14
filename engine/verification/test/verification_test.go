@@ -185,6 +185,7 @@ func TestHappyPath(t *testing.T) {
 	assert.False(t, verNode.AuthReceipts.Has(completeER.Receipt.ID()))
 
 	// receipt ID should be added to the ingested results mempool
+	assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
 
 	verNode.Done()
 	colNode.Done()

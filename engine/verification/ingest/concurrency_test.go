@@ -94,7 +94,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// new chunk assignment
-	a := chmodel.NewAssignment()
+	assignment := chmodel.NewAssignment()
 
 	// create `erCount` ER fixtures that will be concurrently delivered
 	ers := make([]verification.CompleteExecutionResult, 0)
@@ -108,7 +108,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
 		for j, chunk := range er.Receipt.ExecutionResult.Chunks {
-			a.Add(chunk, []flow.Identifier{verID.NodeID})
+			assignment.Add(chunk, []flow.Identifier{verID.NodeID})
 
 			var endState flow.StateCommitment
 			// last chunk
