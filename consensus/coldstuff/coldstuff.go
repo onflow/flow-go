@@ -398,13 +398,6 @@ func (e *ColdStuff) waitForProposal() error {
 				continue
 			}
 
-			// discard proposals with invalid timestamp
-			limit := e.round.Parent().Timestamp.Add(e.interval)
-			if candidate.Timestamp.Before(limit) {
-				log.Warn().Time("candidate_timestamp", candidate.Timestamp).Time("candidate_limit", limit).Msg("invalid timestamp")
-				continue
-			}
-
 			// cache the candidate for the round
 			e.round.Propose(candidate)
 
