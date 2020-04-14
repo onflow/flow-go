@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -78,7 +79,7 @@ func GetTxBodyAddToCounter() *flow.TransactionBody {
 	}
 }
 
-func GetFixturesForCounter(t *testing.T, chunkCount int) (*flow.Block, *flow.Collection, *flow.ExecutionReceipt, *flow.ChunkDataPack) {
+func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExecutionResult {
 
 	// setup collection
 	transactions := make([]*flow.TransactionBody, 0)
@@ -86,6 +87,7 @@ func GetFixturesForCounter(t *testing.T, chunkCount int) (*flow.Block, *flow.Col
 	transactions = append(transactions, GetTxBodyCreateCounter())
 	transactions = append(transactions, GetTxBodyAddToCounter())
 	col := flow.Collection{Transactions: transactions}
+	collections := []*flow.Collection{&col}
 
 	// setup block
 	guarantee := col.Guarantee()
@@ -104,8 +106,8 @@ func GetFixturesForCounter(t *testing.T, chunkCount int) (*flow.Block, *flow.Col
 	}
 
 	// Setup chunk and chunk data package
-	var chunk *flow.Chunk
-	var chdp flow.ChunkDataPack
+	chunks := make([]*flow.Chunk, 0)
+	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
 	unittest.RunWithTempDBDir(t, func(dir string) {
 		led, err := ledger.NewTrieStorage(dir)
@@ -160,6 +162,7 @@ func GetFixturesForCounter(t *testing.T, chunkCount int) (*flow.Block, *flow.Col
 			Index:    0,
 			EndState: endStateCommitment,
 		}
+		chunks = append(chunks, chunk)
 
 		// chunkDataPack
 		allRegisters := view.RegisterTouches()
@@ -173,15 +176,14 @@ func GetFixturesForCounter(t *testing.T, chunkCount int) (*flow.Block, *flow.Col
 				Proof: proofs[i],
 			}
 		}
-		chdp = flow.ChunkDataPack{
+		chdp := &flow.ChunkDataPack{
 			ChunkID:         chunk.ID(),
 			StartState:      chunk.StartState,
 			RegisterTouches: regTs,
 		}
+		chunkDataPacks = append(chunkDataPacks, chdp)
 
 	})
-	chunks := make([]*flow.Chunk, 0)
-	chunks = append(chunks, chunk)
 
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
@@ -193,6 +195,10 @@ func GetFixturesForCounter(t *testing.T, chunkCount int) (*flow.Block, *flow.Col
 	receipt := flow.ExecutionReceipt{
 		ExecutionResult: result,
 	}
-	return &block, &col, &receipt, &chdp
-
+	return verification.CompleteExecutionResult{
+		Receipt:        &receipt,
+		Block:          &block,
+		Collections:    collections,
+		ChunkDataPacks: chunkDataPacks,
+	}
 }

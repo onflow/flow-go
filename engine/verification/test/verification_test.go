@@ -27,10 +27,8 @@ import (
 // - submitting a verifiable chunk locally to the verify engine by the ingest engine
 // - broadcast of a matching result approval to consensus nodes fo each assigned chunk
 func TestHappyPath(t *testing.T) {
-	// number of chunks in an ER
-	chunkNum := 10
-	hub := stub.NewNetworkHub()
 
+	hub := stub.NewNetworkHub()
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -43,8 +41,11 @@ func TestHappyPath(t *testing.T) {
 	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 
-	completeER := CompleteExecutionResultFixture(t, chunkNum)
+	completeER := CompleteExecutionResultFixture(t, 10)
+	// completeER := GetCompleteExecutionResultForCounter(t)
 
+	// number of chunks in an ER
+	chunkNum := len(completeER.Receipt.ExecutionResult.Chunks)
 	// assigns half of the chunks to this verifier
 	a := chmodel.NewAssignment()
 	for i := 0; i < chunkNum; i++ {
