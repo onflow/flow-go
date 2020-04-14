@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -12,8 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/forkchoice"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
@@ -22,29 +21,31 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	consensusmetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
-const (
-	startView  = 1
-	prunedView = 0
-	votedView  = 0
-)
+func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, state protocol.State,
+	me module.Local, builder module.Builder, updater module.Finalizer, signer hotstuff.Signer,
+	communicator hotstuff.Communicator, selector flow.IdentityFilter, rootHeader *flow.Header,
+	rootQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
 
-// TODO: this needs to be integrated with proper configuration and bootstrapping.
+	// initialize the default configuration
+	defTimeout := timeout.DefaultConfig
+	cfg := ParticipantConfig{
+		ViewStart:                  1,
+		ViewPruned:                 0,
+		ViewVoted:                  0,
+		TimeoutInitial:             time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
+		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
+		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
+		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
+		TimeoutDecreaseStep:        time.Duration(defTimeout.TimeoutDecrease) * time.Millisecond,
+	}
 
-func CreateConsumer(log zerolog.Logger, metrics module.Metrics, guarantees storage.Guarantees, seals storage.Seals) hotstuff.Consumer {
-	logConsumer := notifications.NewLogConsumer(log)
-	metricsConsumer := consensusmetrics.NewMetricsConsumer(metrics, guarantees, seals)
-	dis := pubsub.NewDistributor()
-	dis.AddConsumer(logConsumer)
-	dis.AddConsumer(metricsConsumer)
-	return dis
-}
-
-func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, state protocol.State, me module.Local, builder module.Builder, updater module.Finalizer, signer hotstuff.Signer, communicator hotstuff.Communicator, selector flow.IdentityFilter, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*hotstuff.EventLoop, error) {
+	// apply the configuration options
+	for _, option := range options {
+		option(&cfg)
+	}
 
 	// initialize view state
 	viewState, err := viewstate.New(state, me.NodeID(), selector)
@@ -76,8 +77,21 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		return nil, fmt.Errorf("could not initialize fork choice: %w", err)
 	}
 
+	// initialize the timeout config
+	timeoutConfig, err := timeout.NewConfig(
+		cfg.TimeoutInitial,
+		cfg.TimeoutMinimum,
+		cfg.TimeoutAggregationFraction,
+		cfg.TimeoutIncreaseFactor,
+		cfg.TimeoutDecreaseStep,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize timeout config: %w", err)
+	}
+
 	// initialize the pacemaker
-	pacemaker, err := pacemaker.New(startView, timeout.DefaultController(), notifier)
+	controller := timeout.NewController(timeoutConfig)
+	pacemaker, err := pacemaker.New(cfg.ViewStart, controller, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
@@ -93,13 +107,13 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// initialize the voter
 	// TODO: load last voted view
-	voter := voter.New(signer, forks, votedView)
+	voter := voter.New(signer, forks, cfg.ViewVoted)
 
 	// initialize the validator
 	validator := validator.New(viewState, forks, signer)
 
 	// initialize the vote aggregator
-	aggregator := voteaggregator.New(notifier, prunedView, viewState, validator, signer)
+	aggregator := voteaggregator.New(notifier, cfg.ViewPruned, viewState, validator, signer)
 
 	// initialize the event handler
 	handler, err := eventhandler.New(log, pacemaker, producer, forks, communicator, viewState, aggregator, voter, validator, notifier)

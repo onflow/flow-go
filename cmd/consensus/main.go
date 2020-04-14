@@ -13,7 +13,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
@@ -38,13 +37,14 @@ import (
 func main() {
 
 	var (
-		guaranteeLimit uint
-		receiptLimit   uint
-		approvalLimit  uint
-		sealLimit      uint
-		chainID        string
-		minInterval    time.Duration
-		maxInterval    time.Duration
+		guaranteeLimit  uint
+		receiptLimit    uint
+		approvalLimit   uint
+		sealLimit       uint
+		chainID         string
+		minInterval     time.Duration
+		maxInterval     time.Duration
+		hotstuffTimeout time.Duration
 
 		err            error
 		privateDKGData *bootstrap.DKGParticipantPriv
@@ -66,9 +66,9 @@ func main() {
 			flags.StringVarP(&chainID, "chain-id", "C", flow.DefaultChainID, "the chain ID for the protocol chain")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
+			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
-			// TODO inject this into HotStuff
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
 			return err
 		}).
@@ -112,6 +112,8 @@ func main() {
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
 			blocksDB := storage.NewBlocks(node.DB)
+			guaranteesDB := storage.NewGuarantees(node.DB)
+			sealsDB := storage.NewSeals(node.DB)
 
 			// initialize the pending blocks cache
 			cache := buffer.NewPendingBlocks()
@@ -154,10 +156,14 @@ func main() {
 			signer := verification.NewCombinedSigner(node.State, node.DKGState, staking, beacon, merger, selector, node.Me.NodeID())
 
 			// initialize a logging notifier for hotstuff
-			notifier := notifications.NewLogConsumer(node.Logger)
+			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, guaranteesDB, sealsDB)
 
 			// initialize hotstuff consensus algorithm
-			hot, err := consensus.NewParticipant(node.Logger, notifier, node.Metrics, node.State, node.Me, build, final, signer, comp, selector, &node.GenesisBlock.Header, node.GenesisQC)
+			hot, err := consensus.NewParticipant(
+				node.Logger, notifier, node.Metrics, node.State, node.Me, build, final, signer, comp, selector,
+				&node.GenesisBlock.Header, node.GenesisQC,
+				consensus.WithTimeout(hotstuffTimeout),
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize coldstuff engine: %w", err)
 			}
