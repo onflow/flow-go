@@ -41,13 +41,3 @@ func (e *ExecutionClient) Ping(ctx context.Context) error {
 	_, err := e.rpcClient.Ping(ctx, &execution.PingRequest{})
 	return err
 }
-
-// ExecuteScript executes a script against the latest sealed world state.
-func (e *ExecutionClient) ExecuteScript(ctx context.Context, script []byte) ([]byte, error) {
-	res, err := e.rpcClient.ExecuteScriptAtLatestBlock(ctx, &execution.ExecuteScriptAtLatestBlockRequest{Script: script})
-	if err != nil {
-		return nil, err
-	}
-
-	return res.GetValue(), nil
-}
