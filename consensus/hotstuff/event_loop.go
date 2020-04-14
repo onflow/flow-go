@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/runner"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -129,10 +130,11 @@ func (el *EventLoop) loop() {
 	}
 }
 
-// OnReceiveProposal pushes the received block to the blockheader channel
-func (el *EventLoop) OnReceiveProposal(proposal *model.Proposal) {
+// SubmitProposal pushes the received block to the blockheader channel
+func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
 	received := time.Now()
 
+	proposal := model.ProposalFromFlow(proposalHeader, parentView)
 	el.proposals <- proposal
 
 	// the busy duration is measured as how long it takes from a block being
@@ -141,10 +143,11 @@ func (el *EventLoop) OnReceiveProposal(proposal *model.Proposal) {
 	el.metrics.HotStuffBusyDuration(busyDuration)
 }
 
-// OnReceiveVote pushes the received vote to the votes channel
-func (el *EventLoop) OnReceiveVote(vote *model.Vote) {
+// SubmitVote pushes the received vote to the votes channel
+func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifier, view uint64, sigData []byte) {
 	received := time.Now()
 
+	vote := model.VoteFromFlow(originID, blockID, view, sigData)
 	el.votes <- vote
 
 	// the busy duration is measured as how long it takes from a vote being
