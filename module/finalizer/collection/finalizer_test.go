@@ -16,7 +16,6 @@ import (
 	modulemock "github.com/dapperlabs/flow-go/module/mock"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -56,10 +55,6 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to insert a block
 		insert := func(block model.Block) {
-			// first insert the payload
-			err = db.Update(operation.SkipDuplicates(operation.InsertCollection(&block.Collection)))
-			assert.Nil(t, err)
-			// then insert the block
 			err = db.Update(procedure.InsertClusterBlock(&block))
 			assert.Nil(t, err)
 		}
@@ -91,7 +86,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a new block on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions([]flow.Identifier{tx1.ID()}))
+			block.SetPayload(model.PayloadFromTransactions(&tx1))
 			insert(block)
 
 			// finalize the block
@@ -130,7 +125,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions([]flow.Identifier{}))
+			block.SetPayload(model.EmptyPayload())
 			insert(block)
 
 			// finalize the block
@@ -163,7 +158,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions([]flow.Identifier{tx1.ID()}))
+			block.SetPayload(model.PayloadFromTransactions(&tx1))
 			insert(block)
 
 			// finalize the block
@@ -210,12 +205,12 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions([]flow.Identifier{tx1.ID()}))
+			block1.SetPayload(model.PayloadFromTransactions(&tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions([]flow.Identifier{tx2.ID()}))
+			block2.SetPayload(model.PayloadFromTransactions(&tx2))
 			insert(block2)
 
 			// finalize block2 (should indirectly finalize block1 as well)
@@ -266,12 +261,12 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions([]flow.Identifier{tx1.ID()}))
+			block1.SetPayload(model.PayloadFromTransactions(&tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions([]flow.Identifier{tx2.ID()}))
+			block2.SetPayload(model.PayloadFromTransactions(&tx2))
 			insert(block2)
 
 			// finalize block1 (should NOT finalize block2)
@@ -318,12 +313,12 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions([]flow.Identifier{tx1.ID()}))
+			block1.SetPayload(model.PayloadFromTransactions(&tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
 			block2 := unittest.ClusterBlockWithParent(genesis)
-			block2.SetPayload(model.PayloadFromTransactions([]flow.Identifier{tx2.ID()}))
+			block2.SetPayload(model.PayloadFromTransactions(&tx2))
 			insert(block2)
 
 			// finalize block2

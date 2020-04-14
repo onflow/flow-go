@@ -66,8 +66,8 @@ func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled
 
 	// program the state snapshot
 	snapshot := &protomock.Snapshot{}
-	snapshot.On("Identities", mock.Anything).Return(func(filters ...flow.IdentityFilter) flow.IdentityList {
-		return identities.Filter(filters...)
+	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
+		return identities.Filter(selector)
 	}, nil)
 	for _, identity := range identities {
 		snapshot.On("Identity", identity.NodeID).Return(identity, nil)

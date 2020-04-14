@@ -6,13 +6,14 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
@@ -27,16 +28,44 @@ func AccountSignatureFixture() flow.AccountSignature {
 	}
 }
 
-func BlockFixture() flow.Block {
-	return BlockWithParentFixture(IdentifierFixture())
+// AccountKeyFixture returns a randomly generated ECDSA/SHA3 account key.
+func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_P256)
+	_, err := rand.Read(seed)
+	if err != nil {
+		return nil, err
+	}
+	key, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
+	if err != nil {
+		return nil, err
+	}
+
+	return &flow.AccountPrivateKey{
+		PrivateKey: key,
+		SignAlgo:   key.Algorithm(),
+		HashAlgo:   hash.SHA3_256,
+	}, nil
 }
 
-func BlockWithParentFixture(parentID flow.Identifier) flow.Block {
+func BlockFixture() flow.Block {
+	header := BlockHeaderFixture()
+	return BlockWithParentFixture(&header)
+}
+
+func StateDeltaFixture() *messages.ExecutionStateDelta {
+	header := BlockHeaderFixture()
+	block := BlockWithParentFixture(&header)
+	return &messages.ExecutionStateDelta{
+		Block: &block,
+	}
+}
+
+func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
 		Guarantees: CollectionGuaranteesFixture(16),
 	}
-	header := BlockHeaderWithParentFixture(parentID)
+	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	return flow.Block{
 		Header:  header,
@@ -44,15 +73,35 @@ func BlockWithParentFixture(parentID flow.Identifier) flow.Block {
 	}
 }
 
-func BlockHeaderFixture() flow.Header {
-	return BlockHeaderWithParentFixture(IdentifierFixture())
+func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
+	payload := flow.Payload{
+		Identities: IdentityListFixture(32),
+		Guarantees: CollectionGuaranteesFixture(16),
+	}
+	header := BlockHeaderWithParentFixture(parent)
+	header.PayloadHash = payload.Hash()
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+	return &messages.ExecutionStateDelta{
+		Block: &block,
+	}
 }
 
-func BlockHeaderWithParentFixture(parentID flow.Identifier) flow.Header {
+func BlockHeaderFixture() flow.Header {
+	return BlockHeaderWithParentFixture(&flow.Header{
+		ParentID: IdentifierFixture(),
+		Height:   0,
+	})
+}
+
+func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	return flow.Header{
 		ChainID:        "chain",
-		ParentID:       parentID,
+		ParentID:       parent.ID(),
 		View:           rand.Uint64(),
+		Height:         parent.Height + 1,
 		ParentVoterIDs: IdentifierListFixture(4),
 		ParentVoterSig: SignatureFixture(),
 		ProposerID:     IdentifierFixture(),
@@ -89,14 +138,21 @@ func SealFixture() flow.Seal {
 	}
 }
 
-func ClusterBlockFixture() cluster.Block {
-	payload := cluster.Payload{
-		Collection: flow.LightCollection{
-			Transactions: []flow.Identifier{IdentifierFixture()},
-		},
+func ClusterPayloadFixture(n int) cluster.Payload {
+	transactions := make([]*flow.TransactionBody, n)
+	for i := 0; i < n; i++ {
+		tx := TransactionBodyFixture()
+		transactions[i] = &tx
 	}
+	return cluster.PayloadFromTransactions(transactions...)
+}
+
+func ClusterBlockFixture() cluster.Block {
+
+	payload := ClusterPayloadFixture(3)
 	header := BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
+
 	return cluster.Block{
 		Header:  header,
 		Payload: payload,
@@ -106,11 +162,8 @@ func ClusterBlockFixture() cluster.Block {
 // ClusterBlockWithParent creates a new cluster consensus block that is valid
 // with respect to the given parent block.
 func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
-	payload := cluster.Payload{
-		Collection: flow.LightCollection{
-			Transactions: []flow.Identifier{IdentifierFixture()},
-		},
-	}
+
+	payload := ClusterPayloadFixture(3)
 
 	header := BlockHeaderFixture()
 	header.Height = parent.Height + 1
@@ -168,12 +221,6 @@ func ExecutionReceiptFixture() *flow.ExecutionReceipt {
 	}
 }
 
-func StateViewFixture() *state.View {
-	return state.NewView(func(key flow.RegisterID) (bytes []byte, err error) {
-		return nil, nil
-	})
-}
-
 func CompleteCollectionFixture() *entity.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &entity.CompleteCollection{
@@ -187,13 +234,14 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 
 func ExecutableBlockFixture(collections int) *entity.ExecutableBlock {
 
-	return ExecutableBlockFixtureWithParent(collections, IdentifierFixture())
+	header := BlockHeaderFixture()
+	return ExecutableBlockFixtureWithParent(collections, &header)
 }
 
-func ExecutableBlockFixtureWithParent(collections int, parentID flow.Identifier) *entity.ExecutableBlock {
+func ExecutableBlockFixtureWithParent(collections int, parent *flow.Header) *entity.ExecutableBlock {
 
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, collections)
-	block := BlockWithParentFixture(parentID)
+	block := BlockWithParentFixture(parent)
 	block.Guarantees = nil
 
 	for i := 0; i < collections; i++ {
@@ -207,29 +255,6 @@ func ExecutableBlockFixtureWithParent(collections int, parentID flow.Identifier)
 	return &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
-	}
-}
-
-func ComputationResultFixture(n int) *execution.ComputationResult {
-	stateViews := make([]*state.View, n)
-	for i := 0; i < n; i++ {
-		stateViews[i] = StateViewFixture()
-	}
-	return &execution.ComputationResult{
-		ExecutableBlock: ExecutableBlockFixture(n),
-		StateViews:      stateViews,
-	}
-}
-
-func ComputationResultForBlockFixture(executableBlock *entity.ExecutableBlock) *execution.ComputationResult {
-	n := len(executableBlock.CompleteCollections)
-	stateViews := make([]*state.View, n)
-	for i := 0; i < n; i++ {
-		stateViews[i] = StateViewFixture()
-	}
-	return &execution.ComputationResult{
-		ExecutableBlock: executableBlock,
-		StateViews:      stateViews,
 	}
 }
 
@@ -423,11 +448,13 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	tb := flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
 		ReferenceBlockID: IdentifierFixture(),
-		Nonce:            rand.Uint64(),
-		ComputeLimit:     10,
-		PayerAccount:     AddressFixture(),
-		ScriptAccounts:   []flow.Address{AddressFixture()},
-		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
+		//Nonce:            rand.Uint64(),
+		Nonce: 0,
+		//ComputeLimit:     10,
+		ComputeLimit:   0,
+		PayerAccount:   AddressFixture(),
+		ScriptAccounts: []flow.Address{AddressFixture()},
+		Signatures:     []flow.AccountSignature{AccountSignatureFixture()},
 	}
 
 	for _, apply := range opts {
@@ -435,6 +462,23 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	}
 
 	return tb
+}
+
+func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {
+	return func(tx *flow.TransactionBody) {
+		tx.Script = []byte(txDSL.ToCadence())
+	}
+}
+
+func TransactionDSLFixture() dsl.Transaction {
+	return dsl.Transaction{
+		Import: dsl.Import{Address: flow.RootAddress},
+		Content: dsl.Prepare{
+			Content: dsl.Code(`
+				pub fun main() {}
+			`),
+		},
+	}
 }
 
 // VerifiableChunk returns a complete verifiable chunk with an
@@ -531,4 +575,19 @@ func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint
 		Payload:          []byte{},
 		TransactionID:    txID,
 	}
+}
+
+func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
+
+	// TODO seems this key literal doesn't decode anymore
+	emulatorRootKey, err := crypto.DecodePrivateKey(crypto.ECDSA_P256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
+	if err != nil {
+		return nil, err
+	}
+
+	return &flow.AccountPrivateKey{
+		PrivateKey: emulatorRootKey,
+		SignAlgo:   emulatorRootKey.Algorithm(),
+		HashAlgo:   hash.SHA3_256,
+	}, nil
 }

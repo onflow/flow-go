@@ -36,7 +36,7 @@ func encode(v interface{}) (*Envelope, error) {
 	case *message.Echo:
 		code = CodeEcho
 
-	// Consensus
+	// consensus
 	case *messages.BlockProposal:
 		code = CodeBlockProposal
 	case *messages.BlockVote:
@@ -44,7 +44,19 @@ func encode(v interface{}) (*Envelope, error) {
 	case *coldstuff.Commit:
 		code = CodeBlockCommit
 
-	// Cluster consensus
+	// protocol state sync
+	case *messages.SyncRequest:
+		code = CodeSyncRequest
+	case *messages.SyncResponse:
+		code = CodeSyncResponse
+	case *messages.RangeRequest:
+		code = CodeRangeRequest
+	case *messages.BatchRequest:
+		code = CodeBatchRequest
+	case *messages.BlockResponse:
+		code = CodeBlockResponse
+
+	// cluster consensus
 	case *messages.ClusterBlockProposal:
 		code = CodeClusterBlockProposal
 	case *messages.ClusterBlockVote:
@@ -70,12 +82,15 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeCollectionResponse
 
 	case *flow.ExecutionReceipt:
-		code = CodeExecutionRecipt
-
+		code = CodeExecutionReceipt
 	case *messages.ChunkDataPackRequest:
 		code = CodeChunkDataPackRequest
 	case *messages.ChunkDataPackResponse:
 		code = CodeChunkDataPackResponse
+	case *messages.ExecutionStateSyncRequest:
+		code = CodeExecutionStateSyncRequest
+	case *messages.ExecutionStateDelta:
+		code = CodeExecutionStateDelta
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)

@@ -41,10 +41,9 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
 		}
 
-		// insert block payload
-		err := operation.InsertCollection(&genesis.Payload.Collection)(tx)
+		err := procedure.InsertClusterPayload(&genesis.Payload)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert genesis block payload: %w", err)
+			return fmt.Errorf("could not insert genesis cluster payload: %w", err)
 		}
 
 		// insert block
@@ -87,7 +86,8 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		// check for duplicate transactions in block's ancestry
 		parentHeight := block.Height - 1
 		parentID := block.ParentID
-		err = operation.VerifyCollectionPayload(parentHeight, parentID, block.Payload.Collection.Transactions)(tx)
+		txIDs := block.Payload.Collection.Light().Transactions
+		err = operation.VerifyCollectionPayload(parentHeight, parentID, txIDs)(tx)
 		if errors.Is(err, storage.ErrAlreadyIndexed) {
 			return fmt.Errorf("found duplicate transaction in payload: %w", err)
 		}

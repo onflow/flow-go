@@ -35,7 +35,7 @@ type Engine struct {
 	me           module.Local
 	protoState   protocol.State // flow-wide protocol chain state
 	clusterState cluster.State  // cluster-specific chain state
-	provider     network.Engine
+	ingest       network.Engine
 	pool         mempool.Transactions
 	transactions storage.Transactions
 	headers      storage.Headers
@@ -53,7 +53,7 @@ func New(
 	protoState protocol.State,
 	clusterState cluster.State,
 	metrics module.Metrics,
-	provider network.Engine,
+	ingest network.Engine,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
 	headers storage.Headers,
@@ -73,7 +73,7 @@ func New(
 		protoState:   protoState,
 		clusterState: clusterState,
 		metrics:      metrics,
-		provider:     provider,
+		ingest:       ingest,
 		pool:         pool,
 		transactions: transactions,
 		headers:      headers,
@@ -209,10 +209,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(filter.And(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}
@@ -228,18 +228,14 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not broadcast proposal: %w", err)
 	}
 
-	final, _ := e.clusterState.Final().Head()
-
 	e.log.Debug().
 		Hex("block_id", logging.ID(header.ID())).
 		Uint64("block_height", header.Height).
 		Hex("parent_id", logging.ID(header.ParentID)).
-		Hex("final_id", logging.ID(final.ID())).
-		Uint64("final_height", final.Height).
 		Int("collection_size", len(payload.Collection.Transactions)).
 		Msg("submitted proposal")
 
-	e.metrics.StartCollectionToGuarantee(payload.Collection)
+	e.metrics.StartCollectionToGuarantee(payload.Collection.Light())
 
 	return nil
 }
@@ -249,10 +245,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(filter.And(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}
@@ -290,34 +286,18 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	blockID := proposal.Header.ID()
 	collection := proposal.Payload.Collection
 
-	// ensure we have received and validated all transactions in the proposal
-	var missingTxErr *multierror.Error
-	for _, txID := range collection.Transactions {
-		if !e.pool.Has(txID) {
-			// note each missing transaction in the error and reject the block
-			missingTxErr = multierror.Append(missingTxErr, fmt.Errorf("cannot validate missing transaction (id=%x)", txID))
-
-			// request the missing transaction
-			req := &messages.SubmitTransactionRequest{
-				Request: messages.TransactionRequest{ID: txID},
+	// validate any transactions we haven't yet seen
+	var merr *multierror.Error
+	for _, tx := range collection.Transactions {
+		if !e.pool.Has(tx.ID()) {
+			err = e.ingest.ProcessLocal(tx)
+			if err != nil {
+				merr = multierror.Append(merr, err)
 			}
-			e.provider.SubmitLocal(req)
 		}
 	}
-	if err := missingTxErr.ErrorOrNil(); err != nil {
-		return fmt.Errorf("cannot validate block proposal (id=%x) with missing transactions: %w", proposal.Header.ID(), err)
-	}
-
-	// store the transactions
-	for _, txID := range collection.Transactions {
-		tx, err := e.pool.ByID(txID)
-		if err != nil {
-			return fmt.Errorf("could not store missing transaction: %w", err)
-		}
-		err = e.transactions.Store(tx)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("could not store transaction: %w", err)
-		}
+	if err := merr.ErrorOrNil(); err != nil {
+		return fmt.Errorf("cannot validate block proposal (id=%x) with invalid transactions: %w", proposal.Header.ID(), err)
 	}
 
 	// store the payload

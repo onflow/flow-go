@@ -59,13 +59,13 @@ func TestCollections(t *testing.T) {
 			_ = db.Update(func(tx *badger.Txn) error {
 				err := InsertCollection(&expected)(tx)
 				assert.Nil(t, err)
-				err = IndexCollectionPayload(height, blockID, parentID, &expected)(tx)
+				err = IndexCollectionPayload(height, blockID, parentID, expected.Transactions)(tx)
 				assert.Nil(t, err)
 				return nil
 			})
 
 			var actual flow.LightCollection
-			err := db.View(LookupCollectionPayload(height, blockID, parentID, &actual))
+			err := db.View(LookupCollectionPayload(height, blockID, parentID, &actual.Transactions))
 			assert.Nil(t, err)
 
 			assert.Equal(t, expected, actual)
