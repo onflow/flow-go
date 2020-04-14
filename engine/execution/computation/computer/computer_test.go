@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
@@ -33,13 +33,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Twice()
 
-		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		result, err := exe.ExecuteBlock(block, view)
 		assert.NoError(t, err)
-		assert.Len(t, result.StateViews, 1)
+		assert.Len(t, result.StateSnapshots, 1)
 
 		vm.AssertExpectations(t)
 		bc.AssertExpectations(t)
@@ -69,7 +69,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{Events: events}, nil).
 			Times(totalTransactionCount)
 
-		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -77,7 +77,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 
 		//chunk count should match collection count
-		assert.Len(t, result.StateViews, collectionCount)
+		assert.Len(t, result.StateSnapshots, collectionCount)
 
 		// all events should have been collected
 		assert.Len(t, result.Events, totalEventCount)

@@ -27,7 +27,7 @@ func Genesis(identities IdentityList) *Block {
 	// create the header
 	header := Header{
 		ChainID:     DefaultChainID,
-		ParentID:    ZeroID,
+		ParentID:    GenesisParentID,
 		Height:      0,
 		PayloadHash: payload.Hash(),
 		Timestamp:   GenesisTime(),

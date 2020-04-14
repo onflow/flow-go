@@ -42,6 +42,22 @@ func (_m *Local) NodeID() flow.Identifier {
 	return r0
 }
 
+// NotMeFilter provides a mock function with given fields:
+func (_m *Local) NotMeFilter() flow.IdentityFilter {
+	ret := _m.Called()
+
+	var r0 flow.IdentityFilter
+	if rf, ok := ret.Get(0).(func() flow.IdentityFilter); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.IdentityFilter)
+		}
+	}
+
+	return r0
+}
+
 // Sign provides a mock function with given fields: _a0, _a1
 func (_m *Local) Sign(_a0 []byte, _a1 hash.Hasher) (crypto.Signature, error) {
 	ret := _m.Called(_a0, _a1)

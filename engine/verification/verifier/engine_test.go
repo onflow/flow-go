@@ -21,6 +21,7 @@ import (
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -241,4 +242,8 @@ func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) (chmodel.Chu
 		return nil, nil
 	}
 
+}
+
+func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
+	return filter.Not(filter.HasNodeID(m.id))
 }

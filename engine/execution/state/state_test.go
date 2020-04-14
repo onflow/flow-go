@@ -3,6 +3,7 @@ package state_test
 import (
 	"testing"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,25 +18,27 @@ import (
 
 func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T) {
 	return func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(dbDir string) {
-			ls, err := ledger.NewTrieStorage(dbDir)
-			require.NoError(t, err)
+		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
+			unittest.RunWithTempDBDir(t, func(dbDir string) {
+				ls, err := ledger.NewTrieStorage(dbDir)
+				require.NoError(t, err)
 
-			ctrl := gomock.NewController(t)
+				ctrl := gomock.NewController(t)
 
-			stateCommitments := mocks.NewMockCommits(ctrl)
+				stateCommitments := mocks.NewMockCommits(ctrl)
 
-			stateCommitment := ls.EmptyStateCommitment()
+				stateCommitment := ls.EmptyStateCommitment()
 
-			stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
+				stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
 
-			chunkDataPacks := new(storage.ChunkDataPacks)
+				chunkDataPacks := new(storage.ChunkDataPacks)
 
-			executionResults := new(storage.ExecutionResults)
+				executionResults := new(storage.ExecutionResults)
 
-			es := state.NewExecutionState(ls, stateCommitments, chunkDataPacks, executionResults)
+				es := state.NewExecutionState(ls, stateCommitments, chunkDataPacks, executionResults, badgerDB)
 
-			f(t, es)
+				f(t, es)
+			})
 		})
 	}
 }
