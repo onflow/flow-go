@@ -3,12 +3,14 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -65,7 +67,12 @@ func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {
 	// lookup the latest seal to get latest blockid
 	seal, err := h.state.Final().Seal()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get latest sealed block ID: %w", err)
+	}
+
+	if seal.BlockID == flow.ZeroID {
+		// TODO: Figure out how to handle the very first seal, for now, just using latest finalized for script
+		return h.state.Final().Head()
 	}
 	// query header storage for that blockid
 	return h.headers.ByBlockID(seal.BlockID)

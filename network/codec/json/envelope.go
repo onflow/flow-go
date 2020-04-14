@@ -42,6 +42,9 @@ const (
 	CodeCollectionRequest
 	CodeCollectionResponse
 
+	CodeTransactionRequest
+	CodeTransactionResponse
+
 	CodeExecutionReceipt
 
 	CodeExecutionStateRequest

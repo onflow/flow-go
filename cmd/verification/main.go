@@ -30,6 +30,7 @@ import (
 func main() {
 
 	var (
+		alpha                uint
 		receiptLimit         uint
 		collectionLimit      uint
 		blockLimit           uint
@@ -56,6 +57,7 @@ func main() {
 			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of authCollections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 100000, "maximum number of chunk states in the memory pool")
+			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			authReceipts, err = stdmap.NewReceipts(receiptLimit)
@@ -107,8 +109,7 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			alpha := 10
-			assigner, err := chunks.NewPublicAssignment(alpha)
+			assigner, err := chunks.NewPublicAssignment(int(alpha))
 			if err != nil {
 				return nil, err
 			}

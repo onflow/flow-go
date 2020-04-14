@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// AccessClient is a GRPC client of the Access API exposed by the Flow network.
+// AccessClient is a GRPC client of the Observation API exposed by the Flow network.
 // NOTE: we use integration/client rather than sdk/client as a stopgap until
 // the SDK client is updated with the latest protobuf definitions.
 type Client struct {
@@ -47,8 +47,6 @@ func NewClient(addr string) (*Client, error) {
 	return NewClientWithKey(addr, key)
 }
 
-// DeployContract submits a transaction to deploy a contract with the given
-// code to the root account.
 func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) error {
 
 	code := dsl.Transaction{
@@ -60,7 +58,7 @@ func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) e
 
 	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(code))
 
-	return c.SendTransaction(ctx, tx)
+	return c.client.SendTransaction(ctx, tx)
 }
 
 // SignTransaction signs the transaction using the configured key and the root
@@ -80,8 +78,6 @@ func (c *Client) SignTransaction(tx flow.TransactionBody) (flow.TransactionBody,
 	return tx, nil
 }
 
-// SendTransaction submits the transaction to the Access API. The caller must
-// set up the transaction, including signing it.
 func (c *Client) SendTransaction(ctx context.Context, tx flow.TransactionBody) error {
 	return c.client.SendTransaction(ctx, tx)
 }
@@ -103,7 +99,7 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, er
 
 	res, err := c.client.ExecuteScript(ctx, []byte(code))
 	if err != nil {
-		return nil, fmt.Errorf("could not execute script: %w", err)
+		return nil, err
 	}
 
 	return res, nil

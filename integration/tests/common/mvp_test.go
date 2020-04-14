@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/testingdock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/testingdock"
 
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -15,7 +16,6 @@ import (
 )
 
 func TestMVP_Network(t *testing.T) {
-
 	t.Skip()
 
 	colNode := testnet.NewNodeConfig(flow.RoleCollection)
@@ -23,16 +23,19 @@ func TestMVP_Network(t *testing.T) {
 
 	net := []testnet.NodeConfig{
 		colNode,
+		testnet.NewNodeConfig(flow.RoleCollection),
 		exeNode,
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 	conf := testnet.NetworkConfig{Nodes: net}
 
 	// Enable verbose logging
 	testingdock.Verbose = true
+	testingdock.SpawnSequential = true
 
 	ctx := context.Background()
 
@@ -42,26 +45,10 @@ func TestMVP_Network(t *testing.T) {
 	flowNetwork.Start(ctx)
 	defer flowNetwork.Stop()
 
-	colContainer, ok := flowNetwork.ContainerByID(colNode.Identifier)
-	require.True(t, ok)
-	colNodeAPIPort := colContainer.Ports[testnet.ColNodeAPIPort]
-	require.NotEqual(t, "", colNodeAPIPort)
-
-	exeContainer, ok := flowNetwork.ContainerByID(exeNode.Identifier)
-	require.True(t, ok)
-	exeNodeAPIPort := exeContainer.Ports[testnet.ExeNodeAPIPort]
-	require.NotEqual(t, "", exeNodeAPIPort)
-
-	key, err := unittest.AccountKeyFixture()
+	accessClient, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]))
 	require.NoError(t, err)
 
-	colClient, err := testnet.NewClientWithKey(fmt.Sprintf(":%s", colNodeAPIPort), key)
-	require.NoError(t, err)
-
-	exeClient, err := testnet.NewClientWithKey(fmt.Sprintf(":%s", exeNodeAPIPort), key)
-	require.NoError(t, err)
-
-	runMVPTest(t, colClient, exeClient)
+	runMVPTest(t, accessClient)
 }
 
 func TestMVP_Emulator(t *testing.T) {
@@ -76,33 +63,37 @@ func TestMVP_Emulator(t *testing.T) {
 	c, err := testnet.NewClientWithKey(":3569", key)
 	require.NoError(t, err)
 
-	runMVPTest(t, c, c)
+	runMVPTest(t, c)
 }
 
-func runMVPTest(t *testing.T, colClient *testnet.Client, exeClient *testnet.Client) {
+func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 
 	ctx := context.Background()
 
 	// contract is not deployed, so script fails
-	counter, err := readCounter(ctx, exeClient)
+	counter, err := readCounter(ctx, accessClient)
 	require.Error(t, err)
 
-	err = deployCounter(ctx, colClient)
+	err = deployCounter(ctx, accessClient)
 	require.NoError(t, err)
 
 	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, exeClient)
+		counter, err = readCounter(ctx, accessClient)
 
+		if err != nil {
+			fmt.Println("Error executing script")
+			fmt.Println(err)
+		}
 		return err == nil && counter == -3
-	}, 30*time.Second, time.Second)
+	}, 60*time.Second, time.Second)
 
-	err = createCounter(ctx, colClient)
+	err = createCounter(ctx, accessClient)
 	require.NoError(t, err)
 
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, exeClient)
+		counter, err = readCounter(ctx, accessClient)
 
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)

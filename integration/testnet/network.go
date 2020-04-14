@@ -352,6 +352,7 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 		nodeContainer.Ports[ColNodeAPIPort] = hostPort
 		f.AccessPorts[ColNodeAPIPort] = hostPort
+
 	case flow.RoleExecution:
 
 		hostPort := testingdock.RandomPort(t)
@@ -375,6 +376,22 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 		)
 
 		nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+
+	case flow.RoleAccess:
+		hostPort := testingdock.RandomPort(t)
+		containerPort := "9000/tcp"
+
+		nodeContainer.bindPort(hostPort, containerPort)
+
+		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+		nodeContainer.addFlag("ingress-addr", fmt.Sprintf("host.docker.internal:%s", f.AccessPorts[ColNodeAPIPort]))
+		nodeContainer.addFlag("script-addr", fmt.Sprintf("host.docker.internal:%s", f.AccessPorts[ExeNodeAPIPort]))
+		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+		nodeContainer.Ports[AccessNodeAPIPort] = hostPort
+		f.AccessPorts[AccessNodeAPIPort] = hostPort
+
+	case flow.RoleVerification:
+		nodeContainer.addFlag("alpha", "1")
 	}
 
 	suiteContainer := suite.Container(*opts)
