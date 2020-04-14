@@ -179,7 +179,7 @@ func main() {
 			build := builder.NewBuilder(node.DB, pool, clusterID)
 			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, prov, pool, transactions, headers, colPayloads, colCache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, headers, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
