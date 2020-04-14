@@ -114,6 +114,7 @@ func main() {
 			blocksDB := storage.NewBlocks(node.DB)
 			guaranteesDB := storage.NewGuarantees(node.DB)
 			sealsDB := storage.NewSeals(node.DB)
+			viewsDB := storage.NewViews(node.DB)
 
 			// initialize the pending blocks cache
 			cache := buffer.NewPendingBlocks()
@@ -160,12 +161,12 @@ func main() {
 
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, headersDB, node.State, node.Me, build, final, signer, comp,
-				selector, &node.GenesisBlock.Header, node.GenesisQC,
+				node.Logger, notifier, node.Metrics, headersDB, viewsDB, node.State, node.Me,
+				build, final, signer, comp, selector, &node.GenesisBlock.Header, node.GenesisQC,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
 			if err != nil {
-				return nil, fmt.Errorf("could not initialize coldstuff engine: %w", err)
+				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
 			}
 
 			comp = comp.WithSynchronization(sync).WithConsensus(hot)

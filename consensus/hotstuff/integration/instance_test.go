@@ -50,6 +50,7 @@ type Instance struct {
 	proto        *protocol.State
 	builder      *module.Builder
 	finalizer    *module.Finalizer
+	persist      *mocks.Persister
 	signer       *mocks.Signer
 	verifier     *mocks.Verifier
 	communicator *mocks.Communicator
@@ -122,6 +123,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		snapshot:     &protocol.Snapshot{},
 		proto:        &protocol.State{},
 		builder:      &module.Builder{},
+		persist:      &mocks.Persister{},
 		signer:       &mocks.Signer{},
 		verifier:     &mocks.Verifier{},
 		communicator: &mocks.Communicator{},
@@ -173,6 +175,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			return nil
 		},
 	)
+
+	// program persister to always succeed
+	in.persist.On("CurrentView", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateProposal", mock.Anything).Return(
@@ -314,7 +319,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.voter = voter.New(in.signer, in.forks, DefaultVoted())
 
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.communicator, in.viewstate, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.viewstate, in.aggregator, in.voter, in.validator, notifier)
 	require.NoError(t, err)
 
 	return &in
