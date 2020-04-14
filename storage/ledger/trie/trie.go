@@ -229,7 +229,8 @@ type SMT struct {
 	forest *forest
 
 	//rootNode                 *node                    // Root
-	height int // Height of the tree
+	height      int // Height of the tree
+	keyByteSize int // acceptable number of bytes for key
 	//database             databases.DAL            // The Database Interface for the trie
 	//historicalStates     map[string]databases.DAL // Map of string representations of Historical States to Historical Database references
 	//cachedBranches       map[string]*proofHolder  // Map of string representations of keys to proofs
@@ -367,6 +368,7 @@ func NewSMT(
 
 	//s.database = db
 	s.height = height
+	s.keyByteSize = (height - 1) / 8
 
 	// Set rootNode to the highest level default node
 	//s.rootNode = newNode(GetDefaultHashForHeight(height-1), height-1)
@@ -466,7 +468,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 
 	// check key sizes
 	for _, k := range keys {
-		if len(k) != (s.height-1)/8 {
+		if len(k) != s.keyByteSize {
 			return nil, nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
 		}
 	}
@@ -894,7 +896,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 
 	// check key sizes
 	for _, k := range keys {
-		if len(k) != (s.height-1)/8 {
+		if len(k) != s.keyByteSize {
 			return nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
 		}
 	}

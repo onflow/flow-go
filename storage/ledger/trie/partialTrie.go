@@ -12,9 +12,10 @@ import (
 // unpopulated branches and parts that are compact. It is fully stored in memory and doesn't use
 // a database.
 type PSMT struct {
-	root      *node // Root
-	height    int   // Height of the tree
-	keyLookUp map[string]*node
+	root        *node // Root
+	height      int   // Height of the tree
+	keyByteSize int   // acceptable size of key (in bytes)
+	keyLookUp   map[string]*node
 }
 
 // GetHeight returns the Height of the SMT
@@ -60,7 +61,7 @@ func NewPSMT(
 	if height < 1 {
 		return nil, fmt.Errorf("minimum acceptable value for the  hight is 1")
 	}
-	psmt := PSMT{newNode(nil, height-1), height, make(map[string]*node)}
+	psmt := PSMT{newNode(nil, height-1), height, (height - 1) / 8, make(map[string]*node)}
 
 	// We need to decode proof encodings
 	proofholder, err := DecodeProof(proofs)
@@ -86,9 +87,8 @@ func NewPSMT(
 		inclusion := proofholder.inclusions[i]
 
 		// check key size
-		if len(key) != (height-1)/8 {
+		if len(key) != psmt.keyByteSize {
 			return nil, fmt.Errorf("key [%x] size (%d) doesn't match the trie height (%d)", key, len(key), height)
-
 		}
 
 		// we keep track of our progress through proofs by proofIndex
