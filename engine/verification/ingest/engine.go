@@ -579,15 +579,6 @@ func (e *Engine) checkPendingChunks() {
 				continue
 			}
 
-			// marks this chunk as ingested
-			err = e.ingestedChunkIDs.Add(chunk.ID())
-			if err != nil {
-				e.log.Error().
-					Err(err).
-					Hex("chunk", logging.Entity(chunk)).
-					Msg("could not add chunk to ingested chunks mempool")
-			}
-
 			// does resource cleanup
 			e.onChunkIngested(vchunk)
 		}
@@ -598,6 +589,15 @@ func (e *Engine) checkPendingChunks() {
 // chunk and is sent to the verify engine successfully.
 // It cleans up all resources associated with this chunk
 func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
+	// marks this chunk as ingested
+	err := e.ingestedChunkIDs.Add(vc.ChunkDataPack.ChunkID)
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Hex("chunk_id", logging.ID(vc.ChunkDataPack.ChunkID)).
+			Msg("could not add chunk to ingested chunks mempool")
+	}
+
 	// cleans up resources of the ingested chunk from mempools
 	e.authCollections.Rem(vc.Collection.ID())
 	e.chunkDataPacks.Rem(vc.ChunkDataPack.ID())
