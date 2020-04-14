@@ -32,7 +32,7 @@ var (
 		Name:      "verifications_storage_per_chunk",
 		Namespace: "verification",
 		Help:      "storage per chunk data",
-	}, []string{"name"})
+	}, []string{"chunkID"})
 )
 
 // OnChunkVerificationStarted is called whenever the verification of a chunk is started
