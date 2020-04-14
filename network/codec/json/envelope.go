@@ -43,9 +43,10 @@ const (
 	CodeCollectionResponse
 
 	CodeExecutionReceipt
-
 	CodeExecutionStateRequest
 	CodeExecutionStateResponse
+	CodeExecutionStateSyncRequest
+	CodeExecutionStateDelta
 	CodeChunkDataPackRequest
 	CodeChunkDataPackResponse
 )

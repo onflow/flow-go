@@ -102,6 +102,20 @@ func (mr *MockLocalMockRecorder) NodeID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NodeID", reflect.TypeOf((*MockLocal)(nil).NodeID))
 }
 
+// NotMeFilter mocks base method
+func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NotMeFilter")
+	ret0, _ := ret[0].(flow.IdentityFilter)
+	return ret0
+}
+
+// NotMeFilter indicates an expected call of NotMeFilter
+func (mr *MockLocalMockRecorder) NotMeFilter() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NotMeFilter", reflect.TypeOf((*MockLocal)(nil).NotMeFilter))
+}
+
 // Sign mocks base method
 func (m *MockLocal) Sign(arg0 []byte, arg1 hash.Hasher) (crypto.Signature, error) {
 	m.ctrl.T.Helper()

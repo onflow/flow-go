@@ -15,6 +15,9 @@ func TestInsertRetrieveBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.BlockFixture()
 
+		// This will break test
+		//block.ChainID = "\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;"
+
 		err := db.Update(InsertBlock(&block))
 		require.NoError(t, err)
 

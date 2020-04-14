@@ -971,6 +971,7 @@ func (s *SMT) insertIntoKeys(database databases.DAL, insert []byte, keys [][]byt
 		}
 		// Otherwise, append the key + value pair and loop
 		newKeys = append(newKeys, keys[i])
+
 		newValues = append(newValues, values[i])
 	}
 
