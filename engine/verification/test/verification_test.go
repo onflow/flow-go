@@ -113,7 +113,6 @@ func TestHappyPath(t *testing.T) {
 		Run(func(args testifymock.Arguments) {
 			_, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
-			// assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.Body.ExecutionResultID)
 		}).
 		// half of the chunks are assigned to the verification node
 		// for each chunk there is one result approval emitted from verification node
@@ -169,12 +168,24 @@ func TestHappyPath(t *testing.T) {
 	// assert proper number of calls made
 	exeEngine.AssertExpectations(t)
 
-	// associated resources should be removed from the mempool
+	// resource cleanup
+	//
 	for i := 0; i < chunkNum; i++ {
+		// associated resources for each chunk should be removed from the mempool
 		assert.False(t, verNode.AuthCollections.Has(completeER.Collections[i].ID()))
+		assert.False(t, verNode.PendingCollections.Has(completeER.Collections[i].ID()))
+		assert.False(t, verNode.ChunkDataPacks.Has(completeER.ChunkDataPacks[i].ID()))
+		if isAssigned(i, chunkNum) {
+			// chunk ID of assigned chunks should be added to ingested chunks mempool
+			assert.True(t, verNode.IngestedChunkIDs.Has(completeER.Receipt.ExecutionResult.Chunks[i].ID()))
+		}
 	}
-	// TODO adding complementary tests for claning other resources like the execution receipt
-	// https://github.com/dapperlabs/flow-go/issues/2750
+	// since all chunks have been ingested, execution receipt should be removed from mempool
+	assert.False(t, verNode.PendingReceipts.Has(completeER.Receipt.ID()))
+	assert.False(t, verNode.AuthReceipts.Has(completeER.Receipt.ID()))
+
+	// receipt ID should be added to the ingested results mempool
+	assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
 
 	verNode.Done()
 	colNode.Done()

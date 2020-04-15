@@ -14,12 +14,12 @@ import (
 // InsertNumberForCluster inserts a block number to block ID mapping for
 // the given cluster.
 func InsertNumberForCluster(clusterID string, number uint64, blockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeNumber, clusterID, number), blockID)
+	return insert(makePrefix(codeFinalizedBlockNumber, clusterID, number), blockID)
 }
 
 // RetrieveNumberForCluster retrieves a block ID by number for the given cluster
 func RetrieveNumberForCluster(clusterID string, number uint64, blockID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeNumber, clusterID, number), blockID)
+	return retrieve(makePrefix(codeFinalizedBlockNumber, clusterID, number), blockID)
 }
 
 // InsertBoundaryForCluster inserts the finalized boundary for the given cluster.

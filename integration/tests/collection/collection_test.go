@@ -157,7 +157,7 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 		// wait for consensus to complete
 		//TODO we should listen for collection guarantees instead, but this is blocked
 		// ref: https://github.com/dapperlabs/flow-go/issues/3021
-		time.Sleep(10 * time.Second)
+		time.Sleep(20 * time.Second)
 
 		// TODO stop then start containers
 		err = net.StopContainers()
@@ -186,11 +186,11 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 			head, err = state.AtBlockID(head.ParentID).Head()
 			assert.Nil(t, err)
 
-			if collection.Len() == 0 {
+			if len(collection.Transactions) == 0 {
 				continue
 			}
 
-			for _, txID := range collection.Transactions {
+			for _, txID := range collection.Light().Transactions {
 				assert.Equal(t, tx.ID(), txID, "found unexpected transaction")
 				if txID == tx.ID() {
 					assert.False(t, foundTx, "found duplicate transaction")

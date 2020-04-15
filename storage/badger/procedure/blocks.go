@@ -4,6 +4,7 @@ package procedure
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -214,13 +215,13 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 		}
 
 		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,
+			PreviousResultID: flow.GenesisExecutionResultParentID,
 			BlockID:          genesis.ID(),
 			FinalStateCommit: seal.FinalState,
 		}}
 
 		// index the commit for the execution node
-		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
+		err = operation.IndexStateCommitment(genesis.ID(), seal.FinalState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index commit: %w", err)
 		}
@@ -287,6 +288,41 @@ func RetrieveBlockByCollectionID(collectionID flow.Identifier, block *flow.Block
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
+		return nil
+	}
+}
+
+func RetrieveLatestFinalizedHeader(header *flow.Header) func(tx *badger.Txn) error {
+	var number uint64 = math.MaxUint64
+	blockID := flow.ZeroID
+	return RetrieveHeader(&number, &blockID, header)
+}
+
+func RetrieveHeader(number *uint64, blockID *flow.Identifier, header *flow.Header) func(tx *badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// set the number to boundary if it's at max uint64
+		if *number == math.MaxUint64 {
+			err := operation.RetrieveBoundary(number)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve boundary: %w", err)
+			}
+		}
+
+		// check if hash is nil and try to get it from height
+		if *blockID == flow.ZeroID {
+			err := operation.RetrieveNumber(*number, blockID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve hash (%d): %w", number, err)
+			}
+		}
+
+		// get the height for our desired target hash
+		err := operation.RetrieveHeader(*blockID, header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header (%x): %w", blockID, err)
+		}
+
 		return nil
 	}
 }

@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -38,10 +36,6 @@ func TestSnapshot(t *testing.T) {
 
 		// a helper function to insert a block
 		insert := func(block cluster.Block) {
-			// first insert the payload
-			err = db.Update(operation.SkipDuplicates(operation.InsertCollection(&block.Collection)))
-			assert.Nil(t, err)
-			// then insert the block
 			err = db.Update(procedure.InsertClusterBlock(&block))
 			assert.Nil(t, err)
 		}
@@ -83,8 +77,7 @@ func TestSnapshot(t *testing.T) {
 
 			// create a block with an empty collection
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.Collection = flow.LightCollection{}
-			block.PayloadHash = block.Payload.Hash()
+			block.SetPayload(cluster.EmptyPayload())
 			insert(block)
 
 			snapshot := state.AtBlockID(block.ID())
