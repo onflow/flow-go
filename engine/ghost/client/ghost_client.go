@@ -1,6 +1,3 @@
-// Package client implements a GRPC client to the Flow network API. This
-// matches the client exposed by the SDK is intended to be replaced by the SDK
-// once its protobuf definitions are up-to-date.
 package client
 
 import (
@@ -12,16 +9,12 @@ import (
 	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
 )
 
-// GhostClient is a Flow user agent client.
-// NOTE: This is a stop gap solution till the flow-go-sdk also starts using the latest access node API
+// GhostClient is a client for the Ghost Node
 type GhostClient struct {
 	rpcClient ghost.GhostNodeAPIClient
 	close     func() error
 }
 
-// NewGhostClient initializes a Flow client with the default gRPC provider.
-//
-// An error will be returned if the host is unreachable.
 func NewGhostClient(addr string) (*GhostClient, error) {
 
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
@@ -61,11 +54,6 @@ func (c *GhostClient) Subscribe(ctx context.Context) (*FlowMessageStreamReader, 
 		return nil, err
 	}
 	return &FlowMessageStreamReader{stream: stream}, nil
-}
-
-// RPCClient get the RPC client
-func (c *GhostClient) RPCClient() ghost.GhostNodeAPIClient {
-	return c.rpcClient
 }
 
 type FlowMessageStreamReader struct {
