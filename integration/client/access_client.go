@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -69,4 +70,14 @@ func (c *AccessClient) ExecuteScript(ctx context.Context, script []byte) ([]byte
 	}
 
 	return res.GetValue(), nil
+}
+
+// GetAccount gets an account
+func (c *AccessClient) GetAccount(ctx context.Context, address flow.Address) (*entities.Account, error) {
+	res, err := c.rpcClient.GetAccount(ctx, &access.GetAccountRequest{Address: address[:]})
+	if err != nil {
+		return nil, err
+	}
+
+	return res.GetAccount(), nil
 }

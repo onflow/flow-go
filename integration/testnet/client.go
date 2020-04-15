@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/client"
@@ -118,4 +120,9 @@ func signTransaction(tx flow.TransactionBody, privateKey crypto.PrivateKey) (cry
 	}
 	b := transaction.Singularity()
 	return privateKey.Sign(b, hasher)
+}
+
+// GetAccount gets an account
+func (c *Client) GetAccount(ctx context.Context, address flow.Address) (*entities.Account, error) {
+	return c.client.GetAccount(ctx, address)
 }
