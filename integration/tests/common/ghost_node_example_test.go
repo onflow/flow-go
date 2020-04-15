@@ -53,6 +53,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 	net.Start(ctx)
 	defer net.Cleanup()
+	defer net.Stop()
 
 	// get the ghost container
 	ghostContainer, ok := net.ContainerByID(ghostExeNode.Identifier)
@@ -90,10 +91,6 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 	assert.EqualValues(t, 1, blocks[0].Height)
 	assert.EqualValues(t, 2, blocks[1].Height)
-
-	err = net.Stop()
-	require.Nil(t, err)
-
 }
 
 // TestGhostNodeExample_Send demonstrates how to emulate a node and send an event from it
@@ -130,6 +127,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 
 	net.Start(ctx)
 	defer net.Cleanup()
+	defer net.Stop()
 
 	// get the ghost container
 	ghostContainer, ok := net.ContainerByID(ghostCollNode.Identifier)
@@ -145,10 +143,6 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	// send the transaction as an event to the real collection node
 	err = ghostClient.Send(ctx, engine.CollectionIngest, []flow.Identifier{realCollNode.Identifier}, &tx)
 	assert.NoError(t, err)
-
-	err = net.Stop()
-	require.Nil(t, err)
-
 }
 
 func sendTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.Identifier) {
