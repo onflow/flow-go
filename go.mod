@@ -6,7 +6,8 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
-	github.com/dapperlabs/flow-go/integration v0.0.0-20200406190816-e4c4d2b5219c
+	github.com/dapperlabs/flow-go/integration v0.0.0-20200414184827-72032a043fca
+	github.com/dapperlabs/flow-go/protobuf v0.3.2-0.20200312195452-df4550a863b7 // indirect
 	github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2

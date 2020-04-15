@@ -90,7 +90,7 @@ type FlowNodeBuilder struct {
 	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
 	postInitFns    []func(*FlowNodeBuilder)
 	stakingKey     crypto.PrivateKey
-	networkKey     crypto.PrivateKey
+	NetworkKey     crypto.PrivateKey
 
 	// genesis information
 	GenesisBlock *flow.Block
@@ -116,7 +116,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		codec := jsoncodec.NewCodec()
 
-		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID(), fnb.networkKey)
+		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID(), fnb.NetworkKey)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
@@ -160,7 +160,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 
 	fnb.NodeID = nodeID
 	fnb.stakingKey = info.StakingPrivKey.PrivateKey
-	fnb.networkKey = info.NetworkPrivKey.PrivateKey
+	fnb.NetworkKey = info.NetworkPrivKey.PrivateKey
 }
 
 func (fnb *FlowNodeBuilder) initLogger() {

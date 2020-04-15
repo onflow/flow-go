@@ -102,6 +102,7 @@ github.com/cpuguy83/go-md2man/v2 v2.0.0/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsr
 github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2 h1:/7hkvJx5m7IYKX0NDkMMBEjYNvUxRtREEHGlgi0wYDk=
 github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2/go.mod h1:WgzAWRd7gcxi6dfJmEdeTArtQVGOr48oLxLW4adsztk=
 github.com/dapperlabs/flow-go/integration v0.0.0-20200406190816-e4c4d2b5219c/go.mod h1:U1t9nUsu42c36UV2Q3tGFCIk0YtPiyTU4eqR38lVm1I=
+github.com/dapperlabs/flow-go/integration v0.0.0-20200414184827-72032a043fca/go.mod h1:xld2pNUktpQuie8Xy87EZ89hXVK17Oqwm07IKUxTfW8=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125 h1:Zc17Y/8ycLcVd1T/tsiho0k9XVq+SxCHhYBuzkn5kkQ=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125/go.mod h1:ThpXZwEduNJCzmpEVEUy3Ml5dDAWttnzlBJPTOSAin0=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679 h1:rOzL+A6plLZY0XwvrUu089U2LTKiyGIdr/F4pknuQYY=

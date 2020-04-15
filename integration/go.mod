@@ -3,7 +3,6 @@ module github.com/dapperlabs/flow-go/integration
 go 1.13
 
 require (
-	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2
 	github.com/dapperlabs/flow-go v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
@@ -14,7 +13,6 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/stretchr/testify v1.5.1
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	google.golang.org/grpc v1.28.0
 	gotest.tools v2.2.0+incompatible
 )
