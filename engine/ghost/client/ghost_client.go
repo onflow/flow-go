@@ -74,7 +74,7 @@ func (c *GhostClient) Subscribe(ctx context.Context) (*FlowMessageStreamReader, 
 
 type FlowMessageStreamReader struct {
 	stream ghost.GhostNodeAPI_SubscribeClient
-	codec  jsoncodec.Codec
+	codec  network.Codec
 }
 
 func (fmsr *FlowMessageStreamReader) Next() (flow.Identifier, interface{}, error) {

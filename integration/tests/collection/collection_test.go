@@ -172,9 +172,10 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, event)
 
-		// TODO: do something meaningful with the origin ID and the message, for now just send it log it
+		// TODO: do something meaningful with the origin ID and the message, for now just log it
 		t.Log(originID)
 
+		// case event to the desired type
 		switch ev := event.(type) {
 		case *messages.ClusterBlockProposal:
 			t.Log(*ev.Payload)
@@ -187,13 +188,6 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 		// send a transaction using the ghost node
 		err = ghostClient.Send(ctx, engine.CollectionIngest, []flow.Identifier{colNode1.Identifier}, &tx)
 		assert.NoError(t, err)
-
-		msg, err := msgReader.Next()
-		assert.NoError(t, err)
-		assert.NotNil(t, msg)
-
-		// TODO: do something meaningful with the message
-		t.Log(msg)
 
 		// wait for consensus to complete
 		//TODO we should listen for collection guarantees instead, but this is blocked
