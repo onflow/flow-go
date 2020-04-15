@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -45,6 +46,7 @@ func TestHappyPath(t *testing.T) {
 
 	completeER := CompleteExecutionResultFixture(t, chunkNum)
 
+	//
 	// assigns half of the chunks to this verifier
 	a := chmodel.NewAssignment()
 	for i := 0; i < chunkNum; i++ {
@@ -122,19 +124,38 @@ func TestHappyPath(t *testing.T) {
 	_, err = conNode.Net.Register(engine.ApprovalProvider, conEngine)
 	assert.Nil(t, err)
 
-	// assume the verification node has received the block
+	// assumes the verification node has received the block
 	err = verNode.BlockStorage.Store(completeER.Block)
 	assert.Nil(t, err)
 
-	// inject the collections into the collection node mempool
+	// injects the collections into the collection node mempool
 	for i := 0; i < chunkNum; i++ {
 		err = colNode.Collections.Store(completeER.Collections[i])
 		assert.Nil(t, err)
 	}
 
 	// send the ER from execution to verification node
-	err = verNode.IngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
-	assert.Nil(t, err)
+	receipt1 := completeER.Receipt
+	receipt2 := &flow.ExecutionReceipt{
+		ExecutorID:        exeIdentity.NodeID,
+		ExecutionResult:   completeER.Receipt.ExecutionResult,
+		ExecutorSignature: unittest.SignatureFixture(),
+	}
+
+	verWG := sync.WaitGroup{}
+	verWG.Add(2)
+
+	go func() {
+		err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt1)
+		assert.Nil(t, err)
+		go verWG.Done()
+	}()
+
+	go func() {
+		err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt2)
+		assert.Nil(t, err)
+		go verWG.Done()
+	}()
 
 	// the receipt should be added to the mempool
 	// sleep for 1 second to make sure that receipt finds its way to
@@ -157,10 +178,10 @@ func TestHappyPath(t *testing.T) {
 		return m.ChannelID == engine.CollectionProvider
 	})
 
-	// TODO add chunk data pack request and response
-
 	// flush the result approval broadcast
 	verNet.DeliverAll(true)
+
+	unittest.AssertReturnsBefore(t, verWG.Wait, 3*time.Second)
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
