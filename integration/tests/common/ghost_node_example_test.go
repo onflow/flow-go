@@ -23,7 +23,6 @@ import (
 func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 	t.Skip()
-
 	var (
 		// one collection node
 		collNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(1))
@@ -92,13 +91,15 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	assert.EqualValues(t, 1, blocks[0].Height)
 	assert.EqualValues(t, 2, blocks[1].Height)
 
+	err = net.Stop()
+	require.Nil(t, err)
+
 }
 
 // TestGhostNodeExample_Send demonstrates how to emulate a node and send an event from it
 func TestGhostNodeExample_Send(t *testing.T) {
 
 	t.Skip()
-
 	var (
 		// one real collection node
 		realCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(1))
@@ -144,6 +145,9 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	// send the transaction as an event to the real collection node
 	err = ghostClient.Send(ctx, engine.CollectionIngest, []flow.Identifier{realCollNode.Identifier}, &tx)
 	assert.NoError(t, err)
+
+	err = net.Stop()
+	require.Nil(t, err)
 
 }
 
