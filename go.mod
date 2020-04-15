@@ -6,8 +6,7 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
-	github.com/dapperlabs/flow-go/integration v0.0.0-20200414184827-72032a043fca
-	github.com/dapperlabs/flow-go/protobuf v0.3.2-0.20200312195452-df4550a863b7 // indirect
+	github.com/dapperlabs/flow-go/integration v0.0.0-20200406190816-e4c4d2b5219c
 	github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
@@ -43,6 +42,7 @@ require (
 	github.com/whyrusleeping/go-logging v0.0.1
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
+	golang.org/x/tools v0.0.0-20200413161937-250b2131eb8b // indirect
 	google.golang.org/grpc v1.28.0
 	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )
