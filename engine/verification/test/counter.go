@@ -44,7 +44,7 @@ func GetTxBodyDeployCounterContract() *flow.TransactionBody {
               prepare(signer: AuthAccount) {
                 signer.setCode("%s".decodeHex())
               }
-            }`, encoded)),
+			}`, encoded)),
 		ScriptAccounts: []flow.Address{flow.RootAddress},
 	}
 }
@@ -73,7 +73,7 @@ func GetTxBodyAddToCounter() *flow.TransactionBody {
 			import 0x01
 			transaction {
 				prepare(acc: AuthAccount) {
-					acc.storage[Container.Counter].add(2)
+					acc.storage[Container.Counter]?.add(2)
               	}
             }`),
 		ScriptAccounts: []flow.Address{flow.RootAddress},
