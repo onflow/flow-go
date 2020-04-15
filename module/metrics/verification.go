@@ -15,22 +15,22 @@ const chunkExecutionSpanner = "chunk_execution_duration"
 var (
 	chunksCheckedPerBlock = promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "verifications_chunks_checked",
-		Namespace: "verification",
+		Namespace: namespaceVerification,
 		Help:      "The total number of chunks checked",
 	})
 	resultApprovalsPerBlock = promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "verifications_result_approvals",
-		Namespace: "verification",
+		Namespace: namespaceVerification,
 		Help:      "The total number of emitted result approvals",
 	})
 	totalStorage = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "verifications_total_size",
-		Namespace: "verification",
+		Namespace: namespaceVerification,
 		Help:      "total storage on disk",
 	})
 	storagePerChunk = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name:      "verifications_storage_per_chunk",
-		Namespace: "verification",
+		Namespace: namespaceVerification,
 		Help:      "storage per chunk data",
 	}, []string{"chunkID"})
 )
