@@ -384,8 +384,9 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 		nodeContainer.bindPort(hostPort, containerPort)
 
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.addFlag("ingress-addr", fmt.Sprintf("host.docker.internal:%s", f.AccessPorts[ColNodeAPIPort]))
-		nodeContainer.addFlag("script-addr", fmt.Sprintf("host.docker.internal:%s", f.AccessPorts[ExeNodeAPIPort]))
+		// Should always have at least 1 collection and execution node
+		nodeContainer.addFlag("ingress-addr", "collection_1:9000")
+		nodeContainer.addFlag("script-addr", "execution_1:9000")
 		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 		nodeContainer.Ports[AccessNodeAPIPort] = hostPort
 		f.AccessPorts[AccessNodeAPIPort] = hostPort
