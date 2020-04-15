@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/integration/testnet"
+	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
@@ -119,12 +120,13 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 func TestTransactionIngress_ValidTransaction(t *testing.T) {
 
 	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
-		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
+		colNode1      = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
+		colNode2      = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
+		colNode3      = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
+		colNode4Ghost = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(4), testnet.AsGhost(true))
 	)
 
-	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
+	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3, colNode4Ghost}, defaultOtherNodes()...)
 	conf := testnet.NetworkConfig{Nodes: nodes}
 
 	net, err := testnet.PrepareFlowNetwork(t, "col_valid_txns", conf)
@@ -144,6 +146,16 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", port))
 
+	// COL4 is the ghost node
+	ghostContainer, ok := net.ContainerByID(colNode4Ghost.Identifier)
+	assert.True(t, ok)
+
+	// get the ghost client
+	ghostClient, err := common.GetGhostClient(ghostContainer)
+	assert.NoError(t, err)
+	msgReader, err := ghostClient.Subscribe(ctx)
+	assert.NoError(t, err)
+
 	t.Run("valid transaction", func(t *testing.T) {
 		tx := unittest.TransactionBodyFixture()
 		tx, err := client.SignTransaction(tx)
@@ -154,6 +166,13 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 		defer cancel()
 		err = client.SendTransaction(ctx, tx)
 		assert.Nil(t, err)
+
+		msg, err := msgReader.Next()
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+
+		// TODO: do something meaningful with the message
+		t.Log(msg)
 
 		// wait for consensus to complete
 		//TODO we should listen for collection guarantees instead, but this is blocked

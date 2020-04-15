@@ -55,7 +55,8 @@ type Middleware struct {
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
-func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier, key crypto.PrivateKey) (*Middleware, error) {
+func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
+	key crypto.PrivateKey, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -64,10 +65,9 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 	p2p := &P2PNode{}
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// add validators to filter out unwanted messages received by this node
-	validators := []validators.MessageValidator{
-		validators.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
-		validators.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
+	if len(validators) == 0 {
+		// add default validators to filter out unwanted messages received by this node
+		validators = defaultValidators(log, flowID)
 	}
 
 	// create the node entity and inject dependencies & config
@@ -87,6 +87,13 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 	}
 
 	return m, err
+}
+
+func defaultValidators(log zerolog.Logger, flowID flow.Identifier) []validators.MessageValidator {
+	return []validators.MessageValidator{
+		validators.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
+		validators.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
+	}
 }
 
 // Me returns the flow identifier of the this middleware

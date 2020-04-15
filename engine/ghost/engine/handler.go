@@ -1,0 +1,81 @@
+package engine
+
+import (
+	"context"
+
+	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network"
+)
+
+// Handler handles the GRPC calls from a client
+type Handler struct {
+	log        zerolog.Logger
+	conduitMap map[uint8]network.Conduit
+	msgChan    chan ghost.FlowMessage
+	codec      network.Codec
+}
+
+var _ ghost.GhostNodeAPIServer = Handler{}
+
+func NewHandler(log zerolog.Logger, conduitMap map[uint8]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
+	return &Handler{
+		log:        log,
+		conduitMap: conduitMap,
+		msgChan:    msgChan,
+		codec:      codec,
+	}
+}
+
+func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*empty.Empty, error) {
+
+	channelID := req.GetChannelId()
+
+	// find the conduit for the channel ID
+	conduit, found := h.conduitMap[uint8(channelID)]
+
+	if !found {
+		return nil, status.Error(codes.InvalidArgument, "conduit not found for given channel id")
+	}
+
+	// TODO: The message might have to be decoded to avoid double encoding by the n/w layer
+	message := req.GetMessage()
+	targetIDs := req.GetTargetID()
+
+	// Convert target ID to flow IDS
+	var flowIDs = make([]flow.Identifier, len(targetIDs))
+	for i, id := range targetIDs {
+		flowIDs[i] = flow.HashToID(id)
+	}
+
+	// Submit the message over libp2p
+	err := conduit.Submit(message, flowIDs...)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to submit message: %v", err)
+	}
+
+	return nil, nil
+}
+
+// Subscribe streams ALL the libp2p network messages over GRPC
+func (h Handler) Subscribe(_ *ghost.SubscribeRequest, stream ghost.GhostNodeAPI_SubscribeServer) error {
+	for {
+
+		// read the network message from the channel
+		flowMessage, ok := <-h.msgChan
+		if !ok {
+			return nil
+		}
+
+		// send it to the client
+		err := stream.Send(&flowMessage)
+		if err != nil {
+			return status.Errorf(codes.Internal, "failed to stream message: %v", err)
+		}
+	}
+}

@@ -47,6 +47,8 @@ const (
 	ExeNodeAPIPort = "exe-api-port"
 	// AccessNodeAPIPort is the name used for the access node API port.
 	AccessNodeAPIPort = "access-api-port"
+	// GhostNodeAPIPort is the name used for the access node API port.
+	GhostNodeAPIPort = "ghost-api-port"
 )
 
 func init() {
@@ -155,6 +157,7 @@ type NodeConfig struct {
 	Stake      uint64
 	Identifier flow.Identifier
 	LogLevel   string
+	Ghost      bool
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -199,6 +202,12 @@ func WithIDInt(id uint) func(config *NodeConfig) {
 func WithLogLevel(level string) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.LogLevel = level
+	}
+}
+
+func AsGhost(ghost bool) func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.Ghost = ghost
 	}
 }
 
@@ -340,59 +349,75 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 		fmt.Sprintf("%s:%s:ro", bootstrapDir, DefaultBootstrapDir),
 	)
 
-	switch conf.Role {
-	case flow.RoleCollection:
+	if !conf.Ghost {
+		switch conf.Role {
+		case flow.RoleCollection:
 
-		hostPort := testingdock.RandomPort(t)
-		containerPort := "9000/tcp"
+			hostPort := testingdock.RandomPort(t)
+			containerPort := "9000/tcp"
 
-		nodeContainer.bindPort(hostPort, containerPort)
+			nodeContainer.bindPort(hostPort, containerPort)
 
-		nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
-		nodeContainer.Ports[ColNodeAPIPort] = hostPort
-		f.AccessPorts[ColNodeAPIPort] = hostPort
+			nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			if !nodeContainer.Config.Ghost {
+				nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+			}
+			nodeContainer.Ports[ColNodeAPIPort] = hostPort
+			f.AccessPorts[ColNodeAPIPort] = hostPort
+		case flow.RoleExecution:
 
-	case flow.RoleExecution:
+			hostPort := testingdock.RandomPort(t)
+			containerPort := "9000/tcp"
 
+			nodeContainer.bindPort(hostPort, containerPort)
+
+			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			if !nodeContainer.Config.Ghost {
+				nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
+			}
+			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
+			f.AccessPorts[ExeNodeAPIPort] = hostPort
+
+			// create directories for execution state trie and values in the tmp
+			// host directory.
+			tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
+			require.Nil(t, err)
+
+			opts.HostConfig.Binds = append(
+				opts.HostConfig.Binds,
+				fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
+			)
+
+			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+
+		case flow.RoleAccess:
+			hostPort := testingdock.RandomPort(t)
+			containerPort := "9000/tcp"
+
+			nodeContainer.bindPort(hostPort, containerPort)
+
+			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			// Should always have at least 1 collection and execution node
+			nodeContainer.addFlag("ingress-addr", "collection_1:9000")
+			nodeContainer.addFlag("script-addr", "execution_1:9000")
+			nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+			nodeContainer.Ports[AccessNodeAPIPort] = hostPort
+			f.AccessPorts[AccessNodeAPIPort] = hostPort
+
+		case flow.RoleVerification:
+			nodeContainer.addFlag("alpha", "1")
+		}
+	} else {
 		hostPort := testingdock.RandomPort(t)
 		containerPort := "9000/tcp"
 
 		nodeContainer.bindPort(hostPort, containerPort)
 
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
-		nodeContainer.Ports[ExeNodeAPIPort] = hostPort
-		f.AccessPorts[ExeNodeAPIPort] = hostPort
-
-		// create directories for execution state trie and values in the tmp
-		// host directory.
-		tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
-		require.Nil(t, err)
-
-		opts.HostConfig.Binds = append(
-			opts.HostConfig.Binds,
-			fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
-		)
-
-		nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
-
-	case flow.RoleAccess:
-		hostPort := testingdock.RandomPort(t)
-		containerPort := "9000/tcp"
-
-		nodeContainer.bindPort(hostPort, containerPort)
-
-		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		// Should always have at least 1 collection and execution node
-		nodeContainer.addFlag("ingress-addr", "collection_1:9000")
-		nodeContainer.addFlag("script-addr", "execution_1:9000")
-		nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
-		nodeContainer.Ports[AccessNodeAPIPort] = hostPort
-		f.AccessPorts[AccessNodeAPIPort] = hostPort
-
-	case flow.RoleVerification:
-		nodeContainer.addFlag("alpha", "1")
+		if !nodeContainer.Config.Ghost {
+			nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+		}
+		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 	}
 
 	suiteContainer := suite.Container(*opts)
@@ -443,6 +468,7 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 			NodeInfo:      info,
 			ContainerName: name,
 			LogLevel:      conf.LogLevel,
+			Ghost:         conf.Ghost,
 		}
 
 		confs = append(confs, containerConf)

@@ -14,8 +14,6 @@ type feldmanVSSstate struct {
 	*dkgCommon
 	// node leader index
 	leaderIndex index
-	// internal context of BLS on BLS12381A
-	blsContext *BLS_BLS12381Algo
 	// Polynomial P = a_0 + a_1*x + .. + a_t*x^t  in Zr[X], the vector size is (t+1)
 	// a_0 is the group private key
 	a []scalar
@@ -34,10 +32,6 @@ type feldmanVSSstate struct {
 
 func (s *feldmanVSSstate) init() {
 	s.running = false
-
-	blsSigner, _ := NewSigner(BLS_BLS12381)
-	s.blsContext = blsSigner.(*BLS_BLS12381Algo)
-
 	s.y = nil
 	s.xReceived = false
 	s.AReceived = false
@@ -66,13 +60,11 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	}
 	// private key of the current node
 	x := &PrKeyBLS_BLS12381{
-		alg:    s.blsContext, // signer algo
-		scalar: s.x,          // the private share
+		scalar: s.x, // the private share
 	}
 
 	// Group public key
 	Y := &PubKeyBLS_BLS12381{
-		alg:   s.blsContext,
 		point: s.A[0],
 	}
 
@@ -80,7 +72,6 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
 		y[i] = &PubKeyBLS_BLS12381{
-			alg:   s.blsContext,
 			point: p,
 		}
 	}
@@ -88,10 +79,10 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 }
 
 const (
-	shareSize = PrKeyLenBLS_BLS12381
+	shareSize = PrKeyLenBlsBls12381
 	// the actual verifVectorSize depends on the state and should be:
-	// PubKeyLenBLS_BLS12381*(t+1)
-	verifVectorSize = PubKeyLenBLS_BLS12381
+	// PubKeyLenBlsBls12381*(t+1)
+	verifVectorSize = PubKeyLenBlsBls12381
 )
 
 func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {

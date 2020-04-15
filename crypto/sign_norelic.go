@@ -2,7 +2,7 @@
 
 package crypto
 
-// NewSigner chooses and initializes a signature scheme
-func NewSigner(algo SigningAlgorithm) (signer, error) {
+// newSigner chooses and initializes a signature scheme
+func newSigner(algo SigningAlgorithm) (signer, error) {
 	return newNonRelicSigner(algo)
 }
