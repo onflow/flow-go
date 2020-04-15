@@ -2,12 +2,14 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"google.golang.org/grpc"
 
 	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 )
 
@@ -15,7 +17,7 @@ import (
 type GhostClient struct {
 	rpcClient ghost.GhostNodeAPIClient
 	close     func() error
-	codec     *jsoncodec.Codec
+	codec     network.Codec
 }
 
 func NewGhostClient(addr string) (*GhostClient, error) {
@@ -43,7 +45,7 @@ func (c *GhostClient) Send(ctx context.Context, channelID uint8, targetIDs []flo
 
 	message, err := c.codec.Encode(event)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not encode event: %w", err)
 	}
 
 	targets := make([][]byte, len(targetIDs))
@@ -58,14 +60,14 @@ func (c *GhostClient) Send(ctx context.Context, channelID uint8, targetIDs []flo
 	}
 
 	_, err = c.rpcClient.SendEvent(ctx, &req)
-	return err
+	return fmt.Errorf("failed to send event to the ghost node: %w", err)
 }
 
 func (c *GhostClient) Subscribe(ctx context.Context) (*FlowMessageStreamReader, error) {
 	req := ghost.SubscribeRequest{}
 	stream, err := c.rpcClient.Subscribe(ctx, &req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to subscribe for events: %w", err)
 	}
 	return &FlowMessageStreamReader{stream: stream}, nil
 }
@@ -75,22 +77,22 @@ type FlowMessageStreamReader struct {
 	codec  jsoncodec.Codec
 }
 
-func (fmsr *FlowMessageStreamReader) Next() (*flow.Identifier, interface{}, error) {
+func (fmsr *FlowMessageStreamReader) Next() (flow.Identifier, interface{}, error) {
 	msg, err := fmsr.stream.Recv()
 	if err == io.EOF {
 		// read done.
-		return nil, nil, nil
+		return flow.ZeroID, nil, fmt.Errorf("end of stream reached: %w", err)
 	}
 	if err != nil {
-		return nil, nil, err
+		return flow.ZeroID, nil, fmt.Errorf("failed to read stream: %w", err)
 	}
 
 	event, err := fmsr.codec.Decode(msg.GetMessage())
 	if err != nil {
-		return nil, nil, err
+		return flow.ZeroID, nil, fmt.Errorf("failed to decode event: %w", err)
 	}
 
 	originID := flow.HashToID(msg.GetSenderID())
 
-	return &originID, event, nil
+	return originID, event, nil
 }
