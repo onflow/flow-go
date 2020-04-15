@@ -43,8 +43,13 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 		return nil, status.Error(codes.InvalidArgument, "conduit not found for given channel id")
 	}
 
-	// TODO: The message might have to be decoded to avoid double encoding by the n/w layer
 	message := req.GetMessage()
+
+	event, err := h.codec.Decode(message)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "failed to decode message")
+	}
+
 	targetIDs := req.GetTargetID()
 
 	// Convert target ID to flow IDS
@@ -54,12 +59,12 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	}
 
 	// Submit the message over libp2p
-	err := conduit.Submit(message, flowIDs...)
+	err = conduit.Submit(event, flowIDs...)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to submit message: %v", err)
 	}
 
-	return nil, nil
+	return new(empty.Empty), nil
 }
 
 // Subscribe streams ALL the libp2p network messages over GRPC
