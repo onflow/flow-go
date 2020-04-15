@@ -39,6 +39,7 @@ const notSet = "not set"
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	nodeIDHex    string
+	bindAddr     string
 	NodeName     string
 	Timeout      time.Duration
 	datadir      string
