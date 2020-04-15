@@ -23,11 +23,6 @@ var (
 		Namespace: namespaceVerification,
 		Help:      "The total number of emitted result approvals",
 	})
-	totalStorage = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "verifications_total_size",
-		Namespace: namespaceVerification,
-		Help:      "total storage on disk",
-	})
 	storagePerChunk = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name:      "verifications_storage_per_chunk",
 		Namespace: namespaceVerification,
@@ -61,30 +56,6 @@ func (c *Collector) OnResultApproval() {
 	// the approvals disseminated by verifier engine
 	resultApprovalsPerBlock.Inc()
 
-}
-
-// OnStorageAdded is called whenever something is added to the persistent (on disk) storage
-// of verification node. It records the size of stored object.
-func (c *Collector) OnStorageAdded(size float64) {
-	// updates the size of on disk storage overhead of the
-	// verification node by value.
-	// Todo wire this up to do monitoring
-	// https://github.com/dapperlabs/flow-go/issues/3183
-	totalStorage.Add(size)
-
-}
-
-// OnStorageRemoved is called whenever something is removed from the persistent (on disk) storage
-// of verification node. It records the size of stored object.
-func (c *Collector) OnStorageRemoved(size float64) {
-	if size > 0 {
-		size *= -1
-	}
-	// updates the size of on disk storage overhead of the
-	// verification node by value.
-	// Todo wire this up to do monitoring
-	// https://github.com/dapperlabs/flow-go/issues/3183
-	totalStorage.Add(size)
 }
 
 // OnChunkDataAdded is called whenever something is added to related to chunkID to the in-memory mempools
