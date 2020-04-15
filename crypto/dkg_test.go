@@ -303,7 +303,7 @@ func dkgRunChan(proc *testDKGProcessor,
 				if pk == nil {
 					proc.pkBytes = []byte{}
 				} else {
-					proc.pkBytes, _ = pk.Encode()
+					proc.pkBytes = pk.Encode()
 				}
 			}
 			sync.Done()

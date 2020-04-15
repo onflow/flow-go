@@ -49,10 +49,7 @@ func PrivKey(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
 	}
 
 	// get the raw dump of the flow key
-	bytes, err := fpk.Encode()
-	if err != nil {
-		return nil, err
-	}
+	bytes := fpk.Encode()
 
 	// in the case of NIST curves, the raw bytes need to be converted to x509 bytes
 	// to accommodate libp2p unmarshaller
@@ -79,10 +76,7 @@ func PublicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 		return nil, lcrypto.ErrBadKeyType
 	}
 
-	tempBytes, err := fpk.Encode()
-	if err != nil {
-		return nil, err
-	}
+	tempBytes := fpk.Encode()
 
 	// at this point, keytype is either KeyType_ECDSA or KeyType_Secp256k1
 	// and can't hold another value

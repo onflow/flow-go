@@ -151,10 +151,10 @@ func (sk *PrKeyBLS_BLS12381) PublicKey() PublicKey {
 	return sk.pk
 }
 
-func (a *PrKeyBLS_BLS12381) Encode() ([]byte, error) {
+func (a *PrKeyBLS_BLS12381) Encode() []byte {
 	dest := make([]byte, prKeyLengthBLS_BLS12381)
 	writeScalar(dest, &a.scalar)
-	return dest, nil
+	return dest
 }
 
 func (sk *PrKeyBLS_BLS12381) Equals(other PrivateKey) bool {
@@ -180,10 +180,10 @@ func (pk *PubKeyBLS_BLS12381) KeySize() int {
 	return PubKeyLenBlsBls12381
 }
 
-func (a *PubKeyBLS_BLS12381) Encode() ([]byte, error) {
+func (a *PubKeyBLS_BLS12381) Encode() []byte {
 	dest := make([]byte, pubKeyLengthBLS_BLS12381)
 	writePointG2(dest, &a.point)
-	return dest, nil
+	return dest
 }
 
 func (pk *PubKeyBLS_BLS12381) Equals(other PublicKey) bool {

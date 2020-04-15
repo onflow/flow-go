@@ -185,11 +185,7 @@ func AccountToMessage(a *flow.Account) (*entities.Account, error) {
 }
 
 func AccountPublicKeyToMessage(a flow.AccountPublicKey) (*entities.AccountPublicKey, error) {
-	publicKey, err := a.PublicKey.Encode()
-	if err != nil {
-		return nil, err
-	}
-
+	publicKey := a.PublicKey.Encode()
 	return &entities.AccountPublicKey{
 		PublicKey: publicKey,
 		SignAlgo:  uint32(a.SignAlgo),

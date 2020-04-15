@@ -215,8 +215,8 @@ func (sk *PrKeyECDSA) rawEncode() []byte {
 
 // Encode returns a byte representation of a private key.
 // a simple raw byte encoding in big endian is used for all curves
-func (sk *PrKeyECDSA) Encode() ([]byte, error) {
-	return sk.rawEncode(), nil
+func (sk *PrKeyECDSA) Encode() []byte {
+	return sk.rawEncode()
 }
 
 func (sk *PrKeyECDSA) Equals(other PrivateKey) bool {
@@ -265,8 +265,8 @@ func (pk *PubKeyECDSA) rawEncode() []byte {
 // Encode returns a byte representation of a public key.
 // a simple uncompressed raw encoding X||Y is used for all curves
 // X and Y are the big endian byte encoding of the x and y coordinate of the public key
-func (pk *PubKeyECDSA) Encode() ([]byte, error) {
-	return pk.rawEncode(), nil
+func (pk *PubKeyECDSA) Encode() []byte {
+	return pk.rawEncode()
 }
 
 func (pk *PubKeyECDSA) Equals(other PublicKey) bool {
