@@ -5,6 +5,5 @@ const (
 	namespaceCommon       = "common"
 	namespaceCollection   = "collection"
 	namespaceConsensus    = "consensus"
-	namespaceExecution    = "execution"
 	namespaceVerification = "verification"
 )
