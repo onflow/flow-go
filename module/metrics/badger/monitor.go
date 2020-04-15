@@ -22,6 +22,7 @@ type Monitor struct {
 // NewMonitor returns a new monitor for reporting Badger metrics.
 func NewMonitor(metrics module.Metrics, db *badger.DB) *Monitor {
 	monitor := &Monitor{
+		unit:    engine.NewUnit(),
 		metrics: metrics,
 		db:      db,
 	}
