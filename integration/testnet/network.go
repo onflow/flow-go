@@ -49,6 +49,8 @@ const (
 	ExeNodeAPIPort = "exe-api-port"
 	// AccessNodeAPIPort is the name used for the access node API port.
 	AccessNodeAPIPort = "access-api-port"
+	// GhostNodeAPIPort is the name used for the access node API port.
+	GhostNodeAPIPort = "ghost-api-port"
 )
 
 func init() {
@@ -187,6 +189,7 @@ type NodeConfig struct {
 	Stake      uint64
 	Identifier flow.Identifier
 	LogLevel   zerolog.Level
+	Ghost      bool
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -249,7 +252,11 @@ func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 		config.LogLevel = level
 	}
 }
-
+func AsGhost(ghost bool) func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.Ghost = ghost
+	}
+}
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, error) {
 
 	// number of nodes
@@ -356,7 +363,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
-				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel),
+				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
 				fmt.Sprintf("--nclusters=%d", net.config.NClusters),
 			},
 		},
@@ -394,41 +401,53 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		fmt.Sprintf("%s:%s:ro", bootstrapDir, DefaultBootstrapDir),
 	)
 
-	switch nodeConf.Role {
-	case flow.RoleCollection:
+	if !nodeConf.Ghost {
+		switch nodeConf.Role {
+		case flow.RoleCollection:
 
+			hostPort := testingdock.RandomPort(t)
+			containerPort := "9000/tcp"
+
+			nodeContainer.bindPort(hostPort, containerPort)
+
+			nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.Ports[ColNodeAPIPort] = hostPort
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+			net.AccessPorts[ColNodeAPIPort] = hostPort
+
+		case flow.RoleExecution:
+
+			hostPort := testingdock.RandomPort(t)
+			containerPort := "9000/tcp"
+
+			nodeContainer.bindPort(hostPort, containerPort)
+
+			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			if !nodeContainer.Config.Ghost {
+			}
+			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
+			net.AccessPorts[ExeNodeAPIPort] = hostPort
+
+			// create directories for execution state trie and values in the tmp
+			// host directory.
+			tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
+			require.Nil(t, err)
+
+			opts.HostConfig.Binds = append(
+				opts.HostConfig.Binds,
+				fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
+			)
+
+			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+		}
+	} else {
 		hostPort := testingdock.RandomPort(t)
 		containerPort := "9000/tcp"
-
-		nodeContainer.bindPort(hostPort, containerPort)
-
-		nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
-		nodeContainer.Ports[ColNodeAPIPort] = hostPort
-		net.AccessPorts[ColNodeAPIPort] = hostPort
-	case flow.RoleExecution:
-
-		hostPort := testingdock.RandomPort(t)
-		containerPort := "9000/tcp"
-
-		nodeContainer.bindPort(hostPort, containerPort)
 
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
-		nodeContainer.Ports[ExeNodeAPIPort] = hostPort
-		net.AccessPorts[ExeNodeAPIPort] = hostPort
-
-		// create directories for execution state trie and values in the tmp
-		// host directory.
-		tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
-		require.Nil(t, err)
-
-		opts.HostConfig.Binds = append(
-			opts.HostConfig.Binds,
-			fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
-		)
-
-		nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+		nodeContainer.bindPort(hostPort, containerPort)
+		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 	}
 
 	suiteContainer := net.suite.Container(*opts)
@@ -480,6 +499,7 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 			NodeInfo:      info,
 			ContainerName: name,
 			LogLevel:      conf.LogLevel,
+			Ghost:         conf.Ghost,
 		}
 
 		confs = append(confs, containerConf)

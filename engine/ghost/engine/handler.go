@@ -16,14 +16,14 @@ import (
 // Handler handles the GRPC calls from a client
 type Handler struct {
 	log        zerolog.Logger
-	conduitMap map[int]network.Conduit
+	conduitMap map[uint8]network.Conduit
 	msgChan    chan ghost.FlowMessage
 	codec      network.Codec
 }
 
 var _ ghost.GhostNodeAPIServer = Handler{}
 
-func NewHandler(log zerolog.Logger, conduitMap map[int]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
+func NewHandler(log zerolog.Logger, conduitMap map[uint8]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
 	return &Handler{
 		log:        log,
 		conduitMap: conduitMap,
@@ -37,7 +37,7 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	channelID := req.GetChannelId()
 
 	// find the conduit for the channel ID
-	conduit, found := h.conduitMap[int(channelID)]
+	conduit, found := h.conduitMap[uint8(channelID)]
 
 	if !found {
 		return nil, status.Error(codes.InvalidArgument, "conduit not found for given channel id")

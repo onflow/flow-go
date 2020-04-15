@@ -70,18 +70,18 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 }
 
 // registerConduits registers for ALL channels and returns a map of engine id to conduit
-func registerConduits(net module.Network, eng network.Engine) (map[int]network.Conduit, error) {
+func registerConduits(net module.Network, eng network.Engine) (map[uint8]network.Conduit, error) {
 
-	allEngineIDs := []int{engine.CollectionProvider, engine.CollectionIngest, engine.ProtocolClusterConsensus,
+	allEngineIDs := []uint8{engine.CollectionProvider, engine.CollectionIngest, engine.ProtocolClusterConsensus,
 		engine.BlockProvider, engine.BlockPropagation, engine.ProtocolConsensus, engine.ProtocolSynchronization,
 		engine.ExecutionReceiptProvider, engine.ExecutionStateProvider, engine.ChunkDataPackProvider,
 		engine.ApprovalProvider}
 
-	conduitMap := make(map[int]network.Conduit, len(allEngineIDs))
+	conduitMap := make(map[uint8]network.Conduit, len(allEngineIDs))
 
 	// Register for ALL channels here and return a map of conduits
 	for _, e := range allEngineIDs {
-		c, err := net.Register(engine.CollectionProvider, eng)
+		c, err := net.Register(e, eng)
 		if err != nil {
 			return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 		}
