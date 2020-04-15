@@ -7,7 +7,7 @@ import (
 
 	encoding "github.com/dapperlabs/cadence/encoding/xdr"
 
-	"github.com/dapperlabs/flow-go/integration/client"
+	"github.com/dapperlabs/flow-go/engine/ghost/client"
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
