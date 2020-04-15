@@ -140,7 +140,7 @@ ConsentLoop:
 
 		log.Debug().
 			Str("leader", e.round.Leader().NodeID.String()).
-			Str("participants", fmt.Sprint("%v", e.participants.NodeIDs())).
+			Str("participants", fmt.Sprintf("%v", e.participants.NodeIDs())).
 			Hex("head_id", logging.ID(head.ID())).
 			Uint64("head_height", head.Height).
 			Msg("starting round")
