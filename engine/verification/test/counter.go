@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -121,7 +122,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		vm := virtualmachine.New(rt)
 
 		// create state.View
-		view := state.NewView(state.LedgerGetRegister(led, startStateCommitment))
+		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 
 		// create BlockComputer
 		bc := computer.NewBlockComputer(vm)
@@ -165,7 +166,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		chunks = append(chunks, chunk)
 
 		// chunkDataPack
-		allRegisters := view.RegisterTouches()
+		allRegisters := view.Interactions().RegisterTouches()
 		values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
 		require.NoError(t, err, "error reading registers with proofs from ledger")
 
