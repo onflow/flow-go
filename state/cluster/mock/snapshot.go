@@ -11,15 +11,15 @@ type Snapshot struct {
 }
 
 // Collection provides a mock function with given fields:
-func (_m *Snapshot) Collection() (*flow.LightCollection, error) {
+func (_m *Snapshot) Collection() (*flow.Collection, error) {
 	ret := _m.Called()
 
-	var r0 *flow.LightCollection
-	if rf, ok := ret.Get(0).(func() *flow.LightCollection); ok {
+	var r0 *flow.Collection
+	if rf, ok := ret.Get(0).(func() *flow.Collection); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.LightCollection)
+			r0 = ret.Get(0).(*flow.Collection)
 		}
 	}
 

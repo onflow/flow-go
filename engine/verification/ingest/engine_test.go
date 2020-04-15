@@ -3,9 +3,7 @@ package ingest_test
 import (
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -13,12 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
-	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/test"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
@@ -29,7 +22,6 @@ import (
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -62,6 +54,8 @@ type TestSuite struct {
 	collectionTrackers   *mempool.CollectionTrackers
 	chunkDataPacks       *mempool.ChunkDataPacks
 	chunkDataPackTracker *mempool.ChunkDataPackTrackers
+	ingestedChunkIDs     *mempool.Identifiers
+	ingestedResultIDs    *mempool.Identifiers
 	blockStorage         *storage.Blocks
 	// resources fixtures
 	collection    *flow.Collection
@@ -98,6 +92,8 @@ func (suite *TestSuite) SetupTest() {
 	suite.collectionTrackers = &mempool.CollectionTrackers{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
 	suite.chunkDataPackTracker = &mempool.ChunkDataPackTrackers{}
+	suite.ingestedResultIDs = &mempool.Identifiers{}
+	suite.ingestedChunkIDs = &mempool.Identifiers{}
 	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := test.CompleteExecutionResultFixture(suite.T(), 1)
@@ -142,6 +138,8 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.collectionTrackers,
 		suite.chunkDataPacks,
 		suite.chunkDataPackTracker,
+		suite.ingestedChunkIDs,
+		suite.ingestedResultIDs,
 		suite.blockStorage,
 		suite.assigner)
 	require.Nil(suite.T(), err, "could not create an engine")
@@ -186,6 +184,13 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
 	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil).Once()
 
+	// engine has not yet ingested the result of this receipt yet
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+
+	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+		suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
+	}
+
 	// expect that we already have the receipt in the authenticated receipts mempool
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
@@ -215,9 +220,38 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
+// TestIngestedResult evaluates the happy path of submitting an execution receipt with an already ingested result
+func (suite *TestSuite) TestIngestedResult() {
+	eng := suite.TestNewEngine()
+
+	// mocks this receipt's result as ingested
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(true)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), suite.receipt)
+	require.NoError(suite.T(), err)
+}
+
+// TestIngestedChunk evaluates the happy path of submitting a chunk data pack for an already ingested chunk
+func (suite *TestSuite) TestIngestedChunk() {
+	eng := suite.TestNewEngine()
+
+	// creates a chunk fixture, its data pack, and the data pack response
+	chunk := unittest.ChunkFixture()
+	chunkDataPack := unittest.ChunkDataPackFixture(chunk.ID())
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: chunkDataPack}
+	// mocks this chunk id
+	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(true)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), chunkDataPackResponse)
+	require.NoError(suite.T(), err)
+}
+
 // TestHandleReceipt_UnstakedSender evaluates sending an execution receipt from an unstaked node
 // it should go to the pending receipts and (later on) dropped from the cache
 // Todo dropping unauthenticated receipts from cache
+// https://github.com/dapperlabs/flow-go/issues/2966
 func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	eng := suite.TestNewEngine()
 
@@ -229,6 +263,8 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, fmt.Errorf("unstaked node")).Once()
+	// engine has not yet ingested the result of this receipt
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
 
 	// receipt should go to the pending receipts mempool
 	suite.pendingReceipts.On("Add", suite.receipt).Return(nil).Once()
@@ -246,7 +282,6 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("block does not exist")).Once()
 
-	// process should fail
 	err := eng.Process(unstakedIdentity, suite.receipt)
 	require.NoError(suite.T(), err)
 
@@ -355,6 +390,8 @@ func (suite *TestSuite) TestHandleCollection_Untracked() {
 
 // TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
 // process method should return an error
+// TODO pending collections cleanup
+// https://github.com/dapperlabs/flow-go/issues/2966
 func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	eng := suite.TestNewEngine()
 
@@ -407,8 +444,6 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 // TestVerifyReady evaluates that the verifier engine should be called
 // when the receipt is ready regardless of
 // the order in which dependent resources are received.
-// TODO add mempool cleanup check after the functionality gets back
-// https://github.com/dapperlabs/flow-go/issues/2750
 func (suite *TestSuite) TestVerifyReady() {
 
 	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
@@ -445,6 +480,14 @@ func (suite *TestSuite) TestVerifyReady() {
 			// allow adding the received resource to mempool
 			suite.authCollections.On("Add", suite.collection).Return(nil)
 
+			// engine has not yet ingested this receipt and chunk
+			suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false).Once()
+
+			for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+				suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
+				suite.ingestedChunkIDs.On("Add", chunk.ID()).Return(nil)
+			}
+
 			// we have all dependencies
 			suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 
@@ -456,6 +499,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true)
 
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
+			suite.chunkDataPacks.On("Rem", suite.chunkDataPack.ID()).Return(true)
 
 			suite.authReceipts.On("Add", suite.receipt).Return(nil)
 			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
@@ -517,6 +561,9 @@ func (suite *TestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
 	// mocks tracker to return an error for this chunk ID
 	suite.chunkDataPackTracker.On("ByChunkID", chunkDataPack.ChunkID).
 		Return(nil, fmt.Errorf("does not exist"))
+	// engine has not yet ingested this chunk
+	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false)
+
 	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
 
 	// asserts that process of an untracked chunk data pack returns with an error
@@ -555,6 +602,10 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.chunkDataPacks.On("Add", &chunkDataPack).Return(nil).Once()
 	suite.chunkDataPackTracker.On("Rem", chunkDataPack.ChunkID).Return(true).Once()
 
+	// engine has not yet ingested this chunk
+	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false)
+	// suite.ingestedChunkIDs.On("Add", chunk).Return(nil)
+
 	// terminates call to checkPendingChunks as it is out of this test's scope
 	suite.authReceipts.On("All").Return(nil).Once()
 
@@ -567,308 +618,4 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.state.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
 	suite.authReceipts.AssertExpectations(suite.T())
-}
-
-func TestConcurrency(t *testing.T) {
-	testcases := []struct {
-		erCount, // number of execution receipts
-		senderCount, // number of (concurrent) senders for each execution receipt
-		chunksNum int // number of chunks in each execution receipt
-	}{
-		{
-			erCount:     1,
-			senderCount: 1,
-			chunksNum:   1,
-		}, {
-			erCount:     1,
-			senderCount: 10,
-			chunksNum:   1,
-		},
-		{
-			erCount:     10,
-			senderCount: 1,
-			chunksNum:   1,
-		},
-		{
-			erCount:     5,
-			senderCount: 10,
-			chunksNum:   1,
-		},
-		// multiple chunks receipts
-		{
-			erCount:     1,
-			senderCount: 1,
-			chunksNum:   5, // choosing a higher number makes the test longer and longer timeout needed
-		},
-		{
-			erCount:     1,
-			senderCount: 10,
-			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
-		},
-		{
-			erCount:     3,
-			senderCount: 1,
-			chunksNum:   5, // choosing a higher number makes the test longer and longer timeout needed
-		},
-		{
-			erCount:     3,
-			senderCount: 5,
-			chunksNum:   2, // choosing a higher number makes the test longer and longer timeout needed
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks", tc.erCount, tc.senderCount, tc.chunksNum), func(t *testing.T) {
-			testConcurrency(t, tc.erCount, tc.senderCount, tc.chunksNum)
-		})
-	}
-}
-
-func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
-	hub := stub.NewNetworkHub()
-
-	// creates test id for each role
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-
-	identities := flow.IdentityList{colID, conID, exeID, verID}
-
-	// new chunk assignment
-	a := chmodel.NewAssignment()
-
-	// create `erCount` ER fixtures that will be concurrently delivered
-	ers := make([]verification.CompleteExecutionResult, 0)
-	// list of assigned chunks to the verifier node
-	vChunks := make([]*verification.VerifiableChunk, 0)
-	// a counter to assign chunks every other one, so to check if
-	// ingest only sends the assigned chunks to verifier
-
-	for i := 0; i < erCount; i++ {
-		er := test.CompleteExecutionResultFixture(t, chunksNum)
-		ers = append(ers, er)
-		// assigns all chunks to the verifier node
-		for j, chunk := range er.Receipt.ExecutionResult.Chunks {
-			a.Add(chunk, []flow.Identifier{verID.NodeID})
-
-			var endState flow.StateCommitment
-			// last chunk
-			if j == len(er.Receipt.ExecutionResult.Chunks)-1 {
-				endState = er.Receipt.ExecutionResult.FinalStateCommit
-			} else {
-				endState = er.Receipt.ExecutionResult.Chunks[j+1].StartState
-			}
-
-			vc := &verification.VerifiableChunk{
-				ChunkIndex: chunk.Index,
-				EndState:   endState,
-				Block:      er.Block,
-				Receipt:    er.Receipt,
-				Collection: er.Collections[chunk.Index],
-			}
-			vChunks = append(vChunks, vc)
-		}
-	}
-
-	// set up mock verifier engine that asserts each receipt is submitted
-	// to the verifier exactly once.
-	verifierEng, verifierEngWG := setupMockVerifierEng(t, vChunks)
-	assigner := NewMockAssigner(verID.NodeID)
-	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner,
-		testutil.WithVerifierEngine(verifierEng))
-
-	colNode := testutil.CollectionNode(t, hub, colID, identities)
-
-	// mock the execution node with a generic node and mocked engine
-	// to handle requests for chunk state
-	exeNode := testutil.GenericNode(t, hub, exeID, identities)
-	setupMockExeNode(t, exeNode, verID.NodeID, ers)
-
-	verNet, ok := hub.GetNetwork(verID.NodeID)
-	assert.True(t, ok)
-
-	// the wait group tracks goroutines for each ER sending it to VER
-	var senderWG sync.WaitGroup
-	senderWG.Add(erCount * senderCount)
-
-	var blockStorageLock sync.Mutex
-
-	for _, completeER := range ers {
-		for _, coll := range completeER.Collections {
-			err := colNode.Collections.Store(coll)
-			assert.Nil(t, err)
-		}
-
-		// spin up `senderCount` sender goroutines to mimic receiving
-		// the same resource multiple times
-		for i := 0; i < senderCount; i++ {
-			go func(j int, id flow.Identifier, block *flow.Block, receipt *flow.ExecutionReceipt) {
-
-				sendBlock := func() {
-					// adds the block to the storage of the node
-					// Note: this is done by the follower
-					// this block should be done in a thread-safe way
-					blockStorageLock.Lock()
-					// we don't check for error as it definitely returns error when we
-					// have duplicate blocks, however, this is not the concern for this test
-					_ = verNode.BlockStorage.Store(block)
-					blockStorageLock.Unlock()
-
-					// casts block into a Hotstuff block for notifier
-					hotstuffBlock := &model.Block{
-						BlockID:     block.ID(),
-						View:        block.View,
-						ProposerID:  block.ProposerID,
-						QC:          nil,
-						PayloadHash: block.Hash(),
-						Timestamp:   block.Timestamp,
-					}
-					verNode.IngestEngine.OnFinalizedBlock(hotstuffBlock)
-				}
-
-				sendReceipt := func() {
-					err := verNode.IngestEngine.Process(exeID.NodeID, receipt)
-					require.NoError(t, err)
-				}
-
-				switch j % 2 {
-				case 0:
-					// block then receipt
-					sendBlock()
-					verNet.DeliverAll(true)
-					// allow another goroutine to run before sending receipt
-					time.Sleep(time.Nanosecond)
-					sendReceipt()
-				case 1:
-					// receipt then block
-					sendReceipt()
-					verNet.DeliverAll(true)
-					// allow another goroutine to run before sending block
-					time.Sleep(time.Nanosecond)
-					sendBlock()
-				}
-
-				verNet.DeliverAll(true)
-				go senderWG.Done()
-			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.Block, completeER.Receipt)
-		}
-	}
-
-	// wait for all ERs to be sent to VER
-	unittest.AssertReturnsBefore(t, senderWG.Wait, 3*time.Second)
-	verNet.DeliverAll(false)
-	unittest.AssertReturnsBefore(t, verifierEngWG.Wait, 3*time.Second)
-	verNet.DeliverAll(false)
-
-	exeNode.Done()
-	colNode.Done()
-	verNode.Done()
-}
-
-// setupMockExeNode sets up a mocked execution node that responds to requests for
-// chunk states. Any requests that don't correspond to an execution receipt in
-// the input ers list result in the test failing.
-func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []verification.CompleteExecutionResult) {
-	eng := new(network.Engine)
-	chunksConduit, err := node.Net.Register(engine.ChunkDataPackProvider, eng)
-	assert.Nil(t, err)
-
-	eng.On("Process", verID, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
-				for _, er := range ers {
-					for _, chunk := range er.Receipt.ExecutionResult.Chunks {
-						if chunk.ID() == req.ChunkID {
-							res := &messages.ChunkDataPackResponse{
-								Data: *er.ChunkDataPacks[chunk.Index],
-							}
-							err := chunksConduit.Submit(res, verID)
-							assert.Nil(t, err)
-							return
-						}
-					}
-				}
-			}
-			t.Logf("invalid chunk request (%T): %v ", args[1], args[1])
-			t.Fail()
-		}).
-		Return(nil)
-}
-
-// setupMockVerifierEng sets up a mock verifier engine that asserts that a set
-// of chunks are delivered to it exactly once each.
-// Returns the mock engine and a wait group that unblocks when all ERs are received.
-func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk) (*network.Engine, *sync.WaitGroup) {
-	eng := new(network.Engine)
-
-	// keep track of which verifiable chunks we have received
-	receivedChunks := make(map[flow.Identifier]struct{})
-	var (
-		// decrement the wait group when each verifiable chunk received
-		wg sync.WaitGroup
-		// check one verifiable chunk at a time to ensure dupe checking works
-		mu sync.Mutex
-	)
-	wg.Add(len(vChunks))
-
-	eng.On("ProcessLocal", testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			mu.Lock()
-			defer mu.Unlock()
-
-			vc, ok := args[0].(*verification.VerifiableChunk)
-			assert.True(t, ok)
-
-			chunk, ok := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex)
-			require.True(t, ok, "chunk out of range requested")
-			vID := chunk.ID()
-			// ensure there are no dupe chunks
-			_, alreadySeen := receivedChunks[vID]
-			if alreadySeen {
-				t.Logf("received duplicated chunk (id=%s)", vID)
-				t.Fail()
-				return
-			}
-
-			// ensure the received chunk matches one we expect
-			for _, vc := range vChunks {
-				chunk, ok := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex)
-				require.True(t, ok, "chunk out of range requested")
-				if chunk.ID() == vID {
-					// mark it as seen and decrement the waitgroup
-					receivedChunks[vID] = struct{}{}
-					wg.Done()
-					return
-				}
-			}
-
-			// the received chunk doesn't match any expected ERs
-			t.Logf("received unexpected ER (id=%s)", vID)
-			t.Fail()
-		}).
-		Return(nil)
-
-	return eng, &wg
-}
-
-type MockAssigner struct {
-	me flow.Identifier
-}
-
-func NewMockAssigner(id flow.Identifier) *MockAssigner {
-	return &MockAssigner{me: id}
-}
-
-// Assign assigns all input chunks to the verifer node
-func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chmodel.Assignment, error) {
-	if len(chunks) == 0 {
-		return nil, fmt.Errorf("assigner called with empty chunk list")
-	}
-	a := chmodel.NewAssignment()
-	for _, c := range chunks {
-		a.Add(c, flow.IdentifierList{m.me})
-	}
-
-	return a, nil
 }

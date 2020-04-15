@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage"
@@ -30,6 +31,7 @@ func main() {
 	var (
 		stateCommitments   storage.Commits
 		ledgerStorage      storage.Ledger
+		blocks             storage.Blocks
 		events             storage.Events
 		providerEngine     *provider.Engine
 		computationManager *computation.Manager
@@ -76,6 +78,11 @@ func main() {
 			if !bytes.Equal(flow.GenesisStateCommitment, block.Seals[0].FinalState) {
 				panic("genesis seal state commitment different from precalculated")
 			}
+
+			err = bootstrap.BootstrapExecutionDatabase(node.DB, &block.Header)
+			if err != nil {
+				panic(fmt.Sprintf("error while boostrapping execution state - cannot bootstrap database: %s", err))
+			}
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			return ledgerStorage, nil
@@ -84,19 +91,22 @@ func main() {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
 			stateCommitments = badger.NewCommits(node.DB)
-			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks, executionResults)
+			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks, executionResults, node.DB)
+			//registerDeltas := badger.NewRegisterDeltas(node.DB)
+			stateSync := sync.NewStateSynchronizer(executionState)
 			providerEngine, err = provider.New(
 				node.Logger,
 				node.Network,
 				node.State,
 				node.Me,
 				executionState,
+				stateSync,
 			)
 
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			blocks := badger.NewBlocks(node.DB)
+			blocks = badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 			payloads := badger.NewPayloads(node.DB)
 			events := badger.NewEvents(node.DB)
@@ -112,11 +122,12 @@ func main() {
 				computationManager,
 				providerEngine,
 				executionState,
+				6, //TODO - config param maybe?
 			)
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, events)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events)
 			return rpcEng, nil
 		}).Run()
 

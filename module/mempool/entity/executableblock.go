@@ -26,6 +26,22 @@ func (b *BlockByCollection) Checksum() flow.Identifier {
 	return b.CollectionID
 }
 
+func (b *ExecutableBlock) ID() flow.Identifier {
+	return b.Block.ID()
+}
+
+func (b *ExecutableBlock) Checksum() flow.Identifier {
+	return b.Block.Checksum()
+}
+
+func (b *ExecutableBlock) Height() uint64 {
+	return b.Block.Height
+}
+
+func (b *ExecutableBlock) ParentID() flow.Identifier {
+	return b.Block.ParentID
+}
+
 func (b *ExecutableBlock) Collections() []*CompleteCollection {
 	collections := make([]*CompleteCollection, len(b.Block.Guarantees))
 

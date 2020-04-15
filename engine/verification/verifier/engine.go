@@ -31,6 +31,7 @@ type Engine struct {
 	state   protocol.State       // used to access the protocol state
 	rah     hash.Hasher          // used as hasher to sign the result approvals
 	chVerif module.ChunkVerifier // used to verify chunks
+	mc      module.Metrics       // used to capture the performance metrics
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -40,6 +41,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	chVerif module.ChunkVerifier,
+	mc module.Metrics,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -49,6 +51,7 @@ func New(
 		me:      me,
 		chVerif: chVerif,
 		rah:     utils.NewResultApprovalHasher(),
+		mc:      mc,
 	}
 
 	var err error
@@ -104,7 +107,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *verification.VerifiableChunk:
-		return e.verify(originID, resource)
+		return e.verifyWithMetrics(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -207,6 +210,8 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 		Uint64("chunkIndex", chunk.ChunkIndex).
 		Hex("execution receipt", logging.Entity(chunk.Receipt)).
 		Msg("result approval submitted")
+	// tracks number of emitted result approvals for this block
+	e.mc.OnResultApproval()
 
 	return nil
 }
@@ -253,4 +258,23 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 		Body:              body,
 		VerifierSignature: bodySign,
 	}, nil
+}
+
+// verifyWithMetrics acts as a wrapper around the verify method that captures its performance-related metrics
+func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.VerifiableChunk) error {
+	// starts verification performance metrics trackers
+	if ch.ChunkDataPack != nil {
+		e.mc.OnChunkVerificationStarted(ch.ChunkDataPack.ChunkID)
+	}
+	// starts verification of chunk
+	err := e.verify(originID, ch)
+	if err != nil {
+		return err
+	}
+	// closes verification performance metrics trackers
+	if ch.ChunkDataPack != nil {
+		e.mc.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)
+	}
+
+	return nil
 }

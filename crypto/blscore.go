@@ -30,14 +30,7 @@ var valid = C.get_valid()
 var invalid = C.get_invalid()
 
 // init sets the context of BLS12381 curve
-func (a *BLS_BLS12381Algo) init() error {
-	// sanity checks of lengths
-	if a.prKeyLength != PrKeyLenBLS_BLS12381 ||
-		a.pubKeyLength != PubKeyLenBLS_BLS12381 ||
-		a.signatureLength != SignatureLenBLS_BLS12381 {
-		return errors.New("BLS Lengths in types.go are not matching bls_include.h")
-	}
-
+func (a *blsBLS12381Algo) init() error {
 	// Inits relic context and sets the B12_381 context
 	c := C.relic_init_BLS12_381()
 	if c == nil {
@@ -51,7 +44,7 @@ func (a *BLS_BLS12381Algo) init() error {
 // reinit the context of BLS12381 curve assuming there was a previous call to init()
 // If the implementation evolves and relic has multiple contexts,
 // reinit should be called at every a. operation.
-func (a *BLS_BLS12381Algo) reinit() {
+func (a *blsBLS12381Algo) reinit() {
 	C.core_set(a.context.relicCtx)
 	C.precomputed_data_set(a.context.precCtx)
 }
@@ -124,7 +117,7 @@ func hashToG1(data []byte) *pointG1 {
 func OpSwUUnitTest(output []byte, input []byte) {
 	C.opswu_test((*C.uchar)(&output[0]),
 		(*C.uchar)(&input[0]),
-		SignatureLenBLS_BLS12381)
+		SignatureLenBlsBls12381)
 }
 
 // sets a scalar to a small integer
@@ -168,8 +161,8 @@ func readPointG2(a *pointG2, src []byte) error {
 }
 
 // computes a bls signature
-func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
-	s := make([]byte, a.signatureLength)
+func (a *blsBLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
+	s := make([]byte, SignatureLenBlsBls12381)
 
 	C._blsSign((*C.uchar)(&s[0]),
 		(*C.bn_st)(sk),
@@ -179,7 +172,7 @@ func (a *BLS_BLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 }
 
 // Checks the validity of a bls signature
-func (a *BLS_BLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
+func (a *blsBLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
 	if len(s) != signatureLengthBLS_BLS12381 {
 		return false
 	}

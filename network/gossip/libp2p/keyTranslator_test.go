@@ -30,7 +30,7 @@ func TestKeyTranslatorTestSuite(t *testing.T) {
 func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 
 	// test all the ECDSA curves that are supported by the translator for private key conversion
-	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSA_P256, fcrypto.ECDSA_SECp256k1}
+	sa := []fcrypto.SigningAlgorithm{fcrypto.EcdsaP256, fcrypto.EcdsaSecp256k1}
 	loops := 50
 
 	for _, s := range sa {
@@ -72,8 +72,8 @@ func rawUncompressed(key lcrypto.PubKey) ([]byte, error) {
 func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 
 	// test the algorithms that are supported by the translator for public key conversion (currently only ECDSA 256)
-	// ECDSA_SECp256k1 doesn't work and throws a 'invalid pub key length 64' error
-	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSA_P256, fcrypto.ECDSA_SECp256k1}
+	// EcdsaSecp256k1 doesn't work and throws a 'invalid pub key length 64' error
+	sa := []fcrypto.SigningAlgorithm{fcrypto.EcdsaP256, fcrypto.EcdsaSecp256k1}
 	loops := 50
 
 	for _, s := range sa {
@@ -95,9 +95,9 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 			require.NoError(k.T(), err)
 
 			var lbytes []byte
-			if s == fcrypto.ECDSA_P256 {
+			if s == fcrypto.EcdsaP256 {
 				lbytes, err = lpublic.Raw()
-			} else if s == fcrypto.ECDSA_SECp256k1 {
+			} else if s == fcrypto.EcdsaSecp256k1 {
 				lbytes, err = rawUncompressed(lpublic)
 			}
 			require.NoError(k.T(), err)
@@ -113,7 +113,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 	seed := k.createSeed()
 
 	// generate a Flow private key
-	fpk, err := fcrypto.GeneratePrivateKey(fcrypto.ECDSA_P256, seed)
+	fpk, err := fcrypto.GeneratePrivateKey(fcrypto.EcdsaP256, seed)
 	require.NoError(k.T(), err)
 
 	// get the Flow public key
@@ -141,7 +141,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 }
 
 func (k *KeyTranslatorTestSuite) createSeed() []byte {
-	seedLen := int(math.Max(fcrypto.KeyGenSeedMinLenECDSA_P256, fcrypto.KeyGenSeedMinLenECDSA_SECp256k1))
+	seedLen := int(math.Max(fcrypto.KeyGenSeedMinLenEcdsaP256, fcrypto.KeyGenSeedMinLenEcdsaSecp256k1))
 	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
 	require.NoError(k.T(), err)
