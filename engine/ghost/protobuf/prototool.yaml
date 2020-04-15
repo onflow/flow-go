@@ -1,0 +1,16 @@
+protoc:
+  version: 3.8.0
+lint:
+  group: uber2
+  rules:
+    remove:
+      - ENUM_ZERO_VALUES_INVALID
+      - ENUM_ZERO_VALUES_INVALID_EXCEPT_MESSAGE
+generate:
+  go_options:
+    import_path: github.com/dapperlabs/flow-go/integration/ghost/protobuf
+  plugins:
+    - name: go
+      type: go
+      flags: plugins=grpc
+      output: .
