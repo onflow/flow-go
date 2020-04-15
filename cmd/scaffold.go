@@ -175,7 +175,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid log level")
 	}
-	log.Level(lvl)
+	log = log.Level(lvl)
 
 	log.Info().Msg("initializing engine modules")
 
