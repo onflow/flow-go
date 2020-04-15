@@ -60,7 +60,10 @@ func (c *GhostClient) Send(ctx context.Context, channelID uint8, targetIDs []flo
 	}
 
 	_, err = c.rpcClient.SendEvent(ctx, &req)
-	return fmt.Errorf("failed to send event to the ghost node: %w", err)
+	if err != nil {
+		return fmt.Errorf("failed to send event to the ghost node: %w", err)
+	}
+	return nil
 }
 
 func (c *GhostClient) Subscribe(ctx context.Context) (*FlowMessageStreamReader, error) {
