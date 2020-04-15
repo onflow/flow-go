@@ -35,7 +35,7 @@ type Engine struct {
 	me           module.Local
 	protoState   protocol.State // flow-wide protocol chain state
 	clusterState cluster.State  // cluster-specific chain state
-	ingest       network.Engine
+	validator    module.TransactionValidator
 	pool         mempool.Transactions
 	transactions storage.Transactions
 	headers      storage.Headers
@@ -53,7 +53,7 @@ func New(
 	protoState protocol.State,
 	clusterState cluster.State,
 	metrics module.Metrics,
-	ingest network.Engine,
+	validator module.TransactionValidator,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
 	headers storage.Headers,
@@ -73,7 +73,7 @@ func New(
 		protoState:   protoState,
 		clusterState: clusterState,
 		metrics:      metrics,
-		ingest:       ingest,
+		validator:    validator,
 		pool:         pool,
 		transactions: transactions,
 		headers:      headers,
@@ -291,7 +291,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	var merr *multierror.Error
 	for _, tx := range collection.Transactions {
 		if !e.pool.Has(tx.ID()) {
-			err = e.ingest.ProcessLocal(tx)
+			err = e.validator.ValidateTransaction(tx)
 			if err != nil {
 				merr = multierror.Append(merr, err)
 			}

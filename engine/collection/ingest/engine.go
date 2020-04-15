@@ -127,7 +127,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	e.metrics.TransactionReceived(tx.ID())
 
 	// first, we check if the transaction is valid
-	err := e.validateTransaction(tx)
+	err := e.ValidateTransaction(tx)
 	if err != nil {
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
@@ -176,14 +176,18 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	return nil
 }
 
-// TODO: implement
-func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
+// ValidateTransaction validates the transaction in order to determine whether
+// the transaction should be included in a collection.
+func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
+
 	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
 		return ErrIncompleteTransaction{Missing: missingFields}
 	}
 
 	// TODO check account/payer signatures
+
+	// TODO parse Cadence script
 
 	return nil
 }

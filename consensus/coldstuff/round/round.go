@@ -3,9 +3,6 @@
 package round
 
 import (
-	"encoding/binary"
-	"math/rand"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -24,16 +21,10 @@ type Round struct {
 // New creates a new consensus round.
 func New(head *flow.Header, me module.Local, participants flow.IdentityList) (*Round, error) {
 
-	// take first 8 bytes of previous block hash as a seed to shuffle identities
-	headID := head.ID()
-	seed := binary.LittleEndian.Uint64(headID[:])
-	r := rand.New(rand.NewSource(int64(seed)))
-	r.Shuffle(len(participants), func(i int, j int) {
-		participants[i], participants[j] = participants[j], participants[i]
-	})
+	// pick the leader on a fixed round-robin basis
+	leader := participants[int(head.Height)%len(participants)]
 
 	// remove ourselves from the participants
-	leader := participants[0]
 	quorum := participants.TotalStake()
 	participants = participants.Filter(filter.Not(filter.HasNodeID(me.NodeID())))
 

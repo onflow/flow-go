@@ -111,10 +111,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// remove the transactions from the memory pool
 			for _, colTx := range payload.Collection.Transactions {
 				txID := colTx.ID()
-				ok := f.transactions.Rem(txID)
-				if !ok {
-					return fmt.Errorf("could not remove transaction from mempool (id=%x)", txID)
-				}
+				// ignore result -- we don't care whether the transaction was
+				// in the pool or not
+				_ = f.transactions.Rem(txID)
 			}
 
 			// finalize the block in cluster state

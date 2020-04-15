@@ -19,7 +19,7 @@ type nodeInfo struct {
 
 func TestNetworkSetupBasic(t *testing.T) {
 
-	net := []testnet.NodeConfig{
+	nodes := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection),
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleConsensus),
@@ -27,13 +27,13 @@ func TestNetworkSetupBasic(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleExecution),
 		testnet.NewNodeConfig(flow.RoleVerification),
 	}
-	conf := testnet.NetworkConfig{Nodes: net}
+	conf := testnet.NewNetworkConfig("meta_test_basic", nodes)
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(t, "testing", conf)
+	flowNetwork, err := testnet.PrepareFlowNetwork(t, conf)
 	require.NoError(t, err)
 	defer flowNetwork.Cleanup()
 
-	assert.Len(t, flowNetwork.Containers, len(net))
+	assert.Len(t, flowNetwork.Containers, len(nodes))
 
 	realData := getNodeInfos(flowNetwork)
 
@@ -51,7 +51,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 
 func TestNetworkSetupMultipleNodes(t *testing.T) {
 
-	net := []testnet.NodeConfig{
+	nodes := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection),
 		testnet.NewNodeConfig(flow.RoleCollection),
 		testnet.NewNodeConfig(flow.RoleCollection),
@@ -63,13 +63,13 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleVerification),
 		testnet.NewNodeConfig(flow.RoleExecution),
 	}
-	conf := testnet.NetworkConfig{Nodes: net}
+	conf := testnet.NewNetworkConfig("meta_test_multinodes", nodes)
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(t, "testing", conf)
+	flowNetwork, err := testnet.PrepareFlowNetwork(t, conf)
 	require.NoError(t, err)
 	defer flowNetwork.Cleanup()
 
-	assert.Len(t, flowNetwork.Containers, len(net))
+	assert.Len(t, flowNetwork.Containers, len(nodes))
 
 	realData := getNodeInfos(flowNetwork)
 
