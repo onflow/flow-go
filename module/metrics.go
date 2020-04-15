@@ -9,27 +9,28 @@ import (
 type Metrics interface {
 
 	// Common Metrics
+	//
+
+	// BadgerDBSize total size on-disk of the badger database.
 	BadgerDBSize(sizeBytes int64)
 
 	// Collection Metrics
+	//
 
-	// StartCollectionToGuarantee starts a span to trace the duration of a collection
-	// from being created to being submitted as a colleciton guarantee
-	StartCollectionToGuarantee(collection flow.LightCollection)
+	// TransactionReceived is called when a new transaction is ingested by the
+	// node. It increments the total count of ingested transactions and starts
+	// a tx->col span for the transaction.
+	TransactionReceived(txID flow.Identifier)
 
-	// FinishCollectionToGuarantee finishes a span to trace the duration of a collection
-	// from being created to being submitted as a colleciton guarantee
-	FinishCollectionToGuarantee(collectionID flow.Identifier)
+	// CollectionProposed is called when a new collection is proposed by us or
+	// any other node in the cluster.
+	CollectionProposed(collection flow.LightCollection)
 
-	// StartTransactionToCollectionGuarantee starts a span to trace the duration of a transaction
-	// from being created to being included as part of a collection guarantee
-	StartTransactionToCollectionGuarantee(txID flow.Identifier)
-
-	// FinishTransactionToCollectionGuarantee finishes a span to trace the duration of a transaction
-	// from being created to being included as part of a collection guarantee
-	FinishTransactionToCollectionGuarantee(txID flow.Identifier)
+	// CollectionGuaranteed is called when a collection is finalized.
+	CollectionGuaranteed(collection flow.LightCollection)
 
 	// Consensus Metrics
+	//
 
 	// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
 	StartCollectionToFinalized(collectionID flow.Identifier)
@@ -68,6 +69,7 @@ type Metrics interface {
 	NewestKnownQC(view uint64)
 
 	// Verification Metrics
+	//
 
 	// OnChunkVerificationStarted is called whenever the verification of a chunk is started
 	// it starts the timer to record the execution time
@@ -80,14 +82,6 @@ type Metrics interface {
 	// OnResultApproval is called whenever a result approval for is emitted
 	// it increases the result approval counter for this chunk
 	OnResultApproval()
-
-	// OnStorageAdded is called whenever something is added to the persistent (on disk) storage
-	// of verification node. It records the size of stored object.
-	OnStorageAdded(size float64)
-
-	// OnStorageRemoved is called whenever something is removed from the persistent (on disk) storage
-	// of verification node. It records the size of stored object.
-	OnStorageRemoved(size float64)
 
 	// OnChunkDataAdded is called whenever something is added to related to chunkID to the in-memory mempools
 	// of verification node. It records the size of stored object.

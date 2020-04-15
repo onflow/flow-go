@@ -124,7 +124,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	log.Debug().Msg("transaction message received")
 
 	// report Metrics Transaction from received to being included in a collection guarantee
-	e.metrics.StartTransactionToCollectionGuarantee(tx.ID())
+	e.metrics.TransactionReceived(tx.ID())
 
 	// first, we check if the transaction is valid
 	err := e.validateTransaction(tx)
