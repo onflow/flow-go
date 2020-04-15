@@ -11,7 +11,7 @@ const (
 	// collectionGuaranteeToProposal is a duration metrics
 	// from a collection being created
 	// to being submited in a proposal
-	collectionGuaranteeToProposal = "collection_guarantee_proposal"
+	collectionGuaranteeToProposal = "collection_guarantee_to_proposal"
 
 	// collectionTransactionToCollectionGuarantee is a duration metrics
 	// from a transaction received being included

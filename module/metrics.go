@@ -7,6 +7,10 @@ import (
 )
 
 type Metrics interface {
+
+	// Common Metrics
+	BadgerDBSize(sizeBytes int64)
+
 	// Collection Metrics
 
 	// StartCollectionToGuarantee starts a span to trace the duration of a collection
