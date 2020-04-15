@@ -69,7 +69,7 @@ func (c *GhostClient) Subscribe(ctx context.Context) (*FlowMessageStreamReader, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe for events: %w", err)
 	}
-	return &FlowMessageStreamReader{stream: stream}, nil
+	return &FlowMessageStreamReader{stream: stream, codec: c.codec}, nil
 }
 
 type FlowMessageStreamReader struct {

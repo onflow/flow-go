@@ -9,13 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
 	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -165,29 +163,15 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 		defer cancel()
-		//err = client.SendTransaction(ctx, tx)
-		//assert.Nil(t, err)
+		err = client.SendTransaction(ctx, tx)
+		assert.Nil(t, err)
 
-		originID, event, err := msgReader.Next()
+		msg, err := msgReader.Next()
 		assert.NoError(t, err)
-		assert.NotNil(t, event)
+		assert.NotNil(t, msg)
 
-		// TODO: do something meaningful with the origin ID and the message, for now just log it
-		t.Log(originID)
-
-		// case event to the desired type
-		switch ev := event.(type) {
-		case *messages.ClusterBlockProposal:
-			t.Log(*ev.Payload)
-			t.Log(*ev.Header)
-		default:
-			// ignore
-		}
-
-		// Example of sending a message via the ghost node
-		// send a transaction using the ghost node
-		err = ghostClient.Send(ctx, engine.CollectionIngest, []flow.Identifier{colNode1.Identifier}, &tx)
-		assert.NoError(t, err)
+		// TODO: do something meaningful with the message
+		t.Log(msg)
 
 		// wait for consensus to complete
 		//TODO we should listen for collection guarantees instead, but this is blocked
