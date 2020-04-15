@@ -2,9 +2,11 @@ package mock
 
 import (
 	"os"
+	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
@@ -17,6 +19,7 @@ import (
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
@@ -76,7 +79,7 @@ type ExecutionNode struct {
 	ReceiptsEngine  *executionprovider.Engine
 	BadgerDB        *badger.DB
 	VM              virtualmachine.VirtualMachine
-	State           state.ExecutionState
+	ExecutionState  state.ExecutionState
 	Ledger          storage.Ledger
 	LevelDbDir      string
 }
@@ -87,6 +90,15 @@ func (en ExecutionNode) Done() {
 	<-en.Ledger.Done()
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()
+}
+
+func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
+
+	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID()
+	require.NoError(t, err)
+
+	require.Equal(t, header.ID(), blockID)
+	require.Equal(t, header.Height, height)
 }
 
 // VerificationNode implements an in-process verification node for tests.
@@ -100,6 +112,8 @@ type VerificationNode struct {
 	CollectionTrackers    mempool.CollectionTrackers
 	ChunkDataPacks        mempool.ChunkDataPacks
 	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
+	IngestedChunkIDs      mempool.Identifiers
+	IngestedResultIDs     mempool.Identifiers
 	IngestEngine          *ingest.Engine
 	VerifierEngine        network.Engine
 }

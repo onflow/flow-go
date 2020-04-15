@@ -59,7 +59,7 @@ func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*Thre
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	// internal list of valid signature shares
-	shares := make([]byte, 0, (threshold+1)*SignatureLenBLS_BLS12381)
+	shares := make([]byte, 0, (threshold+1)*SignatureLenBlsBls12381)
 	signers := make([]index, 0, threshold+1)
 
 	return &ThresholdSigner{

@@ -16,6 +16,7 @@ func TestGenerateGenesisQC(t *testing.T) {
 	participantData := createSignerData(t, 3)
 
 	block := unittest.BlockFixture()
+	block.Height = 0
 	block.Identities = flow.IdentityList{
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),

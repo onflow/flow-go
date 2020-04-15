@@ -27,6 +27,12 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
 
+		// insert the block payload
+		err = InsertClusterPayload(&block.Payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert payload: %w", err)
+		}
+
 		// index the block payload
 		err = IndexClusterPayload(&block.Header, &block.Payload)(tx)
 		if err != nil {
@@ -114,15 +120,25 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	}
 }
 
-// InsertClusterPayload inserts the payload for a cluster block.
+// InsertClusterPayload inserts the payload for a cluster block. It inserts
+// both the collection and all constituent transactions, allowing duplicates.
 func InsertClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// cluster payloads only contain a single collection, allow duplicates,
 		// because it is valid for two competing forks to have the same payload.
-		err := operation.SkipDuplicates(operation.InsertCollection(&payload.Collection))(tx)
+		light := payload.Collection.Light()
+		err := operation.SkipDuplicates(operation.InsertCollection(&light))(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert collection: %w", err)
+			return fmt.Errorf("could not insert payload collection: %w", err)
+		}
+
+		// insert constituent transactions
+		for _, colTx := range payload.Collection.Transactions {
+			err = operation.SkipDuplicates(operation.InsertTransaction(colTx))(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert payload transaction: %w", err)
+			}
 		}
 
 		return nil
@@ -145,7 +161,8 @@ func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*ba
 		}
 
 		// index the transaction IDs within the collection
-		err = operation.SkipDuplicates(operation.IndexCollectionPayload(header.Height, header.ID(), header.ParentID, &payload.Collection))(tx)
+		txIDs := payload.Collection.Light().Transactions
+		err = operation.SkipDuplicates(operation.IndexCollectionPayload(header.Height, header.ID(), header.ParentID, txIDs))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}
@@ -158,9 +175,6 @@ func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*ba
 func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// ensure payload is empty
-		*payload = cluster.Payload{}
-
 		// retrieve the block header
 		var header flow.Header
 		err := operation.RetrieveHeader(blockID, &header)(tx)
@@ -168,11 +182,25 @@ func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) f
 			return fmt.Errorf("could not retrieve header: %w", err)
 		}
 
-		// lookup collection ID
-		err = operation.LookupCollectionPayload(header.Height, blockID, header.ParentID, &payload.Collection)(tx)
+		// lookup collection transaction IDs
+		var txIDs []flow.Identifier
+		err = operation.LookupCollectionPayload(header.Height, blockID, header.ParentID, &txIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not look up collection payload: %w", err)
 		}
+
+		colTransactions := make([]*flow.TransactionBody, 0, len(txIDs))
+		// retrieve individual transactions
+		for _, txID := range txIDs {
+			var nextTx flow.TransactionBody
+			err = operation.RetrieveTransaction(txID, &nextTx)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve transaction: %w", err)
+			}
+			colTransactions = append(colTransactions, &nextTx)
+		}
+
+		*payload = cluster.PayloadFromTransactions(colTransactions...)
 
 		return nil
 	}

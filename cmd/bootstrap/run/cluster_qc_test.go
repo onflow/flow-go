@@ -27,6 +27,7 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 
 	block.ParentID = flow.ZeroID
 	block.View = 3
+	block.Height = 0
 	block.Seals = []*flow.Seal{&flow.Seal{}}
 	block.Guarantees = nil
 	block.PayloadHash = block.Payload.Hash()
@@ -36,9 +37,7 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 			ParentID: flow.ZeroID,
 			View:     42,
 		},
-		Payload: cluster.Payload{
-			Collection: flow.LightCollection{Transactions: nil},
-		},
+		Payload: cluster.EmptyPayload(),
 	}
 	clusterBlock.PayloadHash = clusterBlock.Payload.Hash()
 

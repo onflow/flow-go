@@ -46,6 +46,8 @@ func main() {
 		collectionTrackers   *stdmap.CollectionTrackers
 		chunkDataPacks       *stdmap.ChunkDataPacks
 		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
+		ingestedChunkIDs     *stdmap.Identifiers
+		ingestedResultIDs    *stdmap.Identifiers
 		verifierEng          *verifier.Engine
 		ingestEng            *ingest.Engine
 	)
@@ -94,6 +96,14 @@ func main() {
 			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit)
 			return err
 		}).
+		Module("ingested chunk ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			ingestedChunkIDs, err = stdmap.NewIdentifiers(chunkLimit)
+			return err
+		}).
+		Module("ingested result ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			ingestedResultIDs, err = stdmap.NewIdentifiers(receiptLimit)
+			return err
+		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
 			conCache = buffer.NewPendingBlocks()
@@ -103,7 +113,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 			chunkVerifier := chunks.NewChunkVerifier(vm)
-			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier)
+			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, node.Metrics)
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -130,6 +140,8 @@ func main() {
 				collectionTrackers,
 				chunkDataPacks,
 				chunkDataPackTracker,
+				ingestedChunkIDs,
+				ingestedResultIDs,
 				blockStorage,
 				assigner)
 			return ingestEng, err

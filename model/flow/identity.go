@@ -91,12 +91,12 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 	iy.Stake = m.Stake
 	var err error
 	if m.StakingPubKey != nil {
-		if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLS_BLS12381, m.StakingPubKey); err != nil {
+		if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BlsBls12381, m.StakingPubKey); err != nil {
 			return err
 		}
 	}
 	if m.NetworkPubKey != nil {
-		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSA_P256, m.NetworkPubKey); err != nil {
+		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.EcdsaP256, m.NetworkPubKey); err != nil {
 			return err
 		}
 	}
