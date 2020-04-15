@@ -32,7 +32,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 			ZrPolynomialImage(xdata, s.a, i, &s.y[i-1])
 			C.bn_read_bin((*C.bn_st)(&s.x),
 				(*C.uchar)(&xdata[0]),
-				PrKeyLenBLS_BLS12381,
+				PrKeyLenBlsBls12381,
 			)
 			continue
 		}
@@ -74,7 +74,7 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
-		PrKeyLenBLS_BLS12381,
+		PrKeyLenBlsBls12381,
 	)
 
 	s.xReceived = true

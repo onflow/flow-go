@@ -7,7 +7,7 @@ import (
 )
 
 func GenerateNetworkingKey(seed []byte) (crypto.PrivateKey, error) {
-	keys, err := GenerateKeys(crypto.ECDSA_P256, 1, [][]byte{seed})
+	keys, err := GenerateKeys(crypto.EcdsaP256, 1, [][]byte{seed})
 	if err != nil {
 		return nil, err
 	}
@@ -15,11 +15,11 @@ func GenerateNetworkingKey(seed []byte) (crypto.PrivateKey, error) {
 }
 
 func GenerateNetworkingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
-	return GenerateKeys(crypto.ECDSA_P256, n, seeds)
+	return GenerateKeys(crypto.EcdsaP256, n, seeds)
 }
 
 func GenerateStakingKey(seed []byte) (crypto.PrivateKey, error) {
-	keys, err := GenerateKeys(crypto.BLS_BLS12381, 1, [][]byte{seed})
+	keys, err := GenerateKeys(crypto.BlsBls12381, 1, [][]byte{seed})
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func GenerateStakingKey(seed []byte) (crypto.PrivateKey, error) {
 }
 
 func GenerateStakingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
-	return GenerateKeys(crypto.BLS_BLS12381, n, seeds)
+	return GenerateKeys(crypto.BlsBls12381, n, seeds)
 }
 
 func GenerateKeys(algo crypto.SigningAlgorithm, n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
