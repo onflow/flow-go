@@ -467,6 +467,11 @@ func (e *EventHandler) processVote(vote *model.Vote) error {
 	// if we don't have enough votes to build QC for this block:
 	// nothing more to do for processing vote
 	if !built {
+
+		e.log.Info().
+			Uint64("vote_view", vote.View).
+			Msgf("a vote didn't trigger a qc to be made")
+
 		return nil
 	}
 
@@ -485,6 +490,9 @@ func (e *EventHandler) processQC(qc *model.QuorumCertificate) error {
 	_, viewChanged := e.paceMaker.UpdateCurViewWithQC(qc)
 	if !viewChanged {
 		// this QC didn't trigger any view change, the processing ends.
+		e.log.Info().
+			Uint64("qc_view", qc.View).
+			Msgf("qc didn't trigger any view change")
 		return nil
 	}
 
