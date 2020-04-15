@@ -20,7 +20,7 @@ import (
 type ecdsaAlgo struct {
 	// elliptic curve
 	curve elliptic.Curve
-	// the signing algo
+	// the signing algo and parameters
 	algo SigningAlgorithm
 }
 

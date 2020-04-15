@@ -19,7 +19,7 @@ import (
 type blsBls12381Algo struct {
 	// points to Relic context of BLS12-381 with all the parameters
 	context ctx
-	// the signing algo
+	// the signing algo and parameters
 	algo SigningAlgorithm
 }
 
