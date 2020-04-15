@@ -16,10 +16,14 @@ type ContainerConfig struct {
 	bootstrap.NodeInfo
 	ContainerName string
 	LogLevel      string
+	Ghost         bool
 }
 
 // ImageName returns the Docker image name for the given config.
 func (c *ContainerConfig) ImageName() string {
+	if c.Ghost {
+		return "gcr.io/dl-flow/ghost:latest"
+	}
 	return fmt.Sprintf("gcr.io/dl-flow/%s:latest", c.Role.String())
 }
 
