@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -58,6 +59,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not get consensus participants: %w", err)
 	}
+	participants = participants.Order(order.ByNodeIDAsc)
 
 	cold := &ColdStuff{
 		log:          log,
@@ -135,6 +137,13 @@ ConsentLoop:
 
 		// calculate the time at which we can generate the next valid block
 		limit := e.round.Parent().Timestamp.Add(e.interval)
+
+		log.Debug().
+			Str("leader", e.round.Leader().NodeID.String()).
+			Str("participants", fmt.Sprint("%v", e.participants.NodeIDs())).
+			Hex("head_id", logging.ID(head.ID())).
+			Uint64("head_height", head.Height).
+			Msg("starting round")
 
 		select {
 		case <-e.unit.Quit():
