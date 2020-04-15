@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,30 +23,31 @@ import (
 func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 	t.Skip()
+
 	var (
 		// one collection node
-		collNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel("info"), testnet.WithIDInt(1))
+		collNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(1))
 
 		// three consensus nodes
-		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
+		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
 
 		// an actual execution node
-		realExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel("info"), testnet.WithIDInt(2))
+		realExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(2))
 
 		// a ghost node masquerading as an execution node
-		ghostExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel("debug"), testnet.WithIDInt(3),
+		ghostExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(3),
 			testnet.AsGhost(true))
 
 		// a verification node
-		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel("info"))
+		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
 	)
 
 	nodes := append([]testnet.NodeConfig{collNode, conNode1, conNode2, conNode3, realExeNode, verNode, ghostExeNode})
-	conf := testnet.NetworkConfig{Nodes: nodes}
+	conf := testnet.NewNetworkConfig("ghost_example_subscribe", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, "example_ghost", conf)
+	net, err := testnet.PrepareFlowNetwork(t, conf)
 	require.Nil(t, err)
 
 	ctx := context.Background()
@@ -90,8 +92,6 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	assert.EqualValues(t, 1, blocks[0].Height)
 	assert.EqualValues(t, 2, blocks[1].Height)
 
-	err = net.StopContainers()
-	assert.Nil(t, err)
 }
 
 // TestGhostNodeExample_Send demonstrates how to emulate a node and send an event from it
@@ -101,28 +101,28 @@ func TestGhostNodeExample_Send(t *testing.T) {
 
 	var (
 		// one real collection node
-		realCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel("info"), testnet.WithIDInt(1))
+		realCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(1))
 
 		// a ghost node masquerading as a collection node
-		ghostCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel("debug"), testnet.WithIDInt(2),
+		ghostCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(2),
 			testnet.AsGhost(true))
 
 		// three consensus nodes
-		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
+		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
 
 		// an actual execution node
-		realExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel("info"))
+		realExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel))
 
 		// a verification node
-		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel("info"))
+		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
 	)
 
 	nodes := append([]testnet.NodeConfig{realCollNode, ghostCollNode, conNode1, conNode2, conNode3, realExeNode, verNode})
-	conf := testnet.NetworkConfig{Nodes: nodes}
+	conf := testnet.NewNetworkConfig("ghost_example_send", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, "example_ghost", conf)
+	net, err := testnet.PrepareFlowNetwork(t, conf)
 	require.Nil(t, err)
 
 	ctx := context.Background()
