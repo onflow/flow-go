@@ -44,6 +44,8 @@ type Engine struct {
 	collectionTrackers   mempool.CollectionTrackers    // keeps track of collection requests that this engine made
 	chunkDataPacks       mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
 	chunkDataPackTackers mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
+	ingestedResultIDs    mempool.Identifiers           // keeps ids of ingested execution results
+	ingestedChunkIDs     mempool.Identifiers           // keeps ids of ingested chunks
 	blockStorage         storage.Blocks
 	checkChunksLock      sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
 	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
@@ -63,6 +65,8 @@ func New(
 	collectionTrackers mempool.CollectionTrackers,
 	chunkDataPacks mempool.ChunkDataPacks,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
+	ingestedChunkIDs mempool.Identifiers,
+	ingestedResultIDs mempool.Identifiers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
 ) (*Engine, error) {
@@ -80,6 +84,8 @@ func New(
 		collectionTrackers:   collectionTrackers,
 		chunkDataPacks:       chunkDataPacks,
 		chunkDataPackTackers: chunkDataPackTrackers,
+		ingestedChunkIDs:     ingestedChunkIDs,
+		ingestedResultIDs:    ingestedResultIDs,
 		blockStorage:         blockStorage,
 		assigner:             assigner,
 	}
@@ -177,6 +183,11 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("execution receipt received")
 
+	if e.ingestedResultIDs.Has(receipt.ExecutionResult.ID()) {
+		// discards the receipt if its result has already been ingested
+		return nil
+	}
+
 	// TODO: correctness check for execution receipts
 	// extracts list of verifier nodes id
 	origin, err := e.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
@@ -219,6 +230,11 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
 		Msg("chunk data pack received")
+
+	if e.ingestedChunkIDs.Has(chunkDataPack.ChunkID) {
+		// discards the chunk data pack if it belongs to an already ingested chunk
+		return nil
+	}
 
 	// checks if this event is a reply of a prior request
 	// extracts the tracker
@@ -506,13 +522,13 @@ func (e *Engine) checkPendingChunks() {
 			continue
 		}
 
-		mychunks, err := e.myChunks(&receipt.ExecutionResult)
+		mychunks, err := e.myUningestedChunks(&receipt.ExecutionResult)
 		// extracts list of chunks assigned to this Verification node
 		if err != nil {
 			e.log.Error().
 				Err(err).
 				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-				Msg("could not fetch the assigned chunks")
+				Msg("could not fetch assigned chunks")
 			continue
 		}
 
@@ -563,22 +579,58 @@ func (e *Engine) checkPendingChunks() {
 				continue
 			}
 
-			// TODO add a tracker to clean the memory up from resources that have already been verified
-			// https://github.com/dapperlabs/flow-go/issues/2750
-			// clean up would be something like this:
-			// cleans the execution receipt from receipts mempool
-			// cleans block form blocks mempool
-			// for now, we clean the mempool from only the collection, as otherwise
-			// ingest engine sends the chunk corresponding to this collection everytime
-			// this function gets called, since it has everything that is needed to verify this
-			e.authCollections.Rem(collection.ID())
+			// does resource cleanup
+			e.onChunkIngested(vchunk)
 		}
 	}
 }
 
-// myChunks returns the list of chunks in the chunk list that this verifier node
-// is assigned to
-func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
+// onChunkIngested is called whenever a verifiable chunk is formed for a
+// chunk and is sent to the verify engine successfully.
+// It cleans up all resources associated with this chunk
+func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
+	// marks this chunk as ingested
+	err := e.ingestedChunkIDs.Add(vc.ChunkDataPack.ChunkID)
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Hex("chunk_id", logging.ID(vc.ChunkDataPack.ChunkID)).
+			Msg("could not add chunk to ingested chunks mempool")
+	}
+
+	// cleans up resources of the ingested chunk from mempools
+	e.authCollections.Rem(vc.Collection.ID())
+	e.chunkDataPacks.Rem(vc.ChunkDataPack.ID())
+
+	mychunks, err := e.myUningestedChunks(&vc.Receipt.ExecutionResult)
+	// extracts list of chunks assigned to this Verification node
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Hex("result_id", logging.Entity(vc.Receipt.ExecutionResult)).
+			Msg("could not fetch assigned chunks")
+		return
+	}
+
+	if len(mychunks) == 0 {
+		// no un-ingested chunk remains with this receipt
+		// marks execution result as ingested
+		err := e.ingestedResultIDs.Add(vc.Receipt.ExecutionResult.ID())
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Hex("result_id", logging.Entity(vc.Receipt.ExecutionResult)).
+				Msg("could add ingested result to mempool")
+		}
+		// removes receipt from mempool to avoid further iteration
+		e.authReceipts.Rem(vc.Receipt.ID())
+	}
+}
+
+// myUningestedChunks returns the list of chunks in the chunk list that this verifier node
+// is assigned to, and are not ingested yet. A chunk is ingested once a verifiable chunk is
+// formed out of it and is passed to verify engine
+func (e *Engine) myUningestedChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 
 	// extracts list of verifier nodes id
 	//
@@ -609,6 +661,10 @@ func (e *Engine) myChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 		chunk, ok := res.Chunks.ByIndex(index)
 		if !ok {
 			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+		}
+		// discard the chunk if it has been already ingested
+		if e.ingestedChunkIDs.Has(chunk.ID()) {
+			continue
 		}
 		mine = append(mine, chunk)
 	}

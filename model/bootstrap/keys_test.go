@@ -11,7 +11,7 @@ import (
 )
 
 func TestEncodableNetworkPubKey(t *testing.T) {
-	netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed(t))
+	netw, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, generateRandomSeed(t))
 	require.NoError(t, err)
 	key := EncodableNetworkPubKey{netw.PublicKey()}
 
@@ -39,7 +39,7 @@ func TestEncodableNetworkPubKeyNil(t *testing.T) {
 }
 
 func TestEncodableNetworkPrivKey(t *testing.T) {
-	netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed(t))
+	netw, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, generateRandomSeed(t))
 	require.NoError(t, err)
 	key := EncodableNetworkPrivKey{netw}
 
@@ -67,7 +67,7 @@ func TestEncodableNetworkPrivKeyNil(t *testing.T) {
 }
 
 func TestEncodableStakingPubKey(t *testing.T) {
-	stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed(t))
+	stak, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, generateRandomSeed(t))
 	require.NoError(t, err)
 	key := EncodableStakingPubKey{stak.PublicKey()}
 
@@ -95,7 +95,7 @@ func TestEncodableStakingPubKeyNil(t *testing.T) {
 }
 
 func TestEncodableStakingPrivKey(t *testing.T) {
-	stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed(t))
+	stak, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, generateRandomSeed(t))
 	require.NoError(t, err)
 	key := EncodableStakingPrivKey{stak}
 
@@ -124,7 +124,7 @@ func TestEncodableStakingPrivKeyNil(t *testing.T) {
 }
 
 func TestEncodableRandomBeaconPubKey(t *testing.T) {
-	randbeac, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed(t))
+	randbeac, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, generateRandomSeed(t))
 	require.NoError(t, err)
 	key := EncodableRandomBeaconPubKey{randbeac.PublicKey()}
 
@@ -152,7 +152,7 @@ func TestEncodableRandomBeaconPubKeyNil(t *testing.T) {
 }
 
 func TestEncodableRandomBeaconPrivKey(t *testing.T) {
-	randbeac, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed(t))
+	randbeac, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, generateRandomSeed(t))
 	require.NoError(t, err)
 	key := EncodableRandomBeaconPrivKey{randbeac}
 

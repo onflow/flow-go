@@ -30,12 +30,12 @@ func AccountSignatureFixture() flow.AccountSignature {
 
 // AccountKeyFixture returns a randomly generated ECDSA/SHA3 account key.
 func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_P256)
+	seed := make([]byte, crypto.KeyGenSeedMinLenEcdsaP256)
 	_, err := rand.Read(seed)
 	if err != nil {
 		return nil, err
 	}
-	key, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
+	key, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, seed)
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +138,21 @@ func SealFixture() flow.Seal {
 	}
 }
 
-func ClusterBlockFixture() cluster.Block {
-	payload := cluster.Payload{
-		Collection: flow.LightCollection{
-			Transactions: []flow.Identifier{IdentifierFixture()},
-		},
+func ClusterPayloadFixture(n int) cluster.Payload {
+	transactions := make([]*flow.TransactionBody, n)
+	for i := 0; i < n; i++ {
+		tx := TransactionBodyFixture()
+		transactions[i] = &tx
 	}
+	return cluster.PayloadFromTransactions(transactions...)
+}
+
+func ClusterBlockFixture() cluster.Block {
+
+	payload := ClusterPayloadFixture(3)
 	header := BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
+
 	return cluster.Block{
 		Header:  header,
 		Payload: payload,
@@ -155,11 +162,8 @@ func ClusterBlockFixture() cluster.Block {
 // ClusterBlockWithParent creates a new cluster consensus block that is valid
 // with respect to the given parent block.
 func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
-	payload := cluster.Payload{
-		Collection: flow.LightCollection{
-			Transactions: []flow.Identifier{IdentifierFixture()},
-		},
-	}
+
+	payload := ClusterPayloadFixture(3)
 
 	header := BlockHeaderFixture()
 	header.Height = parent.Height + 1
@@ -374,12 +378,12 @@ func WithNodeID(b byte) func(*flow.Identity) {
 // WithRandomPublicKeys adds random public keys to an identity.
 func WithRandomPublicKeys() func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		stak, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, generateRandomSeed())
+		stak, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, generateRandomSeed())
 		if err != nil {
 			panic(err)
 		}
 		identity.StakingPubKey = stak.PublicKey()
-		netw, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, generateRandomSeed())
+		netw, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, generateRandomSeed())
 		if err != nil {
 			panic(err)
 		}
@@ -445,6 +449,7 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	tb := flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
 		ReferenceBlockID: IdentifierFixture(),
+		// TODO remove or update these once Access API is finalized
 		//Nonce:            rand.Uint64(),
 		Nonce: 0,
 		//ComputeLimit:     10,
@@ -577,7 +582,7 @@ func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint
 func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
 
 	// TODO seems this key literal doesn't decode anymore
-	emulatorRootKey, err := crypto.DecodePrivateKey(crypto.ECDSA_P256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
+	emulatorRootKey, err := crypto.DecodePrivateKey(crypto.EcdsaP256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
 	if err != nil {
 		return nil, err
 	}
