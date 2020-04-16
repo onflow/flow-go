@@ -351,7 +351,7 @@ func (p *P2PNode) Publish(ctx context.Context, t string, data []byte, minPeers i
 	if !found {
 		return fmt.Errorf("topic not found:%s", t)
 	}
-	err := ps.Publish(ctx, data, pubsub.WithReadiness(pubsub.MinTopicSize(minPeers)))
+	err := ps.Publish(ctx, data)
 	if err != nil {
 		return fmt.Errorf("failed to publish to topic %s: %w", t, err)
 	}
