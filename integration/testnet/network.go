@@ -451,9 +451,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// Should always have at least 1 collection and execution node
 			nodeContainer.addFlag("ingress-addr", "collection_1:9000")
 			nodeContainer.addFlag("script-addr", "execution_1:9000")
-			nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 			nodeContainer.Ports[AccessNodeAPIPort] = hostPort
-			f.AccessPorts[AccessNodeAPIPort] = hostPort
+			net.AccessPorts[AccessNodeAPIPort] = hostPort
 
 		case flow.RoleVerification:
 			nodeContainer.addFlag("alpha", "1")
