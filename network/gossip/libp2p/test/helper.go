@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
@@ -53,6 +54,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
+		me.On("NotMeFilter").Return(flow.IdentityFilter(filter.Any))
 		net, err := libp2p.NewNetwork(log, json.NewCodec(), identities, me, mws[i], csize, tops[i])
 		if err != nil {
 			return nil, fmt.Errorf("could not create error %w", err)
@@ -88,6 +90,12 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 			NetworkPubKey: key,
 		}
 		identities[i] = &id
+	}
+
+	// now that the network has started, address within the identity will have the actual port number
+	// update the network with the new id
+	for _, net := range nets {
+		net.SetIDs(identities)
 	}
 
 	return nets, nil
