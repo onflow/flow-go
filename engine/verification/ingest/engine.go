@@ -638,7 +638,7 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 		for _, areceipt := range e.authReceipts.All() {
 			// TODO check for nil dereferencing
 			if e.ingestedResultIDs.Has(areceipt.ExecutionResult.ID()) {
-				e.pendingReceipts.Rem(areceipt.ID())
+				e.authReceipts.Rem(areceipt.ID())
 			}
 		}
 	}
