@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	badgerDBSizeKB = promauto.NewGauge(prometheus.GaugeOpts{
+	badgerDBSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceCommon,
 		Name:      "badger_db_size_bytes",
 	})
@@ -15,5 +15,5 @@ var (
 // BadgerDBSize sets the total badger database size on disk, measured in bytes.
 // This includes the LSM tree and value log.
 func (c *Collector) BadgerDBSize(sizeBytes int64) {
-	badgerDBSizeKB.Set(float64(sizeBytes))
+	badgerDBSizeGauge.Set(float64(sizeBytes))
 }
