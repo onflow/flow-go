@@ -13,6 +13,10 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// a pacemaker timeout to wait for proposals. Usually 10 ms is enough,
+// but for slow environment like CI, a longer one is needed.
+const safeTimeout = 10 * time.Second
+
 func TestSingleInstance(t *testing.T) {
 
 	// set up a single instance to run4
@@ -46,7 +50,7 @@ func TestThreeInstances(t *testing.T) {
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(1*time.Second, 1*time.Second, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, 1*time.Second)
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
@@ -105,7 +109,7 @@ func TestSevenInstances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(1*time.Second, 1*time.Second, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, 1*time.Second)
 	require.NoError(t, err)
 
 	// set up five instances that work fully
@@ -120,14 +124,14 @@ func TestSevenInstances(t *testing.T) {
 		instances = append(instances, in)
 	}
 
-	// set up two instances which can't vote, nor propose
+	// set up two instances which can't vote
 	for n := numPass; n < numPass+numFail; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(ViewReached(finalView)),
+			WithStopCondition(ViewFinalized(finalView)),
 			WithOutgoingVotes(BlockAllVotes),
 		)
 		instances = append(instances, in)
@@ -142,7 +146,7 @@ func TestSevenInstances(t *testing.T) {
 		wg.Add(1)
 		go func(in *Instance) {
 			err := in.Run()
-			require.True(t, errors.Is(err, errStopCondition))
+			require.True(t, errors.Is(err, errStopCondition), "should run until stop condition")
 			wg.Done()
 		}(in)
 	}
