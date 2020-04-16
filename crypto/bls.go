@@ -172,6 +172,13 @@ func (sk *PrKeyBlsBls12381) Equals(other PrivateKey) bool {
 	return sk.scalar.equals(&otherBLS.scalar)
 }
 
+// String returns the hex string representation of the key.
+func (sk *PrKeyBlsBls12381) String() string {
+	// err in this case is always nil
+	skBytes, _ := sk.Encode()
+	return fmt.Sprintf("%#x", skBytes)
+}
+
 // PubKeyBlsBls12381 is the public key of BLS using BLS12_381,
 // it implements PublicKey
 type PubKeyBlsBls12381 struct {
@@ -199,6 +206,13 @@ func (pk *PubKeyBlsBls12381) Equals(other PublicKey) bool {
 		return false
 	}
 	return pk.point.equals(&otherBLS.point)
+}
+
+// String returns the hex string representation of the key.
+func (pk *PubKeyBlsBls12381) String() string {
+	// err in this case is always nil
+	pkBytes, _ := pk.Encode()
+	return fmt.Sprintf("%#x", pkBytes)
 }
 
 // Get Macro definitions from the C layer as Cgo does not export macros

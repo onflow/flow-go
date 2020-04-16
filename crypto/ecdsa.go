@@ -237,6 +237,12 @@ func (sk *PrKeyECDSA) Equals(other PrivateKey) bool {
 	return sk.goPrKey.D.Cmp(otherECDSA.goPrKey.D) == 0
 }
 
+// String returns the hex string representation of the key.
+func (sk *PrKeyECDSA) String() string {
+	skBytes, _ := sk.Encode()
+	return fmt.Sprintf("%#x", skBytes)
+}
+
 // PubKeyECDSA is the public key of ECDSA, it implements PublicKey
 type PubKeyECDSA struct {
 	// the signature algo
@@ -289,4 +295,10 @@ func (pk *PubKeyECDSA) Equals(other PublicKey) bool {
 	}
 	return (pk.goPubKey.X.Cmp(otherECDSA.goPubKey.X) == 0) &&
 		(pk.goPubKey.Y.Cmp(otherECDSA.goPubKey.Y) == 0)
+}
+
+// String returns the hex string representation of the key.
+func (pk *PubKeyECDSA) String() string {
+	pkBytes, _ := pk.Encode()
+	return fmt.Sprintf("%#x", pkBytes)
 }

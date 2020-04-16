@@ -3,8 +3,6 @@ package crypto
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 )
@@ -71,15 +69,7 @@ func (s Signature) Bytes() []byte {
 
 // String returns a String representation of the signature data
 func (s Signature) String() string {
-	const zero = "00"
-	var sb strings.Builder
-	sb.WriteString("0x")
-	for _, i := range s {
-		hex := strconv.FormatUint(uint64(i), 16)
-		sb.WriteString(zero[:2-len(hex)])
-		sb.WriteString(hex)
-	}
-	return sb.String()
+	return fmt.Sprintf("%#x", s.Bytes())
 }
 
 // Key Pair
@@ -88,8 +78,10 @@ func (s Signature) String() string {
 type PrivateKey interface {
 	// Algorithm returns the signing algorithm related to the private key.
 	Algorithm() SigningAlgorithm
-	//  return the key size in bytes.
+	// Size return the key size in bytes.
 	Size() int
+	// String return a hex representation of the key
+	String() string
 	// Sign generates a signature using the provided hasher.
 	Sign([]byte, hash.Hasher) (Signature, error)
 	// PublicKey returns the public key.
@@ -106,8 +98,10 @@ type PrivateKey interface {
 type PublicKey interface {
 	// Algorithm returns the signing algorithm related to the public key.
 	Algorithm() SigningAlgorithm
-	//  return the key size in bytes.
+	// Size() return the key size in bytes.
 	Size() int
+	// String return a hex representation of the key
+	String() string
 	// Verify verifies a signature of an input message using the provided hasher.
 	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
