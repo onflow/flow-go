@@ -8,8 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/testingdock"
-
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -32,10 +30,6 @@ func TestMVP_Network(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 	conf := testnet.NewNetworkConfig("mvp", net)
-
-	// Enable verbose logging
-	testingdock.Verbose = true
-	testingdock.SpawnSequential = true
 
 	ctx := context.Background()
 

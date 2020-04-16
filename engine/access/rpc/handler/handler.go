@@ -60,6 +60,14 @@ func NewHandler(log zerolog.Logger,
 
 // Ping responds to requests when the server is up.
 func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
+	_, err := h.executionRPC.Ping(ctx, &execution.PingRequest{})
+	if err != nil {
+		return nil, err
+	}
+	_, err = h.collectionRPC.Ping(ctx, req)
+	if err != nil {
+		return nil, err
+	}
 	return &access.PingResponse{}, nil
 }
 
