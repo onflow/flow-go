@@ -62,11 +62,11 @@ func NewHandler(log zerolog.Logger,
 func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
 	_, err := h.executionRPC.Ping(ctx, &execution.PingRequest{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not ping execution node: %w", err)
 	}
 	_, err = h.collectionRPC.Ping(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not ping collection node: %w", err)
 	}
 	return &access.PingResponse{}, nil
 }
