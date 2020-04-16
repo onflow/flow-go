@@ -13,16 +13,15 @@ import (
 )
 
 const (
-	testHeight     = 256
 	testHashLength = 32
 )
 
 func TestSMTInitialization(t *testing.T) {
 
-	withSMT(t, testHeight, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 257, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
-		if smt.GetHeight() != testHeight {
-			t.Errorf("Height is %d; want %d", smt.GetHeight(), testHeight)
+		if smt.GetHeight() != 257 {
+			t.Errorf("Height is %d; want %d", smt.GetHeight(), 257)
 		}
 
 		hashes := GetDefaultHashes()
@@ -53,7 +52,7 @@ func TestSMTHeightTooSmall(t *testing.T) {
 
 func TestInteriorNode(t *testing.T) {
 
-	withSMT(t, 255, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 257, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		k1 := make([]byte, 1)
 		k2 := make([]byte, 2)
 		v1 := make([]byte, 5)
@@ -74,7 +73,7 @@ func TestInteriorNode(t *testing.T) {
 }
 
 func TestInteriorNodeLRNil(t *testing.T) {
-	withSMT(t, 255, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 257, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
 		batcher := emptyTree.database.NewBatcher()
 
@@ -87,7 +86,7 @@ func TestInteriorNodeLRNil(t *testing.T) {
 
 func TestInteriorNodeLNil(t *testing.T) {
 
-	withSMT(t, 255, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 257, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		k := make([]byte, 1)
 		v := make([]byte, 5)
 		h := HashLeaf(k, v)
@@ -107,7 +106,7 @@ func TestInteriorNodeLNil(t *testing.T) {
 
 func TestInteriorNodeRNil(t *testing.T) {
 
-	withSMT(t, 255, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 257, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		k := make([]byte, 1)
 		v := make([]byte, 5)
 		h := HashLeaf(k, v)
@@ -127,8 +126,56 @@ func TestInteriorNodeRNil(t *testing.T) {
 	})
 }
 
+func TestUpdateWithWrongKeySize(t *testing.T) {
+	withSMT(t, 257, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
+		// short key
+		key1 := make([]byte, 1)
+		utils.SetBit(key1, 5)
+		value1 := []byte{'a'}
+		keys := [][]byte{key1}
+		values := [][]byte{value1}
+
+		_, err := smt.Update(keys, values, emptyTree.root)
+		require.Error(t, err)
+
+		// long key
+		key2 := make([]byte, 33)
+		utils.SetBit(key2, 5)
+		value2 := []byte{'a'}
+		keys = [][]byte{key2}
+		values = [][]byte{value2}
+
+		_, err = smt.Update(keys, values, emptyTree.root)
+		require.Error(t, err)
+	})
+
+}
+
+func TestReadWithWrongKeySize(t *testing.T) {
+	withSMT(t, 257, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
+		// setup data
+		key1 := make([]byte, 32)
+		utils.SetBit(key1, 5)
+		value1 := []byte{'a'}
+		keys := [][]byte{key1}
+		values := [][]byte{value1}
+
+		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		require.NoError(t, err)
+
+		// wrong key
+		key2 := make([]byte, 33)
+		utils.SetBit(key2, 5)
+		keys = [][]byte{key2}
+
+		_, _, read_err := smt.Read(keys, true, newRoot)
+		require.Error(t, read_err)
+	})
+
+}
+
 func TestInsertIntoKey(t *testing.T) {
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
@@ -179,7 +226,7 @@ func TestInsertIntoKey(t *testing.T) {
 
 func TestInsertToEndofKeys(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -242,7 +289,7 @@ func TestInsertToEndofKeys(t *testing.T) {
 
 func TestUpdateAtomicallySingleValUpdateAndRead(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key := make([]byte, 8)
 		value := []byte{'a'}
 
@@ -273,7 +320,7 @@ func TestUpdateAtomicallySingleValUpdateAndRead(t *testing.T) {
 
 func TestUpdateAtomicallyMultiValUpdateAndRead(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -330,7 +377,7 @@ func TestUpdateAtomicallyMultiValUpdateAndRead(t *testing.T) {
 
 func TestTrustedRead(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -394,7 +441,7 @@ func TestFailedRead(t *testing.T) {
 
 func TestGetProofFlags_MultipleValueTree(t *testing.T) {
 
-	withSMT(t, 8, 10, 10, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 10, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 
 		value1 := []byte{'a'}
@@ -471,7 +518,7 @@ func CheckFlag(trie *node, flag []byte, key []byte, t *testing.T) bool {
 
 func TestGetProofAndVerifyInclusionProof_SingleValueTreeLeft(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -501,7 +548,7 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeLeft(t *testing.T) {
 
 func TestGetProof_SingleValueTreeConstructedLeft(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
@@ -542,7 +589,7 @@ func TestGetProof_SingleValueTreeConstructedLeft(t *testing.T) {
 
 func TestGetProofAndVerifyInclusionProof_SingleValueTreeRight(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
@@ -575,7 +622,7 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeRight(t *testing.T) {
 
 func TestGetProof_MultipleValueTree(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -630,7 +677,7 @@ func TestGetProof_MultipleValueTree(t *testing.T) {
 
 func TestGetProof_MultipleStaggeredUpdates(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -699,7 +746,7 @@ func TestGetProof_MultipleStaggeredUpdates(t *testing.T) {
 
 func TestGetProof_MultipleValueTreeDeeper(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		utils.SetBit(key1, 0)
 		utils.SetBit(key1, 4)
@@ -743,7 +790,7 @@ func TestGetProof_MultipleValueTreeDeeper(t *testing.T) {
 
 func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
@@ -786,7 +833,7 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 
 func TestNonInclusionProof_EmptyTree(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		nonIncludedKey := make([]byte, 1)
 		utils.SetBit(nonIncludedKey, 2)
 		nonIncludedValue := []byte{'d'}
@@ -805,7 +852,7 @@ func TestNonInclusionProof_EmptyTree(t *testing.T) {
 
 func TestNonInclusionProof_SingleValueTree(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -839,7 +886,7 @@ func TestNonInclusionProof_SingleValueTree(t *testing.T) {
 
 func TestNonInclusionProof_IncludedKey(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
@@ -891,7 +938,7 @@ func TestNonInclusionProof_IncludedKey(t *testing.T) {
 
 func TestHistoricalState(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -942,7 +989,7 @@ func TestHistoricalState(t *testing.T) {
 }
 
 func TestGetHistoricalProofs(t *testing.T) {
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -1038,7 +1085,7 @@ func TestGetHistoricalProofs(t *testing.T) {
 
 func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -1122,7 +1169,7 @@ func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
 
 func TestRead_HistoricalValues(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -1205,7 +1252,7 @@ func TestRead_HistoricalValues(t *testing.T) {
 
 func TestRead_HistoricalValuesTrusted(t *testing.T) {
 
-	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -1253,7 +1300,7 @@ func TestRead_HistoricalValuesTrusted(t *testing.T) {
 
 func TestGetHistoricalValues_Pruned(t *testing.T) {
 
-	withSMT(t, 8, 6, 6, 2, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 6, 6, 2, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -1389,7 +1436,7 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 
 func TestGetProof_Pruned(t *testing.T) {
 
-	withSMT(t, 8, 6, 6, 2, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 6, 6, 2, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -1531,7 +1578,7 @@ func TestGetProof_Pruned(t *testing.T) {
 
 func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 
-	withSMT(t, 8, 6, 6, 2, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 6, 6, 2, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -1840,7 +1887,7 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 
 func TestTrustedRead_Pruned(t *testing.T) {
 
-	withSMT(t, 8, 6, 6, 1, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 6, 6, 1, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -1935,7 +1982,7 @@ func TestTrustedRead_Pruned(t *testing.T) {
 
 func TestKVDB_Pruned(t *testing.T) {
 
-	withSMT(t, 8, 2, 6, 6, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 2, 6, 6, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -2163,7 +2210,7 @@ func TestKVDB_Pruned(t *testing.T) {
 
 func TestKVDB_Pruned2(t *testing.T) {
 
-	withSMT(t, 8, 6, 6, 6, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 6, 6, 6, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 
@@ -2403,7 +2450,7 @@ func TestComputeCompactValue(t *testing.T) {
 
 func TestRead_HistoricalValuesPruned(t *testing.T) {
 
-	withSMT(t, 8, 6, 6, 6, func(t *testing.T, smt *SMT, emptyTree *tree) {
+	withSMT(t, 9, 6, 6, 6, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
 

@@ -448,6 +448,7 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	tb := flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
 		ReferenceBlockID: IdentifierFixture(),
+		// TODO remove or update these once Access API is finalized
 		//Nonce:            rand.Uint64(),
 		Nonce: 0,
 		//ComputeLimit:     10,
