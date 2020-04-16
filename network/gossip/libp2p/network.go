@@ -50,15 +50,12 @@ func NewNetwork(
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
 
-	idsMinusMe := ids.Filter(me.NotMeFilter())
-
 	// fanout is set to half of the system size for connectivity assurance w.h.p
 	fanout := len(ids) / 2
 
 	o := &Network{
 		logger:  log,
 		codec:   codec,
-		ids:     idsMinusMe,
 		me:      me,
 		mw:      mw,
 		engines: make(map[uint8]network.Engine),
@@ -66,6 +63,8 @@ func NewNetwork(
 		fanout:  fanout,
 		top:     top,
 	}
+
+	o.SetIDs(ids)
 
 	return o, nil
 }
@@ -150,6 +149,12 @@ func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 		err = fmt.Errorf("could not process message: %w", err)
 	}
 	return err
+}
+
+func (n *Network) SetIDs(ids flow.IdentityList) {
+	// remove this node id from the list of fanout target ids to avoid self-dial
+	idsMinusMe := ids.Filter(n.me.NotMeFilter())
+	n.ids = idsMinusMe
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
