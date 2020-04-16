@@ -2,23 +2,14 @@
 package crypto
 
 import (
-	"crypto/elliptic"
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // revive:disable:var-naming
-
-var ECDSA_P256Instance *ECDSAalgo
-var ECDSA_SECp256k1Instance *ECDSAalgo
-
-//  Once variables to make sure each Signer is instantiated only once
-var ECDSA_P256Once sync.Once
-var ECDSA_SECp256k1Once sync.Once
 
 // revive:enable
 
@@ -34,49 +25,24 @@ type signer interface {
 
 // commonSigner holds the common data for all signers
 type commonSigner struct {
-	algo            SigningAlgorithm
-	prKeyLength     int
-	pubKeyLength    int
-	signatureLength int
+	algo SigningAlgorithm
 }
 
 // newNonRelicSigner initializes a signer that does not depend on the Relic library.
 func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
-	if algo == ECDSA_P256 {
-		ECDSA_P256Once.Do(func() {
-			ECDSA_P256Instance = &(ECDSAalgo{
-				curve: elliptic.P256(),
-				commonSigner: &commonSigner{
-					algo,
-					PrKeyLenECDSA_P256,
-					PubKeyLenECDSA_P256,
-					SignatureLenECDSA_P256,
-				},
-			})
-		})
-		return ECDSA_P256Instance, nil
+	switch algo {
+	case EcdsaP256:
+		return newEcdsaP256(), nil
+	case EcdsaSecp256k1:
+		return newEcdsaSecp256k1(), nil
+	default:
+		return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
 	}
-
-	if algo == ECDSA_SECp256k1 {
-		ECDSA_SECp256k1Once.Do(func() {
-			ECDSA_SECp256k1Instance = &(ECDSAalgo{
-				curve: secp256k1(),
-				commonSigner: &commonSigner{
-					algo,
-					PrKeyLenECDSA_SECp256k1,
-					PubKeyLenECDSA_SECp256k1,
-					SignatureLenECDSA_SECp256k1,
-				},
-			})
-		})
-		return ECDSA_SECp256k1Instance, nil
-	}
-	return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
 }
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
-	signer, err := NewSigner(algo)
+	signer, err := newSigner(algo)
 	if err != nil {
 		return nil, fmt.Errorf("key generation failed: %w", err)
 	}
@@ -85,7 +51,7 @@ func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) 
 
 // DecodePrivateKey decodes an array of bytes into a private key of the given algorithm
 func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
-	signer, err := NewSigner(algo)
+	signer, err := newSigner(algo)
 	if err != nil {
 		return nil, fmt.Errorf("decode private key failed: %w", err)
 	}
@@ -94,7 +60,7 @@ func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 
 // DecodePublicKey decodes an array of bytes into a public key of the given algorithm
 func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
-	signer, err := NewSigner(algo)
+	signer, err := newSigner(algo)
 	if err != nil {
 		return nil, fmt.Errorf("decode public key failed: %w", err)
 	}
@@ -134,7 +100,7 @@ type PrivateKey interface {
 	// PublicKey returns the public key.
 	PublicKey() PublicKey
 	// Encode returns a bytes representation of the private key
-	Encode() ([]byte, error)
+	Encode() []byte
 	// Equals returns true if the given PrivateKeys are equal. Keys are considered unequal if their algorithms are
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
@@ -150,7 +116,7 @@ type PublicKey interface {
 	// Verify verifies a signature of an input message using the provided hasher.
 	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
-	Encode() ([]byte, error)
+	Encode() []byte
 	// Equals returns true if the given PublicKeys are equal. Keys are considered unequal if their algorithms are
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.

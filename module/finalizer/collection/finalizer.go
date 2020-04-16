@@ -109,11 +109,10 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// remove the transactions from the memory pool
-			for _, txID := range payload.Collection.Transactions {
-				ok := f.transactions.Rem(txID)
-				if !ok {
-					return fmt.Errorf("could not remove transaction from mempool (id=%x)", txID)
-				}
+			for _, colTx := range payload.Collection.Transactions {
+				txID := colTx.ID()
+				// ignore result -- we don't care whether the
+				_ = f.transactions.Rem(txID)
 				f.metrics.FinishTransactionToCollectionGuarantee(txID)
 			}
 
@@ -124,7 +123,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// don't bother submitting empty collections
-			if payload.Collection.Len() == 0 {
+			if len(payload.Collection.Transactions) == 0 {
 				continue
 			}
 

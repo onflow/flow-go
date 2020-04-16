@@ -106,14 +106,15 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="state/protocol" -case=underscore -output="state/protocol/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="state/dkg" -case=underscore -output="state/dkg/mocks" -outpkg="mocks"
+	GO111MODULE=on mockery -name '.*' -dir=engine/execution/sync -case=underscore -output="./engine/execution/sync/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/virtualmachine -case=underscore -output="./engine/execution/computation/virtualmachine/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
-	GO111MODULE=on mockery -name 'AccessAPIClient' -dir="./engine/access/mock/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
-
+	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -output="./engine/execution/ingestion/mock" -outpkg="mock"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -232,8 +233,18 @@ docker-build-access-debug:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=access --target debug \
 		-t gcr.io/dl-flow/access-debug:latest -t "gcr.io/dl-flow/access-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/access-debug:$(IMAGE_TAG)" .
 
+.PHONY: docker-build-ghost
+docker-build-ghost:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=ghost --target production \
+		-t gcr.io/dl-flow/ghost:latest -t "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/ghost:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-ghost-debug
+docker-build-ghost-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=ghost --target debug \
+		-t gcr.io/dl-flow/ghost-debug:latest -t "gcr.io/dl-flow/ghost-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/ghost-debug:$(IMAGE_TAG)" .
+
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
 
 .PHONY: docker-push-collection
 docker-push-collection:
@@ -265,6 +276,12 @@ docker-push-access:
 	docker push "gcr.io/dl-flow/access:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/access:$(IMAGE_TAG)"
 
+.PHONY: docker-push-ghost
+docker-push-ghost:
+	docker push gcr.io/dl-flow/ghost:latest
+	docker push "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)"
+	docker push "gcr.io/dl-flow/ghost:$(IMAGE_TAG)"
+
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access
 
@@ -287,6 +304,10 @@ docker-run-verification:
 .PHONY: docker-run-access
 docker-run-access:
 	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/access:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries access-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+.PHONY: docker-run-access
+docker-run-ghost:
+	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/ghost:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries ghost-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 # Check if the go version is 1.13. flow-go only supports go 1.13
 .PHONY: check-go-version
@@ -316,7 +337,7 @@ update-deployment-image-name-staging:
 	for file in $$files; do \
 		patched=`openssl rand -hex 8`; \
 		node=`echo "$$file" | grep -oP 'flow-\K\w+(?=-node-deployment.yml)'`; \
- 		kubectl patch -f $$file -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"gcr.io/dl-flow/'"$$node"':${IMAGE_TAG}"}]}}}}`' --local -o yaml > $$patched; \
+		kubectl patch -f $$file -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"gcr.io/dl-flow/'"$$node"':${IMAGE_TAG}"}]}}}}`' --local -o yaml > $$patched; \
 		mv -f $$patched $$file; \
 	done
 

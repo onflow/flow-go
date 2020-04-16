@@ -150,7 +150,7 @@ func tsDkgRunChan(proc *TestDKGProcessor,
 				if groupPK == nil {
 					proc.pkBytes = []byte{}
 				} else {
-					proc.pkBytes, _ = groupPK.Encode()
+					proc.pkBytes = groupPK.Encode()
 				}
 				assert.Nil(t, err)
 				proc.currentPrivateKey = sk

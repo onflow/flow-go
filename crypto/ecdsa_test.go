@@ -14,12 +14,12 @@ import (
 // ECDSA tests
 func TestECDSA(t *testing.T) {
 	ECDSAcurves := []SigningAlgorithm{
-		ECDSA_P256,
-		ECDSA_SECp256k1,
+		EcdsaP256,
+		EcdsaSecp256k1,
 	}
 	ECDSAseedLen := []int{
-		KeyGenSeedMinLenECDSA_P256,
-		KeyGenSeedMinLenECDSA_SECp256k1,
+		KeyGenSeedMinLenEcdsaP256,
+		KeyGenSeedMinLenEcdsaSecp256k1,
 	}
 	for i, curve := range ECDSAcurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
@@ -40,27 +40,27 @@ func TestECDSA(t *testing.T) {
 }
 
 // Signing bench
-func BenchmarkECDSA_P256Sign(b *testing.B) {
+func BenchmarkEcdsaP256Sign(b *testing.B) {
 	halg := hash.NewSHA3_256()
-	benchSign(b, ECDSA_P256, halg)
+	benchSign(b, EcdsaP256, halg)
 }
 
 // Verifying bench
-func BenchmarkECDSA_P256Verify(b *testing.B) {
+func BenchmarkEcdsaP256Verify(b *testing.B) {
 	halg := hash.NewSHA3_256()
-	benchVerify(b, ECDSA_P256, halg)
+	benchVerify(b, EcdsaP256, halg)
 }
 
 // Signing bench
-func BenchmarkECDSA_SECp256k1Sign(b *testing.B) {
+func BenchmarkEcdsaSecp256k1Sign(b *testing.B) {
 	halg := hash.NewSHA3_256()
-	benchSign(b, ECDSA_SECp256k1, halg)
+	benchSign(b, EcdsaSecp256k1, halg)
 }
 
 // Verifying bench
-func BenchmarkECDSA_SECp256k1Verify(b *testing.B) {
+func BenchmarkEcdsaSecp256k1Verify(b *testing.B) {
 	halg := hash.NewSHA3_256()
-	benchVerify(b, ECDSA_SECp256k1, halg)
+	benchVerify(b, EcdsaSecp256k1, halg)
 }
 
 // ECDSA tests
@@ -68,12 +68,12 @@ func BenchmarkECDSA_SECp256k1Verify(b *testing.B) {
 // TestBLSEncodeDecode tests encoding and decoding of ECDSA keys
 func TestECDSAEncodeDecode(t *testing.T) {
 	ECDSAcurves := []SigningAlgorithm{
-		ECDSA_P256,
-		ECDSA_SECp256k1,
+		EcdsaP256,
+		EcdsaSecp256k1,
 	}
 	ECDSAseedLen := []int{
-		KeyGenSeedMinLenECDSA_P256,
-		KeyGenSeedMinLenECDSA_SECp256k1,
+		KeyGenSeedMinLenEcdsaP256,
+		KeyGenSeedMinLenEcdsaSecp256k1,
 	}
 
 	for i, curve := range ECDSAcurves {
@@ -86,23 +86,19 @@ func TestECDSAEncodeDecode(t *testing.T) {
 		sk, err := GeneratePrivateKey(curve, seed)
 		assert.Nil(t, err, "the key generation has failed")
 
-		skBytes, err := sk.Encode()
-		require.Nil(t, err, "the key encoding has failed")
+		skBytes := sk.Encode()
 		skCheck, err := DecodePrivateKey(curve, skBytes)
 		require.Nil(t, err, "the key decoding has failed")
 		assert.True(t, sk.Equals(skCheck), "key equality check failed")
-		skCheckBytes, err := skCheck.Encode()
-		require.Nil(t, err, "the key encoding has failed")
+		skCheckBytes := skCheck.Encode()
 		assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
 
 		pk := sk.PublicKey()
-		pkBytes, err := pk.Encode()
-		require.Nil(t, err, "the key encoding has failed")
+		pkBytes := pk.Encode()
 		pkCheck, err := DecodePublicKey(curve, pkBytes)
 		require.Nil(t, err, "the key decoding has failed")
 		assert.True(t, pk.Equals(pkCheck), "key equality check failed")
-		pkCheckBytes, err := pkCheck.Encode()
-		require.Nil(t, err, "the key encoding has failed")
+		pkCheckBytes := pkCheck.Encode()
 		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
 	}
 }
@@ -110,12 +106,12 @@ func TestECDSAEncodeDecode(t *testing.T) {
 // TestECDSAEquals tests equal for ECDSA keys
 func TestECDSAEquals(t *testing.T) {
 	ECDSAcurves := []SigningAlgorithm{
-		ECDSA_P256,
-		ECDSA_SECp256k1,
+		EcdsaP256,
+		EcdsaSecp256k1,
 	}
 	ECDSAseedLen := []int{
-		KeyGenSeedMinLenECDSA_P256,
-		KeyGenSeedMinLenECDSA_SECp256k1,
+		KeyGenSeedMinLenEcdsaP256,
+		KeyGenSeedMinLenEcdsaSecp256k1,
 	}
 
 	for i, curve := range ECDSAcurves {

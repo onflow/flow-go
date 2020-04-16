@@ -5,7 +5,6 @@ package badger
 import (
 	"encoding/binary"
 	"fmt"
-	"math"
 	"sort"
 
 	"github.com/dgraph-io/badger/v2"
@@ -15,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -28,7 +28,7 @@ type Snapshot struct {
 
 // Identities retrieves all active ids at the given snapshot and
 // applies the given filters.
-func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
+func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 
 	// execute the transaction that retrieves everything
 	var identities flow.IdentityList
@@ -54,7 +54,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 		}
 
 		// get finalized stakes within the boundary
-		deltas, err := computeFinalizedDeltas(tx, boundary, filters)
+		deltas, err := computeFinalizedDeltas(tx, boundary, selector)
 		if err != nil {
 			return fmt.Errorf("could not compute finalized stakes: %w", err)
 		}
@@ -83,10 +83,8 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 
 				// manually add the deltas for valid ids
 				for _, identity := range identities {
-					for _, filter := range filters {
-						if !filter(identity) {
-							continue
-						}
+					if !selector(identity) {
+						continue
 					}
 					deltas[identity.NodeID] += int64(identity.Stake)
 				}
@@ -120,7 +118,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 
 		// apply filters again to filter on stuff that wasn't available while
 		// running through the delta index in the key-value store
-		identities = identities.Filter(filters...)
+		identities = identities.Filter(selector)
 
 		sort.Slice(identities, func(i int, j int) bool {
 			return order.ByNodeIDAsc(identities[i], identities[j])
@@ -189,48 +187,11 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// order the identities by node ID
-	sort.Slice(identities, func(i, j int) bool {
-		return order.ByNodeIDAsc(identities[i], identities[j])
-	})
-
-	// create the desired number of clusters and assign nodes
-	clusters := flow.NewClusterList(nClusters)
-	for i, identity := range identities {
-		index := uint(i) % nClusters
-		clusters.Add(index, identity)
-	}
-
-	return clusters, nil
+	return protocol.Clusters(nClusters, identities), nil
 }
 
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// set the number to boundary if it's at max uint64
-		if s.number == math.MaxUint64 {
-			err := operation.RetrieveBoundary(&s.number)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve boundary: %w", err)
-			}
-		}
-
-		// check if hash is nil and try to get it from height
-		if s.blockID == flow.ZeroID {
-			err := operation.RetrieveNumber(s.number, &s.blockID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve hash (%d): %w", s.number, err)
-			}
-		}
-
-		// get the height for our desired target hash
-		err := operation.RetrieveHeader(s.blockID, head)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve header (%x): %w", s.blockID, err)
-		}
-
-		return nil
-	}
+	return procedure.RetrieveHeader(&s.number, &s.blockID, head)
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
@@ -321,11 +282,11 @@ func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
 	return unfinalizedBlockIDs, nil
 }
 
-func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, filters []flow.IdentityFilter) (map[flow.Identifier]int64, error) {
+func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, selector flow.IdentityFilter) (map[flow.Identifier]int64, error) {
 
 	// define start and end prefixes for the range scan
 	deltas := make(map[flow.Identifier]int64)
-	err := operation.TraverseDeltas(0, boundary, filters, func(nodeID flow.Identifier, delta int64) error {
+	err := operation.TraverseDeltas(0, boundary, selector, func(nodeID flow.Identifier, delta int64) error {
 		deltas[nodeID] += delta
 		return nil
 	})(tx)

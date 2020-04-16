@@ -3,6 +3,7 @@
 package badger
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/dgraph-io/badger/v2"
@@ -26,6 +27,11 @@ func NewState(db *badger.DB, options ...func(*State)) (*State, error) {
 	for _, option := range options {
 		option(s)
 	}
+
+	if s.clusters < 1 {
+		return nil, fmt.Errorf("must have clusters>0 (actual=%d)", s.clusters)
+	}
+
 	return s, nil
 }
 
