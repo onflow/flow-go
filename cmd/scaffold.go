@@ -26,6 +26,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	dbmetrics "github.com/dapperlabs/flow-go/module/metrics/badger"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
@@ -137,9 +138,16 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 }
 
 func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
-	fnb.Component("metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+	fnb.Component("metrics server", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
 		return server, nil
+	})
+}
+
+func (fnb *FlowNodeBuilder) enqueueDBMetrics() {
+	fnb.Component("badger db metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		monitor := dbmetrics.NewMonitor(fnb.Metrics, fnb.DB)
+		return monitor, nil
 	})
 }
 
@@ -374,6 +382,8 @@ func FlowNode(name string) *FlowNodeBuilder {
 	builder.enqueueNetworkInit()
 
 	builder.enqueueMetricsServerInit()
+
+	builder.enqueueDBMetrics()
 
 	return builder
 }

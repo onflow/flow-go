@@ -55,11 +55,9 @@ func sendMetrics(log zerolog.Logger) {
 		metrics.OnResultApproval()
 
 		// storage tests
-		metrics.OnStorageAdded(100)
 		metrics.OnChunkDataAdded(chunkID, 10)
 		// adds a synthetic 10 ms delay between adding an removing storage
 		time.Sleep(10 * time.Millisecond)
-		metrics.OnStorageRemoved(100)
 		metrics.OnChunkDataRemoved(chunkID, 10)
 	}
 }
