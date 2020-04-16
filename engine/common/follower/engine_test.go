@@ -15,7 +15,6 @@ import (
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -83,7 +82,6 @@ func (suite *Suite) TestHandlePendingBlock() {
 	suite.cache.On("ByID", block.ParentID).Return(nil, false).Once()
 	suite.cache.On("Add", mock.Anything).Return(true).Once()
 	suite.sync.On("RequestBlock", block.ParentID).Return().Once()
-	suite.headers.On("ByBlockID", mock.Anything).Return(nil, realstorage.ErrNotFound).Once()
 
 	// submit the block
 	proposal := messages.BlockProposal{
@@ -119,8 +117,6 @@ func (suite *Suite) TestHandleProposal() {
 	// the proposal should be forwarded to the follower
 	suite.follower.On("SubmitProposal", &block.Header, parent.View).Once()
 
-	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
-
 	// submit the block
 	proposal := messages.BlockProposal{
 		Header:  &block.Header,
@@ -154,9 +150,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.mutator.On("Extend", child.ID()).Return(nil).Once()
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
-	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(&block.Header, nil).Once()
-	suite.headers.On("ByBlockID", child.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// should submit to follower
 	suite.follower.On("SubmitProposal", &block.Header, parent.View).Once()
 	suite.follower.On("SubmitProposal", &child.Header, block.View).Once()

@@ -3,7 +3,6 @@
 package compliance
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -251,12 +250,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	final, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get final block: %w", err)
-	}
-
-	_, err = e.headers.ByBlockID(proposal.Header.ID())
-	if !errors.Is(err, storage.ErrNotFound) {
-		e.log.Debug().Msgf("block %s already received, skip", proposal.Header.ID())
-		return nil
 	}
 
 	// reject orphaned block
