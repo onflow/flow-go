@@ -3,353 +3,316 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
+	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestBootstrap(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+type MutatorSuite struct {
+	suite.Suite
+	db    *badger.DB
+	dbdir string
 
-		chainID := cluster.Genesis().ChainID
+	genesis *model.Block
+	chainID string
 
-		state, err := NewState(db, chainID)
-		require.Nil(t, err)
-		mutator := state.Mutate()
-
-		// a helper function to wipe the DB to clean up in between tests
-		cleanup := func() {
-			err := db.DropAll()
-			require.Nil(t, err)
-		}
-
-		t.Run("invalid chain ID", func(t *testing.T) {
-			defer cleanup()
-			genesis := cluster.Genesis()
-			genesis.ChainID = fmt.Sprintf("%s-invalid", genesis.ChainID)
-
-			err := mutator.Bootstrap(genesis)
-			assert.Error(t, err)
-		})
-
-		t.Run("invalid number", func(t *testing.T) {
-			defer cleanup()
-			genesis := cluster.Genesis()
-			genesis.View = 1
-
-			err := mutator.Bootstrap(genesis)
-			assert.Error(t, err)
-		})
-
-		t.Run("invalid parent hash", func(t *testing.T) {
-			defer cleanup()
-			genesis := cluster.Genesis()
-			genesis.ParentID = unittest.IdentifierFixture()
-
-			err := mutator.Bootstrap(genesis)
-			assert.Error(t, err)
-		})
-
-		t.Run("payload hash does not match payload", func(t *testing.T) {
-			defer cleanup()
-			genesis := cluster.Genesis()
-			genesis.PayloadHash = unittest.IdentifierFixture()
-
-			err := mutator.Bootstrap(genesis)
-			assert.Error(t, err)
-		})
-
-		t.Run("invalid payload", func(t *testing.T) {
-			defer cleanup()
-			genesis := cluster.Genesis()
-			// this is invalid because genesis collection should be empty
-			genesis.Payload = unittest.ClusterPayloadFixture(2)
-
-			err := mutator.Bootstrap(genesis)
-			assert.Error(t, err)
-		})
-
-		t.Run("bootstrap", func(t *testing.T) {
-			defer cleanup()
-			genesis := cluster.Genesis()
-
-			err := mutator.Bootstrap(genesis)
-			assert.Nil(t, err)
-
-			err = db.View(func(tx *badger.Txn) error {
-
-				// should insert collection
-				var collection flow.LightCollection
-				err = operation.RetrieveCollection(genesis.Collection.ID(), &collection)(tx)
-				assert.Nil(t, err)
-				assert.Equal(t, genesis.Collection.Light(), collection)
-
-				// should index collection
-				collection = flow.LightCollection{} // reset the collection
-				err = operation.LookupCollectionPayload(genesis.Height, genesis.ID(), genesis.ParentID, &collection.Transactions)(tx)
-				assert.Nil(t, err)
-				assert.Equal(t, genesis.Collection.Light(), collection)
-
-				// should insert header
-				var header flow.Header
-				err = operation.RetrieveHeader(genesis.ID(), &header)(tx)
-				assert.Nil(t, err)
-				assert.Equal(t, genesis.Header.ID(), header.ID())
-
-				// should insert block number -> ID lookup
-				var blockID flow.Identifier
-				err = operation.RetrieveNumberForCluster(genesis.ChainID, genesis.View, &blockID)(tx)
-				assert.Nil(t, err)
-				assert.Equal(t, genesis.ID(), blockID)
-
-				// should insert boundary
-				var boundary uint64
-				err = operation.RetrieveBoundaryForCluster(genesis.ChainID, &boundary)(tx)
-				assert.Nil(t, err)
-				assert.Equal(t, genesis.View, boundary)
-
-				return nil
-			})
-			assert.Nil(t, err)
-		})
-	})
+	state   cluster.State
+	mutator cluster.Mutator
 }
 
-func TestExtend(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+// runs before each test runs
+func (suite *MutatorSuite) SetupTest() {
+	var err error
 
-		genesis := cluster.Genesis()
-		chainID := genesis.ChainID
+	suite.genesis = model.Genesis()
+	suite.chainID = suite.genesis.ChainID
 
-		// a helper function to wipe the DB to clean up in between tests
-		cleanup := func() {
-			err := db.DropAll()
-			require.Nil(t, err)
-		}
+	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
 
-		// set up state and mutator objects, these are safe to share between tests
-		state, err := NewState(db, chainID)
-		require.Nil(t, err)
-		mutator := state.Mutate()
+	suite.state, err = NewState(suite.db, suite.chainID)
+	suite.Assert().Nil(err)
+	suite.mutator = suite.state.Mutate()
+}
 
-		// a helper function to bootstrap with the genesis block
-		bootstrap := func() {
-			err = mutator.Bootstrap(genesis)
-			assert.Nil(t, err)
-		}
+// runs after each test finishes
+func (suite *MutatorSuite) TearDownTest() {
+	err := suite.db.Close()
+	suite.Assert().Nil(err)
+	err = os.RemoveAll(suite.dbdir)
+	suite.Assert().Nil(err)
+}
 
-		// a helper function to insert a block
-		insert := func(block cluster.Block) {
-			_ = db.Update(func(tx *badger.Txn) error {
-				err = procedure.InsertClusterBlock(&block)(tx)
-				assert.Nil(t, err)
-				return nil
-			})
-		}
+func (suite *MutatorSuite) Bootstrap() {
+	err := suite.mutator.Bootstrap(suite.genesis)
+	suite.Assert().Nil(err)
+}
 
-		t.Run("without first bootstrapping", func(t *testing.T) {
-			defer cleanup()
+func (suite *MutatorSuite) InsertBlock(block model.Block) {
+	err := suite.db.Update(procedure.InsertClusterBlock(&block))
+	suite.Assert().Nil(err)
+}
 
-			block := unittest.ClusterBlockWithParent(genesis)
-			insert(block)
+func TestMutator(t *testing.T) {
+	suite.Run(t, new(MutatorSuite))
+}
 
-			err = mutator.Extend(block.ID())
-			assert.Error(t, err)
-		})
+func (suite *MutatorSuite) TestBootstrap_InvalidChainID() {
+	suite.genesis.ChainID = fmt.Sprintf("%s-invalid", suite.genesis.ChainID)
 
-		t.Run("non-existent block", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
+	err := suite.mutator.Bootstrap(suite.genesis)
+	suite.Assert().Error(err)
+}
 
-			// ID of a non-existent block
-			blockID := unittest.IdentifierFixture()
+func (suite *MutatorSuite) TestBootstrap_InvalidNumber() {
+	suite.genesis.View = 1
 
-			err = mutator.Extend(blockID)
-			assert.Error(t, err)
-		})
+	err := suite.mutator.Bootstrap(suite.genesis)
+	suite.Assert().Error(err)
+}
 
-		t.Run("non-existent parent", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
+func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
+	suite.genesis.ParentID = unittest.IdentifierFixture()
 
-			block := unittest.ClusterBlockWithParent(genesis)
-			// change the parent ID
-			block.ParentID = unittest.IdentifierFixture()
-			insert(block)
+	err := suite.mutator.Bootstrap(suite.genesis)
+	suite.Assert().Error(err)
+}
 
-			err = mutator.Extend(block.ID())
-			assert.Error(t, err)
-		})
+func (suite *MutatorSuite) TestBootstrap_InvalidPayloadHash() {
+	suite.genesis.PayloadHash = unittest.IdentifierFixture()
 
-		t.Run("wrong chain ID", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
+	err := suite.mutator.Bootstrap(suite.genesis)
+	suite.Assert().Error(err)
+}
 
-			block := unittest.ClusterBlockWithParent(genesis)
-			// change the chain ID
-			block.ChainID = fmt.Sprintf("%s-invalid", block.ChainID)
-			insert(block)
+func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
+	// this is invalid because genesis collection should be empty
+	suite.genesis.Payload = unittest.ClusterPayloadFixture(2)
 
-			err = mutator.Extend(block.ID())
-			assert.Error(t, err)
-		})
+	err := suite.mutator.Bootstrap(suite.genesis)
+	suite.Assert().Error(err)
+}
 
-		t.Run("invalid block number", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
+func (suite *MutatorSuite) TestBootstrap_Successful() {
 
-			block := unittest.ClusterBlockWithParent(genesis)
-			// change the block number
-			block.View = block.View - 1
-			insert(block)
+	// bootstrap
+	err := suite.mutator.Bootstrap(suite.genesis)
+	suite.Assert().Nil(err)
 
-			err = mutator.Extend(block.ID())
-			assert.Error(t, err)
-		})
+	err = suite.db.View(func(tx *badger.Txn) error {
 
-		t.Run("building on parent of finalized block", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
+		// should insert collection
+		var collection flow.LightCollection
+		err = operation.RetrieveCollection(suite.genesis.Collection.ID(), &collection)(tx)
+		suite.Assert().Nil(err)
+		suite.Assert().Equal(suite.genesis.Collection.Light(), collection)
 
-			// build one block on top of genesis
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			insert(block1)
-			err = mutator.Extend(block1.ID())
-			assert.Nil(t, err)
+		// should index collection
+		collection = flow.LightCollection{} // reset the collection
+		err = operation.LookupCollectionPayload(suite.genesis.Height, suite.genesis.ID(), suite.genesis.ParentID, &collection.Transactions)(tx)
+		suite.Assert().Nil(err)
+		suite.Assert().Equal(suite.genesis.Collection.Light(), collection)
 
-			// finalize the block
-			err = db.Update(procedure.FinalizeClusterBlock(block1.ID()))
-			assert.Nil(t, err)
+		// should insert header
+		var header flow.Header
+		err = operation.RetrieveHeader(suite.genesis.ID(), &header)(tx)
+		suite.Assert().Nil(err)
+		suite.Assert().Equal(suite.genesis.Header.ID(), header.ID())
 
-			// insert another block on top of genesis
-			// since we have already finalized block 1, this is invalid
-			block2 := unittest.ClusterBlockWithParent(genesis)
-			insert(block2)
+		// should insert block number -> ID lookup
+		var blockID flow.Identifier
+		err = operation.RetrieveNumberForCluster(suite.genesis.ChainID, suite.genesis.View, &blockID)(tx)
+		suite.Assert().Nil(err)
+		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
-			// try to extend with the invalid block
-			err = mutator.Extend(block2.ID())
-			assert.Error(t, err)
-		})
+		// should insert boundary
+		var boundary uint64
+		err = operation.RetrieveBoundaryForCluster(suite.genesis.ChainID, &boundary)(tx)
+		suite.Assert().Nil(err)
+		suite.Assert().Equal(suite.genesis.View, boundary)
 
-		t.Run("extend", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
-
-			block := unittest.ClusterBlockWithParent(genesis)
-			insert(block)
-
-			err = mutator.Extend(block.ID())
-			assert.Nil(t, err)
-		})
-
-		t.Run("extend with empty collection", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
-
-			block := unittest.ClusterBlockWithParent(genesis)
-			// set an empty collection as the payload
-			block.SetPayload(cluster.Payload{})
-			insert(block)
-
-			err = mutator.Extend(block.ID())
-			assert.Nil(t, err)
-		})
-
-		t.Run("extend un-finalized block with duplicated transaction", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
-
-			tx1 := unittest.TransactionBodyFixture()
-
-			// create a block extending genesis containing tx1
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			payload1 := cluster.PayloadFromTransactions(&tx1)
-			block1.SetPayload(payload1)
-			insert(block1)
-
-			// should be able to extend block 1
-			err = mutator.Extend(block1.ID())
-			assert.Nil(t, err)
-
-			// create a block building on block1 ALSO containing tx1
-			block2 := unittest.ClusterBlockWithParent(&block1)
-			payload2 := cluster.PayloadFromTransactions(&tx1)
-			block2.SetPayload(payload2)
-			insert(block2)
-
-			// should be unable to extend block 2, as it contains a dupe transaction
-			err = mutator.Extend(block2.ID())
-			t.Log(err)
-			assert.True(t, errors.Is(err, storage.ErrAlreadyIndexed))
-		})
-
-		t.Run("extend finalized block with duplicated transaction", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
-
-			tx1 := unittest.TransactionBodyFixture()
-
-			// create a block extending genesis containing tx1
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			payload1 := cluster.PayloadFromTransactions(&tx1)
-			block1.SetPayload(payload1)
-			insert(block1)
-
-			// should be able to extend block 1
-			err = mutator.Extend(block1.ID())
-			assert.Nil(t, err)
-
-			// should be able to finalize block 1
-			err = db.Update(procedure.FinalizeClusterBlock(block1.ID()))
-			assert.Nil(t, err)
-
-			// create a block building on block1 ALSO containing tx1
-			block2 := unittest.ClusterBlockWithParent(&block1)
-			payload2 := cluster.PayloadFromTransactions(&tx1)
-			block2.SetPayload(payload2)
-			insert(block2)
-
-			// should be unable to extend block 2, as it contains a dupe transaction
-			err = mutator.Extend(block2.ID())
-			t.Log(err)
-			assert.True(t, errors.Is(err, storage.ErrAlreadyIndexed))
-		})
-
-		t.Run("extend conflicting fork with duplicated transaction", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
-
-			tx1 := unittest.TransactionBodyFixture()
-
-			// create a block extending genesis containing tx1
-			block1 := unittest.ClusterBlockWithParent(genesis)
-			payload1 := cluster.PayloadFromTransactions(&tx1)
-			block1.SetPayload(payload1)
-			insert(block1)
-
-			// should be able to extend block 1
-			err = mutator.Extend(block1.ID())
-			assert.Nil(t, err)
-
-			// create a block ALSO extending genesis ALSO containing tx1
-			block2 := unittest.ClusterBlockWithParent(genesis)
-			payload2 := cluster.PayloadFromTransactions(&tx1)
-			block2.SetPayload(payload2)
-			insert(block2)
-
-			// should be able to extend block2, although it conflicts with block1,
-			// it is on a different fork
-			err = mutator.Extend(block2.ID())
-			assert.Nil(t, err)
-		})
+		return nil
 	})
+	suite.Assert().Nil(err)
+}
+
+func (suite *MutatorSuite) TestExtend_WithoutBootstrap() {
+	block := unittest.ClusterBlockWithParent(suite.genesis)
+	suite.InsertBlock(block)
+
+	err := suite.mutator.Extend(block.ID())
+	suite.Assert().Error(err)
+}
+
+func (suite *MutatorSuite) TestExtend_NonexistentBlock() {
+	suite.Bootstrap()
+
+	// ID of a non-existent block
+	blockID := unittest.IdentifierFixture()
+
+	err := suite.mutator.Extend(blockID)
+	suite.Assert().Error(err)
+}
+
+func (suite *MutatorSuite) TestExtend_InvalidChainID() {
+	suite.Bootstrap()
+
+	block := unittest.ClusterBlockWithParent(suite.genesis)
+	// change the chain ID
+	block.ChainID = fmt.Sprintf("%s-invalid", block.ChainID)
+	suite.InsertBlock(block)
+
+	err := suite.mutator.Extend(block.ID())
+	suite.Assert().Error(err)
+}
+
+func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
+	suite.Bootstrap()
+
+	block := unittest.ClusterBlockWithParent(suite.genesis)
+	// change the block number
+	block.View = block.View - 1
+	suite.InsertBlock(block)
+
+	err := suite.mutator.Extend(block.ID())
+	suite.Assert().Error(err)
+}
+
+func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
+	suite.Bootstrap()
+
+	// build one block on top of genesis
+	block1 := unittest.ClusterBlockWithParent(suite.genesis)
+	suite.InsertBlock(block1)
+	err := suite.mutator.Extend(block1.ID())
+	suite.Assert().Nil(err)
+
+	// finalize the block
+	err = suite.db.Update(procedure.FinalizeClusterBlock(block1.ID()))
+	suite.Assert().Nil(err)
+
+	// insert another block on top of genesis
+	// since we have already finalized block 1, this is invalid
+	block2 := unittest.ClusterBlockWithParent(suite.genesis)
+	suite.InsertBlock(block2)
+
+	// try to extend with the invalid block
+	err = suite.mutator.Extend(block2.ID())
+	suite.Assert().Error(err)
+}
+
+func (suite *MutatorSuite) TestExtend_Success() {
+	suite.Bootstrap()
+
+	block := unittest.ClusterBlockWithParent(suite.genesis)
+	suite.InsertBlock(block)
+
+	err := suite.mutator.Extend(block.ID())
+	suite.Assert().Nil(err)
+}
+
+func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
+	suite.Bootstrap()
+
+	block := unittest.ClusterBlockWithParent(suite.genesis)
+	// set an empty collection as the payload
+	block.SetPayload(model.EmptyPayload())
+	suite.InsertBlock(block)
+
+	err := suite.mutator.Extend(block.ID())
+	suite.Assert().Nil(err)
+}
+
+func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
+	suite.Bootstrap()
+
+	tx1 := unittest.TransactionBodyFixture()
+
+	// create a block extending genesis containing tx1
+	block1 := unittest.ClusterBlockWithParent(suite.genesis)
+	payload1 := model.PayloadFromTransactions(&tx1)
+	block1.SetPayload(payload1)
+	suite.InsertBlock(block1)
+
+	// should be able to extend block 1
+	err := suite.mutator.Extend(block1.ID())
+	suite.Assert().Nil(err)
+
+	// create a block building on block1 ALSO containing tx1
+	block2 := unittest.ClusterBlockWithParent(&block1)
+	payload2 := model.PayloadFromTransactions(&tx1)
+	block2.SetPayload(payload2)
+	suite.InsertBlock(block2)
+
+	// should be unable to extend block 2, as it contains a dupe transaction
+	err = suite.mutator.Extend(block2.ID())
+	suite.T().Log(err)
+	suite.Assert().True(errors.Is(err, storage.ErrAlreadyIndexed))
+}
+
+func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
+	suite.Bootstrap()
+
+	tx1 := unittest.TransactionBodyFixture()
+
+	// create a block extending genesis containing tx1
+	block1 := unittest.ClusterBlockWithParent(suite.genesis)
+	payload1 := model.PayloadFromTransactions(&tx1)
+	block1.SetPayload(payload1)
+	suite.InsertBlock(block1)
+
+	// should be able to extend block 1
+	err := suite.mutator.Extend(block1.ID())
+	suite.Assert().Nil(err)
+
+	// should be able to finalize block 1
+	err = suite.db.Update(procedure.FinalizeClusterBlock(block1.ID()))
+	suite.Assert().Nil(err)
+
+	// create a block building on block1 ALSO containing tx1
+	block2 := unittest.ClusterBlockWithParent(&block1)
+	payload2 := model.PayloadFromTransactions(&tx1)
+	block2.SetPayload(payload2)
+	suite.InsertBlock(block2)
+
+	// should be unable to extend block 2, as it contains a dupe transaction
+	err = suite.mutator.Extend(block2.ID())
+	suite.T().Log(err)
+	suite.Assert().True(errors.Is(err, storage.ErrAlreadyIndexed))
+}
+
+func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
+	suite.Bootstrap()
+
+	tx1 := unittest.TransactionBodyFixture()
+
+	// create a block extending genesis containing tx1
+	block1 := unittest.ClusterBlockWithParent(suite.genesis)
+	payload1 := model.PayloadFromTransactions(&tx1)
+	block1.SetPayload(payload1)
+	suite.InsertBlock(block1)
+
+	// should be able to extend block 1
+	err := suite.mutator.Extend(block1.ID())
+	suite.Assert().Nil(err)
+
+	// create a block ALSO extending genesis ALSO containing tx1
+	block2 := unittest.ClusterBlockWithParent(suite.genesis)
+	payload2 := model.PayloadFromTransactions(&tx1)
+	block2.SetPayload(payload2)
+	suite.InsertBlock(block2)
+
+	// should be able to extend block2, although it conflicts with block1,
+	// it is on a different fork
+	err = suite.mutator.Extend(block2.ID())
+	suite.Assert().Nil(err)
 }
