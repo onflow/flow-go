@@ -136,7 +136,7 @@ func (sk *PrKeyBlsBls12381) Algorithm() SigningAlgorithm {
 	return BlsBls12381
 }
 
-func (sk *PrKeyBlsBls12381) KeySize() int {
+func (sk *PrKeyBlsBls12381) Size() int {
 	return PrKeyLenBlsBls12381
 }
 
@@ -183,7 +183,7 @@ func (pk *PubKeyBlsBls12381) Algorithm() SigningAlgorithm {
 	return BlsBls12381
 }
 
-func (pk *PubKeyBlsBls12381) KeySize() int {
+func (pk *PubKeyBlsBls12381) Size() int {
 	return PubKeyLenBlsBls12381
 }
 

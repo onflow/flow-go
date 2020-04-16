@@ -16,15 +16,9 @@ func TestBlsBls12381(t *testing.T) {
 	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
 	require.NoError(t, err)
-	sk, err := GeneratePrivateKey(BlsBls12381, seed)
-	require.Nil(t, err)
 	halg := NewBLS_KMAC("test tag")
-	input := []byte("test input")
 	// test the consistency with different inputs
-	for i := 0; i < 256; i++ {
-		input[0] = byte(i)
-		testSignVerify(t, halg, sk, input)
-	}
+	testGenSignVerify(t, BlsBls12381, halg)
 }
 
 // Signing bench
@@ -101,4 +95,19 @@ func TestBLSEquals(t *testing.T) {
 	assert.False(t, pk1.Equals(pk3), "key equality should return false")
 	assert.False(t, sk1.Equals(sk4), "key equality should return false")
 	assert.False(t, pk1.Equals(pk4), "key equality should return false")
+}
+
+// TestBlsUtils tests some utility functions
+func TestBlsUtils(t *testing.T) {
+	// generate a key pair
+	seed := make([]byte, KeyGenSeedMinLenBlsBls12381)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
+	require.NoError(t, err)
+	sk, err := GeneratePrivateKey(BlsBls12381, seed)
+	require.NoError(t, err)
+	// test Algorithm()
+	testKeysAlgorithm(t, sk, BlsBls12381)
+	// test Size()
+	testKeySize(t, sk, PrKeyLenBlsBls12381, PubKeyLenBlsBls12381)
 }

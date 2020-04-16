@@ -88,8 +88,8 @@ func (s Signature) String() string {
 type PrivateKey interface {
 	// Algorithm returns the signing algorithm related to the private key.
 	Algorithm() SigningAlgorithm
-	// KeySize return the key size in bytes.
-	KeySize() int
+	//  return the key size in bytes.
+	Size() int
 	// Sign generates a signature using the provided hasher.
 	Sign([]byte, hash.Hasher) (Signature, error)
 	// PublicKey returns the public key.
@@ -106,8 +106,8 @@ type PrivateKey interface {
 type PublicKey interface {
 	// Algorithm returns the signing algorithm related to the public key.
 	Algorithm() SigningAlgorithm
-	// KeySize return the key size in bytes.
-	KeySize() int
+	//  return the key size in bytes.
+	Size() int
 	// Verify verifies a signature of an input message using the provided hasher.
 	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.

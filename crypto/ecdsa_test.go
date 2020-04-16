@@ -6,36 +6,20 @@ import (
 	"math/rand"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // ECDSA tests
 func TestECDSA(t *testing.T) {
-	ECDSAcurves := []SigningAlgorithm{
+	ecdsaCurves := []SigningAlgorithm{
 		EcdsaP256,
 		EcdsaSecp256k1,
 	}
-	ECDSAseedLen := []int{
-		KeyGenSeedMinLenEcdsaP256,
-		KeyGenSeedMinLenEcdsaSecp256k1,
-	}
-	for i, curve := range ECDSAcurves {
+	for i, curve := range ecdsaCurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
-
 		halg := hash.NewSHA3_256()
-		seed := make([]byte, ECDSAseedLen[i])
-		n, err := rand.Read(seed)
-		require.Equal(t, n, ECDSAseedLen[i])
-		require.NoError(t, err)
-		sk, err := GeneratePrivateKey(curve, seed)
-		if err != nil {
-			log.Error(err.Error())
-			return
-		}
-		input := []byte("test")
-		testSignVerify(t, halg, sk, input)
+		testGenSignVerify(t, ecdsaCurves[i], halg)
 	}
 }
 
@@ -67,21 +51,21 @@ func BenchmarkEcdsaSecp256k1Verify(b *testing.B) {
 
 // TestBLSEncodeDecode tests encoding and decoding of ECDSA keys
 func TestECDSAEncodeDecode(t *testing.T) {
-	ECDSAcurves := []SigningAlgorithm{
+	ecdsaCurves := []SigningAlgorithm{
 		EcdsaP256,
 		EcdsaSecp256k1,
 	}
-	ECDSAseedLen := []int{
+	ecdsaSeedLen := []int{
 		KeyGenSeedMinLenEcdsaP256,
 		KeyGenSeedMinLenEcdsaSecp256k1,
 	}
 
-	for i, curve := range ECDSAcurves {
+	for i, curve := range ecdsaCurves {
 		t.Logf("Testing encode/decode for curve %s", curve)
 		// Key generation seed
-		seed := make([]byte, ECDSAseedLen[i])
+		seed := make([]byte, ecdsaSeedLen[i])
 		read, err := rand.Read(seed)
-		require.Equal(t, read, ECDSAseedLen[i])
+		require.Equal(t, read, ecdsaSeedLen[i])
 		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(curve, seed)
 		assert.Nil(t, err, "the key generation has failed")
@@ -109,20 +93,20 @@ func TestECDSAEncodeDecode(t *testing.T) {
 
 // TestECDSAEquals tests equal for ECDSA keys
 func TestECDSAEquals(t *testing.T) {
-	ECDSAcurves := []SigningAlgorithm{
+	ecdsaCurves := []SigningAlgorithm{
 		EcdsaP256,
 		EcdsaSecp256k1,
 	}
-	ECDSAseedLen := []int{
+	ecdsaSeedLen := []int{
 		KeyGenSeedMinLenEcdsaP256,
 		KeyGenSeedMinLenEcdsaSecp256k1,
 	}
 
-	for i, curve := range ECDSAcurves {
+	for i, curve := range ecdsaCurves {
 		// generate a key pair
-		seed := make([]byte, ECDSAseedLen[i])
+		seed := make([]byte, ecdsaSeedLen[i])
 		n, err := rand.Read(seed)
-		require.Equal(t, n, ECDSAseedLen[i])
+		require.Equal(t, n, ecdsaSeedLen[i])
 		require.NoError(t, err)
 		// first pair
 		sk1, err := GeneratePrivateKey(curve, seed)
@@ -133,12 +117,12 @@ func TestECDSAEquals(t *testing.T) {
 		require.NoError(t, err)
 		pk2 := sk2.PublicKey()
 		// third pair of a  different curve
-		sk3, err := GeneratePrivateKey(ECDSAcurves[i]^1, seed)
+		sk3, err := GeneratePrivateKey(ecdsaCurves[i]^1, seed)
 		require.NoError(t, err)
 		pk3 := sk3.PublicKey()
 		// fourth pair after changing the seed
 		n, err = rand.Read(seed)
-		require.Equal(t, n, ECDSAseedLen[i])
+		require.Equal(t, n, ecdsaSeedLen[i])
 		require.NoError(t, err)
 		sk4, err := GeneratePrivateKey(curve, seed)
 		require.NoError(t, err)
@@ -150,5 +134,37 @@ func TestECDSAEquals(t *testing.T) {
 		assert.False(t, pk1.Equals(pk3), "key equality should return false")
 		assert.False(t, sk1.Equals(sk4), "key equality should return false")
 		assert.False(t, pk1.Equals(pk4), "key equality should return false")
+	}
+}
+
+// TestECDSAUtils tests some utility functions
+func TestECDSAUtils(t *testing.T) {
+	ecdsaCurves := []SigningAlgorithm{
+		EcdsaP256,
+		EcdsaSecp256k1,
+	}
+	ecdsaSeedLen := []int{
+		KeyGenSeedMinLenEcdsaP256,
+		KeyGenSeedMinLenEcdsaSecp256k1,
+	}
+	ecdsaPrKeyLen := []int{
+		PrKeyLenEcdsaP256,
+		PrKeyLenEcdsaSecp256k1,
+	}
+	ecdsaPubKeyLen := []int{
+		PubKeyLenEcdsaP256,
+		PubKeyLenEcdsaSecp256k1,
+	}
+
+	for i, curve := range ecdsaCurves {
+		// generate a key pair
+		seed := make([]byte, ecdsaSeedLen[i])
+		n, err := rand.Read(seed)
+		require.Equal(t, n, ecdsaSeedLen[i])
+		require.NoError(t, err)
+		sk, err := GeneratePrivateKey(curve, seed)
+		require.NoError(t, err)
+		testKeysAlgorithm(t, sk, ecdsaCurves[i])
+		testKeySize(t, sk, ecdsaPrKeyLen[i], ecdsaPubKeyLen[i])
 	}
 }
