@@ -51,6 +51,7 @@ func NewNetwork(
 	}
 
 	// fanout is set to half of the system size for connectivity assurance w.h.p
+	// ids contain the address of this node itself (hence fanout is (len(ids) - 1) + 1) / 2) = len(ids) / 2
 	fanout := len(ids) / 2
 
 	o := &Network{
