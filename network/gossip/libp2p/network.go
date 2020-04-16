@@ -50,14 +50,15 @@ func NewNetwork(
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
 
+	idsMinusMe := ids.Filter(me.NotMeFilter())
+
 	// fanout is set to half of the system size for connectivity assurance w.h.p
-	// ids contain the address of this node itself (hence fanout is (len(ids) - 1) + 1) / 2) = len(ids) / 2
 	fanout := len(ids) / 2
 
 	o := &Network{
 		logger:  log,
 		codec:   codec,
-		ids:     ids,
+		ids:     idsMinusMe,
 		me:      me,
 		mw:      mw,
 		engines: make(map[uint8]network.Engine),
