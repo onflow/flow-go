@@ -32,6 +32,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/liveness"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -45,6 +46,7 @@ type BaseConfig struct {
 	datadir      string
 	level        string
 	metricsPort  uint
+	livenessPort uint
 	nClusters    uint
 	BootstrapDir string
 }
@@ -83,6 +85,7 @@ type FlowNodeBuilder struct {
 	Me             *local.Local
 	State          *protocol.State
 	DKGState       *wrapper.State
+	Liveness       *liveness.CheckCollector
 	modules        []namedModuleFunc
 	components     []namedComponentFunc
 	doneObject     []namedDoneObject
@@ -109,6 +112,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
+	fnb.flags.UintVarP(&fnb.BaseConfig.livenessPort, "livenessport", "L", 8081, "port for /liveness endpoint")
 	fnb.flags.UintVar(&fnb.BaseConfig.nClusters, "nclusters", 2, "number of collection node clusters")
 }
 
@@ -265,6 +269,11 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.State = state
 }
 
+func (fnb *FlowNodeBuilder) enqueueLivenessServer() {
+	fnb.Component(func(fnb *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+	})
+}
+
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
 	err := v.fn(fnb)
 	if err != nil {
@@ -373,8 +382,10 @@ func FlowNode(name string) *FlowNodeBuilder {
 	builder := &FlowNodeBuilder{
 		BaseConfig: BaseConfig{},
 		Logger:     zerolog.New(os.Stderr),
-		flags:      pflag.CommandLine,
-		name:       name,
+		// NOTE: since we have no checks, this will always resolve to live
+		Liveness: liveness.NewCheckCollector(time.Second * 60),
+		flags:    pflag.CommandLine,
+		name:     name,
 	}
 
 	builder.baseFlags()
