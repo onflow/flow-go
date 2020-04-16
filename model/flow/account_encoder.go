@@ -25,10 +25,7 @@ type accountPrivateKeyWrapper struct {
 }
 
 func EncodeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
-	publicKey, err := a.PublicKey.Encode()
-	if err != nil {
-		return nil, err
-	}
+	publicKey := a.PublicKey.Encode()
 
 	w := accountPublicKeyWrapper{
 		PublicKey: publicKey,
@@ -65,10 +62,7 @@ func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
 }
 
 func EncodeAccountPrivateKey(a AccountPrivateKey) ([]byte, error) {
-	privateKey, err := a.PrivateKey.Encode()
-	if err != nil {
-		return nil, err
-	}
+	privateKey := a.PrivateKey.Encode()
 
 	w := accountPrivateKeyWrapper{
 		PrivateKey: privateKey,

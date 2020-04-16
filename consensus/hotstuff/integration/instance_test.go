@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
@@ -51,6 +50,7 @@ type Instance struct {
 	proto        *protocol.State
 	builder      *module.Builder
 	finalizer    *module.Finalizer
+	persist      *mocks.Persister
 	signer       *mocks.Signer
 	verifier     *mocks.Verifier
 	communicator *mocks.Communicator
@@ -66,7 +66,6 @@ type Instance struct {
 
 	// main logic
 	handler *eventhandler.EventHandler
-	loop    *hotstuff.EventLoop
 }
 
 func NewInstance(t require.TestingT, options ...Option) *Instance {
@@ -124,6 +123,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		snapshot:     &protocol.Snapshot{},
 		proto:        &protocol.State{},
 		builder:      &module.Builder{},
+		persist:      &mocks.Persister{},
 		signer:       &mocks.Signer{},
 		verifier:     &mocks.Verifier{},
 		communicator: &mocks.Communicator{},
@@ -175,6 +175,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			return nil
 		},
 	)
+
+	// program persister to always succeed
+	in.persist.On("CurrentView", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateProposal", mock.Anything).Return(
@@ -255,8 +258,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			}
 
 			// check on stop condition
-			// TODO: hook into notifier & stop manually, so it works even when
-			// no blocks are finalized
+			// TODO: we can remove that once the single instance stop
+			// recursively calling into itself
 			if in.stop(&in) {
 				return errStopCondition
 			}
@@ -316,24 +319,58 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.voter = voter.New(in.signer, in.forks, DefaultVoted())
 
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.communicator, in.viewstate, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.viewstate, in.aggregator, in.voter, in.validator, notifier)
 	require.NoError(t, err)
-
-	// initialize and return the event loop
-	in.loop, err = hotstuff.NewEventLoop(log, metrics, in.handler)
-	require.NoError(t, err)
-
-	// launch a goroutine to read the queue and submit messages
-	go func() {
-		for message := range in.queue {
-			switch msg := message.(type) {
-			case *model.Proposal:
-				in.loop.OnReceiveProposal(msg)
-			case *model.Vote:
-				in.loop.OnReceiveVote(msg)
-			}
-		}
-	}()
 
 	return &in
+}
+
+func (in *Instance) Run() error {
+
+	// start the event handler
+	err := in.handler.Start()
+	if err != nil {
+		return fmt.Errorf("could not start event handler: %w", err)
+	}
+
+	// run until an error or stop condition is reached
+	for {
+
+		// we handle timeouts with priority
+		select {
+		case _ = <-in.handler.TimeoutChannel():
+			err := in.handler.OnLocalTimeout()
+			if err != nil {
+				return fmt.Errorf("could not process timeout: %w", err)
+			}
+		default:
+		}
+
+		// otherwise, process first received event
+		select {
+		case _ = <-in.handler.TimeoutChannel():
+			err := in.handler.OnLocalTimeout()
+			if err != nil {
+				return fmt.Errorf("could not process timeout: %w", err)
+			}
+		case msg := <-in.queue:
+			switch m := msg.(type) {
+			case *model.Proposal:
+				err := in.handler.OnReceiveProposal(m)
+				if err != nil {
+					return fmt.Errorf("could not process proposal: %w", err)
+				}
+			case *model.Vote:
+				err := in.handler.OnReceiveVote(m)
+				if err != nil {
+					return fmt.Errorf("could not process vote: %w", err)
+				}
+			}
+		}
+
+		// check on stop conditions
+		if in.stop(in) {
+			return errStopCondition
+		}
+	}
 }

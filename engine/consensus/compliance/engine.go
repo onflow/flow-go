@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -23,16 +22,16 @@ import (
 // Engine is the consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
 type Engine struct {
-	unit      *engine.Unit   // used to control startup/shutdown
-	log       zerolog.Logger // used to log relevant actions with context
-	me        module.Local
-	state     protocol.State
-	headers   storage.Headers
-	payloads  storage.Payloads
-	con       network.Conduit
-	cache     module.PendingBlockBuffer
-	coldstuff module.ColdStuff
-	sync      module.Synchronization
+	unit     *engine.Unit   // used to control startup/shutdown
+	log      zerolog.Logger // used to log relevant actions with context
+	me       module.Local
+	state    protocol.State
+	headers  storage.Headers
+	payloads storage.Payloads
+	con      network.Conduit
+	cache    module.PendingBlockBuffer
+	hotstuff module.HotStuff
+	sync     module.Synchronization
 }
 
 // New creates a new consensus propagation engine.
@@ -76,8 +75,8 @@ func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
 
 // WithConsensus adds the consensus algorithm to the engine. This must be
 // called before the engine can start.
-func (e *Engine) WithConsensus(cold module.ColdStuff) *Engine {
-	e.coldstuff = cold
+func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
+	e.hotstuff = hot
 	return e
 }
 
@@ -88,12 +87,12 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.sync == nil {
 		panic("must initialize compliance engine with synchronization module")
 	}
-	if e.coldstuff == nil {
-		panic("must initialize compliance engine with coldstuff engine")
+	if e.hotstuff == nil {
+		panic("must initialize compliance engine with hotstuff engine")
 	}
 	return e.unit.Ready(func() {
 		<-e.sync.Ready()
-		<-e.coldstuff.Ready()
+		<-e.hotstuff.Ready()
 	})
 }
 
@@ -102,7 +101,7 @@ func (e *Engine) Ready() <-chan struct{} {
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
 		<-e.sync.Done()
-		<-e.coldstuff.Done()
+		<-e.hotstuff.Done()
 	})
 }
 
@@ -207,25 +206,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return nil
 }
 
-func (e *Engine) BroadcastCommit(commit *model.Commit) error {
-
-	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get consensus recipients: %w", err)
-	}
-
-	err = e.con.Submit(commit, recipients.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not send commit message: %w", err)
-	}
-
-	return err
-}
-
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	switch v := input.(type) {
@@ -235,8 +215,6 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 		return e.onBlockProposal(originID, v)
 	case *messages.BlockVote:
 		return e.onBlockVote(originID, v)
-	case *model.Commit:
-		return e.onBlockCommit(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", v)
 	}
@@ -309,7 +287,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// submit the model to hotstuff for processing
-	e.coldstuff.SubmitProposal(proposal.Header, parent.View)
+	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
 
 	// check for any descendants of the block to process
 	return e.handleConnectedChildren(blockID)
@@ -318,19 +296,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // onBlockVote handles incoming block votes.
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
-	// forward the vote to coldstuff for processing
-	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
+	// forward the vote to hotstuff for processing
+	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
 
-	return nil
-}
-
-// onBlockCommit handles incoming block commits by passing them to the core
-// consensus algorithm.
-//
-// NOTE: This is only necessary for ColdStuff and can be removed when we switch
-// to HotStuff.
-func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
-	e.coldstuff.SubmitCommit(commit)
 	return nil
 }
 

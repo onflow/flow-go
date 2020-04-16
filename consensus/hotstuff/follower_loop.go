@@ -88,3 +88,8 @@ func (fl *FollowerLoop) Ready() <-chan struct{} {
 func (fl *FollowerLoop) Done() <-chan struct{} {
 	return fl.runner.Abort()
 }
+
+// Wait implements a function to wait for the event loop to exit.
+func (fl *FollowerLoop) Wait() <-chan struct{} {
+	return fl.runner.Completed()
+}
