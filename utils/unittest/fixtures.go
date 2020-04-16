@@ -101,7 +101,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 func BlockHeaderFixture() flow.Header {
 	return BlockHeaderWithParentFixture(&flow.Header{
 		ParentID: IdentifierFixture(),
-		Height:   0,
+		Height:   rand.Uint64(),
 	})
 }
 
