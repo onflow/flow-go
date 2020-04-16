@@ -111,9 +111,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// remove the transactions from the memory pool
 			for _, colTx := range payload.Collection.Transactions {
 				txID := colTx.ID()
-				// ignore result -- we don't care whether the
+				// ignore result -- we don't care whether the transaction was
+				// in the pool or not
 				_ = f.transactions.Rem(txID)
-				f.metrics.FinishTransactionToCollectionGuarantee(txID)
 			}
 
 			// finalize the block in cluster state
@@ -121,6 +121,8 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			if err != nil {
 				return fmt.Errorf("could not finalize block: %w", err)
 			}
+
+			f.metrics.CollectionGuaranteed(payload.Collection.Light())
 
 			// don't bother submitting empty collections
 			if len(payload.Collection.Transactions) == 0 {
