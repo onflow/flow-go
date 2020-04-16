@@ -109,7 +109,7 @@ func Test1TimeoutOutof4Instances(t *testing.T) {
 	numFail := 1
 	finalView := uint64(30)
 
-	// generate the seven hotstuff participants
+	// generate the 4 hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
