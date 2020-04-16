@@ -162,27 +162,42 @@ func (suite *TestSuite) TestHandleBlock() {
 func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	eng := suite.TestNewEngine()
 
-	// mock the receipt coming from an execution node
+	// mocks identities
+	//
+	// required roles
 	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 
+	// mocks identity of the verification node
+	suite.me.On("NodeID").Return(verIdentity.NodeID)
+
+	// mocks state snapshot to validate identity of execution node as an staked origin id at the `suite.block` height
 	suite.state.On("Final").Return(suite.ss, nil)
-	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
+	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.ss, nil).Once()
 	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
-	suite.ss.On("Identities", testifymock.Anything).Return(collIdentities, nil).Twice()
+	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
+	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(collIdentities, nil).Twice()
 
-	// we have the corresponding block and chunk state, but not the collection
+	// mocks existing resources at the engine's disposal
+	//
+	// mocks the possession of 'suite.block` in the storage
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
-	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
-
-	// mocks that collection does not exit in the mempools and we do not have a tracker for it
-	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false).Once()
-	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
-	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil).Once()
-
+	// mocks the possession of chunk data pack associated with the `suite.block`
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
 	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil).Once()
+
+	// mocks missing collection
+	//
+	// mocks the absence of `suite.collection` which is the associated collection to this block
+	// the collection does not exist in authenticated and pending collections mempools
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false).Once()
+
+	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
+	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
+	// mocks the functionality of registering a tracker for the collection
+	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil).Once()
 
 	// engine has not yet ingested the result of this receipt yet
 	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
@@ -197,8 +212,12 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 
 	// expect that the collection is requested
-	suite.collectionsConduit.On("Submit", testifymock.Anything, collIdentities[0].NodeID).Return(nil).Once()
+	suite.collectionsConduit.
+		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), collIdentities[0].NodeID).
+		Return(nil).Once()
 
+	// mocks chunk assignment
+	//
 	// assigns all chunks in the receipt to this node through mocking
 	a := chmodel.NewAssignment()
 	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
@@ -207,14 +226,19 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.assigner.On("Assign",
 		testifymock.Anything,
 		testifymock.Anything,
-		testifymock.Anything).Return(a, nil)
-	suite.me.On("NodeID", testifymock.Anything).Return(verIdentity.NodeID)
+		testifymock.Anything).
+		Return(a, nil).
+		Once()
 
 	err := eng.Process(execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
 
+	// asserts necessary calls
 	suite.authReceipts.AssertExpectations(suite.T())
 	suite.collectionsConduit.AssertExpectations(suite.T())
+	suite.assigner.AssertExpectations(suite.T())
+	suite.ss.AssertExpectations(suite.T())
+	suite.state.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
