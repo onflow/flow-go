@@ -338,7 +338,7 @@ func (in *Instance) Run() error {
 
 		// we handle timeouts with priority
 		select {
-		case _ = <-in.handler.TimeoutChannel():
+		case <-in.handler.TimeoutChannel():
 			err := in.handler.OnLocalTimeout()
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
@@ -348,7 +348,7 @@ func (in *Instance) Run() error {
 
 		// otherwise, process first received event
 		select {
-		case _ = <-in.handler.TimeoutChannel():
+		case <-in.handler.TimeoutChannel():
 			err := in.handler.OnLocalTimeout()
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
