@@ -106,6 +106,7 @@ func main() {
 			node.Logger.Info().
 				Hex("genesis_id", logging.ID(genesis.ID())).
 				Str("cluster_id", clusterID).
+				Str("cluster_members", fmt.Sprintf("%v", myCluster.NodeIDs())).
 				Msg("bootstrapped cluster state")
 
 			// bootstrap cluster consensus state
@@ -178,7 +179,7 @@ func main() {
 			build := builder.NewBuilder(node.DB, pool, clusterID)
 			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, prov, pool, transactions, headers, colPayloads, colCache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, headers, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}

@@ -43,7 +43,7 @@ type Suite struct {
 	me           *module.Local
 	net          *module.Network
 	con          *network.Conduit
-	ingest       *network.Engine
+	validator    *module.TransactionValidator
 	pool         *mempool.Transactions
 	transactions *storage.Transactions
 	headers      *storage.Headers
@@ -95,7 +95,7 @@ func (suite *Suite) SetupTest() {
 	suite.con = new(network.Conduit)
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
 
-	suite.ingest = new(network.Engine)
+	suite.validator = new(module.TransactionValidator)
 	suite.pool = new(mempool.Transactions)
 	suite.transactions = new(storage.Transactions)
 	suite.headers = new(storage.Headers)
@@ -105,7 +105,7 @@ func (suite *Suite) SetupTest() {
 	suite.cache = new(module.PendingClusterBlockBuffer)
 	suite.coldstuff = new(module.ColdStuff)
 
-	eng, err := proposal.New(log, suite.net, suite.me, suite.proto.state, suite.cluster.state, metrics, suite.ingest, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.cache)
+	eng, err := proposal.New(log, suite.net, suite.me, suite.proto.state, suite.cluster.state, metrics, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.cache)
 	require.NoError(suite.T(), err)
 	suite.eng = eng.WithConsensus(suite.coldstuff)
 }
@@ -163,7 +163,7 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	// the missing transactions should be verified
 	for _, tx := range block.Payload.Collection.Transactions {
 		// all the transactions are valid
-		suite.ingest.On("ProcessLocal", tx).Return(nil).Once()
+		suite.validator.On("ValidateTransaction", tx).Return(nil).Once()
 	}
 
 	// should store payload and header
@@ -183,7 +183,7 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	suite.headers.AssertExpectations(suite.T())
 	suite.payloads.AssertExpectations(suite.T())
 	// transactions should have been validated
-	suite.ingest.AssertExpectations(suite.T())
+	suite.validator.AssertExpectations(suite.T())
 	suite.coldstuff.AssertExpectations(suite.T())
 }
 

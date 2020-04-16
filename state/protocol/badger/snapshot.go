@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -186,19 +187,7 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// order the identities by node ID
-	sort.Slice(identities, func(i, j int) bool {
-		return order.ByNodeIDAsc(identities[i], identities[j])
-	})
-
-	// create the desired number of clusters and assign nodes
-	clusters := flow.NewClusterList(nClusters)
-	for i, identity := range identities {
-		index := uint(i) % nClusters
-		clusters.Add(index, identity)
-	}
-
-	return clusters, nil
+	return protocol.Clusters(nClusters, identities), nil
 }
 
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
