@@ -218,9 +218,8 @@ func (sk *PrKeyECDSA) rawEncode() []byte {
 
 // Encode returns a byte representation of a private key.
 // a simple raw byte encoding in big endian is used for all curves
-// the enciding is padded to the group order length
-func (sk *PrKeyECDSA) Encode() ([]byte, error) {
-	return sk.rawEncode(), nil
+func (sk *PrKeyECDSA) Encode() []byte {
+	return sk.rawEncode()
 }
 
 // Equals test the equality of two private keys
@@ -239,8 +238,7 @@ func (sk *PrKeyECDSA) Equals(other PrivateKey) bool {
 
 // String returns the hex string representation of the key.
 func (sk *PrKeyECDSA) String() string {
-	skBytes, _ := sk.Encode()
-	return fmt.Sprintf("%#x", skBytes)
+	return fmt.Sprintf("%#x", sk.Encode())
 }
 
 // PubKeyECDSA is the public key of ECDSA, it implements PublicKey
@@ -277,9 +275,8 @@ func (pk *PubKeyECDSA) rawEncode() []byte {
 // Encode returns a byte representation of a public key.
 // a simple uncompressed raw encoding X||Y is used for all curves
 // X and Y are the big endian byte encoding of the x and y coordinate of the public key
-// X and Y are each padded to the elliptic curve field size
-func (pk *PubKeyECDSA) Encode() ([]byte, error) {
-	return pk.rawEncode(), nil
+func (pk *PubKeyECDSA) Encode() []byte {
+	return pk.rawEncode()
 }
 
 // Equals test the equality of two private keys
@@ -299,6 +296,5 @@ func (pk *PubKeyECDSA) Equals(other PublicKey) bool {
 
 // String returns the hex string representation of the key.
 func (pk *PubKeyECDSA) String() string {
-	pkBytes, _ := pk.Encode()
-	return fmt.Sprintf("%#x", pkBytes)
+	return fmt.Sprintf("%#x", pk.Encode())
 }

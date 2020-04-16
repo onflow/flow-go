@@ -49,9 +49,7 @@ func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 			require.NoError(k.T(), err)
 
 			// get the raw bytes of both the keys
-			fbytes, err := fpk.Encode()
-			require.NoError(k.T(), err)
-
+			fbytes := fpk.Encode()
 			lbytes, err := lpk.Raw()
 			lbytes = lbytes[offset[j] : offset[j]+prKeyLen[j]]
 			require.NoError(k.T(), err)
@@ -97,9 +95,7 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 			require.NoError(k.T(), err)
 
 			// compare raw bytes of the public keys
-			fbytes, err := fpublic.Encode()
-			require.NoError(k.T(), err)
-
+			fbytes := fpublic.Encode()
 			var lbytes []byte
 			if s == fcrypto.EcdsaP256 {
 				lbytes, err = lpublic.Raw()

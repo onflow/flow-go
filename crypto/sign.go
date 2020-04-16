@@ -87,7 +87,7 @@ type PrivateKey interface {
 	// PublicKey returns the public key.
 	PublicKey() PublicKey
 	// Encode returns a bytes representation of the private key
-	Encode() ([]byte, error)
+	Encode() []byte
 	// Equals returns true if the given PrivateKeys are equal. Keys are considered unequal if their algorithms are
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
@@ -105,7 +105,7 @@ type PublicKey interface {
 	// Verify verifies a signature of an input message using the provided hasher.
 	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
-	Encode() ([]byte, error)
+	Encode() []byte
 	// Equals returns true if the given PublicKeys are equal. Keys are considered unequal if their algorithms are
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.

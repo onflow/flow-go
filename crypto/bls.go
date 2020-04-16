@@ -158,10 +158,10 @@ func (sk *PrKeyBlsBls12381) PublicKey() PublicKey {
 	return sk.pk
 }
 
-func (a *PrKeyBlsBls12381) Encode() ([]byte, error) {
+func (a *PrKeyBlsBls12381) Encode() []byte {
 	dest := make([]byte, prKeyLengthBlsBls12381)
 	writeScalar(dest, &a.scalar)
-	return dest, nil
+	return dest
 }
 
 func (sk *PrKeyBlsBls12381) Equals(other PrivateKey) bool {
@@ -174,9 +174,7 @@ func (sk *PrKeyBlsBls12381) Equals(other PrivateKey) bool {
 
 // String returns the hex string representation of the key.
 func (sk *PrKeyBlsBls12381) String() string {
-	// err in this case is always nil
-	skBytes, _ := sk.Encode()
-	return fmt.Sprintf("%#x", skBytes)
+	return fmt.Sprintf("%#x", sk.Encode())
 }
 
 // PubKeyBlsBls12381 is the public key of BLS using BLS12_381,
@@ -194,10 +192,10 @@ func (pk *PubKeyBlsBls12381) Size() int {
 	return PubKeyLenBlsBls12381
 }
 
-func (a *PubKeyBlsBls12381) Encode() ([]byte, error) {
+func (a *PubKeyBlsBls12381) Encode() []byte {
 	dest := make([]byte, pubKeyLengthBlsBls12381)
 	writePointG2(dest, &a.point)
-	return dest, nil
+	return dest
 }
 
 func (pk *PubKeyBlsBls12381) Equals(other PublicKey) bool {
@@ -210,9 +208,7 @@ func (pk *PubKeyBlsBls12381) Equals(other PublicKey) bool {
 
 // String returns the hex string representation of the key.
 func (pk *PubKeyBlsBls12381) String() string {
-	// err in this case is always nil
-	pkBytes, _ := pk.Encode()
-	return fmt.Sprintf("%#x", pkBytes)
+	return fmt.Sprintf("%#x", pk.Encode())
 }
 
 // Get Macro definitions from the C layer as Cgo does not export macros
