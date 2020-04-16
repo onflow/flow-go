@@ -1,6 +1,7 @@
 package follower
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -125,9 +126,7 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	case *messages.BlockProposal:
 		return e.onBlockProposal(originID, v)
 	case *flow.Block:
-		// TODO: For some reason we have a block, log for now
-		e.log.Debug().Msg("Received *flow.Block in follower engine")
-		return nil
+		return e.onBlock(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
@@ -149,12 +148,27 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 	return e.onBlockProposal(originID, proposal)
 }
 
+func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
+	// process as proposal
+	proposal := &messages.BlockProposal{
+		Header:  &block.Header,
+		Payload: &block.Payload,
+	}
+	return e.onBlockProposal(originID, proposal)
+}
+
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
 	// get the latest finalized block
 	final, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get final block: %w", err)
+	}
+
+	_, err = e.headers.ByBlockID(proposal.Header.ID())
+	if !errors.Is(err, storage.ErrNotFound) {
+		e.log.Debug().Msgf("block %s already received, skip", proposal.Header.ID())
+		return nil
 	}
 
 	// check if the block is connected to the current finalized state
