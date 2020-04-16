@@ -16,7 +16,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -154,10 +153,10 @@ func (m *Middleware) Stop() {
 	// stop libp2p
 	done, err := m.libP2PNode.Stop()
 	if err != nil {
-		log.Error().Err(err).Msg("stopping failed")
+		m.log.Error().Err(err).Msg("stopping failed")
 	} else {
 		<-done
-		log.Debug().Msg("node stopped successfully")
+		m.log.Debug().Msg("node stopped successfully")
 	}
 
 	// wait for the go routines spawned by middleware to stop
@@ -283,7 +282,7 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
 	}
 
-	log.Info().Str("targetid", flowID).Str("address", address).Msg("stream created")
+	m.log.Info().Str("targetid", flowID).Str("address", address).Msg("stream created")
 	return stream, nil
 }
 
@@ -389,7 +388,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 	// if validation passed, send the message to the overlay
 	err := m.ov.Receive(flow.HashToID(msg.OriginID), msg)
 	if err != nil {
-		log.Error().Err(err).Msg("could not deliver payload")
+		m.log.Error().Err(err).Msg("could not deliver payload")
 	}
 }
 
