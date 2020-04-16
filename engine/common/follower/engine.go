@@ -125,7 +125,9 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	case *messages.BlockProposal:
 		return e.onBlockProposal(originID, v)
 	case *flow.Block:
-		return e.onBlock(originID, v)
+		// TODO: For some reason we have a block, log for now
+		e.log.Debug().Msg("Received *flow.Block in follower engine")
+		return nil
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
@@ -143,15 +145,6 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 	proposal := &messages.BlockProposal{
 		Header:  &synced.Block.Header,
 		Payload: &synced.Block.Payload,
-	}
-	return e.onBlockProposal(originID, proposal)
-}
-
-func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
-	// process as proposal
-	proposal := &messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
 	}
 	return e.onBlockProposal(originID, proposal)
 }
