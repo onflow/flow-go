@@ -86,23 +86,19 @@ func TestECDSAEncodeDecode(t *testing.T) {
 		sk, err := GeneratePrivateKey(curve, seed)
 		assert.Nil(t, err, "the key generation has failed")
 
-		skBytes, err := sk.Encode()
-		require.Nil(t, err, "the key encoding has failed")
+		skBytes := sk.Encode()
 		skCheck, err := DecodePrivateKey(curve, skBytes)
 		require.Nil(t, err, "the key decoding has failed")
 		assert.True(t, sk.Equals(skCheck), "key equality check failed")
-		skCheckBytes, err := skCheck.Encode()
-		require.Nil(t, err, "the key encoding has failed")
+		skCheckBytes := skCheck.Encode()
 		assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
 
 		pk := sk.PublicKey()
-		pkBytes, err := pk.Encode()
-		require.Nil(t, err, "the key encoding has failed")
+		pkBytes := pk.Encode()
 		pkCheck, err := DecodePublicKey(curve, pkBytes)
 		require.Nil(t, err, "the key decoding has failed")
 		assert.True(t, pk.Equals(pkCheck), "key equality check failed")
-		pkCheckBytes, err := pkCheck.Encode()
-		require.Nil(t, err, "the key encoding has failed")
+		pkCheckBytes := pkCheck.Encode()
 		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
 	}
 }
