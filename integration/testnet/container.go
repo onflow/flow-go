@@ -103,7 +103,7 @@ func (c *Container) DB() (*badger.DB, error) {
 
 // ExecutionLedgerStorage returns the execution node's ledger storage/trie DB.
 func (c *Container) ExecutionLedgerStorage() (*ledger.TrieStorage, error) {
-	dbPath := filepath.Join(c.DataDir, DefaultExecutionRootDir)
+	dbPath := filepath.Join(c.datadir, DefaultExecutionRootDir)
 	ledgerStorage, err := ledger.NewTrieStorage(dbPath)
 	return ledgerStorage, err
 }

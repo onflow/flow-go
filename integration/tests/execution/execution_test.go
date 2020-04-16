@@ -9,6 +9,7 @@ import (
 	"time"
 
 	badgerDB "github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,15 +23,20 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const defaultTimeout = 10 * time.Second
+const (
+	// the timeout for individual actions (eg. send a transaction)
+	defaultTimeout = 10 * time.Second
+	// the period we wait to give consensus/routing time to complete
+	waitTime = 20 * time.Second
+)
 
 // default set of non-execution nodes
 func defaultOtherNodes() []testnet.NodeConfig {
 	var (
-		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		verNode  = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel("info"))
+		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		verNode  = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
 	)
 
 	return []testnet.NodeConfig{conNode1, conNode2, conNode3, verNode}
@@ -39,15 +45,15 @@ func defaultOtherNodes() []testnet.NodeConfig {
 func TestExecutionNodes(t *testing.T) {
 
 	var (
-		colNode  = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel("info"))
+		colNode  = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel))
 		exeNode1 = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithIDInt(1))
 		exeNode2 = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithIDInt(2))
 	)
 
 	nodes := append([]testnet.NodeConfig{colNode, exeNode1, exeNode2}, defaultOtherNodes()...)
-	conf := testnet.NetworkConfig{Nodes: nodes}
+	conf := testnet.NewNetworkConfig("exe_tests", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, "exe_tests", conf)
+	net, err := testnet.PrepareFlowNetwork(t, conf)
 	require.Nil(t, err)
 
 	ctx := context.Background()
@@ -82,10 +88,9 @@ func TestExecutionNodes(t *testing.T) {
 		// wait for consensus to complete
 		//TODO we should listen for collection guarantees instead, but this is blocked
 		// ref: https://github.com/dapperlabs/flow-go/issues/3021
-		time.Sleep(10 * time.Second)
+		time.Sleep(waitTime)
 
-		// TODO stop then start containers
-		err = net.StopContainers()
+		err = net.Stop()
 		assert.Nil(t, err)
 
 		// get database for EXE1
@@ -120,7 +125,7 @@ func getExecutionState(ledgerStorage *ledger.TrieStorage, db *badgerDB.DB) execu
 	executionResults := badger.NewExecutionResults(db)
 	stateCommitments := badger.NewCommits(db)
 	executionState := executionState.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks,
-		executionResults)
+		executionResults, db)
 	return executionState
 }
 
