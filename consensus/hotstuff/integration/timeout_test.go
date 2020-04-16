@@ -1,4 +1,8 @@
-// build timesensitivetest
+// +build timesensitivetest
+// This file includes a few time sensitive tests. They might pass on your powerful local machine
+// but fail on slow CI machine.
+// For now, these tests are only for local. Run it with the build tag on:
+// > go test --tags=relic,timesensitivetest ./...
 
 package integration
 
@@ -19,6 +23,8 @@ import (
 // if your laptop is fast enough, 10 ms is enough
 const pmTimeout = 10 * time.Millisecond
 
+// If 2 nodes are down in a 7 nodes cluster, the rest of 5 nodes can
+// still make progress and reach consensus
 func Test2TimeoutOutof7Instances(t *testing.T) {
 
 	// test parameters
@@ -89,6 +95,9 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	}
 }
 
+// If 1 node is down in a 4 nodes cluster, the rest of 3 nodes can
+// still make progress, but no block will be finalized, because
+// finalization requires 2-direct chain and a QC
 func Test1TimeoutOutof4Instances(t *testing.T) {
 
 	// test parameters
@@ -159,6 +168,8 @@ func Test1TimeoutOutof4Instances(t *testing.T) {
 	}
 }
 
+// If 1 node is down in a 5 nodes cluster, the rest of 4 nodes can
+// make progress and reach consensus
 func Test1TimeoutOutof5Instances(t *testing.T) {
 
 	// test parameters
