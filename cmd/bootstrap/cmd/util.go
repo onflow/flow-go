@@ -61,16 +61,8 @@ func writeJSON(filename string, data interface{}) {
 	log.Info().Msgf("wrote file %v", path)
 }
 
-func pubKeyToBytes(key crypto.PublicKey) []byte {
-	enc, err := key.Encode()
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot encode public key")
-	}
-	return enc
-}
-
 func pubKeyToString(key crypto.PublicKey) string {
-	return fmt.Sprintf("%x", pubKeyToBytes(key))
+	return fmt.Sprintf("%x", key.Encode())
 }
 
 func filesInDir(dir string) ([]string, error) {

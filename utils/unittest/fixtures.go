@@ -232,20 +232,21 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 	}
 }
 
-func ExecutableBlockFixture(collections int) *entity.ExecutableBlock {
+func ExecutableBlockFixture(collectionsSignerIDs [][]flow.Identifier) *entity.ExecutableBlock {
 
 	header := BlockHeaderFixture()
-	return ExecutableBlockFixtureWithParent(collections, &header)
+	return ExecutableBlockFixtureWithParent(collectionsSignerIDs, &header)
 }
 
-func ExecutableBlockFixtureWithParent(collections int, parent *flow.Header) *entity.ExecutableBlock {
+func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, parent *flow.Header) *entity.ExecutableBlock {
 
-	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, collections)
+	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(collectionsSignerIDs))
 	block := BlockWithParentFixture(parent)
 	block.Guarantees = nil
 
-	for i := 0; i < collections; i++ {
+	for _, signerIDs := range collectionsSignerIDs {
 		completeCollection := CompleteCollectionFixture()
+		completeCollection.Guarantee.SignerIDs = signerIDs
 		block.Guarantees = append(block.Guarantees, completeCollection.Guarantee)
 		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
 	}
