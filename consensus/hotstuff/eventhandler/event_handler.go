@@ -21,6 +21,7 @@ type EventHandler struct {
 	paceMaker      hotstuff.PaceMaker
 	blockProducer  hotstuff.BlockProducer
 	forks          hotstuff.Forks
+	persist        hotstuff.Persister
 	communicator   hotstuff.Communicator
 	viewState      hotstuff.ViewState
 	voteAggregator hotstuff.VoteAggregator
@@ -35,6 +36,7 @@ func New(
 	paceMaker hotstuff.PaceMaker,
 	blockProducer hotstuff.BlockProducer,
 	forks hotstuff.Forks,
+	persist hotstuff.Persister,
 	communicator hotstuff.Communicator,
 	viewState hotstuff.ViewState,
 	voteAggregator hotstuff.VoteAggregator,
@@ -47,6 +49,7 @@ func New(
 		paceMaker:      paceMaker,
 		blockProducer:  blockProducer,
 		forks:          forks,
+		persist:        persist,
 		communicator:   communicator,
 		voteAggregator: voteAggregator,
 		voter:          voter,
@@ -208,6 +211,11 @@ func (e *EventHandler) Start() error {
 func (e *EventHandler) startNewView() error {
 
 	curView := e.paceMaker.CurView()
+
+	err := e.persist.CurrentView(curView)
+	if err != nil {
+		return fmt.Errorf("could not store view: %w", err)
+	}
 
 	log := e.log.With().
 		Uint64("cur_view", curView).
