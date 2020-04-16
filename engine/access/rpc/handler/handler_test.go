@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -32,6 +33,7 @@ type Suite struct {
 	headers      *storage.Headers
 	collections  *storage.Collections
 	transactions *storage.Transactions
+	colClient    *mockaccess.AccessAPIClient
 	execClient   *mockaccess.ExecutionAPIClient
 }
 
@@ -48,11 +50,14 @@ func (suite *Suite) SetupTest() {
 	suite.headers = new(storage.Headers)
 	suite.transactions = new(storage.Transactions)
 	suite.collections = new(storage.Collections)
+	suite.colClient = new(mockaccess.AccessAPIClient)
 	suite.execClient = new(mockaccess.ExecutionAPIClient)
 }
 
 func (suite *Suite) TestPing() {
-	handler := NewHandler(suite.log, nil, nil, nil, nil, nil, nil, nil)
+	suite.colClient.On("Ping", mock.Anything, &access.PingRequest{}).Return(&access.PingResponse{}, nil)
+	suite.execClient.On("Ping", mock.Anything, &execution.PingRequest{}).Return(&execution.PingResponse{}, nil)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, nil, nil, nil, nil)
 	ping := &access.PingRequest{}
 	pong, err := handler.Ping(context.Background(), ping)
 	suite.checkResponse(pong, err)
