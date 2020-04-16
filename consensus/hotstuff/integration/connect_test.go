@@ -25,12 +25,6 @@ func Connect(instances []*Instance) {
 		*sender.communicator = mocks.Communicator{}
 		sender.communicator.On("BroadcastProposal", mock.Anything).Return(
 			func(header *flow.Header) error {
-				// check on stop condition
-				// TODO: hook into notifier & stop manually, so it works even when
-				// no blocks are finalized
-				if sender.stop(sender) {
-					return errStopCondition
-				}
 
 				// sender should always have the parent
 				parent, exists := sender.headers[header.ParentID]
