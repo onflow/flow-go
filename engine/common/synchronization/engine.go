@@ -21,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
@@ -131,6 +132,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // RequestBlock is an external provider allowing users to request block downloads
 // by block ID.
 func (e *Engine) RequestBlock(blockID flow.Identifier) {
+	e.log.Debug().
+		Hex("block_id", blockID[:]).
+		Msg("adding block_id to request queue")
 	e.queueByBlockID(blockID)
 }
 
@@ -365,6 +369,12 @@ func (e *Engine) processIncomingBlock(block *flow.Block) {
 	// delete from the queue and forward
 	delete(e.heights, block.Height)
 	delete(e.blockIDs, blockID)
+
+	e.log.Debug().
+		Uint64("hblock_eight", block.Height).
+		Uint64("block_view", block.View).
+		Hex("block_id", logging.Entity(block)).
+		Msg("submitting synced block for processing")
 
 	e.comp.SubmitLocal(&events.SyncedBlock{Block: block})
 }

@@ -82,7 +82,7 @@ func (lc *LogConsumer) OnStartingTimeout(info *model.TimerInfo) {
 }
 
 func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
-	lc.log.Warn().
+	lc.log.Info().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Str("timeout_mode", info.Mode.String()).

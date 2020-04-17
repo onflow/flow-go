@@ -117,10 +117,8 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	err := e.storeGuarantee(guarantee)
 	if err != nil {
 		if errors.Is(err, mempool.ErrEntityAlreadyExists) {
-			// TODO: determine if we still want to propogate the guarantee, for now we won't
 			return nil
 		}
-
 		return fmt.Errorf("could not store guarantee: %w", err)
 	}
 

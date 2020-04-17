@@ -42,7 +42,7 @@ func (b *Views) RetrieveStarted() (uint64, error) {
 	err := b.db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveView(started, &view)(tx)
 		if errors.Is(err, storage.ErrNotFound) {
-			view = 1
+			view = 0
 			return nil
 		}
 		return err

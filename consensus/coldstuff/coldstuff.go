@@ -158,21 +158,21 @@ ConsentLoop:
 				e.log.Debug().Msg("sending proposal")
 				err = e.sendProposal()
 				if err != nil {
-					log.Error().Err(err).Msg("could not send proposal")
+					log.Warn().Err(err).Msg("could not send proposal")
 					continue ConsentLoop
 				}
 
 				e.log.Debug().Msg("waiting for votes")
 				err = e.waitForVotes()
 				if err != nil {
-					log.Error().Err(err).Msg("could not receive votes")
+					log.Warn().Err(err).Msg("could not receive votes")
 					continue ConsentLoop
 				}
 
 				e.log.Debug().Msg("sending commit")
 				err = e.sendCommit()
 				if err != nil {
-					log.Error().Err(err).Msg("could not send commit")
+					log.Warn().Err(err).Msg("could not send commit")
 					continue ConsentLoop
 				}
 
@@ -185,21 +185,21 @@ ConsentLoop:
 				e.log.Debug().Msg("waiting for proposal")
 				err = e.waitForProposal()
 				if err != nil {
-					log.Error().Err(err).Msg("could not receive proposal")
+					log.Warn().Err(err).Msg("could not receive proposal")
 					continue ConsentLoop
 				}
 
 				e.log.Debug().Msg("voting for proposal")
 				err = e.voteOnProposal()
 				if err != nil {
-					log.Error().Err(err).Msg("could not vote on proposal")
+					log.Warn().Err(err).Msg("could not vote on proposal")
 					continue ConsentLoop
 				}
 
 				e.log.Debug().Msg("waiting for commit")
 				err = e.waitForCommit()
 				if err != nil {
-					log.Error().Err(err).Msg("could not receive commit")
+					log.Warn().Err(err).Msg("could not receive commit")
 					continue ConsentLoop
 				}
 			}

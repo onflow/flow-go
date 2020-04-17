@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine is the consensus engine, responsible for handling communication for
@@ -32,6 +33,7 @@ type Engine struct {
 	con        network.Conduit
 	buffer     module.PendingBlockBuffer
 	cache      map[flow.Identifier]*flow.Header
+	prov       network.Engine
 	sync       module.Synchronization
 	hotstuff   module.HotStuff
 	sync.Mutex // temporary fix for pending cache concurrent access
@@ -46,6 +48,7 @@ func New(
 	headers storage.Headers,
 	payloads storage.Payloads,
 	buffer module.PendingBlockBuffer,
+	prov network.Engine,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -58,6 +61,7 @@ func New(
 		payloads: payloads,
 		buffer:   buffer,
 		cache:    make(map[flow.Identifier]*flow.Header),
+		prov:     prov,
 		sync:     nil, // use `WithSynchronization`
 		hotstuff: nil, // use `WithConsensus`
 	}
@@ -157,6 +161,11 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		return fmt.Errorf("could not send vote: %w", err)
 	}
 
+	e.log.Debug().
+		Uint64("vote_height", vote.View).
+		Hex("vote_block", vote.BlockID[:]).
+		Msg("vote transmitted")
+
 	return nil
 }
 
@@ -209,6 +218,16 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
 
+	e.log.Info().
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block", logging.Entity(header)).
+		Str("recipients", fmt.Sprint(recipients.NodeIDs())).
+		Msg("block proposal broadcasted")
+
+	// let the provider engine broadcast to the rest of the network
+	e.prov.SubmitLocal(msg)
+
 	return nil
 }
 
@@ -243,13 +262,21 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 	return e.onBlockProposal(originID, proposal)
 }
 
-// onBlockProposal handles incoming block proposals.
+// onBlockProposal handles incoming block proposals; it checks whether we actually need
+// to process them before forwarding to processing.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	// if we already had this block proposed
 	blockID := proposal.Header.ID()
-	_, proposed := e.cache[blockID]
-	if proposed {
+	log := e.log.With().
+		Uint64("block_height", proposal.Header.Height).
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", blockID[:]).
+		Logger()
+
+	// if we already have the proposal cached, no need to go again
+	_, cached := e.cache[blockID]
+	if cached {
+		log.Debug().Msg("skipping cached proposal")
 		return nil
 	}
 
@@ -261,23 +288,15 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	// reject orphaned block
 	if proposal.Header.Height <= final.Height {
-		return fmt.Errorf("rejecting orphaned block (%x)", proposal.Header.ID())
+		e.log.Debug().Msg("skipping orphaned proposal")
+		return nil
 	}
 
 	// TODO: turn cache into module and clean up upon block finalization
 
-	e.Lock() // temp fix
-
 	// we should store the proposal in our pending cache
+	e.Lock() // temp fix
 	e.cache[proposal.Header.ID()] = proposal.Header
-
-	// for now, we clean up by finalization height bruteforce
-	for cachedID, cached := range e.cache {
-		if cached.Height <= final.Height {
-			delete(e.cache, cachedID)
-		}
-	}
-
 	e.Unlock() // temp fix
 
 	// check if the block is connected to the current finalized state
@@ -293,22 +312,52 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		ancestorID = ancestor.ParentID
 	}
 
-	// store the proposal block payload
-	err = e.payloads.Store(proposal.Header, proposal.Payload)
+	// process the proposal
+	err = e.processProposal(originID, proposal)
 	if err != nil {
-		return fmt.Errorf("could not store block payload: %w", err)
+		return fmt.Errorf("could not process proposal: %w", err)
+	}
+
+	// for now, we clean up by finalization height bruteforce
+	e.Lock() // temp fix
+	for cachedID, cached := range e.cache {
+		if cached.Height <= final.Height {
+			delete(e.cache, cachedID)
+		}
+	}
+	e.Unlock() // temp fix
+
+	return nil
+}
+
+func (e *Engine) processProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+
+	blockID := proposal.Header.ID()
+	log := e.log.With().
+		Uint64("block_height", proposal.Header.Height).
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", blockID[:]).
+		Logger()
+
+	// store the proposal block payload
+	err := e.payloads.Store(proposal.Header, proposal.Payload)
+	if err != nil {
+		return fmt.Errorf("could not store payload (height: %d, view: %d, block_id: %x): %w",
+			proposal.Header.Height, proposal.Header.View, blockID, err)
 	}
 
 	// store the proposal block header
 	err = e.headers.Store(proposal.Header)
 	if err != nil {
-		return fmt.Errorf("could not store header: %w", err)
+		return fmt.Errorf("could not store header (height: %d, view: %d, block_id: %x): %w",
+			proposal.Header.Height, proposal.Header.View, blockID, err)
 	}
 
 	// see if the block is a valid extension of the protocol state
 	err = e.state.Mutate().Extend(blockID)
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state: %w", err)
+		return fmt.Errorf("could not extend protocol state (height: %d, view: %d, block_id: %x): %w",
+			proposal.Header.Height, proposal.Header.View, blockID, err)
 	}
 
 	// retrieve the parent
@@ -317,11 +366,18 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
+	log.Debug().Msg("submitting proposal to hotstuff")
+
 	// submit the model to hotstuff for processing
 	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
 
 	// check for any descendants of the block to process
-	return e.handleConnectedChildren(blockID)
+	err = e.handleConnectedChildren(blockID)
+	if err != nil {
+		return fmt.Errorf("could not process proposal children: %w", err)
+	}
+
+	return nil
 }
 
 // onBlockVote handles incoming block votes.
@@ -373,8 +429,9 @@ func (e *Engine) handleConnectedChildren(parentID flow.Identifier) error {
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		err := e.onBlockProposal(child.OriginID, proposal)
+		err := e.processProposal(child.OriginID, proposal)
 		if err != nil {
+			err = fmt.Errorf("could not process child: %w", err)
 			result = multierror.Append(result, err)
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -98,12 +99,12 @@ func (gs *GuaranteeSuite) SetupTest() {
 
 func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 
-	// define timeout on reader
-	start := time.Now().UTC()
-	timeout := 20 * time.Second
+	// set timeout for loop
+	timeout := time.Minute
+	deadline := time.Now().Add(timeout)
 
 	// start the network and defer cleanup
-	gs.Start(time.Minute)
+	gs.Start(timeout)
 
 	// wait for 10 seconds before doing anything
 	time.Sleep(10 * time.Second)
@@ -118,23 +119,29 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 	err = gs.Ghost().Send(context.Background(), engine.CollectionProvider, gs.nodeIDs[:1], guarantee)
 	require.NoError(gs.T(), err, "could not send collection guarantee")
 
+	gs.T().Logf("looking for: %x", guarantee.CollectionID)
+
 	// read messages until we see a block with this guarantee
-	for time.Since(start) < timeout {
+	found := false
+	for time.Now().Before(deadline) {
 		_, msg, err := reader.Next()
 		require.NoError(gs.T(), err, "could not read next message")
-		block, ok := msg.(*flow.Block)
+		gs.T().Logf("%T", msg)
+		proposal, ok := msg.(*messages.BlockProposal)
 		if !ok {
-			gs.T().Logf("%T", msg)
 			continue
 		}
-		if len(block.Guarantees) == 0 {
-			gs.T().Logf("block: %x", block.ID())
-			continue
+		gs.T().Logf("proposal: %x", proposal.Header.ID())
+		for _, included := range proposal.Payload.Guarantees {
+			gs.T().Logf("guarantee: %x", guarantee.CollectionID)
+			if included.CollectionID == guarantee.CollectionID {
+				found = true
+				gs.net.Stop()
+				break
+			}
 		}
-		included := block.Guarantees[0]
-		require.Equal(gs.T(), guarantee, included, "should include correct guarantee")
-		gs.net.Stop()
-		break
 	}
 
+	// make sure we found the guarantee
+	require.True(gs.T(), found, "should have found guarantee in block")
 }
