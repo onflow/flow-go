@@ -103,21 +103,17 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
-
 	if err != nil {
 		return errors.Wrapf(err, "unable to start pubsub %s", p.name)
 	}
 
 	p.topics = make(map[string]*pubsub.Topic)
 	p.subs = make(map[string]*pubsub.Subscription)
+	ip, port := p.GetIPPort()
+	p.logger.Debug().Str("name", p.name).Str("address", fmt.Sprintf("%s:%s", ip, port)).
+		Msg("libp2p node started successfully")
 
-	if err == nil {
-		ip, port := p.GetIPPort()
-		p.logger.Debug().Str("name", p.name).Str("address", fmt.Sprintf("%s:%s", ip, port)).
-			Msg("libp2p node started successfully")
-	}
-
-	return err
+	return nil
 }
 
 // Stop stops the libp2p node.

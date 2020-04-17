@@ -66,7 +66,7 @@ func main() {
 			flags.StringVarP(&chainID, "chain-id", "C", flow.DefaultChainID, "the chain ID for the protocol chain")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", time.Minute, "the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)

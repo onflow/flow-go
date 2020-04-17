@@ -133,7 +133,7 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 		}
 		gs.T().Logf("proposal: %x", proposal.Header.ID())
 		for _, included := range proposal.Payload.Guarantees {
-			gs.T().Logf("guarantee: %x", guarantee.CollectionID)
+			gs.T().Logf("guarantee: %x", included.CollectionID)
 			if included.CollectionID == guarantee.CollectionID {
 				found = true
 				gs.net.Stop()
