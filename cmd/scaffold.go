@@ -124,7 +124,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
-		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(), fnb.networkKey)
+		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.DebugLevel), codec, myAddr, fnb.Me.NodeID(), fnb.networkKey)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}

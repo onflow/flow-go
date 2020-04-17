@@ -238,6 +238,8 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error
 		err = writer.WriteMsg(msg)
 		if err != nil {
 			return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
+		} else {
+			m.log.Debug().Str("msg", msg.String()).Msg("direct message")
 		}
 
 		// flush the stream
@@ -377,6 +379,8 @@ SubscriptionLoop:
 // processMessage processes a message and eventually passes it to the overlay
 func (m *Middleware) processMessage(msg *message.Message) {
 
+	m.log.Debug().Str("msg", msg.String()).Msg("inbound msg")
+
 	// run through all the message validators
 	for _, v := range m.validators {
 		// if any one fails, stop message propagation
@@ -402,6 +406,8 @@ func (m *Middleware) publish(topic string, msg interface{}) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal the message: %w", err)
 		}
+
+		m.log.Debug().Str("msg", msg.String()).Msg("1-k")
 
 		// publish the bytes on the topic
 		// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
