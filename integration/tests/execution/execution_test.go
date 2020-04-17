@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 	"crypto/sha256"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	executionState "github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -42,16 +42,20 @@ func defaultOtherNodes() []testnet.NodeConfig {
 	return []testnet.NodeConfig{conNode1, conNode2, conNode3, verNode}
 }
 
-func TestExecutionNodes(t *testing.T) {
+// TestExecutionStateSync tests that state that lives in another execution node is queried from that node.
+// Approach: Stop or disconnect an execution node 2, send transactions to execution node 1, start execution node 2,
+// verify state is synced
+func TestExecutionStateSync(t *testing.T) {
 
 	var (
-		colNode  = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel))
-		exeNode1 = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithIDInt(1))
-		exeNode2 = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithIDInt(2))
+		colNodeConfig  = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.InfoLevel))
+		exeNodeConfigs = testnet.NewNodeConfigSet(2, flow.RoleExecution)
 	)
+	exeNodeConfig1 := exeNodeConfigs[0]
+	// exeNodeConfig2 := exeNodeConfigs[1]
 
-	nodes := append([]testnet.NodeConfig{colNode, exeNode1, exeNode2}, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig("exe_tests", nodes)
+	nodes := append(append(exeNodeConfigs, colNodeConfig), defaultOtherNodes()...)
+	conf := testnet.NewNetworkConfig("exe_state_sync_test", nodes)
 
 	net, err := testnet.PrepareFlowNetwork(t, conf)
 	require.Nil(t, err)
@@ -62,62 +66,59 @@ func TestExecutionNodes(t *testing.T) {
 	defer net.Cleanup()
 
 	// we will send transaction to COL1
-	colContainer, ok := net.ContainerByID(colNode.Identifier)
+	colNode, ok := net.ContainerByID(colNodeConfig.Identifier)
 	assert.True(t, ok)
 
-	port, ok := colContainer.Ports[testnet.ColNodeAPIPort]
-	assert.True(t, ok)
-
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", port))
+	colClient, err := testnet.NewClient(colNode.Addr(testnet.ColNodeAPIPort))
 
 	// we will test against EXE1
-	exeContainer1, ok := net.ContainerByID(exeNode1.Identifier)
+	exeNode1, ok := net.ContainerByID(exeNodeConfig1.Identifier)
 	assert.True(t, ok)
 
-	t.Run("TODO", func(t *testing.T) {
-		tx := unittest.TransactionBodyFixture()
-		tx, err := client.SignTransaction(tx)
-		assert.Nil(t, err)
-		t.Log("sending transaction: ", tx.ID())
+	// exeNode2, ok := net.ContainerByID(exeNodeConfig2.Identifier)
+	// assert.True(t, ok)
 
-		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-		defer cancel()
-		err = client.SendTransaction(ctx, tx)
-		assert.Nil(t, err)
+	tx := unittest.TransactionBodyFixture()
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+	err = colClient.SignAndSendTransaction(ctx, tx)
+	assert.Nil(t, err)
 
-		// wait for consensus to complete
-		//TODO we should listen for collection guarantees instead, but this is blocked
-		// ref: https://github.com/dapperlabs/flow-go/issues/3021
-		time.Sleep(waitTime)
+	// wait for consensus to complete
+	//TODO we should listen for collection guarantees instead, but this is blocked
+	// ref: https://github.com/dapperlabs/flow-go/issues/3021
+	time.Sleep(waitTime)
 
-		err = net.Stop()
-		assert.Nil(t, err)
+	err = net.Stop()
+	assert.Nil(t, err)
 
-		// get database for EXE1
-		db, err := exeContainer1.DB()
-		require.Nil(t, err)
+	stateView := getLatestExecutionStateView(t, exeNode1)
+	res, err := stateView.Get(fullKeyHash(common.CounterOwner, common.CounterController, common.CounterKey))
+	require.Nil(t, err)
 
-		protocolState, err := protocolBadger.NewState(db)
-		require.Nil(t, err)
+	require.Equal(t, "TODO", res)
+}
 
-		head, err := protocolState.Final().Head()
-		require.Nil(t, err)
+func getLatestExecutionStateView(t *testing.T, node *testnet.Container) *delta.View {
+	// get database for EXE1
+	db, err := node.DB()
+	require.Nil(t, err)
 
-		ledgerStorage, err := exeContainer1.ExecutionLedgerStorage()
-		require.Nil(t, err)
+	protocolState, err := protocolBadger.NewState(db)
+	require.Nil(t, err)
 
-		executionState := getExecutionState(ledgerStorage, db)
+	head, err := protocolState.Final().Head()
+	require.Nil(t, err)
 
-		stateCommitment, err := executionState.StateCommitmentByBlockID(head.ID())
-		require.Nil(t, err)
+	ledgerStorage, err := node.ExecutionLedgerStorage()
+	require.Nil(t, err)
 
-		stateView := executionState.NewView(stateCommitment)
+	executionState := getExecutionState(ledgerStorage, db)
 
-		res, err := stateView.Get(fullKeyHash(common.CounterOwner, common.CounterController, common.CounterKey))
-		require.Nil(t, err)
+	stateCommitment, err := executionState.StateCommitmentByBlockID(head.ID())
+	require.Nil(t, err)
 
-		require.Equal(t, "TODO", res)
-	})
+	return executionState.NewView(stateCommitment)
 }
 
 func getExecutionState(ledgerStorage *ledger.TrieStorage, db *badgerDB.DB) executionState.ExecutionState {
