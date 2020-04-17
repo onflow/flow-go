@@ -18,7 +18,12 @@ func New(views storage.Views) *Persister {
 	return p
 }
 
-// CurrentView persists the current view of hotstuff.
-func (p *Persister) CurrentView(view uint64) error {
-	return p.views.StoreLatest(view)
+// StartedView persists the current view of hotstuff.
+func (p *Persister) StartedView(view uint64) error {
+	return p.views.StoreStarted(view)
+}
+
+// VotedView persists the current view voted on hotstuff.
+func (p *Persister) VotedView(view uint64) error {
+	return p.views.StoreVoted(view)
 }

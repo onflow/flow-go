@@ -31,7 +31,11 @@ func createVoter(t *testing.T, blockView uint64, lastVotedView uint64, isBlockSa
 	signer := &mocks.Signer{}
 	signer.On("CreateVote", mock.Anything).Return(expectVote, nil)
 
-	voter := New(signer, forks, lastVotedView)
+	persist := &mocks.Persister{}
+	persist.On("StartedView", mock.Anything).Return(nil)
+	persist.On("VotedView", mock.Anything).Return(nil)
+
+	voter := New(signer, forks, persist, lastVotedView)
 	return block, expectVote, voter
 }
 

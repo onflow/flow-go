@@ -211,10 +211,9 @@ func (e *EventHandler) Start() error {
 func (e *EventHandler) startNewView() error {
 
 	curView := e.paceMaker.CurView()
-
-	err := e.persist.CurrentView(curView)
+	err := e.persist.StartedView(curView)
 	if err != nil {
-		return fmt.Errorf("could not store view: %w", err)
+		return fmt.Errorf("could not store started view: %w", err)
 	}
 
 	log := e.log.With().

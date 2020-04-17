@@ -26,6 +26,7 @@ type GuaranteeSuite struct {
 	net     *testnet.FlowNetwork
 	nodeIDs []flow.Identifier
 	ghostID flow.Identifier
+	collID  flow.Identifier
 }
 
 func (gs *GuaranteeSuite) Start(timeout time.Duration) {
@@ -64,6 +65,19 @@ func (gs *GuaranteeSuite) SetupTest() {
 	// generate the three consensus identities
 	gs.nodeIDs = unittest.IdentifierListFixture(3)
 
+	// need one execution node
+	exeConfig := testnet.NewNodeConfig(flow.RoleExecution)
+	nodeConfigs = append(nodeConfigs, exeConfig)
+
+	// need one verification node
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification)
+	nodeConfigs = append(nodeConfigs, verConfig)
+
+	// need one collection node
+	gs.collID = unittest.IdentifierFixture()
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.collID))
+	nodeConfigs = append(nodeConfigs, collConfig)
+
 	// generate consensus node config for each consensus identity
 	for _, nodeID := range gs.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID))
@@ -75,18 +89,6 @@ func (gs *GuaranteeSuite) SetupTest() {
 	ghostConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.ghostID), testnet.AsGhost(true))
 	nodeConfigs = append(nodeConfigs, ghostConfig)
 
-	// need one execution node
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution)
-	nodeConfigs = append(nodeConfigs, exeConfig)
-
-	// need one collection node
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection)
-	nodeConfigs = append(nodeConfigs, collConfig)
-
-	// need one verification node
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification)
-	nodeConfigs = append(nodeConfigs, verConfig)
-
 	// generate the network config
 	netConfig := testnet.NewNetworkConfig("consensus_collection_guarantee_cycle", nodeConfigs)
 
@@ -96,8 +98,13 @@ func (gs *GuaranteeSuite) SetupTest() {
 
 func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 
-	// start the network
+	// define timeout on reader
+	start := time.Now().UTC()
+	timeout := 20 * time.Second
+
+	// start the network and defer cleanup
 	gs.Start(10 * time.Second)
+	defer gs.Stop()
 
 	// subscribe to block proposals
 	reader, err := gs.Ghost().Subscribe(context.Background())
@@ -105,18 +112,21 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 
 	// send a guarantee into the first consensus node
 	guarantee := unittest.CollectionGuaranteeFixture()
-	err = gs.Ghost().Send(context.Background(), engine.CollectionProvider, gs.nodeIDs[:1], &guarantee)
+	guarantee.SignerIDs = []flow.Identifier{gs.collID}
+	err = gs.Ghost().Send(context.Background(), engine.CollectionProvider, gs.nodeIDs[:1], guarantee)
 	require.NoError(gs.T(), err, "could not send collection guarantee")
 
 	// read messages until we see a block with this guarantee
-	for {
+	for time.Since(start) < timeout {
 		_, msg, err := reader.Next()
 		require.NoError(gs.T(), err, "could not read next message")
 		block, ok := msg.(*flow.Block)
 		if !ok {
+			gs.T().Logf("%T", msg)
 			continue
 		}
 		if len(block.Guarantees) == 0 {
+			gs.T().Logf("block: %x", block.ID())
 			continue
 		}
 		included := block.Guarantees[0]
@@ -124,6 +134,4 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 		break
 	}
 
-	// stop the network
-	defer gs.Stop()
 }
