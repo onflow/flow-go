@@ -111,7 +111,7 @@ func (suite *Suite) TestHandleProposal() {
 	// we should be able to extend the state with the block
 	suite.mutator.On("Extend", block.ID()).Return(nil).Once()
 	// we should be able to get the parent header by its ID
-	suite.headers.On("ByBlockID", block.ParentID).Return(&parent.Header, nil)
+	suite.headers.On("ByBlockID", block.ParentID).Return(&parent.Header, nil).Once()
 	// we do not have any children cached
 	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 	// the proposal should be forwarded to the follower
@@ -150,7 +150,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.mutator.On("Extend", child.ID()).Return(nil).Once()
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
-	suite.headers.On("ByBlockID", block.ID()).Return(&block.Header, nil)
+	suite.headers.On("ByBlockID", block.ID()).Return(&block.Header, nil).Once()
 	// should submit to follower
 	suite.follower.On("SubmitProposal", &block.Header, parent.View).Once()
 	suite.follower.On("SubmitProposal", &child.Header, block.View).Once()

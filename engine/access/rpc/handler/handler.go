@@ -3,12 +3,14 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -58,6 +60,14 @@ func NewHandler(log zerolog.Logger,
 
 // Ping responds to requests when the server is up.
 func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.PingResponse, error) {
+	_, err := h.executionRPC.Ping(ctx, &execution.PingRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("could not ping execution node: %w", err)
+	}
+	_, err = h.collectionRPC.Ping(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("could not ping collection node: %w", err)
+	}
 	return &access.PingResponse{}, nil
 }
 
@@ -65,7 +75,12 @@ func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {
 	// lookup the latest seal to get latest blockid
 	seal, err := h.state.Final().Seal()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get latest sealed block ID: %w", err)
+	}
+
+	if seal.BlockID == flow.ZeroID {
+		// TODO: Figure out how to handle the very first seal, for now, just using latest finalized for script
+		return h.state.Final().Head()
 	}
 	// query header storage for that blockid
 	return h.headers.ByBlockID(seal.BlockID)

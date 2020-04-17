@@ -26,7 +26,7 @@ type Prepare struct {
 }
 
 func (p Prepare) ToCadence() string {
-	return fmt.Sprintf("prepare(signer: Account) { %s }", p.Content.ToCadence())
+	return fmt.Sprintf("prepare(signer: AuthAccount) { %s }", p.Content.ToCadence())
 }
 
 type Contract struct {
@@ -76,60 +76,8 @@ func (u UpdateAccountCode) ToCadence() string {
 
 	return fmt.Sprintf(`
 		let code = "%s"
-
-		fun hexDecode(_ s: String): [Int] {
-
-                if s.length %% 2 != 0 {
-                    panic("Input must have even number of characters")
-                }
-
-                let table = {
-                        "0" : 0,
-                        "1" : 1,
-                        "2" : 2,
-                        "3" : 3,
-                        "4" : 4,
-                        "5" : 5,
-                        "6" : 6,
-                        "7" : 7,
-                        "8" : 8,
-                        "9" : 9,
-                        "a" : 10,
-                        "A" : 10,
-                        "b" : 11,
-                        "B" : 11,
-                        "c" : 12,
-                        "C" : 12,
-                        "d" : 13,
-                        "D" : 13,
-                        "e" : 14,
-                        "E" : 14,
-                        "f" : 15,
-                        "F" : 15
-                    }
-
-                let length = s.length / 2
-
-                var i = 0
-
-                var res: [Int] = []
-
-                while i < length {
-                    let c = s.slice(from: i*2, upTo: i*2+1)
-                    let in = table[c] ?? panic("Invalid character ".concat(c))
-
-                    let c2 = s.slice(from: i*2+1, upTo: i*2+2)
-                    let in2 = table[c2] ?? panic("Invalid character ".concat(c2))
-
-                    res.append(16 * in + in2)
-                    i = i+1
-                }
-
-                return res
-            }
-
-		updateAccountCode(signer.address, hexDecode(code))
-	`, hexCode)
+        signer.setCode(code.decodeHex())
+    `, hexCode)
 }
 
 type Main struct {
