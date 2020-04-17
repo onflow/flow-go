@@ -103,8 +103,10 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 	timeout := 20 * time.Second
 
 	// start the network and defer cleanup
-	gs.Start(10 * time.Second)
-	defer gs.Stop()
+	gs.Start(time.Minute)
+
+	// wait for 10 seconds before doing anything
+	time.Sleep(10 * time.Second)
 
 	// subscribe to block proposals
 	reader, err := gs.Ghost().Subscribe(context.Background())
@@ -131,6 +133,7 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 		}
 		included := block.Guarantees[0]
 		require.Equal(gs.T(), guarantee, included, "should include correct guarantee")
+		gs.net.Stop()
 		break
 	}
 

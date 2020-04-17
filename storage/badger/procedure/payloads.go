@@ -56,19 +56,19 @@ func IndexPayload(header *flow.Header, payload *flow.Payload) func(*badger.Txn) 
 		// of order
 
 		// index identities
-		err := IndexIdentities(header.Height, blockID, header.ParentID, payload.Identities)(tx)
+		err := operation.SkipDuplicates(IndexIdentities(header.Height, blockID, header.ParentID, payload.Identities))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index identities: %w", err)
 		}
 
 		// index guarantees
-		err = IndexGuarantees(header.Height, blockID, header.ParentID, payload.Guarantees)(tx)
+		err = operation.SkipDuplicates(IndexGuarantees(header.Height, blockID, header.ParentID, payload.Guarantees))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index guarantees: %w", err)
 		}
 
 		// index seals
-		err = IndexSeals(header.Height, blockID, header.ParentID, payload.Seals)(tx)
+		err = operation.SkipDuplicates(IndexSeals(header.Height, blockID, header.ParentID, payload.Seals))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index seals: %w", err)
 		}

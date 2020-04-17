@@ -246,6 +246,13 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
+	// if we already had this block proposed
+	blockID := proposal.Header.ID()
+	_, proposed := e.cache[blockID]
+	if proposed {
+		return nil
+	}
+
 	// get the latest finalized block
 	final, err := e.state.Final().Head()
 	if err != nil {
@@ -265,9 +272,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	e.cache[proposal.Header.ID()] = proposal.Header
 
 	// for now, we clean up by finalization height bruteforce
-	for headerID, header := range e.cache {
-		if header.Height <= final.Height {
-			delete(e.cache, headerID)
+	for cachedID, cached := range e.cache {
+		if cached.Height <= final.Height {
+			delete(e.cache, cachedID)
 		}
 	}
 
@@ -299,7 +306,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// see if the block is a valid extension of the protocol state
-	blockID := proposal.Header.ID()
 	err = e.state.Mutate().Extend(blockID)
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
