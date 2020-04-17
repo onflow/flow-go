@@ -22,6 +22,7 @@ import (
 // TestGhostNodeExample_Subscribe demonstrates how to emulate a node and receive all inbound events for it
 func TestGhostNodeExample_Subscribe(t *testing.T) {
 
+	t.Skip()
 	var (
 		// one collection node
 		collNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(1))
@@ -95,6 +96,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 // TestGhostNodeExample_Send demonstrates how to emulate a node and send an event from it
 func TestGhostNodeExample_Send(t *testing.T) {
 
+	t.Skip()
 	var (
 		// one real collection node
 		realCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(1))
