@@ -104,8 +104,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.0/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsr
 github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2 h1:/7hkvJx5m7IYKX0NDkMMBEjYNvUxRtREEHGlgi0wYDk=
 github.com/dapperlabs/cadence v0.0.0-20200327205214-136b868762e2/go.mod h1:WgzAWRd7gcxi6dfJmEdeTArtQVGOr48oLxLW4adsztk=
 github.com/dapperlabs/flow-go v0.3.2-0.20200312195452-df4550a863b7/go.mod h1:T7BTWgbqZVpUS6m1YOJarI+3lSXPIQhz2XirFz+HeU8=
-github.com/dapperlabs/flow-go/integration v0.0.0-20200406190816-e4c4d2b5219c h1:qVwErra2Uvo0xtnFJub7XUyzfFjd+iM6VPl+YT3Z+h8=
-github.com/dapperlabs/flow-go/integration v0.0.0-20200406190816-e4c4d2b5219c/go.mod h1:U1t9nUsu42c36UV2Q3tGFCIk0YtPiyTU4eqR38lVm1I=
+github.com/dapperlabs/flow-go/integration v0.0.0-20200415173123-af3be319fea2 h1:rRj6T/NWl41vFS1XuIbaWA3a1elCdR/U5rDTAwFIG94=
+github.com/dapperlabs/flow-go/integration v0.0.0-20200415173123-af3be319fea2/go.mod h1:xld2pNUktpQuie8Xy87EZ89hXVK17Oqwm07IKUxTfW8=
 github.com/dapperlabs/flow-go/language v0.3.1/go.mod h1:8Z/N3qFJSM1+J8z4O8mXHYbshadkSBfcLzJeeU7vvj4=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679 h1:rOzL+A6plLZY0XwvrUu089U2LTKiyGIdr/F4pknuQYY=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679/go.mod h1:ThpXZwEduNJCzmpEVEUy3Ml5dDAWttnzlBJPTOSAin0=
@@ -777,6 +777,7 @@ golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fq
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
+golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 h1:SvFZT6jyqRaOeXpc5h/JSfZenJ2O330aBsf7JfSUXmQ=
 golang.org/x/time v0.0.0-20190308202827-9d24e82272b4/go.mod h1:tRJNPiyCQ0inRvYxbN9jk5I+vvW/OXSQhTDSoE431IQ=
 golang.org/x/time v0.0.0-20191024005414-555d28b269f0 h1:/5xXl8Y5W96D+TtHSlonuFqGHIWVuyCkGJLwGh9JJFs=
 golang.org/x/time v0.0.0-20191024005414-555d28b269f0/go.mod h1:tRJNPiyCQ0inRvYxbN9jk5I+vvW/OXSQhTDSoE431IQ=

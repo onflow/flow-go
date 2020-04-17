@@ -31,9 +31,12 @@ func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 
 	// test all the ECDSA curves that are supported by the translator for private key conversion
 	sa := []fcrypto.SigningAlgorithm{fcrypto.EcdsaP256, fcrypto.EcdsaSecp256k1}
-	loops := 50
+	prKeyLen := []int{fcrypto.PrKeyLenEcdsaP256, fcrypto.PrKeyLenEcdsaSecp256k1}
+	// offset of the key raw bytes in the libp2p encoding
+	offset := []int{7, 0}
 
-	for _, s := range sa {
+	loops := 50
+	for j, s := range sa {
 		for i := 0; i < loops; i++ {
 			// generate seed
 			seed := k.createSeed()
@@ -46,10 +49,9 @@ func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 			require.NoError(k.T(), err)
 
 			// get the raw bytes of both the keys
-			fbytes, err := fpk.Encode()
-			require.NoError(k.T(), err)
-
+			fbytes := fpk.Encode()
 			lbytes, err := lpk.Raw()
+			lbytes = lbytes[offset[j] : offset[j]+prKeyLen[j]]
 			require.NoError(k.T(), err)
 
 			// compare the raw bytes
@@ -74,8 +76,10 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 	// test the algorithms that are supported by the translator for public key conversion (currently only ECDSA 256)
 	// EcdsaSecp256k1 doesn't work and throws a 'invalid pub key length 64' error
 	sa := []fcrypto.SigningAlgorithm{fcrypto.EcdsaP256, fcrypto.EcdsaSecp256k1}
-	loops := 50
+	// the offset of the public key bytes in the x509 encoding of an ECDSA P-256 public key
+	x509offset := 27
 
+	loops := 50
 	for _, s := range sa {
 		for i := 0; i < loops; i++ {
 			// generate seed
@@ -91,12 +95,11 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 			require.NoError(k.T(), err)
 
 			// compare raw bytes of the public keys
-			fbytes, err := fpublic.Encode()
-			require.NoError(k.T(), err)
-
+			fbytes := fpublic.Encode()
 			var lbytes []byte
 			if s == fcrypto.EcdsaP256 {
 				lbytes, err = lpublic.Raw()
+				lbytes = lbytes[x509offset:]
 			} else if s == fcrypto.EcdsaSecp256k1 {
 				lbytes, err = rawUncompressed(lpublic)
 			}

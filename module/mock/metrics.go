@@ -12,6 +12,21 @@ type Metrics struct {
 	mock.Mock
 }
 
+// BadgerDBSize provides a mock function with given fields: sizeBytes
+func (_m *Metrics) BadgerDBSize(sizeBytes int64) {
+	_m.Called(sizeBytes)
+}
+
+// CollectionGuaranteed provides a mock function with given fields: collection
+func (_m *Metrics) CollectionGuaranteed(collection flow.LightCollection) {
+	_m.Called(collection)
+}
+
+// CollectionProposed provides a mock function with given fields: collection
+func (_m *Metrics) CollectionProposed(collection flow.LightCollection) {
+	_m.Called(collection)
+}
+
 // CollectionsInFinalizedBlock provides a mock function with given fields: count
 func (_m *Metrics) CollectionsInFinalizedBlock(count int) {
 	_m.Called(count)
@@ -35,16 +50,6 @@ func (_m *Metrics) FinishBlockToSeal(blockID flow.Identifier) {
 // FinishCollectionToFinalized provides a mock function with given fields: collectionID
 func (_m *Metrics) FinishCollectionToFinalized(collectionID flow.Identifier) {
 	_m.Called(collectionID)
-}
-
-// FinishCollectionToGuarantee provides a mock function with given fields: collectionID
-func (_m *Metrics) FinishCollectionToGuarantee(collectionID flow.Identifier) {
-	_m.Called(collectionID)
-}
-
-// FinishTransactionToCollectionGuarantee provides a mock function with given fields: txID
-func (_m *Metrics) FinishTransactionToCollectionGuarantee(txID flow.Identifier) {
-	_m.Called(txID)
 }
 
 // HotStuffBusyDuration provides a mock function with given fields: duration
@@ -87,16 +92,6 @@ func (_m *Metrics) OnResultApproval() {
 	_m.Called()
 }
 
-// OnStorageAdded provides a mock function with given fields: size
-func (_m *Metrics) OnStorageAdded(size float64) {
-	_m.Called(size)
-}
-
-// OnStorageRemoved provides a mock function with given fields: size
-func (_m *Metrics) OnStorageRemoved(size float64) {
-	_m.Called(size)
-}
-
 // SealsInFinalizedBlock provides a mock function with given fields: count
 func (_m *Metrics) SealsInFinalizedBlock(count int) {
 	_m.Called(count)
@@ -112,17 +107,12 @@ func (_m *Metrics) StartCollectionToFinalized(collectionID flow.Identifier) {
 	_m.Called(collectionID)
 }
 
-// StartCollectionToGuarantee provides a mock function with given fields: collection
-func (_m *Metrics) StartCollectionToGuarantee(collection flow.LightCollection) {
-	_m.Called(collection)
-}
-
 // StartNewView provides a mock function with given fields: view
 func (_m *Metrics) StartNewView(view uint64) {
 	_m.Called(view)
 }
 
-// StartTransactionToCollectionGuarantee provides a mock function with given fields: txID
-func (_m *Metrics) StartTransactionToCollectionGuarantee(txID flow.Identifier) {
+// TransactionReceived provides a mock function with given fields: txID
+func (_m *Metrics) TransactionReceived(txID flow.Identifier) {
 	_m.Called(txID)
 }

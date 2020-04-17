@@ -1,4 +1,4 @@
-package forks
+package recovery
 
 import (
 	"errors"
@@ -54,7 +54,10 @@ func (fr *ForksRecovery) SubmitProposal(proposalHeader *flow.Header, parentView 
 	}
 
 	// add it to forks
-	fr.forks.AddBlock(proposal.Block)
+	err = fr.forks.AddBlock(proposal.Block)
+	if err != nil {
+		return fmt.Errorf("could not add block to forks: %w", err)
+	}
 
 	return nil
 }

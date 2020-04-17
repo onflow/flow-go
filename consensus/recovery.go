@@ -1,4 +1,4 @@
-package hotstuff
+package consensus
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/recovery"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -16,19 +16,19 @@ import (
 // to recover its state for the restart.
 func Recover(
 	log zerolog.Logger,
-	f hotstuff.Forks,
+	forks hotstuff.Forks,
 	validator hotstuff.Validator,
 	headers storage.Headers,
-	ps protocol.State,
+	state protocol.State,
 ) error {
 
 	// create the recovery component
-	recovery, err := forks.NewForksRecovery(log, f, validator)
+	recovery, err := recovery.NewForksRecovery(log, forks, validator)
 	if err != nil {
 		return fmt.Errorf("can't create ForksRecovery instance: %w", err)
 	}
 
-	unfinalized, err := ps.Final().Unfinalized()
+	unfinalized, err := state.Final().Unfinalized()
 	if err != nil {
 		return fmt.Errorf("can't find unfinalized block ids: %w", err)
 	}

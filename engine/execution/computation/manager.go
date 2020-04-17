@@ -3,9 +3,10 @@ package computation
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/dapperlabs/cadence"
 	encoding "github.com/dapperlabs/cadence/encoding/xdr"
-	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
@@ -60,7 +61,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *d
 	}
 
 	if !result.Succeeded() {
-		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
+		return nil, fmt.Errorf("failed to execute script at block (%s): %w", blockHeader.ID(), result.Error)
 	}
 
 	value := cadence.ConvertValue(result.Value)

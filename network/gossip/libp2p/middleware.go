@@ -16,7 +16,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -55,7 +54,8 @@ type Middleware struct {
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
-func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier, key crypto.PrivateKey) (*Middleware, error) {
+func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
+	key crypto.PrivateKey, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -64,10 +64,9 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 	p2p := &P2PNode{}
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// add validators to filter out unwanted messages received by this node
-	validators := []validators.MessageValidator{
-		validators.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
-		validators.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
+	if len(validators) == 0 {
+		// add default validators to filter out unwanted messages received by this node
+		validators = defaultValidators(log, flowID)
 	}
 
 	// create the node entity and inject dependencies & config
@@ -87,6 +86,13 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 	}
 
 	return m, err
+}
+
+func defaultValidators(log zerolog.Logger, flowID flow.Identifier) []validators.MessageValidator {
+	return []validators.MessageValidator{
+		validators.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
+		validators.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
+	}
 }
 
 // Me returns the flow identifier of the this middleware
@@ -147,10 +153,10 @@ func (m *Middleware) Stop() {
 	// stop libp2p
 	done, err := m.libP2PNode.Stop()
 	if err != nil {
-		log.Error().Err(err).Msg("stopping failed")
+		m.log.Error().Err(err).Msg("stopping failed")
 	} else {
 		<-done
-		log.Debug().Msg("node stopped successfully")
+		m.log.Debug().Msg("node stopped successfully")
 	}
 
 	// wait for the go routines spawned by middleware to stop
@@ -276,7 +282,7 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
 	}
 
-	log.Info().Str("targetid", flowID).Str("address", address).Msg("stream created")
+	m.log.Info().Str("targetid", flowID).Str("address", address).Msg("stream created")
 	return stream, nil
 }
 
@@ -382,7 +388,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 	// if validation passed, send the message to the overlay
 	err := m.ov.Receive(flow.HashToID(msg.OriginID), msg)
 	if err != nil {
-		log.Error().Err(err).Msg("could not deliver payload")
+		m.log.Error().Err(err).Msg("could not deliver payload")
 	}
 }
 
@@ -400,8 +406,7 @@ func (m *Middleware) publish(topic string, msg interface{}) error {
 		// publish the bytes on the topic
 		// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
 		// for this node.
-		// TODO: specify a minpeers that makes more sense for Flow (Currently, broadcast if there is at least one peer listening)
-		err = m.libP2PNode.Publish(m.ctx, topic, data, 1)
+		err = m.libP2PNode.Publish(m.ctx, topic, data)
 		if err != nil {
 			return fmt.Errorf("failed to publish the message: %w", err)
 		}
