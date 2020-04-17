@@ -121,7 +121,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	// initialize the voter
-	voter := voter.New(signer, forks, lastView)
+	voter := voter.New(signer, forks, lastView-1)
 
 	// initialize the vote aggregator
 	aggregator := voteaggregator.New(notifier, 0, viewState, validator, signer)

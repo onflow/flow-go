@@ -284,7 +284,7 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 		// is redundant for all but the first check, but cheap, and makes the
 		// code a lot simpler
 		if height != ancestor.Height+1 {
-			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", header.Height, ancestor.Height)
+			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", height, ancestor.Height)
 		}
 
 		// check if the ancestor is unfinalized, but already behind the last finalized height (orphaned fork)
@@ -294,8 +294,8 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 
 		// forward to next parent
 		ancestorID = ancestor.ParentID
+		height = ancestor.Height
 	}
-
 	return nil
 }
 

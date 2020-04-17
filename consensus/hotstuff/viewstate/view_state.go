@@ -2,6 +2,7 @@ package viewstate
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -32,11 +33,15 @@ func New(protocolState protocol.State, myID flow.Identifier, consensusMembersFil
 		return nil, fmt.Errorf("require non-empty consensus member nodes to initialize ViewState")
 	}
 
+	orderedNodes := allNodes.Order(func(a *flow.Identity, b *flow.Identity) bool {
+		return strings.Compare(a.NodeID.String(), b.NodeID.String()) == -1
+	})
+
 	return &ViewState{
 		protocolState:          protocolState,
 		myID:                   myID,
 		consensusMembersFilter: consensusMembersFilter,
-		allNodes:               allNodes,
+		allNodes:               orderedNodes,
 	}, nil
 }
 
