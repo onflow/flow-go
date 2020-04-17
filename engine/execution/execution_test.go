@@ -216,6 +216,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	exeNode.Done()
 }
 
+// TODO merge this test with TestSyncFlow in engine/execution/sync_test.go
 func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
@@ -228,10 +229,9 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	genesis := flow.Genesis(identities)
 
-	tx := execTestutil.DeployCounterContractTransaction()
-
-	col := flow.Collection{Transactions: []*flow.TransactionBody{&tx}}
-
+	// transaction that will change state and succeed, used to test that state commitment changes
+	tx1 := execTestutil.DeployCounterContractTransaction()
+	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
 	block2 := &flow.Block{
 		Header: flow.Header{
 			ParentID:   genesis.ID(),
@@ -241,12 +241,15 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 		},
 		Payload: flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
-				{CollectionID: col.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
+				{CollectionID: col1.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
 			},
 		},
 	}
 	block2.PayloadHash = block2.Payload.Hash()
 
+	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
+	tx2 := execTestutil.CreateCounterPanicTransaction()
+	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
 	block3 := &flow.Block{
 		Header: flow.Header{
 			ParentID:   block2.ID(),
@@ -254,28 +257,39 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 			Height:     3,
 			ProposerID: conID.ID(),
 		},
+		Payload: flow.Payload{
+			Guarantees: []*flow.CollectionGuarantee{
+				{CollectionID: col2.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
+			},
+		},
 	}
+	block3.PayloadHash = block3.Payload.Hash()
 
-	exe1Node := testutil.ExecutionNode(t, hub, exe1ID, identities, 27)
-	defer exe1Node.Done()
-
+	// setup mocks and assertions
 	collectionNode := testutil.GenericNode(t, hub, colID, identities)
 	defer collectionNode.Done()
 	consensusNode := testutil.GenericNode(t, hub, conID, identities)
 	defer consensusNode.Done()
-
+	exe1Node := testutil.ExecutionNode(t, hub, exe1ID, identities, 27)
+	defer exe1Node.Done()
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
 	collectionEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID, _ := args[0].(flow.Identifier)
 			req := args[1].(*messages.CollectionRequest)
-			assert.Equal(t, col.ID(), req.ID)
-			err := colConduit.Submit(&messages.CollectionResponse{Collection: col}, originID)
-			assert.NoError(t, err)
+			if req.ID == col1.ID() {
+				err := colConduit.Submit(&messages.CollectionResponse{Collection: col1}, originID)
+				assert.NoError(t, err)
+			} else if req.ID == col2.ID() {
+				err := colConduit.Submit(&messages.CollectionResponse{Collection: col2}, originID)
+				assert.NoError(t, err)
+			} else {
+				assert.Fail(t, "requesting unexpected collection", req.ID)
+			}
 		}).
 		Return(nil).
-		Times(1)
+		Twice()
 
 	receiptsReceived := 0
 
@@ -317,9 +331,12 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	exe1Node.AssertHighestExecutedBlock(t, &block2.Header)
 	exe2Node.AssertHighestExecutedBlock(t, &block3.Header)
 
+	// verify state commitment is the same across nodes
 	scExe2Block2, err := exe2Node.ExecutionState.StateCommitmentByBlockID(block2.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, scExe1Block2, scExe2Block2)
+
+	// verify state commitment of block 3 is the same as block 2, since tx failed
 	scExe2Block3, err := exe2Node.ExecutionState.StateCommitmentByBlockID(block3.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, scExe2Block2, scExe2Block3)
