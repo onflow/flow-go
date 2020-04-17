@@ -99,6 +99,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		Guarantees: guarantees,
 	}
 	header := unittest.BlockHeaderFixture()
+	header.Height = 0
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
@@ -188,8 +189,9 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  chunks,
+			BlockID:          block.ID(),
+			Chunks:           chunks,
+			FinalStateCommit: chunks[0].EndState,
 		},
 	}
 
