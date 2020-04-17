@@ -24,7 +24,6 @@ type TransactionContext struct {
 	events            []runtime.Event
 	OnSetValueHandler func(owner, controller, key, value []byte)
 	gasUsed           uint64 // TODO fill with actual gas
-	stateReads        uint64
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -55,7 +54,6 @@ func (r *TransactionContext) Logs() []string {
 // GetValue gets a register value from the world state.
 func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
 	v, _ := r.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
-	r.stateReads++
 	return v, nil
 }
 
@@ -102,7 +100,6 @@ func CreateAccountInLedger(ledger Ledger, publicKeys [][]byte) (runtime.Address,
 // with this context.
 func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address, error) {
 	accountAddress, err := CreateAccountInLedger(r.ledger, publicKeys)
-	r.stateReads += 2
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %x", accountAddress))
 
@@ -128,7 +125,6 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 
 	publicKeys = append(publicKeys, publicKey)
 
-	r.stateReads++
 	return setAccountPublicKeys(r.ledger, accountID, publicKeys)
 }
 
@@ -161,7 +157,6 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 	if err != nil {
 		return publicKey, err
 	}
-	r.stateReads++
 
 	return removedKey, nil
 }
@@ -173,7 +168,6 @@ func (r *TransactionContext) getAccountPublicKeys(accountID []byte) (publicKeys 
 	if err != nil {
 		return nil, err
 	}
-	r.stateReads++
 
 	if countBytes == nil {
 		return nil, fmt.Errorf("key count not set")
@@ -190,7 +184,6 @@ func (r *TransactionContext) getAccountPublicKeys(accountID []byte) (publicKeys 
 		if err != nil {
 			return nil, err
 		}
-		r.stateReads++
 
 		if publicKey == nil {
 			return nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
@@ -284,7 +277,6 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	r.stateReads++
 
 	if code == nil {
 		return nil, fmt.Errorf("no code deployed at address %x", accountID)
@@ -315,11 +307,9 @@ func (r *TransactionContext) GetAccount(address flow.Address) *flow.Account {
 	}
 
 	balanceBytes, _ := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
-	r.stateReads++
 	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
 
 	code, _ := r.ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
-	r.stateReads++
 
 	publicKeys, err := r.getAccountPublicKeys(accountID)
 	if err != nil {
@@ -391,13 +381,11 @@ func (r *TransactionContext) checkAccountExists(accountID []byte) error {
 	if err != nil {
 		return err
 	}
-	r.stateReads++
 
 	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
 	if err != nil {
 		return err
 	}
-	r.stateReads++
 
 	if len(exists) != 0 || bal != nil {
 		return nil

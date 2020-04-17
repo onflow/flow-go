@@ -51,7 +51,6 @@ func (e *blockComputer) executeBlock(
 	collections := block.Collections()
 
 	var gasUsed uint64
-	var stateReads uint64
 
 	interactions := make([]*delta.Snapshot, len(collections))
 
@@ -69,7 +68,6 @@ func (e *blockComputer) executeBlock(
 		}
 
 		gasUsed += gas
-		stateReads += state
 
 		txIndex = nextIndex
 		events = append(events, collEvents...)
@@ -84,7 +82,7 @@ func (e *blockComputer) executeBlock(
 		StateSnapshots:  interactions,
 		Events:          events,
 		GasUsed:         gasUsed,
-		StateReads:      stateReads,
+		StateReads:      stateView.ReadsCount(),
 	}, nil
 }
 
@@ -93,10 +91,9 @@ func (e *blockComputer) executeCollection(
 	blockCtx virtualmachine.BlockContext,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
-) ([]flow.Event, uint32, uint64, uint64, error) {
+) ([]flow.Event, uint32, uint64, error) {
 	var events []flow.Event
 	var gasUsed uint64
-	var stateReads uint64
 	for _, tx := range collection.Transactions {
 		txView := collectionView.NewChild()
 
@@ -108,7 +105,6 @@ func (e *blockComputer) executeCollection(
 		txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
 		txIndex++
 		gasUsed += result.GasUsed
-		stateReads += result.StateReads
 
 		if err != nil {
 			return nil, txIndex, 0, 0, fmt.Errorf("failed to create flow events: %w", err)
@@ -119,5 +115,5 @@ func (e *blockComputer) executeCollection(
 		}
 	}
 
-	return events, txIndex, gasUsed, stateReads, nil
+	return events, txIndex, gasUsed, nil
 }

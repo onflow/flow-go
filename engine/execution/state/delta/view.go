@@ -13,7 +13,8 @@ type GetRegisterFunc func(key flow.RegisterID) (flow.RegisterValue, error)
 // underlying data source.
 type View struct {
 	delta       Delta
-	regTouchSet map[string]bool
+	regTouchSet map[string]bool // contains all the registers that have been touched (either read or written to)
+	readsCount  uint64          // contains the total number of reads
 	// SpocksSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing SpocksSecret
 	// for views other than collection views to improve performance
@@ -57,7 +58,7 @@ func (r *View) Interactions() *Snapshot {
 	}
 }
 
-// AllRegisters returns all the register IDs ether in read or delta
+// AllRegisters returns all the register IDs either in read or delta
 func (r *Snapshot) AllRegisters() []flow.RegisterID {
 	set := make(map[string]bool, len(r.Reads)+len(r.Delta))
 	for _, reg := range r.Reads {
@@ -98,6 +99,9 @@ func (v *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
 
 	// capture register touch
 	v.regTouchSet[string(key)] = true
+
+	// increase reads
+	v.readsCount++
 
 	// every time we read a value (order preserving)
 	// we append the value to the end of the SpocksSecret byte slice
@@ -143,6 +147,11 @@ func (r *Snapshot) RegisterTouches() []flow.RegisterID {
 	ret := make([]flow.RegisterID, 0, len(r.Reads))
 	ret = append(ret, r.Reads...)
 	return ret
+}
+
+// ReadsCount returns the total number of reads performed on this view including all child views
+func (r *View) ReadsCount() int {
+	return r.numReads
 }
 
 // SpockSecret returns the secret value for SPoCK
