@@ -10,6 +10,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/libp2p/go-tcp-transport"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+
 	"github.com/libp2p/go-libp2p"
 	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -17,14 +22,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
-
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/libp2p/go-tcp-transport"
-	"github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 )
 
 // A unique Libp2p protocol ID for Flow (https://docs.libp2p.io/concepts/protocols/)

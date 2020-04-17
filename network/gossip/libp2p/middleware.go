@@ -14,7 +14,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -166,15 +165,13 @@ func (m *Middleware) Stop() {
 // Send sends the message to the set of target ids
 // If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.sendDirect
 // Otherwise, middleware.publish is used, which uses the PubSub method of communication.
-func (m *Middleware) Send(channelID uint8, msg interface{}, targetIDs ...flow.Identifier) error {
+func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error {
 	var err error
 	mode := m.chooseMode(channelID, msg, targetIDs...)
 	// decide what mode of communication to use
 	switch mode {
 	case NoOp:
-		// TODO: Decide if this is actually an error or not
-		// return fmt.Errorf("empty list of target Ids")
-		return nil
+		return fmt.Errorf("no-op message")
 	case OneToOne:
 		if targetIDs[0] == m.me {
 			// to avoid self dial by the underlay
@@ -195,7 +192,7 @@ func (m *Middleware) Send(channelID uint8, msg interface{}, targetIDs ...flow.Id
 }
 
 // chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
-func (m *Middleware) chooseMode(_ uint8, _ interface{}, targetIDs ...flow.Identifier) communicationMode {
+func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.Identifier) communicationMode {
 	switch len(targetIDs) {
 	case 0:
 		return NoOp
@@ -207,56 +204,48 @@ func (m *Middleware) chooseMode(_ uint8, _ interface{}, targetIDs ...flow.Identi
 }
 
 // sendDirect will try to send the given message to the given peer utilizing a 1-1 direct connection
-func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error {
+func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) error {
 
-	switch msg := msg.(type) {
-	case *message.Message:
-
-		// get an identity to connect to. The identity provides the destination TCP address.
-		idsMap, err := m.ov.Identity()
-		if err != nil {
-			return fmt.Errorf("could not get identities: %w", err)
-		}
-		flowIdentity, found := idsMap[targetID]
-		if !found {
-			return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
-		}
-
-		// create new stream
-		// (streams don't need to be reused and are fairly inexpensive to be created for each send.
-		// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
-		// sent out the the receiver
-		stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address, flowIdentity.NetworkPubKey)
-		if err != nil {
-			return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
-		}
-
-		// create a gogo protobuf writer
-		bufw := bufio.NewWriter(stream)
-		writer := ggio.NewDelimitedWriter(bufw)
-
-		err = writer.WriteMsg(msg)
-		if err != nil {
-			return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
-		}
-
-		// flush the stream
-		err = bufw.Flush()
-		if err != nil {
-			return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
-		}
-
-		// close the stream immediately
-		// helpers.FullClose will close the stream, wait for an EOF and then call reset on the stream
-		// this is the ideal way of closing the stream in libp2p as of now
-		go helpers.FullClose(stream)
-
-		return nil
-
-	default:
-		err := errors.Errorf("invalid message type (%T)", msg)
-		return err
+	// get an identity to connect to. The identity provides the destination TCP address.
+	idsMap, err := m.ov.Identity()
+	if err != nil {
+		return fmt.Errorf("could not get identities: %w", err)
 	}
+	flowIdentity, found := idsMap[targetID]
+	if !found {
+		return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
+	}
+
+	// create new stream
+	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
+	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
+	// sent out the the receiver
+	stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address, flowIdentity.NetworkPubKey)
+	if err != nil {
+		return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
+	}
+
+	// create a gogo protobuf writer
+	bufw := bufio.NewWriter(stream)
+	writer := ggio.NewDelimitedWriter(bufw)
+
+	err = writer.WriteMsg(msg)
+	if err != nil {
+		return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
+	}
+
+	// flush the stream
+	err = bufw.Flush()
+	if err != nil {
+		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
+	}
+
+	// close the stream immediately
+	// helpers.FullClose will close the stream, wait for an EOF and then call reset on the stream
+	// this is the ideal way of closing the stream in libp2p as of now
+	go helpers.FullClose(stream)
+
+	return nil
 }
 
 // connect creates a new stream
@@ -393,26 +382,21 @@ func (m *Middleware) processMessage(msg *message.Message) {
 }
 
 // Publish publishes the given payload on the topic
-func (m *Middleware) publish(topic string, msg interface{}) error {
-	switch msg := msg.(type) {
-	case *message.Message:
+func (m *Middleware) publish(topic string, msg *message.Message) error {
 
-		// convert the message to bytes to be put on the wire.
-		data, err := msg.Marshal()
-		if err != nil {
-			return fmt.Errorf("failed to marshal the message: %w", err)
-		}
-
-		// publish the bytes on the topic
-		// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
-		// for this node.
-		err = m.libP2PNode.Publish(m.ctx, topic, data)
-		if err != nil {
-			return fmt.Errorf("failed to publish the message: %w", err)
-		}
-	default:
-		err := fmt.Errorf("middleware received invalid message type (%T)", msg)
-		return err
+	// convert the message to bytes to be put on the wire.
+	data, err := msg.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal the message: %w", err)
 	}
+
+	// publish the bytes on the topic
+	// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
+	// for this node.
+	err = m.libP2PNode.Publish(m.ctx, topic, data)
+	if err != nil {
+		return fmt.Errorf("failed to publish the message: %w", err)
+	}
+
 	return nil
 }

@@ -70,7 +70,7 @@ func (e *EventHandler) OnReceiveVote(vote *model.Vote) error {
 		Hex("voter_id", vote.SignerID[:]).
 		Logger()
 
-	log.Info().Msg("vote received")
+	log.Info().Msg("vote submitted")
 
 	// votes for finalized view or older should be dropped:
 	if vote.View <= e.forks.FinalizedView() {
@@ -104,7 +104,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		Hex("proposer_id", block.ProposerID[:]).
 		Logger()
 
-	log.Info().Msg("proposal received")
+	log.Info().Msg("proposal submitted")
 
 	// validate the block. exit if the proposal is invalid
 	err := e.validator.ValidateProposal(proposal)

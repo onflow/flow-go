@@ -123,7 +123,7 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 
 	// read messages until we see a block with this guarantee
 	found := false
-	for time.Now().Before(deadline) {
+	for time.Now().Before(deadline) && !found {
 		_, msg, err := reader.Next()
 		require.NoError(gs.T(), err, "could not read next message")
 		gs.T().Logf("%T", msg)
@@ -136,11 +136,12 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 			gs.T().Logf("guarantee: %x", included.CollectionID)
 			if included.CollectionID == guarantee.CollectionID {
 				found = true
-				gs.net.Stop()
-				break
 			}
 		}
 	}
+
+	// stop the network
+	gs.net.Stop()
 
 	// make sure we found the guarantee
 	require.True(gs.T(), found, "should have found guarantee in block")

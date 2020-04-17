@@ -162,9 +162,10 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	}
 
 	e.log.Debug().
-		Uint64("vote_height", vote.View).
-		Hex("vote_block", vote.BlockID[:]).
-		Msg("vote transmitted")
+		Uint64("block_view", vote.View).
+		Hex("block_id", vote.BlockID[:]).
+		Hex("recipient", recipientID[:]).
+		Msg("block vote transmitted")
 
 	return nil
 }
@@ -219,10 +220,9 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	e.log.Info().
-		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block", logging.Entity(header)).
-		Str("recipients", fmt.Sprint(recipients.NodeIDs())).
+		Hex("block_id", logging.Entity(header)).
+		Interface("recipients", recipients.NodeIDs()).
 		Msg("block proposal broadcasted")
 
 	// let the provider engine broadcast to the rest of the network
@@ -268,10 +268,12 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	blockID := proposal.Header.ID()
 	log := e.log.With().
-		Uint64("block_height", proposal.Header.Height).
 		Uint64("block_view", proposal.Header.View).
 		Hex("block_id", blockID[:]).
+		Hex("sender", originID[:]).
 		Logger()
+
+	log.Debug().Msg("block proposal received")
 
 	// if we already have the proposal cached, no need to go again
 	_, cached := e.cache[blockID]
@@ -333,11 +335,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 func (e *Engine) processProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
 	blockID := proposal.Header.ID()
-	log := e.log.With().
-		Uint64("block_height", proposal.Header.Height).
-		Uint64("block_view", proposal.Header.View).
-		Hex("block_id", blockID[:]).
-		Logger()
 
 	// store the proposal block payload
 	err := e.payloads.Store(proposal.Header, proposal.Payload)
@@ -366,8 +363,6 @@ func (e *Engine) processProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
-	log.Debug().Msg("submitting proposal to hotstuff")
-
 	// submit the model to hotstuff for processing
 	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
 
@@ -382,6 +377,12 @@ func (e *Engine) processProposal(originID flow.Identifier, proposal *messages.Bl
 
 // onBlockVote handles incoming block votes.
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
+
+	e.log.Debug().
+		Uint64("block_view", vote.View).
+		Hex("block_id", vote.BlockID[:]).
+		Hex("sender", originID[:]).
+		Msg("block vote received")
 
 	// forward the vote to hotstuff for processing
 	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
