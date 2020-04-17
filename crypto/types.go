@@ -42,6 +42,7 @@ const (
 	// opSwUInputLenBlsBls12381 is the input length of the optimized SwU map to G1
 	opSwUInputLenBlsBls12381    = 2 * (fieldSize + (securityBits / 8))
 	KeyGenSeedMinLenBlsBls12381 = PrKeyLenBlsBls12381 + (securityBits / 8)
+	KeyGenSeedMaxLenBlsBls12381 = maxScalarSize
 
 	// ECDSA
 
@@ -67,6 +68,7 @@ const (
 	DKGMaxSize int = 254
 	// SeedMinLenDKG is the minumum seed length required to participate in a DKG protocol
 	SeedMinLenDKG = securityBits / 8
+	SeedMaxLenDKG = maxRelicPrgSeed
 	// ThresholdMinSize is the minimum size of a group participating in a threshold signature protocol
 	ThresholdMinSize = DKGMinSize
 	// ThresholdMaxSize is the minimum size of a group participating in a threshold signature protocol

@@ -98,15 +98,20 @@ void bn_randZr(bn_t x) {
 
 // reads a private key from an array and maps it to Zr
 // the resulting scalar is in the range 0 < a < r
+// len must be less than BITS_TO_BYTES(RLC_BN_BITS)
 void bn_privateKey_mod_r(bn_st* a, const uint8_t* bin, int len) {
-    bn_read_bin(a, bin, len);
+    bn_st tmp;
+    bn_new(&tmp);
+    bn_new_size(&tmp, BYTES_TO_DIGITS(len));
+    bn_read_bin(&tmp, bin, len);
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
     bn_sub_dig(r,r,1);
-    bn_mod_basic(a,a,r);
+    bn_mod_basic(a,&tmp,r);
     bn_add_dig(a,a,1);
     bn_free(r);
+    bn_free(&tmp);
 }
 
 

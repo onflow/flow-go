@@ -16,6 +16,12 @@ type pointG1 C.ep_st
 type pointG2 C.ep2_st
 type scalar C.bn_st
 
+// max byte length of bn_st
+const maxScalarSize = 256
+
+// max relic PRG seed length in bytes
+const maxRelicPrgSeed = 1 << 32
+
 // context required for the BLS set-up
 type ctx struct {
 	relicCtx *C.ctx_t
@@ -76,6 +82,10 @@ func seedRelic(seed []byte) error {
 		return fmt.Errorf("seed length needs to be larger than %d",
 			securityBits/8)
 	}
+	if len(seed) > maxRelicPrgSeed {
+		return fmt.Errorf("seed length needs to be less than %x",
+			maxRelicPrgSeed)
+	}
 	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 	return nil
 }
@@ -91,10 +101,14 @@ func randZr(x *scalar) error {
 
 // mapKeyZr reads a private key from a slice of bytes and maps it to Zr
 // the resulting scalar is in the range 0 < k < r
-func mapKeyZr(x *scalar, src []byte) {
+func mapKeyZr(x *scalar, src []byte) error {
+	if len(src) > maxScalarSize {
+		return fmt.Errorf("input slice length must be less than %d", maxScalarSize)
+	}
 	C.bn_privateKey_mod_r((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
+	return nil
 }
 
 // TEST/DEBUG/BENCH
