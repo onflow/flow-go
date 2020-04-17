@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/utils/dsl"
 )
 
 func AddressFixture() flow.Address {
@@ -452,57 +451,6 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	}
 
 	return tb
-}
-
-func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {
-	return func(tx *flow.TransactionBody) {
-		tx.Script = []byte(txDSL.ToCadence())
-	}
-}
-
-func TransactionDSLFixture() dsl.Transaction {
-	return dsl.Transaction{
-		Import: dsl.Import{Address: flow.RootAddress},
-		Content: dsl.Prepare{
-			Content: dsl.Code(`
-				pub fun main() {}
-			`),
-		},
-	}
-}
-
-func ContractCounterFixture() dsl.Contract {
-	return dsl.Contract{
-		Name: "Testing",
-		Members: []dsl.CadenceCode{
-			dsl.Resource{
-				Name: "Counter",
-				Code: `
-				pub var count: Int
-
-				init() {
-					self.count = 0
-				}
-				pub fun add(_ count: Int) {
-					self.count = self.count + count
-				}`,
-			},
-			dsl.Code(`
-				pub fun createCounter(): @Counter {
-					return <-create Counter()
-				}`,
-			),
-		},
-	}
-}
-
-func TransactionDSLUpdateContractFixture(contract dsl.Contract) dsl.Transaction {
-	return dsl.Transaction{
-		Import: dsl.Import{Address: flow.RootAddress},
-		Content: dsl.Prepare{
-			Content: dsl.UpdateAccountCode{Code: contract.ToCadence()},
-		},
-	}
 }
 
 // VerifiableChunk returns a complete verifiable chunk with an

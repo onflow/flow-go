@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/engine"
+	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -227,7 +228,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	genesis := flow.Genesis(identities)
 
-	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(unittest.TransactionDSLUpdateContractFixture(unittest.ContractCounterFixture())))
+	tx := execTestutil.DeployCounterContractTransaction()
 
 	col := flow.Collection{Transactions: []*flow.TransactionBody{&tx}}
 
@@ -274,7 +275,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 			assert.NoError(t, err)
 		}).
 		Return(nil).
-		Times(2)
+		Times(1)
 
 	receiptsReceived := 0
 
