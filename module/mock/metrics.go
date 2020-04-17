@@ -52,14 +52,19 @@ func (_m *Metrics) FinishCollectionToFinalized(collectionID flow.Identifier) {
 	_m.Called(collectionID)
 }
 
-// HotStuffBusyDuration provides a mock function with given fields: duration
-func (_m *Metrics) HotStuffBusyDuration(duration time.Duration) {
-	_m.Called(duration)
+// HotStuffBusyDuration provides a mock function with given fields: duration, event
+func (_m *Metrics) HotStuffBusyDuration(duration time.Duration, event string) {
+	_m.Called(duration, event)
 }
 
 // HotStuffIdleDuration provides a mock function with given fields: duration
 func (_m *Metrics) HotStuffIdleDuration(duration time.Duration) {
 	_m.Called(duration)
+}
+
+// HotStuffWaitDuration provides a mock function with given fields: duration, event
+func (_m *Metrics) HotStuffWaitDuration(duration time.Duration, event string) {
+	_m.Called(duration, event)
 }
 
 // NewestKnownQC provides a mock function with given fields: view
