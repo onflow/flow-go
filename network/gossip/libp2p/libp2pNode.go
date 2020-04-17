@@ -344,14 +344,12 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 }
 
 // Publish publishes the given payload on the topic
-// if the nodes doesn't has at least minPeers number of nodes as it peers,
-// then the publish will block until at least minSize number of have been found as peers.
-func (p *P2PNode) Publish(ctx context.Context, t string, data []byte, minPeers int) error {
+func (p *P2PNode) Publish(ctx context.Context, t string, data []byte) error {
 	ps, found := p.topics[t]
 	if !found {
 		return fmt.Errorf("topic not found:%s", t)
 	}
-	err := ps.Publish(ctx, data, pubsub.WithReadiness(pubsub.MinTopicSize(minPeers)))
+	err := ps.Publish(ctx, data)
 	if err != nil {
 		return fmt.Errorf("failed to publish to topic %s: %w", t, err)
 	}
