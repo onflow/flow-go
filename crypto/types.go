@@ -73,6 +73,13 @@ const (
 	ThresholdMinSize = DKGMinSize
 	// ThresholdMaxSize is the minimum size of a group participating in a threshold signature protocol
 	ThresholdMaxSize = DKGMaxSize
+
+	// Relic internal constants (related to exported constants above)
+	// max byte length of bn_st
+	maxScalarSize = 256
+
+	// max relic PRG seed length in bytes
+	maxRelicPrgSeed = 1 << 32
 )
 
 // Signature is a generic type, regardless of the signature scheme

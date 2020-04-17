@@ -16,12 +16,6 @@ type pointG1 C.ep_st
 type pointG2 C.ep2_st
 type scalar C.bn_st
 
-// max byte length of bn_st
-const maxScalarSize = 256
-
-// max relic PRG seed length in bytes
-const maxRelicPrgSeed = 1 << 32
-
 // context required for the BLS set-up
 type ctx struct {
 	relicCtx *C.ctx_t
