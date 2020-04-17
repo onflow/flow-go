@@ -176,7 +176,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		},
 	)
 
-	// program persister to always succeed
+	// check on stop condition, stop the tests as soon as entering a certain view
 	in.persist.On("CurrentView", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
@@ -336,6 +336,11 @@ func (in *Instance) Run() error {
 	// run until an error or stop condition is reached
 	for {
 
+		// check on stop conditions
+		if in.stop(in) {
+			return errStopCondition
+		}
+
 		// we handle timeouts with priority
 		select {
 		case <-in.handler.TimeoutChannel():
@@ -344,6 +349,11 @@ func (in *Instance) Run() error {
 				return fmt.Errorf("could not process timeout: %w", err)
 			}
 		default:
+		}
+
+		// check on stop conditions
+		if in.stop(in) {
+			return errStopCondition
 		}
 
 		// otherwise, process first received event
@@ -368,9 +378,5 @@ func (in *Instance) Run() error {
 			}
 		}
 
-		// check on stop conditions
-		if in.stop(in) {
-			return errStopCondition
-		}
 	}
 }
