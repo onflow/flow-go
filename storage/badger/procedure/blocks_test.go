@@ -32,7 +32,7 @@ func TestInsertRetrieveBlock(t *testing.T) {
 func TestFinalizeBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		parent := unittest.BlockFixture()
-		block := unittest.BlockWithParent(&parent)
+		block := unittest.BlockWithParentFixture(&parent.Header)
 
 		err := db.Update(InsertBlock(&block))
 		require.NoError(t, err)
