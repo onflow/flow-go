@@ -257,14 +257,11 @@ func AsGhost(ghost bool) func(config *NodeConfig) {
 		config.Ghost = ghost
 	}
 }
-func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, error) {
+func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
-
-	if nNodes == 0 {
-		return nil, fmt.Errorf("must specify at least one node")
-	}
+	require.NotZero(t, nNodes, "must specify at least one node")
 
 	// Sort so that access nodes start up last
 	sort.Sort(&networkConf)
@@ -346,7 +343,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, 
 		require.Nil(t, err)
 	}
 
-	return flowNetwork, nil
+	return flowNetwork
 }
 
 // AddNode creates a node container with the given config and adds it to the
