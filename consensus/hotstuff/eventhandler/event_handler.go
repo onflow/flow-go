@@ -21,6 +21,7 @@ type EventHandler struct {
 	paceMaker      hotstuff.PaceMaker
 	blockProducer  hotstuff.BlockProducer
 	forks          hotstuff.Forks
+	persist        hotstuff.Persister
 	communicator   hotstuff.Communicator
 	viewState      hotstuff.ViewState
 	voteAggregator hotstuff.VoteAggregator
@@ -35,6 +36,7 @@ func New(
 	paceMaker hotstuff.PaceMaker,
 	blockProducer hotstuff.BlockProducer,
 	forks hotstuff.Forks,
+	persist hotstuff.Persister,
 	communicator hotstuff.Communicator,
 	viewState hotstuff.ViewState,
 	voteAggregator hotstuff.VoteAggregator,
@@ -47,6 +49,7 @@ func New(
 		paceMaker:      paceMaker,
 		blockProducer:  blockProducer,
 		forks:          forks,
+		persist:        persist,
 		communicator:   communicator,
 		voteAggregator: voteAggregator,
 		voter:          voter,
@@ -209,6 +212,11 @@ func (e *EventHandler) startNewView() error {
 
 	curView := e.paceMaker.CurView()
 
+	err := e.persist.CurrentView(curView)
+	if err != nil {
+		return fmt.Errorf("could not store view: %w", err)
+	}
+
 	log := e.log.With().
 		Uint64("cur_view", curView).
 		Logger()
@@ -252,9 +260,6 @@ func (e *EventHandler) startNewView() error {
 			// 1) the network layer double checks the proposal, and the check failed.
 			// 2) the network layer had some exception encoding the proposal
 			/// ...
-			log.Warn().
-				Err(err).
-				Msg("could not broadcast proposal")
 
 			return fmt.Errorf("can not broadcast the new proposal (%x) for view (%v): %w", block.BlockID, block.View, err)
 		}
@@ -462,6 +467,11 @@ func (e *EventHandler) processVote(vote *model.Vote) error {
 	// if we don't have enough votes to build QC for this block:
 	// nothing more to do for processing vote
 	if !built {
+
+		e.log.Info().
+			Uint64("vote_view", vote.View).
+			Msgf("a vote didn't trigger a qc to be made")
+
 		return nil
 	}
 
@@ -480,6 +490,9 @@ func (e *EventHandler) processQC(qc *model.QuorumCertificate) error {
 	_, viewChanged := e.paceMaker.UpdateCurViewWithQC(qc)
 	if !viewChanged {
 		// this QC didn't trigger any view change, the processing ends.
+		e.log.Info().
+			Uint64("qc_view", qc.View).
+			Msgf("qc didn't trigger any view change")
 		return nil
 	}
 

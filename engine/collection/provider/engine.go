@@ -206,8 +206,6 @@ func (e *Engine) onTransactionResponse(originID flow.Identifier, res *messages.T
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 
-	defer e.metrics.FinishCollectionToGuarantee(guarantee.ID())
-
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus nodes: %w", err)

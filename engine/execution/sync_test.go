@@ -58,10 +58,12 @@ func TestSyncFlow(t *testing.T) {
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col1.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 			},
 		},
 	}
+	block1.PayloadHash = block1.Payload.Hash()
 
 	block2 := &flow.Block{
 		Header: flow.Header{
@@ -73,10 +75,12 @@ func TestSyncFlow(t *testing.T) {
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col2.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 			},
 		},
 	}
+	block2.PayloadHash = block2.Payload.Hash()
 
 	block3 := &flow.Block{
 		Header: flow.Header{
@@ -86,6 +90,7 @@ func TestSyncFlow(t *testing.T) {
 		},
 		Payload: flow.Payload{},
 	}
+	block3.PayloadHash = block3.Payload.Hash()
 
 	block4 := &flow.Block{
 		Header: flow.Header{
@@ -97,10 +102,18 @@ func TestSyncFlow(t *testing.T) {
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col4.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 			},
 		},
 	}
+	block4.PayloadHash = block4.Payload.Hash()
+
+	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.ParentID)
+	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.ParentID)
+	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.ParentID)
+	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.ParentID)
+	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.ParentID)
 
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)

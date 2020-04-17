@@ -85,10 +85,8 @@ func (s *LevelDB) NewBatcher() databases.Batcher {
 func (s *LevelDB) PutIntoBatcher(key []byte, value []byte) {
 	if value == nil {
 		s.batcher.Delete(key)
-		fmt.Printf("TDEL %x\n", key)
 	}
 	s.batcher.Put(key, value)
-	fmt.Printf("TPUT %x = %x\n", key, value)
 }
 
 // SafeClose is a helper function that closes databases safely.
