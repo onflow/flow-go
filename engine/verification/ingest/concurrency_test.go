@@ -1,6 +1,7 @@
 package ingest_test
 
 import (
+	"bytes"
 	"fmt"
 	"sync"
 	"testing"
@@ -114,7 +115,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 
 			var endState flow.StateCommitment
 			// last chunk
-			if j == len(er.Receipt.ExecutionResult.Chunks)-1 {
+			if int(chunk.Index) == len(er.Receipt.ExecutionResult.Chunks)-1 {
 				endState = er.Receipt.ExecutionResult.FinalStateCommit
 			} else {
 				endState = er.Receipt.ExecutionResult.Chunks[j+1].StartState
@@ -309,11 +310,11 @@ func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk)
 			defer mu.Unlock()
 
 			// the received entity should be a verifiable chunk
-			vc, ok := args[0].(*verification.VerifiableChunk)
+			vchunk, ok := args[0].(*verification.VerifiableChunk)
 			assert.True(t, ok)
 
 			// retrieves the content of received chunk
-			chunk, ok := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex)
+			chunk, ok := vchunk.Receipt.ExecutionResult.Chunks.ByIndex(vchunk.ChunkIndex)
 			require.True(t, ok, "chunk out of range requested")
 			vID := chunk.ID()
 
@@ -327,11 +328,14 @@ func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk)
 
 			// ensure the received chunk matches one we expect
 			for _, vc := range vChunks {
-				chunk, ok := vc.Receipt.ExecutionResult.Chunks.ByIndex(vc.ChunkIndex)
-				require.True(t, ok, "chunk out of range requested")
 				if chunk.ID() == vID {
 					// mark it as seen and decrement the waitgroup
 					receivedChunks[vID] = struct{}{}
+					// checks end states match as expected
+					if !bytes.Equal(vchunk.EndState, vc.EndState) {
+						t.Logf("end states are not equal: expected %x got %x", vchunk.EndState, chunk.EndState)
+						t.Fail()
+					}
 					wg.Done()
 					return
 				}

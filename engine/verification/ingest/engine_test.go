@@ -1,6 +1,7 @@
 package ingest_test
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/test"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
@@ -663,8 +665,23 @@ func (suite *TestSuite) TestVerifyReady() {
 			// mocks test expectation
 			//
 			// verifier engine should get called locally by a verifiable chunk
+			// also checks the end state of verifiable chunks about edge cases
 			suite.verifierEng.On("ProcessLocal", testifymock.AnythingOfType("*verification.VerifiableChunk")).
-				Return(nil).Once()
+				Run(func(args testifymock.Arguments) {
+					// the received entity should be a verifiable chunk
+					vc, ok := args[0].(*verification.VerifiableChunk)
+					assert.True(suite.T(), ok)
+
+					// checks verifiable chunk end state
+					// it should be the same as final state of receipt
+					// since this ER has only a single chunk
+					// more chunks cases are covered in concurrency_test
+					if !bytes.Equal(vc.EndState, suite.receipt.ExecutionResult.FinalStateCommit) {
+						assert.Fail(suite.T(), "last chunk in receipt should take the final state commitment")
+					}
+
+				}).
+				Return(nil)
 
 			// get the resources to use from the current test suite
 			received := testcase.getResource(suite)
