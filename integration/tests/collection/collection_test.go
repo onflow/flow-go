@@ -196,6 +196,9 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 	net.Start(ctx)
 	defer net.Cleanup()
 
+	// sleep for a few seconds to let the nodes discover each other and build the libp2p pubsub mesh
+	time.Sleep(5 * time.Second)
+
 	clusters := protocol.Clusters(nClusters, net.Identities())
 
 	// pick a cluster to target
