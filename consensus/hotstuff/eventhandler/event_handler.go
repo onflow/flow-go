@@ -70,7 +70,7 @@ func (e *EventHandler) OnReceiveVote(vote *model.Vote) error {
 		Hex("voter_id", vote.SignerID[:]).
 		Logger()
 
-	log.Info().Msg("vote submitted")
+	log.Debug().Msg("vote submitted")
 
 	// votes for finalized view or older should be dropped:
 	if vote.View <= e.forks.FinalizedView() {
@@ -83,7 +83,7 @@ func (e *EventHandler) OnReceiveVote(vote *model.Vote) error {
 		return fmt.Errorf("failed processing Vote: %w", err)
 	}
 
-	log.Info().Msg("vote processed")
+	log.Debug().Msg("vote processed")
 
 	return nil
 }
@@ -104,7 +104,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		Hex("proposer_id", block.ProposerID[:]).
 		Logger()
 
-	log.Info().Msg("proposal submitted")
+	log.Debug().Msg("proposal submitted")
 
 	// validate the block. exit if the proposal is invalid
 	err := e.validator.ValidateProposal(proposal)
@@ -129,7 +129,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("cannot store block (%x): %w", block.BlockID, err)
 	}
 
-	log.Info().Msg("proposal block stored")
+	log.Debug().Msg("proposal block stored")
 
 	// store the proposer's vote in voteAggregator
 	_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
@@ -144,7 +144,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		// view might have changed, let's log explicitly
 		newView := e.paceMaker.CurView()
 
-		log.Info().
+		log.Debug().
 			Uint64("new_view", newView).
 			Msg("proposal for current view processed")
 
@@ -169,7 +169,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("failed processing qc from block (%x): %w", block.BlockID, err)
 	}
 
-	log.Info().Msg("proposal for non-current view processed")
+	log.Debug().Msg("proposal for non-current view processed")
 
 	return nil
 }
@@ -185,7 +185,7 @@ func (e *EventHandler) TimeoutChannel() <-chan time.Time {
 func (e *EventHandler) OnLocalTimeout() error {
 	curView := e.paceMaker.CurView()
 
-	e.log.Info().
+	e.log.Debug().
 		Uint64("cur_view", curView).
 		Uint64("next_view", curView+1).
 		Msg("local timeout triggered")
@@ -220,7 +220,7 @@ func (e *EventHandler) startNewView() error {
 		Uint64("cur_view", curView).
 		Logger()
 
-	log.Info().Msg("entering new view")
+	log.Debug().Msg("entering new view")
 
 	e.pruneSubcomponents()
 
@@ -246,7 +246,7 @@ func (e *EventHandler) startNewView() error {
 			Uint64("qc_view", qc.View).
 			Logger()
 
-		log.Info().Msg("proposal generated")
+		log.Debug().Msg("proposal generated")
 
 		// broadcast the proposal
 		header := model.ProposalToFlow(proposal)
@@ -266,7 +266,7 @@ func (e *EventHandler) startNewView() error {
 			return fmt.Errorf("can not broadcast the new proposal (%x) for view (%v): %w", block.BlockID, block.View, err)
 		}
 
-		log.Info().Msg("proposal made for new view")
+		log.Debug().Msg("proposal made for new view")
 
 		// store the proposer's vote in voteAggregator
 		// note: duplicate here to account for an edge case
@@ -287,7 +287,7 @@ func (e *EventHandler) startNewView() error {
 	blocks := e.forks.GetBlocksForView(curView)
 	if len(blocks) == 0 {
 
-		log.Info().Msg("no proposal yet for new view")
+		log.Debug().Msg("no proposal yet for new view")
 
 		// if there is no block stored before for the current view, then exit and keep
 		// waiting
@@ -452,7 +452,7 @@ func (e *EventHandler) processVote(vote *model.Vote) error {
 		// the missing block and requested it already.
 		_ = e.voteAggregator.StorePendingVote(vote)
 
-		e.log.Info().
+		e.log.Debug().
 			Uint64("vote_view", vote.View).
 			Hex("voting_block", logging.ID(vote.BlockID)).
 			Msg("block for vote not found")

@@ -232,7 +232,7 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 		return errors.Wrap(err, "could not cast the event into network message")
 	}
 
-	// TODO: debup the message here
+	// TODO: dedup the message here
 
 	err = n.mw.Send(channelID, msg, targetIDs...)
 	if err != nil {

@@ -89,8 +89,8 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 
 func defaultValidators(log zerolog.Logger, flowID flow.Identifier) []validators.MessageValidator {
 	return []validators.MessageValidator{
-		validators.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
-		validators.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
+		validators.NewSenderValidator(flowID), // validator to filter out messages sent by this node itself
+		// validators.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
 	}
 }
 

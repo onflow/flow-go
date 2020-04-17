@@ -53,7 +53,7 @@ func (lc *LogConsumer) OnFinalizedBlock(block *model.Block) {
 }
 
 func (lc *LogConsumer) OnDoubleProposeDetected(block *model.Block, alt *model.Block) {
-	lc.log.Warn().
+	lc.log.Debug().
 		Uint64("block_view", block.View).
 		Hex("block_id", block.BlockID[:]).
 		Hex("alt_id", alt.BlockID[:]).
@@ -68,7 +68,7 @@ func (lc *LogConsumer) OnEnteringView(view uint64) {
 }
 
 func (lc *LogConsumer) OnSkippedAhead(view uint64) {
-	lc.log.Info().
+	lc.log.Debug().
 		Uint64("view", view).
 		Msg("skipped ahead")
 }
@@ -82,7 +82,7 @@ func (lc *LogConsumer) OnStartingTimeout(info *model.TimerInfo) {
 }
 
 func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
-	lc.log.Info().
+	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Str("timeout_mode", info.Mode.String()).
@@ -105,7 +105,7 @@ func (lc *LogConsumer) OnForkChoiceGenerated(view uint64, qc *model.QuorumCertif
 }
 
 func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote) {
-	lc.log.Warn().
+	lc.log.Debug().
 		Uint64("vote_view", vote.View).
 		Hex("vote_id", vote.BlockID[:]).
 		Hex("alt_id", alt.BlockID[:]).
@@ -114,7 +114,7 @@ func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote)
 }
 
 func (lc *LogConsumer) OnInvalidVoteDetected(vote *model.Vote) {
-	lc.log.Warn().
+	lc.log.Debug().
 		Uint64("vote_view", vote.View).
 		Hex("vote_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).

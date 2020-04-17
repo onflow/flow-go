@@ -161,7 +161,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		return fmt.Errorf("could not send vote: %w", err)
 	}
 
-	e.log.Debug().
+	e.log.Info().
 		Uint64("block_view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
 		Hex("recipient", recipientID[:]).
@@ -265,6 +265,8 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 // onBlockProposal handles incoming block proposals; it checks whether we actually need
 // to process them before forwarding to processing.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+	e.Lock()
+	defer e.Unlock()
 
 	blockID := proposal.Header.ID()
 	log := e.log.With().
@@ -273,12 +275,12 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("sender", originID[:]).
 		Logger()
 
-	log.Debug().Msg("block proposal received")
+	log.Info().Msg("block proposal received")
 
 	// if we already have the proposal cached, no need to go again
 	_, cached := e.cache[blockID]
 	if cached {
-		log.Debug().Msg("skipping cached proposal")
+		log.Info().Msg("skipping cached proposal")
 		return nil
 	}
 
@@ -290,24 +292,20 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	// reject orphaned block
 	if proposal.Header.Height <= final.Height {
-		e.log.Debug().Msg("skipping orphaned proposal")
+		e.log.Info().Msg("skipping orphaned proposal")
 		return nil
 	}
 
 	// TODO: turn cache into module and clean up upon block finalization
 
 	// we should store the proposal in our pending cache
-	e.Lock() // temp fix
 	e.cache[proposal.Header.ID()] = proposal.Header
-	e.Unlock() // temp fix
 
 	// check if the block is connected to the current finalized state
 	finalID := final.ID()
 	ancestorID := proposal.Header.ParentID
 	for ancestorID != finalID {
-		e.Lock() // temp fix
 		ancestor, ok := e.cache[ancestorID]
-		e.Unlock() // temp fix
 		if !ok {
 			return e.handleMissingAncestor(originID, proposal, ancestorID)
 		}
@@ -321,13 +319,11 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// for now, we clean up by finalization height bruteforce
-	e.Lock() // temp fix
 	for cachedID, cached := range e.cache {
 		if cached.Height <= final.Height {
 			delete(e.cache, cachedID)
 		}
 	}
-	e.Unlock() // temp fix
 
 	return nil
 }
@@ -378,7 +374,7 @@ func (e *Engine) processProposal(originID flow.Identifier, proposal *messages.Bl
 // onBlockVote handles incoming block votes.
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
-	e.log.Debug().
+	e.log.Info().
 		Uint64("block_view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
 		Hex("sender", originID[:]).

@@ -371,7 +371,6 @@ func (e *Engine) processIncomingBlock(block *flow.Block) {
 	delete(e.blockIDs, blockID)
 
 	e.log.Debug().
-		Uint64("hblock_eight", block.Height).
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.Entity(block)).
 		Msg("submitting synced block for processing")
