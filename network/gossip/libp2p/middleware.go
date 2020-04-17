@@ -406,8 +406,7 @@ func (m *Middleware) publish(topic string, msg interface{}) error {
 		// publish the bytes on the topic
 		// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
 		// for this node.
-		// TODO: specify a minpeers that makes more sense for Flow (Currently, broadcast if there is at least one peer listening)
-		err = m.libP2PNode.Publish(m.ctx, topic, data, 1)
+		err = m.libP2PNode.Publish(m.ctx, topic, data)
 		if err != nil {
 			return fmt.Errorf("failed to publish the message: %w", err)
 		}

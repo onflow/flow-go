@@ -73,6 +73,15 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func PendingBlockFixture(block *flow.Block) *flow.PendingBlock {
+	pending := flow.PendingBlock{
+		OriginID: IdentifierFixture(),
+		Header:   &block.Header,
+		Payload:  &block.Payload,
+	}
+	return &pending
+}
+
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
@@ -92,13 +101,13 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 func BlockHeaderFixture() flow.Header {
 	return BlockHeaderWithParentFixture(&flow.Header{
 		ParentID: IdentifierFixture(),
-		Height:   0,
+		Height:   rand.Uint64(),
 	})
 }
 
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	return flow.Header{
-		ChainID:        "chain",
+		ChainID:        parent.ChainID,
 		ParentID:       parent.ID(),
 		View:           rand.Uint64(),
 		Height:         parent.Height + 1,

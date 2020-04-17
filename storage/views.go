@@ -2,6 +2,8 @@
 
 package storage
 
+// Views is used by HotStuff to persist certain views in order to
+// maintain the correct state between crashes.
 type Views interface {
 
 	// StoreLatest stores the latest view used by hotstuff.

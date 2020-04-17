@@ -4,6 +4,7 @@ package compliance
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -22,16 +23,18 @@ import (
 // Engine is the consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
 type Engine struct {
-	unit     *engine.Unit   // used to control startup/shutdown
-	log      zerolog.Logger // used to log relevant actions with context
-	me       module.Local
-	state    protocol.State
-	headers  storage.Headers
-	payloads storage.Payloads
-	con      network.Conduit
-	cache    module.PendingBlockBuffer
-	hotstuff module.HotStuff
-	sync     module.Synchronization
+	unit       *engine.Unit   // used to control startup/shutdown
+	log        zerolog.Logger // used to log relevant actions with context
+	me         module.Local
+	state      protocol.State
+	headers    storage.Headers
+	payloads   storage.Payloads
+	con        network.Conduit
+	buffer     module.PendingBlockBuffer
+	cache      map[flow.Identifier]*flow.Header
+	sync       module.Synchronization
+	hotstuff   module.HotStuff
+	sync.Mutex // temporary fix for pending cache concurrent access
 }
 
 // New creates a new consensus propagation engine.
@@ -42,7 +45,7 @@ func New(
 	state protocol.State,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	cache module.PendingBlockBuffer,
+	buffer module.PendingBlockBuffer,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -53,7 +56,10 @@ func New(
 		state:    state,
 		headers:  headers,
 		payloads: payloads,
-		cache:    cache,
+		buffer:   buffer,
+		cache:    make(map[flow.Identifier]*flow.Header),
+		sync:     nil, // use `WithSynchronization`
+		hotstuff: nil, // use `WithConsensus`
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -246,19 +252,38 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not get final block: %w", err)
 	}
 
+	// reject orphaned block
+	if proposal.Header.Height <= final.Height {
+		return fmt.Errorf("rejecting orphaned block (%x)", proposal.Header.ID())
+	}
+
+	// TODO: turn cache into module and clean up upon block finalization
+
+	e.Lock() // temp fix
+
+	// we should store the proposal in our pending cache
+	e.cache[proposal.Header.ID()] = proposal.Header
+
+	// for now, we clean up by finalization height bruteforce
+	for headerID, header := range e.cache {
+		if header.Height <= final.Height {
+			delete(e.cache, headerID)
+		}
+	}
+
+	e.Unlock() // temp fix
+
 	// check if the block is connected to the current finalized state
 	finalID := final.ID()
 	ancestorID := proposal.Header.ParentID
 	for ancestorID != finalID {
-		ancestor, ok := e.cache.ByID(ancestorID)
+		e.Lock() // temp fix
+		ancestor, ok := e.cache[ancestorID]
+		e.Unlock() // temp fix
 		if !ok {
 			return e.handleMissingAncestor(originID, proposal, ancestorID)
 		}
-		if ancestor.Header.Height <= final.Height {
-			// TODO: store this in future versions for slashing challenges
-			return fmt.Errorf("rejecting orphaned block (%x)", proposal.Header.ID())
-		}
-		ancestorID = ancestor.Header.ParentID
+		ancestorID = ancestor.ParentID
 	}
 
 	// store the proposal block payload
@@ -313,7 +338,7 @@ func (e *Engine) handleMissingAncestor(originID flow.Identifier, proposal *messa
 		Header:   proposal.Header,
 		Payload:  proposal.Payload,
 	}
-	added := e.cache.Add(pendingBlock)
+	added := e.buffer.Add(pendingBlock)
 	if !added {
 		return nil
 	}
@@ -327,10 +352,10 @@ func (e *Engine) handleMissingAncestor(originID flow.Identifier, proposal *messa
 // handleConnectedChildren checks if the given block has connected some children
 // that were missing a link to the finalized state, in order to process them as
 // well.
-func (e *Engine) handleConnectedChildren(blockID flow.Identifier) error {
+func (e *Engine) handleConnectedChildren(parentID flow.Identifier) error {
 
 	// check if there are any children for this parent in the cache
-	children, ok := e.cache.ByParentID(blockID)
+	children, ok := e.buffer.ByParentID(parentID)
 	if !ok {
 		return nil
 	}
@@ -348,8 +373,8 @@ func (e *Engine) handleConnectedChildren(blockID flow.Identifier) error {
 		}
 	}
 
-	// remove the children from cache
-	e.cache.DropForParent(blockID)
+	// drop all of the children that should have been processed now
+	e.buffer.DropForParent(parentID)
 
 	return result.ErrorOrNil()
 }

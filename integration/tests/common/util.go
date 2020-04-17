@@ -21,7 +21,7 @@ var (
 )
 
 // deployCounter deploys a counter contract using the given client.
-func DeployCounter(ctx context.Context, client *testnet.Client) error {
+func deployCounter(ctx context.Context, client *testnet.Client) error {
 
 	contract := dsl.Contract{
 		Name: "Testing",
@@ -51,7 +51,7 @@ func DeployCounter(ctx context.Context, client *testnet.Client) error {
 
 // readCounter executes a script to read the value of a counter. The counter
 // must have been deployed and created.
-func ReadCounter(ctx context.Context, client *testnet.Client) (int, error) {
+func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
 	script := dsl.Main{
 		ReturnType: "Int",
@@ -74,7 +74,7 @@ func ReadCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
 // createCounter creates a counter instance in the root account. The counter
 // contract must first have been deployed.
-func CreateCounter(ctx context.Context, client *testnet.Client) error {
+func createCounter(ctx context.Context, client *testnet.Client) error {
 
 	txDSL := dsl.Transaction{
 		Import: dsl.Import{Address: flow.RootAddress},

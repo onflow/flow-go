@@ -187,7 +187,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	// check if the node has a stake
 	if identity.Stake == 0 {
-		return fmt.Errorf("approvar has zero stake (%x)", identity.NodeID)
+		return fmt.Errorf("approver has zero stake (%s)", identity.NodeID)
 	}
 
 	// check that the origin is a verification node
@@ -259,7 +259,7 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 	// check if any result reached the threshold on all chunks
 	total := approvers.TotalStake()
 	threshold := (total * 2) / 3 // TODO: precise rounding
-ResultLoop:
+	// ResultLoop:
 	for resultID, chunkVotes := range votes {
 		result := results[resultID]
 
@@ -267,7 +267,14 @@ ResultLoop:
 		for _, chunk := range result.Chunks {
 			voted := chunkVotes[chunk.Index]
 			if voted < threshold {
-				continue ResultLoop
+				e.log.Info().
+					Uint64("threshold", threshold).
+					Uint64("voted", voted).
+					Hex("result_id", resultID[:]).
+					Msg("skipping result due to chunk not meeting threshold")
+				// TODO: Once verification successfully sends result approvals,
+				// We should start skipping when we don't have enough approvals
+				// continue ResultLoop
 			}
 		}
 

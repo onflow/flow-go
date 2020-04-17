@@ -81,6 +81,11 @@ func encode(v interface{}) (*Envelope, error) {
 	case *messages.CollectionResponse:
 		code = CodeCollectionResponse
 
+	case *messages.TransactionRequest:
+		code = CodeTransactionRequest
+	case *messages.TransactionResponse:
+		code = CodeTransactionResponse
+
 	case *flow.ExecutionReceipt:
 		code = CodeExecutionReceipt
 	case *messages.ChunkDataPackRequest:

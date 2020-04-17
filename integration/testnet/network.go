@@ -440,6 +440,23 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			)
 
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+
+		case flow.RoleAccess:
+			hostPort := testingdock.RandomPort(t)
+			containerPort := "9000/tcp"
+
+			nodeContainer.bindPort(hostPort, containerPort)
+
+			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			// Should always have at least 1 collection and execution node
+			nodeContainer.addFlag("ingress-addr", "collection_1:9000")
+			nodeContainer.addFlag("script-addr", "execution_1:9000")
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+			nodeContainer.Ports[AccessNodeAPIPort] = hostPort
+			net.AccessPorts[AccessNodeAPIPort] = hostPort
+
+		case flow.RoleVerification:
+			nodeContainer.addFlag("alpha", "1")
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)
