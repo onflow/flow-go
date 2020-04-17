@@ -32,7 +32,7 @@ const (
 	//
 	// chunkAssignmentAlpha represents number of verification
 	// DISCLAIMER: alpha down there is not a production-level value
-	chunkAssignmentAlpha = 10
+	chunkAssignmentAlpha = 1
 )
 
 func main() {
