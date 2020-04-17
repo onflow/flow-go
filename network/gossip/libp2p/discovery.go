@@ -20,6 +20,7 @@ type Discovery struct {
 	overlay middleware.Overlay
 	me      flow.Identifier
 	done    chan struct{}
+	printed bool
 }
 
 func NewDiscovery(log zerolog.Logger, overlay middleware.Overlay, me flow.Identifier, done chan struct{}) *Discovery {
@@ -63,6 +64,8 @@ func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option
 	// create a channel of peer.AddrInfo that needs to be returned
 	ch := make(chan peer.AddrInfo, len(ids))
 
+	directPeers := make([]flow.Identity, 0)
+
 	// send each id to the channel after converting it to a peer.AddrInfo
 	for _, id := range ids {
 		// create a new NodeAddress
@@ -85,6 +88,13 @@ func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option
 
 		// add the address to the channel
 		ch <- addrInfo
+
+		directPeers = append(directPeers, id)
+	}
+
+	if !d.printed {
+		d.log.Debug().Str("node", d.me.String()).Msgf("topology: %v", directPeers)
+		d.printed = true
 	}
 
 	// close the channel as nothing else is going to be written to it
