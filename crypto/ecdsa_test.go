@@ -3,7 +3,7 @@ package crypto
 import (
 	"testing"
 
-	"math/rand"
+	"crypto/rand"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/stretchr/testify/require"

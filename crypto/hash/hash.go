@@ -14,9 +14,14 @@ func (h Hash) Equal(input Hash) bool {
 	return bytes.Equal(h, input)
 }
 
+// Hex returns the hex string representation of the hash.
+func (h Hash) Hex() string {
+	return fmt.Sprintf("%#x", h)
+}
+
 // String returns the hex string representation of the hash.
 func (h Hash) String() string {
-	return fmt.Sprintf("%#x", h)
+	return h.Hex()
 }
 
 // Hasher interface
