@@ -28,6 +28,7 @@ flowdb
 # IDE related files
 .idea
 .vscode
+flow-go.code-workspace
 git
 language/tools/vscode-extension/cadence-*.vsix
 language/tools/vscode-extension/out/*
