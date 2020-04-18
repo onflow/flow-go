@@ -57,6 +57,8 @@ func makePrefix(code byte, keys ...interface{}) []byte {
 
 func b(v interface{}) []byte {
 	switch i := v.(type) {
+	case uint8:
+		return []byte{i}
 	case uint32:
 		b := make([]byte, 4)
 		binary.BigEndian.PutUint32(b, i)

@@ -9,20 +9,20 @@ type Views struct {
 	mock.Mock
 }
 
-// RetrieveLatest provides a mock function with given fields:
-func (_m *Views) RetrieveLatest() (uint64, error) {
-	ret := _m.Called()
+// Retrieve provides a mock function with given fields: action
+func (_m *Views) Retrieve(action uint8) (uint64, error) {
+	ret := _m.Called(action)
 
 	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(uint8) uint64); ok {
+		r0 = rf(action)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(uint8) error); ok {
+		r1 = rf(action)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -30,13 +30,13 @@ func (_m *Views) RetrieveLatest() (uint64, error) {
 	return r0, r1
 }
 
-// StoreLatest provides a mock function with given fields: view
-func (_m *Views) StoreLatest(view uint64) error {
-	ret := _m.Called(view)
+// Store provides a mock function with given fields: action, view
+func (_m *Views) Store(action uint8, view uint64) error {
+	ret := _m.Called(action, view)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64) error); ok {
-		r0 = rf(view)
+	if rf, ok := ret.Get(0).(func(uint8, uint64) error); ok {
+		r0 = rf(action, view)
 	} else {
 		r0 = ret.Error(0)
 	}
