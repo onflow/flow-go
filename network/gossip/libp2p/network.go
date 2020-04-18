@@ -202,18 +202,16 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
 
 	var emTargets [][]byte
-	for _, t := range targetIDs {
-		// copy the array to a temp var by value
-		temp := t
+	for _, targetID := range targetIDs {
 		// create a slice out of the temp var
-		emTargets = append(emTargets, temp[:])
+		emTargets = append(emTargets, targetID[:])
 	}
 
 	// get origin ID (inplace slicing n.me.NodeID()[:] doesn't work)
 	selfID := n.me.NodeID()
 	originID := selfID[:]
 
-	//cast event to a libp2p.Message
+	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: uint32(channelID),
 		EventID:   sip.Sum(payload),
@@ -234,7 +232,7 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 		return errors.Wrap(err, "could not cast the event into network message")
 	}
 
-	// TODO: debup the message here
+	// TODO: dedup the message here
 
 	err = n.mw.Send(channelID, msg, targetIDs...)
 	if err != nil {
