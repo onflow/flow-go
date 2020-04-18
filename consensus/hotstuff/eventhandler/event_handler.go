@@ -254,7 +254,7 @@ func (e *EventHandler) startNewView() error {
 			Uint64("parent_view", qc.View).
 			Hex("parent_id", qc.BlockID[:]).
 			Hex("signer", block.ProposerID[:]).
-			Msg("block proposal generated")
+			Msg("forwarding proposal to compliance engine")
 
 		// broadcast the proposal
 		header := model.ProposalToFlow(proposal)
@@ -432,7 +432,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 	// send my vote if I should vote and I'm not the leader
 	if shouldVote {
 
-		log.Debug().Msg("sending own vote as not next leader")
+		log.Debug().Msg("forwarding vote to compliance engine")
 
 		err := e.communicator.SendVote(
 			ownVote.BlockID,

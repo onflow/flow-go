@@ -11,8 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/libp2p/message"
-	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
 func encode(v interface{}) (*Envelope, error) {
@@ -21,26 +19,13 @@ func encode(v interface{}) (*Envelope, error) {
 	var code uint8
 	switch v.(type) {
 
-	case *trickle.Ping:
-		code = CodePing
-	case *trickle.Pong:
-		code = CodePong
-	case *trickle.Auth:
-		code = CodeAuth
-	case *trickle.Announce:
-		code = CodeAnnounce
-	case *trickle.Request:
-		code = CodeRequest
-	case *trickle.Response:
-		code = CodeResponse
-	case *message.Echo:
-		code = CodeEcho
-
-	// consensus
+	// protocol consensus
 	case *messages.BlockProposal:
 		code = CodeBlockProposal
 	case *messages.BlockVote:
 		code = CodeBlockVote
+
+	// coldstuff-specific
 	case *coldstuff.Commit:
 		code = CodeBlockCommit
 
@@ -72,9 +57,6 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeTransactionBody
 	case *flow.Transaction:
 		code = CodeTransaction
-
-	case *flow.Block:
-		code = CodeBlock
 
 	case *messages.CollectionRequest:
 		code = CodeCollectionRequest
