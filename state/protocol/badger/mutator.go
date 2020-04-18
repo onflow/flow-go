@@ -294,6 +294,7 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 
 		// forward to next parent
 		ancestorID = ancestor.ParentID
+		height = ancestor.Height
 	}
 
 	return nil
