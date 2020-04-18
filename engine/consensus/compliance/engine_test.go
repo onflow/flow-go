@@ -51,6 +51,7 @@ type ComplianceSuite struct {
 	payloads *storage.Payloads
 	con      *network.Conduit
 	net      *module.Network
+	prov     *network.Engine
 	cache    *module.PendingBlockBuffer
 	hotstuff *module.HotStuff
 	sync     *module.Synchronization
@@ -182,6 +183,10 @@ func (cs *ComplianceSuite) SetupTest() {
 		nil,
 	)
 
+	// set up the provider engine
+	cs.prov = &network.Engine{}
+	cs.prov.On("SubmitLocal", mock.Anything).Return()
+
 	// set up cache module mock
 	cs.cache = &module.PendingBlockBuffer{}
 	cs.cache.On("Add", mock.Anything).Return(false)
@@ -199,7 +204,7 @@ func (cs *ComplianceSuite) SetupTest() {
 
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
-	e, err := New(log, cs.net, cs.me, cs.state, cs.headers, cs.payloads, cs.cache)
+	e, err := New(log, cs.net, cs.me, cs.state, cs.headers, cs.payloads, cs.cache, cs.prov)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	// assign engine with consensus & synchronization
