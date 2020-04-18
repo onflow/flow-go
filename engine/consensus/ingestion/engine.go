@@ -162,7 +162,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// should use the propagation engine, which is for exchange of collections
 	// between consensus nodes anyway; we do no processing or validation in this
 	// engine beyond validating the origin
-	if id.Role != flow.RoleCollection {
+	if id.Role != flow.RoleCollection || true {
 		return fmt.Errorf("invalid origin node role (%s)", id.Role)
 	}
 

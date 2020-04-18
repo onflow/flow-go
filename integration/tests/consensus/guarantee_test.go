@@ -122,8 +122,9 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 	gs.T().Logf("looking for: %x", guarantee.CollectionID)
 
 	// read messages until we see a block with this guarantee
-	found := false
-	for time.Now().Before(deadline) && !found {
+	var inclusionID flow.Identifier
+InclusionLoop:
+	for time.Now().Before(deadline) {
 		_, msg, err := reader.Next()
 		require.NoError(gs.T(), err, "could not read next message")
 		gs.T().Logf("%T", msg)
@@ -131,18 +132,43 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 		if !ok {
 			continue
 		}
-		gs.T().Logf("proposal: %x", proposal.Header.ID())
-		for _, included := range proposal.Payload.Guarantees {
-			gs.T().Logf("guarantee: %x", included.CollectionID)
-			if included.CollectionID == guarantee.CollectionID {
-				found = true
+		gs.T().Logf("proposal received: %x", proposal.Header.ID())
+		gs.T().Logf("guarantees included: %d", len(proposal.Payload.Guarantees))
+		for _, check := range proposal.Payload.Guarantees {
+			if check.CollectionID == guarantee.CollectionID {
+				inclusionID = proposal.Header.ID()
+				gs.T().Log("sentinel guarantee included!")
+				break InclusionLoop
 			}
 		}
+		gs.T().Log("sentinel guarantee not found")
+	}
+
+	// check that this block is also confirmed
+	confirmations := 0
+	for time.Now().Before(deadline) {
+		_, msg, err := reader.Next()
+		require.NoError(gs.T(), err, "could not read next message")
+		gs.T().Logf("%T", msg)
+		proposal, ok := msg.(*messages.BlockProposal)
+		if !ok {
+			continue
+		}
+		gs.T().Logf("proposal received: %x", proposal.Header.ID())
+		gs.T().Logf("parent referenced: %x", proposal.Header.ParentID)
+		if proposal.Header.ParentID == inclusionID {
+			inclusionID = proposal.Header.ID()
+			confirmations++
+			gs.T().Logf("inclusion block confirmed! (confirmations: %d)", confirmations)
+			break
+		}
+		gs.T().Log("block not confirmed")
 	}
 
 	// stop the network
 	gs.net.Stop()
 
 	// make sure we found the guarantee
-	require.True(gs.T(), found, "should have found guarantee in block")
+	require.NotEqual(gs.T(), flow.ZeroID, inclusionID, "should have found inclusion block")
+	require.Equal(gs.T(), 3, confirmations, "should have confirmed inclusion block three times")
 }
