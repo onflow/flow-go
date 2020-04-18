@@ -171,8 +171,8 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 	// decide what mode of communication to use
 	switch mode {
 	case NoOp:
-		// NOTE: it's important for debugging to catch this
-		return fmt.Errorf("empty list of target Ids")
+		// TODO: should we error here, or silently ignore?
+		return nil
 	case OneToOne:
 		if targetIDs[0] == m.me {
 			// to avoid self dial by the underlay
