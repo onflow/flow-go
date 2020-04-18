@@ -249,7 +249,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 				err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
 				assert.Nil(t, err)
 			}
-		}).Return(nil).Times(1)
+		}).Return(nil).Once()
 
 	// consensus node
 	conNode := testutil.GenericNode(t, hub, conIdentity, identities)
@@ -258,7 +258,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		Run(func(args testifymock.Arguments) {
 			_, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
-		}).Return(nil).Times(1)
+		}).Return(nil).Once()
 
 	_, err = conNode.Net.Register(engine.ApprovalProvider, conEngine)
 	assert.Nil(t, err)
