@@ -110,9 +110,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // from another node on the network.
 func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
-	e.log.Info().
+	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Msg("collection guarantee submitted")
+		Hex("collection_id", logging.Entity(guarantee)).
+		RawJSON("signers", logging.AsJSON(guarantee.SignerIDs)).
+		Logger()
+
+	log.Info().Msg("collection guarantee received")
 
 	err := e.storeGuarantee(guarantee)
 	if err != nil {
@@ -124,16 +128,15 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 		return fmt.Errorf("could not store guarantee: %w", err)
 	}
 
+	log.Info().Msg("collection guarantee processed")
+
 	// propagate the collection guarantee to other relevant nodes
 	err = e.propagateGuarantee(guarantee)
 	if err != nil {
 		return fmt.Errorf("could not broadcast guarantee: %w", err)
 	}
 
-	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee processed")
+	log.Info().Msg("collection guarantee propagated to consensus nodes")
 
 	return nil
 }
@@ -149,10 +152,6 @@ func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 	if err != nil {
 		return fmt.Errorf("could not add guarantee to mempool: %w", err)
 	}
-
-	e.log.Info().
-		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee stored")
 
 	return nil
 }
@@ -174,13 +173,8 @@ func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 	targetIDs := ids.NodeIDs()
 	err = e.con.Submit(guarantee, targetIDs...)
 	if err != nil {
-		return fmt.Errorf("could not push collection guarantee: %w", err)
+		return fmt.Errorf("could not send collection guarantee: %w", err)
 	}
-
-	e.log.Info().
-		Strs("target_ids", logging.IDs(targetIDs)).
-		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee propagated")
 
 	return nil
 }

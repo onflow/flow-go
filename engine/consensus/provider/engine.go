@@ -117,6 +117,16 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // broadcast it to the network.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
+	log := e.log.With().
+		Hex("origin_id", originID[:]).
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", logging.Entity(proposal.Header)).
+		Hex("parent_id", proposal.Header.ParentID[:]).
+		Hex("signer", proposal.Header.ProposerID[:]).
+		Logger()
+
+	log.Info().Msg("block proposal forwarded from compliance engine")
+
 	// reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	// TODO: move this to the correct location; this is not where the CCL receives
 	// blocks, this is where the CCL forwards blocks to other node roles
@@ -145,7 +155,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Uint64("block_view", proposal.Header.View).
 		Hex("block_id", logging.Entity(proposal.Header)).
 		Hex("signer", proposal.Header.ProposerID[:]).
-		Msg("block proposal propagated")
+		Msg("block proposal propagated to non-consensus nodes")
 
 	return nil
 }
