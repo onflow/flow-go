@@ -130,7 +130,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	}
 
 	// store the proposer's vote in voteAggregator
-	_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
+	_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote(), block)
 
 	// if the block is for the current view, then process the current block
 	if block.View == curView {
@@ -208,6 +208,8 @@ func (e *EventHandler) OnLocalTimeout() error {
 
 // Start will start the pacemaker's timer and start the new view
 func (e *EventHandler) Start() error {
+	time.Sleep(5 * time.Second)
+
 	e.paceMaker.Start()
 	return e.startNewView()
 }
@@ -272,7 +274,7 @@ func (e *EventHandler) startNewView() error {
 		// note: duplicate here to account for an edge case
 		// where we are the leader of current view as well
 		// as the next view
-		_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
+		_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote(), block)
 
 		err = e.forks.AddBlock(proposal.Block)
 		if err != nil {

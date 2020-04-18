@@ -92,7 +92,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Blo
 }
 
 // StoreProposerVote stores the vote for a block that was proposed.
-func (va *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
+func (va *VoteAggregator) StoreProposerVote(vote *model.Vote, block *model.Block) bool {
 	// check if the proposer vote is for a view that has already been pruned (and is thus stale)
 	if va.isStale(vote) { // cannot store vote for already pruned view
 		return false
@@ -103,7 +103,11 @@ func (va *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
 		return false
 	}
 	va.proposerVotes[vote.BlockID] = vote
-	return true
+	valid, err := va.validateAndStoreIncorporatedVote(vote, block)
+	if err != nil {
+		return false
+	}
+	return valid
 }
 
 // BuildQCOnReceivedBlock will attempt to build a QC for the given block when there are votes

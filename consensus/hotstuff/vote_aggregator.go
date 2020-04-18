@@ -16,7 +16,7 @@ type VoteAggregator interface {
 
 	// StoreProposerVote stores the vote of the proposer of the block and is
 	// used to separate vote and block handling.
-	StoreProposerVote(vote *model.Vote) bool
+	StoreProposerVote(vote *model.Vote, block *model.Block) bool
 
 	// BuildQCOnReceivedBlock will try to build a QC for the received block in
 	// case enough votes can be accumulated for it.
