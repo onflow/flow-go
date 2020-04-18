@@ -8,7 +8,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/integration/testnet"
@@ -46,8 +45,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	nodes := append([]testnet.NodeConfig{collNode, conNode1, conNode2, conNode3, realExeNode, verNode, ghostExeNode})
 	conf := testnet.NewNetworkConfig("ghost_example_subscribe", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 
@@ -120,8 +118,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	nodes := append([]testnet.NodeConfig{realCollNode, ghostCollNode, conNode1, conNode2, conNode3, realExeNode, verNode})
 	conf := testnet.NewNetworkConfig("ghost_example_send", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 
