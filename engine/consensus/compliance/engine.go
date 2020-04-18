@@ -33,6 +33,7 @@ type Engine struct {
 	con        network.Conduit
 	buffer     module.PendingBlockBuffer
 	cache      map[flow.Identifier]*flow.Header
+	prov       network.Engine
 	sync       module.Synchronization
 	hotstuff   module.HotStuff
 	sync.Mutex // temporary fix for pending cache concurrent access
@@ -47,6 +48,7 @@ func New(
 	headers storage.Headers,
 	payloads storage.Payloads,
 	buffer module.PendingBlockBuffer,
+	prov network.Engine,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -59,6 +61,7 @@ func New(
 		payloads: payloads,
 		buffer:   buffer,
 		cache:    make(map[flow.Identifier]*flow.Header),
+		prov:     prov,
 		sync:     nil, // use `WithSynchronization`
 		hotstuff: nil, // use `WithConsensus`
 	}
@@ -231,6 +234,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	log.Info().Msg("block proposal broadcasted")
+
+	// submit the proposal to the provider engine to forward it to other
+	// node roles
+	e.prov.SubmitLocal(msg)
 
 	return nil
 }

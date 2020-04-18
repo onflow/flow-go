@@ -88,6 +88,7 @@ func (suite *Suite) SetupTest() {
 func (suite *Suite) TestHandleBlock() {
 	originID := unittest.IdentifierFixture()
 	block := unittest.BlockFixture()
+	proposal := unittest.ProposalFromBlock(&block)
 
 	cNodeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(cNodeIdentities, nil).Once()
@@ -98,7 +99,7 @@ func (suite *Suite) TestHandleBlock() {
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
 
-	err := suite.eng.Process(originID, &block)
+	err := suite.eng.Process(originID, proposal)
 	require.NoError(suite.T(), err)
 	suite.proto.snapshot.AssertExpectations(suite.T())
 	suite.headers.AssertExpectations(suite.T())

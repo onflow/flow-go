@@ -212,21 +212,27 @@ func TestBlockOutOfOrder(t *testing.T) {
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockC.Block))
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockD.Block))
 
+		// initialize the proposals
+		proposalA := unittest.ProposalFromBlock(executableBlockA.Block)
+		proposalB := unittest.ProposalFromBlock(executableBlockB.Block)
+		proposalC := unittest.ProposalFromBlock(executableBlockC.Block)
+		proposalD := unittest.ProposalFromBlock(executableBlockD.Block)
+
 		// no execution state, so puts to waiting queue
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlockB.Block.ParentID).Return(nil, realStorage.ErrNotFound)
-		err := ctx.engine.handleBlock(executableBlockB.Block)
+		err := ctx.engine.handleBlockProposal(proposalB)
 		require.NoError(t, err)
 
 		// no execution state, no connection to other nodes
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlockC.Block.ParentID).Return(nil, realStorage.ErrNotFound)
-		err = ctx.engine.handleBlock(executableBlockC.Block)
+		err = ctx.engine.handleBlockProposal(proposalC)
 		require.NoError(t, err)
 
 		// child of c so no need to query execution state
 
 		// we account for every call, so if this call would have happen, test will fail
 		// ctx.executionState.On("StateCommitmentByBlockID", executableBlockD.Block.ParentID).Return(nil, realStorage.ErrNotFound)
-		err = ctx.engine.handleBlock(executableBlockD.Block)
+		err = ctx.engine.handleBlockProposal(proposalD)
 		require.NoError(t, err)
 
 		// make sure there were no extra calls at this point in test
@@ -241,7 +247,7 @@ func TestBlockOutOfOrder(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(executableBlockD, unittest.IdentifierFixture())
 
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlockA.Block.ParentID).Return(executableBlockA.StartState, nil)
-		err = ctx.engine.handleBlock(executableBlockA.Block)
+		err = ctx.engine.handleBlockProposal(proposalA)
 		require.NoError(t, err)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
