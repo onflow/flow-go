@@ -109,7 +109,9 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
 	persist := persister.New(views)
-	pacemaker, err := pacemaker.New(lastView, controller, notifier)
+	// pacemaker will skip the last view to avoid the chance of double votes/double proposals.
+	// when bootstrap, the last view is 0, so pace maker will start from view 1
+	pacemaker, err := pacemaker.New(lastView+1, controller, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
@@ -121,6 +123,10 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	// initialize the voter
+	// voter will resume the last voted view from last view, since
+	// pacemaker will skip the last view, voter's last view is guaranteed to be behind
+	// the pacemaker's current view to avoid double votes.
+	// when bootstrap, the last view is 0, and voter is able to vote for view 1
 	voter := voter.New(signer, forks, lastView)
 
 	// initialize the vote aggregator
