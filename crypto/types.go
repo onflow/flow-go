@@ -53,7 +53,7 @@ const (
 	PubKeyLenECDSAP256        = 64
 	KeyGenSeedMinLenECDSAP256 = PrKeyLenECDSAP256 + (securityBits / 8)
 
-	// SEC p256k1
+	// SECG secp256k1
 	SignatureLenECDSASecp256k1 = 64
 	PrKeyLenECDSASecp256k1     = 32
 	// PubKeyLenECDSASecp256k1 is the size of uncompressed points on P256
