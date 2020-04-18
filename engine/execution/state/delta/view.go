@@ -150,8 +150,8 @@ func (r *Snapshot) RegisterTouches() []flow.RegisterID {
 }
 
 // ReadsCount returns the total number of reads performed on this view including all child views
-func (r *View) ReadsCount() int {
-	return r.numReads
+func (r *View) ReadsCount() uint64 {
+	return r.readsCount
 }
 
 // SpockSecret returns the secret value for SPoCK

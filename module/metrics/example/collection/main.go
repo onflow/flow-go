@@ -8,11 +8,11 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/metrics/test"
+	"github.com/dapperlabs/flow-go/module/metrics/example"
 )
 
 func main() {
-	test.WithMetricsServer(func(logger zerolog.Logger) {
+	example.WithMetricsServer(func(logger zerolog.Logger) {
 		metrics, err := metrics.NewCollector(logger)
 		if err != nil {
 			panic(err)

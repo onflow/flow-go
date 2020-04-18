@@ -6,14 +6,14 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/metrics/test"
+	"github.com/dapperlabs/flow-go/module/metrics/example"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 // main runs a local tracer server on the machine and starts monitoring some metrics for sake of verification, which
 // increases result approvals counter and checked chunks counter 100 times each
 func main() {
-	test.WithMetricsServer(func(logger zerolog.Logger) {
+	example.WithMetricsServer(func(logger zerolog.Logger) {
 		metrics, err := metrics.NewCollector(logger)
 		if err != nil {
 			panic(err)
