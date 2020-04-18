@@ -13,35 +13,35 @@ import (
 
 func TestDeterministicKeyGen(t *testing.T) {
 	// 2 keys generated with the same seed should be equal
-	seed := make([]byte, KeyGenSeedMinLenBlsBls12381)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
+	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
-	sk1, err := GeneratePrivateKey(BlsBls12381, seed)
+	sk1, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.Nil(t, err)
-	sk2, err := GeneratePrivateKey(BlsBls12381, seed)
+	sk2, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.Nil(t, err)
 	assert.True(t, sk1.Equals(sk2), "private keys should be equal")
 }
 
 // test the deterministicity of the relic PRG (used by the DKG polynimials)
 func TestPRGseeding(t *testing.T) {
-	_ = newBlsBLS12381()
+	_ = newBLSBLS12381()
 	// 2 scalars generated with the same seed should be equal
-	seed := make([]byte, KeyGenSeedMinLenBlsBls12381)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBlsBls12381)
+	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
 	// 1st scalar (wrapped in a private key)
 	err = seedRelic(seed)
 	require.Nil(t, err)
-	var sk1 PrKeyBLS_BLS12381
+	var sk1 PrKeyBLSBLS12381
 	err = randZr(&sk1.scalar)
 	require.Nil(t, err)
 	// 2nd scalar (wrapped in a private key)
 	err = seedRelic(seed)
 	require.Nil(t, err)
-	var sk2 PrKeyBLS_BLS12381
+	var sk2 PrKeyBLSBLS12381
 	err = randZr(&sk2.scalar)
 	require.Nil(t, err)
 	// compare the 2 scalars (by comparing the private keys)
@@ -50,7 +50,7 @@ func TestPRGseeding(t *testing.T) {
 
 // TestG1 helps debugging but is not a unit test
 func TestG1(t *testing.T) {
-	_ = newBlsBLS12381()
+	_ = newBLSBLS12381()
 	seed := make([]byte, securityBits/8)
 	rand.Read(seed)
 	seedRelic(seed)
@@ -63,7 +63,7 @@ func TestG1(t *testing.T) {
 
 // G1 bench
 func BenchmarkG1(b *testing.B) {
-	_ = newBlsBLS12381()
+	_ = newBLSBLS12381()
 	seed := make([]byte, securityBits/8)
 	rand.Read(seed)
 	seedRelic(seed)
@@ -81,7 +81,7 @@ func BenchmarkG1(b *testing.B) {
 
 // TestG2 helps debugging but is not a unit test
 func TestG2(t *testing.T) {
-	_ = newBlsBLS12381()
+	_ = newBLSBLS12381()
 	var expo scalar
 	(&expo).setInt(1)
 	var res pointG2
@@ -91,7 +91,7 @@ func TestG2(t *testing.T) {
 
 // G2 bench
 func BenchmarkG2(b *testing.B) {
-	_ = newBlsBLS12381()
+	_ = newBLSBLS12381()
 	seed := make([]byte, securityBits/8)
 	rand.Read(seed)
 	seedRelic(seed)
@@ -109,8 +109,8 @@ func BenchmarkG2(b *testing.B) {
 
 // Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {
-	_ = newBlsBLS12381()
-	input := make([]byte, opSwUInputLenBlsBls12381)
+	_ = newBLSBLS12381()
+	input := make([]byte, opSwUInputLenBLSBLS12381)
 	for i := 0; i < len(input); i++ {
 		input[i] = byte(i)
 	}
@@ -126,7 +126,7 @@ func BenchmarkHashToG1(b *testing.B) {
 // the test vector is taken from the original implementation used by the authors of
 // the paper https://eprint.iacr.org/2019/403.pdf
 func TestOpSwuHashToG1(t *testing.T) {
-	_ = newBlsBLS12381()
+	_ = newBLSBLS12381()
 	inputs := []string{
 		"0e58bd6d947af8aec009ff396cd83a3636614f917423db76e8948e9c25130ae04e721beb924efca3ce585540b2567cf6",
 		"0082bd2ed5473b191da55420c9b4df9031a50445b28c17115d614ad6993d7037d6792dd2211e4b485761a6fe2df17582",
@@ -140,7 +140,7 @@ func TestOpSwuHashToG1(t *testing.T) {
 		"a21671a9cbbbf73c429d32bf9a07b64141118a00301d8a1a07de587818d788b37ed0b568c6ede80bd31426bafc142981",
 	}
 
-	output := make([]byte, SignatureLenBlsBls12381)
+	output := make([]byte, SignatureLenBLSBLS12381)
 	for i, msg := range inputs {
 		input, _ := hex.DecodeString(msg)
 		OpSwUUnitTest(output, input)
