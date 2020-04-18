@@ -333,9 +333,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidAncestor() {
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent.Header
-	cs.headerDB[parent.ID()] = &parent.Header
-	cs.e.cache[parent.ID()] = &parent.Header
-	cs.e.cache[ancestor.ID()] = &ancestor.Header
+	cs.headerDB[ancestor.ID()] = &ancestor.Header
 
 	// it should be processed without error
 	err := cs.e.onBlockProposal(originID, &proposal)
@@ -371,8 +369,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidHeight() {
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent.Header
-	cs.e.cache[parent.ID()] = &parent.Header
-	cs.e.cache[ancestor.ID()] = &ancestor.Header
+	cs.headerDB[ancestor.ID()] = &ancestor.Header
 
 	// it should be processed without error
 	err := cs.e.onBlockProposal(originID, &proposal)
@@ -406,8 +403,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent.Header
-	cs.e.cache[parent.ID()] = &parent.Header
-	cs.e.cache[ancestor.ID()] = &ancestor.Header
+	cs.headerDB[ancestor.ID()] = &ancestor.Header
 
 	// make sure we fail to extend the state
 	*cs.mutator = protocol.Mutator{}
@@ -449,43 +445,19 @@ func (cs *ComplianceSuite) TestOnSubmitVote() {
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitVote", originID, vote.BlockID, vote.View, vote.SigData)
 }
 
-func (cs *ComplianceSuite) TestHandleMissingAncestor() {
-
-	// create pending block
-	originID := unittest.IdentifierFixture()
-	ancestorID := unittest.IdentifierFixture()
-	block := unittest.BlockFixture()
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-
-	// execute missing ancestors when (by default) we don't add to cache
-	err := cs.e.handleMissingAncestor(originID, &proposal, ancestorID)
-	require.NoError(cs.T(), err, "should pass with old proposl")
-	cs.sync.AssertNotCalled(cs.T(), "RequestBlock", mock.Anything)
-
-	// execute missing ancestor when we add to cache and should request
-	*cs.cache = module.PendingBlockBuffer{}
-	cs.cache.On("Add", mock.Anything).Return(true)
-	err = cs.e.handleMissingAncestor(originID, &proposal, ancestorID)
-	require.NoError(cs.T(), err, "should pass with new proposal")
-	cs.sync.AssertCalled(cs.T(), "RequestBlock", ancestorID)
-}
-
-func (cs *ComplianceSuite) TestHandleConnectedChildrenNone() {
+func (cs *ComplianceSuite) TestProcessPendingChildrenNone() {
 
 	// generate random block ID
 	blockID := unittest.IdentifierFixture()
 
 	// execute handle connected children
-	err := cs.e.handleConnectedChildren(blockID)
+	err := cs.e.processPendingChildren(blockID)
 	require.NoError(cs.T(), err, "should pass when no children")
 	cs.snapshot.AssertNotCalled(cs.T(), "Final")
 	cs.cache.AssertNotCalled(cs.T(), "DropForParent", mock.Anything)
 }
 
-func (cs *ComplianceSuite) TestHandleConnectedChildren() {
+func (cs *ComplianceSuite) TestProcessPendingChildren() {
 
 	// create three children blocks
 	parent := unittest.BlockHeaderFixture()
@@ -508,7 +480,7 @@ func (cs *ComplianceSuite) TestHandleConnectedChildren() {
 	cs.cache.On("Add", mock.Anything).Return(false)
 
 	// execute the connecte children handling
-	err := cs.e.handleConnectedChildren(parent.ID())
+	err := cs.e.processPendingChildren(parent.ID())
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check we tried to process all three children as proposals

@@ -204,14 +204,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 func (e *Engine) handleMissingAncestor(originID flow.Identifier, proposal *messages.BlockProposal, ancestorID flow.Identifier) error {
 
-	pendingBlock := &flow.PendingBlock{
-		OriginID: originID,
-		Header:   proposal.Header,
-		Payload:  proposal.Payload,
-	}
-
 	// cache the block, exit early if it already exists in the cache
-	added := e.cache.Add(pendingBlock)
+	added := e.cache.Add(originID, proposal)
 	if !added {
 		return nil
 	}
