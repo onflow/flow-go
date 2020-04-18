@@ -307,7 +307,12 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	for ancestorID != finalID {
 		ancestor, ok := e.cache[ancestorID]
 		if !ok {
-			return e.handleMissingAncestor(originID, proposal, ancestorID)
+			// not in cache, check storage
+			ancestor, err = e.headers.ByBlockID(ancestorID)
+			if err != nil {
+				e.log.Debug().Msg("missing ancestor when processing proposal")
+				return e.handleMissingAncestor(originID, proposal, ancestorID)
+			}
 		}
 		ancestorID = ancestor.ParentID
 	}
@@ -402,6 +407,12 @@ func (e *Engine) handleMissingAncestor(originID flow.Identifier, proposal *messa
 		return nil
 	}
 
+	proposalID := proposal.Header.ID()
+	e.log.Info().
+		Hex("ancestor_id", ancestorID[:]).
+		Hex("block_id", proposalID[:]).
+		Hex("sender", originID[:]).
+		Msg("requesting ancestor")
 	// add the block to the downlod queue
 	e.sync.RequestBlock(ancestorID)
 
