@@ -172,7 +172,7 @@ func main() {
 			comp = comp.WithSynchronization(sync).WithConsensus(hot)
 			return comp, nil
 		}).
-		Run()
+		Run("consensus")
 }
 
 func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {

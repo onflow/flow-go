@@ -149,6 +149,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		Uint64("block_view", view).
 		Hex("block_id", blockID[:]).
 		Hex("signer", logging.ID(e.me.NodeID())).
+		Hex("recipient", recipientID[:]).
 		Logger()
 
 	log.Info().Msg("processing vote transmission request from hotstuff")
@@ -175,12 +176,24 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 // Note the header has incomplete fields, because it was converted from a hotstuff.Proposal type
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
+	// retrieve all consensus nodes without our ID
+	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
+	if err != nil {
+		return fmt.Errorf("could not get consensus recipients: %w", err)
+	}
+
+	recipientIDs := recipients.NodeIDs()
+
 	log := e.log.With().
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
 		Uint64("block_height", header.Height).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("signer", header.ProposerID[:]).
+		RawJSON("recipients", logging.AsJSON(recipientIDs)).
 		Logger()
 
 	log.Info().Msg("processing proposal broadcast request from hotstuff")
@@ -207,15 +220,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
 
-	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get consensus recipients: %w", err)
-	}
-
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
@@ -225,7 +229,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// broadcast the proposal to consensus nodes
-	err = e.con.Submit(msg, recipients.NodeIDs()...)
+	err = e.con.Submit(msg, recipientIDs...)
 	if err != nil {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
