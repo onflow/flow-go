@@ -35,14 +35,14 @@ func (_m *Metrics) ExecutionStateReadsPerBlock(reads uint64) {
 	_m.Called(reads)
 }
 
-// ExecutionStorageDiskTotal provides a mock function with given fields: gib
-func (_m *Metrics) ExecutionStorageDiskTotal(gib int64) {
-	_m.Called(gib)
+// ExecutionStateStorageDiskTotal provides a mock function with given fields: bytes
+func (_m *Metrics) ExecutionStateStorageDiskTotal(bytes int64) {
+	_m.Called(bytes)
 }
 
-// ExecutionStorageStateCommitment provides a mock function with given fields: gib
-func (_m *Metrics) ExecutionStorageStateCommitment(gib int64) {
-	_m.Called(gib)
+// ExecutionStorageStateCommitment provides a mock function with given fields: bytes
+func (_m *Metrics) ExecutionStorageStateCommitment(bytes int64) {
+	_m.Called(bytes)
 }
 
 // FinalizedBlocks provides a mock function with given fields: count

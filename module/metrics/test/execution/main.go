@@ -32,7 +32,7 @@ func main() {
 
 			diskIncrease := rand.Int63n(1024 ^ 2)
 			diskTotal += diskIncrease
-			metrics.ExecutionStorageDiskTotal(diskTotal)
+			metrics.ExecutionStateStorageDiskTotal(diskTotal)
 			metrics.ExecutionStorageStateCommitment(diskIncrease)
 
 			metrics.FinishBlockReceivedToExecuted(blockID)

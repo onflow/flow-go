@@ -25,15 +25,15 @@ var (
 		Namespace: "execution",
 		Help:      "count of state access/read operations performed per block",
 	})
-	executionStorageDiskTotalGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "storage_disk_total",
+	executionStateStorageDiskTotalGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "execution_state_storage_disk_total",
 		Namespace: "execution",
-		Help:      "the execution storage size on disk in GiB",
+		Help:      "the execution state size on disk in bytes",
 	})
 	executionStorageStateCommitmentGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "storage_state_commitment",
 		Namespace: "execution",
-		Help:      "the storage size of a state commitment in GiB",
+		Help:      "the storage size of a state commitment in bytes",
 	})
 )
 
@@ -60,12 +60,12 @@ func (c *Collector) ExecutionStateReadsPerBlock(reads uint64) {
 	executionStateReadsPerBlockGauge.Set(float64(reads))
 }
 
-// ExecutionStorageDiskTotal reports the total storage size on disk in GiB
-func (c *Collector) ExecutionStorageDiskTotal(gib int64) {
-	executionStorageDiskTotalGauge.Set(float64(gib))
+// ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
+func (c *Collector) ExecutionStateStorageDiskTotal(bytes int64) {
+	executionStateStorageDiskTotalGauge.Set(float64(bytes))
 }
 
 // ExecutionStorageStateCommitment reports the storage size of a state commitment
-func (c *Collector) ExecutionStorageStateCommitment(gib int64) {
-	executionStorageStateCommitmentGauge.Set(float64(gib))
+func (c *Collector) ExecutionStorageStateCommitment(bytes int64) {
+	executionStorageStateCommitmentGauge.Set(float64(bytes))
 }

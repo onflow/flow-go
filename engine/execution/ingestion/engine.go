@@ -331,7 +331,7 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 	if err != nil {
 		e.log.Err(err).Msg("could not get execution state disk size")
 	}
-	e.mc.ExecutionStorageDiskTotal(diskTotal)
+	e.mc.ExecutionStateStorageDiskTotal(diskTotal)
 	e.mc.ExecutionStorageStateCommitment(int64(len(finalState)))
 
 	err = e.mempool.ExecutionQueue.Run(func(executionQueues *stdmap.QueuesBackdata) error {

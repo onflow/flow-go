@@ -218,7 +218,7 @@ func (s *LevelDB) PruneDB(next databases.DAL) error {
 	return nil
 }
 
-// Size returns the size of the current LevelDB on disk
+// Size returns the size of the current LevelDB on disk in bytes
 func (s *LevelDB) Size() (int64, error) {
 	return io.DirSize(s.path)
 }

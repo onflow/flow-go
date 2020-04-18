@@ -109,9 +109,9 @@ type Metrics interface {
 	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
 	ExecutionStateReadsPerBlock(reads uint64)
 
-	// ExecutionStorageDiskTotal reports the total storage size on disk in GiB
-	ExecutionStorageDiskTotal(gib int64)
+	// ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
+	ExecutionStateStorageDiskTotal(bytes int64)
 
-	// ExecutionStorageStateCommitment reports the storage size of a state commitment in GiB
-	ExecutionStorageStateCommitment(gib int64)
+	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
+	ExecutionStorageStateCommitment(bytes int64)
 }

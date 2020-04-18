@@ -225,6 +225,7 @@ func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
 	return db, err
 }
 
+// Size returns the size of the forest on disk in bytes
 func (f *forest) Size() (int64, error) {
 	return io.DirSize(f.dbDir)
 }
@@ -1153,6 +1154,7 @@ func (s *SMT) IsSnapshot(t *tree) bool {
 	return t.height%s.snapshotInterval == 0
 }
 
+// Size returns the size of the forest on disk in bytes
 func (s *SMT) Size() (int64, error) {
 	return s.forest.Size()
 }
