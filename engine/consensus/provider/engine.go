@@ -116,10 +116,15 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // broadcast it to the network.
 func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 
-	e.log.Info().
+	log := e.log.With().
 		Hex("origin_id", originID[:]).
+		Uint64("block_view", block.View).
 		Hex("block_id", logging.Entity(block)).
-		Msg("block submitted")
+		Hex("parent_id", block.ParentID[:]).
+		Hex("signer", block.ProposerID[:]).
+		Logger()
+
+	log.Info().Msg("block proposal forwarded from compliance engine")
 
 	// reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	e.metrics.StartBlockToSeal(block.ID())
@@ -142,10 +147,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 		return errors.Wrap(err, "could not broadcast block")
 	}
 
-	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("block_id", logging.Entity(block)).
-		Msg("block broadcasted")
+	log.Info().Msg("block proposal propagated to non-consensus nodes")
 
 	return nil
 }

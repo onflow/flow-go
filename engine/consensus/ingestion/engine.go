@@ -110,10 +110,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // from nodes that are not consensus nodes (notably collection nodes).
 func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
-	e.log.Info().
+	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee received")
+		RawJSON("signers", logging.AsJSON(guarantee.SignerIDs)).
+		Logger()
+
+	log.Info().Msg("collection guarantee received from collection cluster")
 
 	final := e.state.Final()
 
@@ -164,15 +167,12 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 		return errors.Errorf("invalid origin node role (%s)", id.Role)
 	}
 
+	log.Info().Msg("forwarding collection guarantee to propagation engine")
+
 	// submit the collection to the propagation engine - this is non-blocking
 	// we could just validate it here and add it to the memory pool directly,
 	// but then we would duplicate the validation logic
 	e.prop.SubmitLocal(guarantee)
-
-	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee forwarded")
 
 	e.metrics.StartCollectionToFinalized(guarantee.ID())
 

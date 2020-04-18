@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine is the consensus engine, responsible for handling communication for
@@ -144,6 +145,14 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // SendVote will send a vote to the desired node.
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
+	log := e.log.With().
+		Uint64("block_view", view).
+		Hex("block_id", blockID[:]).
+		Hex("signer", logging.ID(e.me.NodeID())).
+		Logger()
+
+	log.Info().Msg("processing vote transmission request from hotstuff")
+
 	// build the vote message
 	vote := &messages.BlockVote{
 		BlockID: blockID,
@@ -157,12 +166,24 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		return fmt.Errorf("could not send vote: %w", err)
 	}
 
+	log.Info().Msg("block vote transmitted")
+
 	return nil
 }
 
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
 // Note the header has incomplete fields, because it was converted from a hotstuff.Proposal type
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
+
+	log := e.log.With().
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.Entity(header)).
+		Uint64("block_height", header.Height).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("signer", header.ProposerID[:]).
+		Logger()
+
+	log.Info().Msg("processing proposal broadcast request from hotstuff")
 
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
@@ -209,6 +230,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
 
+	log.Info().Msg("block proposal broadcasted")
+
 	return nil
 }
 
@@ -245,6 +268,16 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+
+	log := e.log.With().
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", logging.Entity(proposal.Header)).
+		Uint64("block_height", proposal.Header.Height).
+		Hex("parent_id", proposal.Header.ParentID[:]).
+		Hex("signer", proposal.Header.ProposerID[:]).
+		Logger()
+
+	log.Info().Msg("block proposal received")
 
 	// get the latest finalized block
 	final, err := e.state.Final().Head()
@@ -311,6 +344,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
+	log.Info().Msg("forwarding block proposal to hotstuff")
+
 	// submit the model to hotstuff for processing
 	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
 
@@ -320,6 +355,16 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 // onBlockVote handles incoming block votes.
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
+
+	log := e.log.With().
+		Uint64("block_view", vote.View).
+		Hex("block_id", vote.BlockID[:]).
+		Hex("signer", originID[:]).
+		Logger()
+
+	log.Info().Msg("block vote received")
+
+	log.Info().Msg("forwarding block vote to hotstuff") // to keep consistent with proposals
 
 	// forward the vote to hotstuff for processing
 	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
