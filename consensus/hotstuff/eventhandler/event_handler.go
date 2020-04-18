@@ -259,16 +259,13 @@ func (e *EventHandler) startNewView() error {
 		// broadcast the proposal
 		header := model.ProposalToFlow(proposal)
 
-		err = e.communicator.BroadcastProposal(header)
-		if err != nil {
-			// when the network failed sending the proposal due to network issues, it will NOT
-			// return error.
-			// so if there is an error returned here, it must be some exception. It could be, i.e:
-			// 1) the network layer double checks the proposal, and the check failed.
-			// 2) the network layer had some exception encoding the proposal
-			/// ...
-
-			return fmt.Errorf("can not broadcast the new proposal (%x) for view (%v): %w", block.BlockID, block.View, err)
+		for {
+			err = e.communicator.BroadcastProposal(header)
+			if err != nil {
+				log.Warn().Err(err).Msg("could not forward proposal")
+				continue
+			}
+			break
 		}
 
 		// store the proposer's vote in voteAggregator
@@ -434,14 +431,13 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 
 		log.Debug().Msg("forwarding vote to compliance engine")
 
-		err := e.communicator.SendVote(
-			ownVote.BlockID,
-			ownVote.View,
-			ownVote.SigData,
-			nextLeader.NodeID,
-		)
-		if err != nil {
-			e.log.Error().Err(err).Msg(fmt.Sprintf("failed to send vote: %s", err))
+		for {
+			err := e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader.NodeID)
+			if err != nil {
+				log.Warn().Err(err).Msg("could not forward vote")
+				continue
+			}
+			break
 		}
 	}
 

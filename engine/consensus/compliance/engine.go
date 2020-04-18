@@ -277,9 +277,10 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
+	blockID := proposal.Header.ID()
 	log := e.log.With().
 		Uint64("block_view", proposal.Header.View).
-		Hex("block_id", logging.Entity(proposal.Header)).
+		Hex("block_id", blockID[:]).
 		Uint64("block_height", proposal.Header.Height).
 		Hex("parent_id", proposal.Header.ParentID[:]).
 		Hex("signer", proposal.Header.ProposerID[:]).
@@ -299,6 +300,19 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return nil
 	}
 
+	// skip a proposal that is already cached
+	_, cached := e.buffer.ByID(blockID)
+	if cached {
+		log.Debug().Msg("skipping already cached proposal")
+		return nil
+	}
+
+	// skip a proposal that is already persisted as pending
+	_, err = e.headers.ByBlockID(blockID)
+	if err == nil {
+		log.Debug().Msg("skipping already pending proposal")
+	}
+
 	// there are three possibilities from here on:
 	// 1) the proposal connects to a block in the pending cache
 	// => cache the proposal and (re-)request the missing ancestor
@@ -312,10 +326,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	ancestor, found := e.buffer.ByID(proposal.Header.ParentID)
 	if found {
 
-		// add the block to the cache
+		// add the block to the cache (double check guards against race condition)
 		added := e.buffer.Add(originID, proposal)
 		if !added {
-			log.Debug().Msg("skipping already cached proposal")
+			log.Warn().Msg("race condition on adding proposal to cache")
 			return nil
 		}
 
@@ -379,7 +393,8 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	}
 
 	// see if the block is a valid extension of the protocol state
-	err = e.state.Mutate().Extend(proposal.Header.ID())
+	blockID := proposal.Header.ID()
+	err = e.state.Mutate().Extend(blockID)
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
@@ -396,7 +411,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(proposal.Header.ID())
+	err = e.processPendingChildren(blockID)
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}

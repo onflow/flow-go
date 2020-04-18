@@ -87,7 +87,7 @@ func (gs *GuaranteeSuite) SetupTest() {
 
 	// add the ghost node config
 	gs.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleAccess, testnet.WithID(gs.ghostID), testnet.AsGhost(true))
+	ghostConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.ghostID), testnet.AsGhost(true))
 	nodeConfigs = append(nodeConfigs, ghostConfig)
 
 	// generate the network config
@@ -104,7 +104,7 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 	deadline := time.Now().Add(timeout)
 
 	// start the network and defer cleanup
-	gs.Start(timeout)
+	gs.Start(timeout + 10*time.Second)
 
 	// wait for 10 seconds before doing anything
 	time.Sleep(10 * time.Second)
@@ -119,7 +119,7 @@ func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 	err = gs.Ghost().Send(context.Background(), engine.CollectionProvider, gs.nodeIDs[:1], guarantee)
 	require.NoError(gs.T(), err, "could not send collection guarantee")
 
-	gs.T().Logf("looking for: %x", guarantee.CollectionID)
+	gs.T().Logf("sentinel guarantee: %x", guarantee.CollectionID)
 
 	// read messages until we see a block with this guarantee
 	var inclusionID flow.Identifier
@@ -141,7 +141,7 @@ InclusionLoop:
 				break InclusionLoop
 			}
 		}
-		gs.T().Log("sentinel guarantee not found")
+		gs.T().Log("sentinel guarantee not included")
 	}
 
 	// check that this block is also confirmed
@@ -162,7 +162,7 @@ InclusionLoop:
 			gs.T().Logf("inclusion block confirmed! (confirmations: %d)", confirmations)
 			break
 		}
-		gs.T().Log("block not confirmed")
+		gs.T().Log("inclusion block not confirmed")
 	}
 
 	// stop the network

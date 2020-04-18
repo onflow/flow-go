@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 
 	ggio "github.com/gogo/protobuf/io"
+	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -181,7 +183,22 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 		}
 		err = m.sendDirect(targetIDs[0], msg)
 	case OneToK:
-		err = m.publish(strconv.Itoa(int(channelID)), msg)
+		result := &multierror.Error{}
+		result.ErrorFormat = func(errs []error) string {
+			msgs := make([]string, 0, len(errs))
+			for _, err := range errs {
+				msgs = append(msgs, err.Error())
+			}
+			msg := strings.Join(msgs, ", ")
+			return fmt.Sprintf("%d errors (%s)", len(errs), msg)
+		}
+		for _, targetID := range targetIDs {
+			inErr := m.sendDirect(targetID, msg)
+			if inErr != nil {
+				result = multierror.Append(result, inErr)
+			}
+		}
+		err = result.ErrorOrNil()
 	default:
 		err = fmt.Errorf("invalid communcation mode: %d", mode)
 	}
