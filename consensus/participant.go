@@ -82,10 +82,16 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	// initialize the validator
 	validator := validator.New(viewState, forks, signer)
 
-	// get the last view we were on
-	lastView, err := views.RetrieveLatest()
+	// get the last view we started
+	lastStarted, err := views.Retrieve(persister.ActionStarted)
 	if err != nil {
-		return nil, fmt.Errorf("could not recover last view: %w", err)
+		return nil, fmt.Errorf("could not recover last started: %w", err)
+	}
+
+	// get the last view we voted
+	lastVoted, err := views.Retrieve(persister.ActionVoted)
+	if err != nil {
+		return nil, fmt.Errorf("could not recover last voted: %w", err)
 	}
 
 	// recover the hotstuff state
@@ -109,7 +115,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
 	persist := persister.New(views)
-	pacemaker, err := pacemaker.New(lastView, controller, notifier)
+	pacemaker, err := pacemaker.New(lastStarted+1, controller, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
@@ -121,7 +127,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	// initialize the voter
-	voter := voter.New(signer, forks, lastView)
+	voter := voter.New(signer, forks, persist, lastVoted)
 
 	// initialize the vote aggregator
 	aggregator := voteaggregator.New(notifier, 0, viewState, validator, signer)

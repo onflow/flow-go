@@ -21,23 +21,23 @@ func NewViews(db *badger.DB) *Views {
 	return b
 }
 
-func (b *Views) StoreLatest(view uint64) error {
+func (b *Views) Store(action uint8, view uint64) error {
 	err := b.db.Update(func(tx *badger.Txn) error {
-		err := operation.UpdateView(view)(tx)
+		err := operation.UpdateView(action, view)(tx)
 		if errors.Is(err, storage.ErrNotFound) {
-			return operation.InsertView(view)(tx)
+			return operation.InsertView(action, view)(tx)
 		}
 		return err
 	})
 	return err
 }
 
-func (b *Views) RetrieveLatest() (uint64, error) {
+func (b *Views) Retrieve(action uint8) (uint64, error) {
 	var view uint64
 	err := b.db.View(func(tx *badger.Txn) error {
-		err := operation.RetrieveView(&view)(tx)
+		err := operation.RetrieveView(action, &view)(tx)
 		if errors.Is(err, storage.ErrNotFound) {
-			view = 1
+			view = 0
 			return nil
 		}
 		return err

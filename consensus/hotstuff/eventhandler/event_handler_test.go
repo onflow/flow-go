@@ -340,7 +340,8 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.paceMaker = initPaceMaker(es.T(), curView)
 	es.forks = NewForks(es.T(), finalized)
 	es.persist = &mocks.Persister{}
-	es.persist.On("CurrentView", mock.Anything).Return(nil)
+	es.persist.On("StartedView", mock.Anything).Return(nil)
+	es.persist.On("VotedView", mock.Anything).Return(nil)
 	es.blockProducer = &BlockProducer{}
 	es.communicator = &mocks.Communicator{}
 	es.communicator.On("BroadcastProposal", mock.Anything).Return(nil)
