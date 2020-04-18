@@ -316,7 +316,7 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 	}
 
 	e.mc.FinishBlockReceivedToExecuted(executableBlock.Block.ID())
-	e.mc.ExecutionCPUCyclesPerBlock(computationResult.GasUsed)
+	e.mc.ExecutionGasUsedPerBlock(computationResult.GasUsed)
 	e.mc.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, err := e.handleComputationResult(computationResult, executableBlock.StartState)

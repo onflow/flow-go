@@ -15,15 +15,15 @@ const (
 )
 
 var (
-	executionCPUCyclesPerBlockGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "cpu_cycles_per_block",
+	executionGasUsedPerBlockGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "gas_used_per_block",
 		Namespace: "execution",
-		Help:      "the CPU cycles used per block",
+		Help:      "the gas used per block",
 	})
 	executionStateReadsPerBlockGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "state_reads_per_block",
 		Namespace: "execution",
-		Help:      "the state access/read operations performed per block",
+		Help:      "count of state access/read operations performed per block",
 	})
 	executionStorageDiskTotalGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "storage_disk_total",
@@ -50,9 +50,9 @@ func (c *Collector) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
 	c.tracer.FinishSpan(blockID, executionBlockReceivedToExecuted)
 }
 
-// ExecutionCPUCyclesPerBlock reports number of cpu cylces used per block
-func (c *Collector) ExecutionCPUCyclesPerBlock(cycles uint64) {
-	executionCPUCyclesPerBlockGauge.Set(float64(cycles))
+// ExecutionGasUsedPerBlock reports gas used per block
+func (c *Collector) ExecutionGasUsedPerBlock(gas uint64) {
+	executionGasUsedPerBlockGauge.Set(float64(gas))
 }
 
 // ExecutionStateReadsPerBlock reports number of state access/read operations per block

@@ -103,8 +103,8 @@ type Metrics interface {
 	// from being received for execution to execution being finished
 	FinishBlockReceivedToExecuted(blockID flow.Identifier)
 
-	// ExecutionCPUCyclesPerBlock reports number of cpu cylces used per block
-	ExecutionCPUCyclesPerBlock(cycles uint64)
+	// ExecutionGasUsedPerBlock reports gas used per block
+	ExecutionGasUsedPerBlock(gas uint64)
 
 	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
 	ExecutionStateReadsPerBlock(reads uint64)
