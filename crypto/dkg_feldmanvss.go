@@ -63,19 +63,19 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 		return nil, nil, nil, errors.New("keys are not correct")
 	}
 	// private key of the current node
-	x := &PrKeyBlsBls12381{
+	x := &PrKeyBLSBLS12381{
 		scalar: s.x, // the private share
 	}
 
 	// Group public key
-	Y := &PubKeyBlsBls12381{
+	Y := &PubKeyBLSBLS12381{
 		point: s.A[0],
 	}
 
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
-		y[i] = &PubKeyBlsBls12381{
+		y[i] = &PubKeyBLSBLS12381{
 			point: p,
 		}
 	}
@@ -83,10 +83,10 @@ func (s *feldmanVSSstate) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
 }
 
 const (
-	shareSize = PrKeyLenBlsBls12381
+	shareSize = PrKeyLenBLSBLS12381
 	// the actual verifVectorSize depends on the state and should be:
-	// PubKeyLenBlsBls12381*(t+1)
-	verifVectorSize = PubKeyLenBlsBls12381
+	// PubKeyLenBLSBLS12381*(t+1)
+	verifVectorSize = PubKeyLenBLSBLS12381
 )
 
 func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
@@ -155,7 +155,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 			ZrPolynomialImage(xdata, s.a, i, &s.y[i-1])
 			C.bn_read_bin((*C.bn_st)(&s.x),
 				(*C.uchar)(&xdata[0]),
-				PrKeyLenBlsBls12381,
+				PrKeyLenBLSBLS12381,
 			)
 			continue
 		}
@@ -197,7 +197,7 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
-		PrKeyLenBlsBls12381,
+		PrKeyLenBLSBLS12381,
 	)
 
 	s.xReceived = true

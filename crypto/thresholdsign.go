@@ -59,7 +59,7 @@ func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*Thre
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	// internal list of valid signature shares
-	shares := make([]byte, 0, (threshold+1)*SignatureLenBlsBls12381)
+	shares := make([]byte, 0, (threshold+1)*SignatureLenBLSBLS12381)
 	signers := make([]index, 0, threshold+1)
 
 	return &ThresholdSigner{
@@ -195,11 +195,11 @@ func (s *ThresholdSigner) ThresholdSignature() (Signature, error) {
 // ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
 func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	// sanity check
-	if len(s.shares) != len(s.signers)*signatureLengthBlsBls12381 {
+	if len(s.shares) != len(s.signers)*signatureLengthBLSBLS12381 {
 		s.ClearShares()
 		return nil, errors.New("The number of signature shares is not matching the number of signers")
 	}
-	thresholdSignature := make([]byte, signatureLengthBlsBls12381)
+	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
 	C.G1_lagrangeInterpolateAtZero(
 		(*C.uchar)(&thresholdSignature[0]),
@@ -246,7 +246,7 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 	}
 
 	// flatten the shares (required by the C layer)
-	flatShares := make([]byte, 0, signatureLengthBlsBls12381*(threshold+1))
+	flatShares := make([]byte, 0, signatureLengthBLSBLS12381*(threshold+1))
 	indexSigners := make([]index, 0, threshold+1)
 	for i, share := range shares {
 		flatShares = append(flatShares, share...)
@@ -256,7 +256,7 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 		indexSigners = append(indexSigners, index(signers[i]))
 	}
 
-	thresholdSignature := make([]byte, signatureLengthBlsBls12381)
+	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
 	C.G1_lagrangeInterpolateAtZero(
 		(*C.uchar)(&thresholdSignature[0]),

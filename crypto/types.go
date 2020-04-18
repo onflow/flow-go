@@ -10,17 +10,17 @@ const (
 	// Supported signing algorithms
 
 	unknownSigningAlgorithm SigningAlgorithm = iota
-	// BlsBls12381 is BLS on BLS 12-381 curve
-	BlsBls12381
-	// EcdsaP256 is ECDSA on NIST P-256 curve
-	EcdsaP256
-	// EcdsaSecp256k1 is ECDSA on SECp256k1 curve
-	EcdsaSecp256k1
+	// BLSBLS12381 is BLS on BLS 12-381 curve
+	BLSBLS12381
+	// ECDSAP256 is ECDSA on NIST P-256 curve
+	ECDSAP256
+	// ECDSASecp256k1 is ECDSA on secp256k1 curve
+	ECDSASecp256k1
 )
 
 // String returns the string representation of this signing algorithm.
 func (f SigningAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_SECp256k1"}[f]
+	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_secp256k1"}[f]
 }
 
 const (
@@ -34,31 +34,31 @@ const (
 	fieldSize = 48
 	// Points compression: 1 for compressed, 0 for uncompressed
 	compression = 1
-	// SignatureLenBlsBls12381 is the size of G1 elements
-	SignatureLenBlsBls12381 = fieldSize * (2 - compression) // the length is divided by 2 if compression is on
-	PrKeyLenBlsBls12381     = 32
-	// PubKeyLenBlsBls12381 is the size of G2 elements
-	PubKeyLenBlsBls12381 = 2 * fieldSize * (2 - compression) // the length is divided by 2 if compression is on
-	// opSwUInputLenBlsBls12381 is the input length of the optimized SwU map to G1
-	opSwUInputLenBlsBls12381    = 2 * (fieldSize + (securityBits / 8))
-	KeyGenSeedMinLenBlsBls12381 = PrKeyLenBlsBls12381 + (securityBits / 8)
-	KeyGenSeedMaxLenBlsBls12381 = maxScalarSize
+	// SignatureLenBLSBLS12381 is the size of G1 elements
+	SignatureLenBLSBLS12381 = fieldSize * (2 - compression) // the length is divided by 2 if compression is on
+	PrKeyLenBLSBLS12381     = 32
+	// PubKeyLenBLSBLS12381 is the size of G2 elements
+	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - compression) // the length is divided by 2 if compression is on
+	// opSwUInputLenBLSBLS12381 is the input length of the optimized SwU map to G1
+	opSwUInputLenBLSBLS12381    = 2 * (fieldSize + (securityBits / 8))
+	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
+	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
 
 	// ECDSA
 
 	// NIST P256
-	SignatureLenEcdsaP256 = 64
-	PrKeyLenEcdsaP256     = 32
-	// PubKeyLenEcdsaP256 is the size of uncompressed points on P256
-	PubKeyLenEcdsaP256        = 64
-	KeyGenSeedMinLenEcdsaP256 = PrKeyLenEcdsaP256 + (securityBits / 8)
+	SignatureLenECDSAP256 = 64
+	PrKeyLenECDSAP256     = 32
+	// PubKeyLenECDSAP256 is the size of uncompressed points on P256
+	PubKeyLenECDSAP256        = 64
+	KeyGenSeedMinLenECDSAP256 = PrKeyLenECDSAP256 + (securityBits / 8)
 
 	// SEC p256k1
-	SignatureLenEcdsaSecp256k1 = 64
-	PrKeyLenEcdsaSecp256k1     = 32
-	// PubKeyLenEcdsaSecp256k1 is the size of uncompressed points on P256
-	PubKeyLenEcdsaSecp256k1        = 64
-	KeyGenSeedMinLenEcdsaSecp256k1 = PrKeyLenEcdsaSecp256k1 + (securityBits / 8)
+	SignatureLenECDSASecp256k1 = 64
+	PrKeyLenECDSASecp256k1     = 32
+	// PubKeyLenECDSASecp256k1 is the size of uncompressed points on P256
+	PubKeyLenECDSASecp256k1        = 64
+	KeyGenSeedMinLenECDSASecp256k1 = PrKeyLenECDSASecp256k1 + (securityBits / 8)
 
 	// DKG and Threshold Signatures
 

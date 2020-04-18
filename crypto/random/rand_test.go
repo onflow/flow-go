@@ -1,14 +1,16 @@
 package random
 
 import (
-	"crypto/rand"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gonum.org/v1/gonum/stat"
 )
+
+// math/random is only used to randomize test inputs
 
 // The only purpose of this function is unit testing. It also implements a very basic tandomness test.
 // it doesn't evaluate randomness of the random function and doesn't perform advanced statistical tests

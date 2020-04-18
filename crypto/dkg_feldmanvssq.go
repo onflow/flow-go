@@ -102,17 +102,17 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 	}
 
 	// private key of the current node
-	x := &PrKeyBlsBls12381{
+	x := &PrKeyBLSBLS12381{
 		scalar: s.x, // the private share
 	}
 	// Group public key
-	Y := &PubKeyBlsBls12381{
+	Y := &PubKeyBLSBLS12381{
 		point: s.A[0],
 	}
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
-		y[i] = &PubKeyBlsBls12381{
+		y[i] = &PubKeyBLSBLS12381{
 			point: p,
 		}
 	}
@@ -121,7 +121,7 @@ func (s *feldmanVSSQualState) EndDKG() (PrivateKey, PublicKey, []PublicKey, erro
 
 const (
 	complaintSize      = 1
-	complainAnswerSize = 1 + PrKeyLenBlsBls12381
+	complainAnswerSize = 1 + PrKeyLenBLSBLS12381
 )
 
 func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {
@@ -229,7 +229,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 	// read the node private share
 	C.bn_read_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
-		PrKeyLenBlsBls12381,
+		PrKeyLenBLSBLS12381,
 	)
 	s.xReceived = true
 	if s.AReceived {
@@ -416,7 +416,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		// read the complainer private share
 		C.bn_read_bin((*C.bn_st)(&s.complaints[complainer].answer),
 			(*C.uchar)(&data[1]),
-			PrKeyLenBlsBls12381,
+			PrKeyLenBLSBLS12381,
 		)
 		return
 	}
@@ -438,7 +438,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		// read the complainer private share
 		C.bn_read_bin((*C.bn_st)(&c.answer),
 			(*C.uchar)(&data[1]),
-			PrKeyLenBlsBls12381,
+			PrKeyLenBLSBLS12381,
 		)
 		s.disqualified = s.checkComplaint(complainer, c)
 		if s.disqualified {

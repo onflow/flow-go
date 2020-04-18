@@ -122,7 +122,7 @@ func (x *scalar) setInt(a int) {
 // writeScalar writes a G2 point in a slice of bytes
 func writeScalar(dest []byte, x *scalar) {
 	C.bn_write_bin((*C.uchar)(&dest[0]),
-		(C.int)(prKeyLengthBlsBls12381),
+		(C.int)(prKeyLengthBLSBLS12381),
 		(*C.bn_st)(x),
 	)
 }
@@ -139,7 +139,7 @@ func readScalar(x *scalar, src []byte) {
 func writePointG2(dest []byte, a *pointG2) {
 	C._ep2_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(a),
-		(C.int)(pubKeyLengthBlsBls12381),
+		(C.int)(pubKeyLengthBLSBLS12381),
 	)
 }
 
