@@ -205,7 +205,7 @@ func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.I
 }
 
 // sendDirect will try to send the given message to the given peer utilizing a 1-1 direct connection
-func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error {
+func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) error {
 
 	// get an identity to connect to. The identity provides the destination TCP address.
 	idsMap, err := m.ov.Identity()
