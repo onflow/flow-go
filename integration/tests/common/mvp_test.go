@@ -60,7 +60,7 @@ func TestMVP_Emulator(t *testing.T) {
 }
 
 func runMVPTest(t *testing.T, accessClient *testnet.Client) {
-
+	time.Sleep(3 * time.Second)
 	ctx := context.Background()
 
 	// contract is not deployed, so script fails
@@ -73,9 +73,11 @@ func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
 		counter, err = readCounter(ctx, accessClient)
-
+		if err != nil {
+			fmt.Println("EXECUTE script ", err)
+		}
 		return err == nil && counter == -3
-	}, 60*time.Second, time.Second)
+	}, 30*time.Second, time.Second)
 
 	err = createCounter(ctx, accessClient)
 	require.NoError(t, err)
