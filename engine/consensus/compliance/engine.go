@@ -3,11 +3,11 @@
 package compliance
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/events"
@@ -149,6 +149,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		Uint64("block_view", view).
 		Hex("block_id", blockID[:]).
 		Hex("signer", logging.ID(e.me.NodeID())).
+		Hex("recipient", recipientID[:]).
 		Logger()
 
 	log.Info().Msg("processing vote transmission request from hotstuff")
@@ -175,12 +176,24 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 // Note the header has incomplete fields, because it was converted from a hotstuff.Proposal type
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
+	// retrieve all consensus nodes without our ID
+	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
+	if err != nil {
+		return fmt.Errorf("could not get consensus recipients: %w", err)
+	}
+
+	recipientIDs := recipients.NodeIDs()
+
 	log := e.log.With().
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
 		Uint64("block_height", header.Height).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("signer", header.ProposerID[:]).
+		RawJSON("recipients", logging.AsJSON(recipientIDs)).
 		Logger()
 
 	log.Info().Msg("processing proposal broadcast request from hotstuff")
@@ -207,15 +220,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
 
-	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get consensus recipients: %w", err)
-	}
-
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
@@ -225,7 +229,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// broadcast the proposal to consensus nodes
-	err = e.con.Submit(msg, recipients.NodeIDs()...)
+	err = e.con.Submit(msg, recipientIDs...)
 	if err != nil {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
@@ -234,7 +238,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
 	// submit the proposal to the provider engine to forward it to other
 	// node roles
-	e.prov.SubmitLocal(msg)
+	// TODO: propagate once seals in payload infinite loop is fixed
+	// e.prov.SubmitLocal(msg)
 
 	return nil
 }
@@ -295,6 +300,11 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	log.Info().Msg("block proposal received")
 
+	// first, we reject all blocks that we don't need to process:
+	// 1) blocks already in the cache; they will already be processed later
+	// 2) blocks already on disk; they were processed and await finalization
+	// 3) blocks at a height below finalized height; they can not be finalized
+
 	// ignore proposals that are already cached
 	_, cached := e.pending.ByID(blockID)
 	if cached {
@@ -302,11 +312,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return nil
 	}
 
-	// ignore proposals that were already persisted
+	// ignore proposals that were already processed
 	_, err := e.headers.ByBlockID(blockID)
 	if err == nil {
-		log.Debug().Msg("skipping already persisted proposal")
+		log.Debug().Msg("skipping already processed proposal")
 		return nil
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not retrieve header: %w", err)
 	}
 
 	// get the latest finalized block
@@ -315,22 +328,20 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not get final block: %w", err)
 	}
 
-	// reject blocks that are outdated
+	// ignore proposals that can no longer become valid
 	if proposal.Header.Height <= final.Height {
 		log.Debug().Msg("skipping already outdated proposal")
 		return nil
 	}
 
-	// there are three possibilities from here on:
-	// 1) the proposal connects to a block in the pending cache
-	// => cache the proposal and (re-)request the missing ancestor
-	// 2) the proposal's parent does not exist in the protocol state
-	// => cache the proposal and request the missing parent
-	// 3) the proposal can be processed for validity
-	// => process the block for validity and forward to hotstuff
+	// from here on out, there are two possibilities:
+	// 1) the proposal is unverifiable because parent or ancestor is unknown
+	// => in each cache, we cache the proposal and request the missing link
+	// 2) the proposal is connected to finalized state through an unbroken chain
+	// => we verify the proposal and forward it to hotstuff if valid
 
-	// if we connect to the cache, it means we are definitely missing a link and
-	// we should add to the pending and request this missing link
+	// if we can connect the proposal to an ancestor in the cache, it means
+	// there is a missing link; we cache it and request the missing link
 	ancestor, found := e.pending.ByID(proposal.Header.ParentID)
 	if found {
 
@@ -354,8 +365,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return nil
 	}
 
-	// if the parent is not part of persistent state, we also should request the
-	// missing link
+	// if the proposal is connected to a block that is neither in the cache, nor
+	// in persistent storage, its direct parent is missing; cache the proposal
+	// and request the parent
 	_, err = e.headers.ByBlockID(proposal.Header.ParentID)
 	if err == storage.ErrNotFound {
 
@@ -371,7 +383,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not get parent: %w", err)
 	}
 
-	// process the block proposal now
+	// at this point, we should be able to connect the proposal to the finalized
+	// state and should process it to see whether to forward to hotstuff or not
 	err = e.processBlockProposal(proposal)
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -386,6 +399,18 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // no need to do all the processing again.
 func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 
+	blockID := proposal.Header.ID()
+
+	log := e.log.With().
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", blockID[:]).
+		Uint64("block_height", proposal.Header.Height).
+		Hex("parent_id", proposal.Header.ParentID[:]).
+		Hex("signer", proposal.Header.ProposerID[:]).
+		Logger()
+
+	log.Info().Msg("processing block proposal")
+
 	// store the proposal block payload
 	err := e.payloads.Store(proposal.Header, proposal.Payload)
 	if err != nil {
@@ -399,7 +424,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	}
 
 	// see if the block is a valid extension of the protocol state
-	err = e.state.Mutate().Extend(proposal.Header.ID())
+	err = e.state.Mutate().Extend(blockID)
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
@@ -416,7 +441,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(proposal.Header.ID())
+	err = e.processPendingChildren(blockID)
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}
@@ -435,7 +460,7 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 
 	log.Info().Msg("block vote received")
 
-	log.Info().Msg("forwarding block vote to hotstuff") // to keep consistent with proposals
+	log.Info().Msg("forwarding block vote to hotstuff") // to keep logging consistent with proposals
 
 	// forward the vote to hotstuff for processing
 	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)

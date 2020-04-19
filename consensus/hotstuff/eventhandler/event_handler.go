@@ -159,7 +159,6 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 	// process the QC
 	err = e.processQC(qc)
-
 	if err != nil {
 		return fmt.Errorf("failed processing qc from block (%x): %w", block.BlockID, err)
 	}
@@ -248,27 +247,20 @@ func (e *EventHandler) startNewView() error {
 		}
 
 		block := proposal.Block
+
 		log.Debug().
 			Uint64("block_view", block.View).
 			Hex("block_id", block.BlockID[:]).
 			Uint64("parent_view", qc.View).
 			Hex("parent_id", qc.BlockID[:]).
 			Hex("signer", block.ProposerID[:]).
-			Msg("block proposal generated")
+			Msg("forwarding proposal to compliance engine")
 
 		// broadcast the proposal
 		header := model.ProposalToFlow(proposal)
-
 		err = e.communicator.BroadcastProposal(header)
 		if err != nil {
-			// when the network failed sending the proposal due to network issues, it will NOT
-			// return error.
-			// so if there is an error returned here, it must be some exception. It could be, i.e:
-			// 1) the network layer double checks the proposal, and the check failed.
-			// 2) the network layer had some exception encoding the proposal
-			/// ...
-
-			return fmt.Errorf("can not broadcast the new proposal (%x) for view (%v): %w", block.BlockID, block.View, err)
+			log.Warn().Err(err).Msg("could not forward proposal")
 		}
 
 		// store the proposer's vote in voteAggregator
@@ -416,32 +408,24 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 
 	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
 	shouldVote := true
-
+	var noVote *model.NoVoteError
+	if errors.As(err, &noVote) {
+		log.Debug().Err(err).Msg("should not vote for this block")
+		shouldVote = false
+	}
 	if err != nil {
-		switch err.(type) {
-		// if this block should not be voted, then change shouldVote to false
-		case *model.NoVoteError:
-			log.Debug().Err(err).Msg("should not vote for this block")
-			shouldVote = false
-		default:
-			// unknown error, exit the event loop
-			return fmt.Errorf("could not produce vote: %w", err)
-		}
+		// unknown error, exit the event loop
+		return fmt.Errorf("could not produce vote: %w", err)
 	}
 
 	// send my vote if I should vote and I'm not the leader
 	if shouldVote {
 
-		log.Debug().Msg("sending own vote as not next leader")
+		log.Debug().Msg("forwarding vote to compliance engine")
 
-		err := e.communicator.SendVote(
-			ownVote.BlockID,
-			ownVote.View,
-			ownVote.SigData,
-			nextLeader.NodeID,
-		)
+		err := e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader.NodeID)
 		if err != nil {
-			e.log.Error().Err(err).Msg(fmt.Sprintf("failed to send vote: %s", err))
+			log.Warn().Err(err).Msg("could not forward vote")
 		}
 	}
 

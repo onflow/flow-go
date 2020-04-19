@@ -64,13 +64,13 @@ func (lc *LogConsumer) OnDoubleProposeDetected(block *model.Block, alt *model.Bl
 func (lc *LogConsumer) OnEnteringView(view uint64) {
 	lc.log.Debug().
 		Uint64("view", view).
-		Msg("entering view")
+		Msg("view entered")
 }
 
 func (lc *LogConsumer) OnSkippedAhead(view uint64) {
 	lc.log.Debug().
 		Uint64("view", view).
-		Msg("skipped ahead")
+		Msg("views skipped")
 }
 
 func (lc *LogConsumer) OnStartingTimeout(info *model.TimerInfo) {
@@ -78,7 +78,7 @@ func (lc *LogConsumer) OnStartingTimeout(info *model.TimerInfo) {
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Str("timeout_mode", info.Mode.String()).
-		Msg("starting timeout")
+		Msg("timeout started")
 }
 
 func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
@@ -86,7 +86,7 @@ func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Str("timeout_mode", info.Mode.String()).
-		Msg("reached timeout")
+		Msg("timeout reached")
 }
 
 func (lc *LogConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
