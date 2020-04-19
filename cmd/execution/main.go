@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/dapperlabs/cadence/runtime"
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/spf13/pflag"
 
