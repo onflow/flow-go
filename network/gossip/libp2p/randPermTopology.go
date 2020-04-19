@@ -35,9 +35,9 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse hash: %w", err)
 	}
-	// there is no need to check the error as size>len(idList)>=0
-	topListInd, _ := rng.SubPermutation(len(idList), size)
 
+	// NOTE: this will never error as size>len(idList)>=0
+	topListInd, err := rng.SubPermutation(len(idList), size)
 	if err != nil {
 		return nil, fmt.Errorf("cannot sample topology: %w", err)
 	}
