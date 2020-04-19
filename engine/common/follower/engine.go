@@ -77,6 +77,7 @@ func (e *Engine) Ready() <-chan struct{} {
 	}
 	return e.unit.Ready(func() {
 		<-e.sync.Ready()
+		<-e.follower.Ready()
 	})
 }
 
@@ -84,6 +85,7 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
+		<-e.follower.Done()
 		<-e.sync.Done()
 	})
 }

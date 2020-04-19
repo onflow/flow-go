@@ -158,6 +158,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		switch v := event.(type) {
 		case *flow.Block:
 			err = e.handleBlock(v)
+		case *messages.BlockProposal:
+			err = e.onBlockProposal(originID, v)
 		case *messages.CollectionResponse:
 			err = e.handleCollectionResponse(v)
 		case *messages.ExecutionStateDelta:
@@ -175,6 +177,16 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // Main handling
+
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+	if proposal.Header == nil || proposal.Payload == nil {
+		return errors.New("malformed block proposal")
+	}
+	return e.handleBlock(&flow.Block{
+		Header:  *proposal.Header,
+		Payload: *proposal.Payload,
+	})
+}
 
 func (e *Engine) handleBlock(block *flow.Block) error {
 
