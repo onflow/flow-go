@@ -62,7 +62,6 @@ func (c *CombinedSigner) CreateProposal(block *model.Block) (*model.Proposal, er
 	if err != nil {
 		return nil, fmt.Errorf("could not create signature: %w", err)
 	}
-
 	// create the proposal
 	proposal := &model.Proposal{
 		Block:   block,

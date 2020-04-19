@@ -60,7 +60,7 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	// get the specific identity
 	signer, ok := participants.ByNodeID(voterID)
 	if !ok {
-		return false, fmt.Errorf("signer is not part of participants (signer: %x): %w", voterID, ErrInvalidSigner)
+		return false, fmt.Errorf("signer is not part of participants (signer: %s): %w", voterID, ErrInvalidSigner)
 	}
 
 	// split the two signatures from the vote
@@ -71,7 +71,7 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 
 	// check if we have two signature
 	if len(splitSigs) != 2 {
-		return false, fmt.Errorf("wrong number of combined signatures: %w", ErrInvalidFormat)
+		return false, fmt.Errorf("wrong amount of split signatures (signer: %s, count: %d, expected: 2)", voterID, len(splitSigs))
 	}
 
 	// assign the signtures

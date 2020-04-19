@@ -222,8 +222,6 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error
 			return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
 		}
 
-		fmt.Println("SENDING TO", flowIdentity.Address)
-
 		// create new stream
 		// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 		// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
@@ -232,7 +230,7 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error
 		if err != nil {
 			return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
 		}
-		fmt.Println("====== 1")
+
 		// create a gogo protobuf writer
 		bufw := bufio.NewWriter(stream)
 		writer := ggio.NewDelimitedWriter(bufw)
@@ -241,20 +239,17 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error
 		if err != nil {
 			return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
 		}
-		fmt.Println("====== 2")
 
 		// flush the stream
 		err = bufw.Flush()
 		if err != nil {
 			return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
 		}
-		fmt.Println("====== 3")
 
 		// close the stream immediately
 		// helpers.FullClose will close the stream, wait for an EOF and then call reset on the stream
 		// this is the ideal way of closing the stream in libp2p as of now
 		go helpers.FullClose(stream)
-		fmt.Println("MSG SENT TO", flowIdentity.Address)
 
 		return nil
 

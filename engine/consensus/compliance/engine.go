@@ -311,6 +311,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	_, err = e.headers.ByBlockID(blockID)
 	if err == nil {
 		log.Debug().Msg("skipping already pending proposal")
+		return nil
 	}
 
 	// there are three possibilities from here on:
@@ -356,7 +357,12 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if err == storage.ErrNotFound {
 
 		log.Debug().Msg("requesting missing parent for proposal")
-
+		// add the block to the cache (double check guards against race condition)
+		added := e.buffer.Add(originID, proposal)
+		if !added {
+			log.Warn().Msg("race condition on adding proposal to cache")
+			return nil
+		}
 		e.sync.RequestBlock(proposal.Header.ParentID)
 
 		return nil

@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/events"
@@ -23,7 +24,7 @@ type Engine struct {
 	state    protocol.State
 	headers  storage.Headers
 	payloads storage.Payloads
-	cache    module.PendingBlockBuffer
+	buffer   module.PendingBlockBuffer
 	follower module.HotStuffFollower
 	con      network.Conduit
 	sync     module.Synchronization
@@ -36,7 +37,7 @@ func New(
 	state protocol.State,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	cache module.PendingBlockBuffer,
+	buffer module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 ) (*Engine, error) {
 
@@ -47,7 +48,7 @@ func New(
 		state:    state,
 		headers:  headers,
 		payloads: payloads,
-		cache:    cache,
+		buffer:   buffer,
 		follower: follower,
 	}
 
@@ -147,9 +148,19 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 	return e.onBlockProposal(originID, proposal)
 }
 
+// onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	// TODO: apply the same fixes as for the compliance engine
+	blockID := proposal.Header.ID()
+	log := e.log.With().
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", blockID[:]).
+		Uint64("block_height", proposal.Header.Height).
+		Hex("parent_id", proposal.Header.ParentID[:]).
+		Hex("signer", proposal.Header.ProposerID[:]).
+		Logger()
+
+	log.Info().Msg("block proposal received")
 
 	// get the latest finalized block
 	final, err := e.state.Final().Head()
@@ -157,31 +168,111 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not get final block: %w", err)
 	}
 
-	// check if the block is connected to the current finalized state
-	finalID := final.ID()
-	ancestorID := proposal.Header.ParentID
-	for ancestorID != finalID {
-		ancestor, ok := e.cache.ByID(ancestorID)
-		if !ok {
-			return e.handleMissingAncestor(originID, proposal, ancestorID)
-		}
-		if ancestor.Header.Height <= final.Height {
-			// TODO: store this in future versions for slashing challenges
-			return fmt.Errorf("rejecting orphaned block (%x)", proposal.Header.ID())
-		}
-		ancestorID = ancestor.Header.ParentID
+	// reject blocks that are outdated
+	if proposal.Header.Height <= final.Height {
+		log.Debug().Msg("skipping proposal with outdated view")
+		return nil
 	}
 
-	// store the proposal block payload
-	err = e.payloads.Store(proposal.Header, proposal.Payload)
+	// skip a proposal that is already cached
+	_, cached := e.buffer.ByID(blockID)
+	if cached {
+		log.Debug().Msg("skipping already cached proposal")
+		return nil
+	}
+
+	// skip a proposal that is already persisted as pending
+	_, err = e.headers.ByBlockID(blockID)
+	if err == nil {
+		log.Debug().Msg("skipping already pending proposal")
+		return nil
+	}
+
+	// there are three possibilities from here on:
+	// 1) the proposal connects to a block in the pending cache
+	// => cache the proposal and (re-)request the missing ancestor
+	// 2) the proposal's parent does not exist in the protocol state
+	// => cache the proposal and request the missing parent
+	// 3) the proposal can be processed for validity
+	// => process the block for validity and forward to hotstuff
+
+	// if we connect to the cache, it means we are definitely missing a link and
+	// we should add to the buffer and request this missing link
+	ancestor, found := e.buffer.ByID(proposal.Header.ParentID)
+	if found {
+
+		// add the block to the cache (double check guards against race condition)
+		added := e.buffer.Add(originID, proposal)
+		if !added {
+			log.Warn().Msg("race condition on adding proposal to cache")
+			return nil
+		}
+
+		// go to the first missing ancestor
+		ancestorID := ancestor.Header.ParentID
+		for {
+			ancestor, found := e.buffer.ByID(ancestorID)
+			if !found {
+				break
+			}
+			ancestorID = ancestor.Header.ParentID
+		}
+
+		log.Debug().Msg("requesting missing ancestor for proposal")
+
+		e.sync.RequestBlock(ancestorID)
+
+		return nil
+	}
+
+	// if the parent is not part of persistent state, we also should request the
+	// missing link
+	_, err = e.headers.ByBlockID(proposal.Header.ParentID)
+	if err == storage.ErrNotFound {
+
+		log.Debug().Msg("requesting missing parent for proposal")
+
+		// add the block to the cache (double check guards against race condition)
+		added := e.buffer.Add(originID, proposal)
+		if !added {
+			log.Warn().Msg("race condition on adding proposal to cache")
+			return nil
+		}
+
+		e.sync.RequestBlock(proposal.Header.ParentID)
+
+		return nil
+	}
 	if err != nil {
-		return fmt.Errorf("could not store block payload: %w", err)
+		return fmt.Errorf("could not get parent: %w", err)
+	}
+
+	// process the block proposal now
+	err = e.processBlockProposal(proposal)
+	if err != nil {
+		return fmt.Errorf("could not process block proposal: %w", err)
+	}
+	log.Info().Msg("block proposal processed")
+
+	return nil
+}
+
+// processBlockProposal processes blocks that are already known to connect to
+// the finalized state; if a parent of children is validly processed, it means
+// the children are also still on a valid chain and all missing links are there;
+// no need to do all the processing again.
+func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
+
+	// store the proposal block payload
+	err := e.payloads.Store(proposal.Header, proposal.Payload)
+	if err != nil {
+		return fmt.Errorf("could not store proposal payload: %w", err)
 	}
 
 	// store the proposal block header
 	err = e.headers.Store(proposal.Header)
 	if err != nil {
-		return fmt.Errorf("could not store header: %w", err)
+		return fmt.Errorf("could not store proposal header: %w", err)
 	}
 
 	// see if the block is a valid extension of the protocol state
@@ -197,35 +288,28 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
-	// submit the model to hotstuff finalization logic
+	log.Info().Msg("forwarding block proposal to hotstuff follower")
+
+	// submit the model to hotstuffFollower for processing
 	e.follower.SubmitProposal(proposal.Header, parent.View)
 
 	// check for any descendants of the block to process
-	return e.handleConnectedChildren(blockID)
-}
-
-func (e *Engine) handleMissingAncestor(originID flow.Identifier, proposal *messages.BlockProposal, ancestorID flow.Identifier) error {
-
-	// cache the block, exit early if it already exists in the cache
-	added := e.cache.Add(originID, proposal)
-	if !added {
-		return nil
+	err = e.processPendingChildren(blockID)
+	if err != nil {
+		return fmt.Errorf("could not process pending children: %w", err)
 	}
-
-	// if the block was not already in the buffer, request its parent
-	e.sync.RequestBlock(ancestorID)
 
 	return nil
 }
 
-// handleConnectedChildren checks if the given block has connected some children
-// that were missing a link to the finalized state, in order to process them as
-// well.
-func (e *Engine) handleConnectedChildren(blockID flow.Identifier) error {
+// processPendingChildren checks if there are proposals connected to the given
+// parent block that was just processed; if this is the case, they should now
+// all be validly connected to the finalized state and we should process them.
+func (e *Engine) processPendingChildren(parentID flow.Identifier) error {
 
 	// check if there are any children for this parent in the cache
-	children, ok := e.cache.ByParentID(blockID)
-	if !ok {
+	children, has := e.buffer.ByParentID(parentID)
+	if !has {
 		return nil
 	}
 
@@ -236,14 +320,14 @@ func (e *Engine) handleConnectedChildren(blockID flow.Identifier) error {
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		err := e.onBlockProposal(child.OriginID, proposal)
+		err := e.processBlockProposal(proposal)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 
-	// remove the children from cache
-	e.cache.DropForParent(blockID)
+	// drop all of the children that should have been processed now
+	e.buffer.DropForParent(parentID)
 
 	return result.ErrorOrNil()
 }
