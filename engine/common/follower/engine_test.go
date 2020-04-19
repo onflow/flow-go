@@ -11,7 +11,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -84,11 +83,8 @@ func (suite *Suite) TestHandlePendingBlock() {
 	suite.sync.On("RequestBlock", block.ParentID).Return().Once()
 
 	// submit the block
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-	err := suite.engine.Process(originID, &proposal)
+	proposal := unittest.ProposalFromBlock(&block)
+	err := suite.engine.Process(originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertNotCalled(suite.T(), "SubmitProposal", mock.Anything)
@@ -118,11 +114,8 @@ func (suite *Suite) TestHandleProposal() {
 	suite.follower.On("SubmitProposal", &block.Header, parent.View).Once()
 
 	// submit the block
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-	err := suite.engine.Process(originID, &proposal)
+	proposal := unittest.ProposalFromBlock(&block)
+	err := suite.engine.Process(originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())
@@ -168,11 +161,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.cache.On("DropForParent", block.ID()).Once()
 
 	// submit the block proposal
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-	err := suite.engine.Process(originID, &proposal)
+	proposal := unittest.ProposalFromBlock(&block)
+	err := suite.engine.Process(originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())

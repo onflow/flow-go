@@ -52,6 +52,19 @@ func BlockFixture() flow.Block {
 	return BlockWithParentFixture(&header)
 }
 
+func ProposalFixture() *messages.BlockProposal {
+	block := BlockFixture()
+	return ProposalFromBlock(&block)
+}
+
+func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
+	proposal := &messages.BlockProposal{
+		Header:  &block.Header,
+		Payload: &block.Payload,
+	}
+	return proposal
+}
+
 func StateDeltaFixture() *messages.ExecutionStateDelta {
 	header := BlockHeaderFixture()
 	block := BlockWithParentFixture(&header)

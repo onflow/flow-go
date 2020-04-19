@@ -124,8 +124,6 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
 		return e.onBlockProposal(originID, v)
-	case *flow.Block:
-		return e.onBlock(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
@@ -147,16 +145,9 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 	return e.onBlockProposal(originID, proposal)
 }
 
-func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
-	// process as proposal
-	proposal := &messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-	return e.onBlockProposal(originID, proposal)
-}
-
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+
+	// TODO: apply the same fixes as for the compliance engine
 
 	// get the latest finalized block
 	final, err := e.state.Final().Head()

@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -70,7 +71,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	// create and send a transaction to one of the collection node
 	sendTransaction(t, net, collNode.Identifier)
 
-	blocks := make([]*flow.Block, 0)
+	proposals := make([]*messages.BlockProposal, 0)
 
 	for {
 		_, event, err := msgReader.Next()
@@ -78,19 +79,19 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 		// the following switch should be similar to the one defined in the actual node that is being emulated
 		switch v := event.(type) {
-		case *flow.Block:
-			blocks = append(blocks, v)
+		case *messages.BlockProposal:
+			proposals = append(proposals, v)
 		default:
 			t.Logf(" ignoring event: :%T: %v", v, v)
 		}
 
-		if len(blocks) == 2 {
+		if len(proposals) == 2 {
 			break
 		}
 	}
 
-	assert.EqualValues(t, 1, blocks[0].Height)
-	assert.EqualValues(t, 2, blocks[1].Height)
+	assert.EqualValues(t, 1, proposals[0].Header.Height)
+	assert.EqualValues(t, 2, proposals[1].Header.Height)
 }
 
 // TestGhostNodeExample_Send demonstrates how to emulate a node and send an event from it

@@ -4,6 +4,9 @@ package hotstuff
 // restart or crash.
 type Persister interface {
 
-	// CurrentView stores the view we are currently on.
-	CurrentView(view uint64) error
+	// StartedView persists the view whenever we start it.
+	StartedView(view uint64) error
+
+	// VotedView persist the view when we vote on it.
+	VotedView(view uint64) error
 }

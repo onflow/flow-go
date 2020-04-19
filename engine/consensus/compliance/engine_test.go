@@ -51,6 +51,7 @@ type ComplianceSuite struct {
 	payloads *storage.Payloads
 	con      *network.Conduit
 	net      *module.Network
+	prov     *network.Engine
 	cache    *module.PendingBlockBuffer
 	hotstuff *module.HotStuff
 	sync     *module.Synchronization
@@ -182,6 +183,10 @@ func (cs *ComplianceSuite) SetupTest() {
 		nil,
 	)
 
+	// set up the provider engine
+	cs.prov = &network.Engine{}
+	cs.prov.On("SubmitLocal", mock.Anything).Return()
+
 	// set up cache module mock
 	cs.cache = &module.PendingBlockBuffer{}
 	cs.cache.On("Add", mock.Anything).Return(false)
@@ -199,7 +204,7 @@ func (cs *ComplianceSuite) SetupTest() {
 
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
-	e, err := New(log, cs.net, cs.me, cs.state, cs.headers, cs.payloads, cs.cache)
+	e, err := New(log, cs.net, cs.me, cs.state, cs.headers, cs.payloads, cs.cache, cs.prov)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	// assign engine with consensus & synchronization
@@ -288,16 +293,13 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidParent() {
 	// create a proposal that directly descends from the latest finalized header
 	originID := cs.participants[1].NodeID
 	block := unittest.BlockWithParentFixture(cs.head)
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// store the data for retrieval
 	cs.headerDB[block.ParentID] = cs.head
 
 	// it should be processed without error
-	err := cs.e.onBlockProposal(originID, &proposal)
+	err := cs.e.onBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should store the payload
@@ -321,10 +323,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidAncestor() {
 	ancestor := unittest.BlockWithParentFixture(cs.head)
 	parent := unittest.BlockWithParentFixture(&ancestor.Header)
 	block := unittest.BlockWithParentFixture(&parent.Header)
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent.Header
@@ -333,7 +332,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidAncestor() {
 	cs.e.cache[ancestor.ID()] = &ancestor.Header
 
 	// it should be processed without error
-	err := cs.e.onBlockProposal(originID, &proposal)
+	err := cs.e.onBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should store the payload
@@ -359,10 +358,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidHeight() {
 	parent.Height = cs.head.Height // this should orphan the block
 	block := unittest.BlockWithParentFixture(&parent.Header)
 	block.Height = cs.head.Height
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent.Header
@@ -370,7 +366,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidHeight() {
 	cs.e.cache[ancestor.ID()] = &ancestor.Header
 
 	// it should be processed without error
-	err := cs.e.onBlockProposal(originID, &proposal)
+	err := cs.e.onBlockProposal(originID, proposal)
 	require.Error(cs.T(), err, "proposal with invalid ancestor should fail")
 
 	// we should not store the payload
@@ -394,10 +390,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 	ancestor := unittest.BlockWithParentFixture(cs.head)
 	parent := unittest.BlockWithParentFixture(&ancestor.Header)
 	block := unittest.BlockWithParentFixture(&parent.Header)
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent.Header
@@ -409,7 +402,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 	cs.mutator.On("Extend", mock.Anything).Return(errors.New("dummy error"))
 
 	// it should be processed without error
-	err := cs.e.onBlockProposal(originID, &proposal)
+	err := cs.e.onBlockProposal(originID, proposal)
 	require.Error(cs.T(), err, "proposal with invalid extension should fail")
 
 	// we should store the payload
@@ -450,20 +443,17 @@ func (cs *ComplianceSuite) TestHandleMissingAncestor() {
 	originID := unittest.IdentifierFixture()
 	ancestorID := unittest.IdentifierFixture()
 	block := unittest.BlockFixture()
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// execute missing ancestors when (by default) we don't add to cache
-	err := cs.e.handleMissingAncestor(originID, &proposal, ancestorID)
+	err := cs.e.handleMissingAncestor(originID, proposal, ancestorID)
 	require.NoError(cs.T(), err, "should pass with old proposl")
 	cs.sync.AssertNotCalled(cs.T(), "RequestBlock", mock.Anything)
 
 	// execute missing ancestor when we add to cache and should request
 	*cs.cache = module.PendingBlockBuffer{}
 	cs.cache.On("Add", mock.Anything).Return(true)
-	err = cs.e.handleMissingAncestor(originID, &proposal, ancestorID)
+	err = cs.e.handleMissingAncestor(originID, proposal, ancestorID)
 	require.NoError(cs.T(), err, "should pass with new proposal")
 	cs.sync.AssertCalled(cs.T(), "RequestBlock", ancestorID)
 }
@@ -530,11 +520,8 @@ func (cs *ComplianceSuite) TestProposalBufferingOrder() {
 	for i := 0; i < 3; i++ {
 		descendant := unittest.BlockWithParentFixture(&parent.Header)
 		descendants = append(descendants, &descendant)
-		proposal := messages.BlockProposal{
-			Header:  &descendant.Header,
-			Payload: &descendant.Payload,
-		}
-		proposals = append(proposals, &proposal)
+		proposal := unittest.ProposalFromBlock(&descendant)
+		proposals = append(proposals, proposal)
 		parent = &descendant
 	}
 

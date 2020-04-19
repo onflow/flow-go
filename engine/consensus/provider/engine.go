@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -101,8 +102,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	var err error
 	switch entity := event.(type) {
-	case *flow.Block:
-		err = e.onBlock(originID, entity)
+	case *messages.BlockProposal:
+		err = e.onBlockProposal(originID, entity)
 	default:
 		err = errors.Errorf("invalid event type (%T)", event)
 	}
@@ -112,17 +113,24 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-// onBlock is used when a block has been finalized locally and we want to
+// onBlockProposal is used when a block has been finalized locally and we want to
 // broadcast it to the network.
-func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	e.log.Info().
+	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Hex("block_id", logging.Entity(block)).
-		Msg("block submitted")
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", logging.Entity(proposal.Header)).
+		Hex("parent_id", proposal.Header.ParentID[:]).
+		Hex("signer", proposal.Header.ProposerID[:]).
+		Logger()
+
+	log.Info().Msg("block proposal forwarded from compliance engine")
 
 	// reports Metrics C4: Block Received by CCL → Block Seal in finalized block
-	e.metrics.StartBlockToSeal(block.ID())
+	// TODO: move this to the correct location; this is not where the CCL receives
+	// blocks, this is where the CCL forwards blocks to other node roles
+	e.metrics.StartBlockToSeal(proposal.Header.ID())
 
 	// currently, only accept blocks that come from our local consensus
 	localID := e.me.NodeID()
@@ -137,15 +145,12 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	}
 
 	// submit the blocks to the targets
-	err = e.con.Submit(block, identities.NodeIDs()...)
+	err = e.con.Submit(proposal, identities.NodeIDs()...)
 	if err != nil {
 		return errors.Wrap(err, "could not broadcast block")
 	}
 
-	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("block_id", logging.Entity(block)).
-		Msg("block broadcasted")
+	log.Info().Msg("block proposal propagated to non-consensus nodes")
 
 	return nil
 }
