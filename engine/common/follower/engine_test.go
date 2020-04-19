@@ -79,7 +79,7 @@ func (suite *Suite) TestHandlePendingBlock() {
 	// don't return the parent when requested
 	suite.snapshot.On("Head").Return(&head.Header, nil).Once()
 	suite.cache.On("ByID", block.ParentID).Return(nil, false).Once()
-	suite.cache.On("Add", mock.Anything).Return(true).Once()
+	suite.cache.On("Add", mock.Anything, mock.Anything).Return(true).Once()
 	suite.sync.On("RequestBlock", block.ParentID).Return().Once()
 
 	// submit the block
