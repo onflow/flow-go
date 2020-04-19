@@ -135,6 +135,9 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get node id: %w", err)
+		}
 		nodeRole := nodeID.Role
 		topology := libp2p.NewRandPermTopology(nodeRole)
 
