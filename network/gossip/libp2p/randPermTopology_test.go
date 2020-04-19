@@ -69,7 +69,7 @@ func (r *RandPermTopologyTestSuite) TestMinorityNodesConnected() {
 
 func (r *RandPermTopologyTestSuite) testTopology(total int, minorityRole flow.Role, nodeRole flow.Role) {
 
-	distribution := createDistribution(100, minorityRole)
+	distribution := createDistribution(total, minorityRole)
 
 	ids := make(flow.IdentityList, 0)
 	for role, count := range distribution {
@@ -105,7 +105,8 @@ func createDistribution(total int, minority flow.Role) map[flow.Role]int {
 
 	minorityPercentage := 0.02
 	count := func(per float64) int {
-		return int(per * float64(total))
+		nodes := int(math.Ceil(per * float64(total))) // assume atleast one node of the minority role
+		return nodes
 	}
 	minorityCount, majorityCount := count(minorityPercentage), count(1-minorityPercentage)
 	roles := flow.Roles()
