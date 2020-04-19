@@ -266,13 +266,11 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error
 
 // connect creates a new stream
 func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey) (libp2pnetwork.Stream, error) {
-	fmt.Println("====== 4")
 
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse address %s:%v", address, err)
 	}
-	fmt.Println("====== 5")
 
 	// convert the Flow key to a LibP2P key
 	lkey, err := PublicKey(key)
@@ -282,14 +280,12 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 
 	// Create a new NodeAddress
 	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port, PubKey: lkey}
-	fmt.Println("====== 6", nodeAddress)
 
 	// Create a stream for it
 	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
 	}
-	fmt.Println("====== 7")
 
 	m.log.Info().Str("target_id", flowID).Str("address", address).Msg("stream created")
 	return stream, nil
@@ -301,7 +297,6 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	m.wg.Add(1)
 	defer m.wg.Done()
-	fmt.Println("+++++ 1")
 
 	log := m.log.With().
 		Str("local_addr", s.Conn().LocalPeer().String()).
@@ -310,7 +305,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// initialize the encoder/decoder and create the connection handler
 	conn := NewReadConnection(log, s)
-	fmt.Println("+++++ 2")
 
 	// make sure we close the connection when we are done handling the peer
 	defer conn.stop()
@@ -387,25 +381,20 @@ SubscriptionLoop:
 
 // processMessage processes a message and eventually passes it to the overlay
 func (m *Middleware) processMessage(msg *message.Message) {
-	fmt.Println("+++++ 3", m.host)
 
 	// run through all the message validators
 	for _, v := range m.validators {
 		// if any one fails, stop message propagation
 		if !v.Validate(*msg) {
-			fmt.Println("+++++ EARLY")
 			return
 		}
 	}
-	fmt.Println("+++++ 4")
 
 	// if validation passed, send the message to the overlay
 	err := m.ov.Receive(flow.HashToID(msg.OriginID), msg)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}
-	fmt.Println("+++++ 5")
-
 }
 
 // Publish publishes the given payload on the topic
