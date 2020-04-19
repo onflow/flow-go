@@ -134,7 +134,11 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
+		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
+		nodeRole := nodeID.Role
+		topology := libp2p.NewRandPermTopology(nodeRole)
+
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, topology)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
