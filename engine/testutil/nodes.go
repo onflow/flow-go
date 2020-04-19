@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dapperlabs/cadence/runtime"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 

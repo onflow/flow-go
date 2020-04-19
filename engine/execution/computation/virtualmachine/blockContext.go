@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/cadence"
-	encoding "github.com/dapperlabs/cadence/encoding/xdr"
-	"github.com/dapperlabs/cadence/runtime"
+	"github.com/onflow/cadence"
+	encoding "github.com/onflow/cadence/encoding/xdr"
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
