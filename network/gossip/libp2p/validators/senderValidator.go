@@ -2,6 +2,7 @@ package validators
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
@@ -23,5 +24,7 @@ func NewSenderValidator(sender flow.Identifier) *SenderValidator {
 
 // Validate returns true if the message origin id is different from the sender ID.
 func (sv *SenderValidator) Validate(msg message.Message) bool {
+	fmt.Printf("Sender Validity %v\n", !bytes.Equal(sv.sender, msg.OriginID))
+
 	return !bytes.Equal(sv.sender, msg.OriginID)
 }

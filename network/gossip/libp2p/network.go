@@ -203,8 +203,10 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 
 	var emTargets [][]byte
 	for _, targetID := range targetIDs {
+		// copy the array to a temp var by value
+		temp := targetID
 		// create a slice out of the temp var
-		emTargets = append(emTargets, targetID[:])
+		emTargets = append(emTargets, temp[:])
 	}
 
 	// get origin ID (inplace slicing n.me.NodeID()[:] doesn't work)

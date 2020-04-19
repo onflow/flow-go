@@ -35,6 +35,7 @@ func NewVotingStatus(block *model.Block, stakeThreshold uint64, signer hotstuff.
 // assume votes are valid.
 // duplicate votes will not be accumulated again
 func (vs *VotingStatus) AddVote(vote *model.Vote, voter *flow.Identity) {
+	fmt.Println("ADD VOTE 1", voter.Address)
 	_, exists := vs.votes[vote.ID()]
 	if exists {
 		return
@@ -50,6 +51,8 @@ func (vs *VotingStatus) AddVote(vote *model.Vote, voter *flow.Identity) {
 	//   check votes are from unique signers here, only accumulate stakes if the vote is
 	//   from a new signer that never seen
 	vs.accumulatedStake += voter.Stake
+	fmt.Println("ADD VOTE 2", vs.accumulatedStake, voter.Stake)
+
 }
 
 // CanBuildQC check whether the

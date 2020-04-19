@@ -208,7 +208,7 @@ func (e *EventHandler) OnLocalTimeout() error {
 
 // Start will start the pacemaker's timer and start the new view
 func (e *EventHandler) Start() error {
-	time.Sleep(5 * time.Second)
+	time.Sleep(time.Second)
 
 	e.paceMaker.Start()
 	return e.startNewView()

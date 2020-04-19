@@ -8,14 +8,13 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 
 	ggio "github.com/gogo/protobuf/io"
-	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -173,7 +172,8 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 	// decide what mode of communication to use
 	switch mode {
 	case NoOp:
-		// TODO: should we error here, or silently ignore?
+		// TODO: Decide if this is actually an error or not
+		// return fmt.Errorf("empty list of target Ids")
 		return nil
 	case OneToOne:
 		if targetIDs[0] == m.me {
@@ -183,22 +183,7 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 		}
 		err = m.sendDirect(targetIDs[0], msg)
 	case OneToK:
-		result := &multierror.Error{}
-		result.ErrorFormat = func(errs []error) string {
-			msgs := make([]string, 0, len(errs))
-			for _, err := range errs {
-				msgs = append(msgs, err.Error())
-			}
-			msg := strings.Join(msgs, ", ")
-			return fmt.Sprintf("%d errors (%s)", len(errs), msg)
-		}
-		for _, targetID := range targetIDs {
-			inErr := m.sendDirect(targetID, msg)
-			if inErr != nil {
-				result = multierror.Append(result, inErr)
-			}
-		}
-		err = result.ErrorOrNil()
+		err = m.publish(strconv.Itoa(int(channelID)), msg)
 	default:
 		err = fmt.Errorf("invalid communcation mode: %d", mode)
 	}
@@ -210,7 +195,7 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 }
 
 // chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
-func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.Identifier) communicationMode {
+func (m *Middleware) chooseMode(_ uint8, _ interface{}, targetIDs ...flow.Identifier) communicationMode {
 	switch len(targetIDs) {
 	case 0:
 		return NoOp
@@ -222,57 +207,72 @@ func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.I
 }
 
 // sendDirect will try to send the given message to the given peer utilizing a 1-1 direct connection
-func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) error {
+func (m *Middleware) sendDirect(targetID flow.Identifier, msg interface{}) error {
 
-	// get an identity to connect to. The identity provides the destination TCP address.
-	idsMap, err := m.ov.Identity()
-	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
+	switch msg := msg.(type) {
+	case *message.Message:
+
+		// get an identity to connect to. The identity provides the destination TCP address.
+		idsMap, err := m.ov.Identity()
+		if err != nil {
+			return fmt.Errorf("could not get identities: %w", err)
+		}
+		flowIdentity, found := idsMap[targetID]
+		if !found {
+			return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
+		}
+
+		fmt.Println("SENDING TO", flowIdentity.Address)
+
+		// create new stream
+		// (streams don't need to be reused and are fairly inexpensive to be created for each send.
+		// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
+		// sent out the the receiver
+		stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address, flowIdentity.NetworkPubKey)
+		if err != nil {
+			return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
+		}
+		fmt.Println("====== 1")
+		// create a gogo protobuf writer
+		bufw := bufio.NewWriter(stream)
+		writer := ggio.NewDelimitedWriter(bufw)
+
+		err = writer.WriteMsg(msg)
+		if err != nil {
+			return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
+		}
+		fmt.Println("====== 2")
+
+		// flush the stream
+		err = bufw.Flush()
+		if err != nil {
+			return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
+		}
+		fmt.Println("====== 3")
+
+		// close the stream immediately
+		// helpers.FullClose will close the stream, wait for an EOF and then call reset on the stream
+		// this is the ideal way of closing the stream in libp2p as of now
+		go helpers.FullClose(stream)
+		fmt.Println("MSG SENT TO", flowIdentity.Address)
+
+		return nil
+
+	default:
+		err := errors.Errorf("invalid message type (%T)", msg)
+		return err
 	}
-	flowIdentity, found := idsMap[targetID]
-	if !found {
-		return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
-	}
-
-	// create new stream
-	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
-	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
-	// sent out the the receiver
-	stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address, flowIdentity.NetworkPubKey)
-	if err != nil {
-		return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
-	}
-
-	// create a gogo protobuf writer
-	bufw := bufio.NewWriter(stream)
-	writer := ggio.NewDelimitedWriter(bufw)
-
-	err = writer.WriteMsg(msg)
-	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
-	}
-
-	// flush the stream
-	err = bufw.Flush()
-	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
-	}
-
-	// close the stream immediately
-	// helpers.FullClose will close the stream, wait for an EOF and then call reset on the stream
-	// this is the ideal way of closing the stream in libp2p as of now
-	go helpers.FullClose(stream)
-
-	return nil
 }
 
 // connect creates a new stream
 func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey) (libp2pnetwork.Stream, error) {
+	fmt.Println("====== 4")
 
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse address %s:%v", address, err)
 	}
+	fmt.Println("====== 5")
 
 	// convert the Flow key to a LibP2P key
 	lkey, err := PublicKey(key)
@@ -282,14 +282,16 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 
 	// Create a new NodeAddress
 	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port, PubKey: lkey}
+	fmt.Println("====== 6", nodeAddress)
 
 	// Create a stream for it
 	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
 	}
+	fmt.Println("====== 7")
 
-	m.log.Info().Str("targetid", flowID).Str("address", address).Msg("stream created")
+	m.log.Info().Str("target_id", flowID).Str("address", address).Msg("stream created")
 	return stream, nil
 }
 
@@ -299,6 +301,7 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	m.wg.Add(1)
 	defer m.wg.Done()
+	fmt.Println("+++++ 1")
 
 	log := m.log.With().
 		Str("local_addr", s.Conn().LocalPeer().String()).
@@ -307,6 +310,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// initialize the encoder/decoder and create the connection handler
 	conn := NewReadConnection(log, s)
+	fmt.Println("+++++ 2")
 
 	// make sure we close the connection when we are done handling the peer
 	defer conn.stop()
@@ -383,38 +387,48 @@ SubscriptionLoop:
 
 // processMessage processes a message and eventually passes it to the overlay
 func (m *Middleware) processMessage(msg *message.Message) {
+	fmt.Println("+++++ 3", m.host)
 
 	// run through all the message validators
 	for _, v := range m.validators {
 		// if any one fails, stop message propagation
 		if !v.Validate(*msg) {
+			fmt.Println("+++++ EARLY")
 			return
 		}
 	}
+	fmt.Println("+++++ 4")
 
 	// if validation passed, send the message to the overlay
 	err := m.ov.Receive(flow.HashToID(msg.OriginID), msg)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}
+	fmt.Println("+++++ 5")
+
 }
 
 // Publish publishes the given payload on the topic
-func (m *Middleware) publish(topic string, msg *message.Message) error {
+func (m *Middleware) publish(topic string, msg interface{}) error {
+	switch msg := msg.(type) {
+	case *message.Message:
 
-	// convert the message to bytes to be put on the wire.
-	data, err := msg.Marshal()
-	if err != nil {
-		return fmt.Errorf("failed to marshal the message: %w", err)
+		// convert the message to bytes to be put on the wire.
+		data, err := msg.Marshal()
+		if err != nil {
+			return fmt.Errorf("failed to marshal the message: %w", err)
+		}
+
+		// publish the bytes on the topic
+		// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
+		// for this node.
+		err = m.libP2PNode.Publish(m.ctx, topic, data)
+		if err != nil {
+			return fmt.Errorf("failed to publish the message: %w", err)
+		}
+	default:
+		err := fmt.Errorf("middleware received invalid message type (%T)", msg)
+		return err
 	}
-
-	// publish the bytes on the topic
-	// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
-	// for this node.
-	err = m.libP2PNode.Publish(m.ctx, topic, data)
-	if err != nil {
-		return fmt.Errorf("failed to publish the message: %w", err)
-	}
-
 	return nil
 }

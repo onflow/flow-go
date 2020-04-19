@@ -2,6 +2,7 @@ package validators
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/rs/zerolog"
 
@@ -30,9 +31,12 @@ func NewTargetValidator(log zerolog.Logger, target flow.Identifier) *TargetValid
 func (tv *TargetValidator) Validate(msg message.Message) bool {
 	for _, t := range msg.TargetIDs {
 		if bytes.Equal(tv.target, t) {
+			fmt.Printf("Target Valid %x | %x\n", tv.target, t)
 			return true
 		}
+		fmt.Printf("Target Checked %x | %x\n", tv.target, t)
 	}
+	fmt.Printf("Target not valid %x\n", tv.target)
 	tv.log.Debug().Hex("target", tv.target).Hex("event_id", msg.EventID).Msg("message not intended for target")
 	return false
 }

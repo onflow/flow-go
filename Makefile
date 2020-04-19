@@ -349,3 +349,7 @@ monitor-rollout:
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-consensus-node-v1; \
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-execution-node-v1; \
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-verification-node-v1
+
+.PHONY: mvp-integration
+mvp-integration:
+	cd integration; go test -timeout 300s -tags relic ./tests/common -run "^TestMVP_Network$$" -count=1; cd ..
