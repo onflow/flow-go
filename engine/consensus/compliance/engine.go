@@ -149,7 +149,6 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		Uint64("block_view", view).
 		Hex("block_id", blockID[:]).
 		Hex("signer", logging.ID(e.me.NodeID())).
-		Hex("recipient", recipientID[:]).
 		Logger()
 
 	log.Info().Msg("processing vote transmission request from hotstuff")
@@ -173,30 +172,8 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 }
 
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
-// Note the header has incomplete fields, because it was converted from a hotstuff.Proposal type
+// Note the header has incomplete fields, because it was converted from a hotstuff.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
-
-	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get consensus recipients: %w", err)
-	}
-
-	recipientIDs := recipients.NodeIDs()
-
-	log := e.log.With().
-		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
-		Uint64("block_height", header.Height).
-		Hex("parent_id", header.ParentID[:]).
-		Hex("signer", header.ProposerID[:]).
-		RawJSON("recipients", logging.AsJSON(recipientIDs)).
-		Logger()
-
-	log.Info().Msg("processing proposal broadcast request from hotstuff")
 
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
@@ -213,11 +190,34 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
+	log := e.log.With().
+		Str("chain_id", header.ChainID).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.Entity(header)).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("payload_hash", header.PayloadHash[:]).
+		Time("timestamp", header.Timestamp).
+		Hex("proposer", header.ProposerID[:]).
+		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Hex("parent_sig", header.ParentVoterSig[:]).
+		Logger()
+
+	log.Info().Msg("processing proposal broadcast request from hotstuff")
+
 	// retrieve the payload for the block
-	blockID := header.ID()
-	payload, err := e.payloads.ByBlockID(blockID)
+	payload, err := e.payloads.ByBlockID(header.ID())
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
+	}
+
+	// retrieve all consensus nodes without our ID
+	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
+	if err != nil {
+		return fmt.Errorf("could not get consensus recipients: %w", err)
 	}
 
 	// NOTE: some fields are not needed for the message
@@ -229,7 +229,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// broadcast the proposal to consensus nodes
-	err = e.con.Submit(msg, recipientIDs...)
+	err = e.con.Submit(msg, recipients.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
@@ -288,14 +288,19 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	blockID := proposal.Header.ID()
+	header := proposal.Header
 
 	log := e.log.With().
-		Uint64("block_view", proposal.Header.View).
-		Hex("block_id", blockID[:]).
-		Uint64("block_height", proposal.Header.Height).
-		Hex("parent_id", proposal.Header.ParentID[:]).
-		Hex("signer", proposal.Header.ProposerID[:]).
+		Str("chain_id", header.ChainID).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.Entity(header)).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("payload_hash", header.PayloadHash[:]).
+		Time("timestamp", header.Timestamp).
+		Hex("proposer", header.ProposerID[:]).
+		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
 	log.Info().Msg("block proposal received")
@@ -306,14 +311,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// 3) blocks at a height below finalized height; they can not be finalized
 
 	// ignore proposals that are already cached
-	_, cached := e.pending.ByID(blockID)
+	_, cached := e.pending.ByID(header.ID())
 	if cached {
 		log.Debug().Msg("skipping already cached proposal")
 		return nil
 	}
 
 	// ignore proposals that were already processed
-	_, err := e.headers.ByBlockID(blockID)
+	_, err := e.headers.ByBlockID(header.ID())
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil
@@ -329,20 +334,22 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// ignore proposals that can no longer become valid
-	if proposal.Header.Height <= final.Height {
+	if header.Height <= final.Height {
 		log.Debug().Msg("skipping already outdated proposal")
 		return nil
 	}
 
 	// from here on out, there are two possibilities:
 	// 1) the proposal is unverifiable because parent or ancestor is unknown
-	// => in each cache, we cache the proposal and request the missing link
+	// => in each case, we cache the proposal and request the missing link
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
 
+	// TODO: prune cache from outdated blocks
+
 	// if we can connect the proposal to an ancestor in the cache, it means
 	// there is a missing link; we cache it and request the missing link
-	ancestor, found := e.pending.ByID(proposal.Header.ParentID)
+	ancestor, found := e.pending.ByID(header.ParentID)
 	if found {
 
 		// add the block to the cache
@@ -368,14 +375,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// if the proposal is connected to a block that is neither in the cache, nor
 	// in persistent storage, its direct parent is missing; cache the proposal
 	// and request the parent
-	_, err = e.headers.ByBlockID(proposal.Header.ParentID)
+	_, err = e.headers.ByBlockID(header.ParentID)
 	if err == storage.ErrNotFound {
 
 		_ = e.pending.Add(originID, proposal)
 
 		log.Debug().Msg("requesting missing parent for proposal")
 
-		e.sync.RequestBlock(proposal.Header.ParentID)
+		e.sync.RequestBlock(header.ParentID)
 
 		return nil
 	}
@@ -399,38 +406,43 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // no need to do all the processing again.
 func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 
-	blockID := proposal.Header.ID()
+	header := proposal.Header
 
 	log := e.log.With().
-		Uint64("block_view", proposal.Header.View).
-		Hex("block_id", blockID[:]).
-		Uint64("block_height", proposal.Header.Height).
-		Hex("parent_id", proposal.Header.ParentID[:]).
-		Hex("signer", proposal.Header.ProposerID[:]).
+		Str("chain_id", header.ChainID).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.Entity(header)).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("payload_hash", header.PayloadHash[:]).
+		Time("timestamp", header.Timestamp).
+		Hex("proposer", header.ProposerID[:]).
+		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
 	log.Info().Msg("processing block proposal")
 
 	// store the proposal block payload
-	err := e.payloads.Store(proposal.Header, proposal.Payload)
+	err := e.payloads.Store(header, proposal.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store proposal payload: %w", err)
 	}
 
 	// store the proposal block header
-	err = e.headers.Store(proposal.Header)
+	err = e.headers.Store(header)
 	if err != nil {
 		return fmt.Errorf("could not store proposal header: %w", err)
 	}
 
 	// see if the block is a valid extension of the protocol state
-	err = e.state.Mutate().Extend(blockID)
+	err = e.state.Mutate().Extend(header.ID())
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
 
 	// retrieve the parent
-	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
+	parent, err := e.headers.ByBlockID(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
@@ -438,10 +450,10 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to hotstuff for processing
-	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
+	e.hotstuff.SubmitProposal(header, parent.View)
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(blockID)
+	err = e.processPendingChildren(header.ID())
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}
@@ -455,7 +467,7 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 	log := e.log.With().
 		Uint64("block_view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
-		Hex("signer", originID[:]).
+		Hex("voter", originID[:]).
 		Logger()
 
 	log.Info().Msg("block vote received")

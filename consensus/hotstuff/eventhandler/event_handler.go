@@ -409,13 +409,13 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
 	shouldVote := true
 	var noVote *model.NoVoteError
-	if errors.As(err, &noVote) {
+	if err != nil {
+		if !errors.As(err, &noVote) {
+			// unknown error, exit the event loop
+			return fmt.Errorf("could not produce vote: %w", err)
+		}
 		log.Debug().Err(err).Msg("should not vote for this block")
 		shouldVote = false
-	}
-	if err != nil {
-		// unknown error, exit the event loop
-		return fmt.Errorf("could not produce vote: %w", err)
 	}
 
 	// send my vote if I should vote and I'm not the leader

@@ -28,19 +28,7 @@ type GuaranteeSuite struct {
 	nodeIDs []flow.Identifier
 	ghostID flow.Identifier
 	collID  flow.Identifier
-}
-
-func (gs *GuaranteeSuite) Start(timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	gs.cancel = cancel
-	gs.net.Start(ctx)
-}
-
-func (gs *GuaranteeSuite) Stop() {
-	err := gs.net.Stop()
-	gs.cancel()
-	require.NoError(gs.T(), err, "should stop without error")
-	gs.net.Cleanup()
+	reader  *client.FlowMessageStreamReader
 }
 
 func (gs *GuaranteeSuite) Consensus(index int) *testnet.Container {
@@ -95,40 +83,58 @@ func (gs *GuaranteeSuite) SetupTest() {
 
 	// initialize the network
 	gs.net = testnet.PrepareFlowNetwork(gs.T(), netConfig)
+
+	// start the network
+	ctx, cancel := context.WithCancel(context.Background())
+	gs.cancel = cancel
+	gs.net.Start(ctx)
+
+	// subscribe to the ghost
+	for attempts := 0; ; attempts++ {
+		var err error
+		gs.reader, err = gs.Ghost().Subscribe(context.Background())
+		if err == nil {
+			break
+		}
+		if attempts >= 10 {
+			require.NoError(gs.T(), err, "could not subscribe to ghost (%d attempts)", attempts)
+		}
+	}
+}
+
+func (gs *GuaranteeSuite) TearDownTest() {
+	err := gs.net.Stop()
+	gs.cancel()
+	require.NoError(gs.T(), err, "should stop without error")
 }
 
 func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {
 
-	// set timeout for loop
-	timeout := time.Minute
-	delay := 10 * time.Second
-	deadline := time.Now().Add(timeout - delay)
-
-	// start the network and defer cleanup
-	gs.Start(timeout)
-
-	// wait for 10 seconds before submitting the guarantee
-	time.Sleep(delay)
-
-	// subscribe to block proposals
-	reader, err := gs.Ghost().Subscribe(context.Background())
-	require.NoError(gs.T(), err, "could not subscribe to ghost")
-
-	// send a guarantee into the first consensus node
+	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()
 	sentinel.SignerIDs = []flow.Identifier{gs.collID}
-	err = gs.Ghost().Send(context.Background(), engine.CollectionProvider, gs.nodeIDs[:1], sentinel)
-	require.NoError(gs.T(), err, "could not send sentinel collection guarantee")
+
+	// try sending it to the first consensus node as soon as possible
+	for attempts := 0; ; attempts++ {
+		err := gs.Ghost().Send(context.Background(), engine.CollectionProvider, gs.nodeIDs[:1], sentinel)
+		if err == nil {
+			break
+		}
+		if attempts >= 10 {
+			require.NoError(gs.T(), err, "could not send sentinel guarantee (%d attempts)", attempts)
+		}
+	}
 
 	gs.T().Logf("sentinel collection guarantee: %x", sentinel.CollectionID)
 
 	// we try to find a block with the guarantee included and three confirmations
+	deadline := time.Now().Add(time.Minute)
 	confirmations := make(map[flow.Identifier]uint)
 InclusionLoop:
 	for time.Now().Before(deadline) {
 
 		// we read the next message until we reach deadline
-		_, msg, err := reader.Next()
+		_, msg, err := gs.reader.Next()
 		require.NoError(gs.T(), err, "could not read next message")
 
 		// we only care about block proposals at the moment
@@ -157,8 +163,8 @@ InclusionLoop:
 		// for the follow-up block
 		n, ok := confirmations[proposal.Header.ParentID]
 		if ok {
-			gs.T().Log("sentinel guarantee confirmed!")
 			confirmations[proposalID] = n + 1
+			gs.T().Logf("sentinel guarantee confirmed! (count: %d)", confirmations[proposalID])
 		}
 
 		// if we reached three or more confirmations, we are done!
@@ -167,20 +173,15 @@ InclusionLoop:
 		}
 	}
 
-	// stop the network
-	gs.net.Stop()
-
 	// make sure we found the guarantee in at least one block proposal
 	require.NotEmpty(gs.T(), confirmations, "collection guarantee should have been included in at least one block")
 
 	// check if we have a block with 3 confirmations that contained it
-	var n uint
-	inclusionID := flow.ZeroID
-	for inclusionID, n = range confirmations {
-		if n >= 3 {
-			gs.T().Logf("inclusion block finalized: %x!", inclusionID)
-			break
+	max := uint(0)
+	for _, n := range confirmations {
+		if n > max {
+			max = n
 		}
 	}
-	require.GreaterOrEqual(gs.T(), n, uint(3), "should have confirmed one inclusion block at least three times")
+	require.GreaterOrEqual(gs.T(), max, uint(3), "should have confirmed one inclusion block at least three times")
 }

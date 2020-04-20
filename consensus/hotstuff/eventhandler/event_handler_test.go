@@ -2,6 +2,7 @@ package eventhandler_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -345,7 +346,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.blockProducer = &BlockProducer{}
 	es.communicator = &mocks.Communicator{}
 	es.communicator.On("BroadcastProposal", mock.Anything).Return(nil)
-	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	es.viewState = NewViewState()
 	es.voteAggregator = NewVoteAggregator(es.T())
 	es.voter = NewVoter(es.T(), finalized)
@@ -353,7 +354,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.notifier = &notifications.NoopConsumer{}
 
 	eventhandler, err := eventhandler.New(
-		zerolog.Logger{},
+		zerolog.New(os.Stderr),
 		es.paceMaker,
 		es.blockProducer,
 		es.forks,
