@@ -124,8 +124,6 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
 		return e.onBlockProposal(originID, v)
-	case *flow.Block:
-		return e.onBlock(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
@@ -147,16 +145,9 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 	return e.onBlockProposal(originID, proposal)
 }
 
-func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
-	// process as proposal
-	proposal := &messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-	return e.onBlockProposal(originID, proposal)
-}
-
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+
+	// TODO: apply the same fixes as for the compliance engine
 
 	// get the latest finalized block
 	final, err := e.state.Final().Head()
@@ -213,14 +204,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 func (e *Engine) handleMissingAncestor(originID flow.Identifier, proposal *messages.BlockProposal, ancestorID flow.Identifier) error {
 
-	pendingBlock := &flow.PendingBlock{
-		OriginID: originID,
-		Header:   proposal.Header,
-		Payload:  proposal.Payload,
-	}
-
 	// cache the block, exit early if it already exists in the cache
-	added := e.cache.Add(pendingBlock)
+	added := e.cache.Add(originID, proposal)
 	if !added {
 		return nil
 	}

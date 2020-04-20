@@ -6,47 +6,42 @@ package crypto
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
 // #include "bls_include.h"
 import "C"
-
 import (
 	"errors"
 	"fmt"
 )
 
-// TODO: enable QUIET in relic
-
-// Go wrappers to C types
+// Go wrappers to Relic C types
 type pointG1 C.ep_st
 type pointG2 C.ep2_st
 type scalar C.bn_st
+
+// context required for the BLS set-up
 type ctx struct {
 	relicCtx *C.ctx_t
 	precCtx  *C.prec_st
 }
 
-var signatureLengthBLS_BLS12381 = int(C._getSignatureLengthBLS_BLS12381())
-var pubKeyLengthBLS_BLS12381 = int(C._getPubKeyLengthBLS_BLS12381())
-var prKeyLengthBLS_BLS12381 = int(C._getPrKeyLengthBLS_BLS12381())
+// get some constants from the C layer
+// (Cgo does not export C macros)
 var valid = C.get_valid()
 var invalid = C.get_invalid()
 
-// init sets the context of BLS12381 curve
-func (a *blsBLS12381Algo) init() error {
-	// Inits relic context and sets the B12_381 context
+// initContext sets relic B12_381 parameters and precomputes some data in the C layer
+func (ct *ctx) initContext() error {
 	c := C.relic_init_BLS12_381()
 	if c == nil {
 		return errors.New("Relic core init failed")
 	}
-	a.context.relicCtx = c
-	a.context.precCtx = C.init_precomputed_data_BLS12_381()
+	ct.relicCtx = c
+	ct.precCtx = C.init_precomputed_data_BLS12_381()
 	return nil
 }
 
-// reinit the context of BLS12381 curve assuming there was a previous call to init()
-// If the implementation evolves and relic has multiple contexts,
-// reinit should be called at every a. operation.
-func (a *blsBLS12381Algo) reinit() {
-	C.core_set(a.context.relicCtx)
-	C.precomputed_data_set(a.context.precCtx)
+// reInitContext re init the context of the C layer with pre-saved data
+func (ct *ctx) reInitContext() {
+	C.core_set(ct.relicCtx)
+	C.precomputed_data_set(ct.precCtx)
 }
 
 // Exponentiation in G1 (scalar point multiplication)
@@ -81,6 +76,10 @@ func seedRelic(seed []byte) error {
 		return fmt.Errorf("seed length needs to be larger than %d",
 			securityBits/8)
 	}
+	if len(seed) > maxRelicPrgSeed {
+		return fmt.Errorf("seed length needs to be less than %x",
+			maxRelicPrgSeed)
+	}
 	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 	return nil
 }
@@ -96,10 +95,14 @@ func randZr(x *scalar) error {
 
 // mapKeyZr reads a private key from a slice of bytes and maps it to Zr
 // the resulting scalar is in the range 0 < k < r
-func mapKeyZr(x *scalar, src []byte) {
+func mapKeyZr(x *scalar, src []byte) error {
+	if len(src) > maxScalarSize {
+		return fmt.Errorf("input slice length must be less than %d", maxScalarSize)
+	}
 	C.bn_privateKey_mod_r((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
+	return nil
 }
 
 // TEST/DEBUG/BENCH
@@ -111,15 +114,6 @@ func hashToG1(data []byte) *pointG1 {
 	return &h
 }
 
-// TEST/DEBUG/BENCH
-// wraps a call to optimized SwU algorithm since cgo can't be used
-// in go test files
-func OpSwUUnitTest(output []byte, input []byte) {
-	C.opswu_test((*C.uchar)(&output[0]),
-		(*C.uchar)(&input[0]),
-		SignatureLenBlsBls12381)
-}
-
 // sets a scalar to a small integer
 func (x *scalar) setInt(a int) {
 	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
@@ -128,7 +122,7 @@ func (x *scalar) setInt(a int) {
 // writeScalar writes a G2 point in a slice of bytes
 func writeScalar(dest []byte, x *scalar) {
 	C.bn_write_bin((*C.uchar)(&dest[0]),
-		(C.int)(prKeyLengthBLS_BLS12381),
+		(C.int)(prKeyLengthBLSBLS12381),
 		(*C.bn_st)(x),
 	)
 }
@@ -145,7 +139,7 @@ func readScalar(x *scalar, src []byte) {
 func writePointG2(dest []byte, a *pointG2) {
 	C._ep2_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(a),
-		(C.int)(pubKeyLengthBLS_BLS12381),
+		(C.int)(pubKeyLengthBLSBLS12381),
 	)
 }
 
@@ -158,45 +152,4 @@ func readPointG2(a *pointG2, src []byte) error {
 		return errors.New("reading a G2 point has failed")
 	}
 	return nil
-}
-
-// computes a bls signature
-func (a *blsBLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
-	s := make([]byte, SignatureLenBlsBls12381)
-
-	C._blsSign((*C.uchar)(&s[0]),
-		(*C.bn_st)(sk),
-		(*C.uchar)(&data[0]),
-		(C.int)(len(data)))
-	return s
-}
-
-// Checks the validity of a bls signature
-func (a *blsBLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
-	if len(s) != signatureLengthBLS_BLS12381 {
-		return false
-	}
-	verif := C._blsVerify((*C.ep2_st)(pk),
-		(*C.uchar)(&s[0]),
-		(*C.uchar)(&data[0]),
-		(C.int)(len(data)))
-
-	return (verif == valid)
-}
-
-// checkMembershipZr checks a scalar is less than the groups order (r)
-func (sk *scalar) checkMembershipZr() bool {
-	verif := C.checkMembership_Zr((*C.bn_st)(sk))
-	return verif == valid
-}
-
-// membershipCheckG2 runs a membership check of BLS public keys on BLS12-381 curve.
-// Returns true if the public key is on the correct subgroup of the curve
-// and false otherwise
-// It is necessary to run this test once for every public key before
-// it is used to verify BLS signatures. The library calls this function whenever
-// it imports a key through the function DecodePublicKey.
-func (pk *pointG2) checkMembershipG2() bool {
-	verif := C.checkMembership_G2((*C.ep2_st)(pk))
-	return verif == valid
 }

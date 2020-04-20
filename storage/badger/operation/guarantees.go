@@ -12,26 +12,26 @@ func InsertGuarantee(guarantee *flow.CollectionGuarantee) func(*badger.Txn) erro
 	return insert(makePrefix(codeGuarantee, guarantee.CollectionID), guarantee)
 }
 
-func CheckGuarantee(collID flow.Identifier, exists *bool) func(*badger.Txn) error {
-	return check(makePrefix(codeGuarantee, collID), exists)
+func CheckGuarantee(guaranteeid flow.Identifier, exists *bool) func(*badger.Txn) error {
+	return check(makePrefix(codeGuarantee, guaranteeid), exists)
 }
 
-func RetrieveGuarantee(collID flow.Identifier, guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeGuarantee, collID), guarantee)
+func RetrieveGuarantee(guaranteeid flow.Identifier, guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeGuarantee, guaranteeid), guarantee)
 }
 
 func IndexGuaranteePayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, guaranteeIDs []flow.Identifier) func(*badger.Txn) error {
 	return insert(toPayloadIndex(codeIndexGuarantee, height, blockID, parentID), guaranteeIDs)
 }
 
-func LookupGuaranteePayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, collIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return retrieve(toPayloadIndex(codeIndexGuarantee, height, blockID, parentID), collIDs)
+func LookupGuaranteePayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, guaranteeIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(toPayloadIndex(codeIndexGuarantee, height, blockID, parentID), guaranteeIDs)
 }
 
 // VerifyGuaranteePayload verifies that the candidate collection IDs
 // don't exist in any ancestor block.
-func VerifyGuaranteePayload(height uint64, blockID flow.Identifier, collIDs []flow.Identifier) func(*badger.Txn) error {
-	return iterate(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(0)), validatepayload(blockID, collIDs))
+func VerifyGuaranteePayload(height uint64, blockID flow.Identifier, guaranteeIDs []flow.Identifier) func(*badger.Txn) error {
+	return iterate(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(0)), validatepayload(blockID, guaranteeIDs))
 }
 
 // CheckGuaranteePayload populates `invalidIDs` with any IDs in the candidate

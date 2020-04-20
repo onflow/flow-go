@@ -39,19 +39,20 @@ func main() {
 }
 
 func sendMetrics(log zerolog.Logger) {
-	metrics, err := metrics.NewCollector(log)
+	collector, err := metrics.NewCollector(log)
 	if err != nil {
 		panic(err)
 	}
 
 	for i := 0; i < 100; i++ {
-		metrics.CollectionsPerBlock(1)
-		metrics.CollectionsInFinalizedBlock(3)
-		metrics.SealsInFinalizedBlock(3)
-		metrics.HotStuffBusyDuration(10)
-		metrics.HotStuffIdleDuration(10)
-		metrics.StartNewView(uint64(i))
-		metrics.NewestKnownQC(uint64(i))
+		collector.CollectionsPerBlock(1)
+		collector.CollectionsInFinalizedBlock(3)
+		collector.SealsInFinalizedBlock(3)
+		collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeTimeout)
+		collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeTimeout)
+		collector.HotStuffIdleDuration(10)
+		collector.StartNewView(uint64(i))
+		collector.NewestKnownQC(uint64(i))
 
 		entityID := make([]byte, 32)
 		binary.LittleEndian.PutUint32(entityID, uint32(i/6))
@@ -59,15 +60,15 @@ func sendMetrics(log zerolog.Logger) {
 		entity2ID := make([]byte, 32)
 		binary.LittleEndian.PutUint32(entity2ID, uint32(i/6+100000))
 		if i%6 == 0 {
-			metrics.StartCollectionToFinalized(flow.HashToID(entityID))
+			collector.StartCollectionToFinalized(flow.HashToID(entityID))
 		} else if i%6 == 3 {
-			metrics.FinishCollectionToFinalized(flow.HashToID(entityID))
+			collector.FinishCollectionToFinalized(flow.HashToID(entityID))
 		}
 
 		if i%5 == 0 {
-			metrics.StartBlockToSeal(flow.HashToID(entityID))
+			collector.StartBlockToSeal(flow.HashToID(entityID))
 		} else if i%6 == 3 {
-			metrics.FinishBlockToSeal(flow.HashToID(entityID))
+			collector.FinishBlockToSeal(flow.HashToID(entityID))
 		}
 
 		time.Sleep(1 * time.Second)

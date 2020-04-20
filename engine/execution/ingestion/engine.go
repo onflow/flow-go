@@ -156,8 +156,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		var err error
 		switch v := event.(type) {
-		case *flow.Block:
-			err = e.handleBlock(v)
+		case *messages.BlockProposal:
+			err = e.handleBlockProposal(v)
 		case *messages.CollectionResponse:
 			err = e.handleCollectionResponse(v)
 		case *messages.ExecutionStateDelta:
@@ -176,7 +176,12 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // Main handling
 
-func (e *Engine) handleBlock(block *flow.Block) error {
+func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
+
+	block := &flow.Block{
+		Header:  *proposal.Header,
+		Payload: *proposal.Payload,
+	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block)).

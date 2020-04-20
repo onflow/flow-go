@@ -68,7 +68,7 @@ func (lc *LogConsumer) OnEnteringView(view uint64) {
 }
 
 func (lc *LogConsumer) OnSkippedAhead(view uint64) {
-	lc.log.Info().
+	lc.log.Debug().
 		Uint64("view", view).
 		Msg("skipped ahead")
 }
@@ -82,7 +82,7 @@ func (lc *LogConsumer) OnStartingTimeout(info *model.TimerInfo) {
 }
 
 func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
-	lc.log.Warn().
+	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Str("timeout_mode", info.Mode.String()).

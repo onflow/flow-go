@@ -71,9 +71,9 @@ typedef struct prec_ {
 ctx_t*   relic_init_BLS12_381();
 prec_st* init_precomputed_data_BLS12_381();
 void     precomputed_data_set(prec_st* p);
-int      _getSignatureLengthBLS_BLS12381();
-int      _getPubKeyLengthBLS_BLS12381();
-int      _getPrKeyLengthBLS_BLS12381(); 
+int      getSignatureLengthBLS_BLS12381();
+int      getPubKeyLengthBLS_BLS12381();
+int      getPrKeyLengthBLS_BLS12381(); 
 void     _G1scalarPointMult(ep_st*, const ep_st*, const bn_st*);
 void     _G2scalarGenMult(ep2_st*, const bn_st*);
 void     _blsSign(byte*, const bn_st*, const byte*, const int);

@@ -37,17 +37,10 @@ cmd/collection/collection:
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
-ifeq ($(UNAME), Linux)
-	sudo apt-get -y install capnproto
-endif
-ifeq ($(UNAME), Darwin)
-	brew install capnp
-endif
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
-	GO111MODULE=on go get zombiezen.com/go/capnproto2@v0.0.0-20190505172156-0c36f8f86ab2; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
@@ -84,10 +77,6 @@ generate: generate-proto generate-mocks
 .PHONY: generate-proto
 generate-proto:
 	prototool generate protobuf
-
-.PHONY: generate-capnp
-generate-capnp:
-	capnp compile -I${GOPATH}/src/zombiezen.com/go/capnproto2/std -ogo schema/captain/*.capnp
 
 .PHONY: generate-mocks
 generate-mocks:

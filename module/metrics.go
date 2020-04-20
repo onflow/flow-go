@@ -54,10 +54,13 @@ type Metrics interface {
 	SealsInFinalizedBlock(count int)
 
 	// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
-	HotStuffBusyDuration(duration time.Duration)
+	HotStuffBusyDuration(duration time.Duration, event string)
 
 	// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 	HotStuffIdleDuration(duration time.Duration)
+
+	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
+	HotStuffWaitDuration(duration time.Duration, event string)
 
 	// FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)
 	FinalizedBlocks(count int)

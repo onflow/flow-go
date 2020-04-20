@@ -30,8 +30,8 @@ func TestKeyTranslatorTestSuite(t *testing.T) {
 func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 
 	// test all the ECDSA curves that are supported by the translator for private key conversion
-	sa := []fcrypto.SigningAlgorithm{fcrypto.EcdsaP256, fcrypto.EcdsaSecp256k1}
-	prKeyLen := []int{fcrypto.PrKeyLenEcdsaP256, fcrypto.PrKeyLenEcdsaSecp256k1}
+	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSAP256, fcrypto.ECDSASecp256k1}
+	prKeyLen := []int{fcrypto.PrKeyLenECDSAP256, fcrypto.PrKeyLenECDSASecp256k1}
 	// offset of the key raw bytes in the libp2p encoding
 	offset := []int{7, 0}
 
@@ -74,8 +74,8 @@ func rawUncompressed(key lcrypto.PubKey) ([]byte, error) {
 func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 
 	// test the algorithms that are supported by the translator for public key conversion (currently only ECDSA 256)
-	// EcdsaSecp256k1 doesn't work and throws a 'invalid pub key length 64' error
-	sa := []fcrypto.SigningAlgorithm{fcrypto.EcdsaP256, fcrypto.EcdsaSecp256k1}
+	// ECDSASecp256k1 doesn't work and throws a 'invalid pub key length 64' error
+	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSAP256, fcrypto.ECDSASecp256k1}
 	// the offset of the public key bytes in the x509 encoding of an ECDSA P-256 public key
 	x509offset := 27
 
@@ -97,10 +97,10 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 			// compare raw bytes of the public keys
 			fbytes := fpublic.Encode()
 			var lbytes []byte
-			if s == fcrypto.EcdsaP256 {
+			if s == fcrypto.ECDSAP256 {
 				lbytes, err = lpublic.Raw()
 				lbytes = lbytes[x509offset:]
-			} else if s == fcrypto.EcdsaSecp256k1 {
+			} else if s == fcrypto.ECDSASecp256k1 {
 				lbytes, err = rawUncompressed(lpublic)
 			}
 			require.NoError(k.T(), err)
@@ -116,7 +116,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 	seed := k.createSeed()
 
 	// generate a Flow private key
-	fpk, err := fcrypto.GeneratePrivateKey(fcrypto.EcdsaP256, seed)
+	fpk, err := fcrypto.GeneratePrivateKey(fcrypto.ECDSAP256, seed)
 	require.NoError(k.T(), err)
 
 	// get the Flow public key
@@ -144,7 +144,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 }
 
 func (k *KeyTranslatorTestSuite) createSeed() []byte {
-	seedLen := int(math.Max(fcrypto.KeyGenSeedMinLenEcdsaP256, fcrypto.KeyGenSeedMinLenEcdsaSecp256k1))
+	seedLen := int(math.Max(fcrypto.KeyGenSeedMinLenECDSAP256, fcrypto.KeyGenSeedMinLenECDSASecp256k1))
 	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
 	require.NoError(k.T(), err)

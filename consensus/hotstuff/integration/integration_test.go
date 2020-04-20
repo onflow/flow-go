@@ -13,6 +13,10 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// a pacemaker timeout to wait for proposals. Usually 10 ms is enough,
+// but for slow environment like CI, a longer one is needed.
+const safeTimeout = 10 * time.Second
+
 func TestSingleInstance(t *testing.T) {
 
 	// set up a single instance to run4
@@ -46,7 +50,7 @@ func TestThreeInstances(t *testing.T) {
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(10*time.Second, 10*time.Second, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, 1*time.Second)
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
@@ -81,8 +85,13 @@ func TestThreeInstances(t *testing.T) {
 	in1 := instances[0]
 	in2 := instances[1]
 	in3 := instances[2]
+	// verify progress has been made
+	assert.Equal(t, finalView, in1.forks.FinalizedBlock().View, "the first instance 's finalized view should be four lower than current view")
+	// verify same progresses have been made
 	assert.Equal(t, in1.forks.FinalizedBlock(), in2.forks.FinalizedBlock(), "second instance should have same finalized block as first instance")
 	assert.Equal(t, in1.forks.FinalizedBlock(), in3.forks.FinalizedBlock(), "third instance should have same finalized block as first instance")
+	assert.Equal(t, FinalizedViews(in1), FinalizedViews(in2))
+	assert.Equal(t, FinalizedViews(in1), FinalizedViews(in3))
 }
 
 func TestSevenInstances(t *testing.T) {
@@ -100,7 +109,7 @@ func TestSevenInstances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(10*time.Second, 10*time.Second, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, 1*time.Second)
 	require.NoError(t, err)
 
 	// set up five instances that work fully
@@ -131,7 +140,7 @@ func TestSevenInstances(t *testing.T) {
 	// connect the communicators of the instances together
 	Connect(instances)
 
-	// start the instances and wait for them to finish
+	// start all seven instances and wait for them to wrap up
 	var wg sync.WaitGroup
 	for _, in := range instances {
 		wg.Add(1)
@@ -145,7 +154,10 @@ func TestSevenInstances(t *testing.T) {
 
 	// check that all instances have the same finalized block
 	ref := instances[0]
-	for i := 1; i < len(instances); i++ {
+	assert.Less(t, finalView-uint64(2*numPass+numFail), ref.forks.FinalizedBlock().View, "expect instance 0 should made enough progress, but didn't")
+	finalizedViews := FinalizedViews(ref)
+	for i := 1; i < numPass; i++ {
 		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")
+		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance")
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/runner"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
@@ -66,19 +67,19 @@ func (el *EventLoop) loop() {
 			return
 
 		// if we receive a time out, process it and log errors
-		case t := <-timeoutChannel:
-
-			// measure how long it takes for a timeout event to go through
-			// eventloop and get handled
-			busyDuration := time.Since(t)
-			el.metrics.HotStuffBusyDuration(busyDuration)
+		case _ = <-timeoutChannel:
 
 			// meansure how long the event loop was idle waiting for an
 			// incoming event
-			idleDuration := time.Since(idleStart)
-			el.metrics.HotStuffIdleDuration(idleDuration)
+			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
+
+			processStart := time.Now()
 
 			err := el.eventHandler.OnLocalTimeout()
+
+			// measure how long it takes for a timeout event to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
+
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process timeout")
 			}
@@ -95,34 +96,52 @@ func (el *EventLoop) loop() {
 			return
 
 		// same as before
-		case t := <-timeoutChannel:
-			busyDuration := time.Since(t)
-			el.metrics.HotStuffBusyDuration(busyDuration)
+		case _ = <-timeoutChannel:
+			// meansure how long the event loop was idle waiting for an
+			// incoming event
+			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
-			idleDuration := time.Since(idleStart)
-			el.metrics.HotStuffBusyDuration(idleDuration)
+			processStart := time.Now()
 
 			err := el.eventHandler.OnLocalTimeout()
+
+			// measure how long it takes for a timeout event to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
+
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process timeout")
 			}
 
 		// if we have a new proposal, process it
 		case p := <-el.proposals:
-			idleDuration := time.Since(idleStart)
-			el.metrics.HotStuffBusyDuration(idleDuration)
+			// measure how long the event loop was idle waiting for an
+			// incoming event
+			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
+
+			processStart := time.Now()
 
 			err := el.eventHandler.OnReceiveProposal(p)
+
+			// measure how long it takes for a proposal to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
+
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process proposal")
 			}
 
 		// if we have a new vote, process it
 		case v := <-el.votes:
-			idleDuration := time.Since(idleStart)
-			el.metrics.HotStuffBusyDuration(idleDuration)
+			// measure how long the event loop was idle waiting for an
+			// incoming event
+			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
+
+			processStart := time.Now()
 
 			err := el.eventHandler.OnReceiveVote(v)
+
+			// measure how long it takes for a vote to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnVote)
+
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process vote")
 			}
@@ -139,8 +158,7 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint
 
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
-	busyDuration := time.Since(received)
-	el.metrics.HotStuffBusyDuration(busyDuration)
+	el.metrics.HotStuffBusyDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
 }
 
 // SubmitVote pushes the received vote to the votes channel
@@ -150,10 +168,9 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 	vote := model.VoteFromFlow(originID, blockID, view, sigData)
 	el.votes <- vote
 
-	// the busy duration is measured as how long it takes from a vote being
+	// the wait duration is measured as how long it takes from a vote being
 	// received to a vote being handled by the event handler.
-	busyDuration := time.Since(received)
-	el.metrics.HotStuffBusyDuration(busyDuration)
+	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnVote)
 }
 
 // Ready implements interface module.ReadyDoneAware

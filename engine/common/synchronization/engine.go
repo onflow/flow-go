@@ -136,6 +136,11 @@ func (e *Engine) RequestBlock(blockID flow.Identifier) {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+
+	// process one event at a time for now
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	switch ev := event.(type) {
 	case *messages.SyncRequest:
 		return e.onSyncRequest(originID, ev)
@@ -293,7 +298,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 
 	// process the blocks one by one
 	for _, block := range res.Blocks {
-		e.processIncomingBlock(block)
+		e.processIncomingBlock(originID, block)
 	}
 
 	return nil
@@ -350,7 +355,7 @@ func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 
 // processIncoming processes an incoming block, so we can take into account the
 // overlap between block IDs and heights.
-func (e *Engine) processIncomingBlock(block *flow.Block) {
+func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Block) {
 	e.Lock()
 	defer e.Unlock()
 
@@ -366,7 +371,12 @@ func (e *Engine) processIncomingBlock(block *flow.Block) {
 	delete(e.heights, block.Height)
 	delete(e.blockIDs, blockID)
 
-	e.comp.SubmitLocal(&events.SyncedBlock{Block: block})
+	synced := &events.SyncedBlock{
+		OriginID: originID,
+		Block:    block,
+	}
+
+	e.comp.SubmitLocal(synced)
 }
 
 // checkLoop will regularly scan for items that need requesting.

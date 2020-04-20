@@ -120,7 +120,7 @@ func main() {
 			cache := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cache)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, prov, cache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
