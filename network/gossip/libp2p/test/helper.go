@@ -24,6 +24,7 @@ func CreateIDs(count int) []*flow.Identity {
 		nodeID[0] = byte(i + 1)
 		identity := &flow.Identity{
 			NodeID: nodeID,
+			Role:   flow.RoleCollection,
 		}
 		identities = append(identities, identity)
 	}
@@ -44,7 +45,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 	// if no topology is passed in, use the default topology for all networks
 	if tops == nil {
 		tops = make([]middleware.Topology, count)
-		rpt := libp2p.NewRandPermTopology()
+		rpt := libp2p.NewRandPermTopology(flow.RoleCollection)
 		for i := range tops {
 			tops[i] = rpt
 		}
