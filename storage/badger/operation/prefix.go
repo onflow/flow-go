@@ -15,6 +15,7 @@ const (
 	codeBoundary             = 1 // latest finalized block number
 	codeFinalizedBlockNumber = 2 // lookup for block by number
 	codeDelta                = 3 // history of stake changes
+	codeView                 = 4 // persisting the latest view for hotstuff
 
 	// block header and entities included in block contents
 	codeHeader    = 10
@@ -56,6 +57,8 @@ func makePrefix(code byte, keys ...interface{}) []byte {
 
 func b(v interface{}) []byte {
 	switch i := v.(type) {
+	case uint8:
+		return []byte{i}
 	case uint32:
 		b := make([]byte, 4)
 		binary.BigEndian.PutUint32(b, i)

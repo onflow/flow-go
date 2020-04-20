@@ -268,13 +268,9 @@ func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.Ve
 	}
 	// starts verification of chunk
 	err := e.verify(originID, ch)
-	if err != nil {
-		return err
-	}
 	// closes verification performance metrics trackers
 	if ch.ChunkDataPack != nil {
 		e.mc.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)
 	}
-
-	return nil
+	return err
 }

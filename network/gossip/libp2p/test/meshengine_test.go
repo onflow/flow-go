@@ -88,7 +88,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Each node broadcasting a message to all others
 	for i := range m.nets {
@@ -158,6 +158,9 @@ func (m *MeshNetTestSuite) TestTargetValidator() {
 		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, 1)
 		engs = append(engs, eng)
 	}
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(5 * time.Second)
 
 	// choose half of the nodes as target
 	allIds := m.ids.NodeIDs()

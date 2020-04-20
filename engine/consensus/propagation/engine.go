@@ -3,7 +3,9 @@
 package propagation
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -42,7 +44,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.BlockPropagation, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	e.con = con
@@ -100,7 +102,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *flow.CollectionGuarantee:
 		return e.onGuarantee(originID, entity)
 	default:
-		return errors.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
@@ -108,25 +110,32 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // from another node on the network.
 func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
-	e.log.Info().
+	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Msg("collection guarantee submitted")
+		Hex("collection_id", logging.Entity(guarantee)).
+		RawJSON("signers", logging.AsJSON(guarantee.SignerIDs)).
+		Logger()
+
+	log.Info().Msg("collection guarantee received")
 
 	err := e.storeGuarantee(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not store guarantee")
+		if errors.Is(err, mempool.ErrEntityAlreadyExists) {
+			return nil
+		}
+
+		return fmt.Errorf("could not store guarantee: %w", err)
 	}
+
+	log.Info().Msg("collection guarantee processed")
 
 	// propagate the collection guarantee to other relevant nodes
 	err = e.propagateGuarantee(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not broadcast guaantee")
+		return fmt.Errorf("could not broadcast guarantee: %w", err)
 	}
 
-	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee processed")
+	log.Info().Msg("collection guarantee propagated to consensus nodes")
 
 	return nil
 }
@@ -140,12 +149,8 @@ func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 	// add the collection guarantee to our memory pool (also checks existence)
 	err := e.pool.Add(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not add guarantee to mempool")
+		return fmt.Errorf("could not add guarantee to mempool: %w", err)
 	}
-
-	e.log.Info().
-		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee stored")
 
 	return nil
 }
@@ -160,20 +165,15 @@ func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {
-		return errors.Wrap(err, "could not get identities")
+		return fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// send the collection guarantee to all consensus identities
 	targetIDs := ids.NodeIDs()
 	err = e.con.Submit(guarantee, targetIDs...)
 	if err != nil {
-		return errors.Wrap(err, "could not push collection guarantee")
+		return fmt.Errorf("could not send collection guarantee: %w", err)
 	}
-
-	e.log.Info().
-		Strs("target_ids", logging.IDs(targetIDs)).
-		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee propagated")
 
 	return nil
 }

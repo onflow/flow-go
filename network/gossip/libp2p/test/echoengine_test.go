@@ -138,7 +138,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 	require.Len(s.Suite.T(), receiver.seen, 1)
 }
 
-// TestDuplicateMessageSequential evaluates the correctness of network layer
+// TestDuplicateMessageParallel evaluates the correctness of network layer
 // on deduplicating the received messages. Messages are delivered to the receiver
 // in parallel.
 func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {

@@ -91,12 +91,12 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 	iy.Stake = m.Stake
 	var err error
 	if m.StakingPubKey != nil {
-		if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BlsBls12381, m.StakingPubKey); err != nil {
+		if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, m.StakingPubKey); err != nil {
 			return err
 		}
 	}
 	if m.NetworkPubKey != nil {
-		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.EcdsaP256, m.NetworkPubKey); err != nil {
+		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, m.NetworkPubKey); err != nil {
 			return err
 		}
 	}
@@ -105,16 +105,11 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 
 func (iy Identity) MarshalJSON() ([]byte, error) {
 	m := jsonMarshalIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
-	var err error
 	if iy.StakingPubKey != nil {
-		if m.StakingPubKey, err = iy.StakingPubKey.Encode(); err != nil {
-			return nil, err
-		}
+		m.StakingPubKey = iy.StakingPubKey.Encode()
 	}
 	if iy.NetworkPubKey != nil {
-		if m.NetworkPubKey, err = iy.NetworkPubKey.Encode(); err != nil {
-			return nil, err
-		}
+		m.NetworkPubKey = iy.NetworkPubKey.Encode()
 	}
 
 	return json.Marshal(m)

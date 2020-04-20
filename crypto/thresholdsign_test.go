@@ -238,7 +238,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				if groupPK == nil {
 					proc.pkBytes = []byte{}
 				} else {
-					proc.pkBytes, _ = groupPK.Encode()
+					proc.pkBytes = groupPK.Encode()
 				}
 				n := proc.dkg.Size()
 				kmac := NewBLS_KMAC(ThresholdSignatureTag)

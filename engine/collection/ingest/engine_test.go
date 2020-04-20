@@ -67,10 +67,10 @@ func TestClusterRouting(t *testing.T) {
 		require.True(t, ok)
 
 		// get a transaction that will be routed to local
-		tx := testutil.TransactionForCluster(clusters, localCluster)
+		tx := unittest.TransactionForCluster(clusters, localCluster)
 
 		// submit transaction locally to test storing
-		err = localNode.IngestionEngine.ProcessLocal(tx)
+		err = localNode.IngestionEngine.ProcessLocal(&tx)
 		assert.NoError(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -103,10 +103,10 @@ func TestClusterRouting(t *testing.T) {
 		require.True(t, ok)
 
 		// get a transaction that will be routed to the target cluster
-		tx := testutil.TransactionForCluster(clusters, remoteCluster)
+		tx := unittest.TransactionForCluster(clusters, remoteCluster)
 
 		// submit transaction locally to test propagation
-		err = localNode.IngestionEngine.ProcessLocal(tx)
+		err = localNode.IngestionEngine.ProcessLocal(&tx)
 		assert.NoError(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -139,10 +139,10 @@ func TestClusterRouting(t *testing.T) {
 		require.True(t, ok)
 
 		// get a transaction that will be routed to remote cluster
-		tx := testutil.TransactionForCluster(clusters, targetCluster)
+		tx := unittest.TransactionForCluster(clusters, targetCluster)
 
 		// submit transaction with remote origin to test non-propagation
-		err = localNode.IngestionEngine.Process(remoteNode.Me.NodeID(), tx)
+		err = localNode.IngestionEngine.Process(remoteNode.Me.NodeID(), &tx)
 		assert.NoError(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -175,11 +175,11 @@ func TestClusterRouting(t *testing.T) {
 		require.True(t, ok)
 
 		// get transaction for target cluster, but make it invalid
-		tx := testutil.TransactionForCluster(clusters, targetCluster)
+		tx := unittest.TransactionForCluster(clusters, targetCluster)
 		tx.Script = nil
 
 		// submit transaction locally (should not be relevant)
-		err = localNode.IngestionEngine.ProcessLocal(tx)
+		err = localNode.IngestionEngine.ProcessLocal(&tx)
 		assert.Error(t, err)
 
 		// flush the network to make sure all messages are sent

@@ -21,25 +21,35 @@ func NewLogConsumer(log zerolog.Logger) *LogConsumer {
 }
 
 func (lc *LogConsumer) OnBlockIncorporated(block *model.Block) {
-	lc.log.Debug().
+	entry := lc.log.Debug().
 		Uint64("block_view", block.View).
 		Hex("block_id", logging.ID(block.BlockID)).
-		Uint64("qc_view", block.QC.View).
-		Hex("qc_id", logging.ID(block.QC.BlockID)).
 		Hex("proposer_id", logging.ID(block.ProposerID)).
-		Hex("payload_hash", logging.ID(block.PayloadHash)).
-		Msg("block incorporated")
+		Hex("payload_hash", logging.ID(block.PayloadHash))
+
+	if block.QC != nil {
+		entry.
+			Uint64("qc_view", block.QC.View).
+			Hex("qc_id", logging.ID(block.QC.BlockID))
+	}
+
+	entry.Msg("block incorporated")
 }
 
 func (lc *LogConsumer) OnFinalizedBlock(block *model.Block) {
-	lc.log.Info().
+	entry := lc.log.Debug().
 		Uint64("block_view", block.View).
-		Hex("block_id", block.BlockID[:]).
-		Uint64("qc_view", block.QC.View).
-		Hex("qc_id", block.QC.BlockID[:]).
-		Hex("proposer_id", block.ProposerID[:]).
-		Hex("payload_hash", block.PayloadHash[:]).
-		Msg("block finalized")
+		Hex("block_id", logging.ID(block.BlockID)).
+		Hex("proposer_id", logging.ID(block.ProposerID)).
+		Hex("payload_hash", logging.ID(block.PayloadHash))
+
+	if block.QC != nil {
+		entry.
+			Uint64("qc_view", block.QC.View).
+			Hex("qc_id", logging.ID(block.QC.BlockID))
+	}
+
+	entry.Msg("block finalized")
 }
 
 func (lc *LogConsumer) OnDoubleProposeDetected(block *model.Block, alt *model.Block) {
@@ -58,7 +68,7 @@ func (lc *LogConsumer) OnEnteringView(view uint64) {
 }
 
 func (lc *LogConsumer) OnSkippedAhead(view uint64) {
-	lc.log.Info().
+	lc.log.Debug().
 		Uint64("view", view).
 		Msg("skipped ahead")
 }
@@ -72,7 +82,7 @@ func (lc *LogConsumer) OnStartingTimeout(info *model.TimerInfo) {
 }
 
 func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
-	lc.log.Warn().
+	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Str("timeout_mode", info.Mode.String()).

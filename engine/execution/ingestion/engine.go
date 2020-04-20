@@ -156,8 +156,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		var err error
 		switch v := event.(type) {
-		case *flow.Block:
-			err = e.handleBlock(v)
+		case *messages.BlockProposal:
+			err = e.handleBlockProposal(v)
 		case *messages.CollectionResponse:
 			err = e.handleCollectionResponse(v)
 		case *messages.ExecutionStateDelta:
@@ -176,40 +176,29 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // Main handling
 
-func (e *Engine) handleBlock(block *flow.Block) error {
+func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
+
+	block := &flow.Block{
+		Header:  *proposal.Header,
+		Payload: *proposal.Payload,
+	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block)).
 		Uint64("block_view", block.View).
 		Msg("received block")
 
-	err := e.blocks.Store(block)
-	if err != nil {
-		return fmt.Errorf("could not store block: %w", err)
-	}
-
-	// TODO: for MVP assume we're only receiving finalized blocks
-	// but in essence, Execution Node doesn't care about finalization of blocks.
-	// However, for executing scripts we need latest finalized state and
-	// we need protocol state to be able to find other nodes
-	// Once the Consensus Follower is ready to be implemented, this should be replaced
-
-	//blockID := block.Header.ID()
-	//err = e.state.Mutate().Finalize(blockID)
-	//if err != nil {
-	//	return fmt.Errorf("could not finalize block: %w", err)
-	//}
-
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
 	}
 
-	err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
+	return e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
 
-		err := e.sendCollectionsRequest(executableBlock, blockByCollection)
+		// synchronize DB writing to avoid tx conflicts with multiple blocks arriving fast
+		err := e.blocks.Store(block)
 		if err != nil {
-			return fmt.Errorf("cannot send collection requests: %w", err)
+			return fmt.Errorf("could not store block: %w", err)
 		}
 
 		// if block fits into execution queue, that's it
@@ -257,6 +246,12 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 			panic(fmt.Sprintf("unexpected error while accessing storage, shutting down: %v", err))
 		}
 
+		//if block has state commitment, it has all parents blocks
+		err = e.sendCollectionsRequest(executableBlock, blockByCollection)
+		if err != nil {
+			return fmt.Errorf("cannot send collection requests: %w", err)
+		}
+
 		executableBlock.StartState = stateCommitment
 		newQueue, err := enqueue(executableBlock, executionQueues) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
 		if err != nil {
@@ -274,8 +269,6 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 		return nil
 	})
-
-	return err
 }
 
 // tryRequeueOrphans tries to put orphaned queue into other queues after a new block has been added
@@ -317,22 +310,29 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 			Msg("error while handing computation results")
 		return
 	}
+	err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, _ *stdmap.QueuesBackdata) error {
 
-	err = e.mempool.ExecutionQueue.Run(func(executionQueues *stdmap.QueuesBackdata) error {
 		executionQueue, err := executionQueues.ByID(executableBlock.Block.ID())
 		if err != nil {
 			return fmt.Errorf("fatal error - executed block not present in execution queue: %w", err)
 		}
 		_, newQueues := executionQueue.Dismount()
 		for _, queue := range newQueues {
-			queue.Head.Item.(*entity.ExecutableBlock).StartState = finalState
+			newExecutableBlock := queue.Head.Item.(*entity.ExecutableBlock)
+			newExecutableBlock.StartState = finalState
+
+			err = e.sendCollectionsRequest(newExecutableBlock, blockByCollection)
+			if err != nil {
+				return fmt.Errorf("cannot send collection requests: %w", err)
+			}
+
 			err := executionQueues.Add(queue)
 			if err != nil {
 				return fmt.Errorf("fatal error cannot add children block to execution queue: %w", err)
 			}
-			if queue.Head.Item.(*entity.ExecutableBlock).IsComplete() {
+			if newExecutableBlock.IsComplete() {
 				e.wg.Add(1)
-				go e.executeBlock(queue.Head.Item.(*entity.ExecutableBlock))
+				go e.executeBlock(newExecutableBlock)
 			}
 		}
 		executionQueues.Rem(executableBlock.Block.ID())
@@ -379,6 +379,7 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		}
 
 		if executableBlock.IsComplete() {
+
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
 
 			e.wg.Add(1)
@@ -389,10 +390,15 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 	})
 }
 
-func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
+func (e *Engine) findCollectionNodesForGuarantee(blockID flow.Identifier, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
+
+	filter := filter.And(
+		filter.HasRole(flow.RoleCollection),
+		filter.HasNodeID(guarantee.SignerIDs...))
+
+	identities, err := e.state.AtBlockID(blockID).Identities(filter)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve identities: %w", err)
+		return nil, fmt.Errorf("could not retrieve identities (%s): %w", blockID, err)
 	}
 	if len(identities) < 1 {
 		return nil, fmt.Errorf("no Collection identity found")
@@ -477,12 +483,9 @@ func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Que
 
 func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) error {
 
-	collectionIdentifiers, err := e.findCollectionNodes()
-	if err != nil {
-		return err
-	}
-
 	for _, guarantee := range executableBlock.Block.Guarantees {
+
+		// TODO - Once collection can map to multiple blocks
 		maybeBlockByCollection, err := backdata.ByID(guarantee.ID())
 		if err == mempool.ErrEntityNotFound {
 			executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
@@ -497,12 +500,17 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 				return fmt.Errorf("cannot save collection-block mapping: %w", err)
 			}
 
+			collectionGuaranteesIdentifiers, err := e.findCollectionNodesForGuarantee(executableBlock.Block.ID(), guarantee)
+			if err != nil {
+				return err
+			}
+
 			e.log.Debug().
 				Hex("block_id", logging.Entity(executableBlock.Block)).
 				Hex("collection_id", logging.ID(guarantee.ID())).
 				Msg("requesting collection")
 
-			err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID()}, collectionIdentifiers...)
+			err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID()}, collectionGuaranteesIdentifiers...)
 			if err != nil {
 				// TODO - this should be handled, maybe retried or put into some form of a queue
 				e.log.Err(err).Msg("cannot submit collection requests")
@@ -513,7 +521,7 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 			return fmt.Errorf("cannot get an item from mempool: %w", err)
 		}
 		if maybeBlockByCollection.ID() != executableBlock.Block.ID() {
-			// Should not happen in MVP
+			// Should not happen in MVP, but see TODO at beggining of the function
 			return fmt.Errorf("received block with same collection alredy pointing to different block ")
 		}
 	}
@@ -797,6 +805,13 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 
 	defer e.syncWg.Done()
 
+	// synchronize DB writing to avoid tx conflicts with multiple blocks arriving fast
+	err := e.blocks.Store(executionStateDelta.Block)
+	if err != nil {
+		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).
+			Err(err).Msg("could  not store block from delta")
+	}
+
 	//TODO - validate state sync, reject invalid messages, change provider
 	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateInteractions, executionStateDelta.Events, executionStateDelta.StartState)
 	if err != nil {
@@ -816,7 +831,7 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 	// last block was saved
 	if targetBlockID == executionStateDelta.Block.ID() {
 
-		err = e.mempool.Run(func(_ *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
+		err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, orphanQueues *stdmap.QueuesBackdata) error {
 			var syncedQueue *queue.Queue
 			hadQueue := false
 			for _, q := range orphanQueues.All() {
@@ -835,11 +850,17 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 			executableBlock := syncedQueue.Head.Item.(*entity.ExecutableBlock)
 			executableBlock.StartState = executionStateDelta.EndState
 
-			err = executionQueues.Add(syncedQueue)
+			err = e.sendCollectionsRequest(executableBlock, blockByCollection)
 			if err != nil {
-				panic(fmt.Sprintf("cannot add queue to execution queues"))
+				return fmt.Errorf("cannot send collection requests: %w", err)
 			}
+
 			if executableBlock.IsComplete() {
+				err = executionQueues.Add(syncedQueue)
+				if err != nil {
+					panic(fmt.Sprintf("cannot add queue to execution queues"))
+				}
+
 				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
 
 				e.wg.Add(1)

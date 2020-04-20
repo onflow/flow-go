@@ -35,7 +35,7 @@ type Engine struct {
 	me           module.Local
 	protoState   protocol.State // flow-wide protocol chain state
 	clusterState cluster.State  // cluster-specific chain state
-	ingest       network.Engine
+	validator    module.TransactionValidator
 	pool         mempool.Transactions
 	transactions storage.Transactions
 	headers      storage.Headers
@@ -53,7 +53,7 @@ func New(
 	protoState protocol.State,
 	clusterState cluster.State,
 	metrics module.Metrics,
-	ingest network.Engine,
+	validator module.TransactionValidator,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
 	headers storage.Headers,
@@ -73,7 +73,7 @@ func New(
 		protoState:   protoState,
 		clusterState: clusterState,
 		metrics:      metrics,
-		ingest:       ingest,
+		validator:    validator,
 		pool:         pool,
 		transactions: transactions,
 		headers:      headers,
@@ -235,7 +235,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Int("collection_size", len(payload.Collection.Transactions)).
 		Msg("submitted proposal")
 
-	e.metrics.StartCollectionToGuarantee(payload.Collection.Light())
+	// report proposed collection (case that we are leader)
+	e.metrics.CollectionProposed(payload.Collection.Light())
 
 	return nil
 }
@@ -290,7 +291,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	var merr *multierror.Error
 	for _, tx := range collection.Transactions {
 		if !e.pool.Has(tx.ID()) {
-			err = e.ingest.ProcessLocal(tx)
+			err = e.validator.ValidateTransaction(tx)
 			if err != nil {
 				merr = multierror.Append(merr, err)
 			}
@@ -320,6 +321,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 	// submit the proposal to hotstuff for processing
 	e.coldstuff.SubmitProposal(proposal.Header, parent.View)
+
+	// report proposed (case that we are follower)
+	e.metrics.CollectionProposed(proposal.Payload.Collection.Light())
 
 	children, ok := e.cache.ByParentID(blockID)
 	if !ok {

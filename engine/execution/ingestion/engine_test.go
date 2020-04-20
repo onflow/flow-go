@@ -17,7 +17,6 @@ import (
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
@@ -28,9 +27,18 @@ import (
 )
 
 var (
-	collectionIdentity = unittest.IdentityFixture()
-	myIdentity         = unittest.IdentityFixture()
+	collection1Identity = unittest.IdentityFixture()
+	collection2Identity = unittest.IdentityFixture()
+	collection3Identity = unittest.IdentityFixture()
+	myIdentity          = unittest.IdentityFixture()
 )
+
+func init() {
+	collection1Identity.Role = flow.RoleCollection
+	collection2Identity.Role = flow.RoleCollection
+	collection3Identity.Role = flow.RoleCollection
+	myIdentity.Role = flow.RoleExecution
+}
 
 type testingContext struct {
 	t                  *testing.T
@@ -43,15 +51,12 @@ type testingContext struct {
 	computationManager *computation.ComputationManager
 	providerEngine     *provider.ProviderEngine
 	executionState     *state.ExecutionState
+	snapshot           *protocol.Snapshot
 }
 
-func runWithEngine(t *testing.T, f func(ctx testingContext)) {
-
-	collectionIdentity.Role = flow.RoleCollection
-	myIdentity.Role = flow.RoleExecution
+func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	net := module.NewMockNetwork(ctrl)
 
@@ -75,9 +80,19 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	executionState := new(state.ExecutionState)
 	snapshot := new(protocol.Snapshot)
 
-	identityList := flow.IdentityList{myIdentity, collectionIdentity}
+	var engine *Engine
 
-	protocolState.On("Final").Return(snapshot).Maybe()
+	defer func() {
+		<-engine.Done()
+		ctrl.Finish()
+		computationEngine.AssertExpectations(t)
+		protocolState.AssertExpectations(t)
+		executionState.AssertExpectations(t)
+		providerEngine.AssertExpectations(t)
+	}()
+
+	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
+
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
 	}, nil)
@@ -85,8 +100,6 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
-
-	var engine *Engine
 
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
@@ -106,75 +119,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 		computationManager: computationEngine,
 		providerEngine:     providerEngine,
 		executionState:     executionState,
-	})
-
-	computationEngine.AssertExpectations(t)
-	protocolState.AssertExpectations(t)
-	executionState.AssertExpectations(t)
-	providerEngine.AssertExpectations(t)
-}
-
-// TODO Currently those tests check if objects are stored directly
-// actually validating data is a part of further tasks and likely those
-// tests will have to change to reflect this
-func TestCollectionRequests(t *testing.T) {
-
-	runWithEngine(t, func(ctx testingContext) {
-
-		block := unittest.BlockFixture()
-		//To make sure we always have collection if the block fixture changes
-		block.Guarantees = unittest.CollectionGuaranteesFixture(5)
-
-		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
-		for _, col := range block.Guarantees {
-			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
-		}
-		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(nil, realStorage.ErrNotFound)
-
-		err := ctx.engine.ProcessLocal(&block)
-
-		require.NoError(t, err)
-	})
-}
-
-func TestValidatingCollectionResponse(t *testing.T) {
-
-	runWithEngine(t, func(ctx testingContext) {
-
-		executableBlock := unittest.ExecutableBlockFixture(1)
-
-		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
-
-		id := executableBlock.Collections()[0].Guarantee.ID()
-
-		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(unittest.StateCommitmentFixture(), realStorage.ErrNotFound)
-
-		err := ctx.engine.ProcessLocal(executableBlock.Block)
-		require.NoError(t, err)
-
-		rightResponse := messages.CollectionResponse{
-			Collection: flow.Collection{Transactions: executableBlock.Collections()[0].Transactions},
-		}
-
-		// TODO Enable wrong response sending once we have a way to hash collection
-
-		// wrongResponse := provider.CollectionResponse{
-		//	Fingerprint:  fingerprint,
-		//	Transactions: []flow.TransactionBody{tx},
-		// }
-
-		// engine.Submit(collectionIdentity.NodeID, wrongResponse)
-
-		// no interaction with conduit for finished executableBlock
-		// </TODO enable>
-
-		//ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(unittest.StateCommitmentFixture(), realStorage.ErrNotFound)
-
-		//ctx.assertSuccessfulBlockComputation(executableBlock.Block)
-
-		err = ctx.engine.ProcessLocal(&rightResponse)
-		require.NoError(t, err)
+		snapshot:           snapshot,
 	})
 }
 
@@ -191,7 +136,9 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 	ctx.executionState.On("PersistStateInteractions", executableBlock.Block.ID(), mock.Anything).Return(nil)
 
 	for _, view := range computationResult.StateSnapshots {
-		ctx.executionState.On("CommitDelta", view.Delta).Return(newStateCommitment, nil)
+		ctx.executionState.On("CommitDelta", view.Delta, executableBlock.StartState).Return(newStateCommitment, nil)
+		ctx.executionState.On("GetRegistersWithProofs", mock.Anything, mock.Anything).Return(nil, nil, nil)
+
 		ctx.executionState.On("PersistChunkDataPack", mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
 			return bytes.Equal(f.StartState, executableBlock.StartState)
 		})).Return(nil)
@@ -212,33 +159,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 	})).Return(nil)
 }
 
-func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
-
-	runWithEngine(t, func(ctx testingContext) {
-
-		executableBlock := unittest.ExecutableBlockFixture(3)
-
-		for _, col := range executableBlock.Block.Guarantees {
-			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
-		}
-
-		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(unittest.StateCommitmentFixture(), realStorage.ErrNotFound)
-
-		err := ctx.engine.ProcessLocal(executableBlock.Block)
-		require.NoError(t, err)
-
-		// Expected no calls so test should fail if any occurs
-
-		rightResponse := messages.CollectionResponse{
-			Collection: flow.Collection{Transactions: executableBlock.Collections()[1].Transactions},
-		}
-
-		err = ctx.engine.ProcessLocal(&rightResponse)
-		require.NoError(t, err)
-	})
-}
-
 func TestExecutionGenerationResultsAreChained(t *testing.T) {
 
 	execState := new(state.ExecutionState)
@@ -247,7 +167,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 		execState: execState,
 	}
 
-	executableBlock := unittest.ExecutableBlockFixture(2)
+	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{{collection1Identity.NodeID}, {collection1Identity.NodeID}})
 	endState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
 
@@ -266,10 +186,10 @@ func TestBlockOutOfOrder(t *testing.T) {
 
 	runWithEngine(t, func(ctx testingContext) {
 
-		executableBlockA := unittest.ExecutableBlockFixture(0)
-		executableBlockB := unittest.ExecutableBlockFixtureWithParent(0, &executableBlockA.Block.Header)
-		executableBlockC := unittest.ExecutableBlockFixtureWithParent(0, &executableBlockA.Block.Header)
-		executableBlockD := unittest.ExecutableBlockFixtureWithParent(0, &executableBlockC.Block.Header)
+		executableBlockA := unittest.ExecutableBlockFixture(nil)
+		executableBlockB := unittest.ExecutableBlockFixtureWithParent(nil, &executableBlockA.Block.Header)
+		executableBlockC := unittest.ExecutableBlockFixtureWithParent(nil, &executableBlockA.Block.Header)
+		executableBlockD := unittest.ExecutableBlockFixtureWithParent(nil, &executableBlockC.Block.Header)
 		executableBlockA.StartState = unittest.StateCommitmentFixture()
 
 		// blocks has no collections, so state is essentially the same
@@ -292,21 +212,27 @@ func TestBlockOutOfOrder(t *testing.T) {
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockC.Block))
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockD.Block))
 
+		// initialize the proposals
+		proposalA := unittest.ProposalFromBlock(executableBlockA.Block)
+		proposalB := unittest.ProposalFromBlock(executableBlockB.Block)
+		proposalC := unittest.ProposalFromBlock(executableBlockC.Block)
+		proposalD := unittest.ProposalFromBlock(executableBlockD.Block)
+
 		// no execution state, so puts to waiting queue
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlockB.Block.ParentID).Return(nil, realStorage.ErrNotFound)
-		err := ctx.engine.handleBlock(executableBlockB.Block)
+		err := ctx.engine.handleBlockProposal(proposalB)
 		require.NoError(t, err)
 
 		// no execution state, no connection to other nodes
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlockC.Block.ParentID).Return(nil, realStorage.ErrNotFound)
-		err = ctx.engine.handleBlock(executableBlockC.Block)
+		err = ctx.engine.handleBlockProposal(proposalC)
 		require.NoError(t, err)
 
 		// child of c so no need to query execution state
 
 		// we account for every call, so if this call would have happen, test will fail
 		// ctx.executionState.On("StateCommitmentByBlockID", executableBlockD.Block.ParentID).Return(nil, realStorage.ErrNotFound)
-		err = ctx.engine.handleBlock(executableBlockD.Block)
+		err = ctx.engine.handleBlockProposal(proposalD)
 		require.NoError(t, err)
 
 		// make sure there were no extra calls at this point in test
@@ -321,7 +247,7 @@ func TestBlockOutOfOrder(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(executableBlockD, unittest.IdentifierFixture())
 
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlockA.Block.ParentID).Return(executableBlockA.StartState, nil)
-		err = ctx.engine.handleBlock(executableBlockA.Block)
+		err = ctx.engine.handleBlockProposal(proposalA)
 		require.NoError(t, err)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
@@ -337,7 +263,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		scriptResult := []byte{1}
 
 		// Ensure block we're about to query against is executable
-		executableBlock := unittest.ExecutableBlockFixture(0)
+		executableBlock := unittest.ExecutableBlockFixture(nil)
 		executableBlock.StartState = unittest.StateCommitmentFixture()
 
 		snapshot := new(protocol.Snapshot)

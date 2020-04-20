@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
 // decode will decode the envelope into an entity.
@@ -20,20 +19,6 @@ func decode(env Envelope) (interface{}, error) {
 	// create the desired message
 	var v interface{}
 	switch env.Code {
-
-	// trickle overlay network
-	case CodePing:
-		v = &trickle.Ping{}
-	case CodePong:
-		v = &trickle.Pong{}
-	case CodeAuth:
-		v = &trickle.Auth{}
-	case CodeAnnounce:
-		v = &trickle.Announce{}
-	case CodeRequest:
-		v = &trickle.Request{}
-	case CodeResponse:
-		v = &trickle.Response{}
 
 	// consensus
 	case CodeBlockProposal:
@@ -71,9 +56,10 @@ func decode(env Envelope) (interface{}, error) {
 		v = &flow.TransactionBody{}
 	case CodeTransaction:
 		v = &flow.Transaction{}
-
-	case CodeBlock:
-		v = &flow.Block{}
+	case CodeTransactionRequest:
+		v = &messages.TransactionRequest{}
+	case CodeTransactionResponse:
+		v = &messages.TransactionResponse{}
 
 	case CodeCollectionRequest:
 		v = &messages.CollectionRequest{}

@@ -7,13 +7,13 @@ import (
 )
 
 func NetworkingKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenEcdsaP256)
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
 	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenEcdsaP256 {
+	if err != nil || n != crypto.KeyGenSeedMinLenECDSAP256 {
 		return nil, err
 	}
 
-	sk, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 	return sk, err
 }
 
@@ -32,13 +32,13 @@ func NetworkingKeys(n int) ([]crypto.PrivateKey, error) {
 }
 
 func StakingKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenBlsBls12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenBlsBls12381 {
+	if err != nil || n != crypto.KeyGenSeedMinLenBLSBLS12381 {
 		return nil, err
 	}
 
-	sk, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	return sk, err
 }
 

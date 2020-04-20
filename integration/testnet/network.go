@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +15,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/hashicorp/go-multierror"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 
@@ -53,40 +55,47 @@ const (
 
 func init() {
 	testingdock.Verbose = true
+	//testingdock.SpawnSequential = true
 }
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
 	suite       *testingdock.Suite
-	Network     *testingdock.Network
+	config      NetworkConfig
+	cli         *dockerclient.Client
+	network     *testingdock.Network
 	Containers  []*Container
 	AccessPorts map[string]string
 }
 
 // Identities returns a list of identities, one for each node in the network.
-func (n *FlowNetwork) Identities() flow.IdentityList {
-	il := make(flow.IdentityList, 0, len(n.Containers))
-	for _, c := range n.Containers {
+func (net *FlowNetwork) Identities() flow.IdentityList {
+	il := make(flow.IdentityList, 0, len(net.Containers))
+	for _, c := range net.Containers {
 		il = append(il, c.Config.Identity())
 	}
 	return il
 }
 
 // Start starts the network.
-func (n *FlowNetwork) Start(ctx context.Context) {
-	n.suite.Start(ctx)
+func (net *FlowNetwork) Start(ctx context.Context) {
+
+	// makes it easier to see logs for a specific test case
+	fmt.Println(">>>> starting network: ", net.config.Name)
+
+	net.suite.Start(ctx)
 }
 
-// Stop stops the network and cleans up all resources. If you need to inspect
+// Remove stops the network and cleans up all resources. If you need to inspect
 // state, first stop the containers, then check state, then clean up resources.
-func (n *FlowNetwork) Stop() error {
+func (net *FlowNetwork) Remove() error {
 
-	err := n.StopContainers()
+	err := net.Stop()
 	if err != nil {
 		return fmt.Errorf("could not stop network: %w", err)
 	}
 
-	err = n.Cleanup()
+	err = net.Cleanup()
 	if err != nil {
 		return fmt.Errorf("could not clean up network resources: %w", err)
 	}
@@ -94,11 +103,13 @@ func (n *FlowNetwork) Stop() error {
 	return nil
 }
 
-// StopContainers spins down the network.
-func (n *FlowNetwork) StopContainers() error {
+// Stop disconnects and stops all containers in the network, then
+// removes the network.
+func (net *FlowNetwork) Stop() error {
 
-	// stop the containers
-	err := n.suite.Close()
+	fmt.Println("<<<< stopping network: ", net.config.Name)
+
+	err := net.suite.Close()
 	if err != nil {
 		return fmt.Errorf("could not stop containers: %w", err)
 	}
@@ -107,12 +118,12 @@ func (n *FlowNetwork) StopContainers() error {
 }
 
 // Cleanup cleans up all temporary files used by the network.
-func (n *FlowNetwork) Cleanup() error {
+func (net *FlowNetwork) Cleanup() error {
 
 	// remove data directories
 	var merr *multierror.Error
-	for _, c := range n.Containers {
-		err := os.RemoveAll(c.DataDir)
+	for _, c := range net.Containers {
+		err := os.RemoveAll(c.datadir)
 		if err != nil {
 			merr = multierror.Append(merr, err)
 		}
@@ -123,8 +134,8 @@ func (n *FlowNetwork) Cleanup() error {
 
 // ContainerByID returns the container with the given node ID. If such a
 // container exists, returns true. Otherwise returns false.
-func (n *FlowNetwork) ContainerByID(id flow.Identifier) (*Container, bool) {
-	for _, c := range n.Containers {
+func (net *FlowNetwork) ContainerByID(id flow.Identifier) (*Container, bool) {
+	for _, c := range net.Containers {
 		if c.Config.NodeID == id {
 			return c, true
 		}
@@ -133,9 +144,30 @@ func (n *FlowNetwork) ContainerByID(id flow.Identifier) (*Container, bool) {
 }
 
 // NetworkConfig is the config for the network.
-// TODO add nclusters, etc. here
 type NetworkConfig struct {
-	Nodes []NodeConfig
+	Nodes     []NodeConfig
+	Name      string
+	NClusters uint
+}
+
+func NewNetworkConfig(name string, nodes []NodeConfig, opts ...func(*NetworkConfig)) NetworkConfig {
+	c := NetworkConfig{
+		Nodes:     nodes,
+		Name:      name,
+		NClusters: 1, // default to 1 cluster
+	}
+
+	for _, apply := range opts {
+		apply(&c)
+	}
+
+	return c
+}
+
+func WithClusters(n uint) func(*NetworkConfig) {
+	return func(conf *NetworkConfig) {
+		conf.NClusters = n
+	}
 }
 
 func (n *NetworkConfig) Len() int {
@@ -156,7 +188,7 @@ type NodeConfig struct {
 	Role       flow.Role
 	Stake      uint64
 	Identifier flow.Identifier
-	LogLevel   string
+	LogLevel   zerolog.Level
 	Ghost      bool
 }
 
@@ -165,7 +197,7 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 		Role:       role,
 		Stake:      1000,                         // default stake
 		Identifier: unittest.IdentifierFixture(), // default random ID
-		LogLevel:   "debug",                      // log at debug by default
+		LogLevel:   zerolog.DebugLevel,           // log at debug by default
 	}
 
 	for _, apply := range opts {
@@ -173,6 +205,22 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 	}
 
 	return c
+}
+
+// NewNodeConfigSet creates a set of node configs with the given role. The nodes
+// are given sequential IDs with a common prefix to make reading logs easier.
+func NewNodeConfigSet(n int, role flow.Role, opts ...func(*NodeConfig)) []NodeConfig {
+
+	// each node in the set has a common 4-digit prefix, separated from their
+	// index with a `0` character
+	idPrefix := rand.Intn(10000) * 100
+
+	confs := make([]NodeConfig, n)
+	for i := 0; i < n; i++ {
+		confs[i] = NewNodeConfig(role, append(opts, WithIDInt(uint(idPrefix+i+1)))...)
+	}
+
+	return confs
 }
 
 func WithID(id flow.Identifier) func(config *NodeConfig) {
@@ -199,26 +247,21 @@ func WithIDInt(id uint) func(config *NodeConfig) {
 	return WithID(flowID)
 }
 
-func WithLogLevel(level string) func(config *NodeConfig) {
+func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.LogLevel = level
 	}
 }
-
 func AsGhost(ghost bool) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.Ghost = ghost
 	}
 }
-
-func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*FlowNetwork, error) {
+func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
-
-	if nNodes == 0 {
-		return nil, fmt.Errorf("must specify at least one node")
-	}
+	require.NotZero(t, len(networkConf.Nodes), "must specify at least one node")
 
 	// Sort so that access nodes start up last
 	sort.Sort(&networkConf)
@@ -230,11 +273,11 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 	)
 	require.Nil(t, err)
 
-	suite, _ := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{
+	suite, _ := testingdock.GetOrCreateSuite(t, networkConf.Name, testingdock.SuiteOpts{
 		Client: dockerClient,
 	})
 	network := suite.Network(testingdock.NetworkOpts{
-		Name: name,
+		Name: networkConf.Name,
 	})
 
 	// generate staking and networking keys for each configured node
@@ -286,34 +329,39 @@ func PrepareFlowNetwork(t *testing.T, name string, networkConf NetworkConfig) (*
 	}
 
 	flowNetwork := &FlowNetwork{
+		cli:         dockerClient,
+		config:      networkConf,
 		suite:       suite,
-		Network:     network,
+		network:     network,
 		Containers:  make([]*Container, 0, nNodes),
 		AccessPorts: make(map[string]string),
 	}
-	// create container for each node
+
+	// add each node to the network
 	for _, nodeConf := range confs {
-		err := flowNetwork.createContainer(t, suite, bootstrapDir, nodeConf)
+		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.Nil(t, err)
 	}
 
-	return flowNetwork, nil
+	return flowNetwork
 }
 
-// createContainer ...
-func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bootstrapDir string, conf ContainerConfig) error {
+// AddNode creates a node container with the given config and adds it to the
+// network.
+func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf ContainerConfig) error {
+
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
-		Name:      conf.ContainerName,
+		Name:      nodeConf.ContainerName,
 		Config: &container.Config{
-			Image: conf.ImageName(),
+			Image: nodeConf.ImageName(),
 			User:  currentUser(),
 			Cmd: []string{
-				fmt.Sprintf("--nodeid=%s", conf.NodeID.String()),
+				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
-				fmt.Sprintf("--loglevel=%s", conf.LogLevel),
-				"--nclusters=1",
+				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
+				fmt.Sprintf("--nclusters=%d", net.config.NClusters),
 			},
 		},
 		HostConfig: &container.HostConfig{},
@@ -328,10 +376,11 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 	}
 
 	nodeContainer := &Container{
-		Config:  conf,
+		Config:  nodeConf,
 		Ports:   make(map[string]string),
-		DataDir: tmpdir,
-		Opts:    opts,
+		datadir: tmpdir,
+		net:     net,
+		opts:    opts,
 	}
 
 	// create a directory for the node database
@@ -349,8 +398,8 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 		fmt.Sprintf("%s:%s:ro", bootstrapDir, DefaultBootstrapDir),
 	)
 
-	if !conf.Ghost {
-		switch conf.Role {
+	if !nodeConf.Ghost {
+		switch nodeConf.Role {
 		case flow.RoleCollection:
 
 			hostPort := testingdock.RandomPort(t)
@@ -359,11 +408,10 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 			nodeContainer.bindPort(hostPort, containerPort)
 
 			nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			if !nodeContainer.Config.Ghost {
-				nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
-			}
 			nodeContainer.Ports[ColNodeAPIPort] = hostPort
-			f.AccessPorts[ColNodeAPIPort] = hostPort
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+			net.AccessPorts[ColNodeAPIPort] = hostPort
+
 		case flow.RoleExecution:
 
 			hostPort := testingdock.RandomPort(t)
@@ -373,10 +421,10 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			if !nodeContainer.Config.Ghost {
-				nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 			}
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
-			f.AccessPorts[ExeNodeAPIPort] = hostPort
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
+			net.AccessPorts[ExeNodeAPIPort] = hostPort
 
 			// create directories for execution state trie and values in the tmp
 			// host directory.
@@ -389,24 +437,38 @@ func (f *FlowNetwork) createContainer(t *testing.T, suite *testingdock.Suite, bo
 			)
 
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+
+		case flow.RoleAccess:
+			hostPort := testingdock.RandomPort(t)
+			containerPort := "9000/tcp"
+
+			nodeContainer.bindPort(hostPort, containerPort)
+
+			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			// Should always have at least 1 collection and execution node
+			nodeContainer.addFlag("ingress-addr", "collection_1:9000")
+			nodeContainer.addFlag("script-addr", "execution_1:9000")
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+			nodeContainer.Ports[AccessNodeAPIPort] = hostPort
+			net.AccessPorts[AccessNodeAPIPort] = hostPort
+
+		case flow.RoleVerification:
+			nodeContainer.addFlag("alpha", "1")
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)
 		containerPort := "9000/tcp"
 
-		nodeContainer.bindPort(hostPort, containerPort)
-
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-		if !nodeContainer.Config.Ghost {
-			nodeContainer.Opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
-		}
+		nodeContainer.bindPort(hostPort, containerPort)
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 	}
 
-	suiteContainer := suite.Container(*opts)
+	suiteContainer := net.suite.Container(*opts)
+	net.network.After(suiteContainer)
 	nodeContainer.Container = suiteContainer
-	f.Containers = append(f.Containers, nodeContainer)
-	f.Network.After(nodeContainer.Container)
+	net.Containers = append(net.Containers, nodeContainer)
+
 	return nil
 }
 
