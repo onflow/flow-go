@@ -624,6 +624,23 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 		}
 		// removes receipt from mempool to avoid further iteration
 		e.authReceipts.Rem(vc.Receipt.ID())
+
+		// removes all pending and authenticated receipts with the same result
+		// pending receipts
+		for _, p := range e.pendingReceipts.All() {
+			// TODO check for nil dereferencing
+			if e.ingestedResultIDs.Has(p.Receipt.ExecutionResult.ID()) {
+				e.pendingReceipts.Rem(p.Receipt.ID())
+			}
+		}
+
+		// authenticated receipts
+		for _, areceipt := range e.authReceipts.All() {
+			// TODO check for nil dereferencing
+			if e.ingestedResultIDs.Has(areceipt.ExecutionResult.ID()) {
+				e.authReceipts.Rem(areceipt.ID())
+			}
+		}
 	}
 }
 
