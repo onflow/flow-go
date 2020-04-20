@@ -105,7 +105,7 @@ func randomSubset(ids flow.IdentityList, size int, rnd random.Rand) (flow.Identi
 
 	result := make(flow.IdentityList, 0, size)
 
-	if size == 0 || len(ids) < size {
+	if size == 0 {
 		return result, nil
 	}
 
