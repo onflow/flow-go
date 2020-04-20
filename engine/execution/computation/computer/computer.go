@@ -62,7 +62,7 @@ func (e *blockComputer) executeBlock(
 
 		collectionView := stateView.NewChild()
 
-		collEvents, nextIndex, gas, state, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
+		collEvents, nextIndex, gas, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
@@ -100,14 +100,14 @@ func (e *blockComputer) executeCollection(
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
 			txIndex++
-			return nil, txIndex, 0, 0, fmt.Errorf("failed to execute transaction: %w", err)
+			return nil, txIndex, 0, fmt.Errorf("failed to execute transaction: %w", err)
 		}
 		txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
 		txIndex++
 		gasUsed += result.GasUsed
 
 		if err != nil {
-			return nil, txIndex, 0, 0, fmt.Errorf("failed to create flow events: %w", err)
+			return nil, txIndex, 0, fmt.Errorf("failed to create flow events: %w", err)
 		}
 		events = append(events, txEvents...)
 		if result.Succeeded() {

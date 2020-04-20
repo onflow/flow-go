@@ -13,7 +13,6 @@ type TransactionResult struct {
 	Logs          []string
 	Error         error
 	GasUsed       uint64
-	StateReads    uint64
 }
 
 func (r TransactionResult) Succeeded() bool {
