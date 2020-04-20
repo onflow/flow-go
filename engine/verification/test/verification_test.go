@@ -35,7 +35,7 @@ func TestHappyPath(t *testing.T) {
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
-	verNodeCount := 1
+	verNodeCount := 2
 
 	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -96,7 +96,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// mock execution node
-	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities[0], identities, completeER)
+	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
 
 	// mock consensus node
 	conNode, conEngine := setupMockConsensusNode(t, hub, conIdentity, verIdentities[0], identities, completeER)
@@ -213,7 +213,7 @@ func TestHappyPath(t *testing.T) {
 func setupMockExeNode(t *testing.T,
 	hub *stub.Hub,
 	exeIdentity *flow.Identity,
-	verIdentity *flow.Identity,
+	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	completeER verification.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
 	// mock the execution node with a generic node and mocked engine
@@ -221,46 +221,49 @@ func setupMockExeNode(t *testing.T,
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
 	exeEngine := new(network.Engine)
 
-	exeChunkDataSeen := make(map[flow.Identifier]struct{})
+	// map form verIds --> chunks they asked
+	// exeChunkDataSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
 
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
 
 	chunkNum := len(completeER.ChunkDataPacks)
-	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
-				require.True(t, ok)
-				for i := 0; i < chunkNum; i++ {
-					chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
-					require.True(t, ok, "chunk out of range requested")
-					chunkID := chunk.ID()
-					if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
-						// each assigned chunk data pack should be requested only once
-						_, ok := exeChunkDataSeen[chunkID]
-						require.False(t, ok)
-						exeChunkDataSeen[chunkID] = struct{}{}
+	for _, verIdentity := range verIdentities {
+		exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
+			Run(func(args testifymock.Arguments) {
+				if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
+					require.True(t, ok)
+					for i := 0; i < chunkNum; i++ {
+						chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
+						require.True(t, ok, "chunk out of range requested")
+						chunkID := chunk.ID()
+						if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
+							// each assigned chunk data pack should be requested only once
+							//_, ok := exeChunkDataSeen[chunkID]
+							//require.False(t, ok)
+							//exeChunkDataSeen[chunkID] = struct{}{}
 
-						// publishes the chunk data pack response to the network
-						res := &messages.ChunkDataPackResponse{
-							Data: *completeER.ChunkDataPacks[i],
+							// publishes the chunk data pack response to the network
+							res := &messages.ChunkDataPackResponse{
+								Data: *completeER.ChunkDataPacks[i],
+							}
+							err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
+							assert.Nil(t, err)
+							return
 						}
-						err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
-						assert.Nil(t, err)
-						return
 					}
+					require.Error(t, fmt.Errorf(" requested an unidentifed chunk data pack %v", req))
 				}
-				require.Error(t, fmt.Errorf(" requested an unidentifed chunk data pack %v", req))
-			}
 
-			require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
+				require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
 
-		}).
-		Return(nil).
-		// half of the chunks assigned to the verification node
-		// for each chunk the verification node contacts execution node
-		// once for chunk data pack
-		Times(chunkNum / 2)
+			}).
+			Return(nil).
+			// half of the chunks assigned to the verification node
+			// for each chunk the verification node contacts execution node
+			// once for chunk data pack
+			Times(chunkNum / 2)
+	}
 
 	return &exeNode, exeEngine
 }
