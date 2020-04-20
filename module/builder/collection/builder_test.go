@@ -45,6 +45,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.chainID = suite.genesis.ChainID
 
 	suite.pool, err = stdmap.NewTransactions(1000)
+	suite.Assert().Nil(err)
 
 	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
 
@@ -84,7 +85,7 @@ func (suite *BuilderSuite) InsertBlock(block model.Block) {
 	suite.Assert().Nil(err)
 }
 
-func TestMutator(t *testing.T) {
+func TestBuilder(t *testing.T) {
 	suite.Run(t, new(BuilderSuite))
 }
 
