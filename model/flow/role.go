@@ -65,3 +65,7 @@ func (r *Role) UnmarshalText(text []byte) error {
 	*r, err = ParseRole(string(text))
 	return err
 }
+
+func Roles() []Role {
+	return []Role{RoleCollection, RoleConsensus, RoleExecution, RoleVerification, RoleAccess}
+}
