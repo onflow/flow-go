@@ -2,6 +2,8 @@ package trie
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,8 +28,11 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 		defaultHash := GetDefaultHashForHeight(trieHeight - 1)
 
-		retvalues, proofHldr, err := smt.Read(keys, false, defaultHash)
-		require.NoError(t, err)
+		retvalues, _, err := smt.Read(keys, true, defaultHash)
+		require.NoError(t, err, "error reading values")
+
+		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		require.NoError(t, err, "error getting batch proof")
 
 		psmt, err := NewPSMT(defaultHash, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 
@@ -87,7 +92,12 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		newRoot, err := smt.Update(keys, values, emptyTree.root)
 		require.NoError(t, err, "error updating trie")
 
-		retvalues, proofHldr, _ := smt.Read(keys, false, newRoot)
+		retvalues, _, err := smt.Read(keys, true, newRoot)
+		require.NoError(t, err, "error reading values")
+
+		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		require.NoError(t, err, "error getting batch proof")
+
 		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
 
@@ -109,6 +119,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 	})
 
 }
+
 func TestPartialTrieMiddleBranching(t *testing.T) {
 	trieHeight := 9 // should be key size (in bits) + 1
 
@@ -132,9 +143,17 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		keys = append(keys, key1, key2, key3)
 		values = append(values, value1, value2, value3)
 
-		retvalues, proofHldr, _ := smt.Read(keys, false, emptyTree.root)
+		retvalues, _, err := smt.Read(keys, true, emptyTree.root)
+		require.NoError(t, err, "error reading values")
+
+		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		require.NoError(t, err, "error getting batch proof")
+
 		psmt, err := NewPSMT(emptyTree.root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
+
+		fmt.Println(smt.Print(emptyTree.root))
+		fmt.Println(hex.EncodeToString(emptyTree.root))
 
 		if !bytes.Equal(emptyTree.root, psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [before update]")
@@ -184,7 +203,12 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		keys = append(keys, key1, key2)
 		values = append(values, value1, value2)
 
-		retvalues, proofHldr, _ := smt.Read(keys, false, emptyTree.root)
+		retvalues, _, err := smt.Read(keys, true, emptyTree.root)
+		require.NoError(t, err, "error reading values")
+
+		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		require.NoError(t, err, "error getting batch proof")
+
 		psmt, err := NewPSMT(emptyTree.root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
 
@@ -212,6 +236,48 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		require.NoError(t, err, "error updating psmt")
 		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [after update]")
+		}
+	})
+
+}
+
+func TestMixProof(t *testing.T) {
+	trieHeight := 9 // should be key size (in bits) + 1
+
+	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+		key1 := make([]byte, 1) // 00000001 (1)
+		utils.SetBit(key1, 7)
+		value1 := []byte{'a'}
+
+		key2 := make([]byte, 1) // 00000010 (2)
+		utils.SetBit(key2, 6)
+
+		key3 := make([]byte, 1) // 00001000 (8)
+		utils.SetBit(key3, 4)
+		value3 := []byte{'c'}
+
+		keys := make([][]byte, 0)
+		values := make([][]byte, 0)
+		keys = append(keys, key1, key3)
+		values = append(values, value1, value3)
+
+		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		require.NoError(t, err, "error updating trie")
+
+		keys = make([][]byte, 0)
+		keys = append(keys, key1, key2, key3)
+
+		retvalues, _, err := smt.Read(keys, true, newRoot)
+		require.NoError(t, err, "error reading values")
+
+		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		require.NoError(t, err, "error getting batch proof")
+
+		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+		require.NoError(t, err, "error building partial trie")
+
+		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
+			t.Fatal("rootNode hash doesn't match [before update]")
 		}
 	})
 

@@ -296,7 +296,10 @@ func (n *node) GetHeight() int {
 func (n *node) ComputeValue() []byte {
 	// leaf node
 	if n.lChild == nil && n.rChild == nil {
-		return n.value
+		if n.value != nil {
+			return n.value
+		}
+		return GetDefaultHashForHeight(n.height)
 	}
 	// otherwise compute
 	h1 := GetDefaultHashForHeight(n.height - 1)
@@ -449,6 +452,29 @@ func (p *proofHolder) ExportWholeProof() ([][]byte, [][][]byte, []bool, []uint8)
 	return p.flags, p.proofs, p.inclusions, p.sizes
 }
 
+func (p *proofHolder) String() string {
+	res := fmt.Sprintf("> proof holder includes %d proofs\n", len(p.sizes))
+	for i, size := range p.sizes {
+		proofStr := ""
+		if p.inclusions[i] {
+			proofStr += fmt.Sprintf("\t proof %d (inclusion)\n", i)
+		} else {
+			proofStr += fmt.Sprintf("\t proof %d (noninclusion)\n", i)
+		}
+		flags := p.flags[i]
+		proof := p.proofs[i]
+		proofIndex := 0
+		for j := 0; j < int(size); j++ {
+			if utils.IsBitSet(flags, j) {
+				proofStr += fmt.Sprintf("\t\t %d: [%x]\n", j, proof[proofIndex])
+				proofIndex++
+			}
+		}
+		res = res + "\n" + proofStr
+	}
+	return res
+}
+
 // updateCache takes a key and all relevant parts of the proof and insterts in into the cache, removing values if needed
 func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool, size uint8) {
 	holder := newProofHolder([][]byte{flag}, [][][]byte{proof}, []bool{inclusion}, []uint8{size})
@@ -566,6 +592,17 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 	return values, holder, nil
 }
 
+// Print writes the structure of the tree to the stdout.
+// Warning this should only be used for debugging
+func (s *SMT) Print(root Root) error {
+	t, err := s.forest.Get(root)
+	if err != nil {
+		return err
+	}
+	fmt.Println(t.rootNode.FmtStr("", ""))
+	return nil
+}
+
 // verifyInclusionFlag is used to verify a flag against the trie given the key
 func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, error) {
 
@@ -606,6 +643,100 @@ func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, err
 	return true, nil
 }
 
+func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
+
+	tree, err := s.forest.Get(root)
+	if err != nil {
+		return nil, fmt.Errorf("invalid historical state: %w", err)
+	}
+
+	flags := make([][]byte, len(keys))
+	proofs := make([][][]byte, len(keys))
+	inclusions := make([]bool, len(keys))
+	sizes := make([]uint8, len(keys))
+
+	notFoundKeys := make([][]byte, 0)
+	values := make([][]byte, 0)
+
+	// TODO do we need this?
+	// if s.IsSnapshot(tree) {
+	//if bytes.Equal(root, currRoot) {
+	for _, key := range keys {
+		res, err := tree.database.GetKVDB(key)
+		// TODO check the error
+		if err != nil || len(res) <= 0 {
+			notFoundKeys = append(notFoundKeys, key)
+			values = append(values, []byte{})
+		}
+	}
+
+	// newRoot, err := s.Update(notFoundKeys, values, root)
+
+	treeRoot, err := tree.Root()
+	if err != nil {
+		return nil, fmt.Errorf("cannot load tree root: %w", err)
+	}
+	// TODO check with Maks that this doesn't have a side effect (e.g. trie be there but no value in DB)
+	if len(notFoundKeys) > 0 {
+		fmt.Println(treeRoot.FmtStr("", ""))
+		batcher := tree.database.NewBatcher()
+		treeRoot, err = s.UpdateAtomically(treeRoot, notFoundKeys, values, s.height-1, batcher, tree.database)
+		fmt.Println(treeRoot.FmtStr("", ""))
+		if err != nil {
+			return nil, err
+		}
+		// TODO assert new Root is the same
+		// if bytes.Equal(new)
+	}
+
+	// fmt.Println(err)
+	// fmt.Println(hex.EncodeToString(root))
+	// fmt.Println(hex.EncodeToString(newRootNode.ComputeValue()))
+	fmt.Println("-==-=-=--=-=-=-==")
+	fmt.Println(treeRoot.FmtStr("", ""))
+
+	for i, key := range keys {
+
+		flag := make([]byte, s.GetHeight()/8) // Flag is used to save space by removing default hashesh (zeros) from the proofs
+		proof := make([][]byte, 0)
+		proofLen := uint8(0)
+
+		curr := treeRoot
+
+		for i := 0; i < s.GetHeight()-1; i++ {
+			fmt.Println(key)
+			if bytes.Equal(curr.key, key) {
+				break
+			}
+			if utils.IsBitSet(key, i) {
+				if curr.lChild != nil {
+					utils.SetBit(flag, i)
+					proof = append(proof, curr.lChild.value)
+				}
+				curr = curr.rChild
+			} else {
+				if curr.rChild != nil {
+					utils.SetBit(flag, i)
+					proof = append(proof, curr.rChild.value)
+				}
+				curr = curr.lChild
+			}
+			if curr == nil {
+				// TODO error ??
+				break
+			}
+			proofLen++
+		}
+
+		flags[i] = flag
+		proofs[i] = proof
+		inclusions[i] = true
+		sizes[i] = proofLen
+	}
+	holder := newProofHolder(flags, proofs, inclusions, sizes)
+	return holder, nil
+}
+
 // GetProof searching the tree for a value if it exists, and returns the flag and then proof
 func (s *SMT) GetProof(key []byte, rootNode *node) ([]byte, [][]byte, uint8, bool, error) {
 	flag := make([]byte, s.GetHeight()/8) // Flag is used to save space by removing default hashesh (zeros) from the proofs
@@ -640,11 +771,12 @@ func (s *SMT) GetProof(key []byte, rootNode *node) ([]byte, [][]byte, uint8, boo
 			nextKey = curr.lChild
 		}
 
-		if nextKey == nil {
+		if nextKey == nil { // nonInclusion proof
 			return flag, proof, proofLen, false, nil
 		} else {
 			curr = nextKey
 			proofLen++
+			// inclusion proof
 			if bytes.Equal(key, curr.key) {
 				return flag, proof, proofLen, true, nil
 			}
@@ -818,7 +950,6 @@ func VerifyNonInclusionProof(key []byte, value []byte, flag []byte, proof [][]by
 	if len(proof) != 0 {
 		proofIndex = len(proof) - 1
 	}
-
 	// base case at the bottom of the trie
 	computed := ComputeCompactValue(key, value, height-int(size)-1, height)
 	for i := int(size) - 1; i > -1; i-- {
@@ -852,7 +983,7 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 	numStates := newTree.historicalStateRoots.Len()
 	switch {
 	case numStates > s.numHistoricalStates:
-		return errors.New("We have more Historical States stored than the Maximum Allowed Amount!")
+		return errors.New("we have more Historical States stored than the Maximum Allowed Amount!")
 
 	case numStates >= int(s.snapshotInterval):
 		if newTree.height%s.snapshotInterval != 0 {
@@ -1167,7 +1298,10 @@ func (s *SMT) IsSnapshot(t *tree) bool {
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []byte {
-
+	// if value is nil return default hash
+	if len(value) == 0 {
+		return GetDefaultHashForHeight(height)
+	}
 	computedHash := HashLeaf(key, value)
 
 	for j := maxHeight - 2; j > maxHeight-height-2; j-- {

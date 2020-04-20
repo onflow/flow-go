@@ -49,6 +49,15 @@ func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, 
 	return p.root.ComputeValue(), failedKeys, nil
 }
 
+type proofEntry struct {
+	key         []byte
+	value       []byte
+	flags       []byte
+	proof       [][]byte
+	size        uint8
+	isInclusion bool
+}
+
 // NewPSMT builds a Partial Sparse Merkle Tree (PMST) given a chunkdatapack registertouches
 func NewPSMT(
 	rootValue []byte, // stateCommitment
@@ -80,12 +89,9 @@ func NewPSMT(
 
 	// iterating over proofs for building the tree
 	for i, proofSize := range proofholder.sizes {
-		value := values[i]
 		key := keys[i]
 		flags := proofholder.flags[i]
 		proof := proofholder.proofs[i]
-		inclusion := proofholder.inclusions[i]
-
 		// check key size
 		if len(key) != psmt.keyByteSize {
 			return nil, fmt.Errorf("key [%x] size (%d) doesn't match the trie height (%d)", key, len(key), height)
@@ -111,9 +117,10 @@ func NewPSMT(
 			if utils.IsBitSet(key, j) { // right branching
 				if currentNode.lChild == nil { // check left child
 					currentNode.lChild = newNode(v, currentNode.height-1)
-				} else if !bytes.Equal(currentNode.lChild.ComputeValue(), v) {
-					return nil, fmt.Errorf("incompatible proof (left node value doesn't match) expected [%x], got [%x]", currentNode.lChild.ComputeValue(), v)
 				}
+				//  else if !bytes.Equal(currentNode.lChild.ComputeValue(), v) {
+				// 	return nil, fmt.Errorf("incompatible proof (left node value doesn't match) expected [%x], got [%x]", currentNode.lChild.ComputeValue(), v)
+				// }
 				if currentNode.rChild == nil { // create the right child if not exist
 					currentNode.rChild = newNode(nil, currentNode.height-1)
 				}
@@ -121,63 +128,97 @@ func NewPSMT(
 			} else { // left branching
 				if currentNode.rChild == nil { // check right child
 					currentNode.rChild = newNode(v, currentNode.height-1)
-				} else if !bytes.Equal(currentNode.rChild.ComputeValue(), v) {
-					return nil, fmt.Errorf("incompatible proof (right node value doesn't match) expected [%x], got [%x]", currentNode.rChild.ComputeValue(), v)
 				}
+				// else if !bytes.Equal(currentNode.rChild.ComputeValue(), v) {
+				// 	return nil, fmt.Errorf("incompatible proof (right node value doesn't match) expected [%x], got [%x]", currentNode.rChild.ComputeValue(), v)
+				// }
 				if currentNode.lChild == nil { // create the left child if not exist
 					currentNode.lChild = newNode(nil, currentNode.height-1)
 				}
 				currentNode = currentNode.lChild
 			}
 		}
-		if inclusion { // inclusion proof
-			// for the last node set the leaf key and value
-			currentNode.key = key
-			currentNode.value = ComputeCompactValue(key, value, currentNode.height, height)
-			// keep a reference to this node by key (for update purpose)
-			psmt.keyLookUp[string(key)] = currentNode
 
-		} else { // exclusion proof
-			// for exclusion proofs we continue expanding the tree till it reaches the leaf node
-			// this will simplify the update operations for these nodes
-			// by differentiating unknown registers and unset registers
-			for j := currentNode.height; j > 0; j-- {
-				// set node value based on the height
-				v := GetDefaultHashForHeight(j - 1)
-				// continue checking the key bits
-				if utils.IsBitSet(key, height-j-1) { // right branching
-					if currentNode.rChild == nil {
-						currentNode.rChild = newNode(nil, currentNode.height-1)
-					}
-					if currentNode.lChild == nil {
-						currentNode.lChild = newNode(v, currentNode.height-1)
-					}
-					if !bytes.Equal(currentNode.lChild.ComputeValue(), v) {
-						return nil, fmt.Errorf("incompatible proof (left node value doesn't match) expected [%x], got [%x]", currentNode.lChild.ComputeValue(), v)
-					}
-					currentNode = currentNode.rChild
-				} else { // left branching
-					if currentNode.lChild == nil {
-						currentNode.lChild = newNode(nil, currentNode.height-1)
-					}
-					if currentNode.rChild == nil {
-						currentNode.rChild = newNode(v, currentNode.height-1)
-					}
-					if !bytes.Equal(currentNode.rChild.ComputeValue(), v) {
-						return nil, fmt.Errorf("incompatible proof (left node value doesn't match) expected [%x], got [%x]", currentNode.rChild.ComputeValue(), v)
-					}
-					currentNode = currentNode.lChild
-				}
+	}
+	// Fill
+	// iterating over proofs for building the tree
+	// TODO change this to proof entry
+	for i := range proofholder.sizes {
+		value := values[i]
+		key := keys[i]
+		inclusion := proofholder.inclusions[i]
+
+		// start from the rootNode and walk down the tree until reaching leaf
+		currentNode := psmt.root
+		for j := 0; j < height; j++ {
+			if currentNode.lChild == nil && currentNode.rChild == nil {
+				break
 			}
-			// set leaf
-			currentNode.key = key
-			psmt.keyLookUp[string(key)] = currentNode
-			currentNode.value = defaultLeafHash
+			if utils.IsBitSet(key, j) { // right branching
+				currentNode = currentNode.rChild
+			} else { // left branching
+				currentNode = currentNode.lChild
+			}
 		}
+		if currentNode.key != nil && !bytes.Equal(currentNode.key, key) {
+			return nil, fmt.Errorf("incompatible proof (two keys for the same node) ([%x], [%x])", currentNode.key, key)
+		}
+		// for the last node set the leaf key and value
+		currentNode.key = key
+		if inclusion { // inclusion proof
+			currentNode.value = ComputeCompactValue(key, value, currentNode.height, height)
+		}
+		// keep a reference to this node by key (for update purpose)
+		psmt.keyLookUp[string(key)] = currentNode
+
 	}
 	// check if the state commitment matches the root value of the partial trie
 	if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
 		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.ComputeValue(), rootValue)
 	}
 	return &psmt, nil
+}
+
+func getProofEntries(keys [][]byte,
+	values [][]byte,
+	proofs [][]byte,
+	acceptableKeyByteSize int,
+) ([]proofEntry, error) {
+	// We need to decode proof encodings
+	proofholder, err := DecodeProof(proofs)
+	if err != nil {
+		return nil, fmt.Errorf("decoding proof failed: %w", err)
+	}
+	fmt.Println(proofholder)
+
+	// check size of key, values and proofs
+	if len(keys) != len(values) {
+		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(values))
+	}
+
+	if len(keys) != len(proofholder.sizes) {
+		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(proofholder.sizes))
+	}
+
+	// sort proofs
+	proofItems := make([]proofEntry, 0)
+
+	// validate and generate proof entries
+	for i, proofSize := range proofholder.sizes {
+		// check key size
+		if len(keys[i]) != acceptableKeyByteSize {
+			return nil, fmt.Errorf("key [%x] size (%d) doesn't match the acceptable key size (%d bytes)", keys[i], len(keys[i]), acceptableKeyByteSize)
+		}
+		pe := proofEntry{
+			key:         keys[i],
+			value:       values[i],
+			flags:       proofholder.flags[i],
+			proof:       proofholder.proofs[i],
+			size:        proofSize,
+			isInclusion: proofholder.inclusions[i],
+		}
+		proofItems = append(proofItems, pe)
+	}
+	return proofItems, nil
+
 }

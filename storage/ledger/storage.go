@@ -90,6 +90,11 @@ func (f *TrieStorage) UpdateRegisters(
 	return newStateCommitment, nil
 }
 
+// Warning this should only be used on small trees
+func (f *TrieStorage) Print(stateCommitment flow.StateCommitment) {
+	f.tree.Print(stateCommitment)
+}
+
 // GetRegistersWithProof read the values at the given registers at the given flow.StateCommitment
 // This is untrusted so a proof is generated
 func (f *TrieStorage) GetRegistersWithProof(
@@ -100,10 +105,17 @@ func (f *TrieStorage) GetRegistersWithProof(
 	proofs []flow.StorageProof,
 	err error,
 ) {
-	values, proofHldr, err := f.tree.Read(registerIDs, false, stateCommitment)
+
+	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not get registers with proofs: %w", err)
+		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
 	}
+
+	proofHldr, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
+	}
+
 	proofs = trie.EncodeProof(proofHldr)
 	return values, proofs, err
 }
