@@ -9,4 +9,8 @@ test:
 # Run the integration test suite
 .PHONY: integration-test
 integration-test:
-	GO111MODULE=on go test -tags relic -count=1 `go list ./... | grep integration/tests` -run ^TestExecutionNodes$
+	GO111MODULE=on go test -tags relic -count=1 `go list ./... | grep integration/tests`
+
+.PHONY: integration-test-execution
+integration-test-execution:
+	GO111MODULE=on go test -tags relic -count=1 `go list ./... | grep integration/tests` -run ^TestExecution$$

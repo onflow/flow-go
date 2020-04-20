@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -71,29 +72,33 @@ func (gs *ExecutionSuite) SetupTest() {
 	// generate the three consensus identities
 	gs.nodeIDs = unittest.IdentifierListFixture(3)
 	for _, nodeID := range gs.nodeIDs {
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
+			testnet.WithLogLevel(zerolog.FatalLevel))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 	}
 
 	// need two execution nodes
 	gs.exe1ID = unittest.IdentifierFixture()
-	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(gs.exe1ID))
+	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(gs.exe1ID),
+		testnet.WithLogLevel(zerolog.FatalLevel))
 	nodeConfigs = append(nodeConfigs, exe1Config)
 	gs.exe2ID = unittest.IdentifierFixture()
-	exe2Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(gs.exe2ID))
+	exe2Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(gs.exe2ID),
+		testnet.WithLogLevel(zerolog.FatalLevel))
 	nodeConfigs = append(nodeConfigs, exe2Config)
 
 	// need one verification node
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification)
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
 	nodeConfigs = append(nodeConfigs, verConfig)
 
 	// need one collection node
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection)
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel))
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	// add the ghost node config
 	gs.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.ghostID), testnet.AsGhost(true))
+	ghostConfig := testnet.NewNodeConfig(flow.RoleAccess, testnet.WithID(gs.ghostID), testnet.AsGhost(true),
+		testnet.WithLogLevel(zerolog.DebugLevel))
 	nodeConfigs = append(nodeConfigs, ghostConfig)
 
 	// generate the network config
