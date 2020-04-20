@@ -293,6 +293,9 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	colNode.Done()
 	conNode.Done()
 	exeNode.Done()
+
+}
+
 // setupMockExeNode creates and returns an execution node and its registered engine in the network (hub)
 // it mocks the process method of execution node that on receiving a chunk data pack request from
 // a certain verifier node (verIdentity) about a chunk that is assigned to it, replies the chunk back
