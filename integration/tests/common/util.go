@@ -16,7 +16,31 @@ import (
 
 // deployCounter deploys a counter contract using the given client.
 func deployCounter(ctx context.Context, client *testnet.Client) error {
-	return client.DeployContract(ctx, unittest.ContractCounterFixture())
+
+	contract := dsl.Contract{
+		Name: "Testing",
+		Members: []dsl.CadenceCode{
+			dsl.Resource{
+				Name: "Counter",
+				Code: `
+				pub var count: Int
+
+				init() {
+					self.count = 0
+				}
+				pub fun add(_ count: Int) {
+					self.count = self.count + count
+				}`,
+			},
+			dsl.Code(`
+				pub fun createCounter(): @Counter {
+					return <-create Counter()
+				}`,
+			),
+		},
+	}
+
+	return client.DeployContract(ctx, contract)
 }
 
 // readCounter executes a script to read the value of a counter. The counter

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/utils/dsl"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -451,6 +452,23 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	}
 
 	return tb
+}
+
+func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {
+	return func(tx *flow.TransactionBody) {
+		tx.Script = []byte(txDSL.ToCadence())
+	}
+}
+
+func TransactionDSLFixture() dsl.Transaction {
+	return dsl.Transaction{
+		Import: dsl.Import{Address: flow.RootAddress},
+		Content: dsl.Prepare{
+			Content: dsl.Code(`
+				pub fun main() {}
+			`),
+		},
+	}
 }
 
 // VerifiableChunk returns a complete verifiable chunk with an
