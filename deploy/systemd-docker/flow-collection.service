@@ -1,6 +1,7 @@
 [Unit]
 Description=Flow Collection Node running with Docker
-After=network-online.target
+Requires=docker.service
+After=network-online.target docker.service
 
 [Install]
 WantedBy=default.target
