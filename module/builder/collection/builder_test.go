@@ -88,7 +88,7 @@ func TestMutator(t *testing.T) {
 	suite.Run(t, new(BuilderSuite))
 }
 
-func (suite *BuilderSuite) TestBuild_NonExistentParent() {
+func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 	// use a non-existent parent ID
 	parentID := unittest.IdentifierFixture()
 
@@ -96,7 +96,7 @@ func (suite *BuilderSuite) TestBuild_NonExistentParent() {
 	suite.Assert().Error(err)
 }
 
-func (suite *BuilderSuite) TestBuild_Success() {
+func (suite *BuilderSuite) TestBuildOn_Success() {
 
 	var expectedView uint64 = 42
 	setter := func(h *flow.Header) {
@@ -121,7 +121,7 @@ func (suite *BuilderSuite) TestBuild_Success() {
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(mempoolTransactions)...))
 }
 
-func (suite *BuilderSuite) TestBuild_WithForks() {
+func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	t := suite.T()
 
 	mempoolTransactions := suite.pool.All()
@@ -161,7 +161,7 @@ func (suite *BuilderSuite) TestBuild_WithForks() {
 	assert.False(t, collectionContains(builtCollection, tx1.ID()))
 }
 
-func (suite *BuilderSuite) TestBuild_ConflictingFinalizedBlock() {
+func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	t := suite.T()
 
 	mempoolTransactions := suite.pool.All()
