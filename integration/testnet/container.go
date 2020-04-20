@@ -112,11 +112,6 @@ func (c *Container) ExecutionLedgerStorage() (*ledger.TrieStorage, error) {
 // re-started with Start.
 func (c *Container) Pause() error {
 
-	//TODO
-	// update testingdock to remove autoremove option
-	// ref https://github.com/dapperlabs/testingdock/blob/master/container.go#L132
-	panic("not supported")
-
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
 
@@ -137,22 +132,17 @@ func (c *Container) Pause() error {
 // preserving existing state.
 func (c *Container) Start() error {
 
-	//TODO
-	// update testingdock to remove autoremove option
-	// ref https://github.com/dapperlabs/testingdock/blob/master/container.go#L132
-	panic("not supported")
-
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
 
 	err := c.net.cli.ContainerStart(ctx, c.ID, types.ContainerStartOptions{})
 	if err != nil {
-		return fmt.Errorf("could not stop container: %w", err)
+		return fmt.Errorf("could not start container: %w", err)
 	}
 
 	err = c.waitForCondition(ctx, containerRunning)
 	if err != nil {
-		return fmt.Errorf("error waiting for container to stop: %w", err)
+		return fmt.Errorf("error waiting for container to start: %w", err)
 	}
 
 	return nil

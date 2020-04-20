@@ -119,6 +119,9 @@ func (net *FlowNetwork) Stop() error {
 
 // Cleanup cleans up all temporary files used by the network.
 func (net *FlowNetwork) Cleanup() error {
+	if err := net.suite.Remove(); err != nil {
+		return err
+	}
 
 	// remove data directories
 	var merr *multierror.Error
