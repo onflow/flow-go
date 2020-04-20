@@ -28,7 +28,7 @@ func (pub *EncodableNetworkPubKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var err error
-	pub.PublicKey, err = crypto.DecodePublicKey(crypto.EcdsaP256, bz)
+	pub.PublicKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, bz)
 	return err
 }
 
@@ -56,7 +56,7 @@ func (priv *EncodableNetworkPrivKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var err error
-	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.EcdsaP256, bz)
+	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.ECDSAP256, bz)
 	return err
 }
 
@@ -82,7 +82,7 @@ func (pub *EncodableStakingPubKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var err error
-	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BlsBls12381, bz)
+	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, bz)
 	return err
 }
 
@@ -110,7 +110,7 @@ func (priv *EncodableStakingPrivKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var err error
-	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.BlsBls12381, bz)
+	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.BLSBLS12381, bz)
 	return err
 }
 
@@ -136,7 +136,7 @@ func (pub *EncodableRandomBeaconPubKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var err error
-	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BlsBls12381, bz)
+	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, bz)
 	return err
 }
 
@@ -164,6 +164,6 @@ func (priv *EncodableRandomBeaconPrivKey) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var err error
-	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.BlsBls12381, bz)
+	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.BLSBLS12381, bz)
 	return err
 }

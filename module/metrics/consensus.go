@@ -20,47 +20,61 @@ const (
 	// from a seal being received
 	// to being included in a finalized block
 	consensusBlockToSeal = "consensus_block_to_seal"
+
+	HotstuffEventTypeTimeout    = "timeout"
+	HotstuffEventTypeOnProposal = "onproposal"
+	HotstuffEventTypeOnVote     = "onvote"
 )
 
 var (
 	finalizedSealCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "selas_per_finalized_block",
-		Namespace: "consensus",
+		Name:      "seals_per_finalized_block",
+		Namespace: namespaceConsensus,
 		Help:      "The number of seals included in the finalized block",
 	})
 	finalizedBlockCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "finalized_blocks",
-		Namespace: "consensus",
+		Namespace: namespaceConsensus,
 		Help:      "The number of finalized blocks",
 	})
 	collectionsPerBlock = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "collections_per_block",
-		Namespace: "consensus",
+		Namespace: namespaceConsensus,
 		Help:      "the number of collections per block",
 	})
 	collectionsPerFinalizedBlockCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "collections_per_finalized_block",
-		Namespace: "consensus",
+		Namespace: namespaceConsensus,
 		Help:      "The number of collections included in the finalized block",
 	})
-	hotstuffBusyDuration = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "hotstuff_busy_duration",
-		Namespace: "consensus",
+	hotstuffBusyDuration = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "busy_duration",
+		Namespace: namespaceConsensus,
+		Subsystem: "hotstuff",
 		Help:      "the duration of how long hotstuff's event loop has been busy processing one event",
-	})
+	}, []string{"event_type"})
 	hotstuffIdleDuration = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "hotstuff_idle_duration",
-		Namespace: "consensus",
+		Name:      "idle_duration",
+		Namespace: namespaceConsensus,
+		Subsystem: "hotstuff",
 		Help:      "the duration of how long hotstuff's event loop has been idle without processing any event",
 	})
+	hotstuffWaitDuration = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "wait_duration",
+		Namespace: namespaceConsensus,
+		Subsystem: "hotstuff",
+		Help:      "the duration of how long an event has been waited in the hotstuff event loop queue before being processed.",
+	}, []string{"event_type"})
 	newviewGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "cur_view",
-		Namespace: "consensus",
+		Namespace: namespaceConsensus,
+		Subsystem: "hotstuff",
 		Help:      "the current view that the event handler has entered",
 	})
 	newestKnownQC = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "view_of_newest_known_qc",
-		Namespace: "consensus",
+		Namespace: namespaceConsensus,
+		Subsystem: "hotstuff",
 		Help:      "The view of the newest known qc from hotstuff",
 	})
 )
@@ -101,13 +115,18 @@ func (c *Collector) SealsInFinalizedBlock(count int) {
 }
 
 // HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
-func (c *Collector) HotStuffBusyDuration(duration time.Duration) {
-	hotstuffBusyDuration.Set(float64(duration))
+func (c *Collector) HotStuffBusyDuration(duration time.Duration, event string) {
+	hotstuffBusyDuration.WithLabelValues(event).Set(float64(duration))
 }
 
 // HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 func (c *Collector) HotStuffIdleDuration(duration time.Duration) {
 	hotstuffIdleDuration.Set(float64(duration))
+}
+
+// HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
+func (c *Collector) HotStuffWaitDuration(duration time.Duration, event string) {
+	hotstuffWaitDuration.WithLabelValues(event).Set(float64(duration))
 }
 
 // FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)

@@ -129,6 +129,6 @@ func main() {
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events)
 			return rpcEng, nil
-		}).Run()
+		}).Run("execution")
 
 }

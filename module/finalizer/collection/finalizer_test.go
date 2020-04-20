@@ -34,7 +34,7 @@ func TestFinalizer(t *testing.T) {
 		require.NoError(t, err)
 
 		metrics := &modulemock.Metrics{}
-		metrics.On("FinishTransactionToCollectionGuarantee", mock.Anything).Return()
+		metrics.On("CollectionGuaranteed", mock.Anything).Return()
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {

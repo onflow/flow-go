@@ -4,6 +4,7 @@ package middleware
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 )
 
 // Middleware represents the middleware layer, which manages the connections to
@@ -12,7 +13,7 @@ import (
 type Middleware interface {
 	Start(overlay Overlay) error
 	Stop()
-	Send(channelID uint8, msg interface{}, targetIDs ...flow.Identifier) error
+	Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error
 	Subscribe(channelID uint8) error
 }
 
@@ -23,7 +24,7 @@ type Overlay interface {
 	Topology() (map[flow.Identifier]flow.Identity, error)
 	// Identity returns a map of all identifier to flow identity
 	Identity() (map[flow.Identifier]flow.Identity, error)
-	Receive(nodeID flow.Identifier, msg interface{}) error
+	Receive(nodeID flow.Identifier, msg *message.Message) error
 }
 
 // Connection represents an interface to read from & write to a connection.

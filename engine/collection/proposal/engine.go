@@ -235,7 +235,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Int("collection_size", len(payload.Collection.Transactions)).
 		Msg("submitted proposal")
 
-	e.metrics.StartCollectionToGuarantee(payload.Collection.Light())
+	// report proposed collection (case that we are leader)
+	e.metrics.CollectionProposed(payload.Collection.Light())
 
 	return nil
 }
@@ -320,6 +321,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 	// submit the proposal to hotstuff for processing
 	e.coldstuff.SubmitProposal(proposal.Header, parent.View)
+
+	// report proposed (case that we are follower)
+	e.metrics.CollectionProposed(proposal.Payload.Collection.Light())
 
 	children, ok := e.cache.ByParentID(blockID)
 	if !ok {

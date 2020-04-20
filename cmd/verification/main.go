@@ -27,9 +27,18 @@ import (
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
+const (
+	// following lists the operational parameters of verification node
+	//
+	// chunkAssignmentAlpha represents number of verification
+	// DISCLAIMER: alpha down there is not a production-level value
+	chunkAssignmentAlpha = 1
+)
+
 func main() {
 
 	var (
+		alpha                uint
 		receiptLimit         uint
 		collectionLimit      uint
 		blockLimit           uint
@@ -58,6 +67,7 @@ func main() {
 			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of authCollections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 100000, "maximum number of chunk states in the memory pool")
+			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			authReceipts, err = stdmap.NewReceipts(receiptLimit)
@@ -117,17 +127,11 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			alpha := 10
-			assigner, err := chunks.NewPublicAssignment(alpha)
+
+			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
 			if err != nil {
 				return nil, err
 			}
-			// https://github.com/dapperlabs/flow-go/issues/2703
-			// proper place and only referenced here
-			// Todo the hardcoded default value should be parameterized as alpha in a
-			// should be moved to a configuration class
-			// DISCLAIMER: alpha down there is not a production-level value
-
 			ingestEng, err = ingest.New(node.Logger,
 				node.Network,
 				node.State,
@@ -200,5 +204,5 @@ func main() {
 
 			return followerEng.WithSynchronization(sync), nil
 		}).
-		Run()
+		Run("verification")
 }

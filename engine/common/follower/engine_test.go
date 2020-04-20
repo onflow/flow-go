@@ -11,7 +11,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -80,15 +79,12 @@ func (suite *Suite) TestHandlePendingBlock() {
 	// don't return the parent when requested
 	suite.snapshot.On("Head").Return(&head.Header, nil).Once()
 	suite.cache.On("ByID", block.ParentID).Return(nil, false).Once()
-	suite.cache.On("Add", mock.Anything).Return(true).Once()
+	suite.cache.On("Add", mock.Anything, mock.Anything).Return(true).Once()
 	suite.sync.On("RequestBlock", block.ParentID).Return().Once()
 
 	// submit the block
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-	err := suite.engine.Process(originID, &proposal)
+	proposal := unittest.ProposalFromBlock(&block)
+	err := suite.engine.Process(originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertNotCalled(suite.T(), "SubmitProposal", mock.Anything)
@@ -111,18 +107,15 @@ func (suite *Suite) TestHandleProposal() {
 	// we should be able to extend the state with the block
 	suite.mutator.On("Extend", block.ID()).Return(nil).Once()
 	// we should be able to get the parent header by its ID
-	suite.headers.On("ByBlockID", block.ParentID).Return(&parent.Header, nil)
+	suite.headers.On("ByBlockID", block.ParentID).Return(&parent.Header, nil).Once()
 	// we do not have any children cached
 	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 	// the proposal should be forwarded to the follower
 	suite.follower.On("SubmitProposal", &block.Header, parent.View).Once()
 
 	// submit the block
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-	err := suite.engine.Process(originID, &proposal)
+	proposal := unittest.ProposalFromBlock(&block)
+	err := suite.engine.Process(originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())
@@ -150,7 +143,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.mutator.On("Extend", child.ID()).Return(nil).Once()
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
-	suite.headers.On("ByBlockID", block.ID()).Return(&block.Header, nil)
+	suite.headers.On("ByBlockID", block.ID()).Return(&block.Header, nil).Once()
 	// should submit to follower
 	suite.follower.On("SubmitProposal", &block.Header, parent.View).Once()
 	suite.follower.On("SubmitProposal", &child.Header, block.View).Once()
@@ -168,11 +161,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.cache.On("DropForParent", block.ID()).Once()
 
 	// submit the block proposal
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-	err := suite.engine.Process(originID, &proposal)
+	proposal := unittest.ProposalFromBlock(&block)
+	err := suite.engine.Process(originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())

@@ -38,7 +38,8 @@ func TestCollectionRequests(t *testing.T) {
 
 		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(unittest.StateCommitmentFixture(), nil)
 
-		err := ctx.engine.ProcessLocal(&block)
+		proposal := unittest.ProposalFromBlock(&block)
+		err := ctx.engine.ProcessLocal(proposal)
 
 		require.NoError(t, err)
 	})
@@ -66,7 +67,8 @@ func TestNoCollectionRequestsIfParentMissing(t *testing.T) {
 
 		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(nil, realStorage.ErrNotFound)
 
-		err := ctx.engine.ProcessLocal(&block)
+		proposal := unittest.ProposalFromBlock(&block)
+		err := ctx.engine.ProcessLocal(proposal)
 
 		require.NoError(t, err)
 	})
@@ -88,7 +90,8 @@ func TestValidatingCollectionResponse(t *testing.T) {
 		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id}), gomock.Eq(collection1Identity.NodeID)).Return(nil)
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(executableBlock.StartState, nil)
 
-		err := ctx.engine.ProcessLocal(executableBlock.Block)
+		proposal := unittest.ProposalFromBlock(executableBlock.Block)
+		err := ctx.engine.ProcessLocal(proposal)
 		require.NoError(t, err)
 
 		rightResponse := messages.CollectionResponse{
@@ -137,7 +140,8 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(unittest.StateCommitmentFixture(), nil)
 
-		err := ctx.engine.ProcessLocal(executableBlock.Block)
+		proposal := unittest.ProposalFromBlock(executableBlock.Block)
+		err := ctx.engine.ProcessLocal(proposal)
 		require.NoError(t, err)
 
 		// Expected no calls so test should fail if any occurs

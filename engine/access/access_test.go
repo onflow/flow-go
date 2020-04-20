@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/flow/protobuf/go/flow/access"
 	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"

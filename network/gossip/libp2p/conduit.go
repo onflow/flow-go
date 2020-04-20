@@ -1,6 +1,8 @@
 package libp2p
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 // SubmitFunc is a function that submits the given event for the given engine to
 // the overlay network, which should take care of delivering it to the given

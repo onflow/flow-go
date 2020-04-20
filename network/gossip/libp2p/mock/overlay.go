@@ -3,6 +3,7 @@
 package mock
 
 import flow "github.com/dapperlabs/flow-go/model/flow"
+import message "github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 
 import mock "github.com/stretchr/testify/mock"
 
@@ -35,11 +36,11 @@ func (_m *Overlay) Identity() (map[flow.Identifier]flow.Identity, error) {
 }
 
 // Receive provides a mock function with given fields: nodeID, msg
-func (_m *Overlay) Receive(nodeID flow.Identifier, msg interface{}) error {
+func (_m *Overlay) Receive(nodeID flow.Identifier, msg *message.Message) error {
 	ret := _m.Called(nodeID, msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, interface{}) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *message.Message) error); ok {
 		r0 = rf(nodeID, msg)
 	} else {
 		r0 = ret.Error(0)

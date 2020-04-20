@@ -176,8 +176,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		},
 	)
 
-	// program persister to always succeed
-	in.persist.On("CurrentView", mock.Anything).Return(nil)
+	// check on stop condition, stop the tests as soon as entering a certain view
+	in.persist.On("StartedView", mock.Anything).Return(nil)
+	in.persist.On("VotedView", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateProposal", mock.Anything).Return(
@@ -316,7 +317,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.viewstate, in.validator, in.signer)
 
 	// initialize the voter
-	in.voter = voter.New(in.signer, in.forks, DefaultVoted())
+	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
 
 	// initialize the event handler
 	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.viewstate, in.aggregator, in.voter, in.validator, notifier)
@@ -336,9 +337,14 @@ func (in *Instance) Run() error {
 	// run until an error or stop condition is reached
 	for {
 
+		// check on stop conditions
+		if in.stop(in) {
+			return errStopCondition
+		}
+
 		// we handle timeouts with priority
 		select {
-		case _ = <-in.handler.TimeoutChannel():
+		case <-in.handler.TimeoutChannel():
 			err := in.handler.OnLocalTimeout()
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
@@ -346,9 +352,14 @@ func (in *Instance) Run() error {
 		default:
 		}
 
+		// check on stop conditions
+		if in.stop(in) {
+			return errStopCondition
+		}
+
 		// otherwise, process first received event
 		select {
-		case _ = <-in.handler.TimeoutChannel():
+		case <-in.handler.TimeoutChannel():
 			err := in.handler.OnLocalTimeout()
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
@@ -368,9 +379,5 @@ func (in *Instance) Run() error {
 			}
 		}
 
-		// check on stop conditions
-		if in.stop(in) {
-			return errStopCondition
-		}
 	}
 }

@@ -257,14 +257,11 @@ func AsGhost(ghost bool) func(config *NodeConfig) {
 		config.Ghost = ghost
 	}
 }
-func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, error) {
+func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
-
-	if nNodes == 0 {
-		return nil, fmt.Errorf("must specify at least one node")
-	}
+	require.NotZero(t, len(networkConf.Nodes), "must specify at least one node")
 
 	// Sort so that access nodes start up last
 	sort.Sort(&networkConf)
@@ -346,7 +343,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, 
 		require.Nil(t, err)
 	}
 
-	return flowNetwork, nil
+	return flowNetwork
 }
 
 // AddNode creates a node container with the given config and adds it to the
@@ -440,6 +437,23 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			)
 
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+
+		case flow.RoleAccess:
+			hostPort := testingdock.RandomPort(t)
+			containerPort := "9000/tcp"
+
+			nodeContainer.bindPort(hostPort, containerPort)
+
+			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			// Should always have at least 1 collection and execution node
+			nodeContainer.addFlag("ingress-addr", "collection_1:9000")
+			nodeContainer.addFlag("script-addr", "execution_1:9000")
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
+			nodeContainer.Ports[AccessNodeAPIPort] = hostPort
+			net.AccessPorts[AccessNodeAPIPort] = hostPort
+
+		case flow.RoleVerification:
+			nodeContainer.addFlag("alpha", "1")
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)
