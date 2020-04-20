@@ -492,6 +492,13 @@ func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool,
 // If trusted is false, then we check to see if the key exists in the trie
 func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHolder, error) {
 
+	// fmt.Println("Read=============")
+	// for _, key := range keys {
+	// 	fmt.Println(key, fmt.Sprintf("%b", key))
+	// 	fmt.Println(hex.EncodeToString(key))
+
+	// }
+
 	// check key sizes
 	for _, k := range keys {
 		if len(k) != s.keyByteSize {
@@ -658,9 +665,6 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 	notFoundKeys := make([][]byte, 0)
 	values := make([][]byte, 0)
 
-	// TODO do we need this?
-	// if s.IsSnapshot(tree) {
-	//if bytes.Equal(root, currRoot) {
 	for _, key := range keys {
 		res, err := tree.database.GetKVDB(key)
 		// TODO check the error
@@ -670,18 +674,14 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 		}
 	}
 
-	// newRoot, err := s.Update(notFoundKeys, values, root)
-
 	treeRoot, err := tree.Root()
 	if err != nil {
 		return nil, fmt.Errorf("cannot load tree root: %w", err)
 	}
-	// TODO check with Maks that this doesn't have a side effect (e.g. trie be there but no value in DB)
+
 	if len(notFoundKeys) > 0 {
-		fmt.Println(treeRoot.FmtStr("", ""))
 		batcher := tree.database.NewBatcher()
 		treeRoot, err = s.UpdateAtomically(treeRoot, notFoundKeys, values, s.height-1, batcher, tree.database)
-		fmt.Println(treeRoot.FmtStr("", ""))
 		if err != nil {
 			return nil, err
 		}
@@ -689,22 +689,14 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 		// if bytes.Equal(new)
 	}
 
-	// fmt.Println(err)
-	// fmt.Println(hex.EncodeToString(root))
-	// fmt.Println(hex.EncodeToString(newRootNode.ComputeValue()))
-	fmt.Println("-==-=-=--=-=-=-==")
-	fmt.Println(treeRoot.FmtStr("", ""))
-
 	for i, key := range keys {
-
-		flag := make([]byte, s.GetHeight()/8) // Flag is used to save space by removing default hashesh (zeros) from the proofs
+		flag := make([]byte, s.GetHeight()/8)
 		proof := make([][]byte, 0)
 		proofLen := uint8(0)
 
 		curr := treeRoot
 
 		for i := 0; i < s.GetHeight()-1; i++ {
-			fmt.Println(key)
 			if bytes.Equal(curr.key, key) {
 				break
 			}
@@ -1019,6 +1011,13 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 // Update takes a sorted list of keys and associated values and inserts
 // them into the trie, and if that is successful updates the databases.
 func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
+
+	// fmt.Println("Update=============")
+	// for i, key := range keys {
+	// 	fmt.Println(key, fmt.Sprintf("%b", key))
+	// 	fmt.Println(hex.EncodeToString(key))
+	// 	fmt.Println(hex.EncodeToString(values[i]))
+	// }
 
 	t, err := s.forest.Get(root)
 	if err != nil {
