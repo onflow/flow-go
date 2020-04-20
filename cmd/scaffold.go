@@ -29,6 +29,7 @@ import (
 	dbmetrics "github.com/dapperlabs/flow-go/module/metrics/badger"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage"
@@ -93,6 +94,7 @@ type FlowNodeBuilder struct {
 	postInitFns    []func(*FlowNodeBuilder)
 	stakingKey     crypto.PrivateKey
 	networkKey     crypto.PrivateKey
+	MsgValidators  []validators.MessageValidator
 
 	// genesis information
 	GenesisBlock *flow.Block
@@ -124,7 +126,8 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
-		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(), fnb.networkKey)
+		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
+			fnb.networkKey, fnb.MsgValidators...)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
