@@ -53,7 +53,9 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Stop()
+	defer func() {
+		require.Nil(t, net.Stop())
+	}()
 
 	// we will test against COL1
 	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
@@ -127,7 +129,9 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Cleanup()
+	defer func() {
+		require.Nil(t, net.Cleanup())
+	}()
 
 	// we will test against COL1
 	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
@@ -160,6 +164,9 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	// get database for COL1
 	db, err := colNode1.DB()
 	require.Nil(t, err)
+	defer func() {
+		require.Nil(t, db.Close())
+	}()
 
 	state, err := clusterstate.NewState(db, chainID)
 	assert.Nil(t, err)
@@ -191,7 +198,9 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Cleanup()
+	defer func() {
+		require.Nil(t, net.Cleanup())
+	}()
 
 	// sleep for a few seconds to let the nodes discover each other and build the libp2p pubsub mesh
 	time.Sleep(5 * time.Second)
@@ -249,6 +258,9 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 			ExpectContainsTx(tx.ID()).
 			ExpectTxCount(1).
 			Assert(t)
+
+		err = db.Close()
+		assert.Nil(t, err)
 	}
 
 	// ensure the transaction IS NOT included in other cluster collections
@@ -276,6 +288,9 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 				ExpectOmitsTx(tx.ID()).
 				ExpectTxCount(0).
 				Assert(t)
+
+			err = db.Close()
+			assert.Nil(t, err)
 		}
 	}
 }
@@ -299,7 +314,9 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Cleanup()
+	defer func() {
+		require.Nil(t, net.Cleanup())
+	}()
 
 	clusters := protocol.Clusters(nClusters, net.Identities())
 
@@ -375,6 +392,9 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 			ExpectContainsTx(tx.ID()).
 			ExpectTxCount(1).
 			Assert(t)
+
+		err = db.Close()
+		assert.Nil(t, err)
 	}
 
 	// ensure the transaction IS NOT included in other cluster collections
@@ -402,6 +422,9 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 				ExpectOmitsTx(tx.ID()).
 				ExpectTxCount(0).
 				Assert(t)
+
+			err = db.Close()
+			assert.Nil(t, err)
 		}
 	}
 }
