@@ -35,14 +35,17 @@ func TestHappyPath(t *testing.T) {
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
-	// generates identities of nodes, one of each type
+	verNodeCount := 1
+
+	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	verIdentities := unittest.IdentityListFixture(verNodeCount, unittest.WithRole(flow.RoleVerification))
 	conIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
 	conIdentity := conIdentities[0]
 
-	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
+	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
+	identities = append(identities, verIdentities...)
 
 	// Execution receipt and chunk assignment
 	//
@@ -56,8 +59,10 @@ func TestHappyPath(t *testing.T) {
 	assigner := &mock.ChunkAssigner{}
 	a := chmodel.NewAssignment()
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if isAssigned(int(chunk.Index), chunkNum) {
-			a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+		for _, verIdentity := range verIdentities {
+			if isAssigned(int(chunk.Index), chunkNum) {
+				a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+			}
 		}
 	}
 	assigner.On("Assign",
@@ -69,26 +74,32 @@ func TestHappyPath(t *testing.T) {
 	// nodes and engines
 	//
 	// verification node
-	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
-	// assumes the verification node has received the block
-	err := verNode.BlockStorage.Store(completeER.Block)
-	assert.Nil(t, err)
+	verNodes := make([]mock2.VerificationNode, 0)
+	for _, verIdentity := range verIdentities {
+		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
+
+		// assumes the verification node has received the block
+		err := verNode.BlockStorage.Store(completeER.Block)
+		assert.Nil(t, err)
+
+		verNodes = append(verNodes, verNode)
+	}
 
 	// collection node
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 	// injects the assigned collections into the collection node mempool
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		if isAssigned(int(chunk.Index), chunkNum) {
-			err = colNode.Collections.Store(completeER.Collections[chunk.Index])
+			err := colNode.Collections.Store(completeER.Collections[chunk.Index])
 			assert.Nil(t, err)
 		}
 	}
 
 	// mock execution node
-	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentity, identities, completeER)
+	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities[0], identities, completeER)
 
 	// mock consensus node
-	conNode, conEngine := setupMockConsensusNode(t, hub, conIdentity, verIdentity, identities, completeER)
+	conNode, conEngine := setupMockConsensusNode(t, hub, conIdentity, verIdentities[0], identities, completeER)
 
 	// duplicates the ER (receipt1) into another ER (receipt2)
 	// that share their result part
@@ -103,37 +114,47 @@ func TestHappyPath(t *testing.T) {
 	// concurrently
 	//
 	verWG := sync.WaitGroup{}
-	verWG.Add(2)
 
-	// receipt1
-	go func() {
-		err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt1)
-		assert.Nil(t, err)
-		go verWG.Done()
-	}()
-	// receipt2
-	go func() {
-		err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt2)
-		assert.Nil(t, err)
-		go verWG.Done()
-	}()
+	for _, verNode := range verNodes {
+		verWG.Add(2)
 
-	// both receipts should be added to the authenticated mempool of verification node
-	// and do not reside in pending pool
-	// sleeps for 50 milliseconds to make sure that receipt finds its way to authReceipts pool
-	assert.Eventually(t, func() bool {
-		return verNode.AuthReceipts.Has(receipt1.ID()) &&
-			verNode.AuthReceipts.Has(receipt2.ID()) &&
-			!verNode.PendingReceipts.Has(receipt1.ID()) &&
-			!verNode.PendingReceipts.Has(receipt2.ID())
-	}, time.Second, 50*time.Millisecond)
+		// receipt1
+		go func() {
+			err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt1)
+			assert.Nil(t, err)
+			go verWG.Done()
+		}()
+		// receipt2
+		go func() {
+			err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt2)
+			assert.Nil(t, err)
+			go verWG.Done()
+		}()
+	}
+
+	for _, verNode := range verNodes {
+		// both receipts should be added to the authenticated mempool of verification node
+		// and do not reside in pending pool
+		// sleeps for 50 milliseconds to make sure that receipt finds its way to authReceipts pool
+		assert.Eventually(t, func() bool {
+			return verNode.AuthReceipts.Has(receipt1.ID()) &&
+				verNode.AuthReceipts.Has(receipt2.ID()) &&
+				!verNode.PendingReceipts.Has(receipt1.ID()) &&
+				!verNode.PendingReceipts.Has(receipt2.ID())
+		}, time.Second, 50*time.Millisecond)
+	}
 
 	// flush the collection requests
-	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
-	assert.True(t, ok)
-	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.CollectionProvider
-	})
+	verNets := make([]*stub.Network, 0)
+	for _, verIdentity := range verIdentities {
+		verNet, ok := hub.GetNetwork(verIdentity.NodeID)
+		assert.True(t, ok)
+		verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
+			return m.ChannelID == engine.CollectionProvider
+		})
+
+		verNets = append(verNets, verNet)
+	}
 
 	// flush the collection response
 	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
@@ -143,8 +164,9 @@ func TestHappyPath(t *testing.T) {
 	})
 
 	// flush the result approval broadcast
-	verNet.DeliverAll(true)
-
+	for _, verNet := range verNets {
+		verNet.DeliverAll(true)
+	}
 	unittest.AssertReturnsBefore(t, verWG.Wait, 3*time.Second)
 
 	// assert that the RA was received
@@ -155,26 +177,28 @@ func TestHappyPath(t *testing.T) {
 
 	// resource cleanup
 	//
-	for i := 0; i < chunkNum; i++ {
-		// associated resources for each chunk should be removed from the mempool
-		assert.False(t, verNode.AuthCollections.Has(completeER.Collections[i].ID()))
-		assert.False(t, verNode.PendingCollections.Has(completeER.Collections[i].ID()))
-		assert.False(t, verNode.ChunkDataPacks.Has(completeER.ChunkDataPacks[i].ID()))
-		if isAssigned(i, chunkNum) {
-			// chunk ID of assigned chunks should be added to ingested chunks mempool
-			assert.True(t, verNode.IngestedChunkIDs.Has(completeER.Receipt.ExecutionResult.Chunks[i].ID()))
+	for _, verNode := range verNodes {
+		for i := 0; i < chunkNum; i++ {
+			// associated resources for each chunk should be removed from the mempool
+			assert.False(t, verNode.AuthCollections.Has(completeER.Collections[i].ID()))
+			assert.False(t, verNode.PendingCollections.Has(completeER.Collections[i].ID()))
+			assert.False(t, verNode.ChunkDataPacks.Has(completeER.ChunkDataPacks[i].ID()))
+			if isAssigned(i, chunkNum) {
+				// chunk ID of assigned chunks should be added to ingested chunks mempool
+				assert.True(t, verNode.IngestedChunkIDs.Has(completeER.Receipt.ExecutionResult.Chunks[i].ID()))
+			}
 		}
+		// since all chunks have been ingested, neither of execution receipts should reside on any mempool
+		assert.False(t, verNode.PendingReceipts.Has(receipt1.ID()))
+		assert.False(t, verNode.AuthReceipts.Has(receipt1.ID()))
+		assert.False(t, verNode.PendingReceipts.Has(receipt2.ID()))
+		assert.False(t, verNode.AuthReceipts.Has(receipt2.ID()))
+
+		// result ID should be added to the ingested results mempool
+		assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
+
+		verNode.Done()
 	}
-	// since all chunks have been ingested, neither of execution receipts should reside on any mempool
-	assert.False(t, verNode.PendingReceipts.Has(receipt1.ID()))
-	assert.False(t, verNode.AuthReceipts.Has(receipt1.ID()))
-	assert.False(t, verNode.PendingReceipts.Has(receipt2.ID()))
-	assert.False(t, verNode.AuthReceipts.Has(receipt2.ID()))
-
-	// result ID should be added to the ingested results mempool
-	assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
-
-	verNode.Done()
 	colNode.Done()
 	conNode.Done()
 	exeNode.Done()
