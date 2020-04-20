@@ -135,5 +135,5 @@ func main() {
 			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, blocks, headers, collections, transactions)
 			return rpcEng, nil
 		}).
-		Run()
+		Run("access")
 }

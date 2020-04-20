@@ -42,6 +42,7 @@ const notSet = "not set"
 type BaseConfig struct {
 	nodeIDHex    string
 	bindAddr     string
+	NodeRole     string
 	NodeName     string
 	Timeout      time.Duration
 	datadir      string
@@ -184,7 +185,11 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 func (fnb *FlowNodeBuilder) initLogger() {
 	// configure logger with standard level, node ID and UTC timestamp
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := fnb.Logger.With().Timestamp().Str("node_id", fnb.BaseConfig.nodeIDHex).Logger()
+	log := fnb.Logger.With().
+		Timestamp().
+		Str("node_role", fnb.BaseConfig.NodeRole).
+		Str("node_id", fnb.BaseConfig.nodeIDHex).
+		Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.name)
 
@@ -401,7 +406,9 @@ func FlowNode(name string) *FlowNodeBuilder {
 // Run initiates all common components (logger, database, protocol state etc.)
 // then starts each component. It also sets up a channel to gracefully shut
 // down each component if a SIGINT is received.
-func (fnb *FlowNodeBuilder) Run() {
+func (fnb *FlowNodeBuilder) Run(role string) {
+
+	fnb.BaseConfig.NodeRole = role
 
 	// initialize signal catcher
 	fnb.sig = make(chan os.Signal, 1)

@@ -3,9 +3,8 @@
 package middleware
 
 import (
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
-
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 )
 
 // Middleware represents the middleware layer, which manages the connections to
