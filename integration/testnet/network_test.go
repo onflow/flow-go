@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -29,8 +28,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 	}
 	conf := testnet.NewNetworkConfig("meta_test_basic", nodes)
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(t, conf)
-	require.NoError(t, err)
+	flowNetwork := testnet.PrepareFlowNetwork(t, conf)
 	defer flowNetwork.Cleanup()
 
 	assert.Len(t, flowNetwork.Containers, len(nodes))
@@ -65,8 +63,7 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 	}
 	conf := testnet.NewNetworkConfig("meta_test_multinodes", nodes)
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(t, conf)
-	require.NoError(t, err)
+	flowNetwork := testnet.PrepareFlowNetwork(t, conf)
 	defer flowNetwork.Cleanup()
 
 	assert.Len(t, flowNetwork.Containers, len(nodes))

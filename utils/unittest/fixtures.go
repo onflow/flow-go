@@ -65,6 +65,15 @@ func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
 	return proposal
 }
 
+func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
+	pending := flow.PendingBlock{
+		OriginID: block.Header.ProposerID,
+		Header:   &block.Header,
+		Payload:  &block.Payload,
+	}
+	return &pending
+}
+
 func StateDeltaFixture() *messages.ExecutionStateDelta {
 	header := BlockHeaderFixture()
 	block := BlockWithParentFixture(&header)
@@ -84,15 +93,6 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 		Header:  header,
 		Payload: payload,
 	}
-}
-
-func PendingBlockFixture(block *flow.Block) *flow.PendingBlock {
-	pending := flow.PendingBlock{
-		OriginID: IdentifierFixture(),
-		Header:   &block.Header,
-		Payload:  &block.Payload,
-	}
-	return &pending
 }
 
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
