@@ -13,13 +13,13 @@ Restart=always
 
 StandardOutput=journal
 
-EnvironmentFile=/srv/flow/runtime-conf.env
-EnvironmentFile=-/srv/flow/conf.d/*.env
+EnvironmentFile=/etc/flow/runtime-conf.env
+EnvironmentFile=-/etc/flow/conf.d/*.env
 
 ExecStartPre=docker pull gcr.io/flow-container-registry/flow-access:${FLOW_GO_NODE_VERSION}
 ExecStart=docker run --rm \
-	-v /srv/flow/bootstrap:/bootstrap:ro \
-	-v /srv/flow/data:/data:rw \
+	-v /var/flow/bootstrap:/bootstrap:ro \
+	-v /var/flow/data:/data:rw \
 	--rm \
 	--name flow-go \
 	--network host \
