@@ -32,15 +32,10 @@ import (
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
 func TestHappyPath(t *testing.T) {
-<<<<<<< HEAD
-	chunkNum := 10
-	hub := stub.NewNetworkHub()
-=======
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
 	// generates identities of nodes, one of each type
->>>>>>> master
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -185,7 +180,6 @@ func TestHappyPath(t *testing.T) {
 	exeNode.Done()
 }
 
-<<<<<<< HEAD
 // TestSingleCollectionProcessing checks the full happy
 // path assuming a single collection (including transactions on counter example)
 // are submited to the verification node.
@@ -299,7 +293,6 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	colNode.Done()
 	conNode.Done()
 	exeNode.Done()
-=======
 // setupMockExeNode creates and returns an execution node and its registered engine in the network (hub)
 // it mocks the process method of execution node that on receiving a chunk data pack request from
 // a certain verifier node (verIdentity) about a chunk that is assigned to it, replies the chunk back
@@ -397,7 +390,6 @@ func setupMockConsensusNode(t *testing.T,
 	assert.Nil(t, err)
 
 	return &conNode, conEngine
->>>>>>> master
 }
 
 // isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
