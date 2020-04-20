@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func DeployCounterContractTransaction() flow.TransactionBody {
@@ -12,7 +13,7 @@ func DeployCounterContractTransaction() flow.TransactionBody {
 			access(all) contract Container {
 				access(all) resource Counter {
 					pub var count: Int
-		
+
 					init(_ v: Int) {
 						self.count = v
 					}
@@ -31,14 +32,15 @@ func DeployCounterContractTransaction() flow.TransactionBody {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		ScriptAccounts:   []flow.Address{flow.RootAddress},
+		ReferenceBlockID: unittest.IdentifierFixture(),
+		PayerAccount:     flow.RootAddress,
 	}
 }
 
 func CreateCounterTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
-
 			import 0x01
 
 			transaction {
@@ -49,14 +51,15 @@ func CreateCounterTransaction() flow.TransactionBody {
 					}
               	}
             }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		ScriptAccounts:   []flow.Address{flow.RootAddress},
+		ReferenceBlockID: unittest.IdentifierFixture(),
+		PayerAccount:     flow.RootAddress,
 	}
 }
 
 func AddToCounterTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
-
 			import 0x01
 
 			transaction {
@@ -64,6 +67,8 @@ func AddToCounterTransaction() flow.TransactionBody {
 					acc.storage[Container.Counter].add(2)
               	}
             }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		ScriptAccounts:   []flow.Address{flow.RootAddress},
+		ReferenceBlockID: unittest.IdentifierFixture(),
+		PayerAccount:     flow.RootAddress,
 	}
 }
