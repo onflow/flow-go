@@ -35,7 +35,7 @@ func TestHappyPath(t *testing.T) {
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
-	verNodeCount := 2
+	verNodeCount := 1
 
 	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -99,7 +99,7 @@ func TestHappyPath(t *testing.T) {
 	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
 
 	// mock consensus node
-	conNode, conEngine := setupMockConsensusNode(t, hub, conIdentity, verIdentities[0], identities, completeER)
+	conNode, conEngine := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
 
 	// duplicates the ER (receipt1) into another ER (receipt2)
 	// that share their result part
@@ -274,7 +274,7 @@ func setupMockExeNode(t *testing.T,
 func setupMockConsensusNode(t *testing.T,
 	hub *stub.Hub,
 	conIdentity *flow.Identity,
-	verIdentity *flow.Identity,
+	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	completeER verification.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
 
@@ -291,14 +291,16 @@ func setupMockConsensusNode(t *testing.T,
 	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity)
 	conEngine := new(network.Engine)
 
-	conEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			resultApproval, ok := args[1].(*flow.ResultApproval)
-			assert.True(t, ok)
+	for _, verIdentity := range verIdentities {
+		conEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
+			Run(func(args testifymock.Arguments) {
+				resultApproval, ok := args[1].(*flow.ResultApproval)
+				assert.True(t, ok)
 
-			// asserts that the result approval is assigned to the verifier
-			assert.True(t, isAssigned(int(resultApproval.Body.ChunkIndex), len(completeER.ChunkDataPacks)))
-		}).Return(nil).Times(approvalsCount)
+				// asserts that the result approval is assigned to the verifier
+				assert.True(t, isAssigned(int(resultApproval.Body.ChunkIndex), len(completeER.ChunkDataPacks)))
+			}).Return(nil).Times(approvalsCount)
+	}
 
 	_, err := conNode.Net.Register(engine.ApprovalProvider, conEngine)
 	assert.Nil(t, err)
