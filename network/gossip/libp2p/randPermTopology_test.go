@@ -73,7 +73,7 @@ func (r *RandPermTopologyTestSuite) testTopology(total int, minorityRole flow.Ro
 
 	ids := make(flow.IdentityList, 0)
 	for role, count := range distribution {
-		roleIDs := createIDs(role, count)
+		roleIDs := unittest.IdentityListFixture(count, unittest.WithRole(role))
 		ids = append(ids, roleIDs...)
 	}
 
@@ -122,16 +122,4 @@ func createDistribution(total int, minority flow.Role) map[flow.Role]int {
 		}
 	}
 	return countMap
-}
-
-func createIDs(role flow.Role, count int) []*flow.Identity {
-	identities := make([]*flow.Identity, 0)
-	for i := 0; i < count; i++ {
-		identity := &flow.Identity{
-			NodeID: unittest.IdentifierFixture(),
-			Role:   role,
-		}
-		identities = append(identities, identity)
-	}
-	return identities
 }

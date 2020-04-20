@@ -51,17 +51,28 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 
 	remainder := idList.Filter(filter.Not(filter.In(fanoutIDs)))
 
-	// find one id for each role from the remaining list
+	// find one id for each role from the remaining list,
+	// if it is not already part of fanoutIDs
 	oneOfEachRoleIDs := make(flow.IdentityList, 0)
-	for _, r := range flow.Roles() {
-		ids := remainder.Filter(filter.HasRole(r))
+	for _, role := range flow.Roles() {
+
+		if len(fanoutIDs.Filter(filter.HasRole(role))) > 0 {
+			// we already have a node with this role
+			continue
+		}
+
+		ids := remainder.Filter(filter.HasRole(role))
+		if len(ids) == 0 {
+			// there are no more nodes of this role to choose from
+			continue
+		}
+
+		// choose 1 out of all the remaining nodes of this role
 		selectedID, err := randomSubset(ids, 1, rng)
 		if err != nil {
 			return nil, fmt.Errorf("cannot sample topology: %w", err)
 		}
-		if len(selectedID) == 0 {
-			continue
-		}
+
 		oneOfEachRoleIDs = append(oneOfEachRoleIDs, selectedID[0])
 	}
 
@@ -69,7 +80,8 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 
 	// find a n/2 random subset of nodes of the given role from the remaining list
 	ids := remainder.Filter(filter.HasRole(r.myRole))
-	sameRoleIDs := len(ids) / 2
+	sameRoleIDs := (len(ids) + 1) / 2 // rounded up to the closest integer
+
 	selfRoleIDs, err := randomSubset(ids, sameRoleIDs, rng)
 	if err != nil {
 		return nil, fmt.Errorf("cannot sample topology: %w", err)
@@ -91,10 +103,14 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 
 func randomSubset(ids flow.IdentityList, size int, rnd random.Rand) (flow.IdentityList, error) {
 
-	result := make(flow.IdentityList, 0)
+	result := make(flow.IdentityList, 0, size)
 
 	if size == 0 || len(ids) < size {
 		return result, nil
+	}
+
+	if len(ids) < size {
+		return ids, nil
 	}
 
 	indices, err := rnd.SubPermutation(len(ids), size)

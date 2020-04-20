@@ -36,7 +36,7 @@ func (n *TopologyTestSuite) SetupTest() {
 	n.count = 100
 	n.ids = CreateIDs(n.count)
 	rndSubsetSize := n.count / 2
-	oneOfEachNodetype := 1
+	oneOfEachNodetype := 0 // there is only one node type in this test
 	halfOfRemainingNodes := (n.count - rndSubsetSize - oneOfEachNodetype) / 2
 	n.expectedSize = rndSubsetSize + oneOfEachNodetype + halfOfRemainingNodes
 
