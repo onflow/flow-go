@@ -30,5 +30,5 @@ func main() {
 			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, rpcConf)
 			return rpcEng, err
 		}).
-		Run()
+		Run("ghost")
 }

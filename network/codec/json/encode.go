@@ -24,6 +24,8 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeBlockProposal
 	case *messages.BlockVote:
 		code = CodeBlockVote
+
+	// coldstuff-specific
 	case *coldstuff.Commit:
 		code = CodeBlockCommit
 

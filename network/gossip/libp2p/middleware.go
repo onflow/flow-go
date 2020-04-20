@@ -174,11 +174,12 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 		// NOTE: we can't error on this at the moment, because single nodes of
 		// a role in tests will attempt to send messages like this, which should
 		// be a no-op, but not an error
+		m.log.Debug().Msg("send to no-one")
 		return nil
 	case OneToOne:
 		if targetIDs[0] == m.me {
 			// to avoid self dial by the underlay
-			m.log.Debug().Msg("self dial attempt")
+			m.log.Debug().Msg("send to self")
 			return nil
 		}
 		err = m.sendDirect(targetIDs[0], msg)
