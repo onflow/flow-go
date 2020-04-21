@@ -32,22 +32,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type Views struct {
-	sync.Mutex
-	latest uint64
-}
-
-func (v *Views) Store(action uint8, view uint64) error {
-	v.Lock()
-	defer v.Unlock()
-	v.latest = view
-	return nil
-}
-
-func (v *Views) Retrieve(action uint8) (uint64, error) {
-	return v.latest, nil
-}
-
 type Signer struct {
 	localID flow.Identifier
 }
@@ -90,42 +74,67 @@ func (*Signer) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model
 	return true, nil
 }
 
-type Conduit struct{}
-
-func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
-	return nil
-}
-
-type Network struct{}
-
-func (n *Network) Register(code uint8, engine network.Engine) (network.Conduit, error) {
-	return &Conduit{}, nil
-}
-
 type Finalizer struct{}
 
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	return nil
 }
 
-type Communicator struct{}
+// ===
 
-func (c *Communicator) BroadcastProposal(p *flow.Header) error {
-	return nil
+// move to in memory network
+type SubmitFunc func(uint8, interface{}, ...flow.Identifier) error
+
+type Conduit struct {
+	channelID uint8
+	submit    SubmitFunc
 }
 
-func (c *Communicator) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
-	return nil
+func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
+	return c.submit(c.channelID, event, targetIDs...)
+}
+
+type Network struct {
+	engines  map[uint8]network.Engine
+	conduits []*Conduit
+}
+
+func NewNetwork() *Network {
+	return &Network{
+		engines:  make(map[uint8]network.Engine),
+		conduits: make([]*Conduit, 0),
+	}
+}
+
+func (n *Network) Register(code uint8, engine network.Engine) (network.Conduit, error) {
+	n.engines[code] = engine
+	// the submit function needs the access to all the nodes,
+	// so will be added later
+	c := &Conduit{
+		channelID: code,
+	}
+	n.conduits = append(n.conduits, c)
+	return c, nil
+}
+
+func (n *Network) WithSubmit(submit SubmitFunc) *Network {
+	for _, conduit := range n.conduits {
+		conduit.submit = submit
+	}
+	return n
 }
 
 type Node struct {
 	db         *badger.DB
 	dbDir      string
+	index      int
 	id         *flow.Identity
 	compliance *compliance.Engine
 	sync       *synchronization.Engine
 	hot        *hotstuff.EventLoop
 	headers    *storage.Headers
+	views      *storage.Views
+	net        *Network
 }
 
 func createNodes(t *testing.T, n int) []*Node {
@@ -189,16 +198,14 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	priv := helper.MakeBLSKey(t)
 	local, err := local.New(identity, priv)
 	require.NoError(t, err)
-	fmt.Printf("local id: %v\n", local.NodeID())
-
-	views := &Views{}
 
 	// make network
-	net := &Network{}
+	net := NewNetwork()
 
 	headersDB := storage.NewHeaders(db)
 	payloadsDB := storage.NewPayloads(db)
 	blocksDB := storage.NewBlocks(db)
+	viewsDB := storage.NewViews(db)
 
 	guarantees, err := stdmap.NewGuarantees(100000)
 	require.NoError(t, err)
@@ -227,15 +234,6 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 
 	final := &Finalizer{}
 
-	communicator := &Communicator{}
-
-	// initialize the block finalizer
-	hot, err := consensus.NewParticipant(log, notifier, metrics, headersDB,
-		views, state, local, build, final, signer, communicator, selector, rootHeader,
-		rootQC)
-
-	require.NoError(t, err)
-
 	// initialize the compliance engine
 	comp, err := compliance.New(log, net, local, state, headersDB, payloadsDB, nil, cache)
 	require.NoError(t, err)
@@ -244,23 +242,39 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
+	// initialize the block finalizer
+	hot, err := consensus.NewParticipant(log, notifier, metrics, headersDB,
+		viewsDB, state, local, build, final, signer, comp, selector, rootHeader,
+		rootQC)
+
+	require.NoError(t, err)
+
 	comp = comp.WithSynchronization(sync).WithConsensus(hot)
 
 	node := &Node{
 		db:         db,
 		dbDir:      dbDir,
+		index:      index,
 		id:         identity,
 		compliance: comp,
 		sync:       sync,
 		hot:        hot,
 		headers:    headersDB,
+		views:      viewsDB,
+		net:        net,
 	}
 	return node
 }
 
+func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return true, 0
+}
+
 func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 3)
+	nodes := createNodes(t, 1)
 	defer cleanupNodes(nodes)
+
+	connect(nodes, blockNothing)
 
 	fmt.Printf("%v nodes created", len(nodes))
 	var wg sync.WaitGroup
@@ -273,6 +287,53 @@ func Test3Nodes(t *testing.T) {
 		}(n)
 	}
 	wg.Wait()
+}
+
+type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
+
+func connect(nodes []*Node, blockOrDelay BlockOrDelayFunc) {
+	nodeDict := make(map[flow.Identifier]*Node, len(nodes))
+	for _, n := range nodes {
+		nodeDict[n.id.ID()] = n
+	}
+
+	for _, n := range nodes {
+		{
+			sender := n
+			submit := func(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+				for _, targetID := range targetIDs {
+					// find receiver
+					receiver, found := nodeDict[targetID]
+					if !found {
+						continue
+					}
+
+					blocked, delay := blockOrDelay(channelID, event, sender, receiver)
+					if blocked {
+						continue
+					}
+
+					go receiveWithDelay(channelID, event, sender, receiver, delay)
+				}
+
+				return nil
+			}
+			n.net.WithSubmit(submit)
+		}
+	}
+}
+
+func receiveWithDelay(channelID uint8, event interface{}, sender, receiver *Node, delay time.Duration) {
+	// delay the message sending
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+
+	// find receiver engine
+	receiverEngine := receiver.net.engines[channelID]
+
+	// give it to receiver engine
+	receiverEngine.Submit(sender.id.ID(), event)
 }
 
 func cleanupNodes(nodes []*Node) {
