@@ -689,6 +689,7 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 		// if bytes.Equal(new)
 	}
 
+	incl := true
 	for i, key := range keys {
 		flag := make([]byte, s.GetHeight()/8)
 		proof := make([][]byte, 0)
@@ -706,23 +707,26 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 					proof = append(proof, curr.lChild.value)
 				}
 				curr = curr.rChild
+				proofLen++
 			} else {
 				if curr.rChild != nil {
 					utils.SetBit(flag, i)
 					proof = append(proof, curr.rChild.value)
 				}
 				curr = curr.lChild
+				proofLen++
 			}
 			if curr == nil {
 				// TODO error ??
+				incl = false
 				break
 			}
-			proofLen++
+
 		}
 
 		flags[i] = flag
 		proofs[i] = proof
-		inclusions[i] = true
+		inclusions[i] = incl
 		sizes[i] = proofLen
 	}
 	holder := newProofHolder(flags, proofs, inclusions, sizes)
@@ -762,7 +766,6 @@ func (s *SMT) GetProof(key []byte, rootNode *node) ([]byte, [][]byte, uint8, boo
 
 			nextKey = curr.lChild
 		}
-
 		if nextKey == nil { // nonInclusion proof
 			return flag, proof, proofLen, false, nil
 		} else {
