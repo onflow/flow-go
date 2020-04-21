@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	mathrand "math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,6 +34,7 @@ func TestCombinerJoinSplitEven(t *testing.T) {
 }
 
 func TestCombinerJoinSplitUneven(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	c := &Combiner{}
 	sigs := make([]crypto.Signature, 0, NUM_SIGS)
 	for i := 0; i < NUM_SIGS; i++ {

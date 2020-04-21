@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -207,6 +208,7 @@ func (cs *ComplianceSuite) SetupTest() {
 }
 
 func (cs *ComplianceSuite) TestSendVote() {
+	rand.Seed(time.Now().UnixNano())
 
 	// create parameters to send a vote
 	blockID := unittest.IdentifierFixture()
@@ -427,6 +429,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 }
 
 func (cs *ComplianceSuite) TestOnSubmitVote() {
+	rand.Seed(time.Now().UnixNano())
 
 	// create a vote
 	originID := unittest.IdentifierFixture()

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -412,6 +413,8 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *coldstuffmodel.
 
 // processPendingProposal handles proposals where the parent is missing.
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
 	pendingBlock := &clustermodel.PendingBlock{
 		OriginID: originID,

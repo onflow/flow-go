@@ -3,6 +3,7 @@ package collection_test
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -250,6 +251,9 @@ func TestBuilder(t *testing.T) {
 		t.Run("large history", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
+
+			// seed the RNG
+			rand.Seed(time.Now().UnixNano())
 
 			// use a mempool with 1000 transactions, one per block
 			pool, err = stdmap.NewTransactions(2000)

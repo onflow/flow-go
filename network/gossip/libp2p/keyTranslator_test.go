@@ -1,9 +1,9 @@
 package libp2p
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math"
-	"math/rand"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec"
