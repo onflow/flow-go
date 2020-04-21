@@ -310,16 +310,30 @@ func setupMockConsensusNode(t *testing.T,
 	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity)
 	conEngine := new(network.Engine)
 
+	// map form verIds --> result approval ID
+	resultApprovalSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
 	for _, verIdentity := range verIdentities {
-		conEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
-			Run(func(args testifymock.Arguments) {
-				resultApproval, ok := args[1].(*flow.ResultApproval)
-				assert.True(t, ok)
-
-				// asserts that the result approval is assigned to the verifier
-				assert.True(t, isAssigned(int(resultApproval.Body.ChunkIndex), len(completeER.ChunkDataPacks)))
-			}).Return(nil).Times(approvalsCount)
+		resultApprovalSeen[verIdentity.NodeID] = make(map[flow.Identifier]struct{})
 	}
+
+	conEngine.On("Process", testifymock.Anything, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			originID, ok := args[0].(flow.Identifier)
+			assert.True(t, ok)
+
+			resultApproval, ok := args[1].(*flow.ResultApproval)
+			assert.True(t, ok)
+
+			// asserts that result approval has not been seen from this
+			_, ok = resultApprovalSeen[originID][resultApproval.ID()]
+			assert.False(t, ok)
+
+			// marks result approval as seen
+			resultApprovalSeen[originID][resultApproval.ID()] = struct{}{}
+
+			// asserts that the result approval is assigned to the verifier
+			assert.True(t, isAssigned(int(resultApproval.Body.ChunkIndex), len(completeER.ChunkDataPacks)))
+		}).Return(nil).Times(approvalsCount)
 
 	_, err := conNode.Net.Register(engine.ApprovalProvider, conEngine)
 	assert.Nil(t, err)
