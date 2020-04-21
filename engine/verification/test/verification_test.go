@@ -35,7 +35,7 @@ func TestHappyPath(t *testing.T) {
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
-	verNodeCount := 1
+	verNodeCount := 2
 
 	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -51,7 +51,7 @@ func TestHappyPath(t *testing.T) {
 	//
 	// creates an execution receipt and its associated data
 	// with `chunkNum` chunks
-	chunkNum := 10
+	chunkNum := 2
 	completeER := CompleteExecutionResultFixture(t, chunkNum)
 
 	// mocks the assignment to only assign "some" chunks to the verIdentity
@@ -59,11 +59,13 @@ func TestHappyPath(t *testing.T) {
 	assigner := &mock.ChunkAssigner{}
 	a := chmodel.NewAssignment()
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+		assignees := make([]flow.Identifier, 0)
 		for _, verIdentity := range verIdentities {
 			if isAssigned(int(chunk.Index), chunkNum) {
-				a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+				assignees = append(assignees, verIdentity.NodeID)
 			}
 		}
+		a.Add(chunk, assignees)
 	}
 	assigner.On("Assign",
 		testifymock.Anything,
@@ -228,9 +230,10 @@ func setupMockExeNode(t *testing.T,
 	assert.Nil(t, err)
 
 	chunkNum := len(completeER.ChunkDataPacks)
-	for _, verIdentity := range verIdentities {
-		exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
-			Run(func(args testifymock.Arguments) {
+
+	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			if id, ok := args[0].(flow.Identifier); ok {
 				if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
 					require.True(t, ok)
 					for i := 0; i < chunkNum; i++ {
@@ -247,23 +250,23 @@ func setupMockExeNode(t *testing.T,
 							res := &messages.ChunkDataPackResponse{
 								Data: *completeER.ChunkDataPacks[i],
 							}
-							err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
+							err := exeChunkDataConduit.Submit(res, id)
 							assert.Nil(t, err)
 							return
 						}
 					}
 					require.Error(t, fmt.Errorf(" requested an unidentifed chunk data pack %v", req))
 				}
+			}
 
-				require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
+			require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
 
-			}).
-			Return(nil).
-			// half of the chunks assigned to the verification node
-			// for each chunk the verification node contacts execution node
-			// once for chunk data pack
-			Times(chunkNum / 2)
-	}
+		}).
+		Return(nil).
+		// half of the chunks assigned to the verification node
+		// for each chunk the verification node contacts execution node
+		// once for chunk data pack
+		Times(chunkNum / 2)
 
 	return &exeNode, exeEngine
 }
