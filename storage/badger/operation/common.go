@@ -219,7 +219,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 		// all of the keys backwards.
 		if bytes.Compare(start, end) > 0 {
 			options.Reverse = true      // make sure to go in reverse order
-			start = append(start, 0xff) // make sure to start after start prefix
+			start = append(start, 0x01) // make sure to start after start prefix
 			modifier = -1               // make sure to stop before end prefix
 		}
 
@@ -340,6 +340,27 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 	}
 }
 
+// payloadIterRange determines start and end prefixes for an iteration through
+// a payload index created using `toPayloadIndex`.
+//
+// On the top end of the iteration, we use the prefix (top+1)||ZeroID. This
+// ensures that everything indexed at the top height is included in the
+// iteration. (Nothing above the top height is included in the iteration, since
+// we use the zero ID in the prefix.)
+func payloadIterRange(code uint8, from, to uint64) (start, end []byte) {
+	if from > to {
+		// common case - we are iterating through history in reverse, typically
+		// from the boundary height to 0
+		start = makePrefix(code, from+1, flow.ZeroID)
+		end = makePrefix(code, to)
+	} else {
+		// other case - we are iterating forward through history
+		start = makePrefix(code, from)
+		end = makePrefix(code, to+1, flow.ZeroID)
+	}
+	return
+}
+
 func toPayloadIndex(code uint8, height uint64, blockID flow.Identifier, parentID flow.Identifier) []byte {
 	return makePrefix(code, height, blockID, parentID)
 }
@@ -359,6 +380,9 @@ func fromPayloadIndex(key []byte) (uint64, flow.Identifier, flow.Identifier) {
 //
 // This is useful for verifying an existing payload, for example in a block
 // proposal from another node, where the desired output is accept/reject.
+//
+// **MUST** use `payloadIterRange` to obtain start/end prefixes for iterations
+// using this function
 func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterationFunc {
 
 	// build lookup table for payload entities
@@ -411,6 +435,9 @@ func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterat
 //
 // This is useful when building a payload locally, where we want to know which
 // entities are valid for inclusion so we can produce a valid block proposal.
+//
+// **MUST** use `payloadIterRange` to obtain start/end prefixes for iterations
+// using this function
 func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) iterationFunc {
 
 	// build lookup table for candidate payload entities
