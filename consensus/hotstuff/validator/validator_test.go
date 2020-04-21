@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -35,8 +36,8 @@ type ProposalSuite struct {
 }
 
 func (ps *ProposalSuite) SetupTest() {
-
 	// the leader is a random node for now
+	rand.Seed(time.Now().UnixNano())
 	ps.finalized = uint64(rand.Uint32() + 1)
 	ps.participants = unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
 	ps.leader = ps.participants[0]
