@@ -35,7 +35,7 @@ func TestHappyPath(t *testing.T) {
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
-	verNodeCount := 2
+	verNodeCount := 10
 
 	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -121,24 +121,28 @@ func TestHappyPath(t *testing.T) {
 		verWG.Add(2)
 
 		// receipt1
-		go func() {
-			err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt1)
+		go func(vn mock2.VerificationNode) {
+			defer verWG.Done()
+			err := vn.IngestEngine.Process(exeIdentity.NodeID, receipt1)
 			assert.Nil(t, err)
-			go verWG.Done()
-		}()
+
+		}(verNode)
+
 		// receipt2
-		go func() {
-			err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt2)
+		go func(vn mock2.VerificationNode) {
+			defer verWG.Done()
+			err := vn.IngestEngine.Process(exeIdentity.NodeID, receipt2)
 			assert.Nil(t, err)
-			go verWG.Done()
-		}()
+		}(verNode)
 	}
+
+	unittest.AssertReturnsBefore(t, verWG.Wait, 3*time.Second)
 
 	for _, verNode := range verNodes {
 		// both receipts should be added to the authenticated mempool of verification node
 		// and do not reside in pending pool
 		// sleeps for 50 milliseconds to make sure that receipt finds its way to authReceipts pool
-		assert.Eventually(t, func() bool {
+		go assert.Eventually(t, func() bool {
 			return verNode.AuthReceipts.Has(receipt1.ID()) &&
 				verNode.AuthReceipts.Has(receipt2.ID()) &&
 				!verNode.PendingReceipts.Has(receipt1.ID()) &&
@@ -169,7 +173,6 @@ func TestHappyPath(t *testing.T) {
 	for _, verNet := range verNets {
 		verNet.DeliverAll(true)
 	}
-	unittest.AssertReturnsBefore(t, verWG.Wait, 3*time.Second)
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
@@ -223,6 +226,14 @@ func setupMockExeNode(t *testing.T,
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
 	exeEngine := new(network.Engine)
 
+	// determines the expected number of result approvals this node should receive
+	approvalsCount := 0
+	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+		if isAssigned(len(completeER.ChunkDataPacks), int(chunk.Index)) {
+			approvalsCount++
+		}
+	}
+
 	// map form verIds --> chunks they asked
 	// exeChunkDataSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
 
@@ -266,7 +277,7 @@ func setupMockExeNode(t *testing.T,
 		// half of the chunks assigned to the verification node
 		// for each chunk the verification node contacts execution node
 		// once for chunk data pack
-		Times(chunkNum / 2)
+		Times(len(verIdentities) * approvalsCount)
 
 	return &exeNode, exeEngine
 }
