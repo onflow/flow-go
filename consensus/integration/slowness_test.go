@@ -18,7 +18,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/buffer"
+	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	"github.com/dapperlabs/flow-go/module/local"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
@@ -29,36 +31,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type Headers struct {
-	sync.Mutex
-	headers map[flow.Identifier]*flow.Header
-}
-
-func NewHeaders() *Headers {
-	return &Headers{
-		headers: make(map[flow.Identifier]*flow.Header),
-	}
-}
-
-func (h *Headers) Store(header *flow.Header) error {
-	h.Lock()
-	defer h.Unlock()
-	h.headers[header.ID()] = header
-	return nil
-}
-
-func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
-	header, found := h.headers[blockID]
-	if found {
-		return header, nil
-	}
-	return nil, fmt.Errorf("can not find header by id: %v", blockID)
-}
-
-func (h *Headers) ByNumber(number uint64) (*flow.Header, error) {
-	return nil, nil
-}
 
 type Views struct {
 	sync.Mutex
@@ -74,28 +46,6 @@ func (v *Views) Store(action uint8, view uint64) error {
 
 func (v *Views) Retrieve(action uint8) (uint64, error) {
 	return v.latest, nil
-}
-
-type Builder struct {
-	headers *Headers
-}
-
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
-	headers := b.headers.headers
-	parent, ok := headers[parentID]
-	if !ok {
-		return nil, fmt.Errorf("parent block not found (parent: %x)", parentID)
-	}
-	header := &flow.Header{
-		ChainID:     "chain",
-		ParentID:    parentID,
-		Height:      parent.Height + 1,
-		PayloadHash: unittest.IdentifierFixture(),
-		Timestamp:   time.Now().UTC(),
-	}
-	setter(header)
-	headers[header.ID()] = header
-	return header, nil
 }
 
 type Signer struct {
@@ -242,12 +192,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 		require.NoError(t, err)
 		fmt.Printf("local id: %v\n", local.NodeID())
 
-		headers := NewHeaders()
-		err = headers.Store(&genesis.Header)
-		require.NoError(t, err)
 		views := &Views{}
-
-		builder := &Builder{headers}
 
 		// make network
 		net := &Network{}
@@ -255,6 +200,17 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 		headersDB := storage.NewHeaders(db)
 		payloadsDB := storage.NewPayloads(db)
 		blocksDB := storage.NewBlocks(db)
+
+		guarantees, err := stdmap.NewGuarantees(100000)
+		require.NoError(t, err)
+		seals, err := stdmap.NewSeals(100000)
+		require.NoError(t, err)
+
+		// initialize the block builder
+		chainID := "chain"
+		build := builder.NewBuilder(db, guarantees, seals,
+			builder.WithChainID(chainID),
+		)
 
 		signer := &Signer{identity.ID()}
 
@@ -276,13 +232,13 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 
 		// initialize the block finalizer
 		hot, err := consensus.NewParticipant(log, notifier, metrics, headersDB,
-			views, state, local, builder, final, signer, communicator, selector, rootHeader,
+			views, state, local, build, final, signer, communicator, selector, rootHeader,
 			rootQC)
 
 		require.NoError(t, err)
 
 		// initialize the compliance engine
-		comp, err := compliance.New(log, net, local, state, headers, payloadsDB, nil, cache)
+		comp, err := compliance.New(log, net, local, state, headersDB, payloadsDB, nil, cache)
 		require.NoError(t, err)
 
 		// initialize the synchronization engine
@@ -303,6 +259,13 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 }
 
 func Test3Nodes(t *testing.T) {
+	// unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	// 	db.Update(func(tx *badger.Txn) error {
+	// 		err := tx.Set([]byte("sdf"), nil)
+	// 		require.NoError(t, err)
+	// 		return nil
+	// 	})
+	// })
 	nodes := createNodes(t, 3)
 	fmt.Printf("%v nodes created", len(nodes))
 	var wg sync.WaitGroup
