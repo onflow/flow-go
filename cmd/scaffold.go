@@ -26,8 +26,10 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	dbmetrics "github.com/dapperlabs/flow-go/module/metrics/badger"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage"
@@ -39,6 +41,8 @@ const notSet = "not set"
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	nodeIDHex    string
+	bindAddr     string
+	NodeRole     string
 	NodeName     string
 	Timeout      time.Duration
 	datadir      string
@@ -91,6 +95,7 @@ type FlowNodeBuilder struct {
 	postInitFns    []func(*FlowNodeBuilder)
 	stakingKey     crypto.PrivateKey
 	networkKey     crypto.PrivateKey
+	MsgValidators  []validators.MessageValidator
 
 	// genesis information
 	GenesisBlock *flow.Block
@@ -102,6 +107,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "./bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
@@ -116,7 +122,13 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		codec := jsoncodec.NewCodec()
 
-		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, fnb.Me.Address(), fnb.Me.NodeID(), fnb.networkKey)
+		myAddr := fnb.Me.Address()
+		if fnb.BaseConfig.bindAddr != notSet {
+			myAddr = fnb.BaseConfig.bindAddr
+		}
+
+		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
+			fnb.networkKey, fnb.Metrics, fnb.MsgValidators...)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
@@ -126,7 +138,14 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
+		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get node id: %w", err)
+		}
+		nodeRole := nodeID.Role
+		topology := libp2p.NewRandPermTopology(nodeRole)
+
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, topology)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -137,9 +156,16 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 }
 
 func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
-	fnb.Component("metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+	fnb.Component("metrics server", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
 		return server, nil
+	})
+}
+
+func (fnb *FlowNodeBuilder) enqueueDBMetrics() {
+	fnb.Component("badger db metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		monitor := dbmetrics.NewMonitor(fnb.Metrics, fnb.DB)
+		return monitor, nil
 	})
 }
 
@@ -166,7 +192,11 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 func (fnb *FlowNodeBuilder) initLogger() {
 	// configure logger with standard level, node ID and UTC timestamp
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := fnb.Logger.With().Timestamp().Str("node_id", fnb.BaseConfig.nodeIDHex).Logger()
+	log := fnb.Logger.With().
+		Timestamp().
+		Str("node_role", fnb.BaseConfig.NodeRole).
+		Str("node_id", fnb.BaseConfig.nodeIDHex).
+		Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.name)
 
@@ -175,7 +205,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid log level")
 	}
-	log.Level(lvl)
+	log = log.Level(lvl)
 
 	log.Info().Msg("initializing engine modules")
 
@@ -375,13 +405,17 @@ func FlowNode(name string) *FlowNodeBuilder {
 
 	builder.enqueueMetricsServerInit()
 
+	builder.enqueueDBMetrics()
+
 	return builder
 }
 
 // Run initiates all common components (logger, database, protocol state etc.)
 // then starts each component. It also sets up a channel to gracefully shut
 // down each component if a SIGINT is received.
-func (fnb *FlowNodeBuilder) Run() {
+func (fnb *FlowNodeBuilder) Run(role string) {
+
+	fnb.BaseConfig.NodeRole = role
 
 	// initialize signal catcher
 	fnb.sig = make(chan os.Signal, 1)

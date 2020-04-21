@@ -37,17 +37,10 @@ cmd/collection/collection:
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
-ifeq ($(UNAME), Linux)
-	sudo apt-get -y install capnproto
-endif
-ifeq ($(UNAME), Darwin)
-	brew install capnp
-endif
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
-	GO111MODULE=on go get zombiezen.com/go/capnproto2@v0.0.0-20190505172156-0c36f8f86ab2; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
@@ -84,10 +77,6 @@ generate: generate-proto generate-mocks
 .PHONY: generate-proto
 generate-proto:
 	prototool generate protobuf
-
-.PHONY: generate-capnp
-generate-capnp:
-	capnp compile -I${GOPATH}/src/zombiezen.com/go/capnproto2/std -ogo schema/captain/*.capnp
 
 .PHONY: generate-mocks
 generate-mocks:
@@ -233,8 +222,18 @@ docker-build-access-debug:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=access --target debug \
 		-t gcr.io/dl-flow/access-debug:latest -t "gcr.io/dl-flow/access-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/access-debug:$(IMAGE_TAG)" .
 
+.PHONY: docker-build-ghost
+docker-build-ghost:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=ghost --target production \
+		-t gcr.io/dl-flow/ghost:latest -t "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/ghost:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-ghost-debug
+docker-build-ghost-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=ghost --target debug \
+		-t gcr.io/dl-flow/ghost-debug:latest -t "gcr.io/dl-flow/ghost-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/ghost-debug:$(IMAGE_TAG)" .
+
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
 
 .PHONY: docker-push-collection
 docker-push-collection:
@@ -266,6 +265,12 @@ docker-push-access:
 	docker push "gcr.io/dl-flow/access:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/access:$(IMAGE_TAG)"
 
+.PHONY: docker-push-ghost
+docker-push-ghost:
+	docker push gcr.io/dl-flow/ghost:latest
+	docker push "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)"
+	docker push "gcr.io/dl-flow/ghost:$(IMAGE_TAG)"
+
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access
 
@@ -288,6 +293,10 @@ docker-run-verification:
 .PHONY: docker-run-access
 docker-run-access:
 	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/access:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries access-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+.PHONY: docker-run-access
+docker-run-ghost:
+	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/ghost:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries ghost-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 # Check if the go version is 1.13. flow-go only supports go 1.13
 .PHONY: check-go-version

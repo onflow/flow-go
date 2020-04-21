@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -58,6 +59,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not get consensus participants: %w", err)
 	}
+	participants = participants.Order(order.ByNodeIDAsc)
 
 	cold := &ColdStuff{
 		log:          log,
@@ -136,6 +138,13 @@ ConsentLoop:
 		// calculate the time at which we can generate the next valid block
 		limit := e.round.Parent().Timestamp.Add(e.interval)
 
+		log.Debug().
+			Str("leader", e.round.Leader().NodeID.String()).
+			Str("participants", fmt.Sprintf("%v", e.participants.NodeIDs())).
+			Hex("head_id", logging.ID(head.ID())).
+			Uint64("head_height", head.Height).
+			Msg("starting round")
+
 		select {
 		case <-e.unit.Quit():
 			return nil
@@ -156,7 +165,7 @@ ConsentLoop:
 				e.log.Debug().Msg("waiting for votes")
 				err = e.waitForVotes()
 				if err != nil {
-					log.Error().Err(err).Msg("could not receive votes")
+					log.Debug().Err(err).Msg("could not receive votes")
 					continue ConsentLoop
 				}
 
@@ -176,7 +185,7 @@ ConsentLoop:
 				e.log.Debug().Msg("waiting for proposal")
 				err = e.waitForProposal()
 				if err != nil {
-					log.Error().Err(err).Msg("could not receive proposal")
+					log.Debug().Err(err).Msg("could not receive proposal")
 					continue ConsentLoop
 				}
 
@@ -190,7 +199,7 @@ ConsentLoop:
 				e.log.Debug().Msg("waiting for commit")
 				err = e.waitForCommit()
 				if err != nil {
-					log.Error().Err(err).Msg("could not receive commit")
+					log.Debug().Err(err).Msg("could not receive commit")
 					continue ConsentLoop
 				}
 			}
@@ -395,13 +404,6 @@ func (e *ColdStuff) waitForProposal() error {
 			parentID := e.round.Parent().ID()
 			if candidate.ParentID != parentID {
 				log.Warn().Hex("candidate_parent", candidate.ParentID[:]).Hex("expected_parent", parentID[:]).Msg("invalid parent")
-				continue
-			}
-
-			// discard proposals with invalid timestamp
-			limit := e.round.Parent().Timestamp.Add(e.interval)
-			if candidate.Timestamp.Before(limit) {
-				log.Warn().Time("candidate_timestamp", candidate.Timestamp).Time("candidate_limit", limit).Msg("invalid timestamp")
 				continue
 			}
 

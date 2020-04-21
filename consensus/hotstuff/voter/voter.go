@@ -11,14 +11,16 @@ import (
 type Voter struct {
 	signer        hotstuff.Signer
 	forks         hotstuff.ForksReader
+	persist       hotstuff.Persister
 	lastVotedView uint64 // need to keep track of the last view we voted for so we don't double vote accidentally
 }
 
 // New creates a new Voter instance
-func New(signer hotstuff.Signer, forks hotstuff.ForksReader, lastVotedView uint64) *Voter {
+func New(signer hotstuff.Signer, forks hotstuff.ForksReader, persist hotstuff.Persister, lastVotedView uint64) *Voter {
 	return &Voter{
 		signer:        signer,
 		forks:         forks,
+		persist:       persist,
 		lastVotedView: lastVotedView,
 	}
 }
@@ -51,6 +53,10 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 	// vote for the current view has been produced, update lastVotedView
 	// to prevent from voting for the same view again
 	v.lastVotedView = curView
+	err = v.persist.VotedView(curView)
+	if err != nil {
+		return nil, fmt.Errorf("could not persist last voted: %w", err)
+	}
 
 	return vote, nil
 }

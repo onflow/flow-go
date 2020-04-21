@@ -2,10 +2,10 @@ package collection
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,51 +18,49 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const defaultTimeout = 10 * time.Second
+const (
+	// the timeout for individual actions (eg. send a transaction)
+	defaultTimeout = 10 * time.Second
+	// the period we wait to give consensus/routing time to complete
+	waitTime = 20 * time.Second
+)
 
 // default set of non-collection nodes
 func defaultOtherNodes() []testnet.NodeConfig {
 	var (
-		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel("info"))
-		exeNode  = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel("info"))
-		verNode  = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel("info"))
+		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		exeNode  = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel))
+		verNode  = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
 	)
 
 	return []testnet.NodeConfig{conNode1, conNode2, conNode3, exeNode, verNode}
 }
 
-// Tests sending various invalid transactions to a single-cluster configuration
-// and ensures that they are rejected by the collection node and not included in
-// any collection.
+// Test sending various invalid transactions to a single-cluster configuration.
+// The transactions should be rejected by the collection node and not included
+// in any collection.
 func TestTransactionIngress_InvalidTransaction(t *testing.T) {
-	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
-		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
-	)
 
-	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
-	conf := testnet.NetworkConfig{Nodes: nodes}
+	colNodeConfigs := testnet.NewNodeConfigSet(3, flow.RoleCollection)
+	colNodeConfig1 := colNodeConfigs[0]
+	nodes := append(colNodeConfigs, defaultOtherNodes()...)
+	conf := testnet.NewNetworkConfig("col_txingress_invalidtx", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, "col_invalid_txns", conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Cleanup()
+	defer net.Stop()
 
 	// we will test against COL1
-	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
+	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
 	assert.True(t, ok)
 
-	port, ok := colContainer1.Ports[testnet.ColNodeAPIPort]
-	assert.True(t, ok)
-
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", port))
-	assert.Nil(t, err)
+	client, err := testnet.NewClient(colNode1.Addr(testnet.ColNodeAPIPort))
+	require.Nil(t, err)
 
 	t.Run("missing reference block hash", func(t *testing.T) {
 		txDSL := unittest.TransactionDSLFixture()
@@ -115,19 +113,16 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	})
 }
 
-func TestTransactionIngress_ValidTransaction(t *testing.T) {
+// Test sending a single valid transaction to a single cluster.
+// The transaction should be included in a collection.
+func TestTxIngress_SingleCluster(t *testing.T) {
 
-	var (
-		colNode1 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(1))
-		colNode2 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(2))
-		colNode3 = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithIDInt(3))
-	)
+	colNodeConfigs := testnet.NewNodeConfigSet(3, flow.RoleCollection)
+	colNodeConfig1 := colNodeConfigs[0]
+	nodes := append(colNodeConfigs, defaultOtherNodes()...)
+	conf := testnet.NewNetworkConfig("col_txingress_singlecluster", nodes)
 
-	nodes := append([]testnet.NodeConfig{colNode1, colNode2, colNode3}, defaultOtherNodes()...)
-	conf := testnet.NetworkConfig{Nodes: nodes}
-
-	net, err := testnet.PrepareFlowNetwork(t, "col_valid_txns", conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 
@@ -135,70 +130,278 @@ func TestTransactionIngress_ValidTransaction(t *testing.T) {
 	defer net.Cleanup()
 
 	// we will test against COL1
-	colContainer1, ok := net.ContainerByID(colNode1.Identifier)
+	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
 	assert.True(t, ok)
 
-	port, ok := colContainer1.Ports[testnet.ColNodeAPIPort]
-	assert.True(t, ok)
+	client, err := testnet.NewClient(colNode1.Addr(testnet.ColNodeAPIPort))
+	require.Nil(t, err)
 
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", port))
+	tx := unittest.TransactionBodyFixture()
+	tx, err = client.SignTransaction(tx)
+	assert.Nil(t, err)
+	t.Log("sending transaction: ", tx.ID())
 
-	t.Run("valid transaction", func(t *testing.T) {
-		tx := unittest.TransactionBodyFixture()
-		tx, err := client.SignTransaction(tx)
-		assert.Nil(t, err)
-		t.Log("sending transaction: ", tx.ID())
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+	err = client.SendTransaction(ctx, tx)
+	assert.Nil(t, err)
 
-		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-		defer cancel()
-		err = client.SendTransaction(ctx, tx)
-		assert.Nil(t, err)
+	// wait for consensus to complete
+	//TODO we should listen for collection guarantees instead, but this is blocked
+	// ref: https://github.com/dapperlabs/flow-go/issues/3021
+	time.Sleep(waitTime)
 
-		// wait for consensus to complete
-		//TODO we should listen for collection guarantees instead, but this is blocked
-		// ref: https://github.com/dapperlabs/flow-go/issues/3021
-		time.Sleep(20 * time.Second)
+	err = net.Stop()
+	assert.Nil(t, err)
 
-		// TODO stop then start containers
-		err = net.StopContainers()
-		assert.Nil(t, err)
+	identities := net.Identities()
+	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
 
-		identities := net.Identities()
+	// get database for COL1
+	db, err := colNode1.DB()
+	require.Nil(t, err)
 
-		chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
+	state, err := clusterstate.NewState(db, chainID)
+	assert.Nil(t, err)
 
-		// get database for COL1
-		db, err := colContainer1.DB()
+	// the transaction should be included in exactly one collection
+	checker := unittest.NewClusterStateChecker(state)
+	checker.
+		ExpectContainsTx(tx.ID()).
+		ExpectTxCount(1).
+		Assert(t)
+}
+
+// Test sending a single valid transaction to the responsible cluster in a
+// multi-cluster configuration
+//
+// The transaction should not be routed and should be included in exactly one
+// collection in only the responsible cluster.
+func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
+
+	const nClusters uint = 3
+
+	colNodes := testnet.NewNodeConfigSet(6, flow.RoleCollection)
+
+	nodes := append(colNodes, defaultOtherNodes()...)
+	conf := testnet.NewNetworkConfig("col_txingres_multicluster_correct_cluster", nodes, testnet.WithClusters(nClusters))
+
+	net := testnet.PrepareFlowNetwork(t, conf)
+
+	ctx := context.Background()
+
+	net.Start(ctx)
+	defer net.Cleanup()
+
+	// sleep for a few seconds to let the nodes discover each other and build the libp2p pubsub mesh
+	time.Sleep(5 * time.Second)
+
+	clusters := protocol.Clusters(nClusters, net.Identities())
+
+	// pick a cluster to target
+	targetCluster := clusters.ByIndex(0)
+	targetIdentity, ok := targetCluster.ByIndex(0)
+	require.True(t, ok)
+
+	// pick a member of the cluster
+	targetNode, ok := net.ContainerByID(targetIdentity.NodeID)
+	require.True(t, ok)
+
+	// get a client pointing to the cluster member
+	client, err := testnet.NewClient(targetNode.Addr(testnet.ColNodeAPIPort))
+	require.Nil(t, err)
+
+	// create a transaction for the target cluster
+	tx := unittest.AlterTransactionForCluster(unittest.TransactionBodyFixture(), clusters, targetCluster, func(clusterTx *flow.TransactionBody) {
+		signed, err := client.SignTransaction(*clusterTx)
+		require.Nil(t, err)
+		*clusterTx = signed
+	})
+
+	assert.Equal(t, clusters.ByTxID(tx.ID()).Fingerprint(), targetCluster.Fingerprint())
+	t.Log("tx id: ", tx.ID().String())
+
+	// submit the transaction
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+	err = client.SendTransaction(ctx, tx)
+	assert.Nil(t, err)
+
+	// wait for consensus to complete
+	time.Sleep(waitTime)
+	err = net.Stop()
+	require.Nil(t, err)
+
+	// ensure the transaction IS included in target cluster collection
+	for _, id := range targetCluster.NodeIDs() {
+		node, ok := net.ContainerByID(id)
+		require.True(t, ok)
+		db, err := node.DB()
 		require.Nil(t, err)
 
+		chainID := protocol.ChainIDForCluster(targetCluster)
 		state, err := clusterstate.NewState(db, chainID)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 
-		// the transaction should be included in exactly one collection
-		head, err := state.Final().Head()
-		assert.Nil(t, err)
+		// the transaction should be included exactly once
+		checker := unittest.NewClusterStateChecker(state)
+		checker.
+			ExpectContainsTx(tx.ID()).
+			ExpectTxCount(1).
+			Assert(t)
+	}
 
-		foundTx := false
-		for head.Height > 0 {
-			collection, err := state.AtBlockID(head.ID()).Collection()
-			assert.Nil(t, err)
-
-			head, err = state.AtBlockID(head.ParentID).Head()
-			assert.Nil(t, err)
-
-			if len(collection.Transactions) == 0 {
-				continue
-			}
-
-			for _, txID := range collection.Light().Transactions {
-				assert.Equal(t, tx.ID(), txID, "found unexpected transaction")
-				if txID == tx.ID() {
-					assert.False(t, foundTx, "found duplicate transaction")
-					foundTx = true
-				}
-			}
+	// ensure the transaction IS NOT included in other cluster collections
+	for _, cluster := range clusters.All() {
+		// skip the target cluster
+		if cluster.Fingerprint() == targetCluster.Fingerprint() {
+			continue
 		}
 
-		assert.True(t, foundTx)
+		chainID := protocol.ChainIDForCluster(cluster)
+
+		for _, id := range cluster.NodeIDs() {
+			node, ok := net.ContainerByID(id)
+			require.True(t, ok)
+			db, err := node.DB()
+			require.Nil(t, err)
+
+			state, err := clusterstate.NewState(db, chainID)
+			require.Nil(t, err)
+
+			// the transaction should not be included
+			// the transaction should be included exactly once
+			checker := unittest.NewClusterStateChecker(state)
+			checker.
+				ExpectOmitsTx(tx.ID()).
+				ExpectTxCount(0).
+				Assert(t)
+		}
+	}
+}
+
+// Test sending a single valid transaction to a non-responsible cluster in a
+// multi-cluster configuration
+//
+// The transaction should be routed to the responsible cluster and should be
+// included in a collection in only the responsible cluster's state.
+func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
+
+	const nClusters uint = 3
+
+	colNodes := testnet.NewNodeConfigSet(6, flow.RoleCollection)
+
+	nodes := append(colNodes, defaultOtherNodes()...)
+	conf := testnet.NewNetworkConfig("col_txingress_multicluster_othercluster", nodes, testnet.WithClusters(nClusters))
+
+	net := testnet.PrepareFlowNetwork(t, conf)
+
+	ctx := context.Background()
+
+	net.Start(ctx)
+	defer net.Cleanup()
+
+	clusters := protocol.Clusters(nClusters, net.Identities())
+
+	// pick a cluster to target
+	// this cluster is responsible for the transaction
+	targetCluster := clusters.ByIndex(0)
+
+	// pick nodes from the other clusters
+	// these nodes will receive the transaction, but are not responsible for it
+	otherCluster1 := clusters.ByIndex(1)
+	otherIdentity1, ok := otherCluster1.ByIndex(0)
+	require.True(t, ok)
+	otherNode1, ok := net.ContainerByID(otherIdentity1.NodeID)
+	require.True(t, ok)
+
+	otherCluster2 := clusters.ByIndex(2)
+	otherIdentity2, ok := otherCluster2.ByIndex(0)
+	require.True(t, ok)
+	otherNode2, ok := net.ContainerByID(otherIdentity2.NodeID)
+	require.True(t, ok)
+
+	// create a key to sign the transaction with
+	key, err := unittest.AccountKeyFixture()
+	require.Nil(t, err)
+
+	// get a client pointing to the other nodes, using the same key
+	client1, err := testnet.NewClientWithKey(otherNode1.Addr(testnet.ColNodeAPIPort), key)
+	require.Nil(t, err)
+	client2, err := testnet.NewClientWithKey(otherNode2.Addr(testnet.ColNodeAPIPort), key)
+	require.Nil(t, err)
+
+	// create a transaction for the target cluster
+	tx := unittest.AlterTransactionForCluster(unittest.TransactionBodyFixture(), clusters, targetCluster, func(clusterTx *flow.TransactionBody) {
+		signed, err := client1.SignTransaction(*clusterTx)
+		require.Nil(t, err)
+		*clusterTx = signed
 	})
+
+	assert.Equal(t, clusters.ByTxID(tx.ID()).Fingerprint(), targetCluster.Fingerprint())
+	t.Log("tx id: ", tx.ID().String())
+
+	// submit the transaction to other cluster 1
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+	err = client1.SendTransaction(ctx, tx)
+	assert.Nil(t, err)
+
+	// submit the transaction to other cluster 2
+	ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+	err = client2.SendTransaction(ctx, tx)
+	assert.Nil(t, err)
+
+	// wait for consensus to complete
+	time.Sleep(waitTime)
+	err = net.Stop()
+	require.Nil(t, err)
+
+	// ensure the transaction IS included in target cluster collection
+	for _, id := range targetCluster.NodeIDs() {
+		node, ok := net.ContainerByID(id)
+		require.True(t, ok)
+		db, err := node.DB()
+		require.Nil(t, err)
+
+		chainID := protocol.ChainIDForCluster(targetCluster)
+		state, err := clusterstate.NewState(db, chainID)
+		require.Nil(t, err)
+
+		// the transaction should be included exactly once
+		checker := unittest.NewClusterStateChecker(state)
+		checker.
+			ExpectContainsTx(tx.ID()).
+			ExpectTxCount(1).
+			Assert(t)
+	}
+
+	// ensure the transaction IS NOT included in other cluster collections
+	for _, cluster := range clusters.All() {
+		// skip the target cluster
+		if cluster.Fingerprint() == targetCluster.Fingerprint() {
+			continue
+		}
+
+		chainID := protocol.ChainIDForCluster(cluster)
+
+		for _, id := range cluster.NodeIDs() {
+			node, ok := net.ContainerByID(id)
+			require.True(t, ok)
+			db, err := node.DB()
+			require.Nil(t, err)
+
+			state, err := clusterstate.NewState(db, chainID)
+			require.Nil(t, err)
+
+			// the transaction should not be included
+			// the transaction should be included exactly once
+			checker := unittest.NewClusterStateChecker(state)
+			checker.
+				ExpectOmitsTx(tx.ID()).
+				ExpectTxCount(0).
+				Assert(t)
+		}
+	}
 }

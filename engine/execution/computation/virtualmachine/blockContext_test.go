@@ -198,7 +198,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.Nil(t, err)
 
 		// generate a unique key
-		key, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, seed)
+		key, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 		assert.NoError(t, err)
 
 		// get the key bytes

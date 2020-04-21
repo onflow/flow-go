@@ -134,7 +134,7 @@ func (v *View) Delta() Delta {
 // TODO rename this, this is not actually a merge as we can't merge
 // readFunc s.
 func (v *View) MergeView(child *View) {
-	for k := range child.Interactions().RegisterTouches() {
+	for _, k := range child.Interactions().RegisterTouches() {
 		v.regTouchSet[string(k)] = true
 	}
 	// SpockSecret is order aware

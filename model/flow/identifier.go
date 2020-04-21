@@ -77,10 +77,7 @@ func MakeID(body interface{}) Identifier {
 
 // PublicKeyToID creates an ID from a public key.
 func PublicKeyToID(pub crypto.PublicKey) (Identifier, error) {
-	b, err := pub.Encode()
-	if err != nil {
-		return Identifier{}, err
-	}
+	b := pub.Encode()
 	hasher := hash.NewSHA3_256()
 	hash := hasher.ComputeHash(b)
 	return HashToID(hash), nil

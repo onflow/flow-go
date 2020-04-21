@@ -21,6 +21,9 @@ type xorshiftp struct {
 	a, b uint64
 }
 
+// at least a 16 bytes constant
+var zeroSeed = []byte("NothingUpMySleeve")
+
 // NewRand returns a new PRG that is a set of xorshift128+ PRGs, seeded with the input seed
 // the input seed is the initial state of the PRG.
 // the length of the seed fixes the number of xorshift128+ to initialize:
@@ -42,9 +45,12 @@ func NewRand(seed []byte) (*xorshifts, error) {
 		})
 	}
 	// check states are not zeros
+	// replace the zero seed by a nothing-up-my-sleeve constant seed
+	// the bias introduced is nigligible as the seed space is 2^128
 	for _, x := range states {
 		if x.a|x.b == 0 {
-			return nil, fmt.Errorf("the seed of xorshift+ cannot be zero")
+			x.a = binary.BigEndian.Uint64(zeroSeed[:8])
+			x.b = binary.BigEndian.Uint64(zeroSeed[8:])
 		}
 	}
 	// init the xorshifts

@@ -3,6 +3,7 @@ package module
 import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 )
 
 // PendingBlockBuffer defines an interface for a cache of pending blocks that
@@ -10,7 +11,7 @@ import (
 // state. They are indexed by parent ID to enable processing all of a parent's
 // children once the parent is received.
 type PendingBlockBuffer interface {
-	Add(block *flow.PendingBlock) bool
+	Add(originID flow.Identifier, proposal *messages.BlockProposal) bool
 
 	ByID(blockID flow.Identifier) (*flow.PendingBlock, bool)
 

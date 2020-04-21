@@ -57,3 +57,8 @@ func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, bool) {
 func (cl ClusterList) Size() int {
 	return len(cl.clusters)
 }
+
+// All returns all the clusters.
+func (cl ClusterList) All() []IdentityList {
+	return cl.clusters
+}
