@@ -2,14 +2,32 @@ package integration_test
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	"github.com/dapperlabs/flow-go/consensus"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/module/buffer"
+	"github.com/dapperlabs/flow-go/module/local"
+	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/network"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type Headers struct {
@@ -41,14 +59,14 @@ type Views struct {
 	latest uint64
 }
 
-func (v *Views) StoreLatest(view uint64) error {
+func (v *Views) Store(action uint8, view uint64) error {
 	v.Lock()
 	defer v.Unlock()
 	v.latest = view
 	return nil
 }
 
-func (v *Views) RetrieveLatest() (uint64, error) {
+func (v *Views) Retrieve(action uint8) (uint64, error) {
 	return v.latest, nil
 }
 
@@ -78,23 +96,23 @@ type Signer struct {
 	localID flow.Identifier
 }
 
-func (*Signer) CreateProposal(block *model.Block) *model.Proposal {
+func (*Signer) CreateProposal(block *model.Block) (*model.Proposal, error) {
 	proposal := &model.Proposal{
 		Block:   block,
 		SigData: nil,
 	}
-	return proposal
+	return proposal, nil
 }
-func (s *Signer) CreateVote(block *model.Block) *model.Vote {
+func (s *Signer) CreateVote(block *model.Block) (*model.Vote, error) {
 	vote := &model.Vote{
 		View:     block.View,
 		BlockID:  block.BlockID,
 		SignerID: s.localID,
 		SigData:  nil,
 	}
-	return vote
+	return vote, nil
 }
-func (*Signer) CreateQC(votes []*model.Vote) *model.QuorumCertificate {
+func (*Signer) CreateQC(votes []*model.Vote) (*model.QuorumCertificate, error) {
 	voterIDs := make([]flow.Identifier, 0, len(votes))
 	for _, vote := range votes {
 		voterIDs = append(voterIDs, vote.SignerID)
@@ -105,7 +123,7 @@ func (*Signer) CreateQC(votes []*model.Vote) *model.QuorumCertificate {
 		SignerIDs: voterIDs,
 		SigData:   nil,
 	}
-	return qc
+	return qc, nil
 }
 
 func (*Signer) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
@@ -116,103 +134,169 @@ func (*Signer) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model
 	return true, nil
 }
 
-func createNode(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		// state, err := protocol.NewState(db)
-		// require.NoError(t, err)
-		// // generate random default identity
-		// identity := unittest.IdentityFixture()
-		//
-		// index := uint(0)
-		// localID := identity.ID()
-		// zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-		// log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Uint("index", index).Hex("local_id", localID[:]).Logger()
-		// notifier := notifications.NewLogConsumer(log)
-		//
-		// // initialize no-op metrics mock
-		// metrics := &module.Metrics{}
-		// metrics.On("HotStuffBusyDuration", mock.Anything)
-		// metrics.On("HotStuffIdleDuration", mock.Anything)
-		//
-		// headers := &Headers{}
-		// views := &Views{}
-		//
-		// // mocked dependencies
-		// snapshot := &protocol.Snapshot{}
-		// proto := &protocol.State{}
-		//
-		// participants := flow.IdentityList{identity}
-		// // program the protocol snapshot behaviour
-		// snapshot.On("Identities", mock.Anything).Return(
-		// 	func(selector flow.IdentityFilter) flow.IdentityList {
-		// 		return participants.Filter(selector)
-		// 	},
-		// 	nil,
-		// )
-		// for _, participant := range participants {
-		// 	snapshot.On("Identity", participant.NodeID).Return(participant, nil)
-		// }
-		//
-		// // make local
-		// seed := make([]byte, crypto.KeyGenSeedMinLenBlsBls12381)
-		// n, err := rand.Read(seed)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// if n < len(seed) {
-		// 	return nil, fmt.Errorf("insufficient random bytes")
-		// }
-		// priv, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, seed)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// local, err := local.New(nil, priv)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		//
-		// builder := &Builder{headers}
-		//
-		// // make network
-		// network := nil
-		//
-		// payloadsDB := nil
-		// blocksDB := nil
-		//
-		// signer := &Signer{identity.ID()}
-		//
-		// rootHeader := gensisHeader()
-		// rootQC := gensisQC(rootHeader)
-		// selector := filter.Any
-		//
-		// hot, err := consensus.NewParticipant(log, notifier, metrics, headers,
-		// 	views, proto, local, builder, updater, signer, communicator, selector, rootHeader,
-		// 	rootQC)
-		//
-		// if err != nil {
-		// 	return nil, err
-		// }
-		//
-		// // initialize the pending blocks cache
-		// cache := buffer.NewPendingBlocks()
-		//
-		// // initialize the compliance engine
-		// comp, err := compliance.New(log, network, local, proto, headers, payloadsDB, cache)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
-		// }
-		//
-		// // initialize the synchronization engine
-		// sync, err := synchronization.New(log, network, local, proto, blocksDB, comp)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
-		// }
-		//
-		// comp = comp.WithSynchronization(sync).WithConsensus(hot)
-		//
-	})
+type Conduit struct{}
+
+func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
+	return nil
 }
+
+type Network struct{}
+
+func (n *Network) Register(code uint8, engine network.Engine) (network.Conduit, error) {
+	return &Conduit{}, nil
+}
+
+type Finalizer struct{}
+
+func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
+	return nil
+}
+
+type Communicator struct{}
+
+func (c *Communicator) BroadcastProposal(p *flow.Header) error {
+	return nil
+}
+
+func (c *Communicator) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
+	return nil
+}
+
+type Node struct {
+	id         *flow.Identity
+	compliance *compliance.Engine
+	sync       *synchronization.Engine
+	hot        *hotstuff.EventLoop
+	headers    *storage.Headers
+}
+
+func createNodes(t *testing.T, n int) []*Node {
+	participants := make([]*flow.Identity, 0)
+	for i := 0; i < n; i++ {
+		identity := unittest.IdentityFixture()
+		participants = append(participants, identity)
+	}
+
+	collection := unittest.IdentityFixture()
+	collection.Role = flow.RoleCollection
+	verification := unittest.IdentityFixture()
+	verification.Role = flow.RoleVerification
+	execution := unittest.IdentityFixture()
+	execution.Role = flow.RoleExecution
+
+	allParitipants := append(participants, collection, verification, execution)
+
+	genesis := run.GenerateRootBlock(allParitipants, run.GenerateRootSeal([]byte{}))
+
+	nodes := make([]*Node, 0, len(participants))
+	for _, identity := range participants {
+		nodeChan := make(chan *Node, 1)
+		defer close(nodeChan)
+		unittest.RunWithBadgerDB(t, createNode(t, identity, participants, &genesis, nodeChan))
+		node := <-nodeChan
+		nodes = append(nodes, node)
+	}
+
+	return nodes
+}
+
+func createNode(t *testing.T, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, nodeChan chan<- *Node) func(db *badger.DB) {
+	return func(db *badger.DB) {
+		state, err := protocol.NewState(db)
+		require.NoError(t, err)
+
+		err = state.Mutate().Bootstrap(genesis)
+		require.NoError(t, err)
+
+		// find index
+		index := len(participants)
+		for i := 0; i < len(participants); i++ {
+			if identity == participants[i] {
+				index = i
+				break
+			}
+		}
+		require.NotEqual(t, index, len(participants), "can not find identity in participants")
+
+		localID := identity.ID()
+
+		// log with node index
+		zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+		log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
+		notifier := notifications.NewLogConsumer(log)
+
+		// initialize no-op metrics mock
+		metrics := &module.Metrics{}
+		metrics.On("HotStuffBusyDuration", mock.Anything)
+		metrics.On("HotStuffIdleDuration", mock.Anything)
+
+		// make local
+		priv := helper.MakeBLSKey(t)
+		local, err := local.New(identity, priv)
+		require.NoError(t, err)
+		fmt.Printf("local id: %v\n", local.NodeID())
+
+		headers := &Headers{}
+		views := &Views{}
+
+		builder := &Builder{headers}
+
+		// make network
+		net := &Network{}
+
+		headersDB := storage.NewHeaders(db)
+		payloadsDB := storage.NewPayloads(db)
+		blocksDB := storage.NewBlocks(db)
+
+		signer := &Signer{identity.ID()}
+
+		// initialize the pending blocks cache
+		cache := buffer.NewPendingBlocks()
+
+		rootHeader := &genesis.Header
+		rootQC := &model.QuorumCertificate{
+			View:      genesis.View,
+			BlockID:   genesis.ID(),
+			SignerIDs: nil, // TODO
+			SigData:   nil,
+		}
+		selector := filter.Any
+
+		final := &Finalizer{}
+
+		communicator := &Communicator{}
+
+		// initialize the block finalizer
+		hot, err := consensus.NewParticipant(log, notifier, metrics, headersDB,
+			views, state, local, builder, final, signer, communicator, selector, rootHeader,
+			rootQC)
+
+		require.NoError(t, err)
+
+		// initialize the compliance engine
+		comp, err := compliance.New(log, net, local, state, headers, payloadsDB, nil, cache)
+		require.NoError(t, err)
+
+		// initialize the synchronization engine
+		sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
+		require.NoError(t, err)
+
+		comp = comp.WithSynchronization(sync).WithConsensus(hot)
+
+		node := &Node{
+			id:         identity,
+			compliance: comp,
+			sync:       sync,
+			hot:        hot,
+			headers:    headersDB,
+		}
+		nodeChan <- node
+	}
+}
+
 func Test3Nodes(t *testing.T) {
+	nodes := createNodes(t, 4)
+	fmt.Printf("%v nodes created", len(nodes))
 	// ccl1, err := createNode()
 	// require.NoError(t, err)
 	// ccl2, err := createNode()
