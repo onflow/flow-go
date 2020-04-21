@@ -100,7 +100,7 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// insert block view -> ID mapping
-		err = operation.InsertNumberForCluster(chainID, header.View, header.ID())(tx)
+		err = operation.InsertNumberForCluster(chainID, header.Height, header.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert view->ID mapping: %w", err)
 		}

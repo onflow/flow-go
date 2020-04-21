@@ -47,7 +47,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		var boundary uint64
 		err = db.View(operation.RetrieveBoundaryForCluster(block.ChainID, &boundary))
 		require.NoError(t, err)
-		require.Equal(t, block.View, boundary)
+		require.Equal(t, block.Height, boundary)
 
 		var headID flow.Identifier
 		err = db.View(operation.RetrieveNumberForCluster(block.ChainID, boundary, &headID))
