@@ -8,11 +8,11 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -46,8 +46,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	nodes := append([]testnet.NodeConfig{collNode, conNode1, conNode2, conNode3, realExeNode, verNode, ghostExeNode})
 	conf := testnet.NewNetworkConfig("ghost_example_subscribe", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 
@@ -70,7 +69,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	// create and send a transaction to one of the collection node
 	sendTransaction(t, net, collNode.Identifier)
 
-	blocks := make([]*flow.Block, 0)
+	proposals := make([]*messages.BlockProposal, 0)
 
 	for {
 		_, event, err := msgReader.Next()
@@ -78,19 +77,19 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 		// the following switch should be similar to the one defined in the actual node that is being emulated
 		switch v := event.(type) {
-		case *flow.Block:
-			blocks = append(blocks, v)
+		case *messages.BlockProposal:
+			proposals = append(proposals, v)
 		default:
 			t.Logf(" ignoring event: :%T: %v", v, v)
 		}
 
-		if len(blocks) == 2 {
+		if len(proposals) == 2 {
 			break
 		}
 	}
 
-	assert.EqualValues(t, 1, blocks[0].Height)
-	assert.EqualValues(t, 2, blocks[1].Height)
+	assert.EqualValues(t, 1, proposals[0].Header.Height)
+	assert.EqualValues(t, 2, proposals[1].Header.Height)
 }
 
 // TestGhostNodeExample_Send demonstrates how to emulate a node and send an event from it
@@ -120,8 +119,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	nodes := append([]testnet.NodeConfig{realCollNode, ghostCollNode, conNode1, conNode2, conNode3, realExeNode, verNode})
 	conf := testnet.NewNetworkConfig("ghost_example_send", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 

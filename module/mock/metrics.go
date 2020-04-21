@@ -67,6 +67,11 @@ func (_m *Metrics) HotStuffWaitDuration(duration time.Duration, event string) {
 	_m.Called(duration, event)
 }
 
+// NetworkMessageSent provides a mock function with given fields: sizeBytes
+func (_m *Metrics) NetworkMessageSent(sizeBytes int) {
+	_m.Called(sizeBytes)
+}
+
 // NewestKnownQC provides a mock function with given fields: view
 func (_m *Metrics) NewestKnownQC(view uint64) {
 	_m.Called(view)

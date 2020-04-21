@@ -201,5 +201,5 @@ func main() {
 			prop = prop.WithConsensus(cold)
 			return prop, nil
 		}).
-		Run()
+		Run("collection")
 }

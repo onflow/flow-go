@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
@@ -71,6 +72,7 @@ func sendMetrics(log zerolog.Logger) {
 			collector.FinishBlockToSeal(flow.HashToID(entityID))
 		}
 
+		collector.NetworkMessageSent(rand.Intn(1000))
 		time.Sleep(1 * time.Second)
 	}
 }

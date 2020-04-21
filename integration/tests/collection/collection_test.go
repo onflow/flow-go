@@ -48,8 +48,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	nodes := append(colNodeConfigs, defaultOtherNodes()...)
 	conf := testnet.NewNetworkConfig("col_txingress_invalidtx", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 
@@ -123,8 +122,7 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	nodes := append(colNodeConfigs, defaultOtherNodes()...)
 	conf := testnet.NewNetworkConfig("col_txingress_singlecluster", nodes)
 
-	net, err := testnet.PrepareFlowNetwork(t, conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 
@@ -188,8 +186,7 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 	nodes := append(colNodes, defaultOtherNodes()...)
 	conf := testnet.NewNetworkConfig("col_txingres_multicluster_correct_cluster", nodes, testnet.WithClusters(nClusters))
 
-	net, err := testnet.PrepareFlowNetwork(t, conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 
@@ -297,8 +294,7 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 	nodes := append(colNodes, defaultOtherNodes()...)
 	conf := testnet.NewNetworkConfig("col_txingress_multicluster_othercluster", nodes, testnet.WithClusters(nClusters))
 
-	net, err := testnet.PrepareFlowNetwork(t, conf)
-	require.Nil(t, err)
+	net := testnet.PrepareFlowNetwork(t, conf)
 
 	ctx := context.Background()
 

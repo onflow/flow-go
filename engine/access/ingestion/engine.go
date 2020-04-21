@@ -120,8 +120,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
-	case *flow.Block:
-		return e.onBlock(originID, entity)
+	case *messages.BlockProposal:
+		return e.onBlockProposal(originID, entity)
 	case *messages.CollectionResponse:
 		return e.handleCollectionResponse(originID, entity)
 	default:
@@ -137,7 +137,11 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to lookup block")
 		}
-		err = e.ProcessLocal(block)
+		proposal := &messages.BlockProposal{
+			Header:  &block.Header,
+			Payload: &block.Payload,
+		}
+		err = e.ProcessLocal(proposal)
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
 		}
@@ -146,16 +150,16 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 
 // onBlock handles an incoming block.
 // TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
-func (e *Engine) onBlock(_ flow.Identifier, block *flow.Block) error {
+func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProposal) error {
 
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexByGuarantees(block.ID())
+	err := e.blocks.IndexByGuarantees(proposal.Header.ID())
 	if err != nil {
 		return err
 	}
 
 	// request each of the collections from the collection node
-	return e.requestCollections(block.Guarantees...)
+	return e.requestCollections(proposal.Payload.Guarantees...)
 }
 
 // handleCollectionResponse handles the response of the a collection request made earlier when a block was received

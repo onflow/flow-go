@@ -27,6 +27,14 @@ import (
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
+const (
+	// following lists the operational parameters of verification node
+	//
+	// chunkAssignmentAlpha represents number of verification
+	// DISCLAIMER: alpha down there is not a production-level value
+	chunkAssignmentAlpha = 1
+)
+
 func main() {
 
 	var (
@@ -119,16 +127,11 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assigner, err := chunks.NewPublicAssignment(int(alpha))
+
+			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
 			if err != nil {
 				return nil, err
 			}
-			// https://github.com/dapperlabs/flow-go/issues/2703
-			// proper place and only referenced here
-			// Todo the hardcoded default value should be parameterized as alpha in a
-			// should be moved to a configuration class
-			// DISCLAIMER: alpha down there is not a production-level value
-
 			ingestEng, err = ingest.New(node.Logger,
 				node.Network,
 				node.State,
@@ -201,5 +204,5 @@ func main() {
 
 			return followerEng.WithSynchronization(sync), nil
 		}).
-		Run()
+		Run("verification")
 }

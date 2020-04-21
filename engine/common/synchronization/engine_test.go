@@ -317,7 +317,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	err := ss.e.onBlockResponse(originID, res)
 	require.NoError(ss.T(), err, "should pass block response (by height)")
 	assert.Empty(ss.T(), ss.e.heights, "heights map should now be empty")
-	ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{Block: &block1})
+	ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block1})
 
 	// check if we want the block by block ID
 	block2 := unittest.BlockFixture()
@@ -326,14 +326,14 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	err = ss.e.onBlockResponse(originID, res)
 	require.NoError(ss.T(), err, "should pass block response (by block ID)")
 	assert.Empty(ss.T(), ss.e.blockIDs, "block IDs map should be empty")
-	ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{Block: &block2})
+	ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block2})
 
 	// check if we want the block by neither height or block ID
 	block3 := unittest.BlockFixture()
 	res.Blocks = []*flow.Block{&block3}
 	err = ss.e.onBlockResponse(originID, res)
 	require.NoError(ss.T(), err, "should pass on unwanted block")
-	ss.comp.AssertNotCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{Block: &block3})
+	ss.comp.AssertNotCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block3})
 }
 
 func (ss *SyncSuite) TestQueueByHeight() {
@@ -396,6 +396,7 @@ func (ss *SyncSuite) TestQueueByBlockID() {
 func (ss *SyncSuite) TestProcessIncomingBlock() {
 
 	var blocks []*flow.Block
+	originID := unittest.IdentifierFixture()
 
 	// generate 3 by height blocks
 	for n := 0; n < 3; n++ {
@@ -425,7 +426,7 @@ func (ss *SyncSuite) TestProcessIncomingBlock() {
 
 	// process all of the blocks
 	for _, block := range blocks {
-		ss.e.processIncomingBlock(block)
+		ss.e.processIncomingBlock(originID, block)
 	}
 
 	// assert the maps have right size and elements
@@ -441,7 +442,7 @@ func (ss *SyncSuite) TestProcessIncomingBlock() {
 	// assert that submit local was called with the right blocks
 	if ss.comp.AssertNumberOfCalls(ss.T(), "SubmitLocal", 6) {
 		for _, block := range blocks[0:6] {
-			ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{Block: block})
+			ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: block})
 		}
 	}
 }

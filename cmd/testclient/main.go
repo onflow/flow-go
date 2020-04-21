@@ -33,11 +33,11 @@ func main() {
 	}
 
 	// Generate key
-	seed := make([]byte, crypto.KeyGenSeedMinLenEcdsaP256)
-	if n, err := rand.Read(seed); err != nil || n != crypto.KeyGenSeedMinLenEcdsaP256 {
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+	if n, err := rand.Read(seed); err != nil || n != crypto.KeyGenSeedMinLenECDSAP256 {
 		log.Fatal(err)
 	}
-	key, err := keys.GeneratePrivateKey(keys.EcdsaP256_SHA2_256, seed)
+	key, err := keys.GeneratePrivateKey(keys.ECDSAP256_SHA2_256, seed)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -2,9 +2,8 @@ package compliance
 
 import (
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -16,11 +15,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	real "github.com/dapperlabs/flow-go/module/buffer"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	netint "github.com/dapperlabs/flow-go/network"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protint "github.com/dapperlabs/flow-go/state/protocol"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
+	storerr "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -41,7 +42,7 @@ type ComplianceSuite struct {
 	headerDB   map[flow.Identifier]*flow.Header
 	payloadDB  map[flow.Identifier]*flow.Payload
 	pendingDB  map[flow.Identifier]*flow.PendingBlock
-	childrenDB map[flow.Identifier][]flow.Identifier
+	childrenDB map[flow.Identifier][]*flow.PendingBlock
 
 	// mocked dependencies
 	me       *module.Local
@@ -52,7 +53,8 @@ type ComplianceSuite struct {
 	payloads *storage.Payloads
 	con      *network.Conduit
 	net      *module.Network
-	cache    *module.PendingBlockBuffer
+	prov     *network.Engine
+	pending  *module.PendingBlockBuffer
 	hotstuff *module.HotStuff
 	sync     *module.Synchronization
 
@@ -75,7 +77,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.headerDB = make(map[flow.Identifier]*flow.Header)
 	cs.payloadDB = make(map[flow.Identifier]*flow.Payload)
 	cs.pendingDB = make(map[flow.Identifier]*flow.PendingBlock)
-	cs.childrenDB = make(map[flow.Identifier][]flow.Identifier)
+	cs.childrenDB = make(map[flow.Identifier][]*flow.PendingBlock)
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = &block.Header
@@ -141,7 +143,7 @@ func (cs *ComplianceSuite) SetupTest() {
 		func(blockID flow.Identifier) error {
 			_, exists := cs.headerDB[blockID]
 			if !exists {
-				return fmt.Errorf("unknown header (%x)", blockID)
+				return storerr.ErrNotFound
 			}
 			return nil
 		},
@@ -162,7 +164,7 @@ func (cs *ComplianceSuite) SetupTest() {
 		func(blockID flow.Identifier) error {
 			_, exists := cs.payloadDB[blockID]
 			if !exists {
-				return fmt.Errorf("unknown payload (%x)", blockID)
+				return storerr.ErrNotFound
 			}
 			return nil
 		},
@@ -183,11 +185,32 @@ func (cs *ComplianceSuite) SetupTest() {
 		nil,
 	)
 
-	// set up cache module mock
-	cs.cache = &module.PendingBlockBuffer{}
-	cs.cache.On("Add", mock.Anything).Return(false)
-	cs.cache.On("ByParentID", mock.Anything).Return(nil, false)
-	cs.cache.On("DropForParent", mock.Anything).Return()
+	// set up the provider engine
+	cs.prov = &network.Engine{}
+	cs.prov.On("SubmitLocal", mock.Anything).Return()
+
+	// set up pending module mock
+	cs.pending = &module.PendingBlockBuffer{}
+	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
+	cs.pending.On("ByID", mock.Anything).Return(
+		func(blockID flow.Identifier) *flow.PendingBlock {
+			return cs.pendingDB[blockID]
+		},
+		func(blockID flow.Identifier) bool {
+			_, ok := cs.pendingDB[blockID]
+			return ok
+		},
+	)
+	cs.pending.On("ByParentID", mock.Anything).Return(
+		func(blockID flow.Identifier) []*flow.PendingBlock {
+			return cs.childrenDB[blockID]
+		},
+		func(blockID flow.Identifier) bool {
+			_, ok := cs.childrenDB[blockID]
+			return ok
+		},
+	)
+	cs.pending.On("DropForParent", mock.Anything).Return()
 
 	// set up hotstuff module mock
 	cs.hotstuff = &module.HotStuff{}
@@ -199,8 +222,8 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
 
 	// initialize the engine
-	log := zerolog.New(ioutil.Discard)
-	e, err := New(log, cs.net, cs.me, cs.state, cs.headers, cs.payloads, cs.cache)
+	log := zerolog.New(os.Stderr)
+	e, err := New(log, cs.net, cs.me, cs.state, cs.headers, cs.payloads, cs.prov, cs.pending)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	// assign engine with consensus & synchronization
@@ -290,16 +313,13 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidParent() {
 	// create a proposal that directly descends from the latest finalized header
 	originID := cs.participants[1].NodeID
 	block := unittest.BlockWithParentFixture(cs.head)
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// store the data for retrieval
 	cs.headerDB[block.ParentID] = cs.head
 
 	// it should be processed without error
-	err := cs.e.onBlockProposal(originID, &proposal)
+	err := cs.e.onBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should store the payload
@@ -323,19 +343,14 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidAncestor() {
 	ancestor := unittest.BlockWithParentFixture(cs.head)
 	parent := unittest.BlockWithParentFixture(&ancestor.Header)
 	block := unittest.BlockWithParentFixture(&parent.Header)
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent.Header
-	cs.headerDB[parent.ID()] = &parent.Header
-	cs.e.cache[parent.ID()] = &parent.Header
-	cs.e.cache[ancestor.ID()] = &ancestor.Header
+	cs.headerDB[ancestor.ID()] = &ancestor.Header
 
 	// it should be processed without error
-	err := cs.e.onBlockProposal(originID, &proposal)
+	err := cs.e.onBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should store the payload
@@ -356,24 +371,13 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidHeight() {
 
 	// create a proposal that has two ancestors in the cache
 	originID := cs.participants[1].NodeID
-	ancestor := unittest.BlockWithParentFixture(cs.head)
-	parent := unittest.BlockWithParentFixture(&ancestor.Header)
-	parent.Height = cs.head.Height // this should orphan the block
-	block := unittest.BlockWithParentFixture(&parent.Header)
-	block.Height = cs.head.Height
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-
-	// store the data for retrieval
-	cs.headerDB[parent.ID()] = &parent.Header
-	cs.e.cache[parent.ID()] = &parent.Header
-	cs.e.cache[ancestor.ID()] = &ancestor.Header
+	block := unittest.BlockWithParentFixture(cs.head)
+	block.Height = cs.head.Height // make height intvalid
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// it should be processed without error
-	err := cs.e.onBlockProposal(originID, &proposal)
-	require.Error(cs.T(), err, "proposal with invalid ancestor should fail")
+	err := cs.e.onBlockProposal(originID, proposal)
+	require.NoError(cs.T(), err, "proposal with outdated view should be no-op")
 
 	// we should not store the payload
 	cs.payloads.AssertNotCalled(cs.T(), "Store", mock.Anything, mock.Anything)
@@ -396,22 +400,18 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 	ancestor := unittest.BlockWithParentFixture(cs.head)
 	parent := unittest.BlockWithParentFixture(&ancestor.Header)
 	block := unittest.BlockWithParentFixture(&parent.Header)
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
+	proposal := unittest.ProposalFromBlock(&block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = &parent.Header
-	cs.e.cache[parent.ID()] = &parent.Header
-	cs.e.cache[ancestor.ID()] = &ancestor.Header
+	cs.headerDB[ancestor.ID()] = &ancestor.Header
 
 	// make sure we fail to extend the state
 	*cs.mutator = protocol.Mutator{}
 	cs.mutator.On("Extend", mock.Anything).Return(errors.New("dummy error"))
 
 	// it should be processed without error
-	err := cs.e.onBlockProposal(originID, &proposal)
+	err := cs.e.onBlockProposal(originID, proposal)
 	require.Error(cs.T(), err, "proposal with invalid extension should fail")
 
 	// we should store the payload
@@ -447,143 +447,82 @@ func (cs *ComplianceSuite) TestOnSubmitVote() {
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitVote", originID, vote.BlockID, vote.View, vote.SigData)
 }
 
-func (cs *ComplianceSuite) TestHandleMissingAncestor() {
-
-	// create pending block
-	originID := unittest.IdentifierFixture()
-	ancestorID := unittest.IdentifierFixture()
-	block := unittest.BlockFixture()
-	proposal := messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
-	}
-
-	// execute missing ancestors when (by default) we don't add to cache
-	err := cs.e.handleMissingAncestor(originID, &proposal, ancestorID)
-	require.NoError(cs.T(), err, "should pass with old proposl")
-	cs.sync.AssertNotCalled(cs.T(), "RequestBlock", mock.Anything)
-
-	// execute missing ancestor when we add to cache and should request
-	*cs.cache = module.PendingBlockBuffer{}
-	cs.cache.On("Add", mock.Anything).Return(true)
-	err = cs.e.handleMissingAncestor(originID, &proposal, ancestorID)
-	require.NoError(cs.T(), err, "should pass with new proposal")
-	cs.sync.AssertCalled(cs.T(), "RequestBlock", ancestorID)
-}
-
-func (cs *ComplianceSuite) TestHandleConnectedChildrenNone() {
+func (cs *ComplianceSuite) TestProcessPendingChildrenNone() {
 
 	// generate random block ID
 	blockID := unittest.IdentifierFixture()
 
 	// execute handle connected children
-	err := cs.e.handleConnectedChildren(blockID)
+	err := cs.e.processPendingChildren(blockID)
 	require.NoError(cs.T(), err, "should pass when no children")
 	cs.snapshot.AssertNotCalled(cs.T(), "Final")
-	cs.cache.AssertNotCalled(cs.T(), "DropForParent", mock.Anything)
+	cs.pending.AssertNotCalled(cs.T(), "DropForParent", mock.Anything)
 }
 
-func (cs *ComplianceSuite) TestHandleConnectedChildren() {
+func (cs *ComplianceSuite) TestProcessPendingChildren() {
 
 	// create three children blocks
-	parent := unittest.BlockHeaderFixture()
+	parent := unittest.BlockFixture()
 	parent.Height = cs.head.Height + 1
-	block1 := unittest.BlockWithParentFixture(&parent)
-	block2 := unittest.BlockWithParentFixture(&parent)
-	block3 := unittest.BlockWithParentFixture(&parent)
+	block1 := unittest.BlockWithParentFixture(&parent.Header)
+	block2 := unittest.BlockWithParentFixture(&parent.Header)
+	block3 := unittest.BlockWithParentFixture(&parent.Header)
 
 	// create the pending blocks
-	pending1 := unittest.PendingBlockFixture(&block1)
-	pending2 := unittest.PendingBlockFixture(&block2)
-	pending3 := unittest.PendingBlockFixture(&block3)
+	pending1 := unittest.PendingFromBlock(&block1)
+	pending2 := unittest.PendingFromBlock(&block2)
+	pending3 := unittest.PendingFromBlock(&block3)
 
-	// make sure to return the children
-	*cs.cache = module.PendingBlockBuffer{}
-	cs.cache.On("ByParentID", parent.ID()).Return([]*flow.PendingBlock{pending1, pending2, pending3}, true)
-	cs.cache.On("DropForParent", mock.Anything).Return()
+	// store the parent on disk
+	parentID := parent.ID()
+	cs.headerDB[parentID] = &parent.Header
 
-	// make sure we quite first thing on handleMissingAncestor
-	cs.cache.On("Add", mock.Anything).Return(false)
+	// store the pending children in the cache
+	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending1)
+	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
+	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	// execute the connecte children handling
-	err := cs.e.handleConnectedChildren(parent.ID())
+	// execute the connected children handling
+	err := cs.e.processPendingChildren(parent.ID())
 	require.NoError(cs.T(), err, "should pass handling children")
 
-	// check we tried to process all three children as proposals
-	cs.snapshot.AssertNumberOfCalls(cs.T(), "Head", 3)
+	// check that we submitted each child to hotstuff
+	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", &block1.Header, parent.View)
+	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", &block2.Header, parent.View)
+	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", &block3.Header, parent.View)
 
 	// make sure we drop the cache after trying to process
-	cs.cache.AssertCalled(cs.T(), "DropForParent", parent.ID())
+	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
 }
 
 func (cs *ComplianceSuite) TestProposalBufferingOrder() {
 
 	// create a proposal that we will not submit until the end
 	originID := cs.participants[1].NodeID
-	rootBlock := unittest.BlockWithParentFixture(cs.head)
-	rootProposal := messages.BlockProposal{
-		Header:  &rootBlock.Header,
-		Payload: &rootBlock.Payload,
-	}
+	block := unittest.BlockWithParentFixture(cs.head)
+	missing := unittest.ProposalFromBlock(&block)
 
 	// create a chain of descendants
-	var descendants []*flow.Block
 	var proposals []*messages.BlockProposal
-	parent := &rootBlock
+	parent := missing
 	for i := 0; i < 3; i++ {
-		descendant := unittest.BlockWithParentFixture(&parent.Header)
-		descendants = append(descendants, &descendant)
-		proposal := messages.BlockProposal{
-			Header:  &descendant.Header,
-			Payload: &descendant.Payload,
-		}
-		proposals = append(proposals, &proposal)
-		parent = &descendant
+		descendant := unittest.BlockWithParentFixture(parent.Header)
+		proposal := unittest.ProposalFromBlock(&descendant)
+		proposals = append(proposals, proposal)
+		parent = proposal
 	}
 
-	// reprogram the cache so we can add better check
-	*cs.cache = module.PendingBlockBuffer{}
-	cs.cache.On("ByParentID", mock.Anything).Return(
-		func(parentID flow.Identifier) []*flow.PendingBlock {
-			children := make([]*flow.PendingBlock, 0, len(cs.childrenDB[parentID]))
-			for _, childID := range cs.childrenDB[parentID] {
-				children = append(children, cs.pendingDB[childID])
-			}
-			return children
-		},
-		func(parentID flow.Identifier) bool {
-			return len(cs.childrenDB[parentID]) > 0
-		},
-	)
-	cs.cache.On("DropForParent", mock.Anything).Return(
-		func(parentID flow.Identifier) {
-			for _, childID := range cs.childrenDB[parentID] {
-				delete(cs.pendingDB, childID)
-			}
-			delete(cs.childrenDB, parentID)
-		},
-	)
+	// replace the engine buffer with the real one
+	cs.e.pending = real.NewPendingBlocks()
 
-	// process/buffer all of the descendants
+	// process/pending all of the descendants
 	for _, proposal := range proposals {
-
-		// check that we store the pending block correctly
-		cs.cache.On("Add", mock.Anything).Return(true).Once().Run(
-			func(args mock.Arguments) {
-				pending := args.Get(0).(*flow.PendingBlock)
-				assert.Equal(cs.T(), originID, pending.OriginID, "should store correct origin in buffer")
-				assert.Equal(cs.T(), proposal.Header, pending.Header, "should store correct header in buffer")
-				assert.Equal(cs.T(), proposal.Payload, pending.Payload, "should store correct payload in buffer")
-				cs.pendingDB[pending.Header.ID()] = pending
-				cs.childrenDB[pending.Header.ParentID] = append(cs.childrenDB[pending.Header.ParentID], pending.Header.ID())
-			},
-		)
 
 		// check that we request the ancestor block each time
 		cs.sync.On("RequestBlock", mock.Anything).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
-				assert.Equal(cs.T(), rootBlock.ID(), ancestorID, "should always request root block")
+				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")
 			},
 		)
 
@@ -598,7 +537,12 @@ func (cs *ComplianceSuite) TestProposalBufferingOrder() {
 	// check that we submit ech proposal in order
 	*cs.hotstuff = module.HotStuff{}
 	index := 0
-	order := []flow.Identifier{rootBlock.ID(), descendants[0].ID(), descendants[1].ID(), descendants[2].ID()}
+	order := []flow.Identifier{
+		missing.Header.ID(),
+		proposals[0].Header.ID(),
+		proposals[1].Header.ID(),
+		proposals[2].Header.ID(),
+	}
 	cs.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Times(4).Run(
 		func(args mock.Arguments) {
 			header := args.Get(0).(*flow.Header)
@@ -608,7 +552,7 @@ func (cs *ComplianceSuite) TestProposalBufferingOrder() {
 	)
 
 	// process the root proposal
-	err := cs.e.onBlockProposal(originID, &rootProposal)
+	err := cs.e.onBlockProposal(originID, missing)
 	require.NoError(cs.T(), err, "root proposal should pass")
 
 	// make sure we submitted all four proposals

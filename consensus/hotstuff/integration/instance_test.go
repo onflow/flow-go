@@ -177,7 +177,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 
 	// check on stop condition, stop the tests as soon as entering a certain view
-	in.persist.On("CurrentView", mock.Anything).Return(nil)
+	in.persist.On("StartedView", mock.Anything).Return(nil)
+	in.persist.On("VotedView", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateProposal", mock.Anything).Return(
@@ -316,7 +317,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.viewstate, in.validator, in.signer)
 
 	// initialize the voter
-	in.voter = voter.New(in.signer, in.forks, DefaultVoted())
+	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
 
 	// initialize the event handler
 	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.viewstate, in.aggregator, in.voter, in.validator, notifier)
