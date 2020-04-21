@@ -475,10 +475,10 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 		//Nonce:            rand.Uint64(),
 		Nonce: 0,
 		//GasLimit:     10,
-		GasLimit:    0,
-		Payer:       AddressFixture(),
-		Authorizers: []flow.Address{AddressFixture()},
-		Signatures:  []flow.AccountSignature{AccountSignatureFixture()},
+		GasLimit:          0,
+		Payer:             AddressFixture(),
+		Authorizers:       []flow.Address{AddressFixture()},
+		PayloadSignatures: []flow.AccountSignature{AccountSignatureFixture()},
 	}
 
 	for _, apply := range opts {

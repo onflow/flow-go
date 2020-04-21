@@ -5,72 +5,95 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func MessageToAccountSignature(m *entities.AccountSignature) flow.AccountSignature {
-	return flow.AccountSignature{
-		Account:   flow.BytesToAddress(m.GetAccount()),
-		Signature: m.GetSignature(),
-	}
-}
-
-func AccountSignatureToMessage(a flow.AccountSignature) *entities.AccountSignature {
-	return &entities.AccountSignature{
-		Account:   a.Account.Bytes(),
-		Signature: a.Signature,
-	}
-}
-
-// NOTE: transaction conversion is NOT symmetric if certain fields are set, as
-// not all fields are included in the protobuf message.
-// If `Nonce` or `GasLimit` are non-zero, then conversion is not reversible.
 func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error) {
 	if m == nil {
 		return flow.TransactionBody{}, fmt.Errorf("message is empty")
 	}
 
-	scriptAccounts := make([]flow.Address, len(m.ScriptAccounts))
-	for i, account := range m.ScriptAccounts {
-		scriptAccounts[i] = flow.BytesToAddress(account)
+	t := flow.NewTransactionBody()
+
+	t.SetScript(m.GetScript())
+	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
+	t.SetGasLimit(m.GetGasLimit())
+
+	proposalKey := m.GetProposalKey()
+	if proposalKey != nil {
+		proposalAddress := flow.BytesToAddress(proposalKey.GetAddress())
+		t.SetProposalKey(proposalAddress, int(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
 	}
 
-	signatures := make([]flow.AccountSignature, len(m.Signatures))
-	for i, accountSig := range m.Signatures {
-		signatures[i] = MessageToAccountSignature(accountSig)
+	payer := m.GetPayer()
+	if payer != nil {
+		t.SetPayer(
+			flow.BytesToAddress(payer),
+		)
 	}
 
-	return flow.TransactionBody{
-		Script:           m.GetScript(),
-		ReferenceBlockID: flow.HashToID(m.ReferenceBlockId),
-		Payer:            flow.BytesToAddress(m.PayerAccount),
-		Authorizers:      scriptAccounts,
-		Signatures:       signatures,
-	}, nil
+	for _, authorizer := range m.GetAuthorizers() {
+		t.AddAuthorizer(
+			flow.BytesToAddress(authorizer),
+		)
+	}
+
+	for _, sig := range m.GetPayloadSignatures() {
+		addr := flow.BytesToAddress(sig.GetAddress())
+		t.AddPayloadSignature(addr, int(sig.GetKeyId()), sig.GetSignature())
+	}
+
+	for _, sig := range m.GetEnvelopeSignatures() {
+		addr := flow.BytesToAddress(sig.GetAddress())
+		t.AddEnvelopeSignature(addr, int(sig.GetKeyId()), sig.GetSignature())
+	}
+
+	return *t, nil
 }
 
-// NOTE: transaction conversion is NOT symmetric if certain fields are set, as
-// not all fields are included in the protobuf message.
-// If `Nonce` or `GasLimit` are non-zero, then conversion is not reversible.
-func TransactionToMessage(t flow.TransactionBody) *entities.Transaction {
-	scriptAccounts := make([][]byte, len(t.Authorizers))
-	for i, account := range t.Authorizers {
-		scriptAccounts[i] = account.Bytes()
+func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
+	proposalKeyMessage := &entities.Transaction_ProposalKey{
+		Address:        tb.ProposalKey.Address.Bytes(),
+		KeyId:          uint32(tb.ProposalKey.KeyID),
+		SequenceNumber: tb.ProposalKey.SequenceNumber,
 	}
 
-	signatures := make([]*entities.AccountSignature, len(t.Signatures))
-	for i, accountSig := range t.Signatures {
-		signatures[i] = AccountSignatureToMessage(accountSig)
+	authMessages := make([][]byte, len(tb.Authorizers))
+	for i, auth := range tb.Authorizers {
+		authMessages[i] = auth.Bytes()
+	}
+
+	payloadSigMessages := make([]*entities.Transaction_Signature, len(tb.PayloadSignatures))
+
+	for i, sig := range tb.PayloadSignatures {
+		payloadSigMessages[i] = &entities.Transaction_Signature{
+			Address:   sig.Address.Bytes(),
+			KeyId:     uint32(sig.KeyID),
+			Signature: sig.Signature,
+		}
+	}
+
+	envelopeSigMessages := make([]*entities.Transaction_Signature, len(tb.EnvelopeSignatures))
+
+	for i, sig := range tb.EnvelopeSignatures {
+		envelopeSigMessages[i] = &entities.Transaction_Signature{
+			Address:   sig.Address.Bytes(),
+			KeyId:     uint32(sig.KeyID),
+			Signature: sig.Signature,
+		}
 	}
 
 	return &entities.Transaction{
-		Script:           t.Script,
-		ReferenceBlockId: t.ReferenceBlockID[:],
-		PayerAccount:     t.Payer.Bytes(),
-		ScriptAccounts:   scriptAccounts,
-		Signatures:       signatures,
+		Script:             tb.Script,
+		ReferenceBlockId:   tb.ReferenceBlockID[:],
+		GasLimit:           tb.GasLimit,
+		ProposalKey:        proposalKeyMessage,
+		Payer:              tb.Payer.Bytes(),
+		Authorizers:        authMessages,
+		PayloadSignatures:  payloadSigMessages,
+		EnvelopeSignatures: envelopeSigMessages,
 	}
 }
 
@@ -167,9 +190,9 @@ func EventToMessage(e flow.Event) *entities.Event {
 
 func AccountToMessage(a *flow.Account) (*entities.Account, error) {
 
-	keys := make([]*entities.AccountPublicKey, len(a.Keys))
+	keys := make([]*entities.AccountKey, len(a.Keys))
 	for i, k := range a.Keys {
-		messageKey, err := AccountPublicKeyToMessage(k)
+		messageKey, err := AccountKeyToMessage(k)
 		if err != nil {
 			return nil, err
 		}
@@ -184,9 +207,9 @@ func AccountToMessage(a *flow.Account) (*entities.Account, error) {
 	}, nil
 }
 
-func AccountPublicKeyToMessage(a flow.AccountPublicKey) (*entities.AccountPublicKey, error) {
+func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) {
 	publicKey := a.PublicKey.Encode()
-	return &entities.AccountPublicKey{
+	return &entities.AccountKey{
 		PublicKey: publicKey,
 		SignAlgo:  uint32(a.SignAlgo),
 		HashAlgo:  uint32(a.HashAlgo),
