@@ -235,7 +235,10 @@ func setupMockExeNode(t *testing.T,
 	}
 
 	// map form verIds --> chunks they asked
-	// exeChunkDataSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
+	exeChunkDataSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
+	for _, verIdentity := range verIdentities {
+		exeChunkDataSeen[verIdentity.NodeID] = make(map[flow.Identifier]struct{})
+	}
 
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
@@ -244,7 +247,7 @@ func setupMockExeNode(t *testing.T,
 
 	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			if id, ok := args[0].(flow.Identifier); ok {
+			if originID, ok := args[0].(flow.Identifier); ok {
 				if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
 					require.True(t, ok)
 					for i := 0; i < chunkNum; i++ {
@@ -253,15 +256,17 @@ func setupMockExeNode(t *testing.T,
 						chunkID := chunk.ID()
 						if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
 							// each assigned chunk data pack should be requested only once
-							//_, ok := exeChunkDataSeen[chunkID]
-							//require.False(t, ok)
-							//exeChunkDataSeen[chunkID] = struct{}{}
+							_, ok := exeChunkDataSeen[originID][chunkID]
+							require.False(t, ok)
+
+							// marks execution chunk data pack request as seen
+							exeChunkDataSeen[originID][chunkID] = struct{}{}
 
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataPackResponse{
 								Data: *completeER.ChunkDataPacks[i],
 							}
-							err := exeChunkDataConduit.Submit(res, id)
+							err := exeChunkDataConduit.Submit(res, originID)
 							assert.Nil(t, err)
 							return
 						}
