@@ -126,15 +126,16 @@ ci: install-tools tidy lint test coverage
 ci-integration: install-tools
 	$(MAKE) -C integration integration-test
 
-# Runs unit tests, test coverage, lint in Docker
+# Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
 docker-ci:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
+		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci
 
-# This command is should only be used by Team City
+# This command is should only be used by Team City (for linux)
 # Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
 .PHONY: docker-ci-team-city
 docker-ci-team-city:
@@ -145,7 +146,7 @@ docker-ci-team-city:
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci
 
-# Runs integration tests in Docker
+# Runs integration tests in Docker  (for mac)
 .PHONY: docker-ci-integration
 docker-ci-integration:
 	rm -rf crypto/relic
@@ -159,7 +160,7 @@ docker-ci-integration:
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci-integration
 
-# This command is should only be used by Team City
+# This command is should only be used by Team City (for linux)
 # Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
 .PHONY: docker-ci-integration-team-city
 docker-ci-integration-team-city:
