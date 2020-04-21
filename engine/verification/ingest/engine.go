@@ -388,6 +388,10 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Iden
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)
 	}
 
+	e.log.Info().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("chunk data pack request submitted")
+
 	// caches a tracker for successfully submitted requests
 	tracker := &trackers.ChunkDataPackTracker{
 		ChunkID: chunkID,
