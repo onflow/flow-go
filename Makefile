@@ -148,12 +148,14 @@ docker-ci-team-city:
 # Runs integration tests in Docker
 .PHONY: docker-ci-integration
 docker-ci-integration:
+	rm -rf crypto/relic
 	docker run \
 		--env DOCKER_API_VERSION='1.39' \
 		--network host \
-		-v /tmp:/tmp \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
+		-v /tmp:/tmp \
 		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci-integration
 
