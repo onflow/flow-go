@@ -49,7 +49,9 @@ func (c collector) NodeID() flow.Identifier {
 // approach needs to find a valid collector allocation it might be worthwhile to rething that decision. by shifting
 // partner nodes through deterministic
 func generateAdditionalInternalCollectors(nClusters, minPerCluster int, internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
-
+	if len(partnerNodes) == 0 {
+		return []model.NodeInfo{}
+	}
 	maxPartnerPerCluster := len(partnerNodes) / nClusters
 	if len(partnerNodes)%nClusters > 0 {
 		maxPartnerPerCluster++
