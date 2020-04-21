@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
@@ -666,9 +667,9 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 	values := make([][]byte, 0)
 
 	for _, key := range keys {
-		res, err := tree.database.GetKVDB(key)
+		_, err := tree.database.GetKVDB(key)
 		// TODO check the error
-		if err != nil || len(res) <= 0 {
+		if err != nil {
 			notFoundKeys = append(notFoundKeys, key)
 			values = append(values, []byte{})
 		}
@@ -1027,12 +1028,35 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		return nil, fmt.Errorf("cannot get tree: %w", err)
 	}
 
-	// check key sizes
-	for _, k := range keys {
-		if len(k) != s.keyByteSize {
-			return nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
+	// sort keys and deduplicate keys (we only consider the first occurance, and ignore the rest)
+	sortedKeys := make([][]byte, 0)
+	valueMap := make(map[string][]byte, 0)
+	for i, key := range keys {
+		// check key sizes
+		if len(key) != s.keyByteSize {
+			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
+		}
+		// check if doesn't exist
+		if _, ok := valueMap[string(key)]; !ok {
+			//do something here
+			sortedKeys = append(sortedKeys, key)
+			valueMap[string(key)] = values[i]
+			i++
 		}
 	}
+
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
+	})
+
+	sortedValues := make([][]byte, 0)
+	for _, key := range sortedKeys {
+		sortedValues = append(sortedValues, valueMap[string(key)])
+	}
+
+	// use sorted keys
+	keys = sortedKeys
+	values = sortedValues
 
 	batcher := t.database.NewBatcher()
 
