@@ -106,7 +106,7 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// update the finalized boundary
-		err = operation.UpdateBoundaryForCluster(chainID, header.View)(tx)
+		err = operation.UpdateBoundaryForCluster(chainID, header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update finalized boundary: %w", err)
 		}

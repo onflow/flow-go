@@ -26,8 +26,8 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 		}
 
 		// check header number
-		if genesis.View != 0 {
-			return fmt.Errorf("genesis number should be 0 (got %d)", genesis.View)
+		if genesis.Height != 0 {
+			return fmt.Errorf("genesis number should be 0 (got %d)", genesis.Height)
 		}
 
 		// check header parent ID
@@ -53,13 +53,13 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 		}
 
 		// insert block number -> ID mapping
-		err = operation.InsertNumberForCluster(genesis.ChainID, genesis.View, genesis.ID())(tx)
+		err = operation.InsertNumberForCluster(genesis.ChainID, genesis.Height, genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis number: %w", err)
 		}
 
 		// insert boundary
-		err = operation.InsertBoundaryForCluster(genesis.ChainID, genesis.View)(tx)
+		err = operation.InsertBoundaryForCluster(genesis.ChainID, genesis.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
 		}
@@ -120,8 +120,8 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		}
 
 		// if the new block has a lower number than its parent, we can't add it
-		if block.View <= parent.View {
-			return fmt.Errorf("extending block height (%d) must be > parent height (%d)", block.View, parent.View)
+		if block.Height != parent.Height+1 {
+			return fmt.Errorf("extending block height (%d) must be parent height + 1 (%d)", block.Height, parent.Height)
 		}
 
 		// trace back from new block until we find a block that has the latest
@@ -136,7 +136,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 			// if its number is below current boundary, the block does not connect
 			// to the finalized protocol state and would break database consistency
-			if block.View < boundary {
+			if block.Height < boundary {
 				return fmt.Errorf("block doesn't connect to finalized state")
 			}
 		}
