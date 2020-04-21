@@ -35,6 +35,12 @@ type Headers struct {
 	headers map[flow.Identifier]*flow.Header
 }
 
+func NewHeaders() *Headers {
+	return &Headers{
+		headers: make(map[flow.Identifier]*flow.Header),
+	}
+}
+
 func (h *Headers) Store(header *flow.Header) error {
 	h.Lock()
 	defer h.Unlock()
@@ -236,7 +242,9 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 		require.NoError(t, err)
 		fmt.Printf("local id: %v\n", local.NodeID())
 
-		headers := &Headers{}
+		headers := NewHeaders()
+		err = headers.Store(&genesis.Header)
+		require.NoError(t, err)
 		views := &Views{}
 
 		builder := &Builder{headers}
