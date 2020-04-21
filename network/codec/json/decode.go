@@ -25,6 +25,8 @@ func decode(env Envelope) (interface{}, error) {
 		v = &messages.BlockProposal{}
 	case CodeBlockVote:
 		v = &messages.BlockVote{}
+
+	// coldstuff specific
 	case CodeBlockCommit:
 		v = &coldstuff.Commit{}
 

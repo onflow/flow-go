@@ -60,6 +60,7 @@ type P2PNode struct {
 func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, key lcrypto.PrivKey, handler network.StreamHandler, psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
+
 	p.name = n.Name
 	p.logger = logger
 	addr := multiaddressStr(n)
@@ -91,7 +92,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		libp2p.Identity(key),
 		transport,
 	)
-
 	if err != nil {
 		return errors.Wrapf(err, "could not construct libp2p host for %s", p.name)
 	}
@@ -115,7 +115,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		Str("address", fmt.Sprintf("%s:%s", ip, port)).
 		Msg("libp2p node started successfully")
 
-	return err
+	return nil
 }
 
 // Stop stops the libp2p node.

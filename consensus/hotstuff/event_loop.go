@@ -67,7 +67,7 @@ func (el *EventLoop) loop() {
 			return
 
 		// if we receive a time out, process it and log errors
-		case _ = <-timeoutChannel:
+		case <-timeoutChannel:
 
 			// meansure how long the event loop was idle waiting for an
 			// incoming event
@@ -96,7 +96,7 @@ func (el *EventLoop) loop() {
 			return
 
 		// same as before
-		case _ = <-timeoutChannel:
+		case <-timeoutChannel:
 			// meansure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))

@@ -125,7 +125,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("signer", proposal.Header.ProposerID[:]).
 		Logger()
 
-	log.Info().Msg("block proposal forwarded from compliance engine")
+	log.Info().Msg("block proposal submitted for propagation")
 
 	// reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	// TODO: move this to the correct location; this is not where the CCL receives

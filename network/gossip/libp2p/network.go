@@ -51,8 +51,7 @@ func NewNetwork(
 	}
 
 	// fanout is set to half of the system size for connectivity assurance w.h.p
-	// ids contain the address of this node itself (hence fanout is (len(ids) - 1) + 1) / 2) = len(ids) / 2
-	fanout := len(ids) / 2
+	fanout := (len(ids) + 1) / 2
 
 	o := &Network{
 		logger:  log,
@@ -197,18 +196,16 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
 
 	var emTargets [][]byte
-	for _, t := range targetIDs {
-		// copy the array to a temp var by value
-		temp := t
-		// create a slice out of the temp var
-		emTargets = append(emTargets, temp[:])
+	for _, targetID := range targetIDs {
+		tempID := targetID // avoid capturing loop variable
+		emTargets = append(emTargets, tempID[:])
 	}
 
 	// get origin ID (inplace slicing n.me.NodeID()[:] doesn't work)
 	selfID := n.me.NodeID()
 	originID := selfID[:]
 
-	//cast event to a libp2p.Message
+	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: uint32(channelID),
 		EventID:   sip.Sum(payload),

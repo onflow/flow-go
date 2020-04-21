@@ -42,6 +42,7 @@ const notSet = "not set"
 type BaseConfig struct {
 	nodeIDHex    string
 	bindAddr     string
+	NodeRole     string
 	NodeName     string
 	Timeout      time.Duration
 	datadir      string
@@ -127,7 +128,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.MsgValidators...)
+			fnb.networkKey, fnb.Metrics, fnb.MsgValidators...)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
@@ -137,7 +138,14 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, libp2p.NewRandPermTopology())
+		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get node id: %w", err)
+		}
+		nodeRole := nodeID.Role
+		topology := libp2p.NewRandPermTopology(nodeRole)
+
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, topology)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -184,7 +192,11 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 func (fnb *FlowNodeBuilder) initLogger() {
 	// configure logger with standard level, node ID and UTC timestamp
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := fnb.Logger.With().Timestamp().Str("node_id", fnb.BaseConfig.nodeIDHex).Logger()
+	log := fnb.Logger.With().
+		Timestamp().
+		Str("node_role", fnb.BaseConfig.NodeRole).
+		Str("node_id", fnb.BaseConfig.nodeIDHex).
+		Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.name)
 
@@ -401,7 +413,9 @@ func FlowNode(name string) *FlowNodeBuilder {
 // Run initiates all common components (logger, database, protocol state etc.)
 // then starts each component. It also sets up a channel to gracefully shut
 // down each component if a SIGINT is received.
-func (fnb *FlowNodeBuilder) Run() {
+func (fnb *FlowNodeBuilder) Run(role string) {
+
+	fnb.BaseConfig.NodeRole = role
 
 	// initialize signal catcher
 	fnb.sig = make(chan os.Signal, 1)

@@ -142,7 +142,7 @@ func main() {
 			)
 
 			// initialize the block finalizer
-			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
+			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
 
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
@@ -172,7 +172,7 @@ func main() {
 			comp = comp.WithSynchronization(sync).WithConsensus(hot)
 			return comp, nil
 		}).
-		Run()
+		Run("consensus")
 }
 
 func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {

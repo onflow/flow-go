@@ -204,5 +204,5 @@ func main() {
 
 			return followerEng.WithSynchronization(sync), nil
 		}).
-		Run()
+		Run("verification")
 }
