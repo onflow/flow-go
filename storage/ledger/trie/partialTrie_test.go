@@ -2,7 +2,6 @@ package trie
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -275,9 +274,32 @@ func TestMixProof(t *testing.T) {
 		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
 
+		fmt.Println(smt.Print(newRoot))
+		fmt.Println(psmt.root.FmtStr("", ""))
+
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [before update]")
 		}
+
+		keys = make([][]byte, 0)
+		keys = append(keys, key2, key3)
+
+		values = make([][]byte, 0)
+		values = append(keys, []byte{'X'}, []byte{'Y'})
+
+		root2, err := smt.Update(keys, values, newRoot)
+		require.NoError(t, err, "error updating trie")
+
+		proot2, _, err := psmt.Update(keys, values)
+		require.NoError(t, err, "error updating partial trie")
+
+		fmt.Println(smt.Print(root2))
+		fmt.Println(psmt.root.FmtStr("", ""))
+
+		if !bytes.Equal(root2, proot2) {
+			t.Fatalf("root2 hash doesn't match [%x] != [%x]", root2, proot2)
+		}
+
 	})
 
 }
@@ -294,7 +316,7 @@ func TestRandomProofs(t *testing.T) {
 		rand.Seed(time.Now().UnixNano())
 
 		// numberOfKeys := rand.Intn(256)
-		numberOfKeys := rand.Intn(30)
+		numberOfKeys := rand.Intn(100)
 		for i := 0; i < numberOfKeys; i++ {
 			key := make([]byte, 2)
 			rand.Read(key)
@@ -308,7 +330,6 @@ func TestRandomProofs(t *testing.T) {
 		// keep a subset as initial insert and keep the rest as default value read
 		split := rand.Intn(numberOfKeys)
 		insertKeys := keys[:split]
-
 		insertValues := values[:split]
 
 		root, err := smt.Update(insertKeys, insertValues, emptyTree.root)
@@ -332,6 +353,29 @@ func TestRandomProofs(t *testing.T) {
 		if !bytes.Equal(root, psmt.root.ComputeValue()) {
 			t.Fatal("root hash doesn't match")
 		}
+
+		// select a subset of shuffled keys for random updates
+		split = rand.Intn(numberOfKeys)
+		updateKeys := keys[:split]
+		updateValues := values[:split]
+		// random updates
+		rand.Shuffle(len(updateValues), func(i, j int) {
+			updateValues[i], updateValues[j] = updateValues[j], updateValues[i]
+		})
+
+		root2, err := smt.Update(updateKeys, updateValues, root)
+		require.NoError(t, err, "error updating trie")
+
+		proot2, _, err := psmt.Update(updateKeys, updateValues)
+		require.NoError(t, err, "error updating partial trie")
+
+		fmt.Println(psmt.root.FmtStr("", ""))
+		fmt.Println(smt.Print(root2))
+
+		if !bytes.Equal(root2, proot2) {
+			t.Fatalf("root2 hash doesn't match [%x] != [%x]", root2, proot2)
+		}
+
 	})
 
 }
