@@ -78,6 +78,8 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
 
+	executionState.On("Size").Return(int64(1024*1024), nil).Maybe()
+
 	protocolState.On("Final").Return(snapshot).Maybe()
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
