@@ -25,7 +25,7 @@ func TestSubmitTransaction(t *testing.T) {
 
 	tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
 		tb.Nonce = 0
-		tb.ComputeLimit = 0
+		tb.GasLimit = 0
 	})
 
 	t.Run("should submit transaction to engine", func(t *testing.T) {

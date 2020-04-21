@@ -26,7 +26,7 @@ func AccountSignatureToMessage(a flow.AccountSignature) *entities.AccountSignatu
 
 // NOTE: transaction conversion is NOT symmetric if certain fields are set, as
 // not all fields are included in the protobuf message.
-// If `Nonce` or `ComputeLimit` are non-zero, then conversion is not reversible.
+// If `Nonce` or `GasLimit` are non-zero, then conversion is not reversible.
 func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error) {
 	if m == nil {
 		return flow.TransactionBody{}, fmt.Errorf("message is empty")
@@ -45,18 +45,18 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 	return flow.TransactionBody{
 		Script:           m.GetScript(),
 		ReferenceBlockID: flow.HashToID(m.ReferenceBlockId),
-		PayerAccount:     flow.BytesToAddress(m.PayerAccount),
-		ScriptAccounts:   scriptAccounts,
+		Payer:            flow.BytesToAddress(m.PayerAccount),
+		Authorizers:      scriptAccounts,
 		Signatures:       signatures,
 	}, nil
 }
 
 // NOTE: transaction conversion is NOT symmetric if certain fields are set, as
 // not all fields are included in the protobuf message.
-// If `Nonce` or `ComputeLimit` are non-zero, then conversion is not reversible.
+// If `Nonce` or `GasLimit` are non-zero, then conversion is not reversible.
 func TransactionToMessage(t flow.TransactionBody) *entities.Transaction {
-	scriptAccounts := make([][]byte, len(t.ScriptAccounts))
-	for i, account := range t.ScriptAccounts {
+	scriptAccounts := make([][]byte, len(t.Authorizers))
+	for i, account := range t.Authorizers {
 		scriptAccounts[i] = account.Bytes()
 	}
 
@@ -68,7 +68,7 @@ func TransactionToMessage(t flow.TransactionBody) *entities.Transaction {
 	return &entities.Transaction{
 		Script:           t.Script,
 		ReferenceBlockId: t.ReferenceBlockID[:],
-		PayerAccount:     t.PayerAccount.Bytes(),
+		PayerAccount:     t.Payer.Bytes(),
 		ScriptAccounts:   scriptAccounts,
 		Signatures:       signatures,
 	}

@@ -39,8 +39,8 @@ func (bc *blockContext) newTransactionContext(
 	options ...TransactionContextOption,
 ) *TransactionContext {
 
-	signingAccounts := make([]runtime.Address, len(tx.ScriptAccounts))
-	for i, addr := range tx.ScriptAccounts {
+	signingAccounts := make([]runtime.Address, len(tx.Authorizers))
+	for i, addr := range tx.Authorizers {
 		signingAccounts[i] = runtime.Address(addr)
 	}
 

@@ -474,11 +474,11 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 		// TODO remove or update these once Access API is finalized
 		//Nonce:            rand.Uint64(),
 		Nonce: 0,
-		//ComputeLimit:     10,
-		ComputeLimit:   0,
-		PayerAccount:   AddressFixture(),
-		ScriptAccounts: []flow.Address{AddressFixture()},
-		Signatures:     []flow.AccountSignature{AccountSignatureFixture()},
+		//GasLimit:     10,
+		GasLimit:    0,
+		Payer:       AddressFixture(),
+		Authorizers: []flow.Address{AddressFixture()},
+		Signatures:  []flow.AccountSignature{AccountSignatureFixture()},
 	}
 
 	for _, apply := range opts {

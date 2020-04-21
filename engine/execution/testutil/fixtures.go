@@ -31,7 +31,7 @@ func DeployCounterContractTransaction() flow.TransactionBody {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
@@ -49,7 +49,7 @@ func CreateCounterTransaction() flow.TransactionBody {
 					}
               	}
             }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
@@ -64,6 +64,6 @@ func AddToCounterTransaction() flow.TransactionBody {
 					acc.storage[Container.Counter].add(2)
               	}
             }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }

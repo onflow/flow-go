@@ -107,7 +107,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 func (suite *Suite) TestGetTransaction() {
 	transaction := unittest.TransactionFixture(func(t *flow.Transaction) {
 		t.Nonce = 0
-		t.ComputeLimit = 0
+		t.GasLimit = 0
 	})
 	expected := transaction.TransactionBody
 	suite.transactions.On("ByID", transaction.ID()).Return(&expected, nil).Once()
@@ -134,7 +134,7 @@ func (suite *Suite) TestGetCollection() {
 
 	for i, t := range collection.Transactions {
 		t.Nonce = 0 // obs api doesn't exposes nonce and compute limit as part of a transaction
-		t.ComputeLimit = 0
+		t.GasLimit = 0
 		expectedIDs[i] = t.ID()
 	}
 

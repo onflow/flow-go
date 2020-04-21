@@ -69,7 +69,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		transaction := unittest.TransactionFixture(func(t *flow.Transaction) {
 			t.Nonce = 0
-			t.ComputeLimit = 0
+			t.GasLimit = 0
 		})
 
 		// create storage

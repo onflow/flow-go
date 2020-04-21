@@ -3,7 +3,6 @@ package flow
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
@@ -25,19 +24,23 @@ type TransactionBody struct {
 	Nonce uint64
 
 	// Max amount of computation which is allowed to be done during this transaction
-	ComputeLimit uint64
+	GasLimit uint64
+
+	ProposalKey ProposalKey
 
 	// Account that pays for this transaction fees
-	PayerAccount Address
+	Payer Address
 
 	// A ordered (ascending) list of addresses that scripts will touch their assets (including payer address)
 	// Accounts listed here all have to provide signatures
 	// Each account might provide multiple signatures (sum of weight should be at least 1)
 	// If code touches accounts that is not listed here, tx fails
-	ScriptAccounts []Address
+	Authorizers []Address
 
 	// List of account signatures including signatures of the payer account and the script accounts
-	Signatures []AccountSignature
+	Signatures []TransactionSignature
+
+	EnvelopeSignatures []TransactionSignature
 }
 
 func (tb TransactionBody) ID() Identifier {
@@ -65,13 +68,14 @@ func (tx *Transaction) Singularity() []byte {
 		Script           []byte
 		Nonce            uint64
 		ComputeLimit     uint64
-		PayerAccount     Address
+		Payer            Address
 	}{
 		tx.ReferenceBlockID,
 		tx.Script,
 		tx.Nonce,
-		tx.ComputeLimit,
-		tx.PayerAccount,
+		tx.GasLimit,
+		tx.Payer,
+		// TODO: Do any of the other field need to be included here?
 	}
 	return encoding.DefaultEncoder.MustEncode(temp)
 }
@@ -83,31 +87,7 @@ func (tx *Transaction) Checksum() Identifier {
 
 func (tx *Transaction) String() string {
 	return fmt.Sprintf("Transaction %v submitted by %v (block %v)",
-		tx.ID(), tx.PayerAccount.Hex(), tx.ReferenceBlockID)
-}
-
-// NewTransaction initialize a transaction
-func NewTransaction(blockref Identifier, scrip []byte, nonce uint64, cl uint64, payer Address, sa []Address) *Transaction {
-	txBody := TransactionBody{
-		ReferenceBlockID: blockref,
-		Script:           scrip,
-		Nonce:            nonce,
-		ComputeLimit:     cl,
-		PayerAccount:     payer,
-		ScriptAccounts:   sa,
-	}
-	return &Transaction{TransactionBody: txBody}
-}
-
-// AddSignature signs the transaction with the given account and private key, then adds the signature to the list
-// of signatures.
-func (tx *Transaction) AddSignature(account Address, sig crypto.Signature) {
-	accountSig := AccountSignature{
-		Account:   account,
-		Signature: sig.Bytes(),
-	}
-
-	tx.Signatures = append(tx.Signatures, accountSig)
+		tx.ID(), tx.Payer.Hex(), tx.ReferenceBlockID)
 }
 
 // TransactionStatus represents the status of a Transaction.
@@ -138,19 +118,18 @@ const (
 	TransactionFieldUnknown TransactionField = iota
 	TransactionFieldScript
 	TransactionFieldRefBlockID
-	TransactionFieldNonce
-	TransactionFieldComputeLimit
-	TransactionFieldPayerAccount
+	TransactionFieldGasLimit
+	TransactionFieldPayer
 )
 
 // String returns the string representation of a transaction field.
 func (f TransactionField) String() string {
-	return [...]string{"Unknown", "Script", "ReferenceBlockHash", "Nonce", "ComputeLimit", "PayerAccount"}[f]
+	return [...]string{"Unknown", "Script", "ReferenceBlockHash", "GasLimit", "Payer"}[f]
 }
 
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
 func (tx *TransactionBody) MissingFields() []string {
-	// Required fields are Script, ReferenceBlockHash, Nonce, ComputeLimit, PayerAccount
+	// Required fields are Script, ReferenceBlockHash, Nonce, GasLimit, Payer
 	missingFields := make([]string, 0)
 
 	if len(tx.Script) == 0 {
@@ -161,9 +140,56 @@ func (tx *TransactionBody) MissingFields() []string {
 		missingFields = append(missingFields, TransactionFieldRefBlockID.String())
 	}
 
-	if tx.PayerAccount == ZeroAddress {
-		missingFields = append(missingFields, TransactionFieldPayerAccount.String())
+	if tx.Payer == ZeroAddress {
+		missingFields = append(missingFields, TransactionFieldPayer.String())
 	}
 
 	return missingFields
+}
+
+// A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.
+type ProposalKey struct {
+	Address        Address
+	KeyID          int
+	SequenceNumber uint64
+}
+
+// A TransactionSignature is a signature associated with a specific account key.
+type TransactionSignature struct {
+	Address     Address
+	SignerIndex int
+	KeyID       int
+	Signature   []byte
+}
+
+func (s TransactionSignature) canonicalForm() interface{} {
+	return struct {
+		SignerIndex uint
+		KeyID       uint
+		Signature   []byte
+	}{
+		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
+		KeyID:       uint(s.KeyID),       // int is not RLP-serializable
+		Signature:   s.Signature,
+	}
+}
+
+func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
+	return func(i, j int) bool {
+		sigA := signatures[i]
+		sigB := signatures[j]
+		return sigA.SignerIndex < sigB.SignerIndex || sigA.KeyID < sigB.KeyID
+	}
+}
+
+type signaturesList []TransactionSignature
+
+func (s signaturesList) canonicalForm() interface{} {
+	signatures := make([]interface{}, len(s))
+
+	for i, signature := range s {
+		signatures[i] = signature.canonicalForm()
+	}
+
+	return signatures
 }
