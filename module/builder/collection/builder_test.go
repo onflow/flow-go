@@ -170,17 +170,21 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	tx2 := mempoolTransactions[1] // in an un-finalized block
 	tx3 := mempoolTransactions[2] // in no blocks
 
+	t.Logf("tx1: %s\ntx2: %s\ntx3: %s", tx1.ID(), tx2.ID(), tx3.ID())
+
 	// build a block containing tx1 on genesis
 	finalizedPayload := model.PayloadFromTransactions(tx1)
 	finalizedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	finalizedBlock.SetPayload(finalizedPayload)
 	suite.InsertBlock(finalizedBlock)
+	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.ParentID, finalizedBlock.Height)
 
 	// build a block containing tx2 on the first block
 	unFinalizedPayload := model.PayloadFromTransactions(tx2)
 	unFinalizedBlock := unittest.ClusterBlockWithParent(&finalizedBlock)
 	unFinalizedBlock.SetPayload(unFinalizedPayload)
 	suite.InsertBlock(unFinalizedBlock)
+	t.Logf("unfinalized: id=%s\tparent_id=%s\theight=%d\n", unFinalizedBlock.ID(), unFinalizedBlock.ParentID, unFinalizedBlock.Height)
 
 	// finalize first block
 	err := suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
@@ -197,7 +201,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	builtCollection := built.Collection
 
 	// payload should only contain tx3
-	assert.Len(t, builtCollection.Transactions, 1)
+	assert.Len(t, builtCollection.Light().Transactions, 1)
 	assert.True(t, collectionContains(builtCollection, tx3.ID()))
 	assert.False(t, collectionContains(builtCollection, tx1.ID(), tx2.ID()))
 
@@ -213,17 +217,22 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	tx2 := mempoolTransactions[1] // in an invalidated block
 	tx3 := mempoolTransactions[2] // in no blocks
 
+	t.Logf("tx1: %s\ntx2: %s\ntx3: %s", tx1.ID(), tx2.ID(), tx3.ID())
+
 	// build a block containing tx1 on genesis - will be finalized
 	finalizedPayload := model.PayloadFromTransactions(tx1)
 	finalizedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	finalizedBlock.SetPayload(finalizedPayload)
+
 	suite.InsertBlock(finalizedBlock)
+	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.ParentID, finalizedBlock.Height)
 
 	// build a block containing tx2 ALSO on genesis - will be invalidated
 	invalidatedPayload := model.PayloadFromTransactions(tx2)
 	invalidatedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	invalidatedBlock.SetPayload(invalidatedPayload)
 	suite.InsertBlock(invalidatedBlock)
+	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.ParentID, invalidatedBlock.Height)
 
 	// finalize first block - this indirectly invalidates the second block
 	err := suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
@@ -240,7 +249,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	builtCollection := built.Collection
 
 	// tx2 and tx3 should be in the built collection
-	assert.Len(t, builtCollection.Transactions, 2)
+	assert.Len(t, builtCollection.Light().Transactions, 2)
 	assert.True(t, collectionContains(builtCollection, tx2.ID(), tx3.ID()))
 	assert.False(t, collectionContains(builtCollection, tx1.ID()))
 
@@ -314,7 +323,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	builtCollection := built.Collection
 
 	// payload should only contain transactions from invalidated blocks
-	assert.Len(t, builtCollection.Transactions, len(invalidatedTxIds))
+	assert.Len(t, builtCollection.Transactions, len(invalidatedTxIds), "expected len=%d, got len=%d", len(invalidatedTxIds), len(builtCollection.Transactions))
 	assert.True(t, collectionContains(builtCollection, invalidatedTxIds...))
 }
 
