@@ -295,12 +295,16 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 }
 
 func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 4)
+	nodes := createNodes(t, 3)
 	fmt.Printf("%v nodes created", len(nodes))
-	// ccl1, err := createNode()
-	// require.NoError(t, err)
-	// ccl2, err := createNode()
-	// require.NoError(t, err)
-	// require.NotNil(t, ccl1)
-	// require.NotNil(t, ccl2)
+	var wg sync.WaitGroup
+	for _, n := range nodes {
+		wg.Add(1)
+		go func(n *Node) {
+			<-n.compliance.Ready()
+			<-n.hot.Wait()
+			wg.Done()
+		}(n)
+	}
+	wg.Wait()
 }
