@@ -20,14 +20,6 @@ type Metrics interface {
 	// Collection Metrics
 	//
 
-	// StartCollectionToGuarantee starts a span to trace the duration of a collection
-	// from being created to being submitted as a collection guarantee
-	StartCollectionToGuarantee(collection flow.LightCollection)
-
-	// FinishCollectionToGuarantee finishes a span to trace the duration of a collection
-	// from being created to being submitted as a collection guarantee
-	FinishCollectionToGuarantee(collectionID flow.Identifier)
-
 	// TransactionReceived is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts
 	// a tx->col span for the transaction.
