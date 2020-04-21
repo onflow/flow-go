@@ -31,13 +31,15 @@ func LookupGuaranteePayload(height uint64, blockID flow.Identifier, parentID flo
 // VerifyGuaranteePayload verifies that the candidate collection IDs
 // don't exist in any ancestor block.
 func VerifyGuaranteePayload(height uint64, blockID flow.Identifier, guaranteeIDs []flow.Identifier) func(*badger.Txn) error {
-	return iterate(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(0)), validatepayload(blockID, guaranteeIDs))
+	start, end := payloadIterRange(codeIndexGuarantee, height, 0)
+	return iterate(start, end, validatepayload(blockID, guaranteeIDs))
 }
 
 // CheckGuaranteePayload populates `invalidIDs` with any IDs in the candidate
 // set that already exist in an ancestor block.
 func CheckGuaranteePayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	return iterate(makePrefix(codeIndexGuarantee, height), makePrefix(codeIndexGuarantee, uint64(0)), searchduplicates(blockID, candidateIDs, invalidIDs))
+	start, end := payloadIterRange(codeIndexGuarantee, height, 0)
+	return iterate(start, end, searchduplicates(blockID, candidateIDs, invalidIDs))
 }
 
 // FindDescendants uses guarantee payload index to find all the incorporated descendants for a given block.
