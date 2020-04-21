@@ -14,6 +14,10 @@ type Metrics interface {
 	// BadgerDBSize total size on-disk of the badger database.
 	BadgerDBSize(sizeBytes int64)
 
+	// Network Metrics
+	// NetworkMessageSent size of the network message in bytes
+	NetworkMessageSent(sizeBytes int)
+
 	// Collection Metrics
 	//
 

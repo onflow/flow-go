@@ -18,6 +18,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
@@ -48,13 +49,14 @@ type Middleware struct {
 	host       string
 	port       string
 	key        crypto.PrivateKey
+	metrics    module.Metrics
 	validators []validators.MessageValidator
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
-	key crypto.PrivateKey, validators ...validators.MessageValidator) (*Middleware, error) {
+	key crypto.PrivateKey, metrics module.Metrics, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -81,6 +83,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		host:       ip,
 		port:       port,
 		key:        key,
+		metrics:    metrics,
 		validators: validators,
 	}
 
@@ -244,10 +247,19 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) 
 		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
 	}
 
+	// track the number of bytes that will be written to the wire for metrics
+	byteCount := bufw.Buffered()
+
+	// flush the stream
+	err = bufw.Flush()
+	if err != nil {
+		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
+	}
+
 	// close the stream immediately
-	// helpers.FullClose will close the stream, wait for an EOF and then call reset on the stream
-	// this is the ideal way of closing the stream in libp2p as of now
 	go helpers.FullClose(stream)
+
+	go m.reportMsgSize(byteCount)
 
 	return nil
 }
@@ -395,12 +407,16 @@ func (m *Middleware) publish(topic string, msg *message.Message) error {
 	}
 
 	// publish the bytes on the topic
-	// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
-	// for this node.
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
 	if err != nil {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
+	go m.reportMsgSize(len(data))
+
 	return nil
+}
+
+func (m *Middleware) reportMsgSize(size int) {
+	m.metrics.NetworkMessageSent(size)
 }
