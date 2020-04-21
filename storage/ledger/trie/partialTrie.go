@@ -141,7 +141,8 @@ func NewPSMT(
 		}
 
 		currentNode.key = key
-		if proofholder.inclusions[i] { // inclusion proof
+		// update values only for inclusion proofs (for others we assume default value)
+		if proofholder.inclusions[i] {
 			currentNode.value = ComputeCompactValue(key, value, currentNode.height, height)
 		}
 		// keep a reference to this node by key (for update purpose)
@@ -165,7 +166,6 @@ func getProofEntries(keys [][]byte,
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}
-	fmt.Println(proofholder)
 
 	// check size of key, values and proofs
 	if len(keys) != len(values) {

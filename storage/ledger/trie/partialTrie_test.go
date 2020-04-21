@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -152,9 +154,6 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		psmt, err := NewPSMT(emptyTree.root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
 
-		fmt.Println(smt.Print(emptyTree.root))
-		fmt.Println(hex.EncodeToString(emptyTree.root))
-
 		if !bytes.Equal(emptyTree.root, psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [before update]")
 		}
@@ -270,7 +269,7 @@ func TestMixProof(t *testing.T) {
 		retvalues, _, err := smt.Read(keys, true, newRoot)
 		require.NoError(t, err, "error reading values")
 
-		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		proofHldr, err := smt.GetBatchProof(keys, newRoot)
 		require.NoError(t, err, "error getting batch proof")
 
 		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, EncodeProof(proofHldr))
@@ -278,6 +277,60 @@ func TestMixProof(t *testing.T) {
 
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [before update]")
+		}
+	})
+
+}
+
+func TestRandomProofs(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+
+	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+
+		// insert some values to an empty trie
+		keys := make([][]byte, 0)
+		values := make([][]byte, 0)
+
+		rand.Seed(time.Now().UnixNano())
+
+		// numberOfKeys := rand.Intn(256)
+		numberOfKeys := rand.Intn(30)
+		for i := 0; i < numberOfKeys; i++ {
+			key := make([]byte, 2)
+			rand.Read(key)
+			keys = append(keys, key)
+
+			value := make([]byte, 4)
+			rand.Read(value)
+			values = append(values, value)
+		}
+
+		// keep a subset as initial insert and keep the rest as default value read
+		split := rand.Intn(numberOfKeys)
+		insertKeys := keys[:split]
+
+		insertValues := values[:split]
+
+		root, err := smt.Update(insertKeys, insertValues, emptyTree.root)
+		require.NoError(t, err, "error updating trie")
+
+		// shuffle keys for read
+		rand.Shuffle(len(keys), func(i, j int) {
+			keys[i], keys[j] = keys[j], keys[i]
+			values[i], values[j] = values[j], values[i]
+		})
+
+		retvalues, _, err := smt.Read(keys, true, root)
+		require.NoError(t, err, "error reading values")
+
+		proofHldr, err := smt.GetBatchProof(keys, root)
+		require.NoError(t, err, "error getting batch proof")
+
+		psmt, err := NewPSMT(root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+		require.NoError(t, err, "error building partial trie")
+
+		if !bytes.Equal(root, psmt.root.ComputeValue()) {
+			t.Fatal("root hash doesn't match")
 		}
 	})
 

@@ -453,17 +453,21 @@ func (p *proofHolder) ExportWholeProof() ([][]byte, [][][]byte, []bool, []uint8)
 	return p.flags, p.proofs, p.inclusions, p.sizes
 }
 
-func (p *proofHolder) String() string {
+func (p proofHolder) String() string {
 	res := fmt.Sprintf("> proof holder includes %d proofs\n", len(p.sizes))
 	for i, size := range p.sizes {
-		proofStr := ""
+		flags := p.flags[i]
+		proof := p.proofs[i]
+		flagStr := ""
+		for _, f := range flags {
+			flagStr += fmt.Sprintf("%8b", f)
+		}
+		proofStr := fmt.Sprintf("size: %d flags: %v\n", size, flagStr)
 		if p.inclusions[i] {
 			proofStr += fmt.Sprintf("\t proof %d (inclusion)\n", i)
 		} else {
 			proofStr += fmt.Sprintf("\t proof %d (noninclusion)\n", i)
 		}
-		flags := p.flags[i]
-		proof := p.proofs[i]
 		proofIndex := 0
 		for j := 0; j < int(size); j++ {
 			if utils.IsBitSet(flags, j) {
@@ -682,6 +686,11 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 
 	if len(notFoundKeys) > 0 {
 		batcher := tree.database.NewBatcher()
+		// sort keys before update
+		sort.Slice(notFoundKeys, func(i, j int) bool {
+			return bytes.Compare(notFoundKeys[i], notFoundKeys[j]) < 0
+		})
+
 		treeRoot, err = s.UpdateAtomically(treeRoot, notFoundKeys, values, s.height-1, batcher, tree.database)
 		if err != nil {
 			return nil, err

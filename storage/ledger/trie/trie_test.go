@@ -3,8 +3,10 @@ package trie
 import (
 	"bytes"
 	"encoding/hex"
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -2708,10 +2710,55 @@ func TestTrieConstructionCase1(t *testing.T) {
 
 		keys = [][]byte{key4, key5, key8, key9}
 		_, _, err = smt.Read(keys, false, newRoot2)
-		smt.GetBatchProof(keys, newRoot2)
+		pholder, _ := smt.GetBatchProof(keys, newRoot2)
 		require.NoError(t, err)
+		// TODO furthure checks
+		require.NotNil(t, pholder)
 
 	})
+}
+
+func TestRandomUpdateRead(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+
+	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+
+		// insert some values to an empty trie
+		keys := make([][]byte, 0)
+		values := make([][]byte, 0)
+
+		rand.Seed(time.Now().UnixNano())
+
+		// numberOfKeys := rand.Intn(256)
+		numberOfKeys := rand.Intn(30)
+		for i := 0; i < numberOfKeys; i++ {
+			key := make([]byte, 2)
+			rand.Read(key)
+			keys = append(keys, key)
+
+			value := make([]byte, 4)
+			rand.Read(value)
+			values = append(values, value)
+		}
+
+		// keep a subset as initial insert and keep the rest as default value read
+		split := rand.Intn(numberOfKeys)
+		insertKeys := keys[:split]
+		insertValues := values[:split]
+
+		root, err := smt.Update(insertKeys, insertValues, emptyTree.root)
+		require.NoError(t, err, "error updating trie")
+
+		retvalues, _, err := smt.Read(insertKeys, true, root)
+		require.NoError(t, err, "error reading values")
+
+		for i := range retvalues {
+			if !bytes.Equal(retvalues[i], insertValues[i]) {
+				t.Fatalf("returned values doesn't match for key [%v], expected [%v] got [%v]", insertKeys[i], insertValues[i], retvalues[i])
+			}
+		}
+	})
+
 }
 
 func withSMT(
