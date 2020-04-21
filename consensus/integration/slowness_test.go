@@ -119,6 +119,8 @@ func (c *Communicator) SendVote(blockID flow.Identifier, view uint64, sigData []
 }
 
 type Node struct {
+	db         *badger.DB
+	dbDir      string
 	id         *flow.Identity
 	compliance *compliance.Engine
 	sync       *synchronization.Engine
@@ -146,127 +148,120 @@ func createNodes(t *testing.T, n int) []*Node {
 
 	nodes := make([]*Node, 0, len(participants))
 	for _, identity := range participants {
-		nodeChan := make(chan *Node, 1)
-		defer close(nodeChan)
-		unittest.RunWithBadgerDB(t, createNode(t, identity, participants, &genesis, nodeChan))
-		node := <-nodeChan
+		node := createNode(t, identity, participants, &genesis)
 		nodes = append(nodes, node)
 	}
 
 	return nodes
 }
 
-func createNode(t *testing.T, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, nodeChan chan<- *Node) func(db *badger.DB) {
-	return func(db *badger.DB) {
-		state, err := protocol.NewState(db)
-		require.NoError(t, err)
+func createNode(t *testing.T, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block) *Node {
+	db, dbDir := unittest.TempBadgerDB(t)
+	state, err := protocol.NewState(db)
+	require.NoError(t, err)
 
-		err = state.Mutate().Bootstrap(genesis)
-		require.NoError(t, err)
+	err = state.Mutate().Bootstrap(genesis)
+	require.NoError(t, err)
 
-		// find index
-		index := len(participants)
-		for i := 0; i < len(participants); i++ {
-			if identity == participants[i] {
-				index = i
-				break
-			}
+	// find index
+	index := len(participants)
+	for i := 0; i < len(participants); i++ {
+		if identity == participants[i] {
+			index = i
+			break
 		}
-		require.NotEqual(t, index, len(participants), "can not find identity in participants")
-
-		localID := identity.ID()
-
-		// log with node index
-		zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-		log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
-		notifier := notifications.NewLogConsumer(log)
-
-		// initialize no-op metrics mock
-		metrics := &module.Metrics{}
-		metrics.On("HotStuffBusyDuration", mock.Anything)
-		metrics.On("HotStuffIdleDuration", mock.Anything)
-
-		// make local
-		priv := helper.MakeBLSKey(t)
-		local, err := local.New(identity, priv)
-		require.NoError(t, err)
-		fmt.Printf("local id: %v\n", local.NodeID())
-
-		views := &Views{}
-
-		// make network
-		net := &Network{}
-
-		headersDB := storage.NewHeaders(db)
-		payloadsDB := storage.NewPayloads(db)
-		blocksDB := storage.NewBlocks(db)
-
-		guarantees, err := stdmap.NewGuarantees(100000)
-		require.NoError(t, err)
-		seals, err := stdmap.NewSeals(100000)
-		require.NoError(t, err)
-
-		// initialize the block builder
-		chainID := "chain"
-		build := builder.NewBuilder(db, guarantees, seals,
-			builder.WithChainID(chainID),
-		)
-
-		signer := &Signer{identity.ID()}
-
-		// initialize the pending blocks cache
-		cache := buffer.NewPendingBlocks()
-
-		rootHeader := &genesis.Header
-		rootQC := &model.QuorumCertificate{
-			View:      genesis.View,
-			BlockID:   genesis.ID(),
-			SignerIDs: nil, // TODO
-			SigData:   nil,
-		}
-		selector := filter.Any
-
-		final := &Finalizer{}
-
-		communicator := &Communicator{}
-
-		// initialize the block finalizer
-		hot, err := consensus.NewParticipant(log, notifier, metrics, headersDB,
-			views, state, local, build, final, signer, communicator, selector, rootHeader,
-			rootQC)
-
-		require.NoError(t, err)
-
-		// initialize the compliance engine
-		comp, err := compliance.New(log, net, local, state, headersDB, payloadsDB, nil, cache)
-		require.NoError(t, err)
-
-		// initialize the synchronization engine
-		sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
-		require.NoError(t, err)
-
-		comp = comp.WithSynchronization(sync).WithConsensus(hot)
-
-		node := &Node{
-			id:         identity,
-			compliance: comp,
-			sync:       sync,
-			hot:        hot,
-			headers:    headersDB,
-		}
-		nodeChan <- node
 	}
+	require.NotEqual(t, index, len(participants), "can not find identity in participants")
+
+	localID := identity.ID()
+
+	// log with node index
+	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
+	notifier := notifications.NewLogConsumer(log)
+
+	// initialize no-op metrics mock
+	metrics := &module.Metrics{}
+	metrics.On("HotStuffBusyDuration", mock.Anything, mock.Anything)
+	metrics.On("HotStuffIdleDuration", mock.Anything, mock.Anything)
+
+	// make local
+	priv := helper.MakeBLSKey(t)
+	local, err := local.New(identity, priv)
+	require.NoError(t, err)
+	fmt.Printf("local id: %v\n", local.NodeID())
+
+	views := &Views{}
+
+	// make network
+	net := &Network{}
+
+	headersDB := storage.NewHeaders(db)
+	payloadsDB := storage.NewPayloads(db)
+	blocksDB := storage.NewBlocks(db)
+
+	guarantees, err := stdmap.NewGuarantees(100000)
+	require.NoError(t, err)
+	seals, err := stdmap.NewSeals(100000)
+	require.NoError(t, err)
+
+	// initialize the block builder
+	chainID := "chain"
+	build := builder.NewBuilder(db, guarantees, seals,
+		builder.WithChainID(chainID),
+	)
+
+	signer := &Signer{identity.ID()}
+
+	// initialize the pending blocks cache
+	cache := buffer.NewPendingBlocks()
+
+	rootHeader := &genesis.Header
+	rootQC := &model.QuorumCertificate{
+		View:      genesis.View,
+		BlockID:   genesis.ID(),
+		SignerIDs: nil, // TODO
+		SigData:   nil,
+	}
+	selector := filter.Any
+
+	final := &Finalizer{}
+
+	communicator := &Communicator{}
+
+	// initialize the block finalizer
+	hot, err := consensus.NewParticipant(log, notifier, metrics, headersDB,
+		views, state, local, build, final, signer, communicator, selector, rootHeader,
+		rootQC)
+
+	require.NoError(t, err)
+
+	// initialize the compliance engine
+	comp, err := compliance.New(log, net, local, state, headersDB, payloadsDB, nil, cache)
+	require.NoError(t, err)
+
+	// initialize the synchronization engine
+	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
+	require.NoError(t, err)
+
+	comp = comp.WithSynchronization(sync).WithConsensus(hot)
+
+	node := &Node{
+		db:         db,
+		dbDir:      dbDir,
+		id:         identity,
+		compliance: comp,
+		sync:       sync,
+		hot:        hot,
+		headers:    headersDB,
+	}
+	return node
 }
 
 func Test3Nodes(t *testing.T) {
-	// unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-	// 	db.Update(func(tx *badger.Txn) error {
-	// 		err := tx.Set([]byte("sdf"), nil)
-	// 		require.NoError(t, err)
-	// 		return nil
-	// 	})
-	// })
 	nodes := createNodes(t, 3)
+	defer cleanupNodes(nodes)
+
 	fmt.Printf("%v nodes created", len(nodes))
 	var wg sync.WaitGroup
 	for _, n := range nodes {
@@ -278,4 +273,11 @@ func Test3Nodes(t *testing.T) {
 		}(n)
 	}
 	wg.Wait()
+}
+
+func cleanupNodes(nodes []*Node) {
+	for _, n := range nodes {
+		n.db.Close()
+		os.RemoveAll(n.dbDir)
+	}
 }
