@@ -23,6 +23,12 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// TestHappyPath evaluates the happy path scenario of
+// concurrently sending two execution receipts of the same result each
+// with `chunkCount`-many chunks to `verNodeCount`-many verification nodes
+// the happy path should result in dissemination of a result approval for each
+// distinct chunk by each verification node. The result approvals should be
+// sent to the consensus nodes
 func TestHappyPath(t *testing.T) {
 	testcases := []struct {
 		verNodeCount,
@@ -61,8 +67,9 @@ func TestHappyPath(t *testing.T) {
 	}
 }
 
-// TestHappyPath checks that concurrently received execution receipts with the same result part that
-// received by the verification node results in:
+// testHappyPath runs `verNodeCount`-many verification nodes
+// and checks that concurrently received execution receipts with the same result part that
+// by each verification node results in:
 // - the selection of the assigned chunks by the ingest engine
 // - request of the associated collections to the assigned chunks
 // - formation of a complete verifiable chunk by the ingest engine for each assigned chunk
@@ -256,11 +263,11 @@ func setupMockExeNode(t *testing.T,
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
 	exeEngine := new(network.Engine)
 
-	// determines the expected number of result approvals this node should receive
-	approvalsCount := 0
+	// determines the expected number of result chunk data pack requests
+	chunkDataPackCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		if isAssigned(len(completeER.ChunkDataPacks), int(chunk.Index)) {
-			approvalsCount++
+			chunkDataPackCount++
 		}
 	}
 
@@ -309,10 +316,11 @@ func setupMockExeNode(t *testing.T,
 
 		}).
 		Return(nil).
-		// half of the chunks assigned to the verification node
-		// for each chunk the verification node contacts execution node
-		// once for chunk data pack
-		Times(len(verIdentities) * approvalsCount)
+		// each verification node is assigned to `chunkDataPackCount`-many independent chunks
+		// and there are `len(verIdentities)`-many verification nodes
+		// so there is a total of len(verIdentities) * chunkDataPackCount expected
+		// chunk data pack requests
+		Times(len(verIdentities) * chunkDataPackCount)
 
 	return &exeNode, exeEngine
 }
@@ -363,7 +371,12 @@ func setupMockConsensusNode(t *testing.T,
 
 			// asserts that the result approval is assigned to the verifier
 			assert.True(t, isAssigned(int(resultApproval.Body.ChunkIndex), len(completeER.ChunkDataPacks)))
-		}).Return(nil).Times(approvalsCount)
+		}).Return(nil).
+		// each verification node is assigned to `approvalsCount`-many independent chunks
+		// and there are `len(verIdentities)`-many verification nodes
+		// so there is a total of len(verIdentities) * approvalsCount expected
+		// result approvals
+		Times(len(verIdentities) * approvalsCount)
 
 	_, err := conNode.Net.Register(engine.ApprovalProvider, conEngine)
 	assert.Nil(t, err)
