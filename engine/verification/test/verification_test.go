@@ -23,6 +23,44 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+func TestHappyPath(t *testing.T) {
+	testcases := []struct {
+		verNodeCount,
+		chunkCount int
+	}{
+		{
+			verNodeCount: 1,
+			chunkCount:   2,
+		},
+		{
+			verNodeCount: 1,
+			chunkCount:   10,
+		},
+		{
+			verNodeCount: 2,
+			chunkCount:   2,
+		},
+		{
+			verNodeCount: 2,
+			chunkCount:   10,
+		},
+		{
+			verNodeCount: 10,
+			chunkCount:   2,
+		},
+		{
+			verNodeCount: 10,
+			chunkCount:   10,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
+			testHappyPath(t, tc.verNodeCount, tc.chunkCount)
+		})
+	}
+}
+
 // TestHappyPath checks that concurrently received execution receipts with the same result part that
 // received by the verification node results in:
 // - the selection of the assigned chunks by the ingest engine
@@ -31,11 +69,9 @@ import (
 // - submitting a verifiable chunk locally to the verify engine by the ingest engine
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
-func TestHappyPath(t *testing.T) {
+func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	// generates network hub
 	hub := stub.NewNetworkHub()
-
-	verNodeCount := 10
 
 	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -51,7 +87,6 @@ func TestHappyPath(t *testing.T) {
 	//
 	// creates an execution receipt and its associated data
 	// with `chunkNum` chunks
-	chunkNum := 2
 	completeER := CompleteExecutionResultFixture(t, chunkNum)
 
 	// mocks the assignment to only assign "some" chunks to the verIdentity
@@ -140,14 +175,9 @@ func TestHappyPath(t *testing.T) {
 
 	for _, verNode := range verNodes {
 		// both receipts should be added to the authenticated mempool of verification node
+		require.True(t, verNode.AuthReceipts.Has(receipt1.ID()) && verNode.AuthReceipts.Has(receipt2.ID()))
 		// and do not reside in pending pool
-		// sleeps for 50 milliseconds to make sure that receipt finds its way to authReceipts pool
-		go assert.Eventually(t, func() bool {
-			return verNode.AuthReceipts.Has(receipt1.ID()) &&
-				verNode.AuthReceipts.Has(receipt2.ID()) &&
-				!verNode.PendingReceipts.Has(receipt1.ID()) &&
-				!verNode.PendingReceipts.Has(receipt2.ID())
-		}, time.Second, 50*time.Millisecond)
+		require.False(t, verNode.PendingReceipts.Has(receipt1.ID()) || verNode.PendingReceipts.Has(receipt2.ID()))
 	}
 
 	// flush the collection requests
