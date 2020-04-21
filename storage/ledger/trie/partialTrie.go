@@ -90,6 +90,7 @@ func NewPSMT(
 	// iterating over proofs for building the tree
 	for i, proofSize := range proofholder.sizes {
 		key := keys[i]
+		value := values[i]
 		flags := proofholder.flags[i]
 		proof := proofholder.proofs[i]
 		// check key size
@@ -139,33 +140,8 @@ func NewPSMT(
 			}
 		}
 
-	}
-	// Fill
-	// iterating over proofs for building the tree
-	// TODO change this to proof entry
-	for i := range proofholder.sizes {
-		value := values[i]
-		key := keys[i]
-		inclusion := proofholder.inclusions[i]
-
-		// start from the rootNode and walk down the tree until reaching leaf
-		currentNode := psmt.root
-		for j := 0; j < height; j++ {
-			if currentNode.lChild == nil && currentNode.rChild == nil {
-				break
-			}
-			if utils.IsBitSet(key, j) { // right branching
-				currentNode = currentNode.rChild
-			} else { // left branching
-				currentNode = currentNode.lChild
-			}
-		}
-		if currentNode.key != nil && !bytes.Equal(currentNode.key, key) {
-			return nil, fmt.Errorf("incompatible proof (two keys for the same node) ([%x], [%x])", currentNode.key, key)
-		}
-		// for the last node set the leaf key and value
 		currentNode.key = key
-		if inclusion { // inclusion proof
+		if proofholder.inclusions[i] { // inclusion proof
 			currentNode.value = ComputeCompactValue(key, value, currentNode.height, height)
 		}
 		// keep a reference to this node by key (for update purpose)
