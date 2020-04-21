@@ -87,14 +87,14 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 }
 
 func getNodeInfos(flowNetwork *testnet.FlowNetwork) []nodeInfo {
-	realData := make([]nodeInfo, len(flowNetwork.Containers))
+	realData := make([]nodeInfo, 0, len(flowNetwork.Containers))
 
-	for i, container := range flowNetwork.Containers {
-		realData[i] = nodeInfo{
+	for _, container := range flowNetwork.Containers {
+		realData = append(realData, nodeInfo{
 			image:   container.Image,
 			name:    container.Name(),
 			address: container.Config.Address,
-		}
+		})
 	}
 	return realData
 }

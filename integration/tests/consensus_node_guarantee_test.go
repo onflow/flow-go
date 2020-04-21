@@ -1,4 +1,4 @@
-package consensus
+package tests
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/ghost/client"
 	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -41,7 +40,7 @@ func (gs *GuaranteeSuite) Consensus(index int) *testnet.Container {
 func (gs *GuaranteeSuite) Ghost() *client.GhostClient {
 	ghost, found := gs.net.ContainerByID(gs.ghostID)
 	require.True(gs.T(), found, "could not find ghost containter")
-	client, err := common.GetGhostClient(ghost)
+	client, err := GetGhostClient(ghost)
 	require.NoError(gs.T(), err, "could not get ghost client")
 	return client
 }

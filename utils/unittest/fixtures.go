@@ -6,9 +6,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/model/cluster"

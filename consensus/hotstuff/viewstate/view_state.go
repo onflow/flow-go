@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
@@ -36,7 +37,7 @@ func New(protocolState protocol.State, myID flow.Identifier, consensusMembersFil
 		protocolState:          protocolState,
 		myID:                   myID,
 		consensusMembersFilter: consensusMembersFilter,
-		allNodes:               allNodes,
+		allNodes:               allNodes.Order(order.ByNodeIDAsc),
 	}, nil
 }
 
