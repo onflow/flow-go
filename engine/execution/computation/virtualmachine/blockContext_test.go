@@ -1,8 +1,8 @@
 package virtualmachine_test
 
 import (
-	"crypto/rand"
 	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
 	"time"
