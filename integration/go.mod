@@ -12,7 +12,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/m4ksio/testingdock v0.4.1
-	github.com/onflow/cadence v0.0.0-20200419191218-7825e473e791
+	github.com/onflow/cadence v0.1.0
 	github.com/rs/zerolog v1.15.0
 	github.com/stretchr/testify v1.5.1
 	google.golang.org/grpc v1.28.0
