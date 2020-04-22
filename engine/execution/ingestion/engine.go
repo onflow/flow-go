@@ -237,7 +237,7 @@ func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
 			}
 			e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
-			// special case when sync threshold is zero
+			// special case when sync threshold is reached
 			if queue.Height() >= e.syncModeThreshold && !e.syncInProgress.Load() {
 				e.syncInProgress.Store(true)
 				// Start sync mode - initializing would require DB operation and will stop processing blocks here
