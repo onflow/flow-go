@@ -199,7 +199,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters_count", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -238,7 +238,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
 	// submit the proposal to the provider engine to forward it to other
 	// node roles
-	e.prov.SubmitLocal(msg)
+	// TODO: propagate once seals in payload infinite loop is fixed
+	// e.prov.SubmitLocal(msg)
 
 	return nil
 }
@@ -298,7 +299,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters_count", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -416,7 +417,6 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 

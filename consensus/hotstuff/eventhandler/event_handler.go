@@ -509,7 +509,7 @@ func (e *EventHandler) processQC(qc *model.QuorumCertificate) error {
 	log := e.log.With().
 		Uint64("block_view", qc.View).
 		Hex("block_id", qc.BlockID[:]).
-		RawJSON("signers", logging.AsJSON(qc.SignerIDs)).
+		Int("signers", len(qc.SignerIDs)).
 		Logger()
 
 	err := e.forks.AddQC(qc)
