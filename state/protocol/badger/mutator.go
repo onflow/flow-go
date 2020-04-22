@@ -284,12 +284,12 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 		// is redundant for all but the first check, but cheap, and makes the
 		// code a lot simpler
 		if height != ancestor.Height+1 {
-			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", header.Height, ancestor.Height)
+			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", height, ancestor.Height)
 		}
 
 		// check if the ancestor is unfinalized, but already behind the last finalized height (orphaned fork)
 		if ancestor.Height < boundary {
-			return fmt.Errorf("block doesn't connect to finalized state")
+			return fmt.Errorf("block doesn't connect to finalized state (%d < %d), ancestorID (%v)", ancestor.Height, boundary, ancestorID)
 		}
 
 		// forward to next parent

@@ -8,9 +8,20 @@ test:
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test:
-	GO111MODULE=on go test -tags relic -count=1 `go list ./... | grep integration/tests`
+integration-test: collection-tests consensus-tests common-tests
 
-.PHONY: integration-test-execution
-integration-test-execution:
-	GO111MODULE=on go test -tags relic -count=1 `go list ./... | grep integration/tests` -run ^TestExecution$$
+.PHONY: collection-tests
+collection-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/collection
+
+.PHONY: consensus-tests
+consensus-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/consensus
+
+.PHONY: common-tests
+common-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/common
+
+.PHONY: execution-tests
+execution-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/execution

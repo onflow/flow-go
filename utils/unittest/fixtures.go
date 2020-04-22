@@ -6,9 +6,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/model/cluster"
@@ -86,6 +85,7 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
 		Guarantees: CollectionGuaranteesFixture(16),
+		Seals:      BlockSealsFixture(16),
 	}
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
@@ -221,6 +221,27 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 		ret = append(ret, &cg)
 	}
 	return ret
+}
+
+func BlockSealFixture() *flow.Seal {
+	return &flow.Seal{
+		BlockID:           IdentifierFixture(),
+		ExecutionResultID: IdentifierFixture(),
+		PreviousState:     StateCommitmentFixture(),
+		FinalState:        StateCommitmentFixture(),
+	}
+}
+
+func BlockSealsFixture(n int) []*flow.Seal {
+	seals := make([]*flow.Seal, 0, n)
+	for i := 0; i < n; i++ {
+		seal := BlockSealFixture()
+		if i > 0 {
+			seal.PreviousState = seals[i-1].FinalState
+		}
+		seals = append(seals, seal)
+	}
+	return seals
 }
 
 func CollectionFixture(n int) flow.Collection {
