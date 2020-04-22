@@ -177,7 +177,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		assert.NoError(ctx.t, err, "could not find executor in protocol state")
 
 		// verify the signature
-		b, err := encoding.DefaultEncoder.Encode(receipt.ExecutionResult)
+		b, err := encoding.DefaultEncoder.Encode(receipt.Body())
 		assert.NoError(ctx.t, err)
 
 		validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, b, ctx.engine.receiptHasher)

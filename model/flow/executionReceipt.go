@@ -16,9 +16,11 @@ type ExecutionReceipt struct {
 // Body returns the body of the execution receipt.
 func (er *ExecutionReceipt) Body() interface{} {
 	return struct {
+		ExecutorID      Identifier
 		ExecutionResult ExecutionResult
 		Spocks          []Spock
 	}{
+		ExecutorID:      er.ExecutorID,
 		ExecutionResult: er.ExecutionResult,
 		Spocks:          er.Spocks,
 	}
