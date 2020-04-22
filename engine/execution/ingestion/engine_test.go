@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"bytes"
+	"crypto/rand"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -10,14 +11,18 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	engineCommon "github.com/dapperlabs/flow-go/engine"
 	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
 	provider "github.com/dapperlabs/flow-go/engine/execution/provider/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
+	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -60,15 +65,20 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	net := module.NewMockNetwork(ctrl)
 
-	myself := unittest.IdentifierFixture()
-
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
 	collectionConduit := network.NewMockConduit(ctrl)
 	syncConduit := network.NewMockConduit(ctrl)
 
-	me := module.NewMockLocal(ctrl)
-	me.EXPECT().NodeID().Return(myself).AnyTimes()
+	// generates signing identity including staking key for signing
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	require.NoError(t, err)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	require.NoError(t, err)
+	myIdentity.StakingPubKey = sk.PublicKey()
+	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
 
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
@@ -93,19 +103,28 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 
+	executionState.On("Size").Return(int64(1024*1024), nil).Maybe()
+
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
+	}, nil)
+	snapshot.On("Identity", mock.Anything).Return(func(nodeID flow.Identifier) *flow.Identity {
+		identity, ok := identityList.ByNodeID(nodeID)
+		require.Truef(t, ok, "Could not find nodeID %v in identityList", nodeID)
+		return identity
 	}, nil)
 
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
+	metrics, err := metrics.NewCollector(log)
+	require.NoError(t, err)
 
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21)
+	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21, metrics)
 	require.NoError(t, err)
 
 	f(testingContext{
@@ -156,7 +175,21 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 	ctx.executionState.On("PersistStateCommitment", executableBlock.Block.ID(), newStateCommitment).Return(nil)
 	ctx.providerEngine.On("BroadcastExecutionReceipt", mock.MatchedBy(func(er *flow.ExecutionReceipt) bool {
 		return er.ExecutionResult.BlockID == executableBlock.Block.ID() && er.ExecutionResult.PreviousResultID == previousExecutionResultID
-	})).Return(nil)
+	})).Run(func(args mock.Arguments) {
+		receipt := args[0].(*flow.ExecutionReceipt)
+
+		executor, err := ctx.snapshot.Identity(receipt.ExecutorID)
+		assert.NoError(ctx.t, err, "could not find executor in protocol state")
+
+		// verify the signature
+		b, err := encoding.DefaultEncoder.Encode(receipt.Body())
+		assert.NoError(ctx.t, err)
+
+		validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, b, ctx.engine.receiptHasher)
+		assert.NoError(ctx.t, err)
+
+		assert.True(ctx.t, validSig, "execution receipt signature invalid")
+	}).Return(nil)
 }
 
 func TestExecutionGenerationResultsAreChained(t *testing.T) {

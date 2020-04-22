@@ -10,6 +10,8 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
@@ -17,6 +19,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	executionSync "github.com/dapperlabs/flow-go/engine/execution/sync"
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -37,6 +41,7 @@ type Engine struct {
 	log                zerolog.Logger
 	me                 module.Local
 	state              protocol.State
+	receiptHasher      hash.Hasher // used as hasher to sign the execution receipt
 	conduit            network.Conduit
 	collectionConduit  network.Conduit
 	syncConduit        network.Conduit
@@ -54,6 +59,7 @@ type Engine struct {
 	syncInProgress     *atomic.Bool
 	syncTargetBlockID  atomic.Value
 	stateSync          executionSync.StateSynchronizer
+	mc                 module.Metrics
 }
 
 func New(
@@ -69,6 +75,7 @@ func New(
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
 	syncThreshold uint64,
+	mc module.Metrics,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
@@ -79,6 +86,7 @@ func New(
 		log:                log,
 		me:                 me,
 		state:              state,
+		receiptHasher:      utils.NewExecutionReceiptHasher(),
 		blocks:             blocks,
 		payloads:           payloads,
 		collections:        collections,
@@ -90,6 +98,7 @@ func New(
 		syncModeThreshold:  syncThreshold,
 		syncInProgress:     atomic.NewBool(false),
 		stateSync:          executionSync.NewStateSynchronizer(execState),
+		mc:                 mc,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -188,6 +197,8 @@ func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
 		Uint64("block_view", block.View).
 		Msg("received block")
 
+	e.mc.StartBlockReceivedToExecuted(block.ID())
+
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
@@ -232,7 +243,7 @@ func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
 			}
 			e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
-			// special case when sync threshold is zero
+			// special case when sync threshold is reached
 			if queue.Height() >= e.syncModeThreshold && !e.syncInProgress.Load() {
 				e.syncInProgress.Store(true)
 				// Start sync mode - initializing would require DB operation and will stop processing blocks here
@@ -303,6 +314,10 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 		return
 	}
 
+	e.mc.FinishBlockReceivedToExecuted(executableBlock.Block.ID())
+	e.mc.ExecutionGasUsedPerBlock(computationResult.GasUsed)
+	e.mc.ExecutionStateReadsPerBlock(computationResult.StateReads)
+
 	finalState, err := e.handleComputationResult(computationResult, executableBlock.StartState)
 	if err != nil {
 		e.log.Err(err).
@@ -310,6 +325,14 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 			Msg("error while handing computation results")
 		return
 	}
+
+	diskTotal, err := e.execState.Size()
+	if err != nil {
+		e.log.Err(err).Msg("could not get execution state disk size")
+	}
+	e.mc.ExecutionStateStorageDiskTotal(diskTotal)
+	e.mc.ExecutionStorageStateCommitment(int64(len(finalState)))
+
 	err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, _ *stdmap.QueuesBackdata) error {
 
 		executionQueue, err := executionQueues.ByID(executableBlock.Block.ID())
@@ -344,6 +367,10 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 			Hex("block_id", logging.Entity(executableBlock.Block)).
 			Msg("error while requeueing blocks after execution")
 	}
+	e.log.Info().
+		Hex("block_id", logging.Entity(executableBlock.Block)).
+		Hex("final_state", finalState).
+		Msg("executing block")
 }
 
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
@@ -637,13 +664,9 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
 
-	receipt := &flow.ExecutionReceipt{
-		ExecutionResult: *executionResult,
-		// TODO: include SPoCKs
-		Spocks: nil,
-		// TODO: sign execution receipt
-		ExecutorSignature: nil,
-		ExecutorID:        e.me.NodeID(),
+	receipt, err := e.generateExecutionReceipt(executionResult)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
 	if len(events) > 0 {
@@ -709,6 +732,29 @@ func (e *Engine) generateExecutionResultForBlock(
 	}
 
 	return er, nil
+}
+
+func (e *Engine) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
+	receipt := &flow.ExecutionReceipt{
+		ExecutionResult:   *result,
+		Spocks:            nil, // TODO: include SPoCKs
+		ExecutorSignature: crypto.Signature{},
+		ExecutorID:        e.me.NodeID(),
+	}
+
+	// generates a signature over the execution result
+	b, err := encoding.DefaultEncoder.Encode(receipt.Body())
+	if err != nil {
+		return nil, fmt.Errorf("could not encode execution result: %w", err)
+	}
+	sig, err := e.me.Sign(b, e.receiptHasher)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign execution result: %w", err)
+	}
+
+	receipt.ExecutorSignature = sig
+
+	return receipt, nil
 }
 
 func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
