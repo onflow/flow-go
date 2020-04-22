@@ -60,20 +60,18 @@ func (s *SingleVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, blo
 // VerifyQC verifies a QC with a single aggregated signature as signature data.
 func (s *SingleVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
 
-	// get the signers of the QC
+	// get the full Identities of the signers
 	selector := filter.And(s.selector, filter.HasNodeID(voterIDs...))
 	signers, err := s.state.AtBlockID(block.BlockID).Identities(selector)
 	if err != nil {
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
-
-	// check they were all in the selector set
-	if len(signers) < len(voterIDs) {
+	if len(signers) < len(voterIDs) { // check we have valid consensus member Identities for all signers
 		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d): %w", len(voterIDs), len(signers), ErrInvalidSigner)
 	}
+	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 
 	// create the message we verify against and check signature
-	signers = signers.Order(order.ByReferenceOrder(voterIDs))
 	msg := makeVoteMessage(block.View, block.BlockID)
 	valid, err := s.verifier.VerifyMany(msg, sigData, signers.StakingKeys())
 	if err != nil {

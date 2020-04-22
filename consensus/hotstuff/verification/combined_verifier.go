@@ -100,17 +100,16 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
 func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
 
-	// get the signers from the selector set
+	// get the full Identities of the signers
 	selector := filter.And(c.selector, filter.HasNodeID(voterIDs...))
 	signers, err := c.state.AtBlockID(block.BlockID).Identities(selector)
 	if err != nil {
-		return false, fmt.Errorf("could not get signers from protocol state: %w", err)
+		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
-
-	// check if we have sufficient signers
-	if len(signers) < len(voterIDs) {
+	if len(signers) < len(voterIDs) { // check we have valid consensus member Identities for all signers
 		return false, fmt.Errorf("not all signers are part of the selector set (signers: %d, selector: %d): %w", len(voterIDs), len(signers), ErrInvalidSigner)
 	}
+	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 
 	// get the DKG group key from the DKG state
 	dkgKey, err := c.dkg.GroupKey()
@@ -134,7 +133,6 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 	beaconThresSig := splitSigs[1]
 
 	// verify the aggregated staking signature first
-	signers = signers.Order(order.ByReferenceOrder(voterIDs))
 	msg := makeVoteMessage(block.View, block.BlockID)
 	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
 	if err != nil {

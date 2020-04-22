@@ -5,22 +5,39 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/state/dkg"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 // ViewState provides method for querying identities related information by view or block ID
 type ViewState struct {
-	consensusMembers ConsensusMembers
+	protocolState protocol.State
 
 	myID                   flow.Identifier     // my own identifier
 	consensusMembersFilter flow.IdentityFilter // identityFilter to find only the consensus members for the cluster
+	allNodes               flow.IdentityList   // the cached all consensus members for finding leaders for a certain view
+
+	dkgState dkg.State
 }
 
 // New creates a new ViewState instance
-func New(consensusMembers ConsensusMembers, myID flow.Identifier) *ViewState {
-	return &ViewState{
-		consensusMembers: consensusMembers,
-		myID:             myID,
+func New(protocolState protocol.State, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
+	// finding all consensus members
+	allNodes, err := protocolState.Final().Identities(consensusMembersFilter)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find all consensus member nodes when initializing ViewState: %w", err)
 	}
+
+	if len(allNodes) == 0 {
+		return nil, fmt.Errorf("require non-empty consensus member nodes to initialize ViewState")
+	}
+
+	return &ViewState{
+		protocolState:          protocolState,
+		myID:                   myID,
+		consensusMembersFilter: consensusMembersFilter,
+		allNodes:               allNodes,
+	}, nil
 }
 
 // Self returns the own nodeID.
@@ -38,7 +55,12 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 	return v.IsSelf(v.LeaderForView(view).ID())
 }
 
-// AllConsensusParticipants returns all _staked_ consensus participants at block with blockID.
+// DKGState returns the public DKG data for block
+func (v *ViewState) DKGState() dkg.State {
+	return v.dkgState
+}
+
+// ConsensusParticipants returns all _staked_ consensus participants at block with blockID.
 // Which node is considered an eligible consensus participant is determined by
 // `ViewState.consensusMembersFilter` (defined at construction time).
 func (v *ViewState) AllConsensusParticipants(blockID flow.Identifier) (flow.IdentityList, error) {
@@ -140,4 +162,9 @@ func (v *ViewState) IdentitiesForConsensusParticipants(blockID flow.Identifier, 
 func (v *ViewState) LeaderForView(view uint64) *flow.Identity {
 	leader := roundRobin(v.allNodes, view)
 	return leader
+}
+
+// Selects Leader in Round-Robin fashion. NO support for Epochs.
+func roundRobin(nodes flow.IdentityList, view uint64) *flow.Identity {
+	return nodes[int(view)%int(len(nodes))]
 }

@@ -66,6 +66,21 @@ func (e ErrorInvalidVote) Is(other error) bool {
 	return ok
 }
 
+type ErrorInvalidConsensusParticipants struct {
+	BlockID             flow.Identifier
+	InvalidParticipants []flow.Identifier
+	Msg                 string
+}
+
+func (e ErrorInvalidConsensusParticipants) Error() string {
+	return fmt.Sprintf("invalid consensus participants %x at block %x: %s", e.InvalidParticipants, e.BlockID, e.Msg)
+}
+
+func (e ErrorInvalidConsensusParticipants) Is(other error) bool {
+	_, ok := other.(ErrorInvalidConsensusParticipants)
+	return ok
+}
+
 // ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which
 // prove a Byzantine threshold of consensus replicas has been exceeded.
 // Per definition, the byzantine threshold is exceeded is there are byzantine consensus
