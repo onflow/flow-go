@@ -229,7 +229,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 		SignerIDs: nil, // TODO
 		SigData:   nil,
 	}
-	selector := filter.Any
+	selector := filter.HasRole(flow.RoleConsensus)
 
 	final := &Finalizer{}
 
