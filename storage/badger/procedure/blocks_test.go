@@ -37,10 +37,10 @@ func TestFinalizeBlock(t *testing.T) {
 		err := db.Update(InsertBlock(&block))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertNumber(parent.View, parent.ID()))
+		err = db.Update(operation.InsertNumber(parent.Height, parent.ID()))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertBoundary(parent.View))
+		err = db.Update(operation.InsertBoundary(parent.Height))
 		require.NoError(t, err)
 
 		err = db.Update(FinalizeBlock(block.Header.ID()))
@@ -49,7 +49,7 @@ func TestFinalizeBlock(t *testing.T) {
 		var boundary uint64
 		err = db.View(operation.RetrieveBoundary(&boundary))
 		require.NoError(t, err)
-		require.Equal(t, block.View, boundary)
+		require.Equal(t, block.Height, boundary)
 
 		var headID flow.Identifier
 		err = db.View(operation.RetrieveNumber(boundary, &headID))

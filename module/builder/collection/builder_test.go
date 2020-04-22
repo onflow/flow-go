@@ -99,16 +99,16 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 
 func (suite *BuilderSuite) TestBuildOn_Success() {
 
-	var expectedView uint64 = 42
+	var expectedHeight uint64 = 42
 	setter := func(h *flow.Header) {
-		h.View = expectedView
+		h.Height = expectedHeight
 	}
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter)
 	suite.Assert().Nil(err)
 
 	// setter should have been run
-	suite.Assert().Equal(expectedView, header.View)
+	suite.Assert().Equal(expectedHeight, header.Height)
 
 	// should be able to retrieve built block from storage
 	var built model.Block

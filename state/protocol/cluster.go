@@ -51,7 +51,7 @@ func Clusters(nClusters uint, identities flow.IdentityList) *flow.ClusterList {
 
 	// order the identities by node ID
 	sort.Slice(filtered, func(i, j int) bool {
-		return order.ByNodeIDAsc(identities[i], identities[j])
+		return order.ByNodeIDAsc(filtered[i], filtered[j])
 	})
 
 	// create the desired number of clusters and assign nodes

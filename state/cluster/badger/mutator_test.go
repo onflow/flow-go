@@ -74,7 +74,7 @@ func (suite *MutatorSuite) TestBootstrap_InvalidChainID() {
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidNumber() {
-	suite.genesis.View = 1
+	suite.genesis.Height = 1
 
 	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Error(err)
@@ -130,7 +130,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should insert block number -> ID lookup
 		var blockID flow.Identifier
-		err = operation.RetrieveNumberForCluster(suite.genesis.ChainID, suite.genesis.View, &blockID)(tx)
+		err = operation.RetrieveNumberForCluster(suite.genesis.ChainID, suite.genesis.Height, &blockID)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
@@ -138,7 +138,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 		var boundary uint64
 		err = operation.RetrieveBoundaryForCluster(suite.genesis.ChainID, &boundary)(tx)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.View, boundary)
+		suite.Assert().Equal(suite.genesis.Height, boundary)
 
 		return nil
 	})
@@ -180,7 +180,7 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// change the block number
-	block.View = block.View - 1
+	block.Height = block.Height - 1
 	suite.InsertBlock(block)
 
 	err := suite.mutator.Extend(block.ID())
