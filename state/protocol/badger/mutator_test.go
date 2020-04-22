@@ -477,7 +477,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
-		require.EqualError(t, err, "extend header not valid: block doesn't connect to finalized state")
+		require.EqualError(t, err, "extend header not valid: block doesn't connect to finalized state (0 < 1), ancestorID (816c4a92f3393aafc052558370fb81f0bb8a5da4def9253619d698c42dc0bf95)")
 
 		// verify seal not indexed
 		var seal flow.Identifier
