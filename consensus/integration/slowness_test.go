@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -73,12 +74,6 @@ func (*Signer) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.
 
 func (*Signer) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
 	return true, nil
-}
-
-type Finalizer struct{}
-
-func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
-	return nil
 }
 
 // move to in memory network
@@ -140,6 +135,13 @@ func (s *Stopper) OnEnteringView(view uint64) {
 	}
 }
 
+type Engine struct{}
+
+func (*Engine) SubmitLocal(event interface{})                             {}
+func (*Engine) Submit(originID flow.Identifier, event interface{})        {}
+func (*Engine) ProcessLocal(event interface{}) error                      { return nil }
+func (*Engine) Process(originID flow.Identifier, event interface{}) error { return nil }
+
 type Node struct {
 	db         *badger.DB
 	dbDir      string
@@ -155,21 +157,27 @@ type Node struct {
 }
 
 func createNodes(t *testing.T, n int, stopAtView uint64) []*Node {
+	// create n consensus nodes
 	participants := make([]*flow.Identity, 0)
 	for i := 0; i < n; i++ {
 		identity := unittest.IdentityFixture()
 		participants = append(participants, identity)
 	}
 
+	// create non-consensus nodes
 	collection := unittest.IdentityFixture()
 	collection.Role = flow.RoleCollection
+
 	verification := unittest.IdentityFixture()
 	verification.Role = flow.RoleVerification
+
 	execution := unittest.IdentityFixture()
 	execution.Role = flow.RoleExecution
 
 	allParitipants := append(participants, collection, verification, execution)
 
+	// add all identities to genesis block and
+	// create and bootstrap consensus node with the genesis
 	genesis := run.GenerateRootBlock(allParitipants, run.GenerateRootSeal([]byte{}))
 
 	nodes := make([]*Node, 0, len(participants))
@@ -252,10 +260,13 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	}
 	selector := filter.HasRole(flow.RoleConsensus)
 
-	final := &Finalizer{}
+	// initialize the block finalizer
+	final := finalizer.NewFinalizer(db, guarantees, seals)
+
+	prov := &Engine{}
 
 	// initialize the compliance engine
-	comp, err := compliance.New(log, net, local, state, headersDB, payloadsDB, nil, cache)
+	comp, err := compliance.New(log, net, local, state, headersDB, payloadsDB, prov, cache)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine
@@ -352,62 +363,60 @@ func start(nodes []*Node) {
 
 func Test3Nodes(t *testing.T) {
 	nodes := createNodes(t, 3, 100)
-	defer cleanupNodes(nodes)
 
 	connect(nodes, blockNothing)
 
 	start(nodes)
 
 	// verify all nodes arrive the same state
-	header, err := nodes[0].state.Final().Head()
-	require.NoError(t, err)
-	final := header.ID()
-
-	for i := 1; i < len(nodes); i++ {
+	for i := 0; i < len(nodes); i++ {
 		headerN, err := nodes[i].state.Final().Head()
 		require.NoError(t, err)
-		require.Equal(t, final, headerN.ID())
+		require.Greater(t, headerN.View, uint64(90))
 	}
+
+	cleanupNodes(nodes)
 }
 
-func Test4Nodes(t *testing.T) {
-	nodes := createNodes(t, 4, 100)
-	defer cleanupNodes(nodes)
+func Test5Nodes(t *testing.T) {
+	nodes := createNodes(t, 5, 100)
 
 	connect(nodes, blockNodes(nodes[0]))
 
 	start(nodes)
 
-	// verify all nodes arrive the same state
 	header, err := nodes[0].state.Final().Head()
 	require.NoError(t, err)
-	final := header.ID()
 
+	// the first node was blocked, never finalize any block
+	require.Equal(t, uint64(0), header.View)
+
+	// verify all nodes arrive the same state
 	for i := 1; i < len(nodes); i++ {
 		headerN, err := nodes[i].state.Final().Head()
 		require.NoError(t, err)
-		require.Equal(t, final, headerN.ID())
+		require.Greater(t, headerN.View, uint64(90))
 	}
+
+	cleanupNodes(nodes)
 }
 
-func Test4NodesBeginning(t *testing.T) {
-	nodes := createNodes(t, 3, 100)
-	defer cleanupNodes(nodes)
+func TestOneDelayed(t *testing.T) {
+	nodes := createNodes(t, 50, 300)
 
-	connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
+	// connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
+	connect(nodes, blockNothing)
 
 	start(nodes)
 
 	// verify all nodes arrive the same state
-	header, err := nodes[0].state.Final().Head()
-	require.NoError(t, err)
-	final := header.ID()
-
-	for i := 1; i < len(nodes); i++ {
+	for i := 0; i < len(nodes); i++ {
 		headerN, err := nodes[i].state.Final().Head()
 		require.NoError(t, err)
-		require.Equal(t, final, headerN.ID())
+		require.Greater(t, headerN.View, uint64(90))
 	}
+
+	cleanupNodes(nodes)
 }
 
 type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
