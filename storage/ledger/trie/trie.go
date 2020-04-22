@@ -49,6 +49,28 @@ type node struct {
 	key    []byte // key this node is pointing at
 }
 
+func (n *node) deepCopy() *node {
+	newNode := &node{height: n.height}
+
+	if n.value != nil {
+		value := make([]byte, len(n.value))
+		copy(value, n.value)
+		newNode.value = value
+	}
+	if n.key != nil {
+		key := make([]byte, len(n.key))
+		copy(key, n.key)
+		newNode.key = key
+	}
+	if n.lChild != nil {
+		newNode.lChild = n.lChild.deepCopy()
+	}
+	if n.rChild != nil {
+		newNode.rChild = n.rChild.deepCopy()
+	}
+	return newNode
+}
+
 type tree struct {
 	root           Root
 	rootNode       *node
@@ -130,6 +152,14 @@ func LoadNode(value Root, height int, db databases.DAL) (*node, error) {
 		height: height,
 		key:    key,
 	}, nil
+}
+
+func (f forest) PrintCache() {
+	for _, key := range f.cache.Keys() {
+		k, _ := hex.DecodeString(key.(string))
+		t, _ := f.Get(Root(k))
+		fmt.Println(key, t.rootNode.FmtStr("", ""))
+	}
 }
 
 func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
@@ -316,17 +346,17 @@ func (n *node) ComputeValue() []byte {
 	return HashInterNode(h1, h2)
 }
 
-func (n node) String() string {
-	right := ""
-	if n.rChild != nil {
-		right = n.rChild.String()
-	}
-	left := ""
-	if n.lChild != nil {
-		left = n.lChild.String()
-	}
-	return fmt.Sprintf("%v: (%v,%v) left> %v right> %v ", n.height, n.key, hex.EncodeToString(n.value), left, right)
-}
+// func (n node) String() string {
+// 	right := ""
+// 	if n.rChild != nil {
+// 		right = n.rChild.String()
+// 	}
+// 	left := ""
+// 	if n.lChild != nil {
+// 		left = n.lChild.String()
+// 	}
+// 	return fmt.Sprintf("%v: (%v,%v) left> %v right> %v ", n.height, n.key, hex.EncodeToString(n.value), left, right)
+// }
 
 // FmtStr provides formated string represntation of the node and sub tree
 func (n node) FmtStr(prefix string, path string) string {
@@ -460,7 +490,7 @@ func (p proofHolder) String() string {
 		proof := p.proofs[i]
 		flagStr := ""
 		for _, f := range flags {
-			flagStr += fmt.Sprintf("%8b", f)
+			flagStr += fmt.Sprintf("%08b", f)
 		}
 		proofStr := fmt.Sprintf("size: %d flags: %v\n", size, flagStr)
 		if p.inclusions[i] {
@@ -496,13 +526,6 @@ func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool,
 // If the trusted flag is true, it is just a read from the database
 // If trusted is false, then we check to see if the key exists in the trie
 func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHolder, error) {
-
-	// fmt.Println("Read=============")
-	// for _, key := range keys {
-	// 	fmt.Println(key, fmt.Sprintf("%b", key))
-	// 	fmt.Println(hex.EncodeToString(key))
-
-	// }
 
 	// check key sizes
 	for _, k := range keys {
@@ -679,10 +702,11 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 		}
 	}
 
-	treeRoot, err := tree.Root()
+	orgRoot, err := tree.Root()
 	if err != nil {
 		return nil, fmt.Errorf("cannot load tree root: %w", err)
 	}
+	treeRoot := orgRoot.deepCopy()
 
 	if len(notFoundKeys) > 0 {
 		batcher := tree.database.NewBatcher()
@@ -1025,13 +1049,6 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 // them into the trie, and if that is successful updates the databases.
 func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 
-	// fmt.Println("Update=============")
-	// for i, key := range keys {
-	// 	fmt.Println(key, fmt.Sprintf("%b", key))
-	// 	fmt.Println(hex.EncodeToString(key))
-	// 	fmt.Println(hex.EncodeToString(values[i]))
-	// }
-
 	t, err := s.forest.Get(root)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tree: %w", err)
@@ -1073,7 +1090,8 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot load tree root: %w", err)
 	}
-	newRootNode, err := s.UpdateAtomically(treeRoot, keys, values, s.height-1, batcher, t.database)
+	newRootNode, err := s.UpdateAtomically(treeRoot.deepCopy(), keys, values, s.height-1, batcher, t.database)
+
 	if err != nil {
 		return nil, err
 	}

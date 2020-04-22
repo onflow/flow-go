@@ -149,6 +149,7 @@ func NewPSMT(
 		psmt.keyLookUp[string(key)] = currentNode
 
 	}
+
 	// check if the state commitment matches the root value of the partial trie
 	if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
 		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.ComputeValue(), rootValue)

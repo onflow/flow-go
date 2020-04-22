@@ -2,7 +2,6 @@ package trie
 
 import (
 	"bytes"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -268,14 +267,12 @@ func TestMixProof(t *testing.T) {
 		retvalues, _, err := smt.Read(keys, true, newRoot)
 		require.NoError(t, err, "error reading values")
 
+		_ = retvalues
 		proofHldr, err := smt.GetBatchProof(keys, newRoot)
 		require.NoError(t, err, "error getting batch proof")
 
 		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
-
-		fmt.Println(smt.Print(newRoot))
-		fmt.Println(psmt.root.FmtStr("", ""))
 
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [before update]")
@@ -292,9 +289,6 @@ func TestMixProof(t *testing.T) {
 
 		proot2, _, err := psmt.Update(keys, values)
 		require.NoError(t, err, "error updating partial trie")
-
-		fmt.Println(smt.Print(root2))
-		fmt.Println(psmt.root.FmtStr("", ""))
 
 		if !bytes.Equal(root2, proot2) {
 			t.Fatalf("root2 hash doesn't match [%x] != [%x]", root2, proot2)
@@ -368,9 +362,6 @@ func TestRandomProofs(t *testing.T) {
 
 		proot2, _, err := psmt.Update(updateKeys, updateValues)
 		require.NoError(t, err, "error updating partial trie")
-
-		fmt.Println(psmt.root.FmtStr("", ""))
-		fmt.Println(smt.Print(root2))
 
 		if !bytes.Equal(root2, proot2) {
 			t.Fatalf("root2 hash doesn't match [%x] != [%x]", root2, proot2)
