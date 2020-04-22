@@ -51,11 +51,11 @@ func TestHappyPath(t *testing.T) {
 			chunkCount:   10,
 		},
 		{
-			verNodeCount: 10,
+			verNodeCount: 5,
 			chunkCount:   2,
 		},
 		{
-			verNodeCount: 10,
+			verNodeCount: 5,
 			chunkCount:   10,
 		},
 	}
