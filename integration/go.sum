@@ -111,6 +111,7 @@ github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7/go.mod
 github.com/dapperlabs/flow-go/integration v0.0.0-20200406190816-e4c4d2b5219c/go.mod h1:U1t9nUsu42c36UV2Q3tGFCIk0YtPiyTU4eqR38lVm1I=
 github.com/dapperlabs/flow-go/integration v0.0.0-20200409200346-f0707af6d512/go.mod h1:NOysGgG4tgVXQeXeuIdQhh3h8MiU8t3wkK+6NnmMIik=
 github.com/dapperlabs/flow-go/integration v0.0.0-20200415173123-af3be319fea2/go.mod h1:xld2pNUktpQuie8Xy87EZ89hXVK17Oqwm07IKUxTfW8=
+github.com/dapperlabs/flow-go/integration v0.0.0-20200422200901-a79a811142aa/go.mod h1:5A6R4gdCvK+0z74H6Xaq0kdqSGa9Q8QHWpFIIUAEiSM=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125 h1:Zc17Y/8ycLcVd1T/tsiho0k9XVq+SxCHhYBuzkn5kkQ=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200405045545-03db81265125/go.mod h1:ThpXZwEduNJCzmpEVEUy3Ml5dDAWttnzlBJPTOSAin0=
 github.com/dapperlabs/flow/protobuf/go/flow v0.0.0-20200409225253-ee3418aad679 h1:rOzL+A6plLZY0XwvrUu089U2LTKiyGIdr/F4pknuQYY=
