@@ -7,15 +7,8 @@ import (
 )
 
 type Config struct {
-	chainID     string
 	minInterval time.Duration
 	maxInterval time.Duration
-}
-
-func WithChainID(chainID string) func(*Config) {
-	return func(cfg *Config) {
-		cfg.chainID = chainID
-	}
 }
 
 func WithMinInterval(minInterval time.Duration) func(*Config) {

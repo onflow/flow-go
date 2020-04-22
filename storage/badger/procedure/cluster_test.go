@@ -35,10 +35,10 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		err := db.Update(InsertClusterBlock(&block))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertNumberForCluster(block.ChainID, parent.View, parent.ID()))
+		err = db.Update(operation.InsertNumberForCluster(block.ChainID, parent.Height, parent.ID()))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertBoundaryForCluster(block.ChainID, parent.View))
+		err = db.Update(operation.InsertBoundaryForCluster(block.ChainID, parent.Height))
 		require.NoError(t, err)
 
 		err = db.Update(FinalizeClusterBlock(block.Header.ID()))
@@ -47,7 +47,7 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		var boundary uint64
 		err = db.View(operation.RetrieveBoundaryForCluster(block.ChainID, &boundary))
 		require.NoError(t, err)
-		require.Equal(t, block.View, boundary)
+		require.Equal(t, block.Height, boundary)
 
 		var headID flow.Identifier
 		err = db.View(operation.RetrieveNumberForCluster(block.ChainID, boundary, &headID))
