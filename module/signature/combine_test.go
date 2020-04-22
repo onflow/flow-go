@@ -1,8 +1,7 @@
 package signature
 
 import (
-	"crypto/rand"
-	mathrand "math/rand"
+	rand "math/rand"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 const NUM_SIGS = 10
 
 func TestCombinerJoinSplitEven(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	c := &Combiner{}
 	sigs := make([]crypto.Signature, 0, NUM_SIGS)
 	for i := 0; i < NUM_SIGS; i++ {
@@ -38,7 +38,7 @@ func TestCombinerJoinSplitUneven(t *testing.T) {
 	c := &Combiner{}
 	sigs := make([]crypto.Signature, 0, NUM_SIGS)
 	for i := 0; i < NUM_SIGS; i++ {
-		sig := make([]byte, mathrand.Intn(128)+1)
+		sig := make([]byte, rand.Intn(128)+1)
 		n, err := rand.Read(sig[:])
 		require.Equal(t, n, len(sig))
 		require.NoError(t, err)
