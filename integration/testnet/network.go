@@ -325,9 +325,15 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		clusterGenesis := clusterBlocks[i]
 		clusterQC := clusterQCs[i]
 
-		err = writeJSON(filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, i)), clusterGenesis)
+		// cluster ID is equivalent to chain ID
+		clusterID := clusterGenesis.ChainID
+
+		clusterGenesisPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
+		err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
 		require.Nil(t, err)
-		err = writeJSON(filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, i)), clusterQC)
+
+		clusterQCPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
+		err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
 		require.Nil(t, err)
 	}
 
