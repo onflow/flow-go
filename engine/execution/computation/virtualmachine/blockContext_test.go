@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dapperlabs/cadence/runtime"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,8 @@ import (
 )
 
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 	rt := runtime.NewInterpreterRuntime()
 
 	h := unittest.BlockHeaderFixture()
@@ -121,6 +124,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 }
 
 func TestBlockContext_ExecuteScript(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 	rt := runtime.NewInterpreterRuntime()
 
 	h := unittest.BlockHeaderFixture()
@@ -180,6 +185,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 }
 
 func TestBlockContext_GetAccount(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 	count := 10
 	rt := runtime.NewInterpreterRuntime()
 

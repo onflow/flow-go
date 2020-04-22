@@ -4,7 +4,9 @@ package voteaggregator
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,6 +42,9 @@ type AggregatorSuite struct {
 }
 
 func (as *AggregatorSuite) SetupTest() {
+
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
 	// generate the validator set with qualified majority threshold of 5
 	as.participants = unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleConsensus))

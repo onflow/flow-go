@@ -3,7 +3,9 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -140,6 +142,9 @@ func TestExtend(t *testing.T) {
 		state, err := NewState(db, chainID)
 		require.Nil(t, err)
 		mutator := state.Mutate()
+
+		// seed the RNG
+		rand.Seed(time.Now().UnixNano())
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {

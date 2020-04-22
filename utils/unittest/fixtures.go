@@ -447,7 +447,7 @@ func ChunkFixture() *flow.Chunk {
 
 func SignatureFixture() crypto.Signature {
 	sig := make([]byte, 32)
-	_, _ = rand.Read(sig)
+	_, _ = crand.Read(sig)
 	return sig
 }
 
@@ -577,7 +577,7 @@ func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 // SeedFixture returns a random []byte with length n
 func SeedFixture(n int) []byte {
 	var seed = make([]byte, n)
-	_, _ = rand.Read(seed[0:n])
+	_, _ = crand.Read(seed[0:n])
 	return seed
 }
 

@@ -45,6 +45,8 @@ func TestBuilder(t *testing.T) {
 
 		// helper function for bootstrapping chain/mempool state
 		bootstrap := func() {
+			// seed the RNG
+			rand.Seed(time.Now().UnixNano())
 			// bootstrap chain state with genesis block
 			err = state.Mutate().Bootstrap(genesis)
 			require.Nil(t, err)
@@ -251,9 +253,6 @@ func TestBuilder(t *testing.T) {
 		t.Run("large history", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
-
-			// seed the RNG
-			rand.Seed(time.Now().UnixNano())
 
 			// use a mempool with 1000 transactions, one per block
 			pool, err = stdmap.NewTransactions(2000)

@@ -1,7 +1,9 @@
 package badger
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -23,6 +25,9 @@ func TestSnapshot(t *testing.T) {
 			err := db.DropAll()
 			require.Nil(t, err)
 		}
+
+		// seed the RNG
+		rand.Seed(time.Now().UnixNano())
 
 		state, err := NewState(db, chainID)
 		require.Nil(t, err)

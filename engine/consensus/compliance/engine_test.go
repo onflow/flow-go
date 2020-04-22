@@ -63,6 +63,8 @@ type ComplianceSuite struct {
 }
 
 func (cs *ComplianceSuite) SetupTest() {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
@@ -231,8 +233,6 @@ func (cs *ComplianceSuite) SetupTest() {
 }
 
 func (cs *ComplianceSuite) TestSendVote() {
-	rand.Seed(time.Now().UnixNano())
-
 	// create parameters to send a vote
 	blockID := unittest.IdentifierFixture()
 	view := rand.Uint64()
@@ -429,7 +429,6 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 }
 
 func (cs *ComplianceSuite) TestOnSubmitVote() {
-	rand.Seed(time.Now().UnixNano())
 
 	// create a vote
 	originID := unittest.IdentifierFixture()
