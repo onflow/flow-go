@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
@@ -708,8 +709,15 @@ func (e *Engine) generateExecutionResultForBlock(
 }
 
 func (e *Engine) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
+	receipt := &flow.ExecutionReceipt{
+		ExecutionResult:   *result,
+		Spocks:            nil, // TODO: include SPoCKs
+		ExecutorSignature: crypto.Signature{},
+		ExecutorID:        e.me.NodeID(),
+	}
+
 	// generates a signature over the execution result
-	b, err := encoding.DefaultEncoder.Encode(*result)
+	b, err := encoding.DefaultEncoder.Encode(receipt.Body())
 	if err != nil {
 		return nil, fmt.Errorf("could not encode execution result: %w", err)
 	}
@@ -718,13 +726,7 @@ func (e *Engine) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.E
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}
 
-	receipt := &flow.ExecutionReceipt{
-		ExecutionResult: *result,
-		// TODO: include SPoCKs
-		Spocks:            nil,
-		ExecutorSignature: sig,
-		ExecutorID:        e.me.NodeID(),
-	}
+	receipt.ExecutorSignature = sig
 
 	return receipt, nil
 }
