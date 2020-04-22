@@ -1,11 +1,15 @@
 package integration_test
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/consensus"
@@ -27,10 +31,6 @@ import (
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 type Signer struct {
@@ -80,8 +80,6 @@ type Finalizer struct{}
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	return nil
 }
-
-// ===
 
 // move to in memory network
 type SubmitFunc func(uint8, interface{}, ...flow.Identifier) error
@@ -263,10 +261,12 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
+	hotstuffTimeout := 100 * time.Millisecond
+
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
 		viewsDB, state, local, build, final, signer, comp, selector, rootHeader,
-		rootQC)
+		rootQC, consensus.WithTimeout(hotstuffTimeout))
 	stopper.WithHotstuff(hot, stopAtView)
 
 	require.NoError(t, err)
@@ -292,13 +292,23 @@ func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (b
 	return false, 0
 }
 
-func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 2, 100)
-	defer cleanupNodes(nodes)
+func blockNodes(blackList ...*Node) BlockOrDelayFunc {
+	blackDict := make(map[flow.Identifier]*Node, len(blackList))
+	for _, n := range blackList {
+		blackDict[n.id.ID()] = n
+	}
+	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		if _, ok := blackDict[sender.id.ID()]; ok {
+			return true, 0
+		}
+		if _, ok := blackDict[receiver.id.ID()]; ok {
+			return true, 0
+		}
+		return false, 0
+	}
+}
 
-	connect(nodes, blockNothing)
-
-	fmt.Printf("%v nodes created", len(nodes))
+func start(nodes []*Node) {
 	var wg sync.WaitGroup
 	for _, n := range nodes {
 		wg.Add(1)
@@ -309,6 +319,26 @@ func Test3Nodes(t *testing.T) {
 		}(n)
 	}
 	wg.Wait()
+}
+
+func Test3Nodes(t *testing.T) {
+	nodes := createNodes(t, 3, 100)
+
+	connect(nodes, blockNothing)
+
+	start(nodes)
+
+	cleanupNodes(nodes)
+}
+
+func Test4Nodes(t *testing.T) {
+	nodes := createNodes(t, 4, 100)
+
+	connect(nodes, blockNodes(nodes[0]))
+
+	start(nodes)
+
+	cleanupNodes(nodes)
 }
 
 type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
