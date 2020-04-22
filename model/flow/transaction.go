@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 )
 
 // TransactionBody includes the main contents of a transaction
@@ -114,7 +115,8 @@ type Transaction struct {
 func (tx *Transaction) PayloadMessage() []byte {
 	body := tx.TransactionBody
 	temp := body.payloadCanonicalForm()
-	return encoding.DefaultEncoder.MustEncode(temp)
+	encoder := rlp.NewEncoder()
+	return encoder.MustEncode(temp)
 }
 
 // Checksum provides a cryptographic commitment for a chunk content
@@ -352,7 +354,8 @@ func (tb *TransactionBody) createSignature(address Address, keyID int, sig []byt
 
 func (tb *TransactionBody) PayloadMessage() []byte {
 	temp := tb.payloadCanonicalForm()
-	return encoding.DefaultEncoder.MustEncode(temp)
+	encoder := rlp.NewEncoder()
+	return encoder.MustEncode(temp)
 }
 
 func (tb *TransactionBody) payloadCanonicalForm() interface{} {
@@ -412,5 +415,6 @@ func (tb *TransactionBody) Encode() []byte {
 		signaturesList(tb.EnvelopeSignatures).canonicalForm(),
 	}
 
-	return encoding.DefaultEncoder.MustEncode(temp)
+	encoder := rlp.NewEncoder()
+	return encoder.MustEncode(temp)
 }
