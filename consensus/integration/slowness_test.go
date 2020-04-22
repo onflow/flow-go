@@ -193,6 +193,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	metrics := &module.Metrics{}
 	metrics.On("HotStuffBusyDuration", mock.Anything, mock.Anything)
 	metrics.On("HotStuffIdleDuration", mock.Anything, mock.Anything)
+	metrics.On("HotStuffWaitDuration", mock.Anything, mock.Anything)
 
 	// make local
 	priv := helper.MakeBLSKey(t)
@@ -266,11 +267,11 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 }
 
 func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
-	return true, 0
+	return false, 0
 }
 
 func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 1)
+	nodes := createNodes(t, 2)
 	defer cleanupNodes(nodes)
 
 	connect(nodes, blockNothing)
