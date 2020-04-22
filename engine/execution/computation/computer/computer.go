@@ -3,8 +3,6 @@ package computer
 import (
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
@@ -107,7 +105,6 @@ func (e *blockComputer) executeCollection(
 		if result.Succeeded() {
 			collectionView.MergeView(txView)
 		}
-		spew.Dump(result)
 	}
 
 	return events, txIndex, nil
