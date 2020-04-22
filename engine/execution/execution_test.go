@@ -252,6 +252,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 		},
 	}
 	block2.PayloadHash = block2.Payload.Hash()
+	proposal2 := unittest.ProposalFromBlock(block2)
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
 	tx2 := execTestutil.CreateCounterPanicTransaction()
@@ -270,6 +271,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 		},
 	}
 	block3.PayloadHash = block3.Payload.Hash()
+	proposal3 := unittest.ProposalFromBlock(block3)
 
 	// setup mocks and assertions
 	collectionNode := testutil.GenericNode(t, hub, colID, identities)
@@ -311,7 +313,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 		}).Return(nil)
 
 	// submit block2 from consensus node to execution node 1
-	exe1Node.IngestionEngine.Submit(conID.NodeID, block2)
+	exe1Node.IngestionEngine.Submit(conID.NodeID, proposal2)
 
 	// esure block has been executed
 	hub.Eventually(t, equal(1, &receiptsReceived))
@@ -328,7 +330,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	exe2Node.AssertHighestExecutedBlock(t, &genesis.Header)
 
 	// submit block3 from consensus node to execution node 2 (who does not have block2), but not to execution node 1
-	exe2Node.IngestionEngine.Submit(conID.NodeID, block3)
+	exe2Node.IngestionEngine.Submit(conID.NodeID, proposal3)
 
 	// esure block 2 and 3 have been executed
 	hub.Eventually(t, equal(3, &receiptsReceived))
