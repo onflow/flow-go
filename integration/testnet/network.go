@@ -23,7 +23,9 @@ import (
 
 	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -295,6 +297,9 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	seal := bootstraprun.GenerateRootSeal(flow.GenesisStateCommitment)
 	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), seal)
 
+	// generate genesis blocks for each collector cluster
+	clusterBlocks, clusterQCs := setupClusters(t, confs, genesis)
+
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
 	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
@@ -313,6 +318,17 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	require.Nil(t, err)
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkg.Public())
 	require.Nil(t, err)
+
+	// write collector-specific genesis bootstrap files for each cluster
+	for i := 0; i < len(clusterBlocks); i++ {
+		clusterGenesis := clusterBlocks[i]
+		clusterQC := clusterQCs[i]
+
+		err = writeJSON(filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, i)), clusterGenesis)
+		require.Nil(t, err)
+		err = writeJSON(filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, i)), clusterQC)
+		require.Nil(t, err)
+	}
 
 	// write private key files for each DKG participant
 	for _, part := range dkg.Participants {
@@ -555,4 +571,8 @@ func runDKG(t *testing.T, confs []ContainerConfig) bootstrap.DKGData {
 	}
 
 	return dkg
+}
+
+func setupClusters(t *testing.T, confs []ContainerConfig, genesis flow.Block) ([]*cluster.Block, []*hotstuff.QuorumCertificate) {
+	panic("TODO")
 }
