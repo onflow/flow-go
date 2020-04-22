@@ -18,6 +18,7 @@ import (
 	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -93,6 +94,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 
+	executionState.On("Size").Return(int64(1024*1024), nil).Maybe()
+
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
 	}, nil)
@@ -100,12 +103,14 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
+	metrics, err := metrics.NewCollector(log)
+	require.NoError(t, err)
 
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21)
+	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21, metrics)
 	require.NoError(t, err)
 
 	f(testingContext{
@@ -212,21 +217,27 @@ func TestBlockOutOfOrder(t *testing.T) {
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockC.Block))
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockD.Block))
 
+		// initialize the proposals
+		proposalA := unittest.ProposalFromBlock(executableBlockA.Block)
+		proposalB := unittest.ProposalFromBlock(executableBlockB.Block)
+		proposalC := unittest.ProposalFromBlock(executableBlockC.Block)
+		proposalD := unittest.ProposalFromBlock(executableBlockD.Block)
+
 		// no execution state, so puts to waiting queue
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlockB.Block.ParentID).Return(nil, realStorage.ErrNotFound)
-		err := ctx.engine.handleBlock(executableBlockB.Block)
+		err := ctx.engine.handleBlockProposal(proposalB)
 		require.NoError(t, err)
 
 		// no execution state, no connection to other nodes
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlockC.Block.ParentID).Return(nil, realStorage.ErrNotFound)
-		err = ctx.engine.handleBlock(executableBlockC.Block)
+		err = ctx.engine.handleBlockProposal(proposalC)
 		require.NoError(t, err)
 
 		// child of c so no need to query execution state
 
 		// we account for every call, so if this call would have happen, test will fail
 		// ctx.executionState.On("StateCommitmentByBlockID", executableBlockD.Block.ParentID).Return(nil, realStorage.ErrNotFound)
-		err = ctx.engine.handleBlock(executableBlockD.Block)
+		err = ctx.engine.handleBlockProposal(proposalD)
 		require.NoError(t, err)
 
 		// make sure there were no extra calls at this point in test
@@ -241,7 +252,7 @@ func TestBlockOutOfOrder(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(executableBlockD, unittest.IdentifierFixture())
 
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlockA.Block.ParentID).Return(executableBlockA.StartState, nil)
-		err = ctx.engine.handleBlock(executableBlockA.Block)
+		err = ctx.engine.handleBlockProposal(proposalA)
 		require.NoError(t, err)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed

@@ -7,12 +7,15 @@ import (
 )
 
 type Metrics interface {
-
 	// Common Metrics
 	//
 
 	// BadgerDBSize total size on-disk of the badger database.
 	BadgerDBSize(sizeBytes int64)
+
+	// Network Metrics
+	// NetworkMessageSent size of the network message in bytes
+	NetworkMessageSent(sizeBytes int)
 
 	// Collection Metrics
 	//
@@ -54,10 +57,13 @@ type Metrics interface {
 	SealsInFinalizedBlock(count int)
 
 	// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
-	HotStuffBusyDuration(duration time.Duration)
+	HotStuffBusyDuration(duration time.Duration, event string)
 
 	// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 	HotStuffIdleDuration(duration time.Duration)
+
+	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
+	HotStuffWaitDuration(duration time.Duration, event string)
 
 	// FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)
 	FinalizedBlocks(count int)
@@ -90,4 +96,26 @@ type Metrics interface {
 	// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
 	// of verification node. It records the size of stored object.
 	OnChunkDataRemoved(chunkID flow.Identifier, size float64)
+
+	// Execution Metrics
+
+	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
+	// from being received for execution to execution being finished
+	StartBlockReceivedToExecuted(blockID flow.Identifier)
+
+	// FinishBlockReceivedToExecuted finishes a span to trace the duration of a block
+	// from being received for execution to execution being finished
+	FinishBlockReceivedToExecuted(blockID flow.Identifier)
+
+	// ExecutionGasUsedPerBlock reports gas used per block
+	ExecutionGasUsedPerBlock(gas uint64)
+
+	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
+	ExecutionStateReadsPerBlock(reads uint64)
+
+	// ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
+	ExecutionStateStorageDiskTotal(bytes int64)
+
+	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
+	ExecutionStorageStateCommitment(bytes int64)
 }

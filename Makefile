@@ -37,17 +37,10 @@ cmd/collection/collection:
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
-ifeq ($(UNAME), Linux)
-	sudo apt-get -y install capnproto
-endif
-ifeq ($(UNAME), Darwin)
-	brew install capnp
-endif
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
-	GO111MODULE=on go get zombiezen.com/go/capnproto2@v0.0.0-20190505172156-0c36f8f86ab2; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
@@ -84,10 +77,6 @@ generate: generate-proto generate-mocks
 .PHONY: generate-proto
 generate-proto:
 	prototool generate protobuf
-
-.PHONY: generate-capnp
-generate-capnp:
-	capnp compile -I${GOPATH}/src/zombiezen.com/go/capnproto2/std -ogo schema/captain/*.capnp
 
 .PHONY: generate-mocks
 generate-mocks:
@@ -137,15 +126,16 @@ ci: install-tools tidy lint test coverage
 ci-integration: install-tools
 	$(MAKE) -C integration integration-test
 
-# Runs unit tests, test coverage, lint in Docker
+# Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
 docker-ci:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
+		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci
 
-# This command is should only be used by Team City
+# This command is should only be used by Team City (for linux)
 # Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
 .PHONY: docker-ci-team-city
 docker-ci-team-city:
@@ -156,19 +146,21 @@ docker-ci-team-city:
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci
 
-# Runs integration tests in Docker
+# Runs integration tests in Docker  (for mac)
 .PHONY: docker-ci-integration
 docker-ci-integration:
+	rm -rf crypto/relic
 	docker run \
 		--env DOCKER_API_VERSION='1.39' \
 		--network host \
-		-v /tmp:/tmp \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
+		-v /tmp:/tmp \
 		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci-integration
 
-# This command is should only be used by Team City
+# This command is should only be used by Team City (for linux)
 # Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
 .PHONY: docker-ci-integration-team-city
 docker-ci-integration-team-city:

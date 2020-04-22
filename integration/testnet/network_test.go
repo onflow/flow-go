@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -29,8 +28,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 	}
 	conf := testnet.NewNetworkConfig("meta_test_basic", nodes)
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(t, conf)
-	require.NoError(t, err)
+	flowNetwork := testnet.PrepareFlowNetwork(t, conf)
 	defer flowNetwork.Cleanup()
 
 	assert.Len(t, flowNetwork.Containers, len(nodes))
@@ -65,8 +63,7 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 	}
 	conf := testnet.NewNetworkConfig("meta_test_multinodes", nodes)
 
-	flowNetwork, err := testnet.PrepareFlowNetwork(t, conf)
-	require.NoError(t, err)
+	flowNetwork := testnet.PrepareFlowNetwork(t, conf)
 	defer flowNetwork.Cleanup()
 
 	assert.Len(t, flowNetwork.Containers, len(nodes))
@@ -90,14 +87,14 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 }
 
 func getNodeInfos(flowNetwork *testnet.FlowNetwork) []nodeInfo {
-	realData := make([]nodeInfo, len(flowNetwork.Containers))
+	realData := make([]nodeInfo, 0, len(flowNetwork.Containers))
 
-	for i, container := range flowNetwork.Containers {
-		realData[i] = nodeInfo{
+	for _, container := range flowNetwork.Containers {
+		realData = append(realData, nodeInfo{
 			image:   container.Image,
 			name:    container.Name(),
 			address: container.Config.Address,
-		}
+		})
 	}
 	return realData
 }

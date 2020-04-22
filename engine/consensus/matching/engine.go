@@ -230,7 +230,14 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 		filter.HasRole(flow.RoleVerification),
 	))
 	if err != nil {
-		return fmt.Errorf("could not get verifier identities: %w", err)
+		// TODO Temp fix for receipt coming too fast (before the block in some cases)
+		approvers, err = e.state.Final().Identities(filter.And(
+			filter.HasStake(true),
+			filter.HasRole(flow.RoleVerification),
+		))
+		if err != nil {
+			return fmt.Errorf("could not get verifier identities: %w", err)
+		}
 	}
 
 	// make a list of all result IDs and each of their chunks

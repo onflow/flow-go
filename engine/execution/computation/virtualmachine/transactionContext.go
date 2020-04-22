@@ -23,6 +23,7 @@ type TransactionContext struct {
 	logs              []string
 	events            []runtime.Event
 	OnSetValueHandler func(owner, controller, key, value []byte)
+	gasUsed           uint64 // TODO fill with actual gas
 }
 
 type TransactionContextOption func(*TransactionContext)

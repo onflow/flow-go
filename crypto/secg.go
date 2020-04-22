@@ -209,7 +209,7 @@ func (curve *SECCurve) ScalarBaseMult(k []byte) (*big.Int, *big.Int) {
 	return curve.ScalarMult(curve.Gx, curve.Gy, k)
 }
 
-// SECp256k1 returns a SECCurve which implements secp256k1
+// secp256k1 returns a SEC curve which implements secp256k1
 func secp256k1() *SECCurve {
 	// See SEC 2 section 2.7.1
 	secp256k1Curve := new(SECCurve)

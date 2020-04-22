@@ -6,15 +6,14 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/utils/dsl"
-
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/utils/dsl"
 )
 
 func AddressFixture() flow.Address {
@@ -30,12 +29,12 @@ func AccountSignatureFixture() flow.AccountSignature {
 
 // AccountKeyFixture returns a randomly generated ECDSA/SHA3 account key.
 func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenEcdsaP256)
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
 	_, err := rand.Read(seed)
 	if err != nil {
 		return nil, err
 	}
-	key, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, seed)
+	key, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 	if err != nil {
 		return nil, err
 	}
@@ -52,6 +51,28 @@ func BlockFixture() flow.Block {
 	return BlockWithParentFixture(&header)
 }
 
+func ProposalFixture() *messages.BlockProposal {
+	block := BlockFixture()
+	return ProposalFromBlock(&block)
+}
+
+func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
+	proposal := &messages.BlockProposal{
+		Header:  &block.Header,
+		Payload: &block.Payload,
+	}
+	return proposal
+}
+
+func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
+	pending := flow.PendingBlock{
+		OriginID: block.Header.ProposerID,
+		Header:   &block.Header,
+		Payload:  &block.Payload,
+	}
+	return &pending
+}
+
 func StateDeltaFixture() *messages.ExecutionStateDelta {
 	header := BlockHeaderFixture()
 	block := BlockWithParentFixture(&header)
@@ -64,6 +85,7 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
 		Guarantees: CollectionGuaranteesFixture(16),
+		Seals:      BlockSealsFixture(16),
 	}
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
@@ -71,15 +93,6 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 		Header:  header,
 		Payload: payload,
 	}
-}
-
-func PendingBlockFixture(block *flow.Block) *flow.PendingBlock {
-	pending := flow.PendingBlock{
-		OriginID: IdentifierFixture(),
-		Header:   &block.Header,
-		Payload:  &block.Payload,
-	}
-	return &pending
 }
 
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
@@ -187,6 +200,27 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 		ret = append(ret, &cg)
 	}
 	return ret
+}
+
+func BlockSealFixture() *flow.Seal {
+	return &flow.Seal{
+		BlockID:           IdentifierFixture(),
+		ExecutionResultID: IdentifierFixture(),
+		PreviousState:     StateCommitmentFixture(),
+		FinalState:        StateCommitmentFixture(),
+	}
+}
+
+func BlockSealsFixture(n int) []*flow.Seal {
+	seals := make([]*flow.Seal, 0, n)
+	for i := 0; i < n; i++ {
+		seal := BlockSealFixture()
+		if i > 0 {
+			seal.PreviousState = seals[i-1].FinalState
+		}
+		seals = append(seals, seal)
+	}
+	return seals
 }
 
 func CollectionFixture(n int) flow.Collection {
@@ -366,12 +400,12 @@ func WithNodeID(b byte) func(*flow.Identity) {
 // WithRandomPublicKeys adds random public keys to an identity.
 func WithRandomPublicKeys() func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		stak, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, generateRandomSeed())
+		stak, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, generateRandomSeed())
 		if err != nil {
 			panic(err)
 		}
 		identity.StakingPubKey = stak.PublicKey()
-		netw, err := crypto.GeneratePrivateKey(crypto.EcdsaP256, generateRandomSeed())
+		netw, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, generateRandomSeed())
 		if err != nil {
 			panic(err)
 		}
@@ -570,7 +604,7 @@ func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint
 func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
 
 	// TODO seems this key literal doesn't decode anymore
-	emulatorRootKey, err := crypto.DecodePrivateKey(crypto.EcdsaP256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
+	emulatorRootKey, err := crypto.DecodePrivateKey(crypto.ECDSAP256, []byte("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203"))
 	if err != nil {
 		return nil, err
 	}

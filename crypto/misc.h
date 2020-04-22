@@ -12,6 +12,7 @@ typedef uint8_t byte;
 
 #define BITS_TO_BYTES(x) ((x+7)>>3)
 #define BITS_TO_DIGITS(x) ((x+63)>>6)
+#define BYTES_TO_DIGITS(x) ((x+7)>>3)
 #define MIN(a,b) ((a)>(b)?(b):(a))
 
 // Most of the functions are written for ALLOC=AUTO not ALLOC=DYNAMIC

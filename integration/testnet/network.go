@@ -64,7 +64,7 @@ type FlowNetwork struct {
 	config      NetworkConfig
 	cli         *dockerclient.Client
 	network     *testingdock.Network
-	Containers  []*Container
+	Containers  map[string]*Container
 	AccessPorts map[string]string
 }
 
@@ -141,6 +141,11 @@ func (net *FlowNetwork) ContainerByID(id flow.Identifier) (*Container, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (net *FlowNetwork) ContainerByName(name string) (*Container, bool) {
+	container, exists := net.Containers[name]
+	return container, exists
 }
 
 // NetworkConfig is the config for the network.
@@ -257,14 +262,11 @@ func AsGhost(ghost bool) func(config *NodeConfig) {
 		config.Ghost = ghost
 	}
 }
-func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, error) {
+func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
-
-	if nNodes == 0 {
-		return nil, fmt.Errorf("must specify at least one node")
-	}
+	require.NotZero(t, len(networkConf.Nodes), "must specify at least one node")
 
 	// Sort so that access nodes start up last
 	sort.Sort(&networkConf)
@@ -336,7 +338,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, 
 		config:      networkConf,
 		suite:       suite,
 		network:     network,
-		Containers:  make([]*Container, 0, nNodes),
+		Containers:  make(map[string]*Container, nNodes),
 		AccessPorts: make(map[string]string),
 	}
 
@@ -346,7 +348,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) (*FlowNetwork, 
 		require.Nil(t, err)
 	}
 
-	return flowNetwork, nil
+	return flowNetwork
 }
 
 // AddNode creates a node container with the given config and adds it to the
@@ -468,10 +470,16 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	}
 
 	suiteContainer := net.suite.Container(*opts)
-	net.network.After(suiteContainer)
 	nodeContainer.Container = suiteContainer
-	net.Containers = append(net.Containers, nodeContainer)
-
+	net.Containers[nodeContainer.Name()] = nodeContainer
+	if nodeConf.Role == flow.RoleAccess {
+		// collection1, _ := net.ContainerByName("collection_1")
+		execution1, _ := net.ContainerByName("execution_1")
+		// collection1.After(suiteContainer)
+		execution1.After(suiteContainer)
+	} else {
+		net.network.After(suiteContainer)
+	}
 	return nil
 }
 

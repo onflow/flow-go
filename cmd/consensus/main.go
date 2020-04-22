@@ -41,7 +41,6 @@ func main() {
 		receiptLimit    uint
 		approvalLimit   uint
 		sealLimit       uint
-		chainID         string
 		minInterval     time.Duration
 		maxInterval     time.Duration
 		hotstuffTimeout time.Duration
@@ -63,7 +62,6 @@ func main() {
 			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 100000, "maximum number of result approvals in the memory pool")
 			flags.UintVar(&sealLimit, "seal-limit", 100000, "maximum number of block seals in the memory pool")
-			flags.StringVarP(&chainID, "chain-id", "C", flow.DefaultChainID, "the chain ID for the protocol chain")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
@@ -120,7 +118,7 @@ func main() {
 			cache := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cache)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, prov, cache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -136,13 +134,12 @@ func main() {
 
 			// initialize the block builder
 			build := builder.NewBuilder(node.DB, guarantees, seals,
-				builder.WithChainID(chainID),
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
 
 			// initialize the block finalizer
-			final := finalizer.NewFinalizer(node.DB, guarantees, seals, prov)
+			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
 
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
@@ -172,7 +169,7 @@ func main() {
 			comp = comp.WithSynchronization(sync).WithConsensus(hot)
 			return comp, nil
 		}).
-		Run()
+		Run("consensus")
 }
 
 func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {

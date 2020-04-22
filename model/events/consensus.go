@@ -5,5 +5,6 @@ import (
 )
 
 type SyncedBlock struct {
-	Block *flow.Block
+	OriginID flow.Identifier
+	Block    *flow.Block
 }

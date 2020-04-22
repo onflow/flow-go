@@ -73,6 +73,8 @@ func TestExecutionFlow(t *testing.T) {
 		},
 	}
 
+	proposal := unittest.ProposalFromBlock(block)
+
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
 
@@ -130,7 +132,7 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	exeNode.IngestionEngine.Submit(conID.NodeID, block)
+	exeNode.IngestionEngine.Submit(conID.NodeID, proposal)
 
 	assert.Eventually(t, func() bool {
 		hub.DeliverAll()
@@ -183,6 +185,10 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 		},
 	}
 
+	proposal2 := unittest.ProposalFromBlock(block2)
+	proposal2alt := unittest.ProposalFromBlock(fork)
+	proposal3 := unittest.ProposalFromBlock(block3)
+
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 
 	consensus1Node := testutil.GenericNode(t, hub, con1ID, identities)
@@ -199,12 +205,12 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 
 	exeNode.AssertHighestExecutedBlock(t, &genesis.Header)
 
-	exeNode.IngestionEngine.Submit(con1ID.NodeID, fork)
-	exeNode.IngestionEngine.Submit(con1ID.NodeID, block3) // block 3 cannot be executed if parent (block2 is missing)
+	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2alt)
+	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal3) // block 3 cannot be executed if parent (block2 is missing)
 
 	hub.Eventually(t, equal(2, &actualCalls))
 
-	exeNode.IngestionEngine.Submit(con1ID.NodeID, block2)
+	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2)
 	hub.Eventually(t, equal(6, &actualCalls)) // now block 3 and 2 can be executed
 
 	exeNode.AssertHighestExecutedBlock(t, &block3.Header)
@@ -363,6 +369,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 			View:     42,
 		},
 	}
+	proposal := unittest.ProposalFromBlock(block)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
@@ -387,7 +394,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		}).
 		Return(nil)
 
-	exeNode.IngestionEngine.SubmitLocal(block)
+	exeNode.IngestionEngine.SubmitLocal(proposal)
 
 	hub.Eventually(t, equal(2, &actualCalls))
 

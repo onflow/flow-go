@@ -3,11 +3,11 @@
 package synchronization
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,7 +25,6 @@ import (
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
-	sync.Mutex
 	unit     *engine.Unit
 	log      zerolog.Logger
 	me       module.Local
@@ -136,6 +135,11 @@ func (e *Engine) RequestBlock(blockID flow.Identifier) {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+
+	// process one event at a time for now
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	switch ev := event.(type) {
 	case *messages.SyncRequest:
 		return e.onSyncRequest(originID, ev)
@@ -236,10 +240,19 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 	blocks := make([]*flow.Block, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := e.blocks.ByHeight(height)
+		if errors.Is(err, storage.ErrNotFound) {
+			e.log.Debug().Uint64("height", height).Msg("skipping unknown heights")
+			break
+		}
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
 		blocks = append(blocks, block)
+	}
+
+	if len(blocks) == 0 {
+		e.log.Debug().Msg("skipping empty range response")
+		return nil
 	}
 
 	// send the response
@@ -258,7 +271,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 // onBatchRequest processes a request for a specific block by block ID.
 func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
 
-	// TODO: de-duplicate the elements in `req.BlockIDs` to prevent an uplink  exhaustion attack (e.g. a request to send 500 times the same block).
+	// TODO: de-duplicate the elements in `req.BlockIDs` to prevent an uplink exhaustion attack (e.g. a request to send 500 times the same block).
 
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
@@ -269,10 +282,19 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	blocks := make([]*flow.Block, 0, len(req.BlockIDs))
 	for _, blockID := range req.BlockIDs {
 		block, err := e.blocks.ByID(blockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			e.log.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
 		blocks = append(blocks, block)
+	}
+
+	if len(blocks) == 0 {
+		e.log.Debug().Msg("skipping empty batch response")
+		return nil
 	}
 
 	// build the response
@@ -293,7 +315,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 
 	// process the blocks one by one
 	for _, block := range res.Blocks {
-		e.processIncomingBlock(block)
+		e.processIncomingBlock(originID, block)
 	}
 
 	return nil
@@ -301,8 +323,6 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 
 // queueByHeight queues a request for the finalized block at the given height.
 func (e *Engine) queueByHeight(height uint64) {
-	e.Lock()
-	defer e.Unlock()
 
 	// if we already have the height, skip
 	_, ok := e.heights[height]
@@ -323,8 +343,6 @@ func (e *Engine) queueByHeight(height uint64) {
 
 // queueByBlockID queues a request for a block by block ID.
 func (e *Engine) queueByBlockID(blockID flow.Identifier) {
-	e.Lock()
-	defer e.Unlock()
 
 	// Do not bother with the zero ID
 	if blockID == flow.ZeroID {
@@ -350,9 +368,7 @@ func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 
 // processIncoming processes an incoming block, so we can take into account the
 // overlap between block IDs and heights.
-func (e *Engine) processIncomingBlock(block *flow.Block) {
-	e.Lock()
-	defer e.Unlock()
+func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Block) {
 
 	// check if we still need to process this height or it is stale already
 	blockID := block.ID()
@@ -366,7 +382,12 @@ func (e *Engine) processIncomingBlock(block *flow.Block) {
 	delete(e.heights, block.Height)
 	delete(e.blockIDs, blockID)
 
-	e.comp.SubmitLocal(&events.SyncedBlock{Block: block})
+	synced := &events.SyncedBlock{
+		OriginID: originID,
+		Block:    block,
+	}
+
+	e.comp.SubmitLocal(synced)
 }
 
 // checkLoop will regularly scan for items that need requesting.
@@ -380,12 +401,16 @@ CheckLoop:
 		case <-e.unit.Quit():
 			break CheckLoop
 		case <-poll.C:
+			e.unit.Lock()
+			defer e.unit.Unlock()
 			err := e.pollHeight()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not poll heights")
 				continue
 			}
 		case <-scan.C:
+			e.unit.Lock()
+			defer e.unit.Unlock()
 			heights, blockIDs, err := e.scanPending()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not scan pending")
@@ -439,8 +464,6 @@ func (e *Engine) pollHeight() error {
 
 // scanPending will check which items shall be requested.
 func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
-	e.Lock()
-	defer e.Unlock()
 
 	// TODO: we will probably want to limit the maximum amount of in-flight
 	// requests and maximum amount of blocks requested at the same time here;

@@ -8,9 +8,10 @@ import (
 
 // Unit handles synchronization management, startup, and shutdown for engines.
 type Unit struct {
-	wg   sync.WaitGroup // tracks in-progress functions
-	once sync.Once      // ensures that the done channel is only closed once
-	quit chan struct{}  // used to signal that shutdown has started
+	wg         sync.WaitGroup // tracks in-progress functions
+	once       sync.Once      // ensures that the done channel is only closed once
+	quit       chan struct{}  // used to signal that shutdown has started
+	sync.Mutex                // can be used to synchronize the engine
 }
 
 // NewUnit returns a new unit.
