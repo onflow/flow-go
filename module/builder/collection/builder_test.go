@@ -85,9 +85,9 @@ func TestBuilder(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			var expectedView uint64 = 42
+			var expectedHeight uint64 = 42
 			setter := func(h *flow.Header) {
-				h.View = expectedView
+				h.Height = expectedHeight
 			}
 
 			builder := collection.NewBuilder(db, pool, chainID)
@@ -95,7 +95,7 @@ func TestBuilder(t *testing.T) {
 			assert.Nil(t, err)
 
 			// setter should have been run
-			assert.Equal(t, expectedView, header.View)
+			assert.Equal(t, expectedHeight, header.Height)
 
 			// should be able to retrieve built block from storage
 			var built model.Block

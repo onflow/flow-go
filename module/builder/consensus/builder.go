@@ -3,12 +3,12 @@
 package consensus
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/thanhpk/randstr"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -30,7 +30,6 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 
 	// initialize default config
 	cfg := Config{
-		chainID:     randstr.Hex(32),
 		minInterval: 500 * time.Millisecond,
 		maxInterval: 10 * time.Second,
 	}
@@ -75,7 +74,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// for each unfinalized ancestor of the payload we are building, we retrieve
 		// a list of all pending IDs for guarantees and seals; we can use them to
-		// exclude entities from being included in two block on the same fork.
+		// exclude entities from being included in two blocks on the same fork.
 		ancestorID := parentID
 		guaranteeLookup := make(map[flow.Identifier]struct{})
 		sealLookup := make(map[flow.Identifier]struct{})
@@ -175,8 +174,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		loopSeal := &seal
 		for {
 			// get a seal that extends the last known state commitment
-			previousSeal, err := b.seals.ByPreviousState(loopSeal.FinalState)
+			nextSeal, err := b.seals.ByPreviousState(loopSeal.FinalState)
 			if errors.Is(err, mempool.ErrEntityNotFound) {
+				break
+			} else if bytes.Equal(nextSeal.PreviousState, loopSeal.FinalState) {
+				// TODO Edgecase where no transactions happen in a block. Unlikely in mature system, but possible for tests
+				// https://github.com/dapperlabs/flow-go/issues/3348
 				break
 			}
 			if err != nil {
@@ -184,8 +187,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			}
 
 			// add the seal to our list and forward to the known last valid state
-			seals = append(seals, previousSeal)
-			loopSeal = previousSeal
+			seals = append(seals, nextSeal)
+			loopSeal = nextSeal
 		}
 
 		seal = *loopSeal
@@ -223,7 +226,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// construct default block on top of the provided parent
 		header = &flow.Header{
-			ChainID:     b.cfg.chainID,
+			ChainID:     parent.ChainID,
 			ParentID:    parentID,
 			Height:      parent.Height + 1,
 			Timestamp:   timestamp,
