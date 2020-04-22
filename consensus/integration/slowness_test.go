@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -124,6 +125,23 @@ func (n *Network) WithSubmit(submit SubmitFunc) *Network {
 	return n
 }
 
+type Stopper struct {
+	notifications.NoopConsumer
+	hotstuff   *hotstuff.EventLoop
+	stopAtView uint64
+}
+
+func (s *Stopper) WithHotstuff(hot *hotstuff.EventLoop, stopAtView uint64) {
+	s.hotstuff = hot
+	s.stopAtView = stopAtView
+}
+
+func (s *Stopper) OnEnteringView(view uint64) {
+	if view >= s.stopAtView {
+		s.hotstuff.Done()
+	}
+}
+
 type Node struct {
 	db         *badger.DB
 	dbDir      string
@@ -137,7 +155,7 @@ type Node struct {
 	net        *Network
 }
 
-func createNodes(t *testing.T, n int) []*Node {
+func createNodes(t *testing.T, n int, stopAtView uint64) []*Node {
 	participants := make([]*flow.Identity, 0)
 	for i := 0; i < n; i++ {
 		identity := unittest.IdentityFixture()
@@ -157,14 +175,14 @@ func createNodes(t *testing.T, n int) []*Node {
 
 	nodes := make([]*Node, 0, len(participants))
 	for _, identity := range participants {
-		node := createNode(t, identity, participants, &genesis)
+		node := createNode(t, identity, participants, &genesis, stopAtView)
 		nodes = append(nodes, node)
 	}
 
 	return nodes
 }
 
-func createNode(t *testing.T, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block) *Node {
+func createNode(t *testing.T, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, stopAtView uint64) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
 	state, err := protocol.NewState(db)
 	require.NoError(t, err)
@@ -184,10 +202,15 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 
 	localID := identity.ID()
 
+	stopper := &Stopper{}
+
 	// log with node index
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
+	dis := pubsub.NewDistributor()
+	dis.AddConsumer(stopper)
+	dis.AddConsumer(notifier)
 
 	// initialize no-op metrics mock
 	metrics := &module.Metrics{}
@@ -241,9 +264,10 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	require.NoError(t, err)
 
 	// initialize the block finalizer
-	hot, err := consensus.NewParticipant(log, notifier, metrics, headersDB,
+	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
 		viewsDB, state, local, build, final, signer, comp, selector, rootHeader,
 		rootQC)
+	stopper.WithHotstuff(hot, stopAtView)
 
 	require.NoError(t, err)
 
@@ -269,7 +293,7 @@ func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (b
 }
 
 func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 2)
+	nodes := createNodes(t, 2, 100)
 	defer cleanupNodes(nodes)
 
 	connect(nodes, blockNothing)
