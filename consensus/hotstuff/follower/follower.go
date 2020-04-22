@@ -47,7 +47,7 @@ func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
 	// validate the block. skip if the proposal is invalid
 	err := f.validator.ValidateProposal(blockProposal)
 	if errors.Is(err, model.ErrorInvalidBlock{}) {
-		f.log.Warn().Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
+		f.log.Warn().AnErr("err", err).Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
 			Msg("invalid proposal")
 		return nil
 	}
