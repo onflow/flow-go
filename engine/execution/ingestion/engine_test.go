@@ -71,11 +71,11 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	syncConduit := network.NewMockConduit(ctrl)
 
 	// generates signing identity including staking key for signing
-	seed := make([]byte, crypto.KeyGenSeedMinLenBlsBls12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
-	require.Equal(t, n, crypto.KeyGenSeedMinLenBlsBls12381)
+	require.Equal(t, n, crypto.KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
-	sk, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)
 	myIdentity.StakingPubKey = sk.PublicKey()
 	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
