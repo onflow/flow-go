@@ -66,7 +66,7 @@ func TestBootStrapValid(t *testing.T) {
 
 		for _, identity := range identities {
 			var delta int64
-			err = db.View(operation.RetrieveDelta(genesis.Header.View, identity.Role, identity.NodeID, &delta))
+			err = db.View(operation.RetrieveDelta(genesis.Header.Height, identity.Role, identity.NodeID, &delta))
 			require.Nil(t, err)
 
 			assert.Equal(t, int64(identity.Stake), delta)
