@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/thanhpk/randstr"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -30,7 +29,6 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 
 	// initialize default config
 	cfg := Config{
-		chainID:     randstr.Hex(32),
 		minInterval: 500 * time.Millisecond,
 		maxInterval: 10 * time.Second,
 	}
@@ -75,7 +73,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// for each unfinalized ancestor of the payload we are building, we retrieve
 		// a list of all pending IDs for guarantees and seals; we can use them to
-		// exclude entities from being included in two block on the same fork.
+		// exclude entities from being included in two blocks on the same fork.
 		ancestorID := parentID
 		guaranteeLookup := make(map[flow.Identifier]struct{})
 		sealLookup := make(map[flow.Identifier]struct{})
@@ -223,7 +221,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// construct default block on top of the provided parent
 		header = &flow.Header{
-			ChainID:     b.cfg.chainID,
+			ChainID:     parent.ChainID,
 			ParentID:    parentID,
 			Height:      parent.Height + 1,
 			Timestamp:   timestamp,

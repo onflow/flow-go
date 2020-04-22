@@ -13,7 +13,6 @@
 #define G1MULT RELIC
 #define G2MULT RELIC
 
-ctx_t bls_ctx;
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
@@ -60,7 +59,8 @@ ctx_t* relic_init_BLS12_381() {
     if (ALLOC != AUTO) return NULL;
 
     // initialize relic core with a new context
-    core_set(&bls_ctx);
+    ctx_t* bls_ctx = (ctx_t*) malloc(sizeof(ctx_t));
+    core_set(bls_ctx);
     if (core_init() != RLC_OK) return NULL;
 
     // init BLS curve
@@ -76,15 +76,15 @@ ctx_t* relic_init_BLS12_381() {
     return core_get();
 }
 
-int _getSignatureLengthBLS_BLS12381() {
+int getSignatureLengthBLS_BLS12381() {
     return SIGNATURE_LEN;
 }
 
-int _getPubKeyLengthBLS_BLS12381() {
+int getPubKeyLengthBLS_BLS12381() {
     return PK_LEN;
 }
 
-int _getPrKeyLengthBLS_BLS12381() {
+int getPrKeyLengthBLS_BLS12381() {
     return SK_LEN;
 }
 

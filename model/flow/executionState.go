@@ -22,7 +22,7 @@ type StateCommitment = []byte
 // Used below with random root key
 //privateKey := flow.AccountPrivateKey{
 //	PrivateKey: rootKey,
-//	SignAlgo:   crypto.EcdsaP256,
+//	SignAlgo:   crypto.ECDSAP256,
 //	HashAlgo:   hash.SHA2_256,
 //}
 

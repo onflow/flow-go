@@ -7,7 +7,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -20,16 +19,14 @@ type Finalizer struct {
 	db         *badger.DB
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
-	prov       *provider.Engine // to propagate finalized blocks to non-consensus nodes
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals, prov *provider.Engine) *Finalizer {
+func NewFinalizer(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals) *Finalizer {
 	f := &Finalizer{
 		db:         db,
 		guarantees: guarantees,
 		seals:      seals,
-		prov:       prov,
 	}
 	return f
 }
@@ -55,9 +52,6 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		if len(toFinalize) == 0 {
 			return nil
 		}
-
-		// the first block to finalize is the new finalized head
-		head := toFinalize[0]
 
 		// now we can step backwards in order to go from oldest to youngest; for
 		// each header, we reconstruct the block and then apply the related
@@ -100,27 +94,6 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			if err != nil {
 				return fmt.Errorf("could not finalize block (%x): %w", blockID, err)
 			}
-		}
-
-		// retrieve the payload, build the full block, and propagate to non-consensus nodes
-		// TODO this is only necessary to replicate existing block propagation behaviour
-		// This should soon be replaced with HotStuff follower https://github.com/dapperlabs/flow/issues/894
-		{
-			// get the payload
-			var payload flow.Payload
-			err = procedure.RetrievePayload(head.ID(), &payload)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve payload: %w", err)
-			}
-
-			// create the block
-			block := &flow.Block{
-				Header:  *head,
-				Payload: payload,
-			}
-
-			// finally broadcast to non-consensus nodes
-			f.prov.SubmitLocal(block)
 		}
 
 		return nil

@@ -98,6 +98,7 @@ func (bc *blockContext) ExecuteTransaction(
 		Error:         nil,
 		Events:        ctx.Events(),
 		Logs:          ctx.Logs(),
+		GasUsed:       ctx.gasUsed,
 	}, nil
 }
 

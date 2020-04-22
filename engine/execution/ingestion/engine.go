@@ -59,6 +59,7 @@ type Engine struct {
 	syncInProgress     *atomic.Bool
 	syncTargetBlockID  atomic.Value
 	stateSync          executionSync.StateSynchronizer
+	mc                 module.Metrics
 }
 
 func New(
@@ -74,6 +75,7 @@ func New(
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
 	syncThreshold uint64,
+	mc module.Metrics,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
@@ -96,6 +98,7 @@ func New(
 		syncModeThreshold:  syncThreshold,
 		syncInProgress:     atomic.NewBool(false),
 		stateSync:          executionSync.NewStateSynchronizer(execState),
+		mc:                 mc,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -162,8 +165,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		var err error
 		switch v := event.(type) {
-		case *flow.Block:
-			err = e.handleBlock(v)
+		case *messages.BlockProposal:
+			err = e.handleBlockProposal(v)
 		case *messages.CollectionResponse:
 			err = e.handleCollectionResponse(v)
 		case *messages.ExecutionStateDelta:
@@ -182,12 +185,19 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // Main handling
 
-func (e *Engine) handleBlock(block *flow.Block) error {
+func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
+
+	block := &flow.Block{
+		Header:  *proposal.Header,
+		Payload: *proposal.Payload,
+	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block)).
 		Uint64("block_view", block.View).
 		Msg("received block")
+
+	e.mc.StartBlockReceivedToExecuted(block.ID())
 
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
@@ -304,6 +314,10 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 		return
 	}
 
+	e.mc.FinishBlockReceivedToExecuted(executableBlock.Block.ID())
+	e.mc.ExecutionGasUsedPerBlock(computationResult.GasUsed)
+	e.mc.ExecutionStateReadsPerBlock(computationResult.StateReads)
+
 	finalState, err := e.handleComputationResult(computationResult, executableBlock.StartState)
 	if err != nil {
 		e.log.Err(err).
@@ -311,6 +325,14 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 			Msg("error while handing computation results")
 		return
 	}
+
+	diskTotal, err := e.execState.Size()
+	if err != nil {
+		e.log.Err(err).Msg("could not get execution state disk size")
+	}
+	e.mc.ExecutionStateStorageDiskTotal(diskTotal)
+	e.mc.ExecutionStorageStateCommitment(int64(len(finalState)))
+
 	err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, _ *stdmap.QueuesBackdata) error {
 
 		executionQueue, err := executionQueues.ByID(executableBlock.Block.ID())

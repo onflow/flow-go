@@ -69,11 +69,11 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	// Mocks the signature oracle of the engine
 	//
 	// generates signing and verification keys
-	seed := make([]byte, crypto.KeyGenSeedMinLenBlsBls12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
-	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBlsBls12381)
+	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(suite.T(), err)
-	sk, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(suite.T(), err)
 	suite.sk = sk
 	// tag of hasher should be the same as the tag of engine's hasher

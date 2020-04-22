@@ -2,6 +2,7 @@ package buffer
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 )
 
 type PendingBlocks struct {
@@ -13,8 +14,8 @@ func NewPendingBlocks() *PendingBlocks {
 	return b
 }
 
-func (b *PendingBlocks) Add(block *flow.PendingBlock) bool {
-	return b.backend.add(block.OriginID, block.Header, block.Payload)
+func (b *PendingBlocks) Add(originID flow.Identifier, proposal *messages.BlockProposal) bool {
+	return b.backend.add(originID, proposal.Header, proposal.Payload)
 }
 
 func (b *PendingBlocks) ByID(blockID flow.Identifier) (*flow.PendingBlock, bool) {

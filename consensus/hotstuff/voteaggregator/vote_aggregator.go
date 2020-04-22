@@ -3,8 +3,6 @@ package voteaggregator
 import (
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -12,7 +10,6 @@ import (
 
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 type VoteAggregator struct {
-	logger                zerolog.Logger
 	notifier              hotstuff.Consumer
 	viewState             hotstuff.ViewState
 	voteValidator         hotstuff.Validator
@@ -29,7 +26,6 @@ type VoteAggregator struct {
 // New creates an instance of vote aggregator
 func New(notifier hotstuff.Consumer, highestPrunedView uint64, viewState hotstuff.ViewState, voteValidator hotstuff.Validator, signer hotstuff.Signer) *VoteAggregator {
 	return &VoteAggregator{
-		logger:                zerolog.Logger{},
 		notifier:              notifier,
 		highestPrunedView:     highestPrunedView,
 		viewState:             viewState,
@@ -51,8 +47,6 @@ func (va *VoteAggregator) StorePendingVote(vote *model.Vote) bool {
 	// check if the vote is for a view that has already been pruned (and is thus stale)
 	// cannot store vote for already pruned view
 	if va.isStale(vote) {
-		va.logger.Info().Msgf("received staled pending vote for view :%v, ignored since highestPrunedView is: %v",
-			vote.View, va.highestPrunedView)
 		return false
 	}
 	// add vote, return false if the vote is not successfully added (already existed)
@@ -77,8 +71,6 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Blo
 	}
 	// ignore stale votes
 	if va.isStale(vote) {
-		va.logger.Info().Msgf("received staled vote for view :%v, ignored since highestPrunedView is: %v",
-			vote.View, va.highestPrunedView)
 		return nil, false, nil
 	}
 	// validate the vote and adding it to the accumulated voting status
@@ -219,7 +211,6 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *model.Vote, blo
 		// does not report invalid vote as an error, notify consumers instead
 		case *model.ErrorInvalidVote:
 			va.notifier.OnInvalidVoteDetected(vote)
-			va.logger.Warn().Err(err).Msg("could not store invalid vote")
 			return false, nil
 		default:
 			return false, fmt.Errorf("could not validate incorporated vote: %w", err)

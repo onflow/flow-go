@@ -59,7 +59,7 @@ func (t *Controller) StartTimeout(mode model.TimeoutMode, view uint64) *model.Ti
 	}
 	duration := t.computeTimeoutDuration(mode)
 
-	startTime := time.Now()
+	startTime := time.Now().UTC()
 	timer := time.NewTimer(duration)
 	timerInfo := model.TimerInfo{Mode: mode, View: view, StartTime: startTime, Duration: duration}
 	t.timer = timer

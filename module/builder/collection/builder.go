@@ -22,14 +22,12 @@ import (
 type Builder struct {
 	db           *badger.DB
 	transactions mempool.Transactions
-	chainID      string
 }
 
 func NewBuilder(db *badger.DB, transactions mempool.Transactions, chainID string) *Builder {
 	b := &Builder{
 		db:           db,
 		transactions: transactions,
-		chainID:      chainID,
 	}
 	return b
 }
@@ -40,17 +38,24 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 	var header *flow.Header
 	err := b.db.Update(func(tx *badger.Txn) error {
 
+		// retrieve the parent to set the height and have chain ID
+		var parent flow.Header
+		err := operation.RetrieveHeader(parentID, &parent)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve parent: %w", err)
+		}
+
 		// STEP ONE: get the payload contents that are included in ancestor
 		// blocks which are not finalized yet; this allows us to avoid
 		// including them in a block on the same fork twice.
 		var boundary uint64
-		err := operation.RetrieveBoundaryForCluster(b.chainID, &boundary)(tx)
+		err = operation.RetrieveBoundaryForCluster(parent.ChainID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		var finalizedID flow.Identifier
-		err = operation.RetrieveNumberForCluster(b.chainID, boundary, &finalizedID)(tx)
+		err = operation.RetrieveNumberForCluster(parent.ChainID, boundary, &finalizedID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized ID: %w", err)
 		}
@@ -70,7 +75,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			}
 
 			// if we have reached the finalized boundary, stop indexing
-			if ancestor.View <= boundary {
+			if ancestor.Height <= boundary {
 				break
 			}
 
@@ -138,15 +143,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// build the payload from the transactions
 		payload := cluster.PayloadFromTransactions(finalTransactions...)
 
-		// retrieve the parent to set the height
-		var parent flow.Header
-		err = operation.RetrieveHeader(parentID, &parent)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve parent: %w", err)
-		}
-
 		header = &flow.Header{
-			ChainID:     b.chainID,
+			ChainID:     parent.ChainID,
 			ParentID:    parentID,
 			Height:      parent.Height + 1,
 			PayloadHash: payload.Hash(),

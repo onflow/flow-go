@@ -6,4 +6,5 @@ const (
 	namespaceCollection   = "collection"
 	namespaceConsensus    = "consensus"
 	namespaceVerification = "verification"
+	subsystemNetwork      = "network"
 )

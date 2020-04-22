@@ -36,15 +36,12 @@ require (
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.5.1
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
-	github.com/thanhpk/randstr v1.0.4
-	github.com/tinylib/msgp v1.1.2 // indirect
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/whyrusleeping/go-logging v0.0.1
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
 	golang.org/x/tools v0.0.0-20200413161937-250b2131eb8b // indirect
 	google.golang.org/grpc v1.28.0
-	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

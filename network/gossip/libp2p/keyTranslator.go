@@ -91,7 +91,7 @@ func PublicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 			return nil, lcrypto.ErrBadKeyType
 		}
 	} else if keyType == lcrypto_pb.KeyType_Secp256k1 {
-		bytes = make([]byte, crypto.PubKeyLenEcdsaSecp256k1+1) // libp2p requires an extra byte
+		bytes = make([]byte, crypto.PubKeyLenECDSASecp256k1+1) // libp2p requires an extra byte
 		bytes[0] = 4                                           // magic number in libp2p to refer to an uncompressed key
 		copy(bytes[1:], tempBytes)
 	}
@@ -102,9 +102,9 @@ func PublicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 // keyType translates Flow signing algorithm constants to the corresponding LibP2P constants
 func keyType(sa fcrypto.SigningAlgorithm) (lcrypto_pb.KeyType, error) {
 	switch sa {
-	case fcrypto.EcdsaP256:
+	case fcrypto.ECDSAP256:
 		return lcrypto_pb.KeyType_ECDSA, nil
-	case fcrypto.EcdsaSecp256k1:
+	case fcrypto.ECDSASecp256k1:
 		return lcrypto_pb.KeyType_Secp256k1, nil
 	default:
 		return -1, lcrypto.ErrBadKeyType
