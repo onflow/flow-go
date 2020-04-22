@@ -116,6 +116,6 @@ func signTransaction(tx flow.TransactionBody, privateKey crypto.PrivateKey) (cry
 	transaction := flow.Transaction{
 		TransactionBody: tx,
 	}
-	b := transaction.Singularity()
+	b := transaction.PayloadMessage()
 	return privateKey.Sign(b, hasher)
 }

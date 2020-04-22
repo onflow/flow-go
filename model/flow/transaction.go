@@ -20,13 +20,10 @@ type TransactionBody struct {
 	// the script part of the transaction in Cadence Language
 	Script []byte
 
-	// a unique random number to differentiate two transactions with the same properties
-	// it doesn't have to be sequential, and we might remove it in the future
-	Nonce uint64
-
 	// Max amount of computation which is allowed to be done during this transaction
 	GasLimit uint64
 
+	// Account key used to propose the transaction
 	ProposalKey ProposalKey
 
 	// Account that pays for this transaction fees
@@ -38,9 +35,10 @@ type TransactionBody struct {
 	// If code touches accounts that is not listed here, tx fails
 	Authorizers []Address
 
-	// List of account signatures including signatures of the payer account and the script accounts
+	// List of account signatures excluding signature of the payer account
 	PayloadSignatures []TransactionSignature
 
+	// payer signature over the envelope (payload + payload signatures)
 	EnvelopeSignatures []TransactionSignature
 }
 
@@ -111,22 +109,9 @@ type Transaction struct {
 	EndState         StateCommitment
 }
 
-func (tx *Transaction) Singularity() []byte {
-
-	temp := struct {
-		ReferenceBlockID Identifier
-		Script           []byte
-		Nonce            uint64
-		ComputeLimit     uint64
-		Payer            Address
-	}{
-		tx.ReferenceBlockID,
-		tx.Script,
-		tx.Nonce,
-		tx.GasLimit,
-		tx.Payer,
-		// TODO: Do any of the other field need to be included here?
-	}
+func (tx *Transaction) PayloadMessage() []byte {
+	body := tx.TransactionBody
+	temp := body.payloadCanonicalForm()
 	return encoding.DefaultEncoder.MustEncode(temp)
 }
 

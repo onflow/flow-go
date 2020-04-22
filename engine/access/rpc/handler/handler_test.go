@@ -9,15 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
-	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	mockaccess "github.com/dapperlabs/flow-go/engine/access/mock"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -105,14 +104,10 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 }
 
 func (suite *Suite) TestGetTransaction() {
-	transaction := unittest.TransactionFixture(func(t *flow.Transaction) {
-		t.Nonce = 0
-		t.GasLimit = 0
-	})
+	transaction := unittest.TransactionFixture()
 	expected := transaction.TransactionBody
 	suite.transactions.On("ByID", transaction.ID()).Return(&expected, nil).Once()
-	suite.collections.On("LightByTransactionID", transaction.ID()).Return(nil, realstorage.ErrNotFound).Once()
-	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, suite.collections, suite.transactions)
+	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, nil, suite.transactions)
 	id := transaction.ID()
 	req := &access.GetTransactionRequest{
 		Id: id[:],
@@ -133,8 +128,6 @@ func (suite *Suite) TestGetCollection() {
 	expectedIDs := make([]flow.Identifier, len(collection.Transactions))
 
 	for i, t := range collection.Transactions {
-		t.Nonce = 0 // obs api doesn't exposes nonce and compute limit as part of a transaction
-		t.GasLimit = 0
 		expectedIDs[i] = t.ID()
 	}
 
@@ -167,6 +160,7 @@ func (suite *Suite) TestGetCollection() {
 // when the protocol state is updated
 func (suite *Suite) TestTransactionStatusTransition() {
 
+	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture()
@@ -176,37 +170,50 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	seal := unittest.SealFixture()
 	seal.BlockID = headBlock.ID()
-	suite.snapshot.On("Seal").Return(seal, nil).Twice()
-	suite.headers.On("ByBlockID", seal.BlockID).Return(&headBlock.Header, nil).Twice()
+	suite.snapshot.On("Seal").Return(seal, nil)
+	suite.headers.On("ByBlockID", seal.BlockID).Return(&headBlock.Header, nil)
 
 	light := collection.Light()
 	// transaction storage returns the corresponding transaction
-	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil).Twice()
+	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
 	// collection storage returns the corresponding collection
-	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(&light, nil).Twice()
+	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(&light, nil)
 	// block storage returns the corresponding block
-	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil).Twice()
+	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil)
 
-	handler := NewHandler(suite.log, suite.state, nil, nil, suite.blocks, suite.headers, suite.collections, suite.transactions)
-	id := transactionBody.ID()
+	txID := transactionBody.ID()
+	blockID := block.ID()
+	exeEventReq := execution.GetEventsForBlockIDTransactionIDRequest{
+		BlockId:       blockID[:],
+		TransactionId: txID[:],
+	}
+	exeEventResp := execution.EventsResponse{
+		Results: nil,
+	}
+	// execution node returns an empty list of events each time
+	suite.execClient.On("GetEventsForBlockIDTransactionID", ctx, &exeEventReq).Return(&exeEventResp, nil)
+
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions)
 	req := &access.GetTransactionRequest{
-		Id: id[:],
+		Id: txID[:],
 	}
 
-	resp, err := handler.GetTransaction(context.Background(), req)
+	// first call - when block under test is ahead of head
+	resp, err := handler.GetTransactionResult(ctx, req)
 	suite.checkResponse(resp, err)
 
 	// status should be finalized since the sealed blocks is smaller in height
-	suite.Assert().Equal(entities.TransactionStatus_STATUS_FINALIZED, resp.Transaction.Status)
+	suite.Assert().Equal(entities.TransactionStatus_FINALIZED, resp.GetStatus())
 
 	// now let the head block be finalized
 	headBlock.Height = block.Height + 1
 
-	resp, err = handler.GetTransaction(context.Background(), req)
+	// second call - when block under test is behind head
+	resp, err = handler.GetTransactionResult(ctx, req)
 	suite.checkResponse(resp, err)
 
 	// status should be sealed since the sealed blocks is greater in height
-	suite.Assert().Equal(entities.TransactionStatus_STATUS_SEALED, resp.Transaction.Status)
+	suite.Assert().Equal(entities.TransactionStatus_SEALED, resp.GetStatus())
 
 	suite.assertAllExpectations()
 }

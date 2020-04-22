@@ -6,8 +6,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 func (h *Handler) ExecuteScriptAtLatestBlock(ctx context.Context,
