@@ -42,8 +42,10 @@ func computeCollectorClusters(stakingNodes []model.NodeInfo) *flow.ClusterList {
 func constructGenesisBlocksForCollectorClusters(clusters *flow.ClusterList) []cluster.Block {
 	clusterBlocks := run.GenerateGenesisClusterBlocks(clusters)
 
-	for i, clusterBlock := range clusterBlocks {
-		writeJSON(fmt.Sprintf(model.FilenameGenesisClusterBlock, i), clusterBlock)
+	for _, clusterBlock := range clusterBlocks {
+		// cluster ID is equivalent to chain ID
+		clusterID := clusterBlock.ChainID
+		writeJSON(fmt.Sprintf(model.FilenameGenesisClusterBlock, clusterID), clusterBlock)
 	}
 
 	return clusterBlocks
@@ -64,7 +66,9 @@ func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, node
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster genesis QC failed")
 		}
 
-		writeJSON(fmt.Sprintf(model.FilenameGenesisClusterQC, i), qc)
+		// cluster ID is equivalent to chain ID
+		clusterID := clusterBlocks[i].ChainID
+		writeJSON(fmt.Sprintf(model.FilenameGenesisClusterQC, clusterID), qc)
 	}
 }
 
