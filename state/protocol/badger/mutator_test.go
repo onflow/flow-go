@@ -335,6 +335,7 @@ func TestExtendValid(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
+		block.Payload.Seals = nil
 		block.Height = 1
 		block.View = 1
 		block.ParentID = genesis.ID()
@@ -358,6 +359,7 @@ func TestExtendMissingParent(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
+		block.Payload.Seals = nil
 		block.Height = 2
 		block.View = 2
 		block.ParentID = unittest.BlockFixture().ID()
@@ -376,42 +378,12 @@ func TestExtendMissingParent(t *testing.T) {
 	})
 }
 
-func TestExtendViewTooSmall(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
-		block := unittest.BlockFixture()
-		block.Payload.Identities = nil
-		block.Payload.Guarantees = nil
-		block.Height = 1
-		block.View = 1
-		block.ParentID = genesis.ID()
-		block.PayloadHash = block.Payload.Hash()
-
-		err := db.Update(procedure.InsertBlock(&block))
-		require.NoError(t, err)
-
-		err = mutator.Extend(block.ID())
-		require.NoError(t, err)
-
-		// create another block with the same height and view, that is coming after
-		block.ParentID = block.ID()
-		block.Height = 2
-		block.View = 1
-
-		err = db.Update(procedure.InsertBlock(&block))
-		require.NoError(t, err)
-
-		// verify seal not indexed
-		var seal flow.Identifier
-		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
-		assert.EqualError(t, err, "key not found")
-	})
-}
-
 func TestExtendHeightTooSmall(t *testing.T) {
 	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
+		block.Payload.Seals = nil
 		block.Height = 1
 		block.View = 1
 		block.ParentID = genesis.ID()
@@ -447,6 +419,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
+		block.Payload.Seals = nil
 		block.Height = 1
 		block.View = 1
 		block.ParentID = genesis.ID()
