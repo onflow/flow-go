@@ -197,7 +197,7 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
 //
-// TODO: this function is unbounded – pass context.Context to this or calling
+//TODO: this function is unbounded – pass context.Context to this or calling
 // functions to allow timing functions out.
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
@@ -207,20 +207,17 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 		options := badger.DefaultIteratorOptions
 
 		// If start is bigger than end, we have a backwards iteration:
-		// 1) Seek will go to the first key that is equal or lesser than the
-		// start prefix. However, this will only include the first key with the
-		// start prefix; we need to add 0xff to the start prefix to cover all
-		// items with the start prefix.
-		// 2) We break the loop upon hitting the first item that has a key
-		// higher than the end prefix. In order to reverse this, we use a
-		// modifier for the comparison that reverses the check and makes it
-		// stop upon the first item before the end prefix.
-		// 3) We also set the reverse option on the iterator, so we step through
-		// all of the keys backwards.
+		// 1) We set the reverse option on the iterater, so we step through all
+		//    the keys backwards. This modifies the behaviour of Seek to go to
+		//    the first key that is less than or equal to the start key (as
+		//    opposed to greater than or equal in a regular iteration).
+		// 2) For a regular iteration, we break the loop upon hitting the first
+		//    item that has a key higher than the end prefix. In order to reverse
+		//    this, we use a modifier for the comparison that reverses the check
+		//    and makes it stop upon the first item lower than the end prefix.
 		if bytes.Compare(start, end) > 0 {
-			options.Reverse = true      // make sure to go in reverse order
-			start = append(start, 0x01) // make sure to start after start prefix
-			modifier = -1               // make sure to stop before end prefix
+			options.Reverse = true // make sure to go in reverse order
+			modifier = -1          // make sure to stop after end prefix
 		}
 
 		it := tx.NewIterator(options)
@@ -345,18 +342,17 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 //
 // On the top end of the iteration, we use the prefix (top+1)||ZeroID. This
 // ensures that everything indexed at the top height is included in the
-// iteration. (Nothing above the top height is included in the iteration, since
-// we use the zero ID in the prefix.)
+// iteration.
 func payloadIterRange(code uint8, from, to uint64) (start, end []byte) {
 	if from > to {
 		// common case - we are iterating through history in reverse, typically
 		// from the boundary height to 0
-		start = makePrefix(code, from+1, flow.ZeroID)
+		start = makePrefix(code, from, flow.MaxID)
 		end = makePrefix(code, to)
 	} else {
 		// other case - we are iterating forward through history
 		start = makePrefix(code, from)
-		end = makePrefix(code, to+1, flow.ZeroID)
+		end = makePrefix(code, to, flow.MaxID)
 	}
 	return
 }

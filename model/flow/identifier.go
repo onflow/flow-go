@@ -13,10 +13,22 @@ import (
 	"github.com/dapperlabs/flow-go/storage/merkle"
 )
 
-// Identifier represents a 32-byte unique identifier for a node.
+// Identifier represents a 32-byte unique identifier for an entity.
 type Identifier [32]byte
 
-var ZeroID = Identifier{}
+var (
+	// ZeroID is the lowest value in the 32-byte ID space.
+	ZeroID = Identifier{}
+	// MaxID is the maximum value in the 32-byte ID space.
+	// NOTE: set in init function
+	MaxID = Identifier{}
+)
+
+func init() {
+	for i := range MaxID {
+		MaxID[i] = byte(255)
+	}
+}
 
 var GenesisParentID = ZeroID
 var GenesisExecutionResultParentID = ZeroID
