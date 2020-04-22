@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
@@ -278,41 +280,41 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 	return signers
 }
 
-// SignPayload signs the transaction payload with the specified account key.
+//SignPayload signs the transaction payload with the specified account key.
 //
-// The resulting signature is combined with the account address and key ID before
-// being added to the transaction.
+//The resulting signature is combined with the account address and key ID before
+//being added to the transaction.
 //
-// This function returns an error if the signature cannot be generated.
-//func (t *Transaction) SignPayload(address Address, keyID int, signer crypto.Signer) error {
-//	sig, err := signer.Sign(t.PayloadMessage())
-//	if err != nil {
-//		// TODO: wrap error
-//		return err
-//	}
-//
-//	t.AddPayloadSignature(address, keyID, sig)
-//
-//	return nil
-//}
+//This function returns an error if the signature cannot be generated.
+func (tb *TransactionBody) SignPayload(address Address, keyID int, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
-// SignEnvelope signs the full transaction (payload + payload signatures) with the specified account key.
+	sig, err := privateKey.Sign(tb.PayloadMessage(), hasher)
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)
+	}
+
+	tb.AddPayloadSignature(address, keyID, sig)
+
+	return nil
+}
+
+//SignEnvelope signs the full transaction (payload + payload signatures) with the specified account key.
 //
-// The resulting signature is combined with the account address and key ID before
-// being added to the transaction.
+//The resulting signature is combined with the account address and key ID before
+//being added to the transaction.
 //
-// This function returns an error if the signature cannot be generated.
-//func (t *Transaction) SignEnvelope(address Address, keyID int, signer crypto.Signer) error {
-//	sig, err := signer.Sign(t.EnvelopeMessage())
-//	if err != nil {
-//		// TODO: wrap error
-//		return err
-//	}
-//
-//	t.AddEnvelopeSignature(address, keyID, sig)
-//
-//	return nil
-//}
+//This function returns an error if the signature cannot be generated.
+func (tb *TransactionBody) SignEnvelope(address Address, keyID int, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
+
+	sig, err := privateKey.Sign(tb.EnvelopeMessage(), hasher)
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction envelope with given key: %w", err)
+	}
+
+	tb.AddEnvelopeSignature(address, keyID, sig)
+
+	return nil
+}
 
 // AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
 func (tb *TransactionBody) AddPayloadSignature(address Address, keyID int, sig []byte) *TransactionBody {
