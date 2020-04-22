@@ -72,6 +72,8 @@ func TestOnReceiptValid(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -105,6 +107,8 @@ func TestOnReceiptWrongExecutor(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -137,6 +141,8 @@ func TestOnReceiptMissingIdentity(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(nil, errors.New("identity missing"))
 	receipts.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -170,6 +176,8 @@ func TestOnReceiptZeroStake(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -202,6 +210,8 @@ func TestOnReceiptWrongRole(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -234,6 +244,8 @@ func TestOnApprovalValid(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -267,6 +279,8 @@ func TestOnApprovalWrongApprover(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -298,6 +312,8 @@ func TestOnApprovalMissingIdentity(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(nil, errors.New("identity missing"))
 	approvals.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -330,6 +346,8 @@ func TestOnApprovalZeroStake(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,
@@ -361,6 +379,8 @@ func TestOnApprovalWrongRole(t *testing.T) {
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
+	// TODO temp
+	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
 		state:     state,

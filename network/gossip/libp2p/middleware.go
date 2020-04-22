@@ -287,7 +287,7 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
 	}
 
-	m.log.Info().Str("targetid", flowID).Str("address", address).Msg("stream created")
+	m.log.Info().Str("target_id", flowID).Str("address", address).Msg("stream created")
 	return stream, nil
 }
 

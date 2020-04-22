@@ -61,12 +61,12 @@ func (s *Seals) ByPreviousState(commit flow.StateCommitment) (*flow.Seal, error)
 		if !ok {
 			return mempool.ErrEntityNotFound
 		}
-		byID, err := s.ByID(sealID)
+		byID, err := backend.ByID(sealID)
 		if err != nil {
 			return err
 		}
 
-		seal = byID
+		seal = byID.(*flow.Seal)
 		return nil
 	})
 
