@@ -148,6 +148,7 @@ type Node struct {
 	compliance *compliance.Engine
 	sync       *synchronization.Engine
 	hot        *hotstuff.EventLoop
+	state      *protocol.State
 	headers    *storage.Headers
 	views      *storage.Views
 	net        *Network
@@ -280,6 +281,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 		id:         identity,
 		compliance: comp,
 		sync:       sync,
+		state:      state,
 		hot:        hot,
 		headers:    headersDB,
 		views:      viewsDB,
@@ -308,6 +310,33 @@ func blockNodes(blackList ...*Node) BlockOrDelayFunc {
 	}
 }
 
+func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
+	blackDict := make(map[flow.Identifier]*Node, len(blackList))
+	for _, n := range blackList {
+		blackDict[n.id.ID()] = n
+	}
+
+	sent, received := 0, 0
+
+	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		if _, ok := blackDict[sender.id.ID()]; ok {
+			if sent > n {
+				return false, 0
+			}
+			sent++
+			return true, 0
+		}
+		if _, ok := blackDict[receiver.id.ID()]; ok {
+			if received > n {
+				return false, 0
+			}
+			received++
+			return true, 0
+		}
+		return false, 0
+	}
+}
+
 func start(nodes []*Node) {
 	var wg sync.WaitGroup
 	for _, n := range nodes {
@@ -323,22 +352,62 @@ func start(nodes []*Node) {
 
 func Test3Nodes(t *testing.T) {
 	nodes := createNodes(t, 3, 100)
+	defer cleanupNodes(nodes)
 
 	connect(nodes, blockNothing)
 
 	start(nodes)
 
-	cleanupNodes(nodes)
+	// verify all nodes arrive the same state
+	header, err := nodes[0].state.Final().Head()
+	require.NoError(t, err)
+	final := header.ID()
+
+	for i := 1; i < len(nodes); i++ {
+		headerN, err := nodes[i].state.Final().Head()
+		require.NoError(t, err)
+		require.Equal(t, final, headerN.ID())
+	}
 }
 
 func Test4Nodes(t *testing.T) {
 	nodes := createNodes(t, 4, 100)
+	defer cleanupNodes(nodes)
 
 	connect(nodes, blockNodes(nodes[0]))
 
 	start(nodes)
 
-	cleanupNodes(nodes)
+	// verify all nodes arrive the same state
+	header, err := nodes[0].state.Final().Head()
+	require.NoError(t, err)
+	final := header.ID()
+
+	for i := 1; i < len(nodes); i++ {
+		headerN, err := nodes[i].state.Final().Head()
+		require.NoError(t, err)
+		require.Equal(t, final, headerN.ID())
+	}
+}
+
+func Test4NodesBeginning(t *testing.T) {
+	nodes := createNodes(t, 3, 100)
+	defer cleanupNodes(nodes)
+
+	connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
+
+	start(nodes)
+
+	// verify all nodes arrive the same state
+	header, err := nodes[0].state.Final().Head()
+	require.NoError(t, err)
+	final := header.ID()
+
+	for i := 1; i < len(nodes); i++ {
+		headerN, err := nodes[i].state.Final().Head()
+		require.NoError(t, err)
+		require.Equal(t, final, headerN.ID())
+	}
 }
 
 type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
