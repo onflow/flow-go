@@ -28,6 +28,3 @@ ExecStart=docker run --rm \
 	--nodeid=${FLOW_GO_NODE_ID} \
 	--bootstrapdir=/bootstrap \
 	--datadir=/data/protocol \
-	--rpc-addr=0.0.0.0:3569 \
-	--ingress-addr=${FLOW_NETWORK_COLLECTION_NODE} \
-	--script-addr=${FLOW_NETWORK_EXECUTION_NODE}
