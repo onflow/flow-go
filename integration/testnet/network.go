@@ -27,6 +27,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -298,7 +299,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), seal)
 
 	// generate genesis blocks for each collector cluster
-	clusterBlocks, clusterQCs := setupClusters(t, confs, genesis)
+	clusterBlocks, clusterQCs := setupClusters(t, networkConf.NClusters, confs, genesis)
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
@@ -549,6 +550,9 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 	return confs
 }
 
+// runDKG runs the distributed key generation process for all consensus nodes
+// and returns all DKG data. This includes the group private key, node indices,
+// and per-node private key-shares.
 func runDKG(t *testing.T, confs []ContainerConfig) bootstrap.DKGData {
 
 	// filter by consensus nodes
@@ -573,6 +577,39 @@ func runDKG(t *testing.T, confs []ContainerConfig) bootstrap.DKGData {
 	return dkg
 }
 
-func setupClusters(t *testing.T, confs []ContainerConfig, genesis flow.Block) ([]*cluster.Block, []*hotstuff.QuorumCertificate) {
-	panic("TODO")
+// setupClusters generates bootstrapping resources necessary for collection
+// node clusters. For each cluster, a genesis block and genesis QC are created.
+func setupClusters(t *testing.T, nClusters uint, confs []ContainerConfig, genesis flow.Block) ([]*cluster.Block, []*hotstuff.QuorumCertificate) {
+
+	identities := toIdentityList(confs)
+	clusters := protocol.Clusters(nClusters, identities)
+
+	blocks := make([]*cluster.Block, 0, nClusters)
+	qcs := make([]*hotstuff.QuorumCertificate, 0, nClusters)
+
+	for _, cluster := range clusters.All() {
+		// generate genesis cluster block
+		block := bootstraprun.GenerateGenesisClusterBlock(cluster)
+
+		// gather cluster participants
+		participants := make([]bootstrap.NodeInfo, 0, len(cluster))
+		for _, conf := range confs {
+			_, exists := cluster.ByNodeID(conf.NodeID)
+			if exists {
+				participants = append(participants, conf.NodeInfo)
+			}
+		}
+
+		require.Equal(t, len(cluster), len(participants)) // sanity check
+
+		// generate qc for genesis cluster block
+		qc, err := bootstraprun.GenerateClusterGenesisQC(participants, &genesis, &block)
+		require.Nil(t, err)
+
+		// add block and qc to list
+		blocks = append(blocks, &block)
+		qcs = append(qcs, qc)
+	}
+
+	return blocks, qcs
 }
