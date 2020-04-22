@@ -118,20 +118,77 @@ func (n *Network) WithSubmit(submit SubmitFunc) *Network {
 	return n
 }
 
-type Stopper struct {
+type StopperConsumer struct {
 	notifications.NoopConsumer
-	hotstuff   *hotstuff.EventLoop
+	onEnteringView func(view uint64)
+}
+
+func (c *StopperConsumer) OnEnteringView(view uint64) {
+	c.onEnteringView(view)
+}
+
+type Stopper struct {
+	sync.Mutex
+	running    map[flow.Identifier]struct{}
+	nodes      []*Node
+	stopping   bool
 	stopAtView uint64
 }
 
-func (s *Stopper) WithHotstuff(hot *hotstuff.EventLoop, stopAtView uint64) {
-	s.hotstuff = hot
-	s.stopAtView = stopAtView
+// How to stop nodes?
+// We can stop each node as soon as it enters a certain view. But the problem
+// is if some fast nodes reaches a view earlier and gets stopped, it won't
+// be available for other nodes to sync, and slow nodes will never be able
+// to catch up.
+// a better strategy is to wait until all nodes has entered a certain view,
+// then stop them all.
+func NewStopper(stopAtView uint64) *Stopper {
+	return &Stopper{
+		running:    make(map[flow.Identifier]struct{}),
+		nodes:      make([]*Node, 0),
+		stopping:   false,
+		stopAtView: stopAtView,
+	}
 }
 
-func (s *Stopper) OnEnteringView(view uint64) {
+func (s *Stopper) AddNode(n *Node) *StopperConsumer {
+	s.Lock()
+	defer s.Unlock()
+	s.running[n.id.ID()] = struct{}{}
+	s.nodes = append(s.nodes, n)
+	return &StopperConsumer{
+		onEnteringView: func(view uint64) {
+			s.OnEnteringView(n.id.ID(), view)
+		},
+	}
+}
+
+func (s *Stopper) OnEnteringView(id flow.Identifier, view uint64) {
+	s.Lock()
+	defer s.Unlock()
+
+	// keep track of remaining running nodes
 	if view >= s.stopAtView {
-		s.hotstuff.Done()
+		delete(s.running, id)
+	}
+
+	// if there is no running nodes, stop all
+	if len(s.running) == 0 {
+		s.stopAll()
+	}
+}
+
+func (s *Stopper) stopAll() {
+	// has been stopped before
+	if s.stopping {
+		return
+	}
+
+	s.stopping = true
+
+	for i := 0; i < len(s.nodes); i++ {
+		// stop compliance will also stop both hotstuff and synchronization engine
+		s.nodes[i].compliance.Done()
 	}
 }
 
@@ -180,16 +237,23 @@ func createNodes(t *testing.T, n int, stopAtView uint64) []*Node {
 	// create and bootstrap consensus node with the genesis
 	genesis := run.GenerateRootBlock(allParitipants, run.GenerateRootSeal([]byte{}))
 
+	stopper := NewStopper(stopAtView)
 	nodes := make([]*Node, 0, len(participants))
 	for _, identity := range participants {
-		node := createNode(t, identity, participants, &genesis, stopAtView)
+		node := createNode(t, identity, participants, &genesis, stopper)
 		nodes = append(nodes, node)
 	}
 
 	return nodes
 }
 
-func createNode(t *testing.T, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, stopAtView uint64) *Node {
+func stopNodes(nodes ...*Node) {
+	for i := 0; i < len(nodes); i++ {
+
+	}
+}
+
+func createNode(t *testing.T, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, stopper *Stopper) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
 	state, err := protocol.NewState(db)
 	require.NoError(t, err)
@@ -209,14 +273,21 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 
 	localID := identity.ID()
 
-	stopper := &Stopper{}
+	node := &Node{
+		db:    db,
+		dbDir: dbDir,
+		index: index,
+		id:    identity,
+	}
+
+	stopConsumer := stopper.AddNode(node)
 
 	// log with node index
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
-	dis.AddConsumer(stopper)
+	dis.AddConsumer(stopConsumer)
 	dis.AddConsumer(notifier)
 
 	// initialize no-op metrics mock
@@ -273,31 +344,25 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
-	hotstuffTimeout := 100 * time.Millisecond
+	hotstuffTimeout := 1000 * time.Millisecond
 
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
 		viewsDB, state, local, build, final, signer, comp, selector, rootHeader,
 		rootQC, consensus.WithTimeout(hotstuffTimeout))
-	stopper.WithHotstuff(hot, stopAtView)
 
 	require.NoError(t, err)
 
 	comp = comp.WithSynchronization(sync).WithConsensus(hot)
 
-	node := &Node{
-		db:         db,
-		dbDir:      dbDir,
-		index:      index,
-		id:         identity,
-		compliance: comp,
-		sync:       sync,
-		state:      state,
-		hot:        hot,
-		headers:    headersDB,
-		views:      viewsDB,
-		net:        net,
-	}
+	node.compliance = comp
+	node.sync = sync
+	node.state = state
+	node.hot = hot
+	node.headers = headersDB
+	node.views = viewsDB
+	node.net = net
+
 	return node
 }
 
@@ -362,7 +427,7 @@ func start(nodes []*Node) {
 }
 
 func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 3, 100)
+	nodes := createNodes(t, 5, 1000)
 
 	connect(nodes, blockNothing)
 
@@ -402,7 +467,7 @@ func Test5Nodes(t *testing.T) {
 }
 
 func TestOneDelayed(t *testing.T) {
-	nodes := createNodes(t, 50, 300)
+	nodes := createNodes(t, 10, 100)
 
 	// connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
 	connect(nodes, blockNothing)
