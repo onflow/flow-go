@@ -224,6 +224,9 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, 5*time.Second)
 	verNet.DeliverAll(false)
 
+	// waiting for cleanups
+	time.Sleep(1 * time.Second)
+
 	// ensures resources are cleaned up
 	for _, c := range vChunks {
 		// since all chunks have been ingested, execution receipt should be removed from mempool
