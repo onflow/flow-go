@@ -174,8 +174,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					blockStorageLock.Lock()
 					// we don't check for error as it definitely returns error when we
 					// have duplicate blocks, however, this is not the concern for this test
-					err := verNode.BlockStorage.Store(block)
-					require.Nil(t, err, fmt.Errorf("could not store block in block storage:%w", err))
+					_ = verNode.BlockStorage.Store(block)
 					blockStorageLock.Unlock()
 
 					// casts block into a Hotstuff block for notifier
