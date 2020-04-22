@@ -182,6 +182,27 @@ func (_m *ReadOnlyExecutionState) RetrieveStateDelta(blockID flow.Identifier) (*
 	return r0, r1
 }
 
+// Size provides a mock function with given fields:
+func (_m *ReadOnlyExecutionState) Size() (int64, error) {
+	ret := _m.Called()
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func() int64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // StateCommitmentByBlockID provides a mock function with given fields: _a0
 func (_m *ReadOnlyExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) ([]byte, error) {
 	ret := _m.Called(_a0)

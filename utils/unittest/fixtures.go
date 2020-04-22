@@ -6,15 +6,14 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/utils/dsl"
 )
 
 func AddressFixture() flow.Address {
@@ -86,6 +85,7 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
 		Guarantees: CollectionGuaranteesFixture(16),
+		Seals:      BlockSealsFixture(16),
 	}
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
@@ -128,27 +128,6 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 		ParentVoterSig: SignatureFixture(),
 		ProposerID:     IdentifierFixture(),
 		ProposerSig:    SignatureFixture(),
-	}
-}
-
-// BlockWithParent creates a new block that is valid
-// with respect to the given parent block.
-func BlockWithParent(parent *flow.Block) flow.Block {
-	payload := flow.Payload{
-		Identities: IdentityListFixture(32),
-		Guarantees: CollectionGuaranteesFixture(16),
-	}
-
-	header := BlockHeaderFixture()
-	header.View = parent.View + 1
-	header.ChainID = parent.ChainID
-	header.Timestamp = time.Now()
-	header.ParentID = parent.ID()
-	header.PayloadHash = payload.Hash()
-
-	return flow.Block{
-		Header:  header,
-		Payload: payload,
 	}
 }
 
@@ -221,6 +200,27 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 		ret = append(ret, &cg)
 	}
 	return ret
+}
+
+func BlockSealFixture() *flow.Seal {
+	return &flow.Seal{
+		BlockID:           IdentifierFixture(),
+		ExecutionResultID: IdentifierFixture(),
+		PreviousState:     StateCommitmentFixture(),
+		FinalState:        StateCommitmentFixture(),
+	}
+}
+
+func BlockSealsFixture(n int) []*flow.Seal {
+	seals := make([]*flow.Seal, 0, n)
+	for i := 0; i < n; i++ {
+		seal := BlockSealFixture()
+		if i > 0 {
+			seal.PreviousState = seals[i-1].FinalState
+		}
+		seals = append(seals, seal)
+	}
+	return seals
 }
 
 func CollectionFixture(n int) flow.Collection {

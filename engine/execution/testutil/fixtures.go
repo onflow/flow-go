@@ -9,21 +9,21 @@ import (
 
 func DeployCounterContractTransaction() flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(`
-		access(all) contract Container {
-			access(all) resource Counter {
-				pub var count: Int
-	
-				init(_ v: Int) {
-					self.count = v
+			access(all) contract Container {
+				access(all) resource Counter {
+					pub var count: Int
+
+					init(_ v: Int) {
+						self.count = v
+					}
+					pub fun add(_ count: Int) {
+						self.count = self.count + count
+					}
 				}
-				pub fun add(_ count: Int) {
-					self.count = self.count + count
+				pub fun createCounter(_ v: Int): @Counter {
+					return <-create Counter(v)
 				}
-			}
-			pub fun createCounter(_ v: Int): @Counter {
-				return <-create Counter(v)
-			}
-		}`))
+			}`))
 
 	return flow.TransactionBody{
 		Script: []byte(fmt.Sprintf(`transaction {
@@ -51,6 +51,26 @@ func CreateCounterTransaction() flow.TransactionBody {
 					acc.save(<-maybeCounter!, to: /storage/counter)
 				}   	
 			}`),
+		ScriptAccounts: []flow.Address{flow.RootAddress},
+	}
+}
+
+// CreateCounterPanicTransaction returns a transaction that will manipulate state by writing a new counter into storage
+// and then panic. It can be used to test whether execution state stays untouched/will revert
+func CreateCounterPanicTransaction() flow.TransactionBody {
+	return flow.TransactionBody{
+		Script: []byte(`
+
+			import 0x01
+
+			transaction {
+				prepare(acc: AuthAccount) {
+					let existing <- acc.storage[Container.Counter] <- Container.createCounter(42)
+					destroy existing
+
+					panic("fail for testing purposes")
+              	}
+            }`),
 		ScriptAccounts: []flow.Address{flow.RootAddress},
 	}
 }

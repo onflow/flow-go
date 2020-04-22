@@ -41,7 +41,6 @@ func main() {
 		receiptLimit    uint
 		approvalLimit   uint
 		sealLimit       uint
-		chainID         string
 		minInterval     time.Duration
 		maxInterval     time.Duration
 		hotstuffTimeout time.Duration
@@ -63,7 +62,6 @@ func main() {
 			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 100000, "maximum number of result approvals in the memory pool")
 			flags.UintVar(&sealLimit, "seal-limit", 100000, "maximum number of block seals in the memory pool")
-			flags.StringVarP(&chainID, "chain-id", "C", flow.DefaultChainID, "the chain ID for the protocol chain")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
@@ -136,7 +134,6 @@ func main() {
 
 			// initialize the block builder
 			build := builder.NewBuilder(node.DB, guarantees, seals,
-				builder.WithChainID(chainID),
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
