@@ -69,7 +69,7 @@ func CreateCounterPanicTransaction() flow.TransactionBody {
 					panic("fail for testing purposes")
               	}
             }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
