@@ -1,7 +1,11 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -9,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
@@ -16,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -31,7 +37,8 @@ import (
 	"github.com/dapperlabs/flow-go/module/signature"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -43,21 +50,27 @@ const (
 func main() {
 
 	var (
-		txLimit      uint
-		ingressConf  ingress.Config
+		txLimit         uint
+		ingressConf     ingress.Config
+		hotstuffTimeout time.Duration
+
 		pool         mempool.Transactions
-		collections  *storage.Collections
-		transactions *storage.Transactions
-		headers      *storage.Headers
-		blocks       *storage.Blocks
-		colPayloads  *storage.ClusterPayloads
-		conPayloads  *storage.Payloads
+		collections  *badger.Collections
+		transactions *badger.Transactions
+		headers      *badger.Headers
+		blocks       *badger.Blocks
+		colPayloads  *badger.ClusterPayloads
+		conPayloads  *badger.Payloads
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
 
 		clusterID    string           // chain ID for the cluster
 		clusterState *clusterkv.State // chain state for the cluster
+
+		// from bootstrap files
+		clusterGenesis *cluster.Block              // genesis block for the cluster
+		clusterQC      *hotstuff.QuorumCertificate // QC for the cluster
 
 		prov *provider.Engine
 		ing  *ingest.Engine
@@ -68,17 +81,18 @@ func main() {
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 100000, "maximum number of transactions in the memory pool")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
+			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			pool, err = stdmap.NewTransactions(txLimit)
 			return err
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			transactions = storage.NewTransactions(node.DB)
-			headers = storage.NewHeaders(node.DB)
-			blocks = storage.NewBlocks(node.DB)
-			colPayloads = storage.NewClusterPayloads(node.DB)
-			conPayloads = storage.NewPayloads(node.DB)
+			transactions = badger.NewTransactions(node.DB)
+			headers = badger.NewHeaders(node.DB)
+			blocks = badger.NewBlocks(node.DB)
+			colPayloads = badger.NewClusterPayloads(node.DB)
+			conPayloads = badger.NewPayloads(node.DB)
 			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -86,6 +100,31 @@ func main() {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
+		// regardless of whether we are starting from scratch or from an
+		// existing state, we load the genesis files
+		Module("cluster consensus bootstrapping", func(node *cmd.FlowNodeBuilder) error {
+			myCluster, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
+			if err != nil {
+				return fmt.Errorf("could not get my cluster: %w", err)
+			}
+
+			clusterID = protocol.ChainIDForCluster(myCluster)
+
+			// read cluster bootstrapping files from standard bootstrap directory
+			clusterGenesis, err = loadClusterBlock(node.BaseConfig.BootstrapDir, clusterID)
+			if err != nil {
+				return fmt.Errorf("could not load cluster block: %w", err)
+			}
+
+			clusterQC, err = loadClusterQC(node.BaseConfig.BootstrapDir, clusterID)
+			if err != nil {
+				return fmt.Errorf("could not load cluster qc: %w", err)
+			}
+
+			return nil
+		}).
+		// if a genesis cluster block already exists in the database, discard
+		// the loaded bootstrap files and use the existing cluster state
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
 			myCluster, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
 			if err != nil {
@@ -99,20 +138,25 @@ func main() {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}
 
-			// create genesis block for cluster consensus
-			genesis := cluster.Genesis()
-			genesis.ChainID = clusterID
+			_, err = clusterState.Final().Head()
+			// storage layer error while checking state - fail fast
+			if err != nil && !errors.Is(err, storage.ErrNotFound) {
+				return fmt.Errorf("could not check cluster state db: %w", err)
+			}
 
-			node.Logger.Info().
-				Hex("genesis_id", logging.ID(genesis.ID())).
-				Str("cluster_id", clusterID).
-				Str("cluster_members", fmt.Sprintf("%v", myCluster.NodeIDs())).
-				Msg("bootstrapped cluster state")
+			// no existing cluster state, bootstrap with block specified in
+			// bootstrapping files
+			if errors.Is(err, storage.ErrNotFound) {
+				err = clusterState.Mutate().Bootstrap(clusterGenesis)
+				if err != nil {
+					return fmt.Errorf("could not bootstrap cluster state: %w", err)
+				}
 
-			// bootstrap cluster consensus state
-			err = clusterState.Mutate().Bootstrap(genesis)
-			if err != nil {
-				return fmt.Errorf("could not bootstrap cluster state: %w", err)
+				node.Logger.Info().
+					Hex("genesis_id", logging.ID(clusterGenesis.ID())).
+					Str("cluster_id", clusterID).
+					Str("cluster_members", fmt.Sprintf("%v", myCluster.NodeIDs())).
+					Msg("bootstrapped cluster state")
 			}
 
 			return nil
@@ -171,7 +215,7 @@ func main() {
 			return server, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			collections = storage.NewCollections(node.DB)
+			collections = badger.NewCollections(node.DB)
 			prov, err = provider.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool, collections, transactions)
 			return prov, err
 		}).
@@ -202,4 +246,34 @@ func main() {
 			return prop, nil
 		}).
 		Run("collection")
+}
+
+func loadClusterBlock(path string, clusterID string) (*cluster.Block, error) {
+	filename := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
+	data, err := ioutil.ReadFile(filepath.Join(path, filename))
+	if err != nil {
+		return nil, err
+	}
+
+	var block cluster.Block
+	err = json.Unmarshal(data, &block)
+	if err != nil {
+		return nil, err
+	}
+	return &block, nil
+}
+
+func loadClusterQC(path string, clusterID string) (*hotstuff.QuorumCertificate, error) {
+	filename := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
+	data, err := ioutil.ReadFile(filepath.Join(path, filename))
+	if err != nil {
+		return nil, err
+	}
+
+	var qc hotstuff.QuorumCertificate
+	err = json.Unmarshal(data, &qc)
+	if err != nil {
+		return nil, err
+	}
+	return &qc, nil
 }
