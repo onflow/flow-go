@@ -214,9 +214,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(db, guarantees, seals,
-		builder.WithChainID(flow.DefaultChainID),
-	)
+	build := builder.NewBuilder(db, guarantees, seals)
 
 	signer := &Signer{identity.ID()}
 
