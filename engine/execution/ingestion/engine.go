@@ -344,6 +344,10 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 			Hex("block_id", logging.Entity(executableBlock.Block)).
 			Msg("error while requeueing blocks after execution")
 	}
+	e.log.Info().
+		Hex("block_id", logging.Entity(executableBlock.Block)).
+		Hex("final_state", finalState).
+		Msg("executing block")
 }
 
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
