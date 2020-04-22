@@ -39,6 +39,11 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return &block, err
 }
 
+func (b *Blocks) Has(blockID flow.Identifier) bool {
+	_, err := b.ByID(blockID)
+	return err != nil
+}
+
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	var block flow.Block
 	err := b.db.View(func(tx *badger.Txn) error {
@@ -51,7 +56,6 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 		}
 
 		// retrieve the block by block ID
-		var block flow.Block
 		err = procedure.RetrieveBlock(blockID, &block)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)

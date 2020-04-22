@@ -12,9 +12,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -22,28 +21,29 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit   *engine.Unit
-	log    zerolog.Logger
-	tracer trace.Tracer
-	con    network.Conduit
-	me     module.Local
-	state  protocol.State
-	pool   mempool.Transactions
+	unit    *engine.Unit
+	log     zerolog.Logger
+	metrics module.Metrics
+	con     network.Conduit
+	me      module.Local
+	state   protocol.State
+	pool    mempool.Transactions
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local, pool mempool.Transactions) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, metrics module.Metrics, me module.Local, pool mempool.Transactions) (*Engine, error) {
 
 	logger := log.With().
 		Str("engine", "ingest").
 		Logger()
+
 	e := &Engine{
-		unit:   engine.NewUnit(),
-		log:    logger,
-		tracer: tracer,
-		me:     me,
-		state:  state,
-		pool:   pool,
+		unit:    engine.NewUnit(),
+		log:     logger,
+		metrics: metrics,
+		me:      me,
+		state:   state,
+		pool:    pool,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
@@ -123,14 +123,11 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	log.Debug().Msg("transaction message received")
 
-	e.tracer.StartSpan(tx.ID(), "transactionToCollectionGuarantee").
-		SetTag("tx_id", tx.ID().String()).
-		SetTag("node_type", "collection").
-		SetTag("origin_id", originID.String()).
-		SetTag("node_id", e.me.NodeID().String())
+	// report Metrics Transaction from received to being included in a collection guarantee
+	e.metrics.TransactionReceived(tx.ID())
 
 	// first, we check if the transaction is valid
-	err := e.validateTransaction(tx)
+	err := e.ValidateTransaction(tx)
 	if err != nil {
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
@@ -179,14 +176,18 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	return nil
 }
 
-// TODO: implement
-func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
+// ValidateTransaction validates the transaction in order to determine whether
+// the transaction should be included in a collection.
+func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
+
 	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
-		return ErrIncompleteTransaction{missing: missingFields}
+		return ErrIncompleteTransaction{Missing: missingFields}
 	}
 
 	// TODO check account/payer signatures
+
+	// TODO parse Cadence script
 
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/thanhpk/randstr"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -21,16 +22,29 @@ type Builder struct {
 	db         *badger.DB
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
-	chainID    string
+	cfg        Config
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals, chainID string) *Builder {
+func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals, options ...func(*Config)) *Builder {
+
+	// initialize default config
+	cfg := Config{
+		chainID:     randstr.Hex(32),
+		minInterval: 500 * time.Millisecond,
+		maxInterval: 10 * time.Second,
+	}
+
+	// apply option parameters
+	for _, option := range options {
+		option(&cfg)
+	}
+
 	b := &Builder{
 		db:         db,
 		guarantees: guarantees,
 		seals:      seals,
-		chainID:    chainID,
+		cfg:        cfg,
 	}
 	return b
 }
@@ -194,24 +208,35 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			return fmt.Errorf("could not retrieve parent: %w", err)
 		}
 
+		// calculate the timestamp and cutoffs
+		timestamp := time.Now().UTC()
+		from := parent.Timestamp.Add(b.cfg.minInterval)
+		to := parent.Timestamp.Add(b.cfg.maxInterval)
+
+		// adjust timestamp if outside of cutoffs
+		if timestamp.Before(from) {
+			timestamp = from
+		}
+		if timestamp.After(to) {
+			timestamp = to
+		}
+
 		// construct default block on top of the provided parent
 		header = &flow.Header{
-			ChainID:     b.chainID,
+			ChainID:     b.cfg.chainID,
 			ParentID:    parentID,
 			Height:      parent.Height + 1,
-			Timestamp:   time.Now().UTC(),
+			Timestamp:   timestamp,
 			PayloadHash: payload.Hash(),
 
 			// the following fields should be set by the custom function as needed
 			// NOTE: we could abstract all of this away into an interface{} field,
 			// but that would be over the top as we will probably always use hotstuff
-			View:                    0,
-			ParentSigners:           nil,
-			ParentStakingSigs:       nil,
-			ParentRandomBeaconSig:   nil,
-			ProposerID:              flow.ZeroID,
-			ProposerStakingSig:      nil,
-			ProposerRandomBeaconSig: nil,
+			View:           0,
+			ParentVoterIDs: nil,
+			ParentVoterSig: nil,
+			ProposerID:     flow.ZeroID,
+			ProposerSig:    nil,
 		}
 
 		// apply the custom fields setter of the consensus algorithm

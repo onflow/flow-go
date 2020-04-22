@@ -5,13 +5,14 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(*entity.ExecutableBlock, *state.View) (*execution.ComputationResult, error)
+	ExecuteBlock(*entity.ExecutableBlock, *delta.View) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -28,7 +29,7 @@ func NewBlockComputer(vm virtualmachine.VirtualMachine) BlockComputer {
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockComputer) ExecuteBlock(
 	block *entity.ExecutableBlock,
-	stateView *state.View,
+	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 	results, err := e.executeBlock(block, stateView)
 	if err != nil {
@@ -42,54 +43,69 @@ func (e *blockComputer) ExecuteBlock(
 
 func (e *blockComputer) executeBlock(
 	block *entity.ExecutableBlock,
-	stateView *state.View,
+	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
 	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
 
 	collections := block.Collections()
 
-	views := make([]*state.View, len(collections))
+	interactions := make([]*delta.Snapshot, len(collections))
+
+	events := make([]flow.Event, 0)
+
+	var txIndex uint32
 
 	for i, collection := range collections {
 
 		collectionView := stateView.NewChild()
 
-		err := e.executeCollection(i, blockCtx, collectionView, collection)
+		collEvents, nextIndex, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
 
-		views[i] = collectionView
+		txIndex = nextIndex
+		events = append(events, collEvents...)
 
-		stateView.ApplyDelta(collectionView.Delta())
+		interactions[i] = collectionView.Interactions()
+
+		stateView.MergeView(collectionView)
 	}
 
 	return &execution.ComputationResult{
 		ExecutableBlock: block,
-		StateViews:      views,
+		StateSnapshots:  interactions,
+		Events:          events,
 	}, nil
 }
 
 func (e *blockComputer) executeCollection(
-	index int,
+	txIndex uint32,
 	blockCtx virtualmachine.BlockContext,
-	collectionView *state.View,
+	collectionView *delta.View,
 	collection *entity.CompleteCollection,
-) error {
-
+) ([]flow.Event, uint32, error) {
+	var events []flow.Event
 	for _, tx := range collection.Transactions {
 		txView := collectionView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
-			return fmt.Errorf("failed to execute transaction: %w", err)
+			txIndex++
+			return nil, txIndex, fmt.Errorf("failed to execute transaction: %w", err)
 		}
+		txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
+		txIndex++
 
+		if err != nil {
+			return nil, txIndex, fmt.Errorf("failed to create flow events: %w", err)
+		}
+		events = append(events, txEvents...)
 		if result.Succeeded() {
-			collectionView.ApplyDelta(txView.Delta())
+			collectionView.MergeView(txView)
 		}
 	}
 
-	return nil
+	return events, txIndex, nil
 }

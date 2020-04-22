@@ -1,0 +1,90 @@
+package metrics
+
+import (
+	"github.com/opentracing/opentracing-go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+)
+
+// Collection Metrics
+const (
+
+	// span from a transaction being received to being included in a block
+	spanTransactionToCollection = "transaction_to_collection"
+
+	// span from a collection being proposed to being finalized (eg. guaranteed)
+	// TODO not used -- this doesn't really make sense until we use hotstuff
+	spanCollectionToGuarantee = "collection_to_guarantee"
+)
+
+var (
+	transactionsIngestedCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceCollection,
+		Name:      "transactions_ingested_total",
+		Help:      "count of transactions ingested by this node",
+	})
+	proposalsCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceCollection,
+		Name:      "collection_proposals_total",
+		Help:      "count of collection proposals",
+	})
+	proposalSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceCollection,
+		Name:      "collection_proposal_size",
+		Help:      "number of transactions in proposed collections",
+	})
+	guaranteedCollectionSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceCollection,
+		Name:      "guaranteed_collection_size",
+		Help:      "number of transactions in guaranteed collections",
+	})
+)
+
+// TransactionReceived starts a span to trace the duration of a transaction
+// from being created to being included as part of a collection.
+func (c *Collector) TransactionReceived(txID flow.Identifier) {
+	transactionsIngestedCounter.Inc()
+	c.tracer.StartSpan(txID, spanTransactionToCollection)
+}
+
+// CollectionProposed tracks the size and number of proposals.
+func (c *Collector) CollectionProposed(collection flow.LightCollection) {
+	proposalSizeGauge.Set(float64(collection.Len()))
+	proposalsCounter.Inc()
+}
+
+// CollectionGuaranteed updates the guaranteed collection size gauge and
+// finishes the tx->collection span for each constituent transaction.
+func (c *Collector) CollectionGuaranteed(collection flow.LightCollection) {
+	guaranteedCollectionSizeGauge.Set(float64(collection.Len()))
+	for _, txID := range collection.Transactions {
+		c.tracer.FinishSpan(txID, spanTransactionToCollection)
+	}
+}
+
+// StartCollectionToGuarantee starts a span to trace the duration of a collection
+// from being created to being submitted as a collection guarantee
+// TODO not used, revisit once HotStuff is in use
+func (c *Collector) StartCollectionToGuarantee(collection flow.LightCollection) {
+
+	followsFrom := make([]opentracing.StartSpanOption, 0, len(collection.Transactions))
+	for _, txID := range collection.Transactions {
+		if txSpan, exists := c.tracer.GetSpan(txID, spanTransactionToCollection); exists {
+			// link its transactions' spans
+			followsFrom = append(followsFrom, opentracing.FollowsFrom(txSpan.Context()))
+		}
+	}
+
+	c.tracer.StartSpan(collection.ID(), spanCollectionToGuarantee, followsFrom...).
+		SetTag("collection_id", collection.ID().String()).
+		SetTag("collection_txs", collection.Transactions)
+}
+
+// FinishCollectionToGuarantee finishes a span to trace the duration of a collection
+// from being proposed to being finalized (eg. guaranteed).
+// TODO not used, revisit once HotStuff is in use
+func (c *Collector) FinishCollectionToGuarantee(collectionID flow.Identifier) {
+	c.tracer.FinishSpan(collectionID, spanCollectionToGuarantee)
+}

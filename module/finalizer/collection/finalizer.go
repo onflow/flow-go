@@ -8,8 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -23,17 +23,17 @@ type Finalizer struct {
 	db           *badger.DB
 	transactions mempool.Transactions
 	prov         network.Engine
-	tracer       trace.Tracer
+	metrics      module.Metrics
 	chainID      string // aka cluster ID
 }
 
 // NewFinalizer creates a new finalizer for collection nodes.
-func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, tracer trace.Tracer, chainID string) *Finalizer {
+func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, metrics module.Metrics, chainID string) *Finalizer {
 	f := &Finalizer{
 		db:           db,
 		transactions: transactions,
 		prov:         prov,
-		tracer:       tracer,
+		metrics:      metrics,
 		chainID:      chainID,
 	}
 	return f
@@ -73,6 +73,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
 
+		// there are no blocks to finalize, we may have already finalized
+		// this block - exit early
+		if boundary >= header.Height {
+			return nil
+		}
+
 		// in order to validate the validity of all changes, we need to iterate
 		// through the blocks that need to be finalized from oldest to youngest;
 		// we thus start at the youngest remember all of the intermediary steps
@@ -103,12 +109,11 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 
 			// remove the transactions from the memory pool
-			for _, txID := range payload.Collection.Transactions {
-				ok := f.transactions.Rem(txID)
-				if !ok {
-					return fmt.Errorf("could not remove transaction from mempool (id=%x)", txID)
-				}
-				f.tracer.FinishSpan(txID)
+			for _, colTx := range payload.Collection.Transactions {
+				txID := colTx.ID()
+				// ignore result -- we don't care whether the transaction was
+				// in the pool or not
+				_ = f.transactions.Rem(txID)
 			}
 
 			// finalize the block in cluster state
@@ -117,8 +122,10 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize block: %w", err)
 			}
 
+			f.metrics.CollectionGuaranteed(payload.Collection.Light())
+
 			// don't bother submitting empty collections
-			if payload.Collection.Len() == 0 {
+			if len(payload.Collection.Transactions) == 0 {
 				continue
 			}
 
@@ -136,8 +143,8 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: payload.Collection.ID(),
-					SignerIDs:    header.ParentSigners,
-					Signatures:   nil,
+					SignerIDs:    step.ParentVoterIDs,
+					Signature:    step.ParentVoterSig,
 				},
 			})
 		}

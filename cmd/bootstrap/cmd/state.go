@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -15,16 +16,11 @@ func genGenesisExecutionState() flow.StateCommitment {
 		log.Fatal().Err(err).Msg("error generating account 0 private key")
 	}
 
-	enc, err := account0Priv.PrivateKey.Encode()
-	if err != nil {
-		log.Fatal().Err(err).Msg("error encoding account 0 private key")
-	}
-	writeJSON(filenameAccount0Priv, enc)
+	enc := account0Priv.PrivateKey.Encode()
+	writeJSON(bootstrap.FilenameAccount0Priv, enc)
 
-	dbpath := filepath.Join(flagOutdir, dirnameExecutionState)
-	db := createLevelDB(dbpath)
-	defer db.SafeClose()
-	stateCommitment, err := run.GenerateExecutionState(db, account0Priv)
+	dbpath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)
+	stateCommitment, err := run.GenerateExecutionState(dbpath, account0Priv)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}

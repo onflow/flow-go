@@ -8,11 +8,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/coldstuff"
-	"github.com/dapperlabs/flow-go/model/messages"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
-	"github.com/dapperlabs/flow-go/model/trickle"
+	"github.com/dapperlabs/flow-go/model/messages"
 )
 
 func encode(v interface{}) (*Envelope, error) {
@@ -21,30 +19,29 @@ func encode(v interface{}) (*Envelope, error) {
 	var code uint8
 	switch v.(type) {
 
-	case *trickle.Ping:
-		code = CodePing
-	case *trickle.Pong:
-		code = CodePong
-	case *trickle.Auth:
-		code = CodeAuth
-	case *trickle.Announce:
-		code = CodeAnnounce
-	case *trickle.Request:
-		code = CodeRequest
-	case *trickle.Response:
-		code = CodeResponse
-	case *message.Echo:
-		code = CodeEcho
-
-	// Consensus
+	// consensus
 	case *messages.BlockProposal:
 		code = CodeBlockProposal
 	case *messages.BlockVote:
 		code = CodeBlockVote
+
+	// coldstuff-specific
 	case *coldstuff.Commit:
 		code = CodeBlockCommit
 
-	// Cluster consensus
+	// protocol state sync
+	case *messages.SyncRequest:
+		code = CodeSyncRequest
+	case *messages.SyncResponse:
+		code = CodeSyncResponse
+	case *messages.RangeRequest:
+		code = CodeRangeRequest
+	case *messages.BatchRequest:
+		code = CodeBatchRequest
+	case *messages.BlockResponse:
+		code = CodeBlockResponse
+
+	// cluster consensus
 	case *messages.ClusterBlockProposal:
 		code = CodeClusterBlockProposal
 	case *messages.ClusterBlockVote:
@@ -61,24 +58,29 @@ func encode(v interface{}) (*Envelope, error) {
 	case *flow.Transaction:
 		code = CodeTransaction
 
-	case *flow.Block:
-		code = CodeBlock
-
 	case *messages.CollectionRequest:
 		code = CodeCollectionRequest
 	case *messages.CollectionResponse:
 		code = CodeCollectionResponse
 
+	case *message.Echo:
+		code = CodeEcho
+
+	case *messages.TransactionRequest:
+		code = CodeTransactionRequest
+	case *messages.TransactionResponse:
+		code = CodeTransactionResponse
+
 	case *flow.ExecutionReceipt:
-		code = CodeExecutionRecipt
-	case *messages.ExecutionStateRequest:
-		code = CodeExecutionStateRequest
-	case *messages.ExecutionStateResponse:
-		code = CodeExecutionStateResponse
+		code = CodeExecutionReceipt
 	case *messages.ChunkDataPackRequest:
 		code = CodeChunkDataPackRequest
 	case *messages.ChunkDataPackResponse:
 		code = CodeChunkDataPackResponse
+	case *messages.ExecutionStateSyncRequest:
+		code = CodeExecutionStateSyncRequest
+	case *messages.ExecutionStateDelta:
+		code = CodeExecutionStateDelta
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)

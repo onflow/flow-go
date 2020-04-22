@@ -15,6 +15,10 @@ import (
 
 // Builder is the builder for collection block payloads. Upon providing a
 // payload hash, it also memorizes the payload contents.
+//
+// NOTE: Builder is NOT safe for use with multiple goroutines. Since the
+// HotStuff event loop is the only consumer of this interface and is single
+// threaded, this is OK.
 type Builder struct {
 	db           *badger.DB
 	transactions mempool.Transactions
@@ -78,8 +82,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			}
 
 			// insert the transactions into the lookup
-			for _, txID := range payload.Collection.Transactions {
-				txLookup[txID] = struct{}{}
+			for _, colTx := range payload.Collection.Transactions {
+				txLookup[colTx.ID()] = struct{}{}
 			}
 
 			// continue with the next ancestor in the chain
@@ -108,7 +112,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// populate the final list of transaction IDs for the block - these
 		// are guaranteed to be valid
-		var finalTxIDs []flow.Identifier
+		var finalTransactions []*flow.TransactionBody
 		for _, txID := range candidateTxIDs {
 
 			_, isInvalid := invalidIDs[txID]
@@ -118,8 +122,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 				continue
 			}
 
-			// add ONLY non-conflicting transaction IDs to the final payload
-			finalTxIDs = append(finalTxIDs, txID)
+			// add ONLY non-conflicting transaction to the final payload
+			nextTx, err := b.transactions.ByID(txID)
+			if err != nil {
+				return fmt.Errorf("could not get transaction: %w", err)
+			}
+			finalTransactions = append(finalTransactions, nextTx)
 		}
 
 		// STEP THREE: we have a set of transactions that are valid to include
@@ -127,29 +135,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// used in the payload, store and index it in storage, and insert the
 		// header.
 
-		// insert transactions included in this collection
-		for _, txID := range finalTxIDs {
-			flowTx, err := b.transactions.ByID(txID)
-			if err != nil {
-				return fmt.Errorf("could not insert missing transaction: %w", err)
-			}
-			err = operation.SkipDuplicates(operation.InsertTransaction(flowTx))(tx)
-			if err != nil {
-				return fmt.Errorf("could not insert transaction: %w", err)
-			}
-		}
-
-		// create and insert the collection
-		collection := flow.LightCollection{Transactions: finalTxIDs}
-		err = operation.SkipDuplicates(operation.InsertCollection(&collection))(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert collection: %w", err)
-		}
-
-		// build the payload
-		payload := cluster.Payload{
-			Collection: collection,
-		}
+		// build the payload from the transactions
+		payload := cluster.PayloadFromTransactions(finalTransactions...)
 
 		// retrieve the parent to set the height
 		var parent flow.Header
@@ -166,13 +153,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			Timestamp:   time.Now().UTC(),
 
 			// the following fields should be set by the provided setter function
-			View:                    0,
-			ParentSigners:           nil,
-			ParentStakingSigs:       nil,
-			ParentRandomBeaconSig:   nil,
-			ProposerID:              flow.ZeroID,
-			ProposerStakingSig:      nil,
-			ProposerRandomBeaconSig: nil,
+			View:           0,
+			ParentVoterIDs: nil,
+			ParentVoterSig: nil,
+			ProposerID:     flow.ZeroID,
+			ProposerSig:    nil,
 		}
 
 		// set fields specific to the consensus algorithm
@@ -181,13 +166,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// insert the header for the newly built block
 		err = operation.InsertHeader(header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert header: %w", err)
+			return fmt.Errorf("could not insert cluster header: %w", err)
+		}
+
+		// insert the payload
+		// this inserts the collection AND all constituent transactions
+		err = procedure.InsertClusterPayload(&payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert cluster payload: %w", err)
 		}
 
 		// index the payload by block ID
 		err = procedure.IndexClusterPayload(header, &payload)(tx)
 		if err != nil {
-			return fmt.Errorf("could not index payload: %w", err)
+			return fmt.Errorf("could not index cluster payload: %w", err)
 		}
 
 		return nil

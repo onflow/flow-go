@@ -18,7 +18,7 @@ import (
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 )
 
 func TestOnCollectionGuarantee(t *testing.T) {
@@ -168,7 +168,7 @@ func TestPropagateCollectionGuarantee(t *testing.T) {
 		case 3:
 			role = flow.RoleVerification
 		case 4:
-			role = flow.RoleObservation
+			role = flow.RoleAccess
 		}
 		identity := &flow.Identity{
 			NodeID:  nodeID,

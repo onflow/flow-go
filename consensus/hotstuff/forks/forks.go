@@ -62,7 +62,7 @@ func (f *Forks) AddBlock(block *model.Block) error {
 	return f.AddQC(block.QC)
 }
 
-func (f *Forks) MakeForkChoice(curView uint64) (*model.Block, *model.QuorumCertificate, error) {
+func (f *Forks) MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error) {
 	return f.forkchoice.MakeForkChoice(curView)
 }
 

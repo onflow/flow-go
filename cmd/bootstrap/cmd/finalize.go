@@ -7,13 +7,18 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 var (
-	flagConfig             string
-	flagPartnerNodeInfoDir string
-	flagPartnerStakes      string
+	flagConfig                                       string
+	flagCollectionClusters                           uint16
+	flagGeneratedCollectorAddressTemplate            string
+	flagGeneratedCollectorStake                      uint64
+	flagPartnerNodeInfoDir                           string
+	flagPartnerStakes                                string
+	flagCollectorGenerationMaxHashGrindingIterations uint
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -25,18 +30,21 @@ var finalizeCmd = &cobra.Command{
 	Long: `Finalize the bootstrapping process, which includes generating of internal networking and staking keys,
 running the DKG for generating the random beacon keys, generating genesis execution state, seal, block and QC.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Info().Msg("✨ generating private networking and staking keys")
-		internalNodesPub, internalNodesPriv := genNetworkAndStakingKeys()
+		log.Info().Msg("✨ collecting partner network and staking keys")
+		partnerNodes := assemblePartnerNodes()
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ generating internal private networking and staking keys")
+		internalNodes := genNetworkAndStakingKeys(partnerNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ assembling network and staking keys")
-		partnerNodes := assemblePartnerNodes()
-		stakingNodes := mergeNodeInfos(internalNodesPub, partnerNodes)
-		writeJSON(filenameNodeInfosPub, stakingNodes)
+		stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
+		writeJSON(model.FilenameNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ running DKG for consensus nodes")
-		dkgDataPub, dkgDataPriv := runDKG(filterConsensusNodes(stakingNodes))
+		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ generating private key for account 0 and generating genesis execution state")
@@ -44,12 +52,28 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis seal and genesis block")
-		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgDataPub)
+		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgData)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis seal and genesis block")
-		constructGenesisQC(&block, filterConsensusNodes(stakingNodes), filterConsensusNodesPriv(internalNodesPriv),
-			dkgDataPriv)
+		log.Info().Msg("✨ constructing genesis QC")
+		constructGenesisQC(
+			&block,
+			model.FilterByRole(stakingNodes, flow.RoleConsensus),
+			model.FilterByRole(internalNodes, flow.RoleConsensus),
+			dkgData,
+		)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ computing collector clusters")
+		clusters := computeCollectorClusters(stakingNodes)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ constructing genesis blocks for collector clusters")
+		clusterBlocks := constructGenesisBlocksForCollectorClusters(clusters)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ constructing genesis QCs for collector clusters")
+		constructGenesisQCsForCollectorClusters(clusters, internalNodes, block, clusterBlocks)
 		log.Info().Msg("")
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
@@ -59,19 +83,29 @@ running the DKG for generating the random beacon keys, generating genesis execut
 func init() {
 	rootCmd.AddCommand(finalizeCmd)
 
-	finalizeCmd.Flags().StringVarP(&flagConfig, "config", "c", "",
+	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
 	_ = finalizeCmd.MarkFlagRequired("config")
-	finalizeCmd.Flags().StringVarP(&flagPartnerNodeInfoDir, "partner-dir", "p", "", fmt.Sprintf("path to directory "+
+	finalizeCmd.Flags().Uint16Var(&flagCollectionClusters, "collection-clusters", 2,
+		"number of collection clusters")
+	finalizeCmd.Flags().StringVar(&flagGeneratedCollectorAddressTemplate, "generated-collector-address-template",
+		"collector-%v.example.com", "address template for collector nodes that will be generated (%v "+
+			"will be replaced by an index)")
+	finalizeCmd.Flags().Uint64Var(&flagGeneratedCollectorStake, "generated-collector-stake", 100,
+		"stake for collector nodes that will be generated")
+	finalizeCmd.Flags().UintVar(&flagCollectorGenerationMaxHashGrindingIterations, "collector-gen-max-iter", 1000,
+		"max hash grinding iterations for collector generation")
+	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
 		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
-		"NetworkPubKey, StakingPubKey)", filenamePartnerNodeInfoSuffix))
+		"NetworkPubKey, StakingPubKey)", model.FilenamePartnerNodeInfoSuffix))
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
-	finalizeCmd.Flags().StringVarP(&flagPartnerStakes, "partner-stakes", "s", "", "path to a JSON file containing "+
+	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
 }
 
-func assemblePartnerNodes() []NodeInfoPub {
+func assemblePartnerNodes() []model.NodeInfo {
+
 	partners := readPartnerNodes()
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
 
@@ -79,7 +113,7 @@ func assemblePartnerNodes() []NodeInfoPub {
 	readJSON(flagPartnerStakes, &stakes)
 	log.Info().Msgf("read %v stakes for partner nodes", len(stakes))
 
-	var nodes []NodeInfoPub
+	var nodes []model.NodeInfo
 	for _, partner := range partners {
 		// validate every single partner node
 		nodeID := validateNodeID(partner.NodeID)
@@ -87,14 +121,16 @@ func assemblePartnerNodes() []NodeInfoPub {
 		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
 		stake := validateStake(stakes[partner.NodeID])
 
-		nodes = append(nodes, NodeInfoPub{
-			Role:          partner.Role,
-			Address:       partner.Address,
-			NodeID:        nodeID,
-			NetworkPubKey: networkPubKey,
-			StakingPubKey: stakingPubKey,
-			Stake:         stake,
-		})
+		node := model.NewPublicNodeInfo(
+			nodeID,
+			partner.Role,
+			partner.Address,
+			stake,
+			networkPubKey,
+			stakingPubKey,
+		)
+
+		nodes = append(nodes, node)
 	}
 
 	return nodes
@@ -107,14 +143,14 @@ func validateNodeID(nodeID flow.Identifier) flow.Identifier {
 	return nodeID
 }
 
-func validateNetworkPubKey(key EncodableNetworkPubKey) EncodableNetworkPubKey {
+func validateNetworkPubKey(key model.EncodableNetworkPubKey) model.EncodableNetworkPubKey {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("NetworkPubKey must not be nil")
 	}
 	return key
 }
 
-func validateStakingPubKey(key EncodableStakingPubKey) EncodableStakingPubKey {
+func validateStakingPubKey(key model.EncodableStakingPubKey) model.EncodableStakingPubKey {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("StakingPubKey must not be nil")
 	}
@@ -128,28 +164,28 @@ func validateStake(stake uint64) uint64 {
 	return stake
 }
 
-func readPartnerNodes() []PartnerNodeInfoPub {
-	var partners []PartnerNodeInfoPub
+func readPartnerNodes() []model.PartnerNodeInfoPub {
+	var partners []model.PartnerNodeInfoPub
 	files, err := filesInDir(flagPartnerNodeInfoDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read partner node infos")
 	}
 	for _, f := range files {
 		// skip files that do not include node-infos
-		if !strings.HasSuffix(f, filenamePartnerNodeInfoSuffix) {
+		if !strings.HasSuffix(f, model.FilenamePartnerNodeInfoSuffix) {
 			continue
 		}
 
 		// read file and append to partners
-		var p PartnerNodeInfoPub
+		var p model.PartnerNodeInfoPub
 		readJSON(f, &p)
 		partners = append(partners, p)
 	}
 	return partners
 }
 
-func mergeNodeInfos(internalNodesPub, partnerNodes []NodeInfoPub) []NodeInfoPub {
-	nodes := append(internalNodesPub, partnerNodes...)
+func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
+	nodes := append(internalNodes, partnerNodes...)
 
 	// test for duplicate Addresses
 	addressLookup := make(map[string]struct{})

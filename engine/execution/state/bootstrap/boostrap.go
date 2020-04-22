@@ -4,19 +4,23 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-// BootstrapLedger adds the above root account to the ledger
+// BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
 func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
-	view := state.NewView(state.LedgerGetRegister(ledger, ledger.LatestStateCommitment()))
+	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
 	BootstrapView(view)
 
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta())
+	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +28,30 @@ func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
 	return newStateCommitment, nil
 }
 
-func BootstrapView(view *state.View) {
+func BootstrapExecutionDatabase(db *badger.DB, genesis *flow.Header) error {
+	err := db.Update(func(txn *badger.Txn) error {
+		err := operation.InsertHighestExecutedBlockNumber(genesis.Height, genesis.ID())(txn)
+		if err != nil {
+			return err
+		}
+
+		views := make([]*delta.Snapshot, 0)
+		err = operation.InsertExecutionStateInteractions(genesis.ID(), views)(txn)
+		if err != nil {
+			return err
+		}
+
+		return operation.IndexStateCommitment(flow.GenesisParentID, flow.GenesisStateCommitment)(txn)
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func BootstrapView(view *delta.View) {
 	privateKeyBytes, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
 	if err != nil {
 		panic("Cannot hex decode hardcoded key!")

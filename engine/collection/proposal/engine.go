@@ -10,8 +10,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/cluster"
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
 	coldstuffmodel "github.com/dapperlabs/flow-go/model/coldstuff"
@@ -20,9 +18,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/cluster"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -32,12 +30,12 @@ import (
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
-	tracer       trace.Tracer
+	metrics      module.Metrics
 	con          network.Conduit
 	me           module.Local
 	protoState   protocol.State // flow-wide protocol chain state
 	clusterState cluster.State  // cluster-specific chain state
-	provider     network.Engine
+	validator    module.TransactionValidator
 	pool         mempool.Transactions
 	transactions storage.Transactions
 	headers      storage.Headers
@@ -54,8 +52,8 @@ func New(
 	me module.Local,
 	protoState protocol.State,
 	clusterState cluster.State,
-	tracer trace.Tracer,
-	provider network.Engine,
+	metrics module.Metrics,
+	validator module.TransactionValidator,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
 	headers storage.Headers,
@@ -74,8 +72,8 @@ func New(
 		me:           me,
 		protoState:   protoState,
 		clusterState: clusterState,
-		tracer:       tracer,
-		provider:     provider,
+		metrics:      metrics,
+		validator:    validator,
 		pool:         pool,
 		transactions: transactions,
 		headers:      headers,
@@ -146,6 +144,15 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
+		//TODO currently it is possible for network messages to be received
+		// and passed to the engine before the engine has been setup
+		// (ie had Ready called). This is a quickfix to get around the issue
+		// but ultimately we should start receiving over the network only
+		// once all the engines are ready.
+
+		if e.coldstuff == nil {
+			return fmt.Errorf("missing coldstuff dependency")
+		}
 		return e.process(originID, event)
 	})
 }
@@ -169,13 +176,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // SendVote will send a vote to the desired node.
-func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, _ crypto.Signature, recipientID flow.Identifier) error {
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
 	// build the vote message
 	vote := &messages.ClusterBlockVote{
-		BlockID:   blockID,
-		View:      view,
-		Signature: sig,
+		BlockID: blockID,
+		View:    view,
+		SigData: sigData,
 	}
 
 	err := e.con.Submit(vote, recipientID)
@@ -202,10 +209,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(filter.And(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}
@@ -223,13 +230,13 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
 	e.log.Debug().
 		Hex("block_id", logging.ID(header.ID())).
+		Uint64("block_height", header.Height).
 		Hex("parent_id", logging.ID(header.ParentID)).
 		Int("collection_size", len(payload.Collection.Transactions)).
 		Msg("submitted proposal")
 
-	trace.StartCollectionSpan(e.tracer, &payload.Collection).
-		SetTag("node_type", "collection").
-		SetTag("node_id", e.me.NodeID().String())
+	// report proposed collection (case that we are leader)
+	e.metrics.CollectionProposed(payload.Collection.Light())
 
 	return nil
 }
@@ -239,10 +246,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(
+	recipients, err := e.protoState.Final().Identities(filter.And(
 		filter.In(e.participants),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get cluster members: %w", err)
 	}
@@ -258,9 +265,14 @@ func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
 // onBlockProposal handles proposals for new blocks.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
+	final, _ := e.clusterState.Final().Head()
+
 	e.log.Debug().
 		Hex("block_id", logging.ID(proposal.Header.ID())).
+		Uint64("block_height", proposal.Header.Height).
 		Hex("parent_id", logging.ID(proposal.Header.ParentID)).
+		Hex("final_id", logging.ID(final.ID())).
+		Uint64("final_height", final.Height).
 		Msg("received proposal")
 
 	// retrieve the parent block
@@ -275,34 +287,18 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	blockID := proposal.Header.ID()
 	collection := proposal.Payload.Collection
 
-	// ensure we have received and validated all transactions in the proposal
-	var missingTxErr *multierror.Error
-	for _, txID := range collection.Transactions {
-		if !e.pool.Has(txID) {
-			// note each missing transaction in the error and reject the block
-			missingTxErr = multierror.Append(missingTxErr, fmt.Errorf("cannot validate missing transaction (id=%x)", txID))
-
-			// request the missing transaction
-			req := &messages.SubmitTransactionRequest{
-				Request: messages.TransactionRequest{ID: txID},
+	// validate any transactions we haven't yet seen
+	var merr *multierror.Error
+	for _, tx := range collection.Transactions {
+		if !e.pool.Has(tx.ID()) {
+			err = e.validator.ValidateTransaction(tx)
+			if err != nil {
+				merr = multierror.Append(merr, err)
 			}
-			e.provider.SubmitLocal(req)
 		}
 	}
-	if err := missingTxErr.ErrorOrNil(); err != nil {
-		return fmt.Errorf("cannot validate block proposal (id=%x) with missing transactions: %w", proposal.Header.ID(), err)
-	}
-
-	// store the transactions
-	for _, txID := range collection.Transactions {
-		tx, err := e.pool.ByID(txID)
-		if err != nil {
-			return fmt.Errorf("could not store missing transaction: %w", err)
-		}
-		err = e.transactions.Store(tx)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("could not store transaction: %w", err)
-		}
+	if err := merr.ErrorOrNil(); err != nil {
+		return fmt.Errorf("cannot validate block proposal (id=%x) with invalid transactions: %w", proposal.Header.ID(), err)
 	}
 
 	// store the payload
@@ -325,6 +321,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 	// submit the proposal to hotstuff for processing
 	e.coldstuff.SubmitProposal(proposal.Header, parent.View)
+
+	// report proposed (case that we are follower)
+	e.metrics.CollectionProposed(proposal.Payload.Collection.Light())
 
 	children, ok := e.cache.ByParentID(blockID)
 	if !ok {
@@ -351,7 +350,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 // onBlockVote handles votes for blocks by passing them to the core consensus
 // algorithm
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature, nil)
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
 	return nil
 }
 

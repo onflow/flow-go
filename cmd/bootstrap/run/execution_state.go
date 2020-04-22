@@ -4,32 +4,31 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 )
 
 func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
-	priv, err := crypto.GeneratePrivateKey(crypto.ECDSA_SECp256k1, seed)
+	priv, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 	if err != nil {
 		return flow.AccountPrivateKey{}, err
 	}
 
 	return flow.AccountPrivateKey{
 		PrivateKey: priv,
-		SignAlgo:   crypto.ECDSA_SECp256k1,
-		HashAlgo:   crypto.SHA2_256,
+		SignAlgo:   crypto.ECDSASecp256k1,
+		HashAlgo:   hash.SHA2_256,
 	}, nil
 }
 
-func GenerateExecutionState(levelDB *leveldb.LevelDB, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	ledgerStorage, err := ledger.NewTrieStorage(levelDB)
-	defer func() {
-		_, _ = ledgerStorage.CloseStorage()
-	}()
+func GenerateExecutionState(dbDir string, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
+	ledgerStorage, err := ledger.NewTrieStorage(dbDir)
+	defer ledgerStorage.CloseStorage()
 	if err != nil {
 		return nil, err
 	}
@@ -38,14 +37,14 @@ func GenerateExecutionState(levelDB *leveldb.LevelDB, priv flow.AccountPrivateKe
 }
 
 func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	view := state.NewView(state.LedgerGetRegister(ledger, ledger.LatestStateCommitment()))
+	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
 	err := createRootAccount(view, priv)
 	if err != nil {
 		return nil, err
 	}
 
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta())
+	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +52,7 @@ func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.S
 	return newStateCommitment, nil
 }
 
-func createRootAccount(view *state.View, privateKey flow.AccountPrivateKey) error {
+func createRootAccount(view *delta.View, privateKey flow.AccountPrivateKey) error {
 	publicKeyBytes, err := flow.EncodeAccountPublicKey(privateKey.PublicKey(1000))
 	if err != nil {
 		return fmt.Errorf("cannot encode public key of hardcoded private key: %w", err)

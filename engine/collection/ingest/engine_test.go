@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/stub"
-	protocol "github.com/dapperlabs/flow-go/protocol/badger"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -32,6 +32,8 @@ func TestInvalidTransaction(t *testing.T) {
 		if assert.Error(t, err) {
 			assert.True(t, errors.Is(err, ingest.ErrIncompleteTransaction{}))
 		}
+
+		node.Done()
 	})
 
 	t.Run("invalid signature", func(t *testing.T) {
@@ -65,10 +67,10 @@ func TestClusterRouting(t *testing.T) {
 		require.True(t, ok)
 
 		// get a transaction that will be routed to local
-		tx := testutil.TransactionForCluster(clusters, localCluster)
+		tx := unittest.TransactionForCluster(clusters, localCluster)
 
 		// submit transaction locally to test storing
-		err = localNode.IngestionEngine.ProcessLocal(tx)
+		err = localNode.IngestionEngine.ProcessLocal(&tx)
 		assert.NoError(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -79,6 +81,10 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 1, localNode.Pool.Size())
 		assert.EqualValues(t, 0, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
+
+		for _, node := range nodes {
+			node.Done()
+		}
 	})
 
 	t.Run("should propagate locally submitted transaction", func(t *testing.T) {
@@ -97,10 +103,10 @@ func TestClusterRouting(t *testing.T) {
 		require.True(t, ok)
 
 		// get a transaction that will be routed to the target cluster
-		tx := testutil.TransactionForCluster(clusters, remoteCluster)
+		tx := unittest.TransactionForCluster(clusters, remoteCluster)
 
 		// submit transaction locally to test propagation
-		err = localNode.IngestionEngine.ProcessLocal(tx)
+		err = localNode.IngestionEngine.ProcessLocal(&tx)
 		assert.NoError(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -111,6 +117,10 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 0, localNode.Pool.Size())
 		assert.EqualValues(t, 1, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
+
+		for _, node := range nodes {
+			node.Done()
+		}
 	})
 
 	t.Run("should not propagate remotely submitted transaction", func(t *testing.T) {
@@ -129,10 +139,10 @@ func TestClusterRouting(t *testing.T) {
 		require.True(t, ok)
 
 		// get a transaction that will be routed to remote cluster
-		tx := testutil.TransactionForCluster(clusters, targetCluster)
+		tx := unittest.TransactionForCluster(clusters, targetCluster)
 
 		// submit transaction with remote origin to test non-propagation
-		err = localNode.IngestionEngine.Process(remoteNode.Me.NodeID(), tx)
+		err = localNode.IngestionEngine.Process(remoteNode.Me.NodeID(), &tx)
 		assert.NoError(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -143,6 +153,10 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 0, localNode.Pool.Size())
 		assert.EqualValues(t, 0, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
+
+		for _, node := range nodes {
+			node.Done()
+		}
 	})
 
 	t.Run("should not process invalid transaction", func(t *testing.T) {
@@ -161,11 +175,11 @@ func TestClusterRouting(t *testing.T) {
 		require.True(t, ok)
 
 		// get transaction for target cluster, but make it invalid
-		tx := testutil.TransactionForCluster(clusters, targetCluster)
+		tx := unittest.TransactionForCluster(clusters, targetCluster)
 		tx.Script = nil
 
 		// submit transaction locally (should not be relevant)
-		err = localNode.IngestionEngine.ProcessLocal(tx)
+		err = localNode.IngestionEngine.ProcessLocal(&tx)
 		assert.Error(t, err)
 
 		// flush the network to make sure all messages are sent
@@ -176,5 +190,9 @@ func TestClusterRouting(t *testing.T) {
 		assert.EqualValues(t, 0, localNode.Pool.Size())
 		assert.EqualValues(t, 0, remoteNode.Pool.Size())
 		assert.EqualValues(t, 0, noopNode.Pool.Size())
+
+		for _, node := range nodes {
+			node.Done()
+		}
 	})
 }

@@ -2,21 +2,12 @@
 package crypto
 
 import (
-	"crypto/elliptic"
 	"fmt"
-	"strconv"
-	"strings"
-	"sync"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
 // revive:disable:var-naming
-
-var ECDSA_P256Instance *ECDSAalgo
-var ECDSA_SECp256k1Instance *ECDSAalgo
-
-//  Once variables to make sure each Signer is instantiated only once
-var ECDSA_P256Once sync.Once
-var ECDSA_SECp256k1Once sync.Once
 
 // revive:enable
 
@@ -30,71 +21,41 @@ type signer interface {
 	decodePublicKey([]byte) (PublicKey, error)
 }
 
-// commonSigner holds the common data for all signers
-type commonSigner struct {
-	algo            SigningAlgorithm
-	prKeyLength     int
-	pubKeyLength    int
-	signatureLength int
-}
-
 // newNonRelicSigner initializes a signer that does not depend on the Relic library.
 func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
-	if algo == ECDSA_P256 {
-		ECDSA_P256Once.Do(func() {
-			ECDSA_P256Instance = &(ECDSAalgo{
-				curve: elliptic.P256(),
-				commonSigner: &commonSigner{
-					algo,
-					PrKeyLenECDSA_P256,
-					PubKeyLenECDSA_P256,
-					SignatureLenECDSA_P256,
-				},
-			})
-		})
-		return ECDSA_P256Instance, nil
+	switch algo {
+	case ECDSAP256:
+		return newECDSAP256(), nil
+	case ECDSASecp256k1:
+		return newECDSASecp256k1(), nil
+	default:
+		return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
 	}
-
-	if algo == ECDSA_SECp256k1 {
-		ECDSA_SECp256k1Once.Do(func() {
-			ECDSA_SECp256k1Instance = &(ECDSAalgo{
-				curve: secp256k1(),
-				commonSigner: &commonSigner{
-					algo,
-					PrKeyLenECDSA_SECp256k1,
-					PubKeyLenECDSA_SECp256k1,
-					SignatureLenECDSA_SECp256k1,
-				},
-			})
-		})
-		return ECDSA_SECp256k1Instance, nil
-	}
-	return nil, cryptoError{fmt.Sprintf("the signature scheme %s is not supported.", algo)}
 }
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
-	signer, err := NewSigner(algo)
+	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("key generation failed: %w", err)
 	}
 	return signer.generatePrivateKey(seed)
 }
 
 // DecodePrivateKey decodes an array of bytes into a private key of the given algorithm
 func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
-	signer, err := NewSigner(algo)
+	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode private key failed: %w", err)
 	}
 	return signer.decodePrivateKey(data)
 }
 
 // DecodePublicKey decodes an array of bytes into a public key of the given algorithm
 func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
-	signer, err := NewSigner(algo)
+	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode public key failed: %w", err)
 	}
 	return signer.decodePublicKey(data)
 }
@@ -108,15 +69,7 @@ func (s Signature) Bytes() []byte {
 
 // String returns a String representation of the signature data
 func (s Signature) String() string {
-	const zero = "00"
-	var sb strings.Builder
-	sb.WriteString("0x")
-	for _, i := range s {
-		hex := strconv.FormatUint(uint64(i), 16)
-		sb.WriteString(zero[:2-len(hex)])
-		sb.WriteString(hex)
-	}
-	return sb.String()
+	return fmt.Sprintf("%#x", s.Bytes())
 }
 
 // Key Pair
@@ -125,14 +78,16 @@ func (s Signature) String() string {
 type PrivateKey interface {
 	// Algorithm returns the signing algorithm related to the private key.
 	Algorithm() SigningAlgorithm
-	// KeySize return the key size in bytes.
-	KeySize() int
+	// Size return the key size in bytes.
+	Size() int
+	// String return a hex representation of the key
+	String() string
 	// Sign generates a signature using the provided hasher.
-	Sign([]byte, Hasher) (Signature, error)
+	Sign([]byte, hash.Hasher) (Signature, error)
 	// PublicKey returns the public key.
 	PublicKey() PublicKey
 	// Encode returns a bytes representation of the private key
-	Encode() ([]byte, error)
+	Encode() []byte
 	// Equals returns true if the given PrivateKeys are equal. Keys are considered unequal if their algorithms are
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
@@ -143,12 +98,14 @@ type PrivateKey interface {
 type PublicKey interface {
 	// Algorithm returns the signing algorithm related to the public key.
 	Algorithm() SigningAlgorithm
-	// KeySize return the key size in bytes.
-	KeySize() int
+	// Size() return the key size in bytes.
+	Size() int
+	// String return a hex representation of the key
+	String() string
 	// Verify verifies a signature of an input message using the provided hasher.
-	Verify(Signature, []byte, Hasher) (bool, error)
+	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
-	Encode() ([]byte, error)
+	Encode() []byte
 	// Equals returns true if the given PublicKeys are equal. Keys are considered unequal if their algorithms are
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.

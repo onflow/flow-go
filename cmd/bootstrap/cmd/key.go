@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -16,22 +17,6 @@ var (
 	flagNetworkSeed []byte
 	flagStakingSeed []byte
 )
-
-type PartnerNodeInfoPriv struct {
-	Role           flow.Role
-	Address        string
-	NodeID         flow.Identifier
-	NetworkPrivKey EncodableNetworkPrivKey
-	StakingPrivKey EncodableStakingPrivKey
-}
-
-type PartnerNodeInfoPub struct {
-	Role          flow.Role
-	Address       string
-	NodeID        flow.Identifier
-	NetworkPubKey EncodableNetworkPubKey
-	StakingPubKey EncodableStakingPubKey
-}
 
 // keyCmd represents the key command
 var keyCmd = &cobra.Command{
@@ -58,34 +43,43 @@ var keyCmd = &cobra.Command{
 		log.Info().Msg("generated staking key")
 
 		log.Debug().Str("address", flagAddress).Msg("assembling node information")
-		priv, pub := assembleNodeInfo(NodeConfig{role, flagAddress, 0}, networkKeys[0],
-			stakingKeys[0])
+		conf := model.NodeConfig{
+			Role:    role,
+			Address: flagAddress,
+			Stake:   0,
+		}
+		nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0])
 
-		writeJSON(fmt.Sprintf(filenameNodeInfoPriv, priv.NodeID), PartnerNodeInfoPriv(priv))
-		writeJSON(fmt.Sprintf(filenameNodeInfoPub, pub.NodeID),
-			PartnerNodeInfoPub{pub.Role, pub.Address, pub.NodeID, pub.NetworkPubKey, pub.StakingPubKey})
+		// retrieve private representation of the node
+		private, err := nodeInfo.Private()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not access private keys")
+		}
+
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
+		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(keyCmd)
 
-	keyCmd.Flags().StringVarP(&flagRole, "role", "r", "",
-		"node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"observation\")")
+	keyCmd.Flags().StringVar(&flagRole, "role", "",
+		"node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"access\")")
 	_ = keyCmd.MarkFlagRequired("role")
-	keyCmd.Flags().StringVarP(&flagAddress, "address", "a", "", "network address")
+	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
-	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", []byte{}, "networking seed")
-	_ = keyCmd.MarkFlagRequired("networking-seed")
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", []byte{}, "staking seed")
-	_ = keyCmd.MarkFlagRequired("staking-seed")
+	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(),
+		fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(),
+		fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
 }
 
 func validateRole(role string) flow.Role {
 	parsed, err := flow.ParseRole(role)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unsupported role, allowed values: \"collection\", \"consensus\", \"execution\", " +
-			"\"verification\" or \"observation\"")
+			"\"verification\" or \"access\"")
 	}
 	return parsed
 }

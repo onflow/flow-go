@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 // Network is a mocked network layer made for testing Engine's behavior.

@@ -17,7 +17,7 @@ import (
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -220,7 +220,7 @@ func TestOnApprovalValid(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = identity.NodeID
+	approval.Body.ApproverID = identity.NodeID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
@@ -253,7 +253,7 @@ func TestOnApprovalWrongApprover(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = flow.ZeroID
+	approval.Body.ApproverID = flow.ZeroID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
@@ -285,7 +285,7 @@ func TestOnApprovalMissingIdentity(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = identity.NodeID
+	approval.Body.ApproverID = identity.NodeID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
@@ -316,7 +316,7 @@ func TestOnApprovalZeroStake(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = identity.NodeID
+	approval.Body.ApproverID = identity.NodeID
 	identity.Stake = 0
 
 	state := &protocol.State{}
@@ -348,7 +348,7 @@ func TestOnApprovalWrongRole(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	approval := unittest.ResultApprovalFixture()
-	approval.ResultApprovalBody.ApproverID = identity.NodeID
+	approval.Body.ApproverID = identity.NodeID
 
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}

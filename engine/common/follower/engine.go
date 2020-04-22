@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
@@ -147,6 +147,8 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
+	// TODO: apply the same fixes as for the compliance engine
+
 	// get the latest finalized block
 	final, err := e.state.Final().Head()
 	if err != nil {
@@ -202,14 +204,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 func (e *Engine) handleMissingAncestor(originID flow.Identifier, proposal *messages.BlockProposal, ancestorID flow.Identifier) error {
 
-	pendingBlock := &flow.PendingBlock{
-		OriginID: originID,
-		Header:   proposal.Header,
-		Payload:  proposal.Payload,
-	}
-
 	// cache the block, exit early if it already exists in the cache
-	added := e.cache.Add(pendingBlock)
+	added := e.cache.Add(originID, proposal)
 	if !added {
 		return nil
 	}

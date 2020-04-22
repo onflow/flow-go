@@ -12,7 +12,7 @@ import (
 //   this results in exponential growing timeout duration on multiple subsequent timeouts
 // - on progress: decrease timeout by subtrahend `timeoutDecrease`
 type Controller struct {
-	config
+	cfg            Config
 	timer          *time.Timer
 	timerInfo      *model.TimerInfo
 	timeoutChannel <-chan time.Time
@@ -24,14 +24,14 @@ type Controller struct {
 const timeoutCap float64 = 1e9
 
 // NewController creates a new Controller.
-func NewController(timeoutConfig config) *Controller {
+func NewController(timeoutConfig Config) *Controller {
 	// the initial value for the timeout channel is a closed channel which returns immediately
 	// this prevents indefinite blocking when no timeout has been started
 	startChannel := make(chan time.Time)
 	close(startChannel)
 
 	tc := Controller{
-		config:         timeoutConfig,
+		cfg:            timeoutConfig,
 		timeoutChannel: startChannel,
 	}
 	return &tc
@@ -59,7 +59,7 @@ func (t *Controller) StartTimeout(mode model.TimeoutMode, view uint64) *model.Ti
 	}
 	duration := t.computeTimeoutDuration(mode)
 
-	startTime := time.Now()
+	startTime := time.Now().UTC()
 	timer := time.NewTimer(duration)
 	timerInfo := model.TimerInfo{Mode: mode, View: view, StartTime: startTime, Duration: duration}
 	t.timer = timer
@@ -87,22 +87,22 @@ func (t *Controller) computeTimeoutDuration(mode model.TimeoutMode) time.Duratio
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
-	return time.Duration(t.replicaTimeout * 1e6)
+	return time.Duration(t.cfg.ReplicaTimeout * 1e6)
 }
 
 // VoteCollectionTimeout returns the duration of Vote aggregation _after_ receiving a block
 // during which the primary tries to aggregate votes for the view where it is leader
 func (t *Controller) VoteCollectionTimeout() time.Duration {
 	// time.Duration expects an int64 as input which specifies the duration in units of nanoseconds (1E-9)
-	return time.Duration(t.replicaTimeout * 1e6 * t.voteAggregationTimeoutFraction)
+	return time.Duration(t.cfg.ReplicaTimeout * 1e6 * t.cfg.VoteAggregationTimeoutFraction)
 }
 
 // OnTimeout indicates to the Controller that the timeout was reached
 func (t *Controller) OnTimeout() {
-	t.replicaTimeout = math.Min(t.replicaTimeout*t.timeoutIncrease, timeoutCap)
+	t.cfg.ReplicaTimeout = math.Min(t.cfg.ReplicaTimeout*t.cfg.TimeoutIncrease, timeoutCap)
 }
 
 // OnProgressBeforeTimeout indicates to the Controller that progress was made _before_ the timeout was reached
 func (t *Controller) OnProgressBeforeTimeout() {
-	t.replicaTimeout = math.Max(t.replicaTimeout-t.timeoutDecrease, t.minReplicaTimeout)
+	t.cfg.ReplicaTimeout = math.Max(t.cfg.ReplicaTimeout-t.cfg.TimeoutDecrease, t.cfg.MinReplicaTimeout)
 }

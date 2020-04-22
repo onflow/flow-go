@@ -3,21 +3,17 @@ package voteaggregator
 import (
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 type VoteAggregator struct {
-	logger                zerolog.Logger
-	notifier              notifications.Consumer
+	notifier              hotstuff.Consumer
 	viewState             hotstuff.ViewState
 	voteValidator         hotstuff.Validator
-	sigAggregator         hotstuff.SigAggregator
+	signer                hotstuff.Signer
 	highestPrunedView     uint64
 	pendingVotes          *PendingVotes                                // keeps track of votes whose blocks can not be found
 	viewToBlockIDSet      map[uint64]map[flow.Identifier]struct{}      // for pruning
@@ -28,14 +24,13 @@ type VoteAggregator struct {
 }
 
 // New creates an instance of vote aggregator
-func New(notifier notifications.Consumer, highestPrunedView uint64, viewState hotstuff.ViewState, voteValidator hotstuff.Validator, sigAggregator hotstuff.SigAggregator) *VoteAggregator {
+func New(notifier hotstuff.Consumer, highestPrunedView uint64, viewState hotstuff.ViewState, voteValidator hotstuff.Validator, signer hotstuff.Signer) *VoteAggregator {
 	return &VoteAggregator{
-		logger:                zerolog.Logger{},
 		notifier:              notifier,
 		highestPrunedView:     highestPrunedView,
 		viewState:             viewState,
 		voteValidator:         voteValidator,
-		sigAggregator:         sigAggregator,
+		signer:                signer,
 		pendingVotes:          NewPendingVotes(),
 		viewToBlockIDSet:      make(map[uint64]map[flow.Identifier]struct{}),
 		viewToVoteID:          make(map[uint64]map[flow.Identifier]*model.Vote),
@@ -52,8 +47,6 @@ func (va *VoteAggregator) StorePendingVote(vote *model.Vote) bool {
 	// check if the vote is for a view that has already been pruned (and is thus stale)
 	// cannot store vote for already pruned view
 	if va.isStale(vote) {
-		va.logger.Info().Msgf("received staled pending vote for view :%v, ignored since highestPrunedView is: %v",
-			vote.View, va.highestPrunedView)
 		return false
 	}
 	// add vote, return false if the vote is not successfully added (already existed)
@@ -78,8 +71,6 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Blo
 	}
 	// ignore stale votes
 	if va.isStale(vote) {
-		va.logger.Info().Msgf("received staled vote for view :%v, ignored since highestPrunedView is: %v",
-			vote.View, va.highestPrunedView)
 		return nil, false, nil
 	}
 	// validate the vote and adding it to the accumulated voting status
@@ -220,7 +211,6 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *model.Vote, blo
 		// does not report invalid vote as an error, notify consumers instead
 		case *model.ErrorInvalidVote:
 			va.notifier.OnInvalidVoteDetected(vote)
-			va.logger.Warn().Err(err).Msg("could not store invalid vote")
 			return false, nil
 		default:
 			return false, fmt.Errorf("could not validate incorporated vote: %w", err)
@@ -245,7 +235,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *model.Vote, blo
 
 		// create VotingStatus for block
 		stakeThreshold := hotstuff.ComputeStakeThresholdForBuildingQC(identities.TotalStake()) // stake threshold for building valid qc
-		votingStatus = NewVotingStatus(block, stakeThreshold, va.sigAggregator)
+		votingStatus = NewVotingStatus(block, stakeThreshold, va.signer)
 		va.blockIDToVotingStatus[vote.BlockID] = votingStatus
 	}
 	votingStatus.AddVote(vote, voter)
@@ -254,7 +244,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *model.Vote, blo
 }
 
 func (va *VoteAggregator) updateState(vote *model.Vote) {
-	voterID := vote.Signature.SignerID
+	voterID := vote.SignerID
 
 	// update viewToVoteID
 	idToVote, exists := va.viewToVoteID[vote.View]
@@ -301,7 +291,7 @@ func (va *VoteAggregator) detectDoubleVote(vote *model.Vote) (*model.Vote, bool)
 		// never voted by anyone
 		return nil, false
 	}
-	originalVote, exists := idToVotes[vote.Signature.SignerID]
+	originalVote, exists := idToVotes[vote.SignerID]
 	if !exists {
 		// never voted by this sender
 		return nil, false

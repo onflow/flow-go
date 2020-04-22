@@ -54,6 +54,12 @@ func (suite *Suite) SetupTest() {
 	suite.Require().Nil(err)
 }
 
+func (suite *Suite) TearDownTest() {
+	suite.reqNode.Done()
+	suite.colNode.Done()
+	suite.conNode.Done()
+}
+
 func TestProviderEngine(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
@@ -64,7 +70,7 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{suite.colNode.Me.NodeID()}
-	guarantee.Signatures = unittest.SignaturesFixture(1)
+	guarantee.Signature = unittest.SignatureFixture()
 
 	err := suite.colNode.ProviderEngine.SubmitCollectionGuarantee(guarantee)
 	assert.NoError(t, err)

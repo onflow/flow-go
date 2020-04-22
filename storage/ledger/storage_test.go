@@ -1,4 +1,4 @@
-package ledger
+package ledger_test
 
 import (
 	"testing"
@@ -7,22 +7,23 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestNewTrieStorage(t *testing.T) {
-	unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-		_, err := NewTrieStorage(db)
+	unittest.RunWithTempDBDir(t, func(dbDir string) {
+		_, err := ledger.NewTrieStorage(dbDir)
 		assert.NoError(t, err)
 	})
 }
 
 func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	t.Run("mismatched IDs and values", func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-			f, err := NewTrieStorage(db)
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
+
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
@@ -30,30 +31,26 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 			// add extra id but not value
 			ids = append(ids, flow.RegisterID{42})
 
-			currentRoot := f.tree.GetRoot().GetValue()
+			currentRoot := f.EmptyStateCommitment()
 
-			_, err = f.UpdateRegisters(ids, values)
+			_, err = f.UpdateRegisters(ids, values, currentRoot)
 			assert.Error(t, err)
-
-			newRoot := f.tree.GetRoot().GetValue()
-
-			// root should not change
-			assert.Equal(t, currentRoot, newRoot)
 		})
 	})
 
 	t.Run("empty update", func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-			f, err := NewTrieStorage(db)
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
+
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			// create empty values
 			ids := []flow.RegisterID{}
 			values := []flow.RegisterValue{}
 
-			currentRoot := f.tree.GetRoot().GetValue()
+			currentRoot := f.EmptyStateCommitment()
 
-			newRoot, err := f.UpdateRegisters(ids, values)
+			newRoot, err := f.UpdateRegisters(ids, values, currentRoot)
 			require.NoError(t, err)
 
 			// root should not change
@@ -62,17 +59,17 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	})
 
 	t.Run("non-empty update", func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-			f, err := NewTrieStorage(db)
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
+
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
 
-			currentRoot := f.tree.GetRoot().GetValue()
+			currentRoot := f.EmptyStateCommitment()
 
-			newRoot, err := f.UpdateRegisters(ids, values)
+			newRoot, err := f.UpdateRegisters(ids, values, currentRoot)
 			require.NoError(t, err)
-			assert.Equal(t, f.tree.GetRoot().GetValue(), newRoot)
 
 			newValues, err := f.GetRegisters(ids, newRoot)
 			require.NoError(t, err)
@@ -85,8 +82,9 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 
 func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	t.Run("mismatched IDs and values", func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-			f, err := NewTrieStorage(db)
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
+
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
@@ -94,30 +92,26 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 			// add extra id but not value
 			ids = append(ids, flow.RegisterID{42})
 
-			currentRoot := f.tree.GetRoot().GetValue()
+			currentRoot := f.EmptyStateCommitment()
 
-			_, _, err = f.UpdateRegistersWithProof(ids, values)
+			_, _, err = f.UpdateRegistersWithProof(ids, values, currentRoot)
 			assert.Error(t, err)
-
-			newRoot := f.tree.GetRoot().GetValue()
-
-			// root should not change
-			assert.Equal(t, currentRoot, newRoot)
 		})
 	})
 
 	t.Run("empty update", func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-			f, err := NewTrieStorage(db)
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
+
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
-			currentRoot := f.tree.GetRoot().GetValue()
+			currentRoot := f.EmptyStateCommitment()
 
 			// create empty values
 			ids := []flow.RegisterID{}
 			values := []flow.RegisterValue{}
 
-			newRoot, _, err := f.UpdateRegistersWithProof(ids, values)
+			newRoot, _, err := f.UpdateRegistersWithProof(ids, values, currentRoot)
 			require.NoError(t, err)
 
 			// root should not change
@@ -126,17 +120,17 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	})
 
 	t.Run("non-empty update", func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-			f, err := NewTrieStorage(db)
+		unittest.RunWithTempDBDir(t, func(dbDir string) {
+
+			f, err := ledger.NewTrieStorage(dbDir)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
 
-			currentRoot := f.tree.GetRoot().GetValue()
+			currentRoot := f.EmptyStateCommitment()
 
-			newRoot, _, err := f.UpdateRegistersWithProof(ids, values)
+			newRoot, _, err := f.UpdateRegistersWithProof(ids, values, currentRoot)
 			require.NoError(t, err)
-			assert.Equal(t, f.tree.GetRoot().GetValue(), newRoot)
 
 			newValues, _, err := f.GetRegistersWithProof(ids, newRoot)
 			require.NoError(t, err)

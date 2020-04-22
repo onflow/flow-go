@@ -4,23 +4,25 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	encoding "github.com/onflow/cadence/encoding/xdr"
 	"github.com/rs/zerolog"
+
+	encoding "github.com/onflow/cadence/encoding/xdr"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 type ComputationManager interface {
-	ExecuteScript([]byte, *flow.Header, *state.View) ([]byte, error)
-	ComputeBlock(block *entity.ExecutableBlock, view *state.View) (*execution.ComputationResult, error)
+	ExecuteScript([]byte, *flow.Header, *delta.View) ([]byte, error)
+	ComputeBlock(block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error)
+	GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error)
 }
 
 // Manager manages computation and execution
@@ -51,7 +53,7 @@ func New(
 	return &e
 }
 
-func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *state.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
 
 	result, err := e.vm.NewBlockContext(blockHeader).ExecuteScript(view, script)
 	if err != nil {
@@ -59,7 +61,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *s
 	}
 
 	if !result.Succeeded() {
-		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
+		return nil, fmt.Errorf("failed to execute script at block (%s): %w", blockHeader.ID(), result.Error)
 	}
 
 	value := cadence.ConvertValue(result.Value)
@@ -72,7 +74,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *s
 	return encodedValue, nil
 }
 
-func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *state.View) (*execution.ComputationResult, error) {
+func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error) {
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
@@ -90,5 +92,11 @@ func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *state.View) 
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
 
+	return result, nil
+}
+
+func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
+
+	result := e.vm.NewBlockContext(blockHeader).GetAccount(view, address)
 	return result, nil
 }

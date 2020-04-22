@@ -10,6 +10,8 @@ import (
 	"gonum.org/v1/gonum/stat"
 )
 
+// math/random is only used to randomize test inputs
+
 // The only purpose of this function is unit testing. It also implements a very basic tandomness test.
 // it doesn't evaluate randomness of the random function and doesn't perform advanced statistical tests
 // just making sure code works on edge cases
@@ -42,7 +44,7 @@ func TestRandomPermutationSubset(t *testing.T) {
 	seed := make([]byte, 16)
 	// test a zero seed
 	rng, err := NewRand(seed)
-	require.Error(t, err)
+	require.NoError(t, err)
 	// fix thee seed
 	seed[0] = 45
 	rng, err = NewRand(seed)

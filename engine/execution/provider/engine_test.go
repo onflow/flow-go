@@ -1,7 +1,7 @@
 package provider
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,11 +12,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestProviderEngine_OnExecutionStateRequest(t *testing.T) {
+func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 	t.Run("non-verification engine", func(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
@@ -32,10 +32,9 @@ func TestProviderEngine_OnExecutionStateRequest(t *testing.T) {
 		ss.On("Identity", originID).
 			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
 
-		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
-
+		req := &messages.ChunkDataPackRequest{ChunkID: chunkID}
 		// submit using origin ID with invalid role
-		err := e.onExecutionStateRequest(originID, req)
+		err := e.onChunkDataPackRequest(originID, req)
 		assert.Error(t, err)
 
 		ps.AssertExpectations(t)
@@ -48,7 +47,7 @@ func TestProviderEngine_OnExecutionStateRequest(t *testing.T) {
 		ss := new(protocol.Snapshot)
 
 		execState := new(state.ExecutionState)
-
+		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(nil, errors.New("not found!"))
 		e := Engine{state: ps, execState: execState}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -57,11 +56,9 @@ func TestProviderEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		execState.On("GetChunkRegisters", chunkID).Return(nil, fmt.Errorf("state error"))
 
-		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
-
-		err := e.onExecutionStateRequest(originIdentity.NodeID, req)
+		req := &messages.ChunkDataPackRequest{ChunkID: chunkID}
+		err := e.onChunkDataPackRequest(originIdentity.NodeID, req)
 		assert.Error(t, err)
 
 		ps.AssertExpectations(t)
@@ -76,42 +73,30 @@ func TestProviderEngine_OnExecutionStateRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execStateCon: con, execState: execState}
+		e := Engine{state: ps, chunksConduit: con, execState: execState}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-		chunkHeader := unittest.ChunkHeaderFixture()
-		chunkID := chunkHeader.ChunkID
-
-		registerIDs := chunkHeader.RegisterIDs
-		registerValues := []flow.RegisterValue{{1}, {2}, {3}}
-
-		expectedRegisters := flow.Ledger{
-			string(registerIDs[0]): registerValues[0],
-			string(registerIDs[1]): registerValues[1],
-			string(registerIDs[2]): registerValues[2],
-		}
+		chunkID := unittest.IdentifierFixture()
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
 		con.On("Submit", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
-				res, ok := args[0].(*messages.ExecutionStateResponse)
+				res, ok := args[0].(*messages.ChunkDataPackResponse)
 				require.True(t, ok)
 
-				actualChunkID := res.State.ChunkID
-				actualRegisters := res.State.Registers
-
+				actualChunkID := res.Data.ChunkID
 				assert.Equal(t, chunkID, actualChunkID)
-				assert.EqualValues(t, expectedRegisters, actualRegisters)
 			}).
 			Return(nil)
 
-		execState.On("GetChunkRegisters", chunkID).Return(expectedRegisters, nil)
+		execState.On("ChunkDataPackByChunkID", chunkID).Return(&chunkDataPack, nil)
 
-		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
+		req := &messages.ChunkDataPackRequest{ChunkID: chunkID}
 
-		err := e.onExecutionStateRequest(originIdentity.NodeID, req)
+		err := e.onChunkDataPackRequest(originIdentity.NodeID, req)
 		assert.NoError(t, err)
 
 		ps.AssertExpectations(t)

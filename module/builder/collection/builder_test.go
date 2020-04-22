@@ -8,12 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cluster "github.com/dapperlabs/flow-go/cluster/badger"
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/builder/collection"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -36,8 +35,6 @@ func TestBuilder(t *testing.T) {
 		// helper function for inserting a block
 		insert := func(block *model.Block) {
 			err := db.Update(func(tx *badger.Txn) error {
-				err = operation.InsertCollection(&block.Collection)(tx)
-				assert.Nil(t, err)
 				err = procedure.InsertClusterBlock(block)(tx)
 				assert.Nil(t, err)
 				return nil
@@ -124,7 +121,7 @@ func TestBuilder(t *testing.T) {
 			tx3 := mempoolTransactions[2] // in no block
 
 			// build first fork on top of genesis
-			payload1 := model.PayloadFromTransactions([]flow.Identifier{tx1.ID()})
+			payload1 := model.PayloadFromTransactions(tx1)
 			block1 := unittest.ClusterBlockWithParent(genesis)
 			block1.SetPayload(payload1)
 
@@ -132,7 +129,7 @@ func TestBuilder(t *testing.T) {
 			insert(&block1)
 
 			// build second fork on top of genesis
-			payload2 := model.PayloadFromTransactions([]flow.Identifier{tx2.ID()})
+			payload2 := model.PayloadFromTransactions(tx2)
 			block2 := unittest.ClusterBlockWithParent(genesis)
 			block2.SetPayload(payload2)
 
@@ -168,13 +165,13 @@ func TestBuilder(t *testing.T) {
 			tx3 := mempoolTransactions[2] // in no blocks
 
 			// build a block containing tx1 on genesis
-			finalizedPayload := model.PayloadFromTransactions([]flow.Identifier{tx1.ID()})
+			finalizedPayload := model.PayloadFromTransactions(tx1)
 			finalizedBlock := unittest.ClusterBlockWithParent(genesis)
 			finalizedBlock.SetPayload(finalizedPayload)
 			insert(&finalizedBlock)
 
 			// build a block containing tx2 on the first block
-			unFinalizedPayload := model.PayloadFromTransactions([]flow.Identifier{tx2.ID()})
+			unFinalizedPayload := model.PayloadFromTransactions(tx2)
 			unFinalizedBlock := unittest.ClusterBlockWithParent(&finalizedBlock)
 			unFinalizedBlock.SetPayload(unFinalizedPayload)
 			insert(&unFinalizedBlock)
@@ -214,13 +211,13 @@ func TestBuilder(t *testing.T) {
 			tx3 := mempoolTransactions[2] // in no blocks
 
 			// build a block containing tx1 on genesis - will be finalized
-			finalizedPayload := model.PayloadFromTransactions([]flow.Identifier{tx1.ID()})
+			finalizedPayload := model.PayloadFromTransactions(tx1)
 			finalizedBlock := unittest.ClusterBlockWithParent(genesis)
 			finalizedBlock.SetPayload(finalizedPayload)
 			insert(&finalizedBlock)
 
 			// build a block containing tx2 ALSO on genesis - will be invalidated
-			invalidatedPayload := model.PayloadFromTransactions([]flow.Identifier{tx2.ID()})
+			invalidatedPayload := model.PayloadFromTransactions(tx2)
 			invalidatedBlock := unittest.ClusterBlockWithParent(genesis)
 			invalidatedBlock.SetPayload(invalidatedPayload)
 			insert(&invalidatedBlock)
@@ -289,7 +286,7 @@ func TestBuilder(t *testing.T) {
 
 				// create a block containing the transaction
 				block := unittest.ClusterBlockWithParent(&head)
-				payload := model.PayloadFromTransactions([]flow.Identifier{tx.ID()})
+				payload := model.PayloadFromTransactions(&tx)
 				block.SetPayload(payload)
 				insert(&block)
 
@@ -327,11 +324,11 @@ func TestBuilder(t *testing.T) {
 }
 
 // helper to check whether a collection contains each of the given transactions.
-func collectionContains(collection flow.LightCollection, txIDs ...flow.Identifier) bool {
+func collectionContains(collection flow.Collection, txIDs ...flow.Identifier) bool {
 
 	lookup := make(map[flow.Identifier]struct{}, len(txIDs))
-	for _, txID := range collection.Transactions {
-		lookup[txID] = struct{}{}
+	for _, tx := range collection.Transactions {
+		lookup[tx.ID()] = struct{}{}
 	}
 
 	for _, txID := range txIDs {

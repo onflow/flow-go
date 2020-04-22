@@ -2,15 +2,15 @@ package unittest
 
 import (
 	"io/ioutil"
-	"path/filepath"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/dgraph-io/badger/v2/options"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 )
 
 func ExpectPanic(expectedMsg string, t *testing.T) {
@@ -43,53 +43,50 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	}
 }
 
-func tempDBDir() (string, error) {
-	return ioutil.TempDir("", "flow-test-db")
+// AssertErrSubstringMatch asserts that two errors match with substring
+// checking on the Error method (`expected` must be a substring of `actual`, to
+// account for the actual error being wrapped). Fails the test if either error
+// is nil.
+//
+// NOTE: This should only be used in cases where `errors.Is` cannot be, like
+// when errors are transmitted over the network without type information.
+func AssertErrSubstringMatch(t *testing.T, expected, actual error) {
+	assert.NotNil(t, expected)
+	assert.NotNil(t, actual)
+	assert.True(t, strings.Contains(actual.Error(), expected.Error()))
 }
 
-func TempBadgerDB(t *testing.T) *badger.DB {
-	dir, err := tempDBDir()
-	require.Nil(t, err)
+func TempDBDir(t *testing.T) string {
+	dir, err := ioutil.TempDir("", "flow-test-db")
+	require.NoError(t, err)
+	return dir
+}
 
-	// Ref: https://github.com/dgraph-io/badger#memory-usage
+func RunWithTempDBDir(t *testing.T, f func(string)) {
+	dbDir := TempDBDir(t)
+	defer os.RemoveAll(dbDir)
+
+	f(dbDir)
+}
+
+func TempBadgerDB(t *testing.T) (*badger.DB, string) {
+
+	dir := TempDBDir(t)
+
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
 	require.Nil(t, err)
 
-	return db
-}
-
-func TempLevelDB(t *testing.T) *leveldb.LevelDB {
-	dir, err := tempDBDir()
-	require.Nil(t, err)
-
-	kvdbPath := filepath.Join(dir, "kvdb")
-	tdbPath := filepath.Join(dir, "tdb")
-
-	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
-	require.Nil(t, err)
-
-	return db
+	return db, dir
 }
 
 func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
-	db := TempBadgerDB(t)
+	RunWithTempDBDir(t, func(dir string) {
+		// Ref: https://github.com/dgraph-io/badger#memory-usage
+		db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
+		require.NoError(t, err)
 
-	defer func() {
-		err := db.Close()
-		require.Nil(t, err)
-	}()
+		f(db)
 
-	f(db)
-}
-
-func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {
-	db := TempLevelDB(t)
-
-	defer func() {
-		err1, err2 := db.SafeClose()
-		require.Nil(t, err1)
-		require.Nil(t, err2)
-	}()
-
-	f(db)
+		db.Close()
+	})
 }

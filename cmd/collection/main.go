@@ -6,24 +6,38 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/cluster"
-	badgercluster "github.com/dapperlabs/flow-go/cluster/badger"
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
-	model "github.com/dapperlabs/flow-go/model/cluster"
+	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	"github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
+	colfinalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
+	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/module/signature"
+	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/logging"
+)
+
+const (
+	proposalInterval = time.Second * 2
+	proposalTimeout  = time.Second * 4
 )
 
 func main() {
@@ -35,12 +49,19 @@ func main() {
 		collections  *storage.Collections
 		transactions *storage.Transactions
 		headers      *storage.Headers
-		payloads     *storage.ClusterPayloads
-		clusterID    string        // chain ID for the cluster
-		clusterState cluster.State // chain state for the cluster
-		prov         *provider.Engine
-		ing          *ingest.Engine
-		err          error
+		blocks       *storage.Blocks
+		colPayloads  *storage.ClusterPayloads
+		conPayloads  *storage.Payloads
+
+		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
+		conCache *buffer.PendingBlocks        // pending block cache for follower
+
+		clusterID    string           // chain ID for the cluster
+		clusterState *clusterkv.State // chain state for the cluster
+
+		prov *provider.Engine
+		ing  *ingest.Engine
+		err  error
 	)
 
 	cmd.FlowNode("collection").
@@ -55,7 +76,14 @@ func main() {
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
 			transactions = storage.NewTransactions(node.DB)
 			headers = storage.NewHeaders(node.DB)
-			payloads = storage.NewClusterPayloads(node.DB)
+			blocks = storage.NewBlocks(node.DB)
+			colPayloads = storage.NewClusterPayloads(node.DB)
+			conPayloads = storage.NewPayloads(node.DB)
+			return nil
+		}).
+		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+			colCache = buffer.NewPendingClusterBlocks()
+			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
@@ -66,14 +94,20 @@ func main() {
 
 			// determine the chain ID for my cluster and create cluster state
 			clusterID = protocol.ChainIDForCluster(myCluster)
-			clusterState, err = badgercluster.NewState(node.DB, clusterID)
+			clusterState, err = clusterkv.NewState(node.DB, clusterID)
 			if err != nil {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}
 
 			// create genesis block for cluster consensus
-			genesis := model.Genesis()
+			genesis := cluster.Genesis()
 			genesis.ChainID = clusterID
+
+			node.Logger.Info().
+				Hex("genesis_id", logging.ID(genesis.ID())).
+				Str("cluster_id", clusterID).
+				Str("cluster_members", fmt.Sprintf("%v", myCluster.NodeIDs())).
+				Msg("bootstrapped cluster state")
 
 			// bootstrap cluster consensus state
 			err = clusterState.Mutate().Bootstrap(genesis)
@@ -83,8 +117,53 @@ func main() {
 
 			return nil
 		}).
+		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// create a finalizer that will handling updating the protocol
+			// state when the follower detects newly finalized blocks
+			final := followerfinalizer.NewFinalizer(node.DB)
+
+			// initialize the staking & beacon verifiers, signature joiner
+			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			merger := signature.NewCombiner()
+
+			// define the node set that is valid as signers
+			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+
+			// TODO: use proper engine for notifier to follower
+			notifier := notifications.NewNoopConsumer()
+
+			// creates a consensus follower with ingestEngine as the notifier
+			// so that it gets notified upon each new finalized block
+			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, notifier, &node.GenesisBlock.Header, node.GenesisQC, selector)
+			if err != nil {
+				//return nil, fmt.Errorf("could not create follower core logic: %w", err)
+				// TODO for now we ignore failures in follower
+				// this is necessary for integration tests to run, until they are
+				// updated to generate/use valid genesis QC and DKG files.
+				// ref https://github.com/dapperlabs/flow-go/issues/3057
+				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
+			}
+
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.State, headers, conPayloads, conCache, core)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower engine: %w", err)
+			}
+
+			// create a block synchronization engine to handle follower getting
+			// out of sync
+			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, blocks, follower)
+			if err != nil {
+				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
+			}
+
+			return follower.WithSynchronization(sync), nil
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool)
+			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -93,15 +172,14 @@ func main() {
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collections = storage.NewCollections(node.DB)
-			prov, err = provider.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool, collections, transactions)
+			prov, err = provider.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool, collections, transactions)
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			cache := buffer.NewPendingClusterBlocks()
 			build := builder.NewBuilder(node.DB, pool, clusterID)
-			final := finalizer.NewFinalizer(node.DB, pool, prov, node.Tracer, clusterID)
+			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Tracer, prov, pool, transactions, headers, payloads, cache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, headers, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
@@ -115,7 +193,7 @@ func main() {
 				return clusterState.Final().Head()
 			}
 
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, 3*time.Second, 6*time.Second, head)
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, proposalInterval, proposalTimeout, head)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}
@@ -123,5 +201,5 @@ func main() {
 			prop = prop.WithConsensus(cold)
 			return prop, nil
 		}).
-		Run()
+		Run("collection")
 }

@@ -2,90 +2,84 @@ package crypto
 
 //revive:disable:var-naming
 
-// SigningAlgorithm is an identifier for a signing algorithm and curve.
+// SigningAlgorithm is an identifier for a signing algorithm
+// (and parameters if applicable)
 type SigningAlgorithm int
 
 const (
 	// Supported signing algorithms
-	UnknownSigningAlgorithm SigningAlgorithm = iota
-	BLS_BLS12381
-	ECDSA_P256
-	ECDSA_SECp256k1
+
+	unknownSigningAlgorithm SigningAlgorithm = iota
+	// BLSBLS12381 is BLS on BLS 12-381 curve
+	BLSBLS12381
+	// ECDSAP256 is ECDSA on NIST P-256 curve
+	ECDSAP256
+	// ECDSASecp256k1 is ECDSA on secp256k1 curve
+	ECDSASecp256k1
 )
 
 // String returns the string representation of this signing algorithm.
 func (f SigningAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_SECp256k1"}[f]
-}
-
-// HashingAlgorithm is an identifier for a hashing algorithm.
-type HashingAlgorithm int
-
-const (
-	// Supported hashing algorithms
-	UnknownHashingAlgorithm HashingAlgorithm = iota
-	SHA2_256
-	SHA2_384
-	SHA3_256
-	SHA3_384
-	KMAC128
-)
-
-// String returns the string representation of this hashing algorithm.
-func (f HashingAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384", "KMAC128"}[f]
+	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_secp256k1"}[f]
 }
 
 const (
-	// targeted bits of security
+	// minimum targeted bits of security
 	securityBits = 128
-
-	// Lengths of hash outputs in bytes
-	HashLenSha2_256 = 32
-	HashLenSha2_384 = 48
-	HashLenSha3_256 = 32
-	HashLenSha3_384 = 48
 
 	// BLS signature scheme lengths
 
 	// BLS12-381
-	// p size in bytes
+	// p size in bytes, where G1 is defined over the field Zp
 	fieldSize = 48
 	// Points compression: 1 for compressed, 0 for uncompressed
 	compression = 1
-	// the length is divided by 2 if compression is on
-	SignatureLenBLS_BLS12381 = fieldSize * (2 - compression)
-	PrKeyLenBLS_BLS12381     = 32
-	// the length is divided by 2 if compression is on
-	PubKeyLenBLS_BLS12381 = 2 * fieldSize * (2 - compression)
-	// Input length of the optimized SwU map to G1: 2*(P_size+security)
-	// security being 128 bits
-	OpSwUInputLenBLS_BLS12381    = 2 * (fieldSize + (securityBits / 8))
-	KeyGenSeedMinLenBLS_BLS12381 = PrKeyLenBLS_BLS12381 + (securityBits / 8)
+	// SignatureLenBLSBLS12381 is the size of G1 elements
+	SignatureLenBLSBLS12381 = fieldSize * (2 - compression) // the length is divided by 2 if compression is on
+	PrKeyLenBLSBLS12381     = 32
+	// PubKeyLenBLSBLS12381 is the size of G2 elements
+	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - compression) // the length is divided by 2 if compression is on
+	// opSwUInputLenBLSBLS12381 is the input length of the optimized SwU map to G1
+	opSwUInputLenBLSBLS12381    = 2 * (fieldSize + (securityBits / 8))
+	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
+	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
 
 	// ECDSA
 
 	// NIST P256
-	SignatureLenECDSA_P256     = 64
-	PrKeyLenECDSA_P256         = 32
-	PubKeyLenECDSA_P256        = 64
-	KeyGenSeedMinLenECDSA_P256 = PrKeyLenECDSA_P256 + (securityBits / 8)
+	SignatureLenECDSAP256 = 64
+	PrKeyLenECDSAP256     = 32
+	// PubKeyLenECDSAP256 is the size of uncompressed points on P256
+	PubKeyLenECDSAP256        = 64
+	KeyGenSeedMinLenECDSAP256 = PrKeyLenECDSAP256 + (securityBits / 8)
 
-	// SEC p256k1
-	SignatureLenECDSA_SECp256k1     = 64
-	PrKeyLenECDSA_SECp256k1         = 32
-	PubKeyLenECDSA_SECp256k1        = 64
-	KeyGenSeedMinLenECDSA_SECp256k1 = PrKeyLenECDSA_SECp256k1 + (securityBits / 8)
+	// SECG secp256k1
+	SignatureLenECDSASecp256k1 = 64
+	PrKeyLenECDSASecp256k1     = 32
+	// PubKeyLenECDSASecp256k1 is the size of uncompressed points on P256
+	PubKeyLenECDSASecp256k1        = 64
+	KeyGenSeedMinLenECDSASecp256k1 = PrKeyLenECDSASecp256k1 + (securityBits / 8)
 
 	// DKG and Threshold Signatures
-	DKGMinSize       int = 3
-	ThresholdMinSize     = DKGMinSize
-	DKGMaxSize       int = 254
-	ThresholdMaxSize     = DKGMaxSize
 
-	// KMAC
-	// the parameter maximum bytes-length as defined in NIST SP 800-185
-	KmacMaxParamsLen = 2040 / 8
+	// DKGMinSize is the minimum size of a group participating in a DKG protocol
+	DKGMinSize int = 1
+	// DKGMaxSize is the minimum size of a group participating in a DKG protocol
+	DKGMaxSize int = 254
+	// SeedMinLenDKG is the minumum seed length required to participate in a DKG protocol
+	SeedMinLenDKG = securityBits / 8
+	SeedMaxLenDKG = maxRelicPrgSeed
+	// ThresholdMinSize is the minimum size of a group participating in a threshold signature protocol
+	ThresholdMinSize = DKGMinSize
+	// ThresholdMaxSize is the minimum size of a group participating in a threshold signature protocol
+	ThresholdMaxSize = DKGMaxSize
+
+	// Relic internal constants (related to exported constants above)
+	// max byte length of bn_st
+	maxScalarSize = 256
+
+	// max relic PRG seed length in bytes
+	maxRelicPrgSeed = 1 << 32
 )
 
 // Signature is a generic type, regardless of the signature scheme

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence"
+	encoding "github.com/onflow/cadence/encoding/xdr"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -21,6 +23,9 @@ type BlockContext interface {
 
 	// ExecuteScript computes the result of a read-only script.
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
+
+	// GetAccount looks up the flow account for the given address
+	GetAccount(ledger Ledger, address flow.Address) *flow.Account
 }
 
 type blockContext struct {
@@ -122,4 +127,44 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 		Value:    value,
 		Logs:     ctx.Logs(),
 	}, nil
+}
+
+func (bc *blockContext) GetAccount(ledger Ledger, address flow.Address) *flow.Account {
+	ctx := bc.newScriptContext(ledger)
+
+	account := ctx.GetAccount(address)
+
+	return account
+}
+
+// ConvertEvents creates flow.Events from runtime.events
+func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) {
+
+	flowEvents := make([]flow.Event, len(tr.Events))
+
+	for i, event := range tr.Events {
+		fields := make([]cadence.Value, len(event.Fields))
+
+		for j, field := range event.Fields {
+			convertedField := cadence.ConvertValue(field)
+			fields[j] = convertedField
+		}
+
+		eventValue := cadence.NewEvent(fields)
+
+		payload, err := encoding.Encode(eventValue)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode event: %w", err)
+		}
+
+		flowEvents[i] = flow.Event{
+			Type:             flow.EventType(event.Type.ID()),
+			TransactionID:    tr.TransactionID,
+			TransactionIndex: txIndex,
+			EventIndex:       uint32(i),
+			Payload:          payload,
+		}
+	}
+
+	return flowEvents, nil
 }

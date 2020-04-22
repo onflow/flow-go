@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
@@ -15,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -64,15 +62,19 @@ func TestExecutionFlow(t *testing.T) {
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col1.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 				{
 					CollectionID: col2.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 			},
 		},
 	}
 
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
+	proposal := unittest.ProposalFromBlock(block)
+
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
 
 	collectionNode := testutil.GenericNode(t, hub, colID, identities)
@@ -129,7 +131,7 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	exeNode.IngestionEngine.Submit(conID.NodeID, block)
+	exeNode.IngestionEngine.Submit(conID.NodeID, proposal)
 
 	assert.Eventually(t, func() bool {
 		hub.DeliverAll()
@@ -139,6 +141,11 @@ func TestExecutionFlow(t *testing.T) {
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)
+
+	collectionNode.Done()
+	verificationNode.Done()
+	consensusNode.Done()
+	exeNode.Done()
 }
 
 func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
@@ -161,14 +168,14 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 			ProposerID: con1ID.ID(),
 		},
 	}
-	//fork := &flow.Block{
-	//	Header: flow.Header{
-	//		ParentID:   genesis.ID(),
-	//		View:       2,
-	//		Height:     2,
-	//		ProposerID: con2ID.ID(),
-	//	},
-	//}
+	fork := &flow.Block{
+		Header: flow.Header{
+			ParentID:   genesis.ID(),
+			View:       2,
+			Height:     2,
+			ProposerID: con2ID.ID(),
+		},
+	}
 	block3 := &flow.Block{
 		Header: flow.Header{
 			ParentID:   block2.ID(),
@@ -178,8 +185,11 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 		},
 	}
 
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
-	defer exeNode.Done()
+	proposal2 := unittest.ProposalFromBlock(block2)
+	proposal2alt := unittest.ProposalFromBlock(fork)
+	proposal3 := unittest.ProposalFromBlock(block3)
+
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 
 	consensus1Node := testutil.GenericNode(t, hub, con1ID, identities)
 	consensus2Node := testutil.GenericNode(t, hub, con2ID, identities)
@@ -193,26 +203,23 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 		Run(func(args mock.Arguments) { actualCalls++ }).
 		Return(nil)
 
-	// TODO Execution Engine is able to work on forks, but full test cannot be enabled
-	// due to Consensus Follower not fully implemented
-	exeNode.IngestionEngine.Submit(con1ID.NodeID, block2)
-	//exeNode.IngestionEngine.Submit(con1ID.NodeID, block3) // block 3 cannot be executed if parent (block2 is missing)
-	//exeNode.IngestionEngine.Submit(con1ID.NodeID, fork) // block 3 cannot be executed if parent (block2 is missing)
+	exeNode.AssertHighestExecutedBlock(t, &genesis.Header)
+
+	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2alt)
+	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal3) // block 3 cannot be executed if parent (block2 is missing)
+
 	hub.Eventually(t, equal(2, &actualCalls))
 
-	exeNode.IngestionEngine.Submit(con2ID.NodeID, block3)
-	hub.Eventually(t, equal(4, &actualCalls))
+	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2)
+	hub.Eventually(t, equal(6, &actualCalls)) // now block 3 and 2 can be executed
 
-	var res flow.Identifier
-	err := exeNode.BadgerDB.View(operation.RetrieveNumber(2, &res))
-	require.NoError(t, err)
-	require.Equal(t, block2.ID(), res)
-
-	err = exeNode.BadgerDB.View(operation.RetrieveNumber(3, &res))
-	require.NoError(t, err)
-	require.Equal(t, block3.ID(), res)
+	exeNode.AssertHighestExecutedBlock(t, &block3.Header)
 
 	consensusEngine.AssertExpectations(t)
+
+	consensus1Node.Done()
+	consensus2Node.Done()
+	exeNode.Done()
 }
 
 func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
@@ -233,8 +240,9 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 			View:     42,
 		},
 	}
+	proposal := unittest.ProposalFromBlock(block)
 
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
 
 	verification1Node := testutil.GenericNode(t, hub, ver1ID, identities)
@@ -257,11 +265,15 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		}).
 		Return(nil)
 
-	exeNode.IngestionEngine.SubmitLocal(block)
+	exeNode.IngestionEngine.SubmitLocal(proposal)
 
 	hub.Eventually(t, equal(2, &actualCalls))
 
 	verificationEngine.AssertExpectations(t)
+
+	verification1Node.Done()
+	verification2Node.Done()
+	exeNode.Done()
 }
 
 func equal(expected int, actual *int) func() bool {

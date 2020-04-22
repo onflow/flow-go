@@ -6,11 +6,13 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
-	mockprotocol "github.com/dapperlabs/flow-go/protocol/mock"
+	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -19,16 +21,19 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 	prop := &mocknetwork.Engine{}
 	state := &mockprotocol.State{}
 	final := &mockprotocol.Snapshot{}
+	metrics := &mockmodule.Metrics{}
+	metrics.On("StartCollectionToFinalized", mock.Anything).Return()
 
 	e := &Engine{
-		prop:  prop,
-		state: state,
+		prop:    prop,
+		state:   state,
+		metrics: metrics,
 	}
 
 	originID := unittest.IdentifierFixture()
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{originID}
-	guarantee.Signatures = unittest.SignaturesFixture(1)
+	guarantee.Signature = unittest.SignatureFixture()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	identity.NodeID = originID
@@ -62,7 +67,7 @@ func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{originID}
-	guarantee.Signatures = unittest.SignaturesFixture(1)
+	guarantee.Signature = unittest.SignatureFixture()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	identity.NodeID = originID
@@ -95,7 +100,7 @@ func TestOnCollectionGuaranteeInvalidRole(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{originID}
-	guarantee.Signatures = unittest.SignaturesFixture(1)
+	guarantee.Signature = unittest.SignatureFixture()
 
 	// origin node has wrong role (consensus)
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))

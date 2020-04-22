@@ -16,6 +16,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/mock"
@@ -23,10 +24,11 @@ import (
 
 type MiddlewareTestSuit struct {
 	suite.Suite
-	size int           // used to determine number of middlewares under test
-	mws  []*Middleware // used to keep track of middlewares under test
-	ov   []*mock.Overlay
-	ids  []flow.Identifier
+	size    int           // used to determine number of middlewares under test
+	mws     []*Middleware // used to keep track of middlewares under test
+	ov      []*mock.Overlay
+	ids     []flow.Identifier
+	metrics *mockmodule.Metrics // mocks performance monitoring metrics
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -37,6 +39,10 @@ func TestMiddlewareTestSuit(t *testing.T) {
 // SetupTest initiates the test setups prior to each test
 func (m *MiddlewareTestSuit) SetupTest() {
 	m.size = 2 // operates on two middlewares
+
+	m.metrics = &mockmodule.Metrics{}
+	m.metrics.On("NetworkMessageSent", mockery.Anything).Return()
+
 	// create the middlewares
 	m.ids, m.mws = m.createMiddleWares(m.size)
 	require.Len(m.Suite.T(), m.ids, m.size)
@@ -261,7 +267,7 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		key := m.generateNetworkingKey(target[:])
 
 		// creates new middleware
-		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key)
+		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)
@@ -308,9 +314,9 @@ func (m *MiddlewareTestSuit) StopMiddlewares() {
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed
 func (m *MiddlewareTestSuit) generateNetworkingKey(seed []byte) crypto.PrivateKey {
-	s := make([]byte, 100)
+	s := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(s, seed)
-	prvKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, s)
+	prvKey, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, s)
 	require.NoError(m.Suite.T(), err)
 	return prvKey
 }

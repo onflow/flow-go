@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -174,7 +174,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		Msg("result approval received")
 
 	// check approver matches the origin ID
-	if approval.ResultApprovalBody.ApproverID != originID {
+	if approval.Body.ApproverID != originID {
 		return fmt.Errorf("invalid origin for approval: %x", originID)
 	}
 
@@ -187,7 +187,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	// check if the node has a stake
 	if identity.Stake == 0 {
-		return fmt.Errorf("approvar has zero stake (%x)", identity.NodeID)
+		return fmt.Errorf("approver has zero stake (%s)", identity.NodeID)
 	}
 
 	// check that the origin is a verification node
@@ -205,7 +205,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	// NOTE: this is not super efficient, so it makes sense to integrate a step
 	// for when receipts have already been matched; however, the logic is simple
 	// now, so let's wait until we actually see a problem with performance
-	err = e.tryBuildSeal(approval.ResultApprovalBody.BlockID)
+	err = e.tryBuildSeal(approval.Body.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not match seals: %w", err)
 	}
@@ -225,10 +225,10 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 
 	// get the list of approvers so we can tally their votes
 	// get all execution node identities from the state
-	approvers, err := e.state.AtBlockID(blockID).Identities(
-		filter.HasStake,
+	approvers, err := e.state.AtBlockID(blockID).Identities(filter.And(
+		filter.HasStake(true),
 		filter.HasRole(flow.RoleVerification),
-	)
+	))
 	if err != nil {
 		return fmt.Errorf("could not get verifier identities: %w", err)
 	}
@@ -246,12 +246,12 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 	for resultID := range votes {
 		approvals := e.approvals.ByResultID(resultID)
 		for _, approval := range approvals {
-			approver, ok := approvers.ByNodeID(approval.ResultApprovalBody.ApproverID)
+			approver, ok := approvers.ByNodeID(approval.Body.ApproverID)
 			if !ok {
 				e.log.Debug().Msg("skipping unknown approver")
 				continue
 			}
-			chunkIndex := approval.ResultApprovalBody.ChunkIndex
+			chunkIndex := approval.Body.ChunkIndex
 			votes[resultID][chunkIndex] += approver.Stake
 		}
 	}
@@ -259,7 +259,7 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 	// check if any result reached the threshold on all chunks
 	total := approvers.TotalStake()
 	threshold := (total * 2) / 3 // TODO: precise rounding
-ResultLoop:
+	// ResultLoop:
 	for resultID, chunkVotes := range votes {
 		result := results[resultID]
 
@@ -267,7 +267,14 @@ ResultLoop:
 		for _, chunk := range result.Chunks {
 			voted := chunkVotes[chunk.Index]
 			if voted < threshold {
-				continue ResultLoop
+				e.log.Info().
+					Uint64("threshold", threshold).
+					Uint64("voted", voted).
+					Hex("result_id", resultID[:]).
+					Msg("skipping result due to chunk not meeting threshold")
+				// TODO: Once verification successfully sends result approvals,
+				// We should start skipping when we don't have enough approvals
+				// continue ResultLoop
 			}
 		}
 

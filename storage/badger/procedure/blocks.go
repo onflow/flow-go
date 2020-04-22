@@ -4,6 +4,7 @@ package procedure
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
+// InsertBlock inserts a block to the storage
 func InsertBlock(block *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -37,6 +39,7 @@ func InsertBlock(block *flow.Block) func(*badger.Txn) error {
 	}
 }
 
+// RetrieveBlock retrieves a block by the given blockID
 func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -56,6 +59,86 @@ func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn)
 	}
 }
 
+// RetrieveUnfinalizedAncestors retrieves all un-finalized ancestors of the
+// given block, including the block itself, reverse-ordered by height.
+func RetrieveUnfinalizedAncestors(blockID flow.Identifier, unfinalized *[]*flow.Header) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// retrieve the block header of the block we want to finalize
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header: %w", err)
+		}
+
+		// retrieve the current boundary of the finalized state
+		var boundary uint64
+		err = operation.RetrieveBoundary(&boundary)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve boundary: %w", err)
+		}
+
+		// if the block has already been finalized, exit early
+		if boundary >= header.Height {
+			*unfinalized = []*flow.Header{}
+			return nil
+		}
+
+		// retrieve the ID of the last finalized block as marker for stopping
+		var headID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &headID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve head: %w", err)
+		}
+
+		// in order to validate the validity of all changes, we need to iterate
+		// through the blocks that need to be finalized from oldest to youngest;
+		// we thus start at the youngest remember all of the intermediary steps
+		// while tracing back until we reach the finalized state
+		*unfinalized = append(*unfinalized, &header)
+		parentID := header.ParentID
+		for parentID != headID {
+			var parent flow.Header
+			err = operation.RetrieveHeader(parentID, &parent)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve parent (%x): %w", parentID, err)
+			}
+			*unfinalized = append(*unfinalized, &parent)
+			parentID = parent.ParentID
+		}
+
+		return nil
+	}
+}
+
+// RetrieveUnfinalizedDescendants find all unfinalized block IDs that connect to the finalized block
+func RetrieveUnfinalizedDescendants(unfinalizedBlockIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		var boundary uint64
+		// retrieve the current finalized view
+		err := operation.RetrieveBoundary(&boundary)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve boundary: %w", err)
+		}
+
+		// retrieve the block ID of the last finalized block
+		var headID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &headID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve head: %w", err)
+		}
+
+		// find all the unfinalized blocks that connect to the finalized block
+		// the order guarantees that if a block requires certain blocks to connect to the
+		// finalized block, those connecting blocks must appear before this block.
+		operation.FindDescendants(boundary, headID, unfinalizedBlockIDs)
+
+		return nil
+	}
+}
+
+// FinalizeBlock finalizes the block by the given blockID and all blocks along the path
+// that connects to the finalized block.
 func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -106,6 +189,7 @@ func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	}
 }
 
+// Bootstrap inserts the genesis block to the storage
 func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -131,13 +215,13 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 		}
 
 		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,
+			PreviousResultID: flow.GenesisExecutionResultParentID,
 			BlockID:          genesis.ID(),
 			FinalStateCommit: seal.FinalState,
 		}}
 
 		// index the commit for the execution node
-		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
+		err = operation.IndexStateCommitment(genesis.ID(), seal.FinalState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index commit: %w", err)
 		}
@@ -169,7 +253,6 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 		return nil
 	}
 }
-
 func IndexBlockByGuarantees(blockID flow.Identifier) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		block := &flow.Block{}
@@ -205,6 +288,41 @@ func RetrieveBlockByCollectionID(collectionID flow.Identifier, block *flow.Block
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
+		return nil
+	}
+}
+
+func RetrieveLatestFinalizedHeader(header *flow.Header) func(tx *badger.Txn) error {
+	var number uint64 = math.MaxUint64
+	blockID := flow.ZeroID
+	return RetrieveHeader(&number, &blockID, header)
+}
+
+func RetrieveHeader(number *uint64, blockID *flow.Identifier, header *flow.Header) func(tx *badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// set the number to boundary if it's at max uint64
+		if *number == math.MaxUint64 {
+			err := operation.RetrieveBoundary(number)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve boundary: %w", err)
+			}
+		}
+
+		// check if hash is nil and try to get it from height
+		if *blockID == flow.ZeroID {
+			err := operation.RetrieveNumber(*number, blockID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve hash (%d): %w", number, err)
+			}
+		}
+
+		// get the height for our desired target hash
+		err := operation.RetrieveHeader(*blockID, header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header (%x): %w", blockID, err)
+		}
+
 		return nil
 	}
 }

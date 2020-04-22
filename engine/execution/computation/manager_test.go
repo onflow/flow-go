@@ -1,8 +1,6 @@
 package computation
 
 import (
-	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -12,53 +10,16 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/unittest"
+	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mock"
 )
 
 func TestComputeBlockWithStorage(t *testing.T) {
-	encoded := hex.EncodeToString([]byte(`
-			access(all) contract Container {
-				access(all) resource Counter {
-					pub var count: Int
-		
-					init(_ v: Int) {
-						self.count = v
-					}
-					pub fun add(_ count: Int) {
-						self.count = self.count + count
-					}
-				}
-				pub fun createCounter(_ v: Int): @Counter {
-					return <-create Counter(v)
-				}
-			}`))
 
-	tx1 := flow.TransactionBody{
-		Script: []byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
-                signer.setCode("%s".decodeHex())
-              }
-            }`, encoded)),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
-	}
-
-	tx2 := flow.TransactionBody{
-		Script: []byte(`
-
-			import 0x01
-
-			transaction {
-				prepare(acc: AuthAccount) {
-					if acc.storage[Container.Counter] == nil {
-                		let existing <- acc.storage[Container.Counter] <- Container.createCounter(3)
-                		destroy existing
-					}
-              	}
-            }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
-	}
+	tx1 := testutil.DeployCounterContractTransaction()
+	tx2 := testutil.CreateCounterTransaction()
 
 	transactions := []*flow.TransactionBody{&tx1, &tx2}
 
@@ -66,7 +27,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
-		Signatures:   nil,
+		Signature:    nil,
 	}
 
 	block := flow.Block{
@@ -110,6 +71,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotEmpty(t, view.Delta())
-	require.Len(t, returnedComputationResult.StateViews, 1)
-	assert.NotEmpty(t, returnedComputationResult.StateViews[0].Delta())
+	require.Len(t, returnedComputationResult.StateSnapshots, 1)
+	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
 }

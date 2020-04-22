@@ -1,6 +1,8 @@
 package verifier_test
 
 import (
+	"crypto/rand"
+	"errors"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -10,28 +12,21 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/engine/verification/test"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
+	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
-
-// TODO add challeneges
-// if ChunkIndex == 0 : ok
-// if ChunkIndex == 1 : error
-// if ChunkIndex == 2 : challenge
-type ChunkVerifierMock struct {
-}
-
-func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) error {
-	return nil
-}
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
@@ -40,8 +35,9 @@ type VerifierEngineTestSuite struct {
 	ss      *protocol.Snapshot
 	me      *MockLocal
 	sk      crypto.PrivateKey
-	hasher  crypto.Hasher
-	conduit *network.Conduit // mocks conduit for submitting result approvals
+	hasher  hash.Hasher
+	conduit *network.Conduit    // mocks conduit for submitting result approvals
+	metrics *mockmodule.Metrics // mocks performance monitoring metrics
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -49,10 +45,12 @@ func TestVerifierEngine(t *testing.T) {
 }
 
 func (suite *VerifierEngineTestSuite) SetupTest() {
+
 	suite.state = &protocol.State{}
 	suite.net = &mockmodule.Network{}
 	suite.ss = &protocol.Snapshot{}
 	suite.conduit = &network.Conduit{}
+	suite.metrics = &mockmodule.Metrics{}
 
 	suite.net.On("Register", uint8(engine.ApprovalProvider), testifymock.Anything).
 		Return(suite.conduit, nil).
@@ -60,12 +58,22 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 
 	suite.state.On("Final").Return(suite.ss)
 
+	// mocks metrics
+	suite.metrics.On("OnChunkVerificationStarted", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {})
+	suite.metrics.On("OnChunkVerificationFinished", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {})
+	suite.metrics.On("OnResultApproval").
+		Run(func(args testifymock.Arguments) {})
+
 	// Mocks the signature oracle of the engine
 	//
 	// generates signing and verification keys
-	seed := []byte{1, 2, 3, 4}
-	h, _ := crypto.NewHasher(crypto.SHA3_384)
-	sk, err := crypto.GeneratePrivateKey(crypto.BLS_BLS12381, h.ComputeHash(seed))
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	n, err := rand.Read(seed)
+	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	require.NoError(suite.T(), err)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(suite.T(), err)
 	suite.sk = sk
 	// tag of hasher should be the same as the tag of engine's hasher
@@ -74,7 +82,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 }
 
 func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
-	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me, ChunkVerifierMock{})
+	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me, ChunkVerifierMock{}, suite.metrics)
 	require.Nil(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
@@ -91,7 +99,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := unittest.CompleteExecutionResultFixture(1)
+	completeRA := test.CompleteExecutionResultFixture(suite.T(), 1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
@@ -101,17 +109,17 @@ func (suite *VerifierEngineTestSuite) TestIncorrectResult() {
 	// TODO when ERs are verified
 }
 
-// TestVerify tests the verification path for a single verifiable chunk, which is
+// TestVerifyHappyPath tests the verification path for a single verifiable chunk, which is
 // assigned to the verifier node, and is passed by the ingest engine
 // The tests evaluates that a result approval is emitted to all consensus nodes
 // about the input execution receipt
-func (suite *VerifierEngineTestSuite) TestVerify() {
+func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 	eng := suite.TestNewEngine()
 	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
 	// creates a verifiable chunk
-	vChunk := unittest.VerifiableChunkFixture()
+	vChunk := unittest.VerifiableChunkFixture(uint64(0))
 
 	// mocking node ID using the LocalMock
 	suite.me.MockNodeID(myID)
@@ -124,20 +132,56 @@ func (suite *VerifierEngineTestSuite) TestVerify() {
 			// check that the approval matches the input execution result
 			ra, ok := args[0].(*flow.ResultApproval)
 			suite.Assert().True(ok)
-			suite.Assert().Equal(vChunk.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+			suite.Assert().Equal(vChunk.Receipt.ExecutionResult.ID(), ra.Body.ExecutionResultID)
 
-			// verifies the signature over the result approval
-			batst, err := encoding.DefaultEncoder.Encode(ra.ResultApprovalBody.Attestation())
+			// verifies the signatures
+			batst, err := encoding.DefaultEncoder.Encode(ra.Body.Attestation)
 			suite.Assert().NoError(err)
-			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, batst, suite.hasher))
+			suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, batst, suite.hasher))
+			bbody, err := encoding.DefaultEncoder.Encode(ra.Body)
+			suite.Assert().NoError(err)
+			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bbody, suite.hasher))
 		}).
 		Once()
 
 	err := eng.Process(myID, vChunk)
-	suite.Assert().Nil(err)
-
+	suite.Assert().NoError(err)
 	suite.ss.AssertExpectations(suite.T())
 	suite.conduit.AssertExpectations(suite.T())
+
+}
+
+func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
+	eng := suite.TestNewEngine()
+	myID := unittest.IdentifierFixture()
+	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
+
+	// mocking node ID using the LocalMock
+	suite.me.MockNodeID(myID)
+	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
+
+	// we shouldn't receive any result approval
+	suite.conduit.
+		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
+		Return(nil).
+		Run(func(args testifymock.Arguments) {
+			// TODO change this to check challeneges
+			_, ok := args[0].(*flow.ResultApproval)
+			suite.Assert().False(ok)
+		})
+
+	var tests = []struct {
+		vc          *verification.VerifiableChunk
+		expectedErr error
+	}{
+		{unittest.VerifiableChunkFixture(uint64(1)), nil},
+		{unittest.VerifiableChunkFixture(uint64(2)), nil},
+		{unittest.VerifiableChunkFixture(uint64(3)), nil},
+	}
+	for _, test := range tests {
+		err := eng.Process(myID, test.vc)
+		suite.Assert().NoError(err)
+	}
 }
 
 // MockLocal represents a mock of Local
@@ -166,10 +210,50 @@ func (m *MockLocal) Address() string {
 	return ""
 }
 
-func (m *MockLocal) Sign(msg []byte, hasher crypto.Hasher) (crypto.Signature, error) {
+func (m *MockLocal) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, error) {
 	return m.sk.Sign(msg, hasher)
 }
 
 func (m *MockLocal) MockNodeID(id flow.Identifier) {
 	m.id = id
+}
+
+type ChunkVerifierMock struct {
+}
+
+func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) (chmodel.ChunkFault, error) {
+	switch ch.ChunkIndex {
+	case 0:
+		return nil, nil
+	// return error
+	case 1:
+		return chmodel.NewCFMissingRegisterTouch(
+			[]string{"test missing register touch"},
+			ch.ChunkIndex,
+			ch.Receipt.ExecutionResult.ID()), nil
+
+	case 2:
+		return chmodel.NewCFInvalidVerifiableChunk(
+			"test",
+			errors.New("test invalid verifiable chunk"),
+			ch.ChunkIndex,
+			ch.Receipt.ExecutionResult.ID()), nil
+
+	case 3:
+		return chmodel.NewCFNonMatchingFinalState(
+			unittest.StateCommitmentFixture(),
+			unittest.StateCommitmentFixture(),
+			ch.ChunkIndex,
+			ch.Receipt.ExecutionResult.ID()), nil
+
+	// TODO add cases for challenges
+	// return successful by default
+	default:
+		return nil, nil
+	}
+
+}
+
+func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
+	return filter.Not(filter.HasNodeID(m.id))
 }

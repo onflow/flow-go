@@ -8,6 +8,9 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -72,6 +75,10 @@ func CreateAccountInLedger(ledger Ledger, publicKeys [][]byte) (runtime.Address,
 
 	accountID := accountAddress[:]
 
+	// mark that account with this ID exists
+	ledger.Set(fullKeyHash(string(accountID), "", keyExists), []byte{1})
+
+	// set account balance to 0
 	ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 
 	err := setAccountPublicKeys(ledger, accountID, publicKeys)
@@ -105,12 +112,9 @@ func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	accountID := address[:]
 
-	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	err := r.checkAccountExists(accountID)
 	if err != nil {
 		return err
-	}
-	if bal == nil {
-		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	publicKeys, err := r.getAccountPublicKeys(accountID)
@@ -130,12 +134,9 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	accountID := address[:]
 
-	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	err = r.checkAccountExists(accountID)
 	if err != nil {
 		return nil, err
-	}
-	if bal == nil {
-		return nil, fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	publicKeys, err := r.getAccountPublicKeys(accountID)
@@ -247,12 +248,9 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return fmt.Errorf("not permitted to update account with ID %s", address)
 	}
 
-	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	err = r.checkAccountExists(accountID)
 	if err != nil {
 		return err
-	}
-	if bal == nil {
-		return fmt.Errorf("account with ID %s does not exist", address)
 	}
 
 	r.ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
@@ -296,6 +294,45 @@ func (r *TransactionContext) EmitEvent(event runtime.Event) {
 	r.events = append(r.events, event)
 }
 
+// GetAccount gets an account by address.
+//
+// The function returns nil if the specified account does not exist.
+func (r *TransactionContext) GetAccount(address flow.Address) *flow.Account {
+	accountID := address.Bytes()
+
+	err := r.checkAccountExists(accountID)
+	if err != nil {
+		return nil
+	}
+
+	balanceBytes, _ := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
+
+	code, _ := r.ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
+
+	publicKeys, err := r.getAccountPublicKeys(accountID)
+	if err != nil {
+		panic(err)
+	}
+
+	accountPublicKeys := make([]flow.AccountPublicKey, len(publicKeys))
+	for i, publicKey := range publicKeys {
+		accountPublicKey, err := decodePublicKey(publicKey)
+		if err != nil {
+			panic(err)
+		}
+
+		accountPublicKeys[i] = accountPublicKey
+	}
+
+	return &flow.Account{
+		Address: address,
+		Balance: balanceInt.Uint64(),
+		Code:    code,
+		Keys:    accountPublicKeys,
+	}
+}
+
 func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
 	for _, accountAddress := range r.GetSigningAccounts() {
 		if accountAddress == address {
@@ -319,6 +356,7 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 
 const (
 	keyLatestAccount  = "latest_account"
+	keyExists         = "exists"
 	keyBalance        = "balance"
 	keyCode           = "code"
 	keyPublicKeyCount = "public_key_count"
@@ -335,4 +373,54 @@ func fullKeyHash(owner, controller, key string) flow.RegisterID {
 
 func keyPublicKey(index int) string {
 	return fmt.Sprintf("public_key_%d", index)
+}
+
+func (r *TransactionContext) checkAccountExists(accountID []byte) error {
+	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
+	if err != nil {
+		return err
+	}
+
+	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	if err != nil {
+		return err
+	}
+
+	if len(exists) != 0 || bal != nil {
+		return nil
+	}
+
+	return fmt.Errorf("account with ID %s does not exist", accountID)
+}
+
+// TODO: replace once public key format changes @psiemens
+func decodePublicKey(b []byte) (a flow.AccountPublicKey, err error) {
+	var temp struct {
+		PublicKey []byte
+		SignAlgo  uint
+		HashAlgo  uint
+		Weight    uint
+	}
+
+	encoder := rlp.NewEncoder()
+
+	err = encoder.Decode(b, &temp)
+	if err != nil {
+		return a, err
+	}
+
+	signAlgo := crypto.SigningAlgorithm(temp.SignAlgo)
+	hashAlgo := hash.HashingAlgorithm(temp.HashAlgo)
+
+	publicKey, err := crypto.DecodePublicKey(signAlgo, temp.PublicKey)
+	if err != nil {
+		return a, err
+	}
+
+	return flow.AccountPublicKey{
+		PublicKey: publicKey,
+		SignAlgo:  signAlgo,
+		HashAlgo:  hashAlgo,
+		Weight:    int(temp.Weight),
+	}, nil
 }

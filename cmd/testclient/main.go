@@ -13,6 +13,7 @@ import (
 	sdk "github.com/dapperlabs/flow-go-sdk"
 	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/dapperlabs/flow-go-sdk/keys"
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 var (
@@ -32,9 +33,11 @@ func main() {
 	}
 
 	// Generate key
-	seed := make([]byte, 40)
-	_, _ = rand.Read(seed)
-	key, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA2_256, seed)
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+	if n, err := rand.Read(seed); err != nil || n != crypto.KeyGenSeedMinLenECDSAP256 {
+		log.Fatal(err)
+	}
+	key, err := keys.GeneratePrivateKey(keys.ECDSAP256_SHA2_256, seed)
 	if err != nil {
 		log.Fatal(err)
 	}
