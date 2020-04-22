@@ -218,9 +218,9 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.AssertReturnsBefore(t, senderWG.Wait, 3*time.Second)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, 5*time.Second)
 	verNet.DeliverAll(false)
-	unittest.AssertReturnsBefore(t, verifierEngWG.Wait, 3*time.Second)
+	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, 5*time.Second)
 	verNet.DeliverAll(false)
 
 	// ensures resources are cleaned up
