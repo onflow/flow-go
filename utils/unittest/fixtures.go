@@ -131,14 +131,6 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	}
 }
 
-func SealFixture() flow.Seal {
-	return flow.Seal{
-		BlockID:       IdentifierFixture(),
-		PreviousState: StateCommitmentFixture(),
-		FinalState:    StateCommitmentFixture(),
-	}
-}
-
 func ClusterPayloadFixture(n int) cluster.Payload {
 	transactions := make([]*flow.TransactionBody, n)
 	for i := 0; i < n; i++ {
@@ -204,10 +196,10 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 
 func BlockSealFixture() *flow.Seal {
 	return &flow.Seal{
-		BlockID:           IdentifierFixture(),
-		ExecutionResultID: IdentifierFixture(),
-		PreviousState:     StateCommitmentFixture(),
-		FinalState:        StateCommitmentFixture(),
+		BlockID:      IdentifierFixture(),
+		ResultID:     IdentifierFixture(),
+		InitialState: StateCommitmentFixture(),
+		FinalState:   StateCommitmentFixture(),
 	}
 }
 
@@ -216,7 +208,7 @@ func BlockSealsFixture(n int) []*flow.Seal {
 	for i := 0; i < n; i++ {
 		seal := BlockSealFixture()
 		if i > 0 {
-			seal.PreviousState = seals[i-1].FinalState
+			seal.InitialState = seals[i-1].FinalState
 		}
 		seals = append(seals, seal)
 	}

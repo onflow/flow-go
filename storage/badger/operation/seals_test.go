@@ -15,9 +15,9 @@ import (
 
 func TestSealInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.SealFixture()
+		expected := unittest.BlockSealFixture()
 
-		err := db.Update(InsertSeal(&expected))
+		err := db.Update(InsertSeal(expected))
 		require.Nil(t, err)
 
 		var exists bool
@@ -29,16 +29,16 @@ func TestSealInsertCheckRetrieve(t *testing.T) {
 		err = db.View(RetrieveSeal(expected.ID(), &actual))
 		require.Nil(t, err)
 
-		assert.Equal(t, expected, actual)
+		assert.Equal(t, expected, &actual)
 	})
 }
 
 func TestSealIndexAndLookup(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		seal1 := unittest.SealFixture()
-		seal2 := unittest.SealFixture()
+		seal1 := unittest.BlockSealFixture()
+		seal2 := unittest.BlockSealFixture()
 
-		seals := []*flow.Seal{&seal1, &seal2}
+		seals := []*flow.Seal{seal1, seal2}
 
 		height := uint64(1337)
 		blockID := flow.MakeID([]byte{0x42})

@@ -12,9 +12,10 @@ func Genesis(identities IdentityList) *Block {
 
 	// create the first seal with zero references
 	seal := Seal{
-		BlockID:       ZeroID,
-		PreviousState: nil,
-		FinalState:    GenesisStateCommitment,
+		BlockID:      ZeroID,
+		ResultID:     ZeroID,
+		InitialState: nil,
+		FinalState:   GenesisStateCommitment,
 	}
 
 	// create the raw content for the genesis block
