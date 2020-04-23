@@ -661,3 +661,10 @@ func (ss *SyncSuite) TestSendRequests() {
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", calls) // need to use total number (1+2)
 
 }
+
+// test a synchronization engine can be started and stopped
+func (ss *SyncSuite) TestStartStop() {
+	<-ss.e.Ready()
+	time.Sleep(2 * time.Second)
+	<-ss.e.Done()
+}
