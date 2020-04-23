@@ -399,17 +399,24 @@ func TestIterateBoundaries(t *testing.T) {
 	start := []byte{0x10}
 	end := []byte{0x20}
 	keys := [][]byte{
-		{0x09, 0xff}, // before start
-		{0x10, 0x00}, // after start
+		// before start -> not included in range
+		{0x09, 0xff},
+		// shares prefix with start -> included in range
+		{0x10, 0x00},
 		{0x10, 0xff},
+		{0x10, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		// prefix between start and end -> included in range
 		{0x11, 0x00},
-		{0x19, 0xff}, // before end
-		{0x20, 0x00}, // after end
-		{0x20, 0xff}, // after end
-		{0x21, 0x00}, // after end
+		{0x19, 0xff},
+		// shares prefix with end -> included in range
+		{0x20, 0x00},
+		{0x20, 0xff},
+		{0x20, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		// after end -> not included in range
+		{0x21, 0x00},
 	}
 	// keys within the expected range
-	keysInRange := keys[1:7]
+	keysInRange := keys[1:9]
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
@@ -445,13 +452,13 @@ func TestIterateBoundaries(t *testing.T) {
 		err := db.View(iterate(start, end, iteration))
 		t.Log(found)
 		require.NoError(t, err, "should iterate forward without error")
-		require.ElementsMatch(t, keysInRange, found, "forward iteration should go over correct keys")
+		assert.ElementsMatch(t, keysInRange, found, "forward iteration should go over correct keys")
 
 		// iterate backward and check boundaries are included correctly
 		found = nil
 		err = db.View(iterate(end, start, iteration))
 		t.Log(found)
 		require.NoError(t, err, "should iterate backward without error")
-		require.ElementsMatch(t, keysInRange, found, "backward iteration should go over correct keys")
+		assert.ElementsMatch(t, keysInRange, found, "backward iteration should go over correct keys")
 	})
 }
