@@ -409,7 +409,7 @@ func TestIterateBoundaries(t *testing.T) {
 		{0x21, 0x00}, // after end
 	}
 	// keys within the expected range
-	keysInRange := keys[1:5]
+	keysInRange := keys[1:7]
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
