@@ -81,7 +81,7 @@ func AddToCounterTransaction() flow.TransactionBody {
 
 			transaction {
 				prepare(acc: AuthAccount) {
-					acc.storage[Container.Counter].add(2)
+					acc.storage[Container.Counter]?.add(2)
               	}
             }`),
 		ScriptAccounts: []flow.Address{flow.RootAddress},

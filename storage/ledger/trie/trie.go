@@ -224,6 +224,11 @@ func (f *forest) Add(tree *tree) {
 	f.cache.Add(tree.root.String(), tree)
 }
 
+func (f *forest) Has(root Root) bool {
+	_, ok := f.cache.Get(root.String())
+	return ok
+}
+
 func (f *forest) Get(root Root) (*tree, error) {
 
 	//if foundFullTree, ok := f.fullCache.Get(root.String()); ok {
@@ -1100,6 +1105,11 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	// TODO improve this in case of getting an state which has been there before
+	if s.forest.Has(newRootNode.value) {
+		return newRootNode.value, nil
 	}
 
 	db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
