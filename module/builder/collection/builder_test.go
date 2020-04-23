@@ -85,6 +85,11 @@ func (suite *BuilderSuite) InsertBlock(block model.Block) {
 	suite.Assert().Nil(err)
 }
 
+func (suite *BuilderSuite) FinalizeBlock(blockID flow.Identifier) {
+	err := suite.db.Update(procedure.FinalizeClusterBlock(blockID))
+	suite.Assert().Nil(err)
+}
+
 func TestBuilder(t *testing.T) {
 	suite.Run(t, new(BuilderSuite))
 }
@@ -348,4 +353,75 @@ func collectionContains(collection flow.Collection, txIDs ...flow.Identifier) bo
 	}
 
 	return true
+}
+
+func BenchmarkBuildOn10(b *testing.B)     { benchmarkBuildOn(b, 10) }
+func BenchmarkBuildOn100(b *testing.B)    { benchmarkBuildOn(b, 100) }
+func BenchmarkBuildOn1000(b *testing.B)   { benchmarkBuildOn(b, 1000) }
+func BenchmarkBuildOn10000(b *testing.B)  { benchmarkBuildOn(b, 10000) }
+func BenchmarkBuildOn100000(b *testing.B) { benchmarkBuildOn(b, 100000) }
+
+func benchmarkBuildOn(b *testing.B, size int) {
+	b.StopTimer()
+	b.ResetTimer()
+
+	// re-use the builder suite
+	suite := new(BuilderSuite)
+
+	// Copied from SetupTest. We can't use that function because suite.Assert
+	// is incompatible with benchmarks.
+	// ref: https://github.com/stretchr/testify/issues/811
+	{
+		var err error
+		suite.genesis = model.Genesis()
+		suite.chainID = suite.genesis.ChainID
+
+		suite.pool, err = stdmap.NewTransactions(1000)
+		assert.Nil(b, err)
+
+		suite.db, suite.dbdir = unittest.TempBadgerDB(b)
+		defer func() {
+			err = suite.db.Close()
+			assert.Nil(b, err)
+			err = os.RemoveAll(suite.dbdir)
+			assert.Nil(b, err)
+		}()
+
+		suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
+		assert.Nil(b, err)
+		suite.mutator = suite.state.Mutate()
+
+		err = suite.mutator.Bootstrap(suite.genesis)
+		assert.Nil(b, err)
+
+		// add some transactions to transaction pool
+		for i := 0; i < 3; i++ {
+			tx := unittest.TransactionBodyFixture()
+			err = suite.pool.Add(&tx)
+			assert.Nil(b, err)
+		}
+
+		// create the builder
+		suite.builder = builder.NewBuilder(suite.db, suite.pool, suite.chainID)
+	}
+
+	// create a block history to test performance against
+	final := suite.genesis
+	for i := 0; i < size; i++ {
+		block := unittest.ClusterBlockWithParent(final)
+		err := suite.db.Update(procedure.InsertClusterBlock(&block))
+		require.Nil(b, err)
+
+		// finalize the block 80% of the time, resulting in a fork-rate of 20%
+		if rand.Intn(100) < 80 {
+			err = suite.db.Update(procedure.FinalizeClusterBlock(block.ID()))
+			final = &block
+		}
+	}
+
+	b.StartTimer()
+	for n := 0; n < b.N; n++ {
+		_, err := suite.builder.BuildOn(final.ID(), noopSetter)
+		assert.Nil(b, err)
+	}
 }
