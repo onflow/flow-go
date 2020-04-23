@@ -19,10 +19,13 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
+	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
@@ -419,6 +422,31 @@ func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
 			}
 			received++
 			return true, 0
+		}
+		return false, 0
+	}
+}
+
+func blockProposals() BlockOrDelayFunc {
+	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		if channelID == engine.ProtocolConsensus {
+			switch event.(type) {
+			case *events.SyncedBlock:
+			case *messages.BlockProposal:
+			case *messages.BlockVote:
+			default:
+				panic("wrong message")
+			}
+		} else if channelID == engine.ProtocolSynchronization {
+			switch event.(type) {
+			case *messages.SyncRequest:
+			case *messages.SyncResponse:
+			case *messages.RangeRequest:
+			case *messages.BatchRequest:
+			case *messages.BlockResponse:
+			default:
+				panic("wrong message")
+			}
 		}
 		return false, 0
 	}
