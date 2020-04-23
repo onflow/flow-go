@@ -51,100 +51,12 @@ func (el *EventLoop) loop() {
 	for {
 		shutdownSignal := el.runner.ShutdownSignal()
 
-		// Giving timeout events the priority to be processed first
-		// This is to prevent attacks from malicious nodes that attempt
-		// to block honest nodes' pacemaker from progressing by sending
-		// other events.
-		timeoutChannel := el.eventHandler.TimeoutChannel()
-
-		idleStart := time.Now()
-
 		// the first select makes sure we process timeouts with priority
 		select {
 
 		// if we receive the shutdown signal, exit the loop
 		case <-shutdownSignal:
 			return
-
-		// if we receive a time out, process it and log errors
-		case <-timeoutChannel:
-
-			// meansure how long the event loop was idle waiting for an
-			// incoming event
-			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
-
-			processStart := time.Now()
-
-			err := el.eventHandler.OnLocalTimeout()
-
-			// measure how long it takes for a timeout event to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
-
-			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process timeout")
-			}
-
-		default:
-			// fall through to non-priority events
-		}
-
-		// select for block headers/votes here
-		select {
-
-		// same as before
-		case <-shutdownSignal:
-			return
-
-		// same as before
-		case <-timeoutChannel:
-			// meansure how long the event loop was idle waiting for an
-			// incoming event
-			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
-
-			processStart := time.Now()
-
-			err := el.eventHandler.OnLocalTimeout()
-
-			// measure how long it takes for a timeout event to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
-
-			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process timeout")
-			}
-
-		// if we have a new proposal, process it
-		case p := <-el.proposals:
-			// measure how long the event loop was idle waiting for an
-			// incoming event
-			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
-
-			processStart := time.Now()
-
-			err := el.eventHandler.OnReceiveProposal(p)
-
-			// measure how long it takes for a proposal to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
-
-			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process proposal")
-			}
-
-		// if we have a new vote, process it
-		case v := <-el.votes:
-			// measure how long the event loop was idle waiting for an
-			// incoming event
-			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
-
-			processStart := time.Now()
-
-			err := el.eventHandler.OnReceiveVote(v)
-
-			// measure how long it takes for a vote to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnVote)
-
-			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process vote")
-			}
 		}
 	}
 }
@@ -178,10 +90,6 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 // Multiple calls are handled gracefully and the event loop will only start
 // once.
 func (el *EventLoop) Ready() <-chan struct{} {
-	err := el.eventHandler.Start()
-	if err != nil {
-		el.log.Fatal().Err(err).Msg("could not start event handler")
-	}
 	return el.runner.Start(el.loop)
 }
 

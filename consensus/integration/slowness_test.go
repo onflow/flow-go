@@ -9,7 +9,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
@@ -18,17 +17,10 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/module/buffer"
-	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	module "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -203,6 +195,21 @@ func (s *Stopper) stopAll() {
 	wg.Wait()
 }
 
+func stopAll(nodes []*Node) {
+	var wg sync.WaitGroup
+	for i := 0; i < len(nodes); i++ {
+		wg.Add(1)
+		// stop compliance will also stop both hotstuff and synchronization engine
+		go func(i int) {
+			fmt.Printf("===> %v closing instance to done \n", i)
+			<-nodes[i].compliance.Done()
+			wg.Done()
+			fmt.Printf("===> %v instance is done\n", i)
+		}(i)
+	}
+	wg.Wait()
+}
+
 type Engine struct{}
 
 func (*Engine) SubmitLocal(event interface{})                             {}
@@ -291,21 +298,9 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 		id:    identity,
 	}
 
-	stopConsumer := stopper.AddNode(node)
-
 	// log with node index
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
-	notifier := notifications.NewLogConsumer(log)
-	dis := pubsub.NewDistributor()
-	dis.AddConsumer(stopConsumer)
-	dis.AddConsumer(notifier)
-
-	// initialize no-op metrics mock
-	metrics := &module.Metrics{}
-	metrics.On("HotStuffBusyDuration", mock.Anything, mock.Anything)
-	metrics.On("HotStuffIdleDuration", mock.Anything, mock.Anything)
-	metrics.On("HotStuffWaitDuration", mock.Anything, mock.Anything)
 
 	// make local
 	priv := helper.MakeBLSKey(t)
@@ -316,51 +311,19 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	net := NewNetwork()
 
 	headersDB := storage.NewHeaders(db)
-	payloadsDB := storage.NewPayloads(db)
 	blocksDB := storage.NewBlocks(db)
 	viewsDB := storage.NewViews(db)
 
-	guarantees, err := stdmap.NewGuarantees(100000)
-	require.NoError(t, err)
-	seals, err := stdmap.NewSeals(100000)
-	require.NoError(t, err)
-
-	// initialize the block builder
-	build := builder.NewBuilder(db, guarantees, seals)
-
-	signer := &Signer{identity.ID()}
-
-	// initialize the pending blocks cache
-	cache := buffer.NewPendingBlocks()
-
-	rootHeader := &genesis.Header
-	rootQC := &model.QuorumCertificate{
-		View:      genesis.View,
-		BlockID:   genesis.ID(),
-		SignerIDs: nil, // TODO
-		SigData:   nil,
-	}
-	selector := filter.HasRole(flow.RoleConsensus)
-
-	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, guarantees, seals)
-
-	prov := &Engine{}
-
 	// initialize the compliance engine
-	comp, err := compliance.New(log, net, local, state, headersDB, payloadsDB, prov, cache)
+	comp, err := compliance.New(log, net, local)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine
 	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
-	hotstuffTimeout := 1000 * time.Millisecond
-
 	// initialize the block finalizer
-	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
-		viewsDB, state, local, build, final, signer, comp, selector, rootHeader,
-		rootQC, consensus.WithTimeout(hotstuffTimeout))
+	hot, err := consensus.NewParticipant(log)
 
 	require.NoError(t, err)
 
@@ -440,63 +403,20 @@ func start(nodes []*Node) {
 func Test3Nodes(t *testing.T) {
 	nodes := createNodes(t, 3, 10)
 
-	connect(nodes, blockNothing)
+	connect(nodes)
 
-	start(nodes)
+	go start(nodes)
 
-	// verify all nodes arrive the same state
-	for i := 0; i < len(nodes); i++ {
-		headerN, err := nodes[i].state.Final().Head()
-		require.NoError(t, err)
-		require.Greater(t, headerN.View, uint64(90))
-	}
-	cleanupNodes(nodes)
-}
+	time.Sleep(3 * time.Second)
 
-func Test5Nodes(t *testing.T) {
-	nodes := createNodes(t, 5, 100)
-
-	connect(nodes, blockNodes(nodes[0]))
-
-	start(nodes)
-
-	header, err := nodes[0].state.Final().Head()
-	require.NoError(t, err)
-
-	// the first node was blocked, never finalize any block
-	require.Equal(t, uint64(0), header.View)
-
-	// verify all nodes arrive the same state
-	for i := 1; i < len(nodes); i++ {
-		headerN, err := nodes[i].state.Final().Head()
-		require.NoError(t, err)
-		require.Greater(t, headerN.View, uint64(90))
-	}
-
-	cleanupNodes(nodes)
-}
-
-func TestOneDelayed(t *testing.T) {
-	nodes := createNodes(t, 10, 100)
-
-	// connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
-	connect(nodes, blockNothing)
-
-	start(nodes)
-
-	// verify all nodes arrive the same state
-	for i := 0; i < len(nodes); i++ {
-		headerN, err := nodes[i].state.Final().Head()
-		require.NoError(t, err)
-		require.Greater(t, headerN.View, uint64(90))
-	}
+	stopAll(nodes)
 
 	cleanupNodes(nodes)
 }
 
 type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
 
-func connect(nodes []*Node, blockOrDelay BlockOrDelayFunc) {
+func connect(nodes []*Node) {
 	nodeDict := make(map[flow.Identifier]*Node, len(nodes))
 	for _, n := range nodes {
 		nodeDict[n.id.ID()] = n
@@ -504,23 +424,7 @@ func connect(nodes []*Node, blockOrDelay BlockOrDelayFunc) {
 
 	for _, n := range nodes {
 		{
-			sender := n
 			submit := func(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
-				for _, targetID := range targetIDs {
-					// find receiver
-					receiver, found := nodeDict[targetID]
-					if !found {
-						continue
-					}
-
-					blocked, delay := blockOrDelay(channelID, event, sender, receiver)
-					if blocked {
-						continue
-					}
-
-					go receiveWithDelay(channelID, event, sender, receiver, delay)
-				}
-
 				return nil
 			}
 			n.net.WithSubmit(submit)
