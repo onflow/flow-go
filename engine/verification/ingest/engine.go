@@ -761,7 +761,7 @@ func (e *Engine) trackersCleanup() {
 func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flow.Identifier) (*trackers.ChunkDataPackTracker, error) {
 	if e.chunkDataPackTackers.Has(chunkID) {
 		// chunk data pack has been already requested
-		// updates tracker counter in data base by one
+		// pulls tracker out of mempool
 		tracker, err := e.chunkDataPackTackers.ByChunkID(chunkID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
@@ -781,6 +781,35 @@ func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flo
 		ChunkID: chunkID,
 		BlockID: blockID,
 		Counter: 1,
+	}, nil
+}
+
+// updateCollectionTracker performs the following
+// If there is a tracker for this collection ID, it pulls it out of mempool, increases its counter by one, and returns it
+// Else it creates a new empty tracker for this collection with counter value of one and returns it
+func (e *Engine) updateCollectionTracker(collectionID flow.Identifier, blockID flow.Identifier) (*trackers.CollectionTracker, error) {
+	if e.collectionTrackers.Has(collectionID) {
+		// collection has been already requested
+		// pulls tracker out of mempool
+		tracker, err := e.collectionTrackers.ByCollectionID(collectionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+		}
+
+		removed := e.collectionTrackers.Rem(collectionID)
+		if !removed {
+			return nil, fmt.Errorf("could not remove collection tracker from mempool")
+		}
+		// increases tracker retry counter
+		tracker.Counter += 1
+
+		return tracker, nil
+	}
+
+	return &trackers.CollectionTracker{
+		CollectionID: collectionID,
+		BlockID:      blockID,
+		Counter:      1,
 	}, nil
 }
 
