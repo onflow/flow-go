@@ -415,6 +415,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
 			err = suite.db.Update(procedure.FinalizeClusterBlock(block.ID()))
+			require.Nil(b, err)
 			final = &block
 		}
 	}
