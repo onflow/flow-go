@@ -12,7 +12,7 @@ func DeployCounterContractTransaction() flow.TransactionBody {
 			access(all) contract Container {
 				access(all) resource Counter {
 					pub var count: Int
-		
+
 					init(_ v: Int) {
 						self.count = v
 					}
@@ -38,15 +38,37 @@ func DeployCounterContractTransaction() flow.TransactionBody {
 func CreateCounterTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
+			import 0x01
+			
+			transaction {
+				prepare(acc: AuthAccount) {
+					var maybeCounter <- acc.load<@Container.Counter>(from: /storage/counter)
+			
+					if maybeCounter == nil {
+						maybeCounter <-! Container.createCounter(3)		
+					}
+			
+					acc.save(<-maybeCounter!, to: /storage/counter)
+				}   	
+			}`),
+		ScriptAccounts: []flow.Address{flow.RootAddress},
+	}
+}
+
+// CreateCounterPanicTransaction returns a transaction that will manipulate state by writing a new counter into storage
+// and then panic. It can be used to test whether execution state stays untouched/will revert
+func CreateCounterPanicTransaction() flow.TransactionBody {
+	return flow.TransactionBody{
+		Script: []byte(`
 
 			import 0x01
 
 			transaction {
 				prepare(acc: AuthAccount) {
-					if acc.storage[Container.Counter] == nil {
-                		let existing <- acc.storage[Container.Counter] <- Container.createCounter(3)
-                		destroy existing
-					}
+					let existing <- acc.storage[Container.Counter] <- Container.createCounter(42)
+					destroy existing
+
+					panic("fail for testing purposes")
               	}
             }`),
 		ScriptAccounts: []flow.Address{flow.RootAddress},
@@ -56,14 +78,17 @@ func CreateCounterTransaction() flow.TransactionBody {
 func AddToCounterTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
-
 			import 0x01
-
+			
 			transaction {
 				prepare(acc: AuthAccount) {
-					acc.storage[Container.Counter].add(2)
-              	}
-            }`),
+					let counter <- acc.load<@Container.Counter>(from: /storage/counter)
+			
+					counter?.add(2)
+			
+					acc.save(<-counter, to: /storage/counter)
+				}
+			}`),
 		ScriptAccounts: []flow.Address{flow.RootAddress},
 	}
 }

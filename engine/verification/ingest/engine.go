@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
@@ -104,7 +103,7 @@ func New(
 
 	e.chunksConduit, err = net.Register(engine.ChunkDataPackProvider, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register chunk data pack provider engine")
+		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
 
 	_, err = net.Register(engine.ExecutionReceiptProvider, e)
@@ -387,6 +386,10 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Iden
 	if err != nil {
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)
 	}
+
+	e.log.Debug().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("chunk data pack request submitted")
 
 	// caches a tracker for successfully submitted requests
 	tracker := &trackers.ChunkDataPackTracker{
