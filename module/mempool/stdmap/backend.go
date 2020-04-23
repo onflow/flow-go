@@ -33,7 +33,7 @@ func (b *Backdata) Add(entity flow.Entity) error {
 	entityID := entity.ID()
 	_, ok := b.entities[entityID]
 	if ok {
-		return mempool.ErrEntityAlreadyExists
+		return mempool.ErrAlreadyExists
 	}
 	b.entities[entityID] = entity
 	return nil
@@ -53,7 +53,7 @@ func (b *Backdata) Rem(entityID flow.Identifier) bool {
 func (b *Backdata) ByID(entityID flow.Identifier) (flow.Entity, error) {
 	_, ok := b.entities[entityID]
 	if !ok {
-		return nil, mempool.ErrEntityNotFound
+		return nil, mempool.ErrNotFound
 	}
 	entity := b.entities[entityID]
 	return entity, nil

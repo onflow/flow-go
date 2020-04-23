@@ -127,7 +127,7 @@ func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 
 func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 	id := s.BlockID
-	result := s.ExecutionResultID
+	result := s.ResultID
 	return &entities.BlockSeal{
 		BlockId:                    id[:],
 		ExecutionReceiptId:         result[:],
