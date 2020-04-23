@@ -147,7 +147,7 @@ func (h *Handler) lookupEvents(ctx context.Context, txID flow.Identifier) ([]*en
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			// access node may not have the block if it hasn't yet been finalized
-			return make([]*entities.Event, 0), nil
+			return nil, nil
 		}
 		return nil, convertStorageError(err)
 	}
