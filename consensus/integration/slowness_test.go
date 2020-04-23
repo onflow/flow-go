@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -167,10 +168,12 @@ func (s *Stopper) OnEnteringView(id flow.Identifier, view uint64) {
 	s.Lock()
 	defer s.Unlock()
 
-	// keep track of remaining running nodes
-	if view >= s.stopAtView {
-		delete(s.running, id)
+	if view < s.stopAtView {
+		return
 	}
+
+	// keep track of remaining running nodes
+	delete(s.running, id)
 
 	// if there is no running nodes, stop all
 	if len(s.running) == 0 {
@@ -186,10 +189,18 @@ func (s *Stopper) stopAll() {
 
 	s.stopping = true
 
+	var wg sync.WaitGroup
 	for i := 0; i < len(s.nodes); i++ {
+		wg.Add(1)
 		// stop compliance will also stop both hotstuff and synchronization engine
-		s.nodes[i].compliance.Done()
+		go func(i int) {
+			fmt.Printf("===> %v closing instance to done \n", i)
+			<-s.nodes[i].compliance.Done()
+			wg.Done()
+			fmt.Printf("===> %v instance is done\n", i)
+		}(i)
 	}
+	wg.Wait()
 }
 
 type Engine struct{}
@@ -427,7 +438,7 @@ func start(nodes []*Node) {
 }
 
 func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 5, 1000)
+	nodes := createNodes(t, 3, 10)
 
 	connect(nodes, blockNothing)
 
@@ -439,7 +450,6 @@ func Test3Nodes(t *testing.T) {
 		require.NoError(t, err)
 		require.Greater(t, headerN.View, uint64(90))
 	}
-
 	cleanupNodes(nodes)
 }
 
