@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	encoding "github.com/dapperlabs/cadence/encoding/xdr"
+	encoding "github.com/onflow/cadence/encoding/xdr"
 
 	"github.com/dapperlabs/flow-go/engine/ghost/client"
 	"github.com/dapperlabs/flow-go/integration/testnet"
