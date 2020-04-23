@@ -406,6 +406,7 @@ func TestIterateBoundaries(t *testing.T) {
 		{0x19, 0xff},
 		{0x20, 0x00},
 		{0x20, 0xff},
+		{0x20, 0xff, 0xff}, // also has prefix 0x20
 		{0x21, 0x00},
 	}
 
@@ -442,12 +443,12 @@ func TestIterateBoundaries(t *testing.T) {
 		found = nil
 		err := db.View(iterate(start, end, iteration))
 		require.NoError(t, err, "should iterate forward without error")
-		require.ElementsMatch(t, keys[1:7], found, "forward iteration should go over correct keys")
+		require.ElementsMatch(t, keys[1:8], found, "forward iteration should go over correct keys")
 
 		// iterate backward and check boundaries are included correctly
 		found = nil
 		err = db.View(iterate(end, start, iteration))
 		require.NoError(t, err, "should iterate backward without error")
-		require.ElementsMatch(t, keys[1:7], found, "backward iteration should go over correct keys")
+		require.ElementsMatch(t, keys[1:8], found, "backward iteration should go over correct keys")
 	})
 }
