@@ -20,10 +20,20 @@ func AddressFixture() flow.Address {
 	return flow.RootAddress
 }
 
-func AccountSignatureFixture() flow.AccountSignature {
-	return flow.AccountSignature{
-		Account:   AddressFixture(),
-		Signature: []byte{1, 2, 3, 4},
+func TransactionSignatureFixture() flow.TransactionSignature {
+	return flow.TransactionSignature{
+		Address:     AddressFixture(),
+		SignerIndex: 0,
+		Signature:   []byte{1, 2, 3, 4},
+		KeyID:       1,
+	}
+}
+
+func ProposalKeyFixture() flow.ProposalKey {
+	return flow.ProposalKey{
+		Address:        AddressFixture(),
+		KeyID:          1,
+		SequenceNumber: 0,
 	}
 }
 
@@ -461,16 +471,14 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 
 func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	tb := flow.TransactionBody{
-		Script:           []byte("pub fun main() {}"),
-		ReferenceBlockID: IdentifierFixture(),
-		// TODO remove or update these once Access API is finalized
-		//Nonce:            rand.Uint64(),
-		Nonce: 0,
-		//ComputeLimit:     10,
-		ComputeLimit:   0,
-		PayerAccount:   AddressFixture(),
-		ScriptAccounts: []flow.Address{AddressFixture()},
-		Signatures:     []flow.AccountSignature{AccountSignatureFixture()},
+		Script:             []byte("pub fun main() {}"),
+		ReferenceBlockID:   IdentifierFixture(),
+		GasLimit:           10,
+		ProposalKey:        ProposalKeyFixture(),
+		Payer:              AddressFixture(),
+		Authorizers:        []flow.Address{AddressFixture()},
+		PayloadSignatures:  []flow.TransactionSignature{TransactionSignatureFixture()},
+		EnvelopeSignatures: []flow.TransactionSignature{TransactionSignatureFixture()},
 	}
 
 	for _, apply := range opts {
