@@ -178,7 +178,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		}(verNode)
 	}
 
-	unittest.AssertReturnsBefore(t, verWG.Wait, 3*time.Second)
+	unittest.AssertReturnsBefore(t, verWG.Wait, 5*time.Second)
 
 	for _, verNode := range verNodes {
 		// both receipts should be added to the authenticated mempool of verification node
