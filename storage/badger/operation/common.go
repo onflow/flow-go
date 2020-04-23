@@ -228,15 +228,8 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 			item := it.Item()
 
 			// check if we have reached the end of our iteration
-			// NOTE: we have to cut down the prefix to the same length as the
-			// end prefix in order to go through all items that have the same
-			// partial prefix before breaking
 			key := item.Key()
-			if len(end) > len(key) {
-				continue
-			}
-			prefix := key[0:len(end)]
-			if bytes.Compare(prefix, end)*modifier > 0 {
+			if bytes.Compare(key, end)*modifier > 0 {
 				break
 			}
 
