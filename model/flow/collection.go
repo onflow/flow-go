@@ -35,6 +35,10 @@ func (c Collection) ID() Identifier {
 	return c.Light().ID()
 }
 
+func (c Collection) Len() int {
+	return len(c.Transactions)
+}
+
 func (c Collection) Checksum() Identifier {
 	return c.Light().Checksum()
 }

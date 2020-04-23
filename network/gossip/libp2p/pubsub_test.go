@@ -96,20 +96,7 @@ func (p *PubSubTestSuite) TestPubSub() {
 
 	}
 
-	// Step 3 publish a message to the topic and check if publish blocks
-	blk := make(chan struct{})
-	go func() {
-		require.NoError(p.Suite.T(), nodes[0].Publish(p.ctx, topic, []byte("hello"), count-1))
-		blk <- struct{}{}
-	}()
-
-	select {
-	case <-blk:
-		assert.Fail(p.Suite.T(), "publish did not block")
-	case <-time.After(3 * time.Second):
-	}
-
-	// Step 4: Now setup discovery to allow nodes to find each other
+	// Step 3: Now setup discovery to allow nodes to find each other
 	var pInfos []peer.AddrInfo
 	for _, n := range nodes {
 		id := n.libP2PHost.ID()
@@ -118,6 +105,12 @@ func (p *PubSubTestSuite) TestPubSub() {
 	}
 	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
 	d.SetPeers(pInfos)
+
+	// let the nodes discover each other
+	time.Sleep(2 * time.Second)
+
+	// Step 4: publish a message to the topic
+	require.NoError(p.Suite.T(), nodes[0].Publish(p.ctx, topic, []byte("hello")))
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message

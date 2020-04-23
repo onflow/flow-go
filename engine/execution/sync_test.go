@@ -58,10 +58,12 @@ func TestSyncFlow(t *testing.T) {
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col1.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 			},
 		},
 	}
+	block1.PayloadHash = block1.Payload.Hash()
 
 	block2 := &flow.Block{
 		Header: flow.Header{
@@ -73,10 +75,12 @@ func TestSyncFlow(t *testing.T) {
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col2.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 			},
 		},
 	}
+	block2.PayloadHash = block2.Payload.Hash()
 
 	block3 := &flow.Block{
 		Header: flow.Header{
@@ -86,6 +90,7 @@ func TestSyncFlow(t *testing.T) {
 		},
 		Payload: flow.Payload{},
 	}
+	block3.PayloadHash = block3.Payload.Hash()
 
 	block4 := &flow.Block{
 		Header: flow.Header{
@@ -97,10 +102,23 @@ func TestSyncFlow(t *testing.T) {
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col4.ID(),
+					SignerIDs:    []flow.Identifier{colID.NodeID},
 				},
 			},
 		},
 	}
+	block4.PayloadHash = block4.Payload.Hash()
+
+	proposal1 := unittest.ProposalFromBlock(block1)
+	proposal2 := unittest.ProposalFromBlock(block2)
+	proposal3 := unittest.ProposalFromBlock(block3)
+	proposal4 := unittest.ProposalFromBlock(block4)
+
+	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.ParentID)
+	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.ParentID)
+	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.ParentID)
+	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.ParentID)
+	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.ParentID)
 
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
@@ -135,8 +153,8 @@ func TestSyncFlow(t *testing.T) {
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(0)
 
 	// submit block from consensus node
-	exeNode2.IngestionEngine.Submit(conID.NodeID, block1)
-	exeNode2.IngestionEngine.Submit(conID.NodeID, block2)
+	exeNode2.IngestionEngine.Submit(conID.NodeID, proposal1)
+	exeNode2.IngestionEngine.Submit(conID.NodeID, proposal2)
 
 	// wait for block2 to be executed on execNode2
 	hub.Eventually(t, func() bool {
@@ -151,8 +169,8 @@ func TestSyncFlow(t *testing.T) {
 	exeNode2.AssertHighestExecutedBlock(t, &block2.Header)
 
 	// submit block3 and block4 to exe1 which should trigger sync
-	exeNode1.IngestionEngine.Submit(conID.NodeID, block3)
-	exeNode1.IngestionEngine.Submit(conID.NodeID, block4)
+	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal3)
+	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal4)
 
 	// wait for block3/4 to be executed on execNode1
 	hub.Eventually(t, func() bool {

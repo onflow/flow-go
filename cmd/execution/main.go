@@ -123,12 +123,13 @@ func main() {
 				providerEngine,
 				executionState,
 				6, //TODO - config param maybe?
+				node.Metrics,
 			)
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events)
 			return rpcEng, nil
-		}).Run()
+		}).Run("execution")
 
 }

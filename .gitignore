@@ -11,6 +11,9 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Output from logging to debug
+*.log
+
 # Coverage artifacts
 coverage.zip
 cover.json
@@ -28,6 +31,7 @@ flowdb
 # IDE related files
 .idea
 .vscode
+flow-go.code-workspace
 git
 language/tools/vscode-extension/cadence-*.vsix
 language/tools/vscode-extension/out/*

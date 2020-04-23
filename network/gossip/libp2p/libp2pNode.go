@@ -17,10 +17,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
-
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -61,6 +60,7 @@ type P2PNode struct {
 func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, key lcrypto.PrivKey, handler network.StreamHandler, psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
+
 	p.name = n.Name
 	p.logger = logger
 	addr := multiaddressStr(n)
@@ -92,7 +92,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		libp2p.Identity(key),
 		transport,
 	)
-
 	if err != nil {
 		return errors.Wrapf(err, "could not construct libp2p host for %s", p.name)
 	}
@@ -103,7 +102,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
-
 	if err != nil {
 		return errors.Wrapf(err, "unable to start pubsub %s", p.name)
 	}
@@ -111,13 +109,13 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	p.topics = make(map[string]*pubsub.Topic)
 	p.subs = make(map[string]*pubsub.Subscription)
 
-	if err == nil {
-		ip, port := p.GetIPPort()
-		p.logger.Debug().Str("name", p.name).Str("address", fmt.Sprintf("%s:%s", ip, port)).
-			Msg("libp2p node started successfully")
-	}
+	ip, port := p.GetIPPort()
+	p.logger.Debug().
+		Str("name", p.name).
+		Str("address", fmt.Sprintf("%s:%s", ip, port)).
+		Msg("libp2p node started successfully")
 
-	return err
+	return nil
 }
 
 // Stop stops the libp2p node.
@@ -344,14 +342,12 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 }
 
 // Publish publishes the given payload on the topic
-// if the nodes doesn't has at least minPeers number of nodes as it peers,
-// then the publish will block until at least minSize number of have been found as peers.
-func (p *P2PNode) Publish(ctx context.Context, t string, data []byte, minPeers int) error {
+func (p *P2PNode) Publish(ctx context.Context, t string, data []byte) error {
 	ps, found := p.topics[t]
 	if !found {
 		return fmt.Errorf("topic not found:%s", t)
 	}
-	err := ps.Publish(ctx, data, pubsub.WithReadiness(pubsub.MinTopicSize(minPeers)))
+	err := ps.Publish(ctx, data)
 	if err != nil {
 		return fmt.Errorf("failed to publish to topic %s: %w", t, err)
 	}

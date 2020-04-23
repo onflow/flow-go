@@ -9,6 +9,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
+	"github.com/dapperlabs/flow-go/utils/io"
 )
 
 var _ databases.DAL = &LevelDB{}
@@ -85,10 +86,8 @@ func (s *LevelDB) NewBatcher() databases.Batcher {
 func (s *LevelDB) PutIntoBatcher(key []byte, value []byte) {
 	if value == nil {
 		s.batcher.Delete(key)
-		fmt.Printf("TDEL %x\n", key)
 	}
 	s.batcher.Put(key, value)
-	fmt.Printf("TPUT %x = %x\n", key, value)
 }
 
 // SafeClose is a helper function that closes databases safely.
@@ -215,6 +214,11 @@ func (s *LevelDB) PruneDB(next databases.DAL) error {
 	}
 
 	return nil
+}
+
+// Size returns the size of the current LevelDB on disk in bytes
+func (s *LevelDB) Size() (int64, error) {
+	return io.DirSize(s.path)
 }
 
 // TODO Replace copyKVDB and copyTDB with a single function

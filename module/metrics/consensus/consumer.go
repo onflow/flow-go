@@ -11,11 +11,11 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-// MetricsConsumer is a consumer that subscribes hotstuff events and
+// MetricsConsumer is a consumer that subscribes to hotstuff events and
 // collects metrics data when certain events trigger.
 // It depends on Metrics module to report metrics data.
 type MetricsConsumer struct {
-	// inherit from noop consumer in order to
+	// inherit from noop consumer in order to satisfy the full interface
 	notifications.NoopConsumer
 	log        zerolog.Logger
 	guarantees storage.Guarantees

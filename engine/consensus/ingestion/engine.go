@@ -5,7 +5,6 @@ package ingestion
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -45,7 +44,7 @@ func New(log zerolog.Logger, net module.Network, prop network.Engine, state prot
 	// register the engine with the network layer and store the conduit
 	_, err := net.Register(engine.CollectionProvider, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	return e, nil
@@ -102,7 +101,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *flow.CollectionGuarantee:
 		return e.onCollectionGuarantee(originID, entity)
 	default:
-		return errors.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
@@ -110,10 +109,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // from nodes that are not consensus nodes (notably collection nodes).
 func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
-	e.log.Info().
+	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee received")
+		RawJSON("signers", logging.AsJSON(guarantee.SignerIDs)).
+		Logger()
+
+	log.Info().Msg("collection guarantee received from collection cluster")
 
 	final := e.state.Final()
 
@@ -152,7 +154,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// source for a collection guarantee (usually collection nodes)
 	id, err := final.Identity(originID)
 	if err != nil {
-		return errors.Wrap(err, "could not get origin node identity")
+		return fmt.Errorf("could not get origin node identity: %w", err)
 	}
 
 	// check that the origin is a collection node; this check is fine even if it
@@ -161,18 +163,15 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// between consensus nodes anyway; we do no processing or validation in this
 	// engine beyond validating the origin
 	if id.Role != flow.RoleCollection {
-		return errors.Errorf("invalid origin node role (%s)", id.Role)
+		return fmt.Errorf("invalid origin node role (%s)", id.Role)
 	}
+
+	log.Info().Msg("forwarding collection guarantee to propagation engine")
 
 	// submit the collection to the propagation engine - this is non-blocking
 	// we could just validate it here and add it to the memory pool directly,
 	// but then we would duplicate the validation logic
 	e.prop.SubmitLocal(guarantee)
-
-	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.Entity(guarantee)).
-		Msg("collection guarantee forwarded")
 
 	e.metrics.StartCollectionToFinalized(guarantee.ID())
 

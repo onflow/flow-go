@@ -167,3 +167,7 @@ func (f *TrieStorage) UpdateRegistersWithProof(
 func (f *TrieStorage) CloseStorage() {
 	f.tree.SafeClose()
 }
+
+func (f *TrieStorage) Size() (int64, error) {
+	return f.tree.Size()
+}

@@ -16,10 +16,7 @@ func genGenesisExecutionState() flow.StateCommitment {
 		log.Fatal().Err(err).Msg("error generating account 0 private key")
 	}
 
-	enc, err := account0Priv.PrivateKey.Encode()
-	if err != nil {
-		log.Fatal().Err(err).Msg("error encoding account 0 private key")
-	}
+	enc := account0Priv.PrivateKey.Encode()
 	writeJSON(bootstrap.FilenameAccount0Priv, enc)
 
 	dbpath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)

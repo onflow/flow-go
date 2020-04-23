@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
+	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/test"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
@@ -21,7 +22,6 @@ import (
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -33,7 +33,7 @@ type VerifierEngineTestSuite struct {
 	net     *mockmodule.Network
 	state   *protocol.State
 	ss      *protocol.Snapshot
-	me      *MockLocal
+	me      *mocklocal.MockLocal
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
 	conduit *network.Conduit    // mocks conduit for submitting result approvals
@@ -69,16 +69,16 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	// Mocks the signature oracle of the engine
 	//
 	// generates signing and verification keys
-	seed := make([]byte, crypto.KeyGenSeedMinLenBlsBls12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
-	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBlsBls12381)
+	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(suite.T(), err)
-	sk, err := crypto.GeneratePrivateKey(crypto.BlsBls12381, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(suite.T(), err)
 	suite.sk = sk
 	// tag of hasher should be the same as the tag of engine's hasher
 	suite.hasher = utils.NewResultApprovalHasher()
-	suite.me = NewMockLocal(sk, flow.Identifier{}, suite.T())
+	suite.me = mocklocal.NewMockLocal(sk, flow.Identifier{}, suite.T())
 }
 
 func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
@@ -184,40 +184,6 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 	}
 }
 
-// MockLocal represents a mock of Local
-// We needed to develop a separate mock for Local as we could not mock
-// a method with return values
-type MockLocal struct {
-	sk crypto.PrivateKey
-	t  testifymock.TestingT
-	id flow.Identifier
-}
-
-func NewMockLocal(sk crypto.PrivateKey, id flow.Identifier, t testifymock.TestingT) *MockLocal {
-	return &MockLocal{
-		sk: sk,
-		t:  t,
-		id: id,
-	}
-}
-
-func (m *MockLocal) NodeID() flow.Identifier {
-	return m.id
-}
-
-func (m *MockLocal) Address() string {
-	require.Fail(m.t, "should not call MockLocal Address")
-	return ""
-}
-
-func (m *MockLocal) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, error) {
-	return m.sk.Sign(msg, hasher)
-}
-
-func (m *MockLocal) MockNodeID(id flow.Identifier) {
-	m.id = id
-}
-
 type ChunkVerifierMock struct {
 }
 
@@ -252,8 +218,4 @@ func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) (chmodel.Chu
 		return nil, nil
 	}
 
-}
-
-func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
-	return filter.Not(filter.HasNodeID(m.id))
 }

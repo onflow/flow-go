@@ -33,6 +33,8 @@ type ReadOnlyExecutionState interface {
 	RetrieveStateDelta(blockID flow.Identifier) (*messages.ExecutionStateDelta, error)
 
 	GetHighestExecutedBlockID() (uint64, flow.Identifier, error)
+
+	Size() (int64, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -246,4 +248,8 @@ func (s *state) GetHighestExecutedBlockID() (uint64, flow.Identifier, error) {
 		return 0, flow.ZeroID, err
 	}
 	return height, blockID, nil
+}
+
+func (s *state) Size() (int64, error) {
+	return s.ls.Size()
 }

@@ -51,13 +51,11 @@ func NewNetwork(
 	}
 
 	// fanout is set to half of the system size for connectivity assurance w.h.p
-	// ids contain the address of this node itself (hence fanout is (len(ids) - 1) + 1) / 2) = len(ids) / 2
-	fanout := len(ids) / 2
+	fanout := (len(ids) + 1) / 2
 
 	o := &Network{
 		logger:  log,
 		codec:   codec,
-		ids:     ids,
 		me:      me,
 		mw:      mw,
 		engines: make(map[uint8]network.Engine),
@@ -65,6 +63,8 @@ func NewNetwork(
 		fanout:  fanout,
 		top:     top,
 	}
+
+	o.SetIDs(ids)
 
 	return o, nil
 }
@@ -136,19 +136,20 @@ func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
 	return n.top.Subset(n.ids, n.fanout, n.me.NodeID().String())
 }
 
-func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
+func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 
-	var err error
-	switch m := msg.(type) {
-	case *message.Message:
-		err = n.processNetworkMessage(nodeID, m)
-	default:
-		err = fmt.Errorf("network received invalid message type (%T)", m)
-	}
+	err := n.processNetworkMessage(nodeID, msg)
 	if err != nil {
-		err = fmt.Errorf("could not process message: %w", err)
+		return fmt.Errorf("could not process message: %w", err)
 	}
-	return err
+
+	return nil
+}
+
+func (n *Network) SetIDs(ids flow.IdentityList) {
+	// remove this node id from the list of fanout target ids to avoid self-dial
+	idsMinusMe := ids.Filter(n.me.NotMeFilter())
+	n.ids = idsMinusMe
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
@@ -195,18 +196,16 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
 
 	var emTargets [][]byte
-	for _, t := range targetIDs {
-		// copy the array to a temp var by value
-		temp := t
-		// create a slice out of the temp var
-		emTargets = append(emTargets, temp[:])
+	for _, targetID := range targetIDs {
+		tempID := targetID // avoid capturing loop variable
+		emTargets = append(emTargets, tempID[:])
 	}
 
 	// get origin ID (inplace slicing n.me.NodeID()[:] doesn't work)
 	selfID := n.me.NodeID()
 	originID := selfID[:]
 
-	//cast event to a libp2p.Message
+	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: uint32(channelID),
 		EventID:   sip.Sum(payload),
@@ -221,13 +220,14 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 // submit method submits the given event for the given channel to the overlay layer
 // for processing; it is used by engines through conduits.
 func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+
 	// genNetworkMessage the event to get payload and event ID
 	msg, err := n.genNetworkMessage(channelID, event, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not cast the event into network message")
 	}
 
-	// TODO: debup the message here
+	// TODO: dedup the message here
 
 	err = n.mw.Send(channelID, msg, targetIDs...)
 	if err != nil {
