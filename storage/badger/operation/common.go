@@ -394,8 +394,8 @@ func fromPayloadIndex(key []byte) (uint64, flow.Identifier, flow.Identifier) {
 // This is useful for verifying an existing payload, for example in a block
 // proposal from another node, where the desired output is accept/reject.
 //
-// **MUST** use `payloadIterRange` to obtain start/end prefixes for iterations
-// using this function
+// Use `payloadIterRange` to obtain start/end prefixes for iterations using
+// this function.
 func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterationFunc {
 
 	// build lookup table for payload entities
@@ -449,8 +449,8 @@ func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterat
 // This is useful when building a payload locally, where we want to know which
 // entities are valid for inclusion so we can produce a valid block proposal.
 //
-// **MUST** use `payloadIterRange` to obtain start/end prefixes for iterations
-// using this function
+// Use `payloadIterRange` to obtain start/end prefixes for iterations using
+// this function.
 func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) iterationFunc {
 
 	// build lookup table for candidate payload entities
