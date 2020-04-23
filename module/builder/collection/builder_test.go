@@ -72,9 +72,7 @@ func (suite *BuilderSuite) Bootstrap() {
 
 	// add some transactions to transaction pool
 	for i := 0; i < 3; i++ {
-		transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
-			tx.Nonce = uint64(i)
-		})
+		transaction := unittest.TransactionBodyFixture()
 		err = suite.pool.Add(&transaction)
 		suite.Assert().Nil(err)
 	}
@@ -282,7 +280,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	for i := 0; i < 1000; i++ {
 
 		// create a transaction
-		tx := unittest.TransactionBodyFixture(func(t *flow.TransactionBody) { t.Nonce = uint64(i) })
+		tx := unittest.TransactionBodyFixture()
 		err = suite.pool.Add(&tx)
 		assert.Nil(t, err)
 
