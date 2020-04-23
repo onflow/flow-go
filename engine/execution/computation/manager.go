@@ -3,10 +3,10 @@ package computation
 import (
 	"fmt"
 
+	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/cadence"
-	encoding "github.com/dapperlabs/cadence/encoding/xdr"
+	encoding "github.com/onflow/cadence/encoding/xdr"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"

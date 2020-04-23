@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/pkg/errors"
-
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/crypto/random"
 	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
@@ -40,6 +38,11 @@ func NewPublicAssignment(alpha int) (*PublicAssignment, error) {
 	}, nil
 }
 
+// Size returns number of assignments
+func (p *PublicAssignment) Size() uint {
+	return p.assignments.Size()
+}
+
 // Assign receives identity list of verifier nodes, chunk lists and a random generator
 // it returns a chunk assignment
 func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chunkmodels.Assignment, error) {
@@ -59,7 +62,7 @@ func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.Chun
 	// otherwise, it computes the assignment and caches it for future calls
 	a, err := chunkAssignment(ids, chunks, rng, p.alpha)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not complete chunk assignment")
+		return nil, fmt.Errorf("could not complete chunk assignment: %w", err)
 	}
 
 	// adds assignment to mempool
