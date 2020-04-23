@@ -41,7 +41,8 @@ func TestConcurrency(t *testing.T) {
 			erCount:     1,
 			senderCount: 1,
 			chunksNum:   2,
-		}, {
+		},
+		{
 			erCount:     1,
 			senderCount: 10,
 			chunksNum:   2,
@@ -212,24 +213,18 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 				}
 
 				verNet.DeliverAll(true)
-				go senderWG.Done()
+				senderWG.Done()
 			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.Block, completeER.Receipt)
 		}
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.AssertReturnsBefore(t, senderWG.Wait, 3*time.Second)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, 5*time.Second)
 	verNet.DeliverAll(false)
-	unittest.AssertReturnsBefore(t, verifierEngWG.Wait, 3*time.Second)
+	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, 5*time.Second)
 	verNet.DeliverAll(false)
 
-	// ensures resources are cleaned up
 	for _, c := range vChunks {
-		// since all chunks have been ingested, execution receipt should be removed from mempool
-		// no receipt should reside in authenticate or pending receipt mempools
-		assert.False(t, verNode.AuthReceipts.Has(c.Receipt.ID()))
-		assert.False(t, verNode.PendingReceipts.Has(c.Receipt.ID()))
-
 		if isAssigned(c.ChunkIndex) {
 			// assigned chunks should have their result to be added to ingested results mempool
 			assert.True(t, verNode.IngestedResultIDs.Has(c.Receipt.ExecutionResult.ID()))

@@ -132,7 +132,7 @@ func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 	mn.Lock()
 	defer mn.Unlock()
 
-	key, err := eventKey(m.ChannelID, m.Event)
+	key, err := eventKey(m.From, m.ChannelID, m.Event)
 	if err != nil {
 		return err
 	}
