@@ -235,6 +235,14 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	for _, er := range ers {
 		// since all chunks have been ingested, execution receipt should be removed from mempool
 		// no receipt should reside in authenticate or pending receipt mempools
+		if verNode.AuthReceipts.Has(er.Receipt.ID()) {
+			fmt.Println("error")
+			fmt.Println("auth receipts", verNode.AuthReceipts.Has(er.Receipt.ID()))
+			fmt.Println("pending receipts", verNode.PendingReceipts.Has(er.Receipt.ID()))
+			for _, c := range er.Receipt.ExecutionResult.Chunks {
+				fmt.Println("chunk assigned", c.Index, " ", isAssigned(c.Index))
+			}
+		}
 		require.False(t, verNode.AuthReceipts.Has(er.Receipt.ID()))
 		require.False(t, verNode.PendingReceipts.Has(er.Receipt.ID()))
 	}
