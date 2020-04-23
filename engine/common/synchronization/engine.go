@@ -323,6 +323,8 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 
 // queueByHeight queues a request for the finalized block at the given height.
 func (e *Engine) queueByHeight(height uint64) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// if we already have the height, skip
 	_, ok := e.heights[height]
@@ -343,6 +345,8 @@ func (e *Engine) queueByHeight(height uint64) {
 
 // queueByBlockID queues a request for a block by block ID.
 func (e *Engine) queueByBlockID(blockID flow.Identifier) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// Do not bother with the zero ID
 	if blockID == flow.ZeroID {
@@ -401,16 +405,12 @@ CheckLoop:
 		case <-e.unit.Quit():
 			break CheckLoop
 		case <-poll.C:
-			e.unit.Lock()
-			defer e.unit.Unlock()
 			err := e.pollHeight()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not poll heights")
 				continue
 			}
 		case <-scan.C:
-			e.unit.Lock()
-			defer e.unit.Unlock()
 			heights, blockIDs, err := e.scanPending()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not scan pending")
@@ -431,6 +431,8 @@ CheckLoop:
 
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// get the last finalized header
 	final, err := e.state.Final().Head()
@@ -464,6 +466,8 @@ func (e *Engine) pollHeight() error {
 
 // scanPending will check which items shall be requested.
 func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// TODO: we will probably want to limit the maximum amount of in-flight
 	// requests and maximum amount of blocks requested at the same time here;
@@ -523,6 +527,8 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 // sendRequests will divide the given heights and block IDs appropriately and
 // request the desired blocks.
 func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// get all of the consensus nodes from the state
 	// NOTE: we want to request from consensus nodes even on other node roles
