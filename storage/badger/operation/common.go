@@ -365,22 +365,12 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 }
 
 // payloadIterRange determines start and end prefixes for an iteration through
-// a payload index created using `toPayloadIndex`.
-//
-// On the top end of the iteration, we use the prefix (top+1)||ZeroID. This
-// ensures that everything indexed at the top height is included in the
-// iteration.
+// a range of block heights within a payload index created using `toPayloadIndex`
+// `from` and `to` are the endpoints of the iteration range. Both will be
+// included in the iteration.
 func payloadIterRange(code uint8, from, to uint64) (start, end []byte) {
-	if from > to {
-		// common case - we are iterating through history in reverse, typically
-		// from the boundary height to 0
-		start = makePrefix(code, from, flow.MaxID)
-		end = makePrefix(code, to)
-	} else {
-		// other case - we are iterating forward through history
-		start = makePrefix(code, from)
-		end = makePrefix(code, to, flow.MaxID)
-	}
+	start = makePrefix(code, from)
+	end = makePrefix(code, to)
 	return
 }
 
