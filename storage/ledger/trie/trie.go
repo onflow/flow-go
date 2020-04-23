@@ -6,17 +6,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
 
 	"github.com/gammazero/deque"
-	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
-	"github.com/dapperlabs/flow-go/utils/io"
 )
 
 var nilChild []byte = make([]byte, 32)
@@ -76,14 +72,18 @@ type tree struct {
 	root           Root
 	rootNode       *node
 	database       databases.DAL
-	previous       Root
+	previous       Commitment
 	cachedBranches map[string]*proofHolder // Map of string representations of keys to proofs
 	forest         *forest
 	height         uint64 //similar to block height, useful for snapshotting
 	// FIFO queue of ordered historical State Roots
 	// In-memory only, used for tracking snapshots. Can be reconstructed from disk if needed
 	// Frequent eviction of a tree/restarting might mean database not gets pruned as frequent
-	historicalStateRoots deque.Deque
+	historicalStateCommitments deque.Deque
+}
+
+func (t *tree) Commitment() Commitment {
+	return newCommitment(t.previous, t.root)
 }
 
 func (t *tree) Root() (*node, error) {
@@ -153,112 +153,6 @@ func LoadNode(value Root, height int, db databases.DAL) (*node, error) {
 		height: height,
 		key:    key,
 	}, nil
-}
-
-func (f forest) PrintCache() {
-	for _, key := range f.cache.Keys() {
-		k, _ := hex.DecodeString(key.(string))
-		t, _ := f.Get(Root(k))
-		fmt.Println(key, t.rootNode.FmtStr("", ""))
-	}
-}
-
-func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
-
-	deltaNumber, err := db.GetTrieDB(metadataHeight)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get delta number: %w", err)
-	}
-
-	previousRoot, err := db.GetTrieDB(metadataKeyPrevious)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get previous root: %w", err)
-	}
-
-	return &tree{
-		rootNode:       nil,
-		root:           root,
-		database:       db,
-		previous:       previousRoot,
-		height:         binary.BigEndian.Uint64(deltaNumber),
-		cachedBranches: make(map[string]*proofHolder),
-		forest:         f,
-	}, nil
-}
-
-type forest struct {
-	dbDir  string
-	cache  *lru.Cache
-	height int
-}
-
-func NewForest(dbDir string, maxSize int, maxFullSize int, height int) (*forest, error) {
-	evict := func(key interface{}, value interface{}) {
-		tree, ok := value.(*tree)
-		if !ok {
-			panic(fmt.Sprintf("cache contains item of type %T", value))
-		}
-		_, _ = tree.database.SafeClose()
-	}
-	cache, err := lru.NewWithEvict(maxSize, evict)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create forest cache: %w", err)
-	}
-	//fullCache, err := lru.NewWithEvict(maxFullSize, evict)
-	//if err != nil {
-	//	return nil, fmt.Errorf("cannot create forest full cache: %w", err)
-	//}
-	return &forest{
-		dbDir: dbDir,
-		cache: cache,
-		//fullCache: fullCache,
-		height: height,
-	}, nil
-}
-
-func (f *forest) Add(tree *tree) {
-	//if tree.numDeltas == 0 {
-	//	f.fullCache.Add(tree.root.String(), tree)
-	//	return
-	//}
-	f.cache.Add(tree.root.String(), tree)
-}
-
-func (f *forest) Get(root Root) (*tree, error) {
-
-	//if foundFullTree, ok := f.fullCache.Get(root.String()); ok {
-	//	return foundFullTree.(*tree), nil
-	//}
-
-	if foundTree, ok := f.cache.Get(root.String()); ok {
-		return foundTree.(*tree), nil
-	}
-
-	db, err := f.newDB(root)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create LevelDB: %w", err)
-	}
-
-	tree, err := f.newTree(root, db)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create tree: %w", err)
-	}
-
-	f.Add(tree)
-
-	return tree, nil
-}
-
-func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
-	treePath := filepath.Join(f.dbDir, root.String())
-
-	db, err := leveldb.NewLevelDB(treePath)
-	return db, err
-}
-
-// Size returns the size of the forest on disk in bytes
-func (f *forest) Size() (int64, error) {
-	return io.DirSize(f.dbDir)
 }
 
 // SMT is a Basic Sparse Merkle Tree struct
@@ -352,18 +246,6 @@ func (n *node) ComputeValue() []byte {
 	return HashInterNode(h1, h2)
 }
 
-// func (n node) String() string {
-// 	right := ""
-// 	if n.rChild != nil {
-// 		right = n.rChild.String()
-// 	}
-// 	left := ""
-// 	if n.lChild != nil {
-// 		left = n.lChild.String()
-// 	}
-// 	return fmt.Sprintf("%v: (%v,%v) left> %v right> %v ", n.height, n.key, hex.EncodeToString(n.value), left, right)
-// }
-
 // FmtStr provides formated string represntation of the node and sub tree
 func (n node) FmtStr(prefix string, path string) string {
 	right := ""
@@ -425,6 +307,11 @@ func NewSMT(
 
 	// add empty tree
 	emptyHash := GetDefaultHashForHeight(height - 1)
+	// empty commitment emptyHash + emptyHash
+	emptyCommitment := make([]byte, 0)
+	emptyCommitment = append(emptyCommitment, emptyHash...)
+	emptyCommitment = append(emptyCommitment, emptyHash...)
+
 	emptyDB, err := forest.newDB(emptyHash)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create empty DB: %w", err)
@@ -455,67 +342,6 @@ func NewSMT(
 	return s, nil
 }
 
-// proofHolder is a struct that holds the proofs and flags from a proof check
-type proofHolder struct {
-	flags      [][]byte   // The flags of the proofs (is set if an intermediate node has a non-default)
-	proofs     [][][]byte // the non-default nodes in the proof
-	inclusions []bool     // flag indicating if this is an inclusion or exclusion
-	sizes      []uint8    // size of the proof in steps
-}
-
-// newProofHolder is a constructor for proofHolder
-func newProofHolder(flags [][]byte, proofs [][][]byte, inclusions []bool, sizes []uint8) *proofHolder {
-	holder := new(proofHolder)
-	holder.flags = flags
-	holder.proofs = proofs
-	holder.inclusions = inclusions
-	holder.sizes = sizes
-
-	return holder
-}
-
-// GetSize returns the length of the proofHolder
-func (p *proofHolder) GetSize() int {
-	return len(p.flags)
-}
-
-// ExportProof return the flag, proofs, inclusion, an size of the proof at index i
-func (p *proofHolder) ExportProof(index int) ([]byte, [][]byte, bool, uint8) {
-	return p.flags[index], p.proofs[index], p.inclusions[index], p.sizes[index]
-}
-
-// ExportWholeProof returns the proof holder seperated into it's individual fields
-func (p *proofHolder) ExportWholeProof() ([][]byte, [][][]byte, []bool, []uint8) {
-	return p.flags, p.proofs, p.inclusions, p.sizes
-}
-
-func (p proofHolder) String() string {
-	res := fmt.Sprintf("> proof holder includes %d proofs\n", len(p.sizes))
-	for i, size := range p.sizes {
-		flags := p.flags[i]
-		proof := p.proofs[i]
-		flagStr := ""
-		for _, f := range flags {
-			flagStr += fmt.Sprintf("%08b", f)
-		}
-		proofStr := fmt.Sprintf("size: %d flags: %v\n", size, flagStr)
-		if p.inclusions[i] {
-			proofStr += fmt.Sprintf("\t proof %d (inclusion)\n", i)
-		} else {
-			proofStr += fmt.Sprintf("\t proof %d (noninclusion)\n", i)
-		}
-		proofIndex := 0
-		for j := 0; j < int(size); j++ {
-			if utils.IsBitSet(flags, j) {
-				proofStr += fmt.Sprintf("\t\t %d: [%x]\n", j, proof[proofIndex])
-				proofIndex++
-			}
-		}
-		res = res + "\n" + proofStr
-	}
-	return res
-}
-
 // updateCache takes a key and all relevant parts of the proof and insterts in into the cache, removing values if needed
 func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool, size uint8) {
 	holder := newProofHolder([][]byte{flag}, [][][]byte{proof}, []bool{inclusion}, []uint8{size})
@@ -529,108 +355,29 @@ func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool,
 //}
 
 // Read takes the keys given and return the values from the database
-// If the trusted flag is true, it is just a read from the database
-// If trusted is false, then we check to see if the key exists in the trie
-func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHolder, error) {
+func (s *SMT) Read(keys [][]byte, commitment Commitment) ([][]byte, error) {
 
 	// check key sizes
 	for _, k := range keys {
 		if len(k) != s.keyByteSize {
-			return nil, nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
+			return nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
 		}
 	}
 
-	flags := make([][]byte, len(keys))
-	proofs := make([][][]byte, len(keys))
-	inclusions := make([]bool, len(keys))
-	sizes := make([]uint8, len(keys))
-
-	//currRoot := s.GetRoot().value
-	//stringRoot := root.String()
-
-	tree, err := s.forest.Get(root)
+	tree, err := s.forest.Get(commitment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid historical state: %w", err)
-	}
-
-	if !trusted {
-		if s.IsSnapshot(tree) {
-
-			//if bytes.Equal(root, currRoot) {
-			for i, key := range keys {
-				k := hex.EncodeToString(key)
-				res := tree.cachedBranches[k]
-				if res == nil {
-					flag, proof, size, inclusion, err := s.GetProof(key, tree.rootNode)
-					if err != nil {
-						return nil, nil, fmt.Errorf("cannot get proof: %w", err)
-					}
-					flags[i] = flag
-					proofs[i] = proof
-					inclusions[i] = inclusion
-					sizes[i] = size
-				} else {
-					flags[i] = res.flags[0]
-					proofs[i] = res.proofs[0]
-					inclusions[i] = res.inclusions[0]
-					sizes[i] = res.sizes[0]
-				}
-
-				tree.updateCache(key, flags[i], proofs[i], inclusions[i], sizes[i])
-			}
-		} else {
-
-			for i, key := range keys {
-				flag, proof, size, inclusion, err := s.GetHistoricalProof(key, root, tree.database)
-				if err != nil {
-					return nil, nil, err
-				}
-
-				flags[i] = flag
-				proofs[i] = proof
-				inclusions[i] = inclusion
-				sizes[i] = size
-			}
-		}
+		return nil, fmt.Errorf("invalid historical state: %w", err)
 	}
 
 	values := make([][]byte, len(keys))
-
 	for i, key := range keys {
 		res, err := tree.database.GetKVDB(key)
 		if err != nil {
-
-			localRoot := root
-			for {
-				tree, err := s.forest.Get(localRoot)
-				if err != nil {
-					return nil, nil, fmt.Errorf("cannot get tree (%s): %w", localRoot, err)
-				}
-
-				res, err = tree.database.GetKVDB(key)
-				if err == nil {
-					break
-				}
-				if s.IsSnapshot(tree) {
-					break
-				}
-				localRoot = tree.previous
-			}
-
-			if res == nil && !errors.Is(err, databases.ErrNotFound) {
-				return nil, nil, err
-			}
+			return nil, err
 		}
 		values[i] = res
 	}
-
-	//}
-
-	if trusted {
-		return values, nil, nil
-	}
-	holder := newProofHolder(flags, proofs, inclusions, sizes)
-	return values, holder, nil
+	return values, nil
 }
 
 // Print writes the structure of the tree to the stdout.
@@ -645,13 +392,13 @@ func (s *SMT) Print(root Root) error {
 }
 
 // verifyInclusionFlag is used to verify a flag against the trie given the key
-func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, error) {
+func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, commitment Commitment) (bool, error) {
 
 	eflag := make([]byte, s.GetHeight()/8)
 
-	tree, err := s.forest.Get(root)
+	tree, err := s.forest.Get(commitment)
 	if err != nil {
-		return false, fmt.Errorf("cannot get tree %s: %w", root, err)
+		return false, fmt.Errorf("cannot get tree %s: %w", commitment, err)
 	}
 	curr := tree.rootNode
 	if curr == nil || bytes.Equal(curr.key, key) {
@@ -684,9 +431,9 @@ func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, err
 	return true, nil
 }
 
-func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
+func (s *SMT) GetBatchProof(keys [][]byte, commitment Commitment) (*proofHolder, error) {
 
-	tree, err := s.forest.Get(root)
+	tree, err := s.forest.Get(commitment)
 	if err != nil {
 		return nil, fmt.Errorf("invalid historical state: %w", err)
 	}
@@ -836,12 +583,15 @@ func (s *SMT) GetProof(key []byte, rootNode *node) ([]byte, [][]byte, uint8, boo
 //}
 
 // GetHistoricalProof reconstructs a proof of inclusion or exclusion for a value in a historical database then returns the flag and proof
-func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) ([]byte, [][]byte, uint8, bool, error) {
+func (s *SMT) GetHistoricalProof(key []byte, commitment Commitment, database databases.DAL) ([]byte, [][]byte, uint8, bool, error) {
 	flag := make([]byte, s.GetHeight()/8)
 	proof := make([][]byte, 0)
 	proofLen := uint8(0)
 
-	curr := root
+	curr, err := commitment.Root()
+	if err != nil {
+		return nil, nil, 0, false, errors.New("can't fetch the root")
+	}
 	if curr == nil {
 		return flag, proof, 0, false, nil
 	}
@@ -852,11 +602,11 @@ func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) 
 		children, err := database.GetTrieDB(curr)
 		if err != nil {
 
-			localRoot := root
+			localCommitment := commitment
 			for {
-				tree, err := s.forest.Get(localRoot)
+				tree, err := s.forest.Get(localCommitment)
 				if err != nil {
-					return flag, proof, 0, false, fmt.Errorf("cannot get tree (%s): %w", localRoot, err)
+					return flag, proof, 0, false, fmt.Errorf("cannot get tree (%s): %w", localCommitment, err)
 				}
 
 				children, err = tree.database.GetTrieDB(curr)
@@ -866,7 +616,7 @@ func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) 
 				if s.IsSnapshot(tree) {
 					break
 				}
-				localRoot = tree.previous
+				localCommitment = tree.previous
 			}
 
 			if children == nil {
@@ -945,69 +695,6 @@ func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) 
 
 }
 
-// VerifyInclusionProof calculates the inclusion proof from a given rootNode, flag, proof list, and size.
-//
-// This function is exclusively for inclusive proofs
-func VerifyInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte, size uint8, root []byte, height int) bool {
-	// get index of proof we start our calculations from
-	proofIndex := 0
-
-	if len(proof) != 0 {
-		proofIndex = len(proof) - 1
-	}
-	// base case at the bottom of the trie
-	computed := ComputeCompactValue(key, value, height-int(size)-1, height)
-	for i := int(size) - 1; i > -1; i-- {
-		// hashing is order dependant
-		if utils.IsBitSet(key, i) {
-			if !utils.IsBitSet(flag, i) {
-				computed = HashInterNode(GetDefaultHashForHeight((height-i)-2), computed)
-			} else {
-				computed = HashInterNode(proof[proofIndex], computed)
-				proofIndex--
-			}
-		} else {
-			if !utils.IsBitSet(flag, i) {
-				computed = HashInterNode(computed, GetDefaultHashForHeight((height-i)-2))
-			} else {
-				computed = HashInterNode(computed, proof[proofIndex])
-				proofIndex--
-			}
-		}
-	}
-	return bytes.Equal(computed, root)
-}
-
-func VerifyNonInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte, size uint8, root []byte, height int) bool {
-	// get index of proof we start our calculations from
-	proofIndex := 0
-
-	if len(proof) != 0 {
-		proofIndex = len(proof) - 1
-	}
-	// base case at the bottom of the trie
-	computed := ComputeCompactValue(key, value, height-int(size)-1, height)
-	for i := int(size) - 1; i > -1; i-- {
-		// hashing is order dependant
-		if utils.IsBitSet(key, i) {
-			if !utils.IsBitSet(flag, i) {
-				computed = HashInterNode(GetDefaultHashForHeight((height-i)-2), computed)
-			} else {
-				computed = HashInterNode(proof[proofIndex], computed)
-				proofIndex--
-			}
-		} else {
-			if !utils.IsBitSet(flag, i) {
-				computed = HashInterNode(computed, GetDefaultHashForHeight((height-i)-2))
-			} else {
-				computed = HashInterNode(computed, proof[proofIndex])
-				proofIndex--
-			}
-		}
-	}
-	return !bytes.Equal(computed, root)
-}
-
 func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher databases.Batcher) error {
 
 	err := oldTree.database.CopyTo(newTree.database)
@@ -1015,15 +702,15 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 		return fmt.Errorf("error while copying DB: %s", err)
 	}
 
-	numStates := newTree.historicalStateRoots.Len()
+	numStates := newTree.historicalStateCommitments.Len()
 	switch {
 	case numStates > s.numHistoricalStates:
 		return errors.New("we have more Historical States stored than the Maximum Allowed Amount!")
 
 	case numStates >= int(s.snapshotInterval):
 		if newTree.height%s.snapshotInterval != 0 {
-			stateToPrune := newTree.historicalStateRoots.At(int(s.snapshotInterval)).(Root)
-			referenceState := newTree.historicalStateRoots.At(int(s.snapshotInterval - 1)).(Root)
+			stateToPrune := newTree.historicalStateCommitments.At(int(s.snapshotInterval)).(Commitment)
+			referenceState := newTree.historicalStateCommitments.At(int(s.snapshotInterval - 1)).(Commitment)
 			dbToPrune, err := s.forest.Get(stateToPrune)
 			if err != nil {
 				return fmt.Errorf("cannot get tree referenced in history: %w", err)
@@ -1037,7 +724,7 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 			if err != nil {
 				return err
 			}
-			_ = newTree.historicalStateRoots.PopFront()
+			_ = newTree.historicalStateCommitments.PopFront()
 
 		}
 	}
@@ -1053,9 +740,9 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 
 // Update takes a sorted list of keys and associated values and inserts
 // them into the trie, and if that is successful updates the databases.
-func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
+func (s *SMT) Update(keys [][]byte, values [][]byte, commitment Commitment) (Root, error) {
 
-	t, err := s.forest.Get(root)
+	t, err := s.forest.Get(commitment)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tree: %w", err)
 	}
@@ -1101,28 +788,29 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if err != nil {
 		return nil, err
 	}
+	nCom := newCommitment(t.Commitment(), newRootNode.value)
 
-	db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
+	db, err := s.forest.newDB(nCom)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create new DB: %w", err)
 	}
 
-	var newHistoricalStatRoots deque.Deque
+	var newHistoricalStateCommitments deque.Deque
 
-	for i := 0; i < t.historicalStateRoots.Len(); i++ {
-		newHistoricalStatRoots.PushBack(t.historicalStateRoots.At(i))
+	for i := 0; i < t.historicalStateCommitments.Len(); i++ {
+		newHistoricalStateCommitments.PushBack(t.historicalStateCommitments.At(i))
 	}
-	newHistoricalStatRoots.PushBack(root)
+	newHistoricalStateCommitments.PushBack(nCom)
 
 	newTree := &tree{
-		root:                 newRootNode.value,
-		rootNode:             newRootNode,
-		database:             db,
-		previous:             root,
-		cachedBranches:       make(map[string]*proofHolder),
-		forest:               s.forest,
-		height:               t.height + 1,
-		historicalStateRoots: newHistoricalStatRoots,
+		root:                       newRootNode.value,
+		rootNode:                   newRootNode,
+		database:                   db,
+		previous:                   t.Commitment(),
+		cachedBranches:             make(map[string]*proofHolder),
+		forest:                     s.forest,
+		height:                     t.height + 1,
+		historicalStateCommitments: newHistoricalStateCommitments,
 	}
 
 	err = s.updateHistoricalStates(t, newTree, batcher)
@@ -1142,6 +830,8 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 
 	s.forest.Add(newTree)
 
+	// TODO RAMTIN (compute stateCommitment)
+	// endStateCommitment =
 	return newRootNode.value, nil
 }
 
@@ -1376,76 +1066,4 @@ func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []
 		}
 	}
 	return computedHash
-}
-
-// EncodeProof encodes a proof holder into an array of byte arrays
-// The following code is the encoding logic
-// Each slice in the proofHolder is stored as a byte array, and the whole thing is stored
-// as a [][]byte
-// First we have a byte, and set the first bit to 1 if it is an inclusion proof
-// Then the size is encoded as a single byte
-// Then the flag is encoded (size is defined by size)
-// Finally the proofs are encoded one at a time, and is stored as a byte array
-func EncodeProof(pholder *proofHolder) [][]byte {
-	proofs := make([][]byte, 0)
-	for i := 0; i < pholder.GetSize(); i++ {
-		flag, singleProof, inclusion, size := pholder.ExportProof(i)
-		byteSize := []byte{size}
-		byteInclusion := make([]byte, 1)
-		if inclusion {
-			utils.SetBit(byteInclusion, 0)
-		}
-		proof := append(byteInclusion, byteSize...)
-
-		flagSize := []byte{uint8(len(flag))}
-		proof = append(proof, flagSize...)
-		proof = append(proof, flag...)
-
-		for _, p := range singleProof {
-			proof = append(proof, p...)
-		}
-		// ledgerStorage is a struct that holds our SM
-		proofs = append(proofs, proof)
-	}
-	return proofs
-}
-
-// DecodeProof takes in an encodes array of byte arrays an converts them into a proofHolder
-func DecodeProof(proofs [][]byte) (*proofHolder, error) {
-	flags := make([][]byte, 0)
-	newProofs := make([][][]byte, 0)
-	inclusions := make([]bool, 0)
-	sizes := make([]uint8, 0)
-	// The decode logic is as follows:
-	// The first byte in the array is the inclusion flag, with the first bit set as the inclusion (1 = inclusion, 0 = non-inclusion)
-	// The second byte is size, needs to be converted to uint8
-	// The next 32 bytes are the flag
-	// Each subsequent 32 bytes are the proofs needed for the verifier
-	// Each result is put into their own array and put into a proofHolder
-	for _, proof := range proofs {
-		if len(proof) < 4 {
-			return nil, fmt.Errorf("error decoding the proof: proof size too small")
-		}
-		byteInclusion := proof[0:1]
-		inclusion := utils.IsBitSet(byteInclusion, 0)
-		inclusions = append(inclusions, inclusion)
-		size := proof[1:2]
-		sizes = append(sizes, size...)
-		flagSize := int(proof[2])
-		if flagSize < 1 {
-			return nil, fmt.Errorf("error decoding the proof: flag size should be greater than 0")
-		}
-		flags = append(flags, proof[3:flagSize+3])
-		byteProofs := make([][]byte, 0)
-		for i := flagSize + 3; i < len(proof); i += 32 {
-			// TODO understand the logic here
-			if i+32 <= len(proof) {
-				byteProofs = append(byteProofs, proof[i:i+32])
-			} else {
-				byteProofs = append(byteProofs, proof[i:])
-			}
-		}
-		newProofs = append(newProofs, byteProofs)
-	}
-	return newProofHolder(flags, newProofs, inclusions, sizes), nil
 }
