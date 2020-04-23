@@ -5,7 +5,6 @@ go 1.13
 require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/dapperlabs/cadence v0.0.0-20200423153910-490525478d03
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
