@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/members"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
@@ -101,7 +101,7 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 		signers[i] = signer
 
 		// create view state
-		vs, err := viewstate.New(ps, participant.NodeID, selector)
+		vs, err := members.New(ps, participant.NodeID, selector)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -64,7 +64,7 @@ func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled
 	// initialize the dkg snapshot
 	dkg := &dkgmock.State{}
 
-	// program the state snapshot
+	// program the consensusMembers snapshot
 	snapshot := &protomock.Snapshot{}
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identities.Filter(selector)
@@ -95,7 +95,7 @@ func MakeProtocolState(t *testing.T, identities flow.IdentityList, beaconEnabled
 		}
 	}
 
-	// program the protocol state
+	// program the protocol consensusMembers
 	state := &protomock.State{}
 	state.On("AtBlockID", mock.Anything).Return(snapshot)
 	state.On("Final").Return(snapshot)

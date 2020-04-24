@@ -6,7 +6,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
@@ -21,17 +24,18 @@ func TestValidateProposal(t *testing.T) {
 
 type ProposalSuite struct {
 	suite.Suite
-	participants flow.IdentityList
-	leader       *flow.Identity
-	finalized    uint64
-	parent       *model.Block
-	block        *model.Block
-	proposal     *model.Proposal
-	vote         *model.Vote
-	viewstate    *mocks.ViewState
-	forks        *mocks.Forks
-	verifier     *mocks.Verifier
-	validator    *Validator
+	participants    flow.IdentityList
+	leader          *flow.Identity
+	finalized       uint64
+	parent          *model.Block
+	block           *model.Block
+	proposal        *model.Proposal
+	vote            *model.Vote
+	membersState    *mocks.MembersState
+	membersSnapshot *mocks.MembersSnapshot
+	forks           *mocks.Forks
+	verifier        *mocks.Verifier
+	validator       *Validator
 }
 
 func (ps *ProposalSuite) SetupTest() {
@@ -54,17 +58,21 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.proposal = &model.Proposal{Block: ps.block}
 	ps.vote = ps.proposal.ProposerVote()
 
-	// the leader for the block view is the correct one
-	ps.viewstate = &mocks.ViewState{}
-	ps.viewstate.On("LeaderForView", ps.block.View).Return(ps.leader)
-	ps.viewstate.On("AllConsensusParticipants", ps.parent.BlockID).Return(ps.participants, nil)
-	ps.viewstate.On("AllConsensusParticipants", ps.block.BlockID).Return(ps.participants, nil)
-	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.parent.BlockID, ps.participants.NodeIDs()).Return(ps.participants, nil)
-	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.block.BlockID, ps.participants.NodeIDs()).Return(ps.participants, nil)
+	// the member state snapshot
+	ps.membersSnapshot.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return ps.participants.Filter(selector)
+		},
+		nil,
+	)
 	for _, participant := range ps.participants {
-		ps.viewstate.On("IdentityForConsensusParticipant", ps.parent.BlockID, participant.NodeID).Return(participant, nil)
-		ps.viewstate.On("IdentityForConsensusParticipant", ps.block.BlockID, participant.NodeID).Return(participant, nil)
+		ps.membersSnapshot.On("Identity", participant.NodeID).Return(participant, nil)
 	}
+
+	// the leader for the block view is the correct one
+	ps.membersState = &mocks.MembersState{}
+	ps.membersState.On("AtBlockID", mock.Anything).Return(ps.membersSnapshot)
+	ps.membersState.On("LeaderForView", ps.block.View).Return(ps.leader)
 
 	// the finalized view is the one of the parent of the
 	ps.forks = &mocks.Forks{}
@@ -78,7 +86,7 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.verifier.On("VerifyVote", ps.vote.SignerID, ps.vote.SigData, ps.block).Return(true, nil)
 
 	// set up the validator with the mocked dependencies
-	ps.validator = New(ps.viewstate, ps.forks, ps.verifier)
+	ps.validator = New(ps.membersState, ps.forks, ps.verifier)
 }
 
 func (ps *ProposalSuite) TestProposalOK() {
@@ -121,17 +129,10 @@ func (ps *ProposalSuite) TestProposalSignatureInvalid() {
 
 func (ps *ProposalSuite) TestProposalWrongLeader() {
 
-	// change the viewstate to return a different leader
-	*ps.viewstate = mocks.ViewState{}
-	ps.viewstate.On("LeaderForView", ps.proposal.Block.View).Return(ps.participants[1])
-	ps.viewstate.On("AllConsensusParticipants", ps.parent.BlockID).Return(ps.participants, nil)
-	ps.viewstate.On("AllConsensusParticipants", ps.block.BlockID).Return(ps.participants, nil)
-	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.parent.BlockID, ps.participants.NodeIDs()).Return(ps.participants, nil)
-	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.block.BlockID, ps.participants.NodeIDs()).Return(ps.participants, nil)
-	for _, participant := range ps.participants {
-		ps.viewstate.On("IdentityForConsensusParticipant", ps.parent.BlockID, participant.NodeID).Return(participant, nil)
-		ps.viewstate.On("IdentityForConsensusParticipant", ps.block.BlockID, participant.NodeID).Return(participant, nil)
-	}
+	// change the MembersState to return a different leader
+	ps.membersState = &mocks.MembersState{}
+	ps.membersState.On("AtBlockID", mock.Anything).Return(ps.membersSnapshot)
+	ps.membersState.On("LeaderForView", ps.block.View).Return(ps.participants[1])
 
 	// check that validation fails now
 	err := ps.validator.ValidateProposal(ps.proposal)
@@ -207,17 +208,10 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 
 func (ps *ProposalSuite) TestProposalQCError() {
 
-	// change viewstate to error when getting stuff
-	*ps.viewstate = mocks.ViewState{}
-	ps.viewstate.On("LeaderForView", ps.block.View).Return(ps.leader)
-	ps.viewstate.On("AllConsensusParticipants", ps.parent.BlockID).Return(ps.participants, nil)
-	ps.viewstate.On("AllConsensusParticipants", ps.block.BlockID).Return(ps.participants, nil)
-	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.parent.BlockID, ps.participants.NodeIDs()).Return(ps.participants, errors.New("dummy error"))
-	ps.viewstate.On("IdentitiesForConsensusParticipants", ps.block.BlockID, ps.participants.NodeIDs()).Return(ps.participants, errors.New("dummy error"))
-	for _, participant := range ps.participants {
-		ps.viewstate.On("IdentityForConsensusParticipant", ps.parent.BlockID, participant.NodeID).Return(participant, nil)
-		ps.viewstate.On("IdentityForConsensusParticipant", ps.block.BlockID, participant.NodeID).Return(participant, nil)
-	}
+	// change Members State Snapshot to error when getting stuff
+	ps.membersSnapshot = &mocks.MembersSnapshot{}
+	ps.membersSnapshot.On("Identities", mock.Anything).Return(ps.participants, errors.New("dummy error"))
+	ps.membersSnapshot.On("Identity", mock.Anything).Return(ps.participants[0], errors.New("dummy error"))
 
 	// check that validation fails now
 	err := ps.validator.ValidateProposal(ps.proposal)
@@ -234,13 +228,14 @@ func TestValidateVote(t *testing.T) {
 
 type VoteSuite struct {
 	suite.Suite
-	signer    *flow.Identity
-	block     *model.Block
-	vote      *model.Vote
-	forks     *mocks.Forks
-	verifier  *mocks.Verifier
-	viewstate *mocks.ViewState
-	validator *Validator
+	signer          *flow.Identity
+	block           *model.Block
+	vote            *model.Vote
+	forks           *mocks.Forks
+	verifier        *mocks.Verifier
+	membersState    *mocks.MembersState
+	membersSnapshot *mocks.MembersSnapshot
+	validator       *Validator
 }
 
 func (vs *VoteSuite) SetupTest() {
@@ -268,11 +263,13 @@ func (vs *VoteSuite) SetupTest() {
 	vs.verifier.On("VerifyVote", vs.vote.SignerID, vs.vote.SigData, vs.block).Return(true, nil)
 
 	// the leader for the block view is the correct one
-	vs.viewstate = &mocks.ViewState{}
-	vs.viewstate.On("IdentityForConsensusParticipant", vs.block.BlockID, vs.signer.NodeID).Return(vs.signer, nil)
+	vs.membersSnapshot = &mocks.MembersSnapshot{}
+	vs.membersSnapshot.On("Identity", vs.signer.NodeID).Return(vs.signer, nil)
+	vs.membersState = &mocks.MembersState{}
+	vs.membersState.On("AtBlockID", vs.block.BlockID).Return(vs.membersSnapshot, nil)
 
 	// set up the validator with the mocked dependencies
-	vs.validator = New(vs.viewstate, vs.forks, vs.verifier)
+	vs.validator = New(vs.membersState, vs.forks, vs.verifier)
 }
 
 func (vs *VoteSuite) TestVoteOK() {
@@ -324,13 +321,14 @@ func TestValidateQC(t *testing.T) {
 
 type QCSuite struct {
 	suite.Suite
-	participants flow.IdentityList
-	signers      flow.IdentityList
-	block        *model.Block
-	qc           *model.QuorumCertificate
-	viewstate    *mocks.ViewState
-	verifier     *mocks.Verifier
-	validator    *Validator
+	participants    flow.IdentityList
+	signers         flow.IdentityList
+	block           *model.Block
+	qc              *model.QuorumCertificate
+	membersState    *mocks.MembersState
+	membersSnapshot *mocks.MembersSnapshot
+	verifier        *mocks.Verifier
+	validator       *Validator
 }
 
 func (qs *QCSuite) SetupTest() {
@@ -349,16 +347,22 @@ func (qs *QCSuite) SetupTest() {
 	qs.qc = helper.MakeQC(qs.T(), helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
 
 	// return the correct participants and identities from view state
-	qs.viewstate = &mocks.ViewState{}
-	qs.viewstate.On("IdentitiesForConsensusParticipants", qs.qc.BlockID, qs.signers.NodeIDs()).Return(qs.signers, nil)
-	qs.viewstate.On("AllConsensusParticipants", qs.qc.BlockID).Return(qs.participants, nil)
+	qs.membersSnapshot = &mocks.MembersSnapshot{}
+	qs.membersSnapshot.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return qs.participants.Filter(selector)
+		},
+		nil,
+	)
+	qs.membersState = &mocks.MembersState{}
+	qs.membersState.On("AtBlockID", qs.qc.BlockID).Return(qs.membersSnapshot, nil)
 
 	// set up the mocked verifier to verify the QC correctly
 	qs.verifier = &mocks.Verifier{}
 	qs.verifier.On("VerifyQC", qs.qc.SignerIDs, qs.qc.SigData, qs.block).Return(true, nil)
 
 	// set up the validator with the mocked dependencies
-	qs.validator = New(qs.viewstate, nil, qs.verifier)
+	qs.validator = New(qs.membersState, nil, qs.verifier)
 }
 
 func (qs *QCSuite) TestQCOK() {
@@ -368,36 +372,46 @@ func (qs *QCSuite) TestQCOK() {
 	assert.NoError(qs.T(), err, "a valid QC should be accepted")
 }
 
+// TestQCSignersError tests that a qc fails validation if:
+// QC signer's Identities cannot all be retrieved
+// (some are not valid consensus participants or retrieval fails with unspecific error)
 func (qs *QCSuite) TestQCSignersError() {
-
-	// change the viewstate to fail at retrieving participants
-	*qs.viewstate = mocks.ViewState{}
-	qs.viewstate.On("IdentitiesForConsensusParticipants", qs.qc.BlockID, qs.signers.NodeIDs()).Return(qs.signers, errors.New("dummy error"))
-	qs.viewstate.On("AllConsensusParticipants", qs.qc.BlockID).Return(qs.participants, nil)
-
-	// the QC should not be validated anymore
-	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	// change the MembersState to fail at retrieving participants
+	qs.membersSnapshot = &mocks.MembersSnapshot{}
+	qs.membersSnapshot.On("Identities", filter.Any).Return(qs.participants, nil)
+	qs.membersSnapshot.On("Identities", qs.signers.NodeIDs()).Return(qs.signers[1:], nil)
+	err := qs.validator.ValidateQC(qs.qc, qs.block) // the QC should not be validated anymore
 	assert.Error(qs.T(), err, "a QC should be rejected if we can't retrieve signer identities")
+	assert.True(qs.T(), errors.Is(err, model.ErrorInvalidBlock{}))
+
+	// change the MembersState to fail at retrieving participants
+	qs.membersSnapshot = &mocks.MembersSnapshot{}
+	qs.membersSnapshot.On("Identities", filter.Any).Return(qs.participants, nil)
+	qs.membersSnapshot.On("Identities", qs.signers.NodeIDs()).Return(qs.signers[1:], errors.New("FATAL internal error"))
+	err = qs.validator.ValidateQC(qs.qc, qs.block) // the QC should not be validated anymore
+	assert.Error(qs.T(), err, "expecting fatal internal error to be escalated to surrounding logic")
+	assert.False(qs.T(), errors.Is(err, model.ErrorInvalidBlock{}), "unspecific internal errors should not result in ErrorInvalidBlock error")
 }
 
+// TestQCParticipantsError tests that validation errors if:
+// there is an error retrieving identities of all consensus participants
 func (qs *QCSuite) TestQCParticipantsError() {
-
-	// change the view state to fail on participants
-	*qs.viewstate = mocks.ViewState{}
-	qs.viewstate.On("IdentitiesForConsensusParticipants", qs.qc.BlockID, qs.signers.NodeIDs()).Return(qs.signers, nil)
-	qs.viewstate.On("AllConsensusParticipants", qs.qc.BlockID).Return(qs.participants, errors.New("dummy error"))
+	// change the MembersState to fail on participants
+	qs.membersSnapshot = &mocks.MembersSnapshot{}
+	qs.membersSnapshot.On("Identities", filter.Any).Return(qs.participants, errors.New("dummy error"))
+	qs.membersSnapshot.On("Identities", qs.signers.NodeIDs()).Return(qs.signers, nil)
 
 	// the QC should not be validated anymore
 	err := qs.validator.ValidateQC(qs.qc, qs.block)
-	assert.Error(qs.T(), err, "a QC should be rejected if we can't retrieve participant identities")
+	assert.Error(qs.T(), err, "expecting fatal internal error to be escalated to surrounding logic")
+	assert.False(qs.T(), errors.Is(err, model.ErrorInvalidBlock{}), "unspecific internal errors should not result in ErrorInvalidBlock error")
 }
 
+// TestQCSignersError tests that a qc fails validation if:
+// QC signer's have insufficient stake (but are all valid consensus participants otherwise)
 func (qs *QCSuite) TestQCInsufficientStake() {
-
-	// reduce the number of signers so the threshold is not reached
-	*qs.viewstate = mocks.ViewState{}
-	qs.viewstate.On("IdentitiesForConsensusParticipants", qs.qc.BlockID, qs.signers.NodeIDs()).Return(qs.signers[:6], nil)
-	qs.viewstate.On("AllConsensusParticipants", qs.qc.BlockID).Return(qs.participants, nil)
+	// signers only have stake 6 out of 10 total (NOT have a supermajority)
+	qs.signers = qs.participants[:6]
 
 	// the QC should not be validated anymore
 	err := qs.validator.ValidateQC(qs.qc, qs.block)

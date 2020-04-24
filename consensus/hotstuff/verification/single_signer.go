@@ -3,11 +3,11 @@ package verification
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 // SingleSigner is a signer capable of adding single signatures that can be
@@ -15,20 +15,17 @@ import (
 type SingleSigner struct {
 	*SingleVerifier
 	signer   module.AggregatingSigner
-	selector flow.IdentityFilter
 	signerID flow.Identifier
 }
 
 // NewSingleSigner initializes a single signer with the given dependencies:
-// - the given protocol state is used to retrieve public keys for the verifier;
+// - the given consensusMembers' state is used to retrieve public keys for the verifier;
 // - the given signer is used to generate signatures for the local node;
-// - the selector is used to select the set of valid signers from the protocol state;
 // - the given signer ID is used as identifier for our signatures.
-func NewSingleSigner(state protocol.State, signer module.AggregatingSigner, selector flow.IdentityFilter, signerID flow.Identifier) *SingleSigner {
+func NewSingleSigner(consensusMembers hotstuff.MembersState, signer module.AggregatingSigner, signerID flow.Identifier) *SingleSigner {
 	sc := &SingleSigner{
-		SingleVerifier: NewSingleVerifier(state, signer, selector),
+		SingleVerifier: NewSingleVerifier(consensusMembers, signer),
 		signer:         signer,
-		selector:       selector,
 		signerID:       signerID,
 	}
 	return sc

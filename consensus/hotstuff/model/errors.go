@@ -20,6 +20,7 @@ func (e NoVoteError) Is(other error) bool {
 
 var ErrInsufficientVotes = errors.New("received insufficient votes")
 var ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
+var ErrInvalidConsensusParticipant = errors.New("invalid consensus participant(s)")
 
 type ErrorConfiguration struct {
 	Msg string
@@ -63,21 +64,6 @@ func (e ErrorInvalidVote) Error() string {
 
 func (e ErrorInvalidVote) Is(other error) bool {
 	_, ok := other.(ErrorInvalidVote)
-	return ok
-}
-
-type ErrorInvalidConsensusParticipants struct {
-	BlockID             flow.Identifier
-	InvalidParticipants []flow.Identifier
-	Msg                 string
-}
-
-func (e ErrorInvalidConsensusParticipants) Error() string {
-	return fmt.Sprintf("invalid consensus participants %x at block %x: %s", e.InvalidParticipants, e.BlockID, e.Msg)
-}
-
-func (e ErrorInvalidConsensusParticipants) Is(other error) bool {
-	_, ok := other.(ErrorInvalidConsensusParticipants)
 	return ok
 }
 

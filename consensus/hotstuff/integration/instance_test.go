@@ -14,13 +14,13 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/forkchoice"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/members"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -56,7 +56,7 @@ type Instance struct {
 	communicator *mocks.Communicator
 
 	// real dependencies
-	viewstate  *viewstate.ViewState
+	viewstate  *members.ViewState
 	pacemaker  *pacemaker.FlowPaceMaker
 	producer   *blockproducer.BlockProducer
 	forks      *forks.Forks
@@ -281,7 +281,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	metrics.On("HotStuffIdleDuration", mock.Anything)
 
 	// initialize the viewstate
-	in.viewstate, err = viewstate.New(in.proto, in.localID, filter.Any)
+	in.viewstate, err = members.New(in.proto, in.localID, filter.Any)
 	require.NoError(t, err)
 
 	// initialize the pacemaker

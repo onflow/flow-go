@@ -23,7 +23,7 @@ type EventHandler struct {
 	forks          hotstuff.Forks
 	persist        hotstuff.Persister
 	communicator   hotstuff.Communicator
-	viewState      hotstuff.ViewState
+	membersState   hotstuff.MembersState
 	voteAggregator hotstuff.VoteAggregator
 	voter          hotstuff.Voter
 	validator      hotstuff.Validator
@@ -38,7 +38,7 @@ func New(
 	forks hotstuff.Forks,
 	persist hotstuff.Persister,
 	communicator hotstuff.Communicator,
-	viewState hotstuff.ViewState,
+	membersState hotstuff.MembersState,
 	voteAggregator hotstuff.VoteAggregator,
 	voter hotstuff.Voter,
 	validator hotstuff.Validator,
@@ -54,7 +54,7 @@ func New(
 		voteAggregator: voteAggregator,
 		voter:          voter,
 		validator:      validator,
-		viewState:      viewState,
+		membersState:   membersState,
 		notifier:       notifier,
 	}
 	return e, nil
@@ -230,7 +230,11 @@ func (e *EventHandler) startNewView() error {
 
 	e.pruneSubcomponents()
 
-	if e.viewState.IsSelfLeaderForView(curView) {
+	currentLeader, err := e.membersState.LeaderForView(curView)
+	if err != nil {
+		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)
+	}
+	if e.membersState.IsSelf(currentLeader) {
 
 		log.Debug().Msg("generating block proposal as leader")
 
@@ -332,10 +336,12 @@ func (e *EventHandler) processBlockForCurrentView(block *model.Block) error {
 	}
 
 	// checking if I'm the next leader
-	nextLeader := e.viewState.LeaderForView(curView + 1)
-	isNextLeader := e.viewState.IsSelf(nextLeader.ID())
-
-	if isNextLeader {
+	nextView := curView + 1
+	nextLeader, err := e.membersState.LeaderForView(nextView)
+	if err != nil {
+		return fmt.Errorf("failed to determine primary for next view %d: %w", nextView, err)
+	}
+	if e.membersState.IsSelf(nextLeader) {
 		return e.processBlockForCurrentViewIfIsNextLeader(block)
 	}
 
@@ -392,7 +398,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 	return e.processVote(ownVote)
 }
 
-func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.Block, nextLeader *flow.Identity) error {
+func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.Block, nextLeader flow.Identifier) error {
 
 	log := e.log.With().
 		Uint64("block_view", block.View).
@@ -423,7 +429,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 
 		log.Debug().Msg("forwarding vote to compliance engine")
 
-		err := e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader.NodeID)
+		err := e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 		if err != nil {
 			log.Warn().Err(err).Msg("could not forward vote")
 		}
