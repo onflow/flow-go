@@ -3,19 +3,20 @@ package verification
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCombinedVote(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	proto, dkg, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
-	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
+	membersState, dkg, stakingKeys, beaconKeys := MakeConsensusMemberState(t, identities, true)
+	signers := MakeSigners(t, membersState, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[2].NodeID))
@@ -63,8 +64,8 @@ func TestCombinedProposalIsVote(t *testing.T) {
 	// NOTE: I don't think this is true for every signature scheme
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	proto, dkg, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
-	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
+	membersState, dkg, stakingKeys, beaconKeys := MakeConsensusMemberState(t, identities, true)
+	signers := MakeSigners(t, membersState, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
@@ -81,8 +82,8 @@ func TestCombinedQC(t *testing.T) {
 	identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
 	voterIDs := identities.NodeIDs()
 	minShares := len(voterIDs) / 2
-	proto, dkg, stakingKeys, beaconKeys := MakeProtocolState(t, identities, true)
-	signers := MakeSigners(t, proto, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
+	membersState, dkg, stakingKeys, beaconKeys := MakeConsensusMemberState(t, identities, true)
+	signers := MakeSigners(t, membersState, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))

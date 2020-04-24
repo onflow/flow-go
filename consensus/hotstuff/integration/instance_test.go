@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/forkchoice"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/members"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
@@ -24,9 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -46,17 +43,16 @@ type Instance struct {
 	headers map[flow.Identifier]*flow.Header
 
 	// mocked dependencies
-	snapshot     *protocol.Snapshot
-	proto        *protocol.State
-	builder      *module.Builder
-	finalizer    *module.Finalizer
-	persist      *mocks.Persister
-	signer       *mocks.Signer
-	verifier     *mocks.Verifier
-	communicator *mocks.Communicator
+	membersSnapshot *mocks.MembersSnapshot
+	membersState    *mocks.MembersState
+	builder         *module.Builder
+	finalizer       *module.Finalizer
+	persist         *mocks.Persister
+	signer          *mocks.Signer
+	verifier        *mocks.Verifier
+	communicator    *mocks.Communicator
 
 	// real dependencies
-	viewstate  *members.ViewState
 	pacemaker  *pacemaker.FlowPaceMaker
 	producer   *blockproducer.BlockProducer
 	forks      *forks.Forks
@@ -120,34 +116,41 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		headers: make(map[flow.Identifier]*flow.Header),
 
 		// instance mocks
-		snapshot:     &protocol.Snapshot{},
-		proto:        &protocol.State{},
-		builder:      &module.Builder{},
-		persist:      &mocks.Persister{},
-		signer:       &mocks.Signer{},
-		verifier:     &mocks.Verifier{},
-		communicator: &mocks.Communicator{},
-		finalizer:    &module.Finalizer{},
+		membersSnapshot: &mocks.MembersSnapshot{},
+		membersState:    &mocks.MembersState{},
+		builder:         &module.Builder{},
+		persist:         &mocks.Persister{},
+		signer:          &mocks.Signer{},
+		verifier:        &mocks.Verifier{},
+		communicator:    &mocks.Communicator{},
+		finalizer:       &module.Finalizer{},
 	}
 
 	// insert root block into headers register
 	in.headers[cfg.Root.ID()] = cfg.Root
 
 	// program the protocol snapshot behaviour
-	in.snapshot.On("Identities", mock.Anything).Return(
+	in.membersSnapshot.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return in.participants.Filter(selector)
 		},
 		nil,
 	)
 	for _, participant := range in.participants {
-		in.snapshot.On("Identity", participant.NodeID).Return(participant, nil)
+		in.membersSnapshot.On("Identity", participant.NodeID).Return(participant, nil)
 	}
 
 	// program the protocol state behaviour
-	in.proto.On("Final").Return(in.snapshot)
-	in.proto.On("AtNumber", mock.Anything).Return(in.snapshot)
-	in.proto.On("AtBlockID", mock.Anything).Return(in.snapshot)
+	in.membersState.On("AtBlockID", mock.Anything).Return(in.membersSnapshot)
+	in.membersState.On("Self").Return(in.localID)
+	in.membersState.On("IsSelf", mock.Anything).Return(
+		func(nodeID flow.Identifier) bool { return nodeID == in.localID },
+	)
+	in.membersState.On("LeaderForView", mock.Anything).Return(
+		func(view uint64) (flow.Identifier, error) {
+			return in.participants[int(view)%len(in.participants)].NodeID, nil
+		},
+	)
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
@@ -249,8 +252,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			// as we don't use mocks to assert expectations, but only to
 			// simulate behaviour, we should drop the call data regularly
 			if len(in.headers)%100 == 0 {
-				in.snapshot.Calls = nil
-				in.proto.Calls = nil
+				in.membersSnapshot.Calls = nil
+				in.membersState.Calls = nil
 				in.builder.Calls = nil
 				in.signer.Calls = nil
 				in.verifier.Calls = nil
@@ -280,17 +283,13 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	metrics.On("HotStuffBusyDuration", mock.Anything)
 	metrics.On("HotStuffIdleDuration", mock.Anything)
 
-	// initialize the viewstate
-	in.viewstate, err = members.New(in.proto, in.localID, filter.Any)
-	require.NoError(t, err)
-
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
 	in.pacemaker, err = pacemaker.New(DefaultStart(), controller, notifier)
 	require.NoError(t, err)
 
 	// initialize the block producer
-	in.producer, err = blockproducer.New(in.signer, in.viewstate, in.builder)
+	in.producer, err = blockproducer.New(in.signer, in.membersState, in.builder)
 	require.NoError(t, err)
 
 	// initialize the finalizer
@@ -311,16 +310,16 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.forks = forks.New(forkalizer, choice)
 
 	// initialize the validator
-	in.validator = validator.New(in.viewstate, in.forks, in.verifier)
+	in.validator = validator.New(in.membersState, in.forks, in.verifier)
 
 	// initialize the vote aggregator
-	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.viewstate, in.validator, in.signer)
+	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.membersState, in.validator, in.signer)
 
 	// initialize the voter
 	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
 
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.viewstate, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.membersState, in.aggregator, in.voter, in.validator, notifier)
 	require.NoError(t, err)
 
 	return &in
