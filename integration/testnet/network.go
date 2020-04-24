@@ -86,13 +86,19 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	net.suite.Start(ctx)
 }
 
-// Remove stops the network and cleans up all resources. If you need to inspect
-// state, first stop the containers, then check state, then clean up resources.
+// Remove stops the network, removes all the containers and cleans up all resources.
+// If you need to inspect state, first `Stop` the containers, then check state, then `Cleanup` resources.
+// If you need to restart containers, use `Stop` instead, which does not remove containers.
 func (net *FlowNetwork) Remove() error {
 
 	err := net.Stop()
 	if err != nil {
 		return fmt.Errorf("could not stop network: %w", err)
+	}
+
+	err = net.RemoveContainers()
+	if err != nil {
+		return fmt.Errorf("could not remove containers: %w", err)
 	}
 
 	err = net.Cleanup()
@@ -103,8 +109,8 @@ func (net *FlowNetwork) Remove() error {
 	return nil
 }
 
-// Stop disconnects and stops all containers in the network, then
-// removes the network.
+// Stop stops all containers in the network, without removing them. This allows containers to be
+// restarted. To remove them, call `RemoveContainers`.
 func (net *FlowNetwork) Stop() error {
 
 	fmt.Println("<<<< stopping network: ", net.config.Name)
@@ -117,12 +123,13 @@ func (net *FlowNetwork) Stop() error {
 	return nil
 }
 
+// RemoveContainers removes all the containers in the network. Containers need to be stopped first using `Stop`.
+func (net *FlowNetwork) RemoveContainers() error {
+	return net.suite.Remove()
+}
+
 // Cleanup cleans up all temporary files used by the network.
 func (net *FlowNetwork) Cleanup() error {
-	if err := net.suite.Remove(); err != nil {
-		return err
-	}
-
 	// remove data directories
 	var merr *multierror.Error
 	for _, c := range net.Containers {

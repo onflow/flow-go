@@ -51,8 +51,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Cleanup()
-	defer net.Stop()
+	defer net.Remove()
 
 	// get the ghost container
 	ghostContainer, ok := net.ContainerByID(ghostExeNode.Identifier)
@@ -124,8 +123,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Cleanup()
-	defer net.Stop()
+	defer net.Remove()
 
 	// get the ghost container
 	ghostContainer, ok := net.ContainerByID(ghostCollNode.Identifier)

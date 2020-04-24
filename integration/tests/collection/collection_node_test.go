@@ -53,7 +53,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Stop()
+	defer net.Remove()
 
 	// we will test against COL1
 	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
@@ -128,6 +128,7 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 
 	net.Start(ctx)
 	defer net.Cleanup()
+	defer net.RemoveContainers()
 
 	// we will test against COL1
 	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
@@ -192,6 +193,7 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 
 	net.Start(ctx)
 	defer net.Cleanup()
+	defer net.RemoveContainers()
 
 	// sleep for a few seconds to let the nodes discover each other and build the libp2p pubsub mesh
 	time.Sleep(5 * time.Second)
@@ -300,6 +302,7 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 
 	net.Start(ctx)
 	defer net.Cleanup()
+	defer net.RemoveContainers()
 
 	clusters := protocol.Clusters(nClusters, net.Identities())
 
