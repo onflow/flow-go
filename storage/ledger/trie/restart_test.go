@@ -37,7 +37,7 @@ func TestRestart(t *testing.T) {
 	valuesA := [][]byte{value1}
 	valuesB := [][]byte{value2}
 
-	emptyCom := newCommitment([]byte{}, GetDefaultHashForHeight(9-1))
+	emptyCom := NewCommitment([]byte{}, GetDefaultHashForHeight(9-1))
 
 	rootA, err := trie.Update(keysA, valuesA, emptyCom)
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestRestartMultipleKeys(t *testing.T) {
 		os.RemoveAll(dir)
 	}()
 
-	emptyCom := newCommitment([]byte{}, GetDefaultHashForHeight(9-1))
+	emptyCom := NewCommitment([]byte{}, GetDefaultHashForHeight(9-1))
 
 	numKeys := 10
 	keys := make([][]byte, numKeys)

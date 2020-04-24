@@ -43,7 +43,7 @@ func (f *TrieStorage) Done() <-chan struct{} {
 }
 
 func (f *TrieStorage) EmptyStateCommitment() flow.StateCommitment {
-	return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
+	return trie.NewCommitment([]byte{}, trie.GetDefaultHashForHeight(257-1))
 }
 
 // GetRegisters read the values at the given registers at the given flow.StateCommitment

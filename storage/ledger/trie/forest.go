@@ -29,7 +29,7 @@ func (c Commitment) String() string {
 	return hex.EncodeToString(c)
 }
 
-func newCommitment(prevCom Commitment, newRoot Root) Commitment {
+func NewCommitment(prevCom Commitment, newRoot Root) Commitment {
 	commitment := make([]byte, 0)
 	// compute the hash of previous root
 	hasher := hash.NewSHA3_256()

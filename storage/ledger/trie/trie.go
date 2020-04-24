@@ -83,7 +83,7 @@ type tree struct {
 }
 
 func (t *tree) Commitment() Commitment {
-	return newCommitment(t.previous, t.root)
+	return NewCommitment(t.previous, t.root)
 }
 
 func (t *tree) Root() (*node, error) {
@@ -867,7 +867,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, commitment Commitment) (Com
 	if err != nil {
 		return nil, err
 	}
-	nCom := newCommitment(t.Commitment(), newRootNode.value)
+	nCom := NewCommitment(t.Commitment(), newRootNode.value)
 
 	db, err := s.forest.newDB(nCom)
 	if err != nil {

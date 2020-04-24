@@ -51,7 +51,7 @@ func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, 
 		return nil, failedKeys, fmt.Errorf("key(s) doesn't exist")
 	}
 	// after updating all the nodes, compute the value recursively only once
-	p.commitment = newCommitment(p.commitment, p.root.ComputeValue())
+	p.commitment = NewCommitment(p.commitment, p.root.ComputeValue())
 	return p.Commitment(), failedKeys, nil
 }
 

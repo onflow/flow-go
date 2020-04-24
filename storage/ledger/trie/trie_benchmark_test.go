@@ -44,7 +44,7 @@ func BenchmarkUpdate(b *testing.B) {
 
 			keys, values := generateRandomKVPairs(mark)
 
-			_, _ = s.Update(keys, values, newCommitment([]byte{}, GetDefaultHashForHeight(257-1)))
+			_, _ = s.Update(keys, values, NewCommitment([]byte{}, GetDefaultHashForHeight(257-1)))
 		})
 	}
 }
@@ -73,7 +73,7 @@ func BenchmarkReadSMT(b *testing.B) {
 	}()
 
 	keys, values := generateRandomKVPairs(1000)
-	newCom, _ := s.Update(keys, values, newCommitment([]byte{}, GetDefaultHashForHeight(257-1)))
+	newCom, _ := s.Update(keys, values, NewCommitment([]byte{}, GetDefaultHashForHeight(257-1)))
 	for _, mark := range benchmarks {
 		mark := mark // Workaround for scopelint issue
 		readKeys := getRandomKeys(keys, mark.size)

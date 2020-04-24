@@ -2022,7 +2022,7 @@ func TestKVDB_Pruned(t *testing.T) {
 		expectedValues1 := make([][]byte, 0)
 		expectedValues1 = append(expectedValues1, value1, value2, value3, value4, value5)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.Commitment())
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'z'}
@@ -2034,7 +2034,7 @@ func TestKVDB_Pruned(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot3, err := smt.Update(newkeys, newvalues, oldRoot2)
+		oldCom3, err := smt.Update(newkeys, newvalues, oldCom2)
 		require.NoError(t, err)
 
 		expectedValues2 := make([][]byte, 0)
@@ -2050,7 +2050,7 @@ func TestKVDB_Pruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot4, err := smt.Update(newkeys, newvalues, oldRoot3)
+		oldCom4, err := smt.Update(newkeys, newvalues, oldCom3)
 		require.NoError(t, err)
 
 		expectedValues3 := make([][]byte, 0)
@@ -2062,7 +2062,7 @@ func TestKVDB_Pruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot5, err := smt.Update(newkeys, newvalues, oldRoot4)
+		oldCom5, err := smt.Update(newkeys, newvalues, oldCom4)
 		require.NoError(t, err)
 
 		newkeys2 := make([][]byte, 0)
@@ -2074,10 +2074,10 @@ func TestKVDB_Pruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(newkeys2, newvalues, oldRoot5)
+		_, err = smt.Update(newkeys2, newvalues, oldCom5)
 		require.NoError(t, err)
 
-		oldTree2, err := smt.forest.Get(oldRoot2)
+		oldTree2, err := smt.forest.Get(oldCom2)
 		require.NoError(t, err)
 
 		db := oldTree2.database
@@ -2128,7 +2128,7 @@ func TestKVDB_Pruned(t *testing.T) {
 		}
 
 		// THIS SHOULD BE PRUNED
-		oldTree3, err := smt.forest.Get(oldRoot3)
+		oldTree3, err := smt.forest.Get(oldCom2)
 		require.NoError(t, err)
 
 		db = oldTree3.database
@@ -2167,7 +2167,7 @@ func TestKVDB_Pruned(t *testing.T) {
 		}
 
 		// THIS SHOULD BE A FULL SNAPSHOT
-		oldTree4, err := smt.forest.Get(oldRoot4)
+		oldTree4, err := smt.forest.Get(oldCom4)
 		require.NoError(t, err)
 
 		db = oldTree4.database
@@ -2777,7 +2777,7 @@ func withSMT(
 		os.RemoveAll(dbDir)
 	}()
 
-	emptyTree, err := trie.forest.Get(newCommitment([]byte{}, GetDefaultHashForHeight(height-1)))
+	emptyTree, err := trie.forest.Get(NewCommitment([]byte{}, GetDefaultHashForHeight(height-1)))
 	require.NoError(t, err)
 	f(t, trie, emptyTree)
 
