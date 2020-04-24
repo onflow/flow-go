@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func DeployCounterContractTransaction() flow.TransactionBody {
@@ -32,9 +31,7 @@ func DeployCounterContractTransaction() flow.TransactionBody {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
-		ScriptAccounts:   []flow.Address{flow.RootAddress},
-		ReferenceBlockID: unittest.IdentifierFixture(),
-		PayerAccount:     flow.RootAddress,
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
@@ -45,15 +42,35 @@ func CreateCounterTransaction() flow.TransactionBody {
 
 			transaction {
 				prepare(acc: AuthAccount) {
-					if acc.storage[Container.Counter] == nil {
-                		let existing <- acc.storage[Container.Counter] <- Container.createCounter(3)
-                		destroy existing
+					var maybeCounter <- acc.load<@Container.Counter>(from: /storage/counter)
+
+					if maybeCounter == nil {
+						maybeCounter <-! Container.createCounter(3)
 					}
+
+					acc.save(<-maybeCounter!, to: /storage/counter)
+				}
+			}`),
+		Authorizers: []flow.Address{flow.RootAddress},
+	}
+}
+
+// CreateCounterPanicTransaction returns a transaction that will manipulate state by writing a new counter into storage
+// and then panic. It can be used to test whether execution state stays untouched/will revert
+func CreateCounterPanicTransaction() flow.TransactionBody {
+	return flow.TransactionBody{
+		Script: []byte(`
+			import 0x01
+
+			transaction {
+				prepare(acc: AuthAccount) {
+					let existing <- acc.storage[Container.Counter] <- Container.createCounter(42)
+					destroy existing
+
+					panic("fail for testing purposes")
               	}
             }`),
-		ScriptAccounts:   []flow.Address{flow.RootAddress},
-		ReferenceBlockID: unittest.IdentifierFixture(),
-		PayerAccount:     flow.RootAddress,
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
@@ -64,11 +81,13 @@ func AddToCounterTransaction() flow.TransactionBody {
 
 			transaction {
 				prepare(acc: AuthAccount) {
-					acc.storage[Container.Counter].add(2)
-              	}
-            }`),
-		ScriptAccounts:   []flow.Address{flow.RootAddress},
-		ReferenceBlockID: unittest.IdentifierFixture(),
-		PayerAccount:     flow.RootAddress,
+					let counter <- acc.load<@Container.Counter>(from: /storage/counter)
+
+					counter?.add(2)
+
+					acc.save(<-counter, to: /storage/counter)
+				}
+			}`),
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }

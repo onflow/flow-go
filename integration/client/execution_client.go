@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // ExecutionClient is an execution RPC client.

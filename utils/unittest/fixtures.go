@@ -9,21 +9,31 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/utils/dsl"
 )
 
 func AddressFixture() flow.Address {
 	return flow.RootAddress
 }
 
-func AccountSignatureFixture() flow.AccountSignature {
-	return flow.AccountSignature{
-		Account:   AddressFixture(),
-		Signature: []byte{1, 2, 3, 4},
+func TransactionSignatureFixture() flow.TransactionSignature {
+	return flow.TransactionSignature{
+		Address:     AddressFixture(),
+		SignerIndex: 0,
+		Signature:   []byte{1, 2, 3, 4},
+		KeyID:       1,
+	}
+}
+
+func ProposalKeyFixture() flow.ProposalKey {
+	return flow.ProposalKey{
+		Address:        AddressFixture(),
+		KeyID:          1,
+		SequenceNumber: 0,
 	}
 }
 
@@ -131,35 +141,6 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	}
 }
 
-// BlockWithParent creates a new block that is valid
-// with respect to the given parent block.
-func BlockWithParent(parent *flow.Block) flow.Block {
-	payload := flow.Payload{
-		Identities: IdentityListFixture(32),
-		Guarantees: CollectionGuaranteesFixture(16),
-	}
-
-	header := BlockHeaderFixture()
-	header.View = parent.View + 1
-	header.ChainID = parent.ChainID
-	header.Timestamp = time.Now()
-	header.ParentID = parent.ID()
-	header.PayloadHash = payload.Hash()
-
-	return flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
-}
-
-func SealFixture() flow.Seal {
-	return flow.Seal{
-		BlockID:       IdentifierFixture(),
-		PreviousState: StateCommitmentFixture(),
-		FinalState:    StateCommitmentFixture(),
-	}
-}
-
 func ClusterPayloadFixture(n int) cluster.Payload {
 	transactions := make([]*flow.TransactionBody, n)
 	for i := 0; i < n; i++ {
@@ -225,10 +206,10 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 
 func BlockSealFixture() *flow.Seal {
 	return &flow.Seal{
-		BlockID:           IdentifierFixture(),
-		ExecutionResultID: IdentifierFixture(),
-		PreviousState:     StateCommitmentFixture(),
-		FinalState:        StateCommitmentFixture(),
+		BlockID:      IdentifierFixture(),
+		ResultID:     IdentifierFixture(),
+		InitialState: StateCommitmentFixture(),
+		FinalState:   StateCommitmentFixture(),
 	}
 }
 
@@ -237,7 +218,7 @@ func BlockSealsFixture(n int) []*flow.Seal {
 	for i := 0; i < n; i++ {
 		seal := BlockSealFixture()
 		if i > 0 {
-			seal.PreviousState = seals[i-1].FinalState
+			seal.InitialState = seals[i-1].FinalState
 		}
 		seals = append(seals, seal)
 	}
@@ -490,16 +471,14 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 
 func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	tb := flow.TransactionBody{
-		Script:           []byte("pub fun main() {}"),
-		ReferenceBlockID: IdentifierFixture(),
-		// TODO remove or update these once Access API is finalized
-		//Nonce:            rand.Uint64(),
-		Nonce: 0,
-		//ComputeLimit:     10,
-		ComputeLimit:   0,
-		PayerAccount:   AddressFixture(),
-		ScriptAccounts: []flow.Address{AddressFixture()},
-		Signatures:     []flow.AccountSignature{AccountSignatureFixture()},
+		Script:             []byte("pub fun main() {}"),
+		ReferenceBlockID:   IdentifierFixture(),
+		GasLimit:           10,
+		ProposalKey:        ProposalKeyFixture(),
+		Payer:              AddressFixture(),
+		Authorizers:        []flow.Address{AddressFixture()},
+		PayloadSignatures:  []flow.TransactionSignature{TransactionSignatureFixture()},
+		EnvelopeSignatures: []flow.TransactionSignature{TransactionSignatureFixture()},
 	}
 
 	for _, apply := range opts {

@@ -22,7 +22,6 @@ func TransactionForCluster(clusters *flow.ClusterList, target flow.IdentityList)
 func AlterTransactionForCluster(tx flow.TransactionBody, clusters *flow.ClusterList, target flow.IdentityList, after func(tx *flow.TransactionBody)) flow.TransactionBody {
 
 	// Bound to avoid infinite loop in case the routing algorithm is broken
-	tx.Nonce = 0
 	for i := 0; i < 10000; i++ {
 		_, err := rand.Read(tx.ReferenceBlockID[:])
 		if err != nil {

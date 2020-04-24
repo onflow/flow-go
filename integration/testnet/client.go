@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/client"
-	"github.com/dapperlabs/flow-go/integration/dsl"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/dsl"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -63,21 +62,21 @@ func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) e
 	return c.SendTransaction(ctx, tx)
 }
 
-// SignTransaction signs the transaction using the configured key and the root
-// account, returning the signed transaction.
+// SignTransaction signs the transaction using the proposer's key
 func (c *Client) SignTransaction(tx flow.TransactionBody) (flow.TransactionBody, error) {
-	sig, err := signTransaction(tx, c.key.PrivateKey)
+
+	hasher := hash.NewSHA3_256()
+	err := tx.SignPayload(tx.Payer, tx.ProposalKey.KeyID, c.key.PrivateKey, hasher)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}
 
-	accountSig := flow.AccountSignature{
-		Account:   flow.RootAddress,
-		Signature: sig,
+	err = tx.SignEnvelope(tx.Payer, tx.ProposalKey.KeyID, c.key.PrivateKey, hasher)
+	if err != nil {
+		return flow.TransactionBody{}, err
 	}
-	tx.Signatures = append(tx.Signatures, accountSig)
 
-	return tx, nil
+	return tx, err
 }
 
 // SendTransaction submits the transaction to the Access API. The caller must
@@ -107,15 +106,4 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, er
 	}
 
 	return res, nil
-}
-
-// signTransaction signs a transaction with a private key.
-func signTransaction(tx flow.TransactionBody, privateKey crypto.PrivateKey) (crypto.Signature, error) {
-	hasher := hash.NewSHA3_256()
-
-	transaction := flow.Transaction{
-		TransactionBody: tx,
-	}
-	b := transaction.Singularity()
-	return privateKey.Sign(b, hasher)
 }
