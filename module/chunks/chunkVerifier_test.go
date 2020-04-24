@@ -95,6 +95,7 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 // TestEmptyCollection tests verification behaviour if a
 // collection doesn't have any transaction.
 func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
+	s.T().Skip()
 	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
 	assert.NotNil(s.T(), vch)
 	col := unittest.CollectionFixture(0)
