@@ -180,6 +180,7 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 	var endStateCommitment flow.StateCommitment
 	var stateInteractions []*delta.Snapshot
 	var events []flow.Event
+	var txErrors []flow.TransactionError
 	err := s.db.View(func(txn *badger.Txn) error {
 		err := procedure.RetrieveBlock(blockID, &block)(txn)
 		if err != nil {
@@ -202,6 +203,11 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 			return fmt.Errorf("cannot lookup events: %w", err)
 		}
 
+		err = operation.LookupTransactionErrorsByBlockID(blockID, &txErrors)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot lookup transaction errors: %w", err)
+		}
+
 		err = operation.RetrieveExecutionStateInteractions(blockID, &stateInteractions)(txn)
 		if err != nil {
 			return fmt.Errorf("cannot lookup execution state views: %w", err)
@@ -217,6 +223,7 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 		StartState:        startStateCommitment,
 		EndState:          endStateCommitment,
 		Events:            events,
+		TransactionErrors: txErrors,
 	}, nil
 }
 

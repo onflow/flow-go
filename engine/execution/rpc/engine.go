@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	"github.com/rs/zerolog"
@@ -34,16 +35,17 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events) *Engine {
+func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events, txErrors storage.TransactionErrors) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine: e,
-			blocks: blocks,
-			events: events,
+			engine:            e,
+			blocks:            blocks,
+			events:            events,
+			transactionErrors: txErrors,
 		},
 		server: grpc.NewServer(),
 		config: config,
@@ -88,9 +90,10 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	engine ingestion.IngestRPC
-	blocks storage.Blocks
-	events storage.Events
+	engine            ingestion.IngestRPC
+	blocks            storage.Blocks
+	events            storage.Events
+	transactionErrors storage.TransactionErrors
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
@@ -103,7 +106,7 @@ func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execut
 func (h *handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *execution.ExecuteScriptAtBlockIDRequest,
-) (*execution.ExecuteScriptResponse, error) {
+) (*execution.ExecuteScriptAtBlockIDResponse, error) {
 	blockID := flow.HashToID(req.GetBlockId())
 
 	value, err := h.engine.ExecuteScriptAtBlockID(req.Script, blockID)
@@ -111,7 +114,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 		return nil, status.Errorf(codes.Internal, "failed to execute script: %v", err)
 	}
 
-	res := &execution.ExecuteScriptResponse{
+	res := &execution.ExecuteScriptAtBlockIDResponse{
 		Value: value,
 	}
 
@@ -119,7 +122,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 }
 
 func (h *handler) GetEventsForBlockIDs(_ context.Context,
-	req *execution.GetEventsForBlockIDsRequest) (*execution.EventsResponse, error) {
+	req *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
 
 	blockIDs := req.GetBlockIds()
 	if len(blockIDs) == 0 {
@@ -133,7 +136,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 
 	eType := flow.EventType(reqEvent)
 
-	results := make([]*execution.EventsResponse_Result, len(blockIDs))
+	results := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockIDs))
 
 	// collect all the events and create a EventsResponse_Result for each block
 	for i, b := range blockIDs {
@@ -153,13 +156,13 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 
 	}
 
-	return &execution.EventsResponse{
+	return &execution.GetEventsForBlockIDsResponse{
 		Results: results,
 	}, nil
 }
 
-func (h *handler) GetEventsForBlockIDTransactionID(_ context.Context,
-	req *execution.GetEventsForBlockIDTransactionIDRequest) (*execution.EventsResponse, error) {
+func (h *handler) GetTransactionResult(_ context.Context,
+	req *execution.GetTransactionResultRequest) (*execution.GetTransactionResultResponse, error) {
 
 	reqBlockID := req.GetBlockId()
 	if reqBlockID == nil {
@@ -180,30 +183,36 @@ func (h *handler) GetEventsForBlockIDTransactionID(_ context.Context,
 		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 	}
 
-	result, err := h.eventResult(blockID, blockEvents)
+	events := h.entityEvents(blockEvents)
+
+	var statusCode uint32 = 0
+	errMsg := ""
+
+	txError, err := h.transactionErrors.ByBlockIDTransactionID(blockID, txID)
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.Internal, "failed to get transaction error: %v", err)
+		}
+		// noop if no tx error was found
+	} else {
+		statusCode = 1 // for now statusCode 1 indicates and error, 0 indicates no error
+		errMsg = txError.Message
+
 	}
 
-	results := []*execution.EventsResponse_Result{
-		result,
-	}
-
-	return &execution.EventsResponse{
-		Results: results,
+	return &execution.GetTransactionResultResponse{
+		StatusCode:   statusCode,
+		ErrorMessage: errMsg,
+		Events:       events,
 	}, nil
 }
 
 // eventResult creates EventsResponse_Result from flow.Event for the given blockID
 func (h *handler) eventResult(blockID flow.Identifier,
-	flowEvents []flow.Event) (*execution.EventsResponse_Result, error) {
+	flowEvents []flow.Event) (*execution.GetEventsForBlockIDsResponse_Result, error) {
 
 	// convert events to event message
-	events := make([]*entities.Event, len(flowEvents))
-	for i, e := range flowEvents {
-		event := convert.EventToMessage(e)
-		events[i] = event
-	}
+	events := h.entityEvents(flowEvents)
 
 	// lookup block
 	block, err := h.blocks.ByID(blockID)
@@ -211,11 +220,21 @@ func (h *handler) eventResult(blockID flow.Identifier,
 		return nil, status.Errorf(codes.Internal, "failed to lookup block: %v", err)
 	}
 
-	return &execution.EventsResponse_Result{
+	return &execution.GetEventsForBlockIDsResponse_Result{
 		BlockId:     blockID[:],
 		BlockHeight: block.Height,
 		Events:      events,
 	}, nil
+}
+
+// entityEvents converts flow events to entities events
+func (h *handler) entityEvents(flowEvents []flow.Event) []*entities.Event {
+	events := make([]*entities.Event, len(flowEvents))
+	for i, e := range flowEvents {
+		event := convert.EventToMessage(e)
+		events[i] = event
+	}
+	return events
 }
 
 func (h *handler) GetAccountAtBlockID(_ context.Context,

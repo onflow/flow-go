@@ -28,6 +28,7 @@ type ExecutionStateDelta struct {
 	StartState        flow.StateCommitment
 	EndState          flow.StateCommitment
 	Events            []flow.Event
+	TransactionErrors []flow.TransactionError
 }
 
 func (b *ExecutionStateDelta) ID() flow.Identifier {

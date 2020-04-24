@@ -204,11 +204,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
 		metrics := &mockmodule.Metrics{}
 
-		exeEventResp := execution.EventsResponse{
-			Results: nil,
+		exeEventResp := execution.GetTransactionResultResponse{
+			Events: nil,
 		}
 		// assume execution node returns an empty list of events
-		suite.execClient.On("GetEventsForBlockIDTransactionID", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
+		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
 
 		// initialize storage
 		blocks := bstorage.NewBlocks(db)
@@ -299,7 +299,7 @@ func (suite *Suite) TestExecuteScript() {
 				BlockId: id,
 				Script:  script,
 			}
-			executionResp := execution.ExecuteScriptResponse{
+			executionResp := execution.ExecuteScriptAtBlockIDResponse{
 				Value: []byte{9, 10, 11},
 			}
 

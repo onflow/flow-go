@@ -16,9 +16,10 @@ type ComputationOrder struct {
 }
 
 type ComputationResult struct {
-	ExecutableBlock *entity.ExecutableBlock
-	StateSnapshots  []*delta.Snapshot
-	Events          []flow.Event
-	GasUsed         uint64
-	StateReads      uint64
+	ExecutableBlock   *entity.ExecutableBlock
+	StateSnapshots    []*delta.Snapshot
+	Events            []flow.Event
+	TransactionErrors []flow.TransactionError
+	GasUsed           uint64
+	StateReads        uint64
 }

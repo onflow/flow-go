@@ -34,6 +34,7 @@ const (
 	codeChunkDataPack              = 28
 	codeEvent                      = 29
 	codeExecutionStateInteractions = 30
+	codeTransactionError           = 31
 
 	codeIndexIdentity                = 100
 	codeIndexGuarantee               = 101
