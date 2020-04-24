@@ -79,17 +79,17 @@ func createCounter(ctx context.Context, client *testnet.Client) error {
 		Import: dsl.Import{Address: flow.RootAddress},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
-			var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
-          
-			if maybeCounter == nil {
-                maybeCounter <-! Testing.createCounter()
-          	}
-
-			maybeCounter?.add(2)
-          	signer.save(<-maybeCounter!, to: /storage/counter)
-
-          	signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
-			`),
+				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
+				
+				if maybeCounter == nil {
+					maybeCounter <-! Testing.createCounter()
+				}
+				
+				maybeCounter?.add(2)
+				signer.save(<-maybeCounter!, to: /storage/counter)
+				
+				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+				`),
 		},
 	}
 
