@@ -120,7 +120,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	err := e.storeGuarantee(guarantee)
 	if err != nil {
-		if errors.Is(err, mempool.ErrEntityAlreadyExists) {
+		if errors.Is(err, mempool.ErrAlreadyExists) {
 			return nil
 		}
 

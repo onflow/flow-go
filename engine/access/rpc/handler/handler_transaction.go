@@ -8,8 +8,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
-	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -49,17 +49,8 @@ func (h *Handler) GetTransaction(_ context.Context, req *access.GetTransactionRe
 		return nil, convertStorageError(err)
 	}
 
-	// derive status of the transaction
-	status, err := h.deriveTransactionStatus(tx)
-	if err != nil {
-		return nil, convertStorageError(err)
-	}
-
 	// convert flow transaction to a protobuf message
 	transaction := convert.TransactionToMessage(*tx)
-
-	// set the status
-	transaction.Status = status
 
 	// return result
 	resp := &access.TransactionResponse{
@@ -70,9 +61,10 @@ func (h *Handler) GetTransaction(_ context.Context, req *access.GetTransactionRe
 
 func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 
-	blockID := flow.HashToID(req.Id)
+	id := flow.HashToID(req.GetId())
+
 	// look up transaction from storage
-	tx, err := h.transactions.ByID(blockID)
+	tx, err := h.transactions.ByID(id)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
@@ -80,9 +72,9 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 	txID := tx.ID()
 
 	// get events for the transaction
-	events, err := h.getTransactionEventsFromExecutionNode(ctx, blockID[:], txID[:])
+	events, err := h.lookupEvents(ctx, txID)
 	if err != nil {
-		return nil, err
+		return nil, convertStorageError(err)
 	}
 
 	// derive status of the transaction
@@ -90,6 +82,8 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
+
+	//TODO: Set correct values for StatusCode and ErrorMessage
 
 	// return result
 	resp := &access.TransactionResultResponse{
@@ -103,40 +97,61 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 // deriveTransactionStatus derives the transaction status based on current protocol state
 func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.TransactionStatus, error) {
 
-	collection, err := h.collections.LightByTransactionID(tx.ID())
-
-	if errors.Is(err, storage.ErrNotFound) {
-		// tx found in transaction storage but not in the collection storage
-		return entities.TransactionStatus_STATUS_PENDING, nil
-	}
-	if err != nil {
-		return entities.TransactionStatus_STATUS_UNKNOWN, err
-	}
-
-	block, err := h.blocks.ByCollectionID(collection.ID())
+	block, err := h.lookupBlock(tx.ID())
 
 	if errors.Is(err, storage.ErrNotFound) {
 		// tx found in transaction storage and collection storage but not in block storage
 		// However, this will not happen as of now since the ingestion engine doesn't subscribe
 		// for collections
-		return entities.TransactionStatus_STATUS_PENDING, nil
+		return entities.TransactionStatus_PENDING, nil
 	}
 	if err != nil {
-		return entities.TransactionStatus_STATUS_UNKNOWN, err
+		return entities.TransactionStatus_UNKNOWN, err
 	}
 
 	// get the latest sealed block from the state
 	latestSealedBlock, err := h.getLatestSealedHeader()
 	if err != nil {
-		return entities.TransactionStatus_STATUS_UNKNOWN, err
+		return entities.TransactionStatus_UNKNOWN, err
 	}
 
 	// if the finalized block precedes the latest sealed block, then it can be safely assumed that it would have been
 	// sealed as well and the transaction can be considered sealed
 	if block.Height <= latestSealedBlock.Height {
-		return entities.TransactionStatus_STATUS_SEALED, nil
+		return entities.TransactionStatus_SEALED, nil
 	}
 	// otherwise, the finalized block of the transaction has not yet been sealed
 	// hence the transaction is finalized but not sealed
-	return entities.TransactionStatus_STATUS_FINALIZED, nil
+	return entities.TransactionStatus_FINALIZED, nil
+}
+
+func (h *Handler) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
+
+	collection, err := h.collections.LightByTransactionID(txID)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := h.blocks.ByCollectionID(collection.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	return block, nil
+}
+
+func (h *Handler) lookupEvents(ctx context.Context, txID flow.Identifier) ([]*entities.Event, error) {
+
+	// find the block ID for the transaction
+	block, err := h.lookupBlock(txID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			// access node may not have the block if it hasn't yet been finalized
+			return nil, nil
+		}
+		return nil, convertStorageError(err)
+	}
+
+	blockID := block.ID()
+	return h.getTransactionEventsFromExecutionNode(ctx, blockID[:], txID[:])
 }
