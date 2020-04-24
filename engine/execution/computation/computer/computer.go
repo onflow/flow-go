@@ -55,6 +55,7 @@ func (e *blockComputer) executeBlock(
 	interactions := make([]*delta.Snapshot, len(collections))
 
 	events := make([]flow.Event, 0)
+	allTxErrors := make([]flow.TransactionError, 0)
 
 	var txIndex uint32
 
@@ -62,7 +63,7 @@ func (e *blockComputer) executeBlock(
 
 		collectionView := stateView.NewChild()
 
-		collEvents, nextIndex, gas, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
+		collEvents, txErrors, nextIndex, gas, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
@@ -71,6 +72,7 @@ func (e *blockComputer) executeBlock(
 
 		txIndex = nextIndex
 		events = append(events, collEvents...)
+		allTxErrors = append(allTxErrors, txErrors...)
 
 		interactions[i] = collectionView.Interactions()
 
@@ -78,11 +80,12 @@ func (e *blockComputer) executeBlock(
 	}
 
 	return &execution.ComputationResult{
-		ExecutableBlock: block,
-		StateSnapshots:  interactions,
-		Events:          events,
-		GasUsed:         gasUsed,
-		StateReads:      stateView.ReadsCount(),
+		ExecutableBlock:   block,
+		StateSnapshots:    interactions,
+		Events:            events,
+		TransactionErrors: allTxErrors,
+		GasUsed:           gasUsed,
+		StateReads:        stateView.ReadsCount(),
 	}, nil
 }
 
@@ -91,8 +94,9 @@ func (e *blockComputer) executeCollection(
 	blockCtx virtualmachine.BlockContext,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
-) ([]flow.Event, uint32, uint64, error) {
+) ([]flow.Event, []flow.TransactionError, uint32, uint64, error) {
 	var events []flow.Event
+	var txErrors []flow.TransactionError
 	var gasUsed uint64
 	for _, tx := range collection.Transactions {
 		txView := collectionView.NewChild()
@@ -100,20 +104,29 @@ func (e *blockComputer) executeCollection(
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
 			txIndex++
-			return nil, txIndex, 0, fmt.Errorf("failed to execute transaction: %w", err)
+			return nil, nil, txIndex, 0, fmt.Errorf("failed to execute transaction: %w", err)
 		}
 		txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
 		txIndex++
 		gasUsed += result.GasUsed
 
 		if err != nil {
-			return nil, txIndex, 0, fmt.Errorf("failed to create flow events: %w", err)
+			return nil, nil, txIndex, 0, fmt.Errorf("failed to create flow events: %w", err)
 		}
 		events = append(events, txEvents...)
+
+		if result.Error != nil {
+			txErr := flow.TransactionError{
+				TransactionID: tx.ID(),
+				Message:       result.Error.Error(),
+			}
+			txErrors = append(txErrors, txErr)
+		}
+
 		if result.Succeeded() {
 			collectionView.MergeView(txView)
 		}
 	}
 
-	return events, txIndex, gasUsed, nil
+	return events, txErrors, txIndex, gasUsed, nil
 }

@@ -40,7 +40,7 @@ func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 	var events []flow.Event
 	err := e.db.View(func(btx *badger.Txn) error {
 		err := operation.LookupEventsByBlockID(blockID, &events)(btx)
-		return handleError(err)
+		return handleError(err, flow.Event{})
 	})
 
 	if err != nil {
@@ -56,7 +56,7 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 	var events *[]flow.Event
 	err := e.db.View(func(btx *badger.Txn) error {
 		err := operation.RetrieveEvents(blockID, txID, events)(btx)
-		return handleError(err)
+		return handleError(err, flow.Event{})
 	})
 
 	if err != nil {
@@ -72,7 +72,7 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, event flow.EventTyp
 	var events *[]flow.Event
 	err := e.db.View(func(btx *badger.Txn) error {
 		err := operation.LookupEventsByBlockIDEventType(blockID, event, events)(btx)
-		return handleError(err)
+		return handleError(err, flow.Event{})
 	})
 
 	if err != nil {
@@ -82,12 +82,12 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, event flow.EventTyp
 	return *events, nil
 }
 
-func handleError(err error) error {
+func handleError(err error, t interface{}) error {
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return fmt.Errorf("could not retrieve events: %w", storage.ErrNotFound)
+			return fmt.Errorf("could not retrieve %T: %w", t, storage.ErrNotFound)
 		}
-		return fmt.Errorf("could not retrieve events: %w", err)
+		return fmt.Errorf("could not retrieve %T: %w", t, err)
 	}
 	return nil
 }
