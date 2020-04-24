@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPartialTrieEmptyTrie(t *testing.T) {
@@ -26,27 +25,26 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
-		defaultHash := GetDefaultHashForHeight(trieHeight - 1)
-
-		retvalues, _, err := smt.Read(keys, true, defaultHash)
+		retvalues, _, err := smt.Read(keys, true, emptyTree.Commitment())
 		require.NoError(t, err, "error reading values")
 
-		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		proofHldr, err := smt.GetBatchProof(keys, emptyTree.Commitment())
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(defaultHash, trieHeight, keys, retvalues, EncodeProof(proofHldr))
-
+		psmt, err := NewPSMT(emptyTree.Commitment(), trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
-		if !bytes.Equal(defaultHash, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before set]")
+
+		if !bytes.Equal(psmt.Commitment(), emptyTree.Commitment()) {
+			t.Fatal("commitment hash doesn't match [before set]")
 		}
-		_, err = smt.Update(keys, values, defaultHash)
+
+		expCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err, "error updating trie")
 
-		newHash, _, err := psmt.Update(keys, values)
+		newCom, _, err := psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newHash, psmt.root.ComputeValue()) {
+		if !bytes.Equal(newCom, expCom) {
 			t.Fatal("rootNode hash doesn't match [after set]")
 		}
 
@@ -55,14 +53,14 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		keys = append(keys, key1)
 		values = append(values, updatedValue1)
 
-		_, err = smt.Update(keys, values, newHash)
+		expCom, err = smt.Update(keys, values, newCom)
 		require.NoError(t, err, "error updating trie")
 
-		newerHash, _, err := psmt.Update(keys, values)
+		newerCom, _, err := psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newerHash, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [after update]")
+		if !bytes.Equal(newerCom, expCom) {
+			t.Fatal("commitment doesn't match [after update]")
 		}
 
 	})
@@ -89,32 +87,32 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		keys = append(keys, key1, key2)
 		values = append(values, value1, value2)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err, "error updating trie")
 
-		retvalues, _, err := smt.Read(keys, true, newRoot)
+		retvalues, _, err := smt.Read(keys, true, newCom)
 		require.NoError(t, err, "error reading values")
 
-		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		proofHldr, err := smt.GetBatchProof(keys, emptyTree.Commitment())
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+		psmt, err := NewPSMT(newCom, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
 
-		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
+		if !bytes.Equal(newCom, psmt.Commitment()) {
+			t.Fatal("commitment doesn't match [before update]")
 		}
 
 		values = make([][]byte, 0)
 		values = append(values, updatedValue1, updatedValue2)
-		newRoot2, err := smt.Update(keys, values, newRoot)
+		newCom2, err := smt.Update(keys, values, newCom)
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [after update]")
+		if !bytes.Equal(newCom2, psmt.Commitment()) {
+			t.Fatal("commitment doesn't match [after update]")
 		}
 	})
 
@@ -143,40 +141,40 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		keys = append(keys, key1, key2, key3)
 		values = append(values, value1, value2, value3)
 
-		retvalues, _, err := smt.Read(keys, true, emptyTree.root)
+		retvalues, _, err := smt.Read(keys, true, emptyTree.Commitment())
 		require.NoError(t, err, "error reading values")
 
-		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		proofHldr, err := smt.GetBatchProof(keys, emptyTree.Commitment())
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(emptyTree.root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+		psmt, err := NewPSMT(emptyTree.Commitment(), trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
 
-		if !bytes.Equal(emptyTree.root, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
+		if !bytes.Equal(emptyTree.Commitment(), psmt.Commitment()) {
+			t.Fatal("commitment hash doesn't match [before update]")
 		}
 		// first update
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
+		if !bytes.Equal(newCom, psmt.Commitment()) {
+			t.Fatal("commitment hash doesn't match [before update]")
 		}
 
 		// second update
 		values = make([][]byte, 0)
 		values = append(values, updatedValue1, updatedValue2, updatedValue3)
-		newRoot2, err := smt.Update(keys, values, newRoot)
+		newCom2, err := smt.Update(keys, values, newCom)
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [after update]")
+		if !bytes.Equal(newCom2, psmt.Commitment()) {
+			t.Fatal("commitment doesn't match [after update]")
 		}
 	})
 
@@ -200,39 +198,39 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		keys = append(keys, key1, key2)
 		values = append(values, value1, value2)
 
-		retvalues, _, err := smt.Read(keys, true, emptyTree.root)
+		retvalues, _, err := smt.Read(keys, true, emptyTree.Commitment())
 		require.NoError(t, err, "error reading values")
 
-		proofHldr, err := smt.GetBatchProof(keys, emptyTree.root)
+		proofHldr, err := smt.GetBatchProof(keys, emptyTree.Commitment())
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(emptyTree.root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+		psmt, err := NewPSMT(emptyTree.Commitment(), trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
 
-		if !bytes.Equal(emptyTree.root, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
+		if !bytes.Equal(emptyTree.Commitment(), psmt.Commitment()) {
+			t.Fatal("commitment doesn't match [before update]")
 		}
 
 		// first update
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
-		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
+		if !bytes.Equal(newCom, psmt.Commitment()) {
+			t.Fatal("commitment doesn't match [after update]")
 		}
 
 		// second update
 		values = make([][]byte, 0)
 		values = append(values, updatedValue1, updatedValue2)
-		newRoot2, err := smt.Update(keys, values, newRoot)
+		newCom2, err := smt.Update(keys, values, newCom)
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
-		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [after update]")
+		if !bytes.Equal(newCom2, psmt.Commitment()) {
+			t.Fatal("commitment doesn't match [after update]")
 		}
 	})
 
@@ -258,24 +256,24 @@ func TestMixProof(t *testing.T) {
 		keys = append(keys, key1, key3)
 		values = append(values, value1, value3)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err, "error updating trie")
 
 		keys = make([][]byte, 0)
 		keys = append(keys, key1, key2, key3)
 
-		retvalues, _, err := smt.Read(keys, true, newRoot)
+		retvalues, _, err := smt.Read(keys, true, newCom)
 		require.NoError(t, err, "error reading values")
 
 		_ = retvalues
-		proofHldr, err := smt.GetBatchProof(keys, newRoot)
+		proofHldr, err := smt.GetBatchProof(keys, newCom)
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+		psmt, err := NewPSMT(newCom, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
 
-		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
-			t.Fatal("rootNode hash doesn't match [before update]")
+		if !bytes.Equal(newCom, psmt.Commitment()) {
+			t.Fatal("commitment doesn't match [before update]")
 		}
 
 		keys = make([][]byte, 0)
@@ -284,14 +282,14 @@ func TestMixProof(t *testing.T) {
 		values = make([][]byte, 0)
 		values = append(keys, []byte{'X'}, []byte{'Y'})
 
-		root2, err := smt.Update(keys, values, newRoot)
+		newCom2, err := smt.Update(keys, values, newCom)
 		require.NoError(t, err, "error updating trie")
 
-		proot2, _, err := psmt.Update(keys, values)
+		pCom2, _, err := psmt.Update(keys, values)
 		require.NoError(t, err, "error updating partial trie")
 
-		if !bytes.Equal(root2, proot2) {
-			t.Fatalf("root2 hash doesn't match [%x] != [%x]", root2, proot2)
+		if !bytes.Equal(newCom2, pCom2) {
+			t.Fatalf("root2 hash doesn't match [%x] != [%x]", newCom2, pCom2)
 		}
 
 	})
@@ -326,7 +324,7 @@ func TestRandomProofs(t *testing.T) {
 		insertKeys := keys[:split]
 		insertValues := values[:split]
 
-		root, err := smt.Update(insertKeys, insertValues, emptyTree.root)
+		com, err := smt.Update(insertKeys, insertValues, emptyTree.Commitment())
 		require.NoError(t, err, "error updating trie")
 
 		// shuffle keys for read
@@ -335,17 +333,17 @@ func TestRandomProofs(t *testing.T) {
 			values[i], values[j] = values[j], values[i]
 		})
 
-		retvalues, _, err := smt.Read(keys, true, root)
+		retvalues, _, err := smt.Read(keys, true, com)
 		require.NoError(t, err, "error reading values")
 
-		proofHldr, err := smt.GetBatchProof(keys, root)
+		proofHldr, err := smt.GetBatchProof(keys, com)
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+		psmt, err := NewPSMT(com, trieHeight, keys, retvalues, EncodeProof(proofHldr))
 		require.NoError(t, err, "error building partial trie")
 
-		if !bytes.Equal(root, psmt.root.ComputeValue()) {
-			t.Fatal("root hash doesn't match")
+		if !bytes.Equal(com, psmt.Commitment()) {
+			t.Fatal("commitment doesn't match")
 		}
 
 		// select a subset of shuffled keys for random updates
@@ -357,19 +355,19 @@ func TestRandomProofs(t *testing.T) {
 			updateValues[i], updateValues[j] = updateValues[j], updateValues[i]
 		})
 
-		root2, err := smt.Update(updateKeys, updateValues, root)
+		com2, err := smt.Update(updateKeys, updateValues, com)
 		require.NoError(t, err, "error updating trie")
 
-		proot2, _, err := psmt.Update(updateKeys, updateValues)
+		pcom2, _, err := psmt.Update(updateKeys, updateValues)
 		require.NoError(t, err, "error updating partial trie")
 
-		if !bytes.Equal(root2, proot2) {
-			t.Fatalf("root2 hash doesn't match [%x] != [%x]", root2, proot2)
+		if !bytes.Equal(com2, pcom2) {
+			t.Fatalf("commitment doesn't match [%x] != [%x]", com2, pcom2)
 		}
 
 	})
 
 }
 
-// TODO add test for incompatible proofs [Byzantine milestone]
-// TODO add test key not exist [Byzantine milestone]
+// // TODO add test for incompatible proofs [Byzantine milestone]
+// // TODO add test key not exist [Byzantine milestone]

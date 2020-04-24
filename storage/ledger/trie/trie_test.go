@@ -138,7 +138,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 		keys := [][]byte{key1}
 		values := [][]byte{value1}
 
-		_, err := smt.Update(keys, values, emptyTree.root)
+		_, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.Error(t, err)
 
 		// long key
@@ -148,7 +148,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 		keys = [][]byte{key2}
 		values = [][]byte{value2}
 
-		_, err = smt.Update(keys, values, emptyTree.root)
+		_, err = smt.Update(keys, values, emptyTree.Commitment())
 		require.Error(t, err)
 	})
 
@@ -163,7 +163,7 @@ func TestReadWithWrongKeySize(t *testing.T) {
 		keys := [][]byte{key1}
 		values := [][]byte{value1}
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newRoot, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		// wrong key
@@ -203,7 +203,7 @@ func TestInsertIntoKey(t *testing.T) {
 
 		values = append(values, value1, value2, value3, value4)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newRoot, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		keys = make([][]byte, 0)
@@ -255,7 +255,7 @@ func TestInsertToEndofKeys(t *testing.T) {
 
 		//sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newRoot, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newTree, err := smt.forest.Get(newRoot)
@@ -347,7 +347,7 @@ func TestUpdateAtomicallyMultiValUpdateAndRead(t *testing.T) {
 
 		values = append(values, value1, value2, value3, value4)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newRoot, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newTree, err := smt.forest.Get(newRoot)
@@ -362,7 +362,7 @@ func TestUpdateAtomicallyMultiValUpdateAndRead(t *testing.T) {
 			flags = append(flags, flag)
 		}
 
-		test_vals, _, read_err := smt.Read(keys, false, newRoot)
+		test_vals, _, read_err := smt.Read(keys, true, newRoot)
 		require.NoError(t, read_err)
 
 		for i := 0; i < len(values); i++ {
@@ -404,7 +404,7 @@ func TestTrustedRead(t *testing.T) {
 
 		values = append(values, value1, value2, value3, value4)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newRoot, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		test_vals, _, read_err := smt.Read(keys, true, newRoot)
@@ -434,7 +434,7 @@ func TestFailedRead(t *testing.T) {
 	keys = append(keys, key1, key2)
 
 	withSMT(t, 8, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
-		_, _, read_err := smt.Read(keys, true, emptyTree.root)
+		_, _, read_err := smt.Read(keys, true, emptyTree.Commitment())
 		if read_err == nil {
 			t.Fatalf("Read an non-existant value without an error")
 		}
@@ -464,7 +464,7 @@ func TestGetProofFlags_MultipleValueTree(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newRoot, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 		newTree, err := smt.forest.Get(newRoot)
 		require.NoError(t, err)
@@ -531,9 +531,9 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeLeft(t *testing.T) {
 		keys = append(keys, key1)
 		values = append(values, value1)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		newTree, err := smt.forest.Get(newRoot)
+		newTree, err := smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		flag, proof, size, inclusion, err := smt.GetProof(keys[0], newTree.rootNode)
@@ -543,7 +543,7 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeLeft(t *testing.T) {
 			t.Fatalf("Trie Read failed")
 		}
 
-		if !VerifyInclusionProof(key1, value1, flag, proof, size, newRoot, smt.height) {
+		if !VerifyInclusionProof(key1, value1, flag, proof, size, newTree.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree!")
 		}
 	})
@@ -563,9 +563,9 @@ func TestGetProof_SingleValueTreeConstructedLeft(t *testing.T) {
 
 		values = append(values, value1)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		newTree, err := smt.forest.Get(newRoot)
+		newTree, err := smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		flag, proof, _, inclusion, err := smt.GetProof(keys[0], newTree.rootNode)
@@ -607,9 +607,9 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeRight(t *testing.T) {
 		keys = append(keys, key1)
 		values = append(values, value1)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		newTree, err := smt.forest.Get(newRoot)
+		newTree, err := smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		flag, proof, size, inclusion, err := smt.GetProof(keys[0], newTree.rootNode)
@@ -617,7 +617,7 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeRight(t *testing.T) {
 
 		require.True(t, inclusion, "Trie Read failed")
 
-		if !VerifyInclusionProof(key1, value1, flag, proof, size, newRoot, smt.height) {
+		if !VerifyInclusionProof(key1, value1, flag, proof, size, newTree.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree!")
 		}
 	})
@@ -644,9 +644,9 @@ func TestGetProof_MultipleValueTree(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		newTree, err := smt.forest.Get(newRoot)
+		newTree, err := smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		flag, proof, size, inclusion, err := smt.GetProof(key1, newTree.rootNode)
@@ -655,7 +655,7 @@ func TestGetProof_MultipleValueTree(t *testing.T) {
 			t.Fatalf("Trie Read failed")
 		}
 
-		verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, newRoot, smt.height)
+		verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, newTree.root, smt.height)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key2, newTree.rootNode)
 		require.NoError(t, err)
@@ -663,7 +663,7 @@ func TestGetProof_MultipleValueTree(t *testing.T) {
 			t.Fatalf("Trie Read failed")
 		}
 
-		verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, newRoot, smt.height)
+		verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, newTree.root, smt.height)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key3, newTree.rootNode)
 		require.NoError(t, err)
@@ -671,7 +671,7 @@ func TestGetProof_MultipleValueTree(t *testing.T) {
 			t.Fatalf("Trie Read failed")
 		}
 
-		verify3 := VerifyInclusionProof(key3, value3, flag, proof, size, newRoot, smt.height)
+		verify3 := VerifyInclusionProof(key3, value3, flag, proof, size, newTree.root, smt.height)
 		if !(verify1 && verify2 && verify3) {
 			t.Errorf("not producing expected rootNode for tree!")
 		}
@@ -699,16 +699,16 @@ func TestGetProof_MultipleStaggeredUpdates(t *testing.T) {
 
 		values = append(values, value1)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		newTree, err := smt.forest.Get(newRoot)
+		newTree, err := smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		flag, proof, size, inclusion, err := smt.GetProof(key1, newTree.rootNode)
 		require.NoError(t, err)
 		require.True(t, inclusion, "Trie Read failed")
 
-		verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, newRoot, smt.height)
+		verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, newTree.root, smt.height)
 		require.True(t, verify1, "not producing expected rootNode for tree!")
 
 		keys = make([][]byte, 0)
@@ -718,28 +718,28 @@ func TestGetProof_MultipleStaggeredUpdates(t *testing.T) {
 
 		values = append(values, value2, value3)
 
-		newRoot, err = smt.Update(keys, values, newRoot)
+		newCom, err = smt.Update(keys, values, newCom)
 		require.NoError(t, err)
-		newTree, err = smt.forest.Get(newRoot)
+		newTree, err = smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key1, newTree.rootNode)
 		require.NoError(t, err)
 		require.True(t, inclusion, "Trie Read failed")
 
-		verify1 = VerifyInclusionProof(key1, value1, flag, proof, size, newRoot, smt.height)
+		verify1 = VerifyInclusionProof(key1, value1, flag, proof, size, newTree.root, smt.height)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key2, newTree.rootNode)
 		require.NoError(t, err)
 		require.True(t, inclusion, "Trie Read failed")
 
-		verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, newRoot, smt.height)
+		verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, newTree.root, smt.height)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key3, newTree.rootNode)
 		require.NoError(t, err)
 		require.True(t, inclusion, "Trie Read failed")
 
-		verify3 := VerifyInclusionProof(key3, value3, flag, proof, size, newRoot, smt.height)
+		verify3 := VerifyInclusionProof(key3, value3, flag, proof, size, newTree.root, smt.height)
 
 		if !(verify1 && verify2 && verify3) {
 			t.Errorf("not producing expected rootNode for tree!")
@@ -768,22 +768,22 @@ func TestGetProof_MultipleValueTreeDeeper(t *testing.T) {
 		keys = append(keys, key1, key2)
 		values = append(values, value1, value2)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		newTree, err := smt.forest.Get(newRoot)
+		newTree, err := smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		flag, proof, size, inclusion, err := smt.GetProof(key1, newTree.rootNode)
 		require.NoError(t, err)
 		require.True(t, inclusion, "Trie Read failed 1")
 
-		verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, newRoot, smt.height)
+		verify1 := VerifyInclusionProof(key1, value1, flag, proof, size, newTree.root, smt.height)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key2, newTree.rootNode)
 		require.NoError(t, err)
 		require.True(t, inclusion, "Trie Read failed 2")
 
-		verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, newRoot, smt.height)
+		verify2 := VerifyInclusionProof(key2, value2, flag, proof, size, newTree.root, smt.height)
 
 		if !(verify1 && verify2) {
 			t.Errorf("not producing expected rootNode for tree!")
@@ -813,9 +813,9 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		newTree, err := smt.forest.Get(newRoot)
+		newTree, err := smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		nonIncludedKey := make([]byte, 1)
@@ -826,7 +826,7 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, inclusion, "Key should not be included in the trie!")
 
-		verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, newRoot, smt.height)
+		verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, newTree.root, smt.height)
 
 		if !(verifyNonInclusion) {
 			t.Errorf("not producing expected rootNode for tree!")
@@ -866,9 +866,9 @@ func TestNonInclusionProof_SingleValueTree(t *testing.T) {
 
 		values = append(values, value1)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		newTree, err := smt.forest.Get(newRoot)
+		newTree, err := smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		nonIncludedKey := make([]byte, 1)
@@ -879,7 +879,7 @@ func TestNonInclusionProof_SingleValueTree(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, inclusion, "Key should not be included in the trie!")
 
-		verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, newRoot, smt.height)
+		verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, newTree.root, smt.height)
 
 		if !(verifyNonInclusion) {
 			t.Errorf("not producing expected rootNode for tree!")
@@ -909,28 +909,28 @@ func TestNonInclusionProof_IncludedKey(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		newTree, err := smt.forest.Get(newRoot)
+		newTree, err := smt.forest.Get(newCom)
 		require.NoError(t, err)
 
 		flag, proof, size, inclusion, err := smt.GetProof(key1, newTree.rootNode)
 		require.NoError(t, err)
 		require.True(t, inclusion, "Key should be included in the trie!")
 
-		verifyNonInclusion1 := VerifyNonInclusionProof(key1, value1, flag, proof, size, newRoot, smt.height)
+		verifyNonInclusion1 := VerifyNonInclusionProof(key1, value1, flag, proof, size, newTree.root, smt.height)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key2, newTree.rootNode)
 		require.NoError(t, err)
 		require.True(t, inclusion, "Key should be included in the trie!")
 
-		verifyNonInclusion2 := VerifyNonInclusionProof(key2, value2, flag, proof, size, newRoot, smt.height)
+		verifyNonInclusion2 := VerifyNonInclusionProof(key2, value2, flag, proof, size, newTree.root, smt.height)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key3, newTree.rootNode)
 		require.NoError(t, err)
 		require.True(t, inclusion, "Key should be included in the trie!")
 
-		verifyNonInclusion3 := VerifyNonInclusionProof(key3, value3, flag, proof, size, newRoot, smt.height)
+		verifyNonInclusion3 := VerifyNonInclusionProof(key3, value3, flag, proof, size, newTree.root, smt.height)
 
 		if verifyNonInclusion1 || verifyNonInclusion2 || verifyNonInclusion3 {
 			t.Errorf("key is included in trie but we are returning that it isn't included 1")
@@ -960,9 +960,9 @@ func TestHistoricalState(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		oldTree2, err := smt.forest.Get(oldRoot2)
+		oldTree2, err := smt.forest.Get(oldCom2)
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'d'}
@@ -972,7 +972,7 @@ func TestHistoricalState(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(keys, newvalues, oldRoot2)
+		_, err = smt.Update(keys, newvalues, oldCom2)
 		require.NoError(t, err)
 
 		hv1, err := oldTree2.database.GetKVDB(key1)
@@ -1011,9 +1011,9 @@ func TestGetHistoricalProofs(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		oldTree2, err := smt.forest.Get(oldRoot2)
+		oldTree2, err := smt.forest.Get(oldCom2)
 		require.NoError(t, err)
 
 		flag1, proof1, size1, inclusion1, err := smt.GetProof(key1, oldTree2.rootNode)
@@ -1032,20 +1032,20 @@ func TestGetHistoricalProofs(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(keys, newvalues, oldRoot2)
+		_, err = smt.Update(keys, newvalues, oldCom2)
 		require.NoError(t, err)
 
-		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(key1, oldRoot2, oldTree2.database)
+		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(key1, oldCom2, oldTree2.database)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(key2, oldRoot2, oldTree2.database)
+		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(key2, oldCom2, oldTree2.database)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		hflag3, hproof3, hsize3, hinclusion3, err := smt.GetHistoricalProof(key3, oldRoot2, oldTree2.database)
+		hflag3, hproof3, hsize3, hinclusion3, err := smt.GetHistoricalProof(key3, oldCom2, oldTree2.database)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1087,7 +1087,6 @@ func TestGetHistoricalProofs(t *testing.T) {
 }
 
 func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
-	// TODO (Ramtin Fix me)
 	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
@@ -1107,9 +1106,9 @@ func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		oldTree2, err := smt.forest.Get(oldRoot2)
+		oldTree2, err := smt.forest.Get(oldCom2)
 		require.NoError(t, err)
 
 		nkey1 := make([]byte, 1)
@@ -1132,15 +1131,15 @@ func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(keys, newvalues, oldRoot2)
+		_, err = smt.Update(keys, newvalues, oldCom2)
 		require.NoError(t, err)
 
-		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(nkey1, oldRoot2, oldTree2.database)
+		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(nkey1, oldCom2, oldTree2.database)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(nkey2, oldRoot2, oldTree2.database)
+		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(nkey2, oldCom2, oldTree2.database)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1191,9 +1190,9 @@ func TestRead_HistoricalValues(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		oldTree2, err := smt.forest.Get(oldRoot2)
+		oldTree2, err := smt.forest.Get(oldCom2)
 		require.NoError(t, err)
 
 		flags := make([][]byte, 0)
@@ -1216,10 +1215,10 @@ func TestRead_HistoricalValues(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(keys, newvalues, oldRoot2)
+		_, err = smt.Update(keys, newvalues, oldCom2)
 		require.NoError(t, err)
 
-		test_vals, proofHolder, read_err := smt.Read(keys, false, oldRoot2)
+		test_vals, proofHolder, read_err := smt.Read(keys, false, oldCom2)
 		require.NoError(t, read_err)
 
 		for i := 0; i < len(values); i++ {
@@ -1274,7 +1273,7 @@ func TestRead_HistoricalValuesTrusted(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'d'}
@@ -1284,10 +1283,10 @@ func TestRead_HistoricalValuesTrusted(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(keys, newvalues, oldRoot2)
+		_, err = smt.Update(keys, newvalues, oldCom2)
 		require.NoError(t, err)
 
-		test_vals, _, read_err := smt.Read(keys, true, oldRoot2)
+		test_vals, _, read_err := smt.Read(keys, true, oldCom2)
 		if read_err != nil {
 			t.Fatalf(read_err.Error())
 		}
@@ -1326,7 +1325,7 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'z'}
@@ -1338,29 +1337,29 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot3, err := smt.Update(newkeys, newvalues, oldRoot2)
+		oldCom3, err := smt.Update(newkeys, newvalues, oldCom2)
 		require.NoError(t, err)
-		oldTree3, err := smt.forest.Get(oldRoot3)
+		oldTree3, err := smt.forest.Get(oldCom3)
 		require.NoError(t, err)
 
 		flag1, proof1, size1, inclusion1, err := smt.GetProof(key1, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 1!")
 		}
 
 		flag2, proof2, size2, inclusion2, err := smt.GetProof(key2, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 2!")
 		}
 
 		flag3, proof3, size3, inclusion3, err := smt.GetProof(key3, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 3!")
 		}
 
@@ -1370,7 +1369,7 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot4, err := smt.Update(newkeys, newvalues, oldRoot3)
+		oldCom4, err := smt.Update(newkeys, newvalues, oldCom3)
 		require.NoError(t, err)
 
 		newvalue1 = []byte{'u'}
@@ -1379,7 +1378,7 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot5, err := smt.Update(newkeys, newvalues, oldRoot4)
+		oldCom5, err := smt.Update(newkeys, newvalues, oldCom4)
 		require.NoError(t, err)
 
 		newvalue1 = []byte{'m'}
@@ -1389,16 +1388,16 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(keys, newvalues, oldRoot5)
+		_, err = smt.Update(keys, newvalues, oldCom5)
 		require.NoError(t, err)
 
-		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(key1, oldRoot3, oldTree3.database)
+		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(key1, oldTree3.Commitment(), oldTree3.database)
 		require.NoError(t, err)
 
-		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(key2, oldRoot3, oldTree3.database)
+		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(key2, oldTree3.Commitment(), oldTree3.database)
 		require.NoError(t, err)
 
-		hflag3, hproof3, hsize3, hinclusion3, err := smt.GetHistoricalProof(key3, oldRoot3, oldTree3.database)
+		hflag3, hproof3, hsize3, hinclusion3, err := smt.GetHistoricalProof(key3, oldTree3.Commitment(), oldTree3.database)
 		require.NoError(t, err)
 
 		proofVerifier1 := true
@@ -1462,7 +1461,7 @@ func TestGetProof_Pruned(t *testing.T) {
 
 		values = append(values, value1, value2, value3)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldRoot2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'z'}
@@ -1474,29 +1473,29 @@ func TestGetProof_Pruned(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot3, err := smt.Update(newkeys, newvalues, oldRoot2)
+		oldCom3, err := smt.Update(newkeys, newvalues, oldRoot2)
 		require.NoError(t, err)
-		oldTree3, err := smt.forest.Get(oldRoot3)
+		oldTree3, err := smt.forest.Get(oldCom3)
 		require.NoError(t, err)
 
 		flag1, proof1, size1, inclusion1, err := smt.GetProof(key1, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 1!")
 		}
 
 		flag2, proof2, size2, inclusion2, err := smt.GetProof(key2, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 2!")
 		}
 
 		flag3, proof3, size3, inclusion3, err := smt.GetProof(key3, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 3!")
 		}
 
@@ -1506,7 +1505,7 @@ func TestGetProof_Pruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot4, err := smt.Update(newkeys, newvalues, oldRoot3)
+		oldCom4, err := smt.Update(newkeys, newvalues, oldCom3)
 		require.NoError(t, err)
 
 		newvalue1 = []byte{'u'}
@@ -1515,7 +1514,7 @@ func TestGetProof_Pruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot5, err := smt.Update(newkeys, newvalues, oldRoot4)
+		oldCom5, err := smt.Update(newkeys, newvalues, oldCom4)
 		require.NoError(t, err)
 
 		newvalue1 = []byte{'m'}
@@ -1525,20 +1524,20 @@ func TestGetProof_Pruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(keys, newvalues, oldRoot5)
+		_, err = smt.Update(keys, newvalues, oldCom5)
 		require.NoError(t, err)
 
-		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(key1, oldRoot3, oldTree3.database)
+		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(key1, oldCom3, oldTree3.database)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(key2, oldRoot3, oldTree3.database)
+		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(key2, oldCom3, oldTree3.database)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		hflag3, hproof3, hsize3, hinclusion3, err := smt.GetHistoricalProof(key3, oldRoot3, oldTree3.database)
+		hflag3, hproof3, hsize3, hinclusion3, err := smt.GetHistoricalProof(key3, oldCom3, oldTree3.database)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1616,7 +1615,7 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 
 		values = append(values, value1, value2, value3, value4, value5)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'z'}
@@ -1628,43 +1627,43 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot3, err := smt.Update(newkeys, newvalues, oldRoot2)
+		oldCom3, err := smt.Update(newkeys, newvalues, oldCom2)
 		require.NoError(t, err)
-		oldTree3, err := smt.forest.Get(oldRoot3)
+		oldTree3, err := smt.forest.Get(oldCom3)
 		require.NoError(t, err)
 
 		flag1, proof1, size1, inclusion1, err := smt.GetProof(key1, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key1, newvalue1, flag1, proof1, size1, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 1!")
 		}
 
 		flag2, proof2, size2, inclusion2, err := smt.GetProof(key2, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key2, newvalue2, flag2, proof2, size2, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 2!")
 		}
 
 		flag3, proof3, size3, inclusion3, err := smt.GetProof(key3, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key3, value3, flag3, proof3, size3, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 3!")
 		}
 
 		flag4, proof4, size4, inclusion4, err := smt.GetProof(key4, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key4, value4, flag4, proof4, size4, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key4, value4, flag4, proof4, size4, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 4!")
 		}
 
 		flag5, proof5, size5, inclusion5, err := smt.GetProof(key5, oldTree3.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key5, value5, flag5, proof5, size5, oldRoot3, smt.height) {
+		if !VerifyInclusionProof(key5, value5, flag5, proof5, size5, oldTree3.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 3!")
 		}
 
@@ -1674,7 +1673,7 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot4, err := smt.Update(newkeys, newvalues, oldRoot3)
+		oldCom4, err := smt.Update(newkeys, newvalues, oldCom3)
 		require.NoError(t, err)
 
 		newvalue1 = []byte{'u'}
@@ -1683,43 +1682,43 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot5, err := smt.Update(newkeys, newvalues, oldRoot4)
+		oldCom5, err := smt.Update(newkeys, newvalues, oldCom4)
 		require.NoError(t, err)
-		oldTree5, err := smt.forest.Get(oldRoot5)
+		oldTree5, err := smt.forest.Get(oldCom5)
 		require.NoError(t, err)
 
 		nflag1, nproof1, nsize1, ninclusion1, err := smt.GetProof(key1, oldTree5.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key1, newvalue1, nflag1, nproof1, nsize1, oldRoot5, smt.height) {
+		if !VerifyInclusionProof(key1, newvalue1, nflag1, nproof1, nsize1, oldTree5.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 1!")
 		}
 
 		nflag2, nproof2, nsize2, ninclusion2, err := smt.GetProof(key2, oldTree5.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key2, newvalue2, nflag2, nproof2, nsize2, oldRoot5, smt.height) {
+		if !VerifyInclusionProof(key2, newvalue2, nflag2, nproof2, nsize2, oldTree5.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 2!")
 		}
 
 		nflag3, nproof3, nsize3, ninclusion3, err := smt.GetProof(key3, oldTree5.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key3, value3, nflag3, nproof3, nsize3, oldRoot5, smt.height) {
+		if !VerifyInclusionProof(key3, value3, nflag3, nproof3, nsize3, oldTree5.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 3!")
 		}
 
 		nflag4, nproof4, nsize4, ninclusion4, err := smt.GetProof(key4, oldTree5.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key4, value4, nflag4, nproof4, nsize4, oldRoot5, smt.height) {
+		if !VerifyInclusionProof(key4, value4, nflag4, nproof4, nsize4, oldTree5.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 4!")
 		}
 
 		nflag5, nproof5, nsize5, ninclusion5, err := smt.GetProof(key5, oldTree5.rootNode)
 		require.NoError(t, err)
 
-		if !VerifyInclusionProof(key5, value5, nflag5, nproof5, nsize5, oldRoot5, smt.height) {
+		if !VerifyInclusionProof(key5, value5, nflag5, nproof5, nsize5, oldTree5.root, smt.height) {
 			t.Errorf("not producing expected rootNode for tree with key 5!")
 		}
 
@@ -1732,22 +1731,22 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(newkeys2, newvalues, oldRoot5)
+		_, err = smt.Update(newkeys2, newvalues, oldCom5)
 		require.NoError(t, err)
 
-		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(key1, oldRoot3, oldTree3.database)
+		hflag1, hproof1, hsize1, hinclusion1, err := smt.GetHistoricalProof(key1, oldCom3, oldTree3.database)
 		require.NoError(t, err)
 
-		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(key2, oldRoot3, oldTree3.database)
+		hflag2, hproof2, hsize2, hinclusion2, err := smt.GetHistoricalProof(key2, oldCom3, oldTree3.database)
 		require.NoError(t, err)
 
-		hflag3, hproof3, hsize3, hinclusion3, err := smt.GetHistoricalProof(key3, oldRoot3, oldTree3.database)
+		hflag3, hproof3, hsize3, hinclusion3, err := smt.GetHistoricalProof(key3, oldCom3, oldTree3.database)
 		require.NoError(t, err)
 
-		hflag4, hproof4, hsize4, hinclusion4, err := smt.GetHistoricalProof(key4, oldRoot3, oldTree3.database)
+		hflag4, hproof4, hsize4, hinclusion4, err := smt.GetHistoricalProof(key4, oldCom3, oldTree3.database)
 		require.NoError(t, err)
 
-		hflag5, hproof5, hsize5, hinclusion5, err := smt.GetHistoricalProof(key5, oldRoot3, oldTree3.database)
+		hflag5, hproof5, hsize5, hinclusion5, err := smt.GetHistoricalProof(key5, oldCom3, oldTree3.database)
 		require.NoError(t, err)
 
 		proofVerifier1 := true
@@ -1805,27 +1804,27 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 			t.Errorf("Can't retrieve proper proof from historical state for key 5!")
 		}
 
-		hflag1, hproof1, hsize1, hinclusion1, err = smt.GetHistoricalProof(key1, oldRoot5, oldTree5.database)
+		hflag1, hproof1, hsize1, hinclusion1, err = smt.GetHistoricalProof(key1, oldCom5, oldTree5.database)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		hflag2, hproof2, hsize2, hinclusion2, err = smt.GetHistoricalProof(key2, oldRoot5, oldTree5.database)
+		hflag2, hproof2, hsize2, hinclusion2, err = smt.GetHistoricalProof(key2, oldCom5, oldTree5.database)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		hflag3, hproof3, hsize3, hinclusion3, err = smt.GetHistoricalProof(key3, oldRoot5, oldTree5.database)
+		hflag3, hproof3, hsize3, hinclusion3, err = smt.GetHistoricalProof(key3, oldCom5, oldTree5.database)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		hflag4, hproof4, hsize4, hinclusion4, err = smt.GetHistoricalProof(key4, oldRoot5, oldTree5.database)
+		hflag4, hproof4, hsize4, hinclusion4, err = smt.GetHistoricalProof(key4, oldCom5, oldTree5.database)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		hflag5, hproof5, hsize5, hinclusion5, err = smt.GetHistoricalProof(key5, oldRoot5, oldTree5.database)
+		hflag5, hproof5, hsize5, hinclusion5, err = smt.GetHistoricalProof(key5, oldCom5, oldTree5.database)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1922,7 +1921,7 @@ func TestTrustedRead_Pruned(t *testing.T) {
 
 		values = append(values, value1, value2, value3, value4, value5)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldRoot2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'z'}
@@ -2023,7 +2022,7 @@ func TestKVDB_Pruned(t *testing.T) {
 		expectedValues1 := make([][]byte, 0)
 		expectedValues1 = append(expectedValues1, value1, value2, value3, value4, value5)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldRoot2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'z'}
@@ -2246,9 +2245,9 @@ func TestKVDB_Pruned2(t *testing.T) {
 		expectedValues1 := make([][]byte, 0)
 		expectedValues1 = append(expectedValues1, value1, value2, value3, value4, value5)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		oldTree2, err := smt.forest.Get(oldRoot2)
+		oldTree2, err := smt.forest.Get(oldCom2)
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'z'}
@@ -2260,7 +2259,7 @@ func TestKVDB_Pruned2(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot3, err := smt.Update(newkeys, newvalues, oldRoot2)
+		oldCom3, err := smt.Update(newkeys, newvalues, oldCom2)
 		require.NoError(t, err)
 
 		expectedValues2 := make([][]byte, 0)
@@ -2272,7 +2271,7 @@ func TestKVDB_Pruned2(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot4, err := smt.Update(newkeys, newvalues, oldRoot3)
+		oldCom4, err := smt.Update(newkeys, newvalues, oldCom3)
 		require.NoError(t, err)
 
 		expectedValues3 := make([][]byte, 0)
@@ -2284,7 +2283,7 @@ func TestKVDB_Pruned2(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot5, err := smt.Update(newkeys, newvalues, oldRoot4)
+		oldCom5, err := smt.Update(newkeys, newvalues, oldCom4)
 		require.NoError(t, err)
 
 		newkeys2 := make([][]byte, 0)
@@ -2296,7 +2295,7 @@ func TestKVDB_Pruned2(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(newkeys2, newvalues, oldRoot5)
+		_, err = smt.Update(newkeys2, newvalues, oldCom5)
 		require.NoError(t, err)
 
 		db := oldTree2.database
@@ -2339,7 +2338,7 @@ func TestKVDB_Pruned2(t *testing.T) {
 		}
 
 		// THIS SHOULD NOT BE PRUNED
-		oldTree3, err := smt.forest.Get(oldRoot3)
+		oldTree3, err := smt.forest.Get(oldCom3)
 		require.NoError(t, err)
 
 		db = oldTree3.database
@@ -2377,7 +2376,7 @@ func TestKVDB_Pruned2(t *testing.T) {
 		}
 
 		// THIS SHOULD NOT BE PRUNED
-		oldTree4, err := smt.forest.Get(oldRoot4)
+		oldTree4, err := smt.forest.Get(oldCom4)
 		require.NoError(t, err)
 
 		db = oldTree4.database
@@ -2488,7 +2487,7 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 
 		values = append(values, value1, value2, value3, value4, value5)
 
-		oldRoot2, err := smt.Update(keys, values, emptyTree.root)
+		oldCom2, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		newvalue1 := []byte{'z'}
@@ -2500,9 +2499,9 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 		newvalues := make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot3, err := smt.Update(newkeys, newvalues, oldRoot2)
+		oldCom3, err := smt.Update(newkeys, newvalues, oldCom2)
 		require.NoError(t, err)
-		oldTree3, err := smt.forest.Get(oldRoot3)
+		oldTree3, err := smt.forest.Get(oldCom3)
 		require.NoError(t, err)
 
 		flags := make([][]byte, 0)
@@ -2527,7 +2526,7 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot4, err := smt.Update(newkeys, newvalues, oldRoot3)
+		oldCom4, err := smt.Update(newkeys, newvalues, oldCom3)
 		require.NoError(t, err)
 
 		newvalue1 = []byte{'u'}
@@ -2536,7 +2535,7 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2)
 
-		oldRoot5, err := smt.Update(newkeys, newvalues, oldRoot4)
+		oldCom5, err := smt.Update(newkeys, newvalues, oldCom4)
 		require.NoError(t, err)
 
 		newkeys2 := make([][]byte, 0)
@@ -2548,10 +2547,10 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 		newvalues = make([][]byte, 0)
 		newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-		_, err = smt.Update(newkeys2, newvalues, oldRoot5)
+		_, err = smt.Update(newkeys2, newvalues, oldCom5)
 		require.NoError(t, err)
 
-		test_vals, proofHolder, read_err := smt.Read(keys, false, oldRoot3)
+		test_vals, proofHolder, read_err := smt.Read(keys, false, oldCom3)
 		require.NoError(t, read_err)
 
 		for i := 0; i < len(expectedValues); i++ {
@@ -2600,9 +2599,9 @@ func TestProofEncoderDecoder(t *testing.T) {
 		keys = append(keys, key1, key2)
 		values = append(values, value1, value2)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		_, proofHldr, err := smt.Read(keys, false, newRoot)
+		_, proofHldr, err := smt.Read(keys, false, newCom)
 		require.NoError(t, err)
 
 		p, err := DecodeProof(EncodeProof(proofHldr))
@@ -2625,9 +2624,9 @@ func TestProofEncoderDecoder(t *testing.T) {
 		keys = append(keys, key1, key2)
 		values = append(values, value1, value2)
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
-		_, proofHldr, err := smt.Read(keys, false, newRoot)
+		_, proofHldr, err := smt.Read(keys, false, newCom)
 		require.NoError(t, err)
 
 		p, err := DecodeProof(EncodeProof(proofHldr))
@@ -2687,30 +2686,30 @@ func TestTrieConstructionCase1(t *testing.T) {
 		keys := [][]byte{key1, key2, key3, key4, key5}
 		values := [][]byte{value1, value2, value3, value4, value5}
 
-		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		newCom, err := smt.Update(keys, values, emptyTree.Commitment())
 		require.NoError(t, err)
 
 		keys = [][]byte{key1, key2, key3, key4, key5}
-		_, _, err = smt.Read(keys, true, newRoot)
+		_, _, err = smt.Read(keys, true, newCom)
 		require.NoError(t, err)
 
-		_, _, err = smt.Read([][]byte{key4}, true, newRoot)
+		_, _, err = smt.Read([][]byte{key4}, true, newCom)
 		require.NoError(t, err)
 
-		_, _, err = smt.Read([][]byte{key6}, true, newRoot)
+		_, _, err = smt.Read([][]byte{key6}, true, newCom)
 		require.NoError(t, err)
 
-		_, _, err = smt.Read([][]byte{key8}, true, newRoot)
+		_, _, err = smt.Read([][]byte{key8}, true, newCom)
 		require.NoError(t, err)
 
 		keys = [][]byte{key6, key7, key8}
 		values = [][]byte{value6, value7, value8}
 
-		newRoot2, err := smt.Update(keys, values, newRoot)
+		newCom2, err := smt.Update(keys, values, newCom)
 
 		keys = [][]byte{key4, key5, key8, key9}
-		_, _, err = smt.Read(keys, false, newRoot2)
-		pholder, _ := smt.GetBatchProof(keys, newRoot2)
+		_, _, err = smt.Read(keys, false, newCom2)
+		pholder, _ := smt.GetBatchProof(keys, newCom2)
 		require.NoError(t, err)
 		// TODO furthure checks
 		require.NotNil(t, pholder)
@@ -2746,10 +2745,10 @@ func TestRandomUpdateRead(t *testing.T) {
 		insertKeys := keys[:split]
 		insertValues := values[:split]
 
-		root, err := smt.Update(insertKeys, insertValues, emptyTree.root)
+		newCom, err := smt.Update(insertKeys, insertValues, emptyTree.Commitment())
 		require.NoError(t, err, "error updating trie")
 
-		retvalues, _, err := smt.Read(insertKeys, true, root)
+		retvalues, _, err := smt.Read(insertKeys, true, newCom)
 		require.NoError(t, err, "error reading values")
 
 		for i := range retvalues {
@@ -2778,7 +2777,7 @@ func withSMT(
 		os.RemoveAll(dbDir)
 	}()
 
-	emptyTree, err := trie.forest.Get(GetDefaultHashForHeight(height - 1))
+	emptyTree, err := trie.forest.Get(newCommitment([]byte{}, GetDefaultHashForHeight(height-1)))
 	require.NoError(t, err)
 	f(t, trie, emptyTree)
 

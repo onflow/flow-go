@@ -355,35 +355,114 @@ func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool,
 //}
 
 // Read takes the keys given and return the values from the database
-func (s *SMT) Read(keys [][]byte, commitment Commitment) ([][]byte, error) {
+// If the trusted flag is true, it is just a read from the database
+// If trusted is false, then we check to see if the key exists in the trie
+func (s *SMT) Read(keys [][]byte, trusted bool, commitment Commitment) ([][]byte, *proofHolder, error) {
 
 	// check key sizes
 	for _, k := range keys {
 		if len(k) != s.keyByteSize {
-			return nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
+			return nil, nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
 		}
 	}
+
+	flags := make([][]byte, len(keys))
+	proofs := make([][][]byte, len(keys))
+	inclusions := make([]bool, len(keys))
+	sizes := make([]uint8, len(keys))
+
+	//currRoot := s.GetRoot().value
+	//stringRoot := root.String()
 
 	tree, err := s.forest.Get(commitment)
 	if err != nil {
-		return nil, fmt.Errorf("invalid historical state: %w", err)
+		return nil, nil, fmt.Errorf("invalid historical state: %w", err)
+	}
+
+	if !trusted {
+		if s.IsSnapshot(tree) {
+
+			//if bytes.Equal(root, currRoot) {
+			for i, key := range keys {
+				k := hex.EncodeToString(key)
+				res := tree.cachedBranches[k]
+				if res == nil {
+					flag, proof, size, inclusion, err := s.GetProof(key, tree.rootNode)
+					if err != nil {
+						return nil, nil, fmt.Errorf("cannot get proof: %w", err)
+					}
+					flags[i] = flag
+					proofs[i] = proof
+					inclusions[i] = inclusion
+					sizes[i] = size
+				} else {
+					flags[i] = res.flags[0]
+					proofs[i] = res.proofs[0]
+					inclusions[i] = res.inclusions[0]
+					sizes[i] = res.sizes[0]
+				}
+
+				tree.updateCache(key, flags[i], proofs[i], inclusions[i], sizes[i])
+			}
+		} else {
+
+			for i, key := range keys {
+				flag, proof, size, inclusion, err := s.GetHistoricalProof(key, commitment, tree.database)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				flags[i] = flag
+				proofs[i] = proof
+				inclusions[i] = inclusion
+				sizes[i] = size
+			}
+		}
 	}
 
 	values := make([][]byte, len(keys))
+
 	for i, key := range keys {
 		res, err := tree.database.GetKVDB(key)
 		if err != nil {
-			return nil, err
+
+			localCommitment := commitment
+			for {
+				tree, err := s.forest.Get(localCommitment)
+				if err != nil {
+					return nil, nil, fmt.Errorf("cannot get tree (%s): %w", localCommitment, err)
+				}
+
+				res, err = tree.database.GetKVDB(key)
+				if err == nil {
+					break
+				}
+				if s.IsSnapshot(tree) {
+					break
+				}
+				localCommitment = tree.previous
+			}
+
+			if res == nil && !errors.Is(err, databases.ErrNotFound) {
+				return nil, nil, err
+			}
 		}
 		values[i] = res
 	}
-	return values, nil
+
+	//}
+
+	if trusted {
+		return values, nil, nil
+	}
+	holder := newProofHolder(flags, proofs, inclusions, sizes)
+	return values, holder, nil
 }
 
 // Print writes the structure of the tree to the stdout.
 // Warning this should only be used for debugging
-func (s *SMT) Print(root Root) error {
-	t, err := s.forest.Get(root)
+func (s *SMT) Print(c Commitment) error {
+	t, err := s.forest.Get(c)
 	if err != nil {
 		return err
 	}
@@ -740,7 +819,7 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 
 // Update takes a sorted list of keys and associated values and inserts
 // them into the trie, and if that is successful updates the databases.
-func (s *SMT) Update(keys [][]byte, values [][]byte, commitment Commitment) (Root, error) {
+func (s *SMT) Update(keys [][]byte, values [][]byte, commitment Commitment) (Commitment, error) {
 
 	t, err := s.forest.Get(commitment)
 	if err != nil {
@@ -829,10 +908,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, commitment Commitment) (Roo
 	}
 
 	s.forest.Add(newTree)
-
-	// TODO RAMTIN (compute stateCommitment)
-	// endStateCommitment =
-	return newRootNode.value, nil
+	return newTree.Commitment(), nil
 }
 
 // GetHeight returns the Height of the SMT

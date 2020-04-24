@@ -37,16 +37,16 @@ func TestRestart(t *testing.T) {
 	valuesA := [][]byte{value1}
 	valuesB := [][]byte{value2}
 
-	rootEmpty := GetDefaultHashForHeight(9 - 1)
+	emptyCom := newCommitment([]byte{}, GetDefaultHashForHeight(9-1))
 
-	rootA, err := trie.Update(keysA, valuesA, rootEmpty)
+	rootA, err := trie.Update(keysA, valuesA, emptyCom)
 	require.NoError(t, err)
 
 	rootB, err := trie.Update(keysA, valuesB, rootA)
 	require.NoError(t, err)
 
 	// check values
-	readEmpty, _, err := trie.Read(keysA, true, rootEmpty)
+	readEmpty, _, err := trie.Read(keysA, true, emptyCom)
 	require.NoError(t, err)
 
 	assert.Len(t, readEmpty, 1)
@@ -72,7 +72,7 @@ func TestRestart(t *testing.T) {
 		t.Fatalf("failed to initialize SMT instance for second time: %s", err)
 	}
 
-	readEmpty, _, err = trie.Read(keysA, true, rootEmpty)
+	readEmpty, _, err = trie.Read(keysA, true, emptyCom)
 	require.NoError(t, err)
 
 	assert.Len(t, readEmpty, 1)
@@ -105,7 +105,7 @@ func TestRestartMultipleKeys(t *testing.T) {
 		os.RemoveAll(dir)
 	}()
 
-	rootEmpty := GetDefaultHashForHeight(9 - 1)
+	emptyCom := newCommitment([]byte{}, GetDefaultHashForHeight(9-1))
 
 	numKeys := 10
 	keys := make([][]byte, numKeys)
@@ -120,7 +120,7 @@ func TestRestartMultipleKeys(t *testing.T) {
 		valuesStart++
 	}
 
-	newRoot, err := trie.Update(keys, values, rootEmpty)
+	newCom, err := trie.Update(keys, values, emptyCom)
 	require.NoError(t, err)
 
 	// close and start SMT with the same DB again
@@ -131,7 +131,7 @@ func TestRestartMultipleKeys(t *testing.T) {
 		t.Fatalf("failed to initialize SMT instance for second time: %s", err)
 	}
 
-	readValues, _, err := trie.Read(keys, false, newRoot)
+	readValues, _, err := trie.Read(keys, false, newCom)
 	require.NoError(t, err)
 	assert.Equal(t, values, readValues)
 }

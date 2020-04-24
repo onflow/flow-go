@@ -18,11 +18,11 @@ import (
 type Commitment []byte
 
 func (c Commitment) Root() (Root, error) {
-	if len(c) < 64 {
+	if len(c) < 32 {
 		return nil, errors.New("commitment length is not enough")
 	}
 	// root portion of commitment
-	return Root(c[64:]), nil
+	return Root(c[32:]), nil
 }
 
 func (c Commitment) String() string {

@@ -16,6 +16,7 @@ type PSMT struct {
 	height      int   // Height of the tree
 	keyByteSize int   // acceptable size of key (in bytes)
 	keyLookUp   map[string]*node
+	commitment  []byte
 }
 
 // GetHeight returns the Height of the SMT
@@ -26,6 +27,10 @@ func (p *PSMT) GetHeight() int {
 // GetRootHash returns the rootNode value of the SMT
 func (p *PSMT) GetRootHash() []byte {
 	return p.root.ComputeValue()
+}
+
+func (p *PSMT) Commitment() Commitment {
+	return Commitment(p.commitment)
 }
 
 // Update updates the register values and returns rootValue after updates
@@ -46,7 +51,8 @@ func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, 
 		return nil, failedKeys, fmt.Errorf("key(s) doesn't exist")
 	}
 	// after updating all the nodes, compute the value recursively only once
-	return p.root.ComputeValue(), failedKeys, nil
+	p.commitment = newCommitment(p.commitment, p.root.ComputeValue())
+	return p.Commitment(), failedKeys, nil
 }
 
 type proofEntry struct {
@@ -60,7 +66,7 @@ type proofEntry struct {
 
 // NewPSMT builds a Partial Sparse Merkle Tree (PMST) given a chunkdatapack registertouches
 func NewPSMT(
-	rootValue []byte, // stateCommitment
+	commitment []byte, // stateCommitment
 	height int,
 	keys [][]byte,
 	values [][]byte,
@@ -70,7 +76,13 @@ func NewPSMT(
 	if height < 1 {
 		return nil, fmt.Errorf("minimum acceptable value for the  hight is 1")
 	}
-	psmt := PSMT{newNode(nil, height-1), height, (height - 1) / 8, make(map[string]*node)}
+
+	// TODO We need to check the commitment at chunk verifier
+	rootValue, err := Commitment(commitment).Root()
+	if err != nil {
+		return nil, fmt.Errorf("error extracting root from commitment")
+	}
+	psmt := PSMT{newNode(nil, height-1), height, (height - 1) / 8, make(map[string]*node), commitment}
 
 	// We need to decode proof encodings
 	proofholder, err := DecodeProof(proofs)
@@ -154,6 +166,7 @@ func NewPSMT(
 	if !bytes.Equal(psmt.root.ComputeValue(), rootValue) {
 		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.ComputeValue(), rootValue)
 	}
+
 	return &psmt, nil
 }
 
