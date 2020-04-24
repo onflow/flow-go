@@ -8,6 +8,8 @@ package crypto
 // arithmetic or big number arithmetic. It should evolve in the future to address
 // performance optimization
 
+// This implementation does not include any security against side-channel attacks.
+
 import (
 	goec "crypto/elliptic"
 	"math/big"

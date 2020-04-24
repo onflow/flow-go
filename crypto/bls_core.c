@@ -143,6 +143,7 @@ int checkMembership_Zr(const bn_st* a){
 // checks if input point s is on the curve E1 
 // and is in the subgroup G1
 static int checkMembership_G1(const ep_t p){
+#if MEMBERSHIP_CHECK
     // check p is on curve
     if (!ep_is_valid(p))
         return INVALID;
@@ -158,6 +159,7 @@ static int checkMembership_G1(const ep_t p){
         return INVALID;
     }
     ep_free(&inf);
+#endif
     return VALID;
 }
 
@@ -209,11 +211,9 @@ int _blsVerify(const ep2_st *pk, const byte* sig, const byte* data, const int le
     if (ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN) != RLC_OK) 
         return INVALID;
 
- #if MEMBERSHIP_CHECK
     // check s is on curve and in G1
-    if (checkMembership_G1(elemsG1[0]) != VALID)
+    if (checkMembership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
         return INVALID;
- #endif
 
     // elemsG1[1] = h
     ep_new(elemsG1[1]);
