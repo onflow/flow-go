@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
@@ -298,7 +299,8 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 
 	// log with node index
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
+	// log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
+	log := zerolog.New(ioutil.Discard).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(stopConsumer)
@@ -458,7 +460,9 @@ func start(nodes []*Node) {
 		wg.Add(1)
 		go func(n *Node) {
 			<-n.compliance.Ready()
+			fmt.Print("wait for hotstuff is done\n")
 			<-n.hot.Wait()
+			fmt.Print("hotstuff is done\n")
 			wg.Done()
 		}(n)
 	}
@@ -466,7 +470,7 @@ func start(nodes []*Node) {
 }
 
 func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 3, 10)
+	nodes := createNodes(t, 1, 5)
 
 	connect(nodes, blockNothing)
 

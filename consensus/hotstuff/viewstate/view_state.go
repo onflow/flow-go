@@ -53,7 +53,8 @@ func (v *ViewState) IsSelf(nodeID flow.Identifier) bool {
 
 // IsSelfLeaderForView returns if myself is the leader at a given view
 func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
-	return v.IsSelf(v.LeaderForView(view).ID())
+	return view%2 == 0
+	// return v.IsSelf(v.LeaderForView(view).ID())
 }
 
 // DKGState returns the public DKG data for block

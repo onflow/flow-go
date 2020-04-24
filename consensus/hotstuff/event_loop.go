@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -41,6 +42,8 @@ func NewEventLoop(log zerolog.Logger, metrics module.Metrics, eventHandler Event
 }
 
 func (el *EventLoop) loop() {
+	fmt.Printf("in loop\n")
+	defer fmt.Printf("out loop\n")
 
 	// hotstuff will run in an event loop to process all events synchronously. And this is what will happen when hitting errors:
 	// if hotstuff hits a known critical error, it will exit the loop (for instance, there is a conflicting block with a QC against finalized blocks
@@ -49,6 +52,7 @@ func (el *EventLoop) loop() {
 	// if hotstuff hits any unknown error, it will exit the loop
 
 	for {
+		fmt.Printf("looping...\n")
 		shutdownSignal := el.runner.ShutdownSignal()
 
 		// Giving timeout events the priority to be processed first
@@ -64,6 +68,7 @@ func (el *EventLoop) loop() {
 
 		// if we receive the shutdown signal, exit the loop
 		case <-shutdownSignal:
+			fmt.Printf("========exiting1...\n")
 			return
 
 		// if we receive a time out, process it and log errors
@@ -93,6 +98,7 @@ func (el *EventLoop) loop() {
 
 		// same as before
 		case <-shutdownSignal:
+			fmt.Printf("========exiting2...\n")
 			return
 
 		// same as before
@@ -147,6 +153,7 @@ func (el *EventLoop) loop() {
 			}
 		}
 	}
+
 }
 
 // SubmitProposal pushes the received block to the blockheader channel
@@ -178,10 +185,12 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 // Multiple calls are handled gracefully and the event loop will only start
 // once.
 func (el *EventLoop) Ready() <-chan struct{} {
+	fmt.Printf("Eventloop started\n")
 	err := el.eventHandler.Start()
 	if err != nil {
 		el.log.Fatal().Err(err).Msg("could not start event handler")
 	}
+	fmt.Printf("runner Start...\n")
 	return el.runner.Start(el.loop)
 }
 

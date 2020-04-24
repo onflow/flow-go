@@ -207,8 +207,12 @@ func (e *EventHandler) OnLocalTimeout() error {
 
 // Start will start the pacemaker's timer and start the new view
 func (e *EventHandler) Start() error {
+	fmt.Printf("pacemaker.....\n")
 	e.paceMaker.Start()
-	return e.startNewView()
+	fmt.Printf("start new view.....\n")
+	err := e.startNewView()
+	fmt.Printf("start new view done.....\n")
+	return err
 }
 
 // startNewView will only be called when there is a view change from pacemaker.

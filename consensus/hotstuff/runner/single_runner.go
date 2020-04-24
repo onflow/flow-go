@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -41,14 +42,17 @@ func (s *SingleRunner) Start(f func()) <-chan struct{} {
 	}
 
 	s.startupCommenced = true
+	fmt.Printf("single runner start\n")
 	go func() {
 		close(s.startupCompleted)
 		s.stateTransition.Unlock()
+		fmt.Printf("Start f...\n")
 		f()
 		// there are two cases f() would exit:
 		// (a) f exited on its own without Abort() being called (this is generally an internal error)
 		// (b) f exited as a reaction to Abort() being called
 		// In either case, we want to abort and close shutdownCompleted
+		fmt.Printf("Start Lock...\n")
 		s.stateTransition.Lock()
 		s.unsafeCommenceShutdown()
 		close(s.shutdownCompleted)
@@ -63,7 +67,9 @@ func (s *SingleRunner) Start(f func()) <-chan struct{} {
 //    * consider a runner at a starting position of a race waiting for the start signal
 //    * if the runner to told to abort the race _before_ the start signal occurred, the runner will never start
 func (s *SingleRunner) Abort() <-chan struct{} {
+	defer fmt.Printf("abort done\n")
 	s.stateTransition.Lock()
+	fmt.Printf("close shutdown signal \n")
 	s.unsafeCommenceShutdown()
 	s.stateTransition.Unlock()
 	return s.shutdownCompleted

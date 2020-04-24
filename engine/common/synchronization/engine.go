@@ -94,6 +94,7 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
+	fmt.Printf("e.me %v Done is called\n", e.me.NodeID())
 	return e.unit.Done()
 }
 
@@ -107,10 +108,12 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
+		fmt.Printf("e.me :%v Submit start\n", e.me.NodeID())
 		err := e.Process(originID, event)
 		if err != nil {
 			e.log.Error().Err(err).Msg("could not process submitted event")
 		}
+		fmt.Printf("e.me :%v Submit finishes\n", e.me.NodeID())
 	})
 }
 
@@ -123,7 +126,10 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
-		return e.process(originID, event)
+		fmt.Printf("e.me :%v process start\n", e.me.NodeID())
+		err := e.process(originID, event)
+		fmt.Printf("e.me :%v process done\n", e.me.NodeID())
+		return err
 	})
 }
 
@@ -397,19 +403,23 @@ func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Bloc
 func (e *Engine) checkLoop() {
 	poll := time.NewTicker(e.pollInterval)
 	scan := time.NewTicker(e.scanInterval)
+	fmt.Printf("e.me %v looping\n", e.me.NodeID())
 
 CheckLoop:
 	for {
 		select {
 		case <-e.unit.Quit():
+			fmt.Printf("========================> quiting\n")
 			break CheckLoop
 		case <-poll.C:
+			fmt.Printf("++++++++++++++++++++++++>polling\n")
 			err := e.pollHeight()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not poll heights")
 				continue
 			}
 		case <-scan.C:
+			fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxx scanning\n")
 			heights, blockIDs, err := e.scanPending()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not scan pending")
@@ -426,6 +436,7 @@ CheckLoop:
 	// some minor cleanup
 	scan.Stop()
 	poll.Stop()
+	fmt.Printf("e.me %v looping finished\n", e.me.NodeID())
 }
 
 // pollHeight will send a synchronization request to three random nodes.
