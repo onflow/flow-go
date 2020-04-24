@@ -233,30 +233,15 @@ func (fnb *FlowNodeBuilder) initState() {
 	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
+	// Load Genesis info, needed for the consensus follower even when not bootstrapping
+	fnb.loadGenesis()
+
 	// check if database is initialized
 	head, err := state.Final().Head()
 	if errors.Is(err, storage.ErrNotFound) {
 		// Bootstrap!
 
 		fnb.Logger.Info().Msg("bootstrapping empty database")
-
-		// Load the rest of the genesis info, eventually needed for the consensus follower
-		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
-		}
-
-		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
-		}
-
-		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-		}
-		fnb.DKGState = wrapper.NewState(dkgPubData)
 
 		err = state.Mutate().Bootstrap(fnb.GenesisBlock)
 		if err != nil {
@@ -486,6 +471,27 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 			Err(err).
 			Msg("could not close database")
 	}
+}
+
+func (fnb *FlowNodeBuilder) loadGenesis() {
+	var err error
+	// Load the rest of the genesis info, eventually needed for the consensus follower
+	fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.BootstrapDir)
+	if err != nil {
+		fnb.MustNot(err).Msg("could not load gensis, reading genesis header")
+	}
+
+	// load genesis QC and DKG data from bootstrap files
+	fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
+	if err != nil {
+		fnb.MustNot(err).Msg("could not load gensis, reading root block sigs")
+	}
+
+	dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
+	if err != nil {
+		fnb.MustNot(err).Msg("could not load gensis, reading dkg public data")
+	}
+	fnb.DKGState = wrapper.NewState(dkgPubData)
 }
 
 func loadDKGPublicData(path string) (*dkg.PublicData, error) {
