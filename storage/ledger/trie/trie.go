@@ -1125,16 +1125,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		return nil, fmt.Errorf("cannot create new DB: %w", err)
 	}
 
-	err = db.UpdateTrieDB(batcher)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.UpdateKVDB(keys, values)
-	if err != nil {
-		return nil, err
-	}
-
 	var newHistoricalStatRoots deque.Deque
 	for i := 0; i < t.historicalStateRoots.Len(); i++ {
 		newHistoricalStatRoots.PushBack(t.historicalStateRoots.At(i))
@@ -1153,6 +1143,15 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	}
 
 	err = s.updateHistoricalStates(t, newTree, batcher)
+	if err != nil {
+		return nil, err
+	}
+	err = db.UpdateTrieDB(batcher)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.UpdateKVDB(keys, values)
 	if err != nil {
 		return nil, err
 	}
