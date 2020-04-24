@@ -47,7 +47,8 @@ type Engine struct {
 	ingestedResultIDs    mempool.Identifiers           // keeps ids of ingested execution results
 	ingestedChunkIDs     mempool.Identifiers           // keeps ids of ingested chunks
 	blockStorage         storage.Blocks
-	checkChunksLock      sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
+	checkChunksLock      sync.Mutex // protects the checkPendingChunks method to prevent double-verifying
+	trackerCheckLock     sync.Mutex
 	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
 	requestInterval      uint                 // determines time in milliseconds for retrying tracked requests
 	failureThreshold     uint                 // determines number of retries for tracked requests before raising a challenge
@@ -124,7 +125,7 @@ func New(
 // Ready returns a channel that is closed when the verifier engine is ready.
 func (e *Engine) Ready() <-chan struct{} {
 	// runs cleanup periodically every `requestInterval` milliseconds
-	go e.unit.LaunchPeriodically(e.trackersCleanup,
+	e.unit.LaunchPeriodically(e.trackersCleanup,
 		time.Duration(e.requestInterval)*time.Millisecond)
 	return e.unit.Ready()
 }
@@ -370,9 +371,9 @@ func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifi
 }
 
 // requestChunkDataPack submits a request for the given chunk ID to the execution nodes.
-func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Identifier) error {
+func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
 	// updates tracker for this request
-	tracker, err := e.updateChunkDataPackTracker(chunkID, blockID)
+	tracker, err := e.updateChunkDataPackTracker(chunkID)
 	if err != nil {
 		return fmt.Errorf("could not update the chunk data pack tracker: %w", err)
 	}
@@ -775,6 +776,9 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 // trackersCleanup should be called periodically at intervals
 // It retries the requests of all registered trackers a the node
 func (e *Engine) trackersCleanup() {
+	e.trackerCheckLock.Lock()
+	defer e.trackerCheckLock.Unlock()
+
 	// chunk data packs
 	//
 	// iterates over all chunk data pack trackers
@@ -788,9 +792,11 @@ func (e *Engine) trackersCleanup() {
 			e.log.Info().
 				Hex("chunk_id", logging.ID(cdpt.ChunkID)).
 				Msg("chunk data pack tracker met maximum retries")
+
+			continue
 		}
 		// retries requesting chunk data pack
-		err := e.requestChunkDataPack(cdpt.ChunkID, cdpt.BlockID)
+		err := e.requestChunkDataPack(cdpt.ChunkID)
 		if err != nil {
 			e.log.Error().
 				Err(err).
@@ -810,6 +816,8 @@ func (e *Engine) trackersCleanup() {
 			e.log.Info().
 				Hex("collection_id", logging.ID(ct.CollectionID)).
 				Msg("collection tracker met maximum retries")
+
+			continue
 		}
 
 		// retries requesting collection
@@ -826,30 +834,22 @@ func (e *Engine) trackersCleanup() {
 // updateChunkDataPackTracker performs the following
 // If there is a tracker for this chunk ID, it pulls it out of mempool, increases its counter by one, and returns it
 // Else it creates a new empty tracker with counter value of one and returns it
-func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flow.Identifier) (*trackers.ChunkDataPackTracker, error) {
-	if e.chunkDataPackTackers.Has(chunkID) {
-		// chunk data pack has been already requested
-		// pulls tracker out of mempool
-		tracker, err := e.chunkDataPackTackers.ByChunkID(chunkID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
-		}
-
-		removed := e.chunkDataPackTackers.Rem(tracker.ChunkID)
-		if !removed {
-			return nil, fmt.Errorf("could not remove data pack tracker from mempool")
-		}
-		// increases tracker retry counter
-		tracker.Counter += 1
-
-		return tracker, nil
+func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier) (*trackers.ChunkDataPackTracker, error) {
+	// chunk data pack has been already requested
+	// pulls tracker out of mempool
+	tracker, err := e.chunkDataPackTackers.ByChunkID(chunkID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
 	}
 
-	return &trackers.ChunkDataPackTracker{
-		ChunkID: chunkID,
-		BlockID: blockID,
-		Counter: 1,
-	}, nil
+	removed := e.chunkDataPackTackers.Rem(tracker.ChunkID)
+	if !removed {
+		return nil, fmt.Errorf("could not remove data pack tracker from mempool")
+	}
+	// increases tracker retry counter
+	tracker.Counter += 1
+
+	return tracker, nil
 }
 
 // updateCollectionTracker performs the following

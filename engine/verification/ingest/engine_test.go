@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -60,14 +62,16 @@ type TestSuite struct {
 	ingestedResultIDs     *mempool.Identifiers
 	blockStorage          *storage.Blocks
 	// resources fixtures
-	collection    *flow.Collection
-	block         *flow.Block
-	receipt       *flow.ExecutionReceipt
-	chunk         *flow.Chunk
-	chunkDataPack *flow.ChunkDataPack
-	chunkTracker  *tracker.ChunkDataPackTracker
-	assigner      *module.ChunkAssigner
-	collTracker   *tracker.CollectionTracker
+	collection       *flow.Collection
+	block            *flow.Block
+	receipt          *flow.ExecutionReceipt
+	chunk            *flow.Chunk
+	chunkDataPack    *flow.ChunkDataPack
+	chunkTracker     *tracker.ChunkDataPackTracker
+	assigner         *module.ChunkAssigner
+	collTracker      *tracker.CollectionTracker
+	requestInterval  uint
+	failureThreshold uint
 }
 
 // Invoking this method executes all TestSuite tests.
@@ -115,6 +119,12 @@ func (suite *TestSuite) SetupTest() {
 		BlockID: suite.receipt.ExecutionResult.BlockID,
 	}
 
+	// each request should be send only once
+	suite.failureThreshold = 1
+
+	// retry intervals is 2 sec
+	suite.requestInterval = 2000
+
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
 	suite.net.On("Register", uint8(engine.CollectionProvider), testifymock.Anything).
@@ -150,7 +160,9 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 		suite.ingestedChunkIDs,
 		suite.ingestedResultIDs,
 		suite.blockStorage,
-		suite.assigner)
+		suite.assigner,
+		suite.requestInterval,
+		suite.failureThreshold)
 	require.Nil(suite.T(), err, "could not create an engine")
 
 	suite.net.AssertExpectations(suite.T())
@@ -257,6 +269,8 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 // but not the chunk data pack of it, it asks for the chunk data pack through the network
 func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	eng := suite.TestNewEngine()
+	// waits for the engine to be up and running
+	<-eng.Ready()
 
 	// mocks identities
 	//
@@ -312,28 +326,42 @@ func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// mocks functionalities
 	//
 	// adding functionality of chunk tracker to trackers mempool
+	// mocks initial insertion of tracker into mempool
 	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Return(nil).Once()
+	// mocks tracker check
+	suite.chunkDataPackTrackers.On("All").Return([]*tracker.ChunkDataPackTracker{suite.chunkTracker}).Once()
+	suite.collectionTrackers.On("All").Return(nil)
+	// mocks update tracker functionality
+	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkTracker.ChunkID).Return(suite.chunkTracker, nil).Once()
+	suite.chunkDataPackTrackers.On("Rem", suite.chunkTracker.ChunkID).Return(true).Once()
+	newTracker := &tracker.ChunkDataPackTracker{
+		ChunkID: suite.chunkTracker.ChunkID,
+		BlockID: suite.chunkTracker.BlockID,
+		Counter: 1,
+	}
+	suite.chunkDataPackTrackers.On("Add", newTracker).Return(nil).Once()
 	// mocks the functionality of adding receipt to the mempool
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 
 	// mocks expectation
 	//
 	// expect that the chunk data pack is requested from execution nodes
+	submitWG := sync.WaitGroup{}
+	submitWG.Add(1)
 	suite.chunksConduit.
 		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), execIdentities[0].NodeID).
-		Return(nil).Once()
+		Run(func(args testifymock.Arguments) {
+			submitWG.Done()
+		}).Return(nil).Once()
 
 	err := eng.Process(execIdentities[0].NodeID, suite.receipt)
 	suite.Assert().Nil(err)
 
+	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait, 5*time.Second)
+
 	// asserts necessary calls
-	suite.authReceipts.AssertExpectations(suite.T())
 	suite.chunksConduit.AssertExpectations(suite.T())
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
-	suite.chunkDataPacks.AssertExpectations(suite.T())
-	suite.assigner.AssertExpectations(suite.T())
-	suite.ss.AssertExpectations(suite.T())
-	suite.state.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)

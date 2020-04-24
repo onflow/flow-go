@@ -56,14 +56,18 @@ func (u *Unit) Launch(f func()) {
 // If f is executed, the unit will not shut down until after f returns.
 func (u *Unit) LaunchPeriodically(f func(), interval time.Duration) {
 	timer := time.NewTicker(interval)
-	for {
-		select {
-		case <-u.quit:
-			return
-		case <-timer.C:
-			u.Launch(f)
+	u.wg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-u.quit:
+				u.wg.Done()
+				return
+			case <-timer.C:
+				u.Launch(f)
+			}
 		}
-	}
+	}()
 }
 
 // Ready returns a channel that is closed when the unit is ready. A unit is
