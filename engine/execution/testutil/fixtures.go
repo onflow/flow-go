@@ -31,25 +31,27 @@ func DeployCounterContractTransaction() flow.TransactionBody {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
 func CreateCounterTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
-
 			import 0x01
-
+			
 			transaction {
 				prepare(acc: AuthAccount) {
-					if acc.storage[Container.Counter] == nil {
-                		let existing <- acc.storage[Container.Counter] <- Container.createCounter(3)
-                		destroy existing
+					var maybeCounter <- acc.load<@Container.Counter>(from: /storage/counter)
+			
+					if maybeCounter == nil {
+						maybeCounter <-! Container.createCounter(3)		
 					}
-              	}
-            }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+			
+					acc.save(<-maybeCounter!, to: /storage/counter)
+				}   	
+			}`),
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
@@ -69,21 +71,24 @@ func CreateCounterPanicTransaction() flow.TransactionBody {
 					panic("fail for testing purposes")
               	}
             }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
 func AddToCounterTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
-
 			import 0x01
-
+			
 			transaction {
 				prepare(acc: AuthAccount) {
-					acc.storage[Container.Counter]?.add(2)
-              	}
-            }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+					let counter <- acc.load<@Container.Counter>(from: /storage/counter)
+			
+					counter?.add(2)
+			
+					acc.save(<-counter, to: /storage/counter)
+				}
+			}`),
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }

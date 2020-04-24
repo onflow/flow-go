@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -23,10 +23,7 @@ func TestSubmitTransaction(t *testing.T) {
 		engine: &engine,
 	}
 
-	tx := unittest.TransactionBodyFixture(func(tb *flow.TransactionBody) {
-		tb.Nonce = 0
-		tb.ComputeLimit = 0
-	})
+	tx := unittest.TransactionBodyFixture()
 
 	t.Run("should submit transaction to engine", func(t *testing.T) {
 		engine.On("ProcessLocal", &tx).Return(nil).Once()
