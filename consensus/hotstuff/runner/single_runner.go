@@ -18,8 +18,8 @@ type SingleRunner struct {
 	shutdownCompleted chan struct{} // used to signal that shutdown was completed and the component is done
 }
 
-func NewSingleRunner() SingleRunner {
-	return SingleRunner{
+func NewSingleRunner() *SingleRunner {
+	return &SingleRunner{
 		stateTransition:   sync.Mutex{},
 		startupCommenced:  false,
 		startupCompleted:  make(chan struct{}),
@@ -72,6 +72,7 @@ func (s *SingleRunner) Abort() <-chan struct{} {
 	fmt.Printf("close shutdown signal \n")
 	s.unsafeCommenceShutdown()
 	s.stateTransition.Unlock()
+	fmt.Printf("close shutdown signal done \n")
 	return s.shutdownCompleted
 }
 
@@ -84,6 +85,7 @@ func (s *SingleRunner) Completed() <-chan struct{} {
 func (s *SingleRunner) unsafeCommenceShutdown() {
 	if !s.shutdownCommenced {
 		s.shutdownCommenced = true
+		fmt.Printf("closing shutdownSignal\n")
 		close(s.shutdownSignal)
 	}
 }

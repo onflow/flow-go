@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/runner"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -21,7 +21,7 @@ type EventLoop struct {
 	proposals    chan *model.Proposal
 	votes        chan *model.Vote
 
-	runner runner.SingleRunner // lock for preventing concurrent state transitions
+	runner *engine.Unit
 }
 
 // NewEventLoop creates an instance of EventLoop.
@@ -35,7 +35,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.Metrics, eventHandler Event
 		metrics:      metrics,
 		proposals:    proposals,
 		votes:        votes,
-		runner:       runner.NewSingleRunner(),
+		runner:       engine.NewUnit(),
 	}
 
 	return el, nil
@@ -53,7 +53,7 @@ func (el *EventLoop) loop() {
 
 	for {
 		fmt.Printf("looping...\n")
-		shutdownSignal := el.runner.ShutdownSignal()
+		shutdownSignal := el.runner.Quit()
 
 		// Giving timeout events the priority to be processed first
 		// This is to prevent attacks from malicious nodes that attempt
@@ -93,6 +93,7 @@ func (el *EventLoop) loop() {
 			// fall through to non-priority events
 		}
 
+		fmt.Printf("looping2...\n")
 		// select for block headers/votes here
 		select {
 
@@ -191,15 +192,15 @@ func (el *EventLoop) Ready() <-chan struct{} {
 		el.log.Fatal().Err(err).Msg("could not start event handler")
 	}
 	fmt.Printf("runner Start...\n")
-	return el.runner.Start(el.loop)
+	return el.runner.Ready(el.loop)
 }
 
 // Done implements interface module.ReadyDoneAware
 func (el *EventLoop) Done() <-chan struct{} {
-	return el.runner.Abort()
+	return el.runner.Done()
 }
 
 // Wait implements a function to wait for the event loop to exit.
 func (el *EventLoop) Wait() <-chan struct{} {
-	return el.runner.Completed()
+	return el.runner.Quit()
 }

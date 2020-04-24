@@ -17,7 +17,7 @@ type FollowerLoop struct {
 	followerLogic FollowerLogic
 	proposals     chan *model.Proposal
 
-	runner runner.SingleRunner // lock for preventing concurrent state transitions
+	runner *runner.SingleRunner // lock for preventing concurrent state transitions
 }
 
 // NewFollowerLoop creates an instance of EventLoop
