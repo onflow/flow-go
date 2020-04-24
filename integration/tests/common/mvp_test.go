@@ -77,14 +77,15 @@ func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 		return err == nil && counter == -3
 	}, 30*time.Second, time.Second)
 
-	// TODO: Fix Cadence code
-	// err = createCounter(ctx, accessClient)
-	// require.NoError(t, err)
+	//TODO: Fix Cadence code
+	err = createCounter(ctx, accessClient)
+	require.NoError(t, err)
 
-	// // counter is created and incremented eventually
-	// require.Eventually(t, func() bool {
-	// 	counter, err = readCounter(ctx, accessClient)
-
-	// 	return err == nil && counter == 2
-	// }, 30*time.Second, time.Second)
+	// counter is created and incremented eventually
+	require.Eventually(t, func() bool {
+		counter, err = readCounter(ctx, accessClient)
+		fmt.Printf("counter = %d\n", counter)
+		fmt.Printf("error = %s\n", err)
+		return err == nil && counter == 2
+	}, 30*time.Second, time.Second)
 }
