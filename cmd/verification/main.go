@@ -33,6 +33,16 @@ const (
 	// chunkAssignmentAlpha represents number of verification
 	// DISCLAIMER: alpha down there is not a production-level value
 	chunkAssignmentAlpha = 1
+
+	// requestInterval represents the time interval in milliseconds that the
+	// ingest engine retries sending resource requests to the network
+	// DISCLAIMER: current provided value is not production-level.
+	requestInterval = 10
+
+	// failureThreshold represents the number of retries ingest engine sends
+	// at `requestInterval` milliseconds for each of the missing resources.
+	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
+	failureThreshold = 10
 )
 
 func main() {
@@ -147,7 +157,9 @@ func main() {
 				ingestedChunkIDs,
 				ingestedResultIDs,
 				blockStorage,
-				assigner)
+				assigner,
+				requestInterval,
+				failureThreshold)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

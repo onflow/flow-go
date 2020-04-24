@@ -89,6 +89,10 @@ func TestConcurrency(t *testing.T) {
 func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	hub := stub.NewNetworkHub()
 
+	// ingest engine parameters
+	requestInterval := uint(1)
+	failureThreshold := uint(1)
+
 	// creates test id for each role
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -138,7 +142,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// to the verifier exactly once.
 	verifierEng, verifierEngWG := setupMockVerifierEng(t, vChunks)
 	assigner := NewMockAssigner(verID.NodeID)
-	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner,
+	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, requestInterval, failureThreshold,
 		testutil.WithVerifierEngine(verifierEng))
 
 	colNode := testutil.CollectionNode(t, hub, colID, identities)

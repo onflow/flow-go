@@ -77,6 +77,10 @@ func TestHappyPath(t *testing.T) {
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
 func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
+	// ingest engine parameters
+	requestInterval := uint(1)
+	failureThreshold := uint(1)
+
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
@@ -120,7 +124,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 	for _, verIdentity := range verIdentities {
-		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
+		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
 
 		// assumes the verification node has received the block
 		err := verNode.BlockStorage.Store(completeER.Block)
@@ -252,6 +256,10 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 func TestSingleCollectionProcessing(t *testing.T) {
 	t.Skip()
 
+	// ingest engine parameters
+	requestInterval := uint(1)
+	failureThreshold := uint(1)
+
 	// network identity setup
 	hub := stub.NewNetworkHub()
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -279,7 +287,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// setup nodes
 
 	// verification node
-	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
+	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
 	// inject block
 	err := verNode.BlockStorage.Store(completeER.Block)
 	assert.Nil(t, err)

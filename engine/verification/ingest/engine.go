@@ -71,6 +71,8 @@ func New(
 	ingestedResultIDs mempool.Identifiers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
+	requestInterval uint,
+	failureThreshold uint,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -90,6 +92,8 @@ func New(
 		ingestedResultIDs:    ingestedResultIDs,
 		blockStorage:         blockStorage,
 		assigner:             assigner,
+		failureThreshold:     failureThreshold,
+		requestInterval:      requestInterval,
 	}
 
 	var err error
