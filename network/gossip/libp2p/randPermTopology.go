@@ -103,25 +103,22 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 
 func randomSubset(ids flow.IdentityList, size int, rnd random.Rand) (flow.IdentityList, error) {
 
-	result := make(flow.IdentityList, 0, size)
-
 	if size == 0 {
-		return result, nil
+		return []flow.IdentityList{}, nil
 	}
 
 	if len(ids) < size {
 		return ids, nil
 	}
 
-	indices, err := rnd.SubPermutation(len(ids), size)
+	copy := make(flow.IdentityList, 0, len(ids))
+	copy = append(copy, ids...)
+	err := rnd.Samples(copy, size, func(i int, j int) {
+		copy[i], copy[j] = copy[j], copy[i]
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	for _, index := range indices {
-		id := ids[index]
-		result = append(result, id)
-	}
-
-	return result, nil
+	return copy[:size], nil
 }

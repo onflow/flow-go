@@ -3,7 +3,6 @@ package verifier
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -110,7 +109,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *verification.VerifiableChunk:
 		return e.verifyWithMetrics(originID, resource)
 	default:
-		return errors.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 

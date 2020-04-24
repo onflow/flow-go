@@ -53,7 +53,7 @@ func TestBuilder(t *testing.T) {
 			// add some transactions to transaction pool
 			for i := 0; i < 3; i++ {
 				transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
-					tx.Nonce = uint64(i)
+					tx.ProposalKey.SequenceNumber = uint64(i)
 				})
 				err = pool.Add(&transaction)
 				require.Nil(t, err)
@@ -268,7 +268,9 @@ func TestBuilder(t *testing.T) {
 			for i := 0; i < 1000; i++ {
 
 				// create a transaction
-				tx := unittest.TransactionBodyFixture(func(t *flow.TransactionBody) { t.Nonce = uint64(i) })
+				tx := unittest.TransactionBodyFixture(func(t *flow.TransactionBody) {
+					t.ProposalKey.SequenceNumber = uint64(i)
+				})
 				err = pool.Add(&tx)
 				assert.Nil(t, err)
 

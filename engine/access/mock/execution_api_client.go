@@ -3,7 +3,7 @@
 package mock
 
 import context "context"
-import execution "github.com/dapperlabs/flow/protobuf/go/flow/execution"
+import execution "github.com/onflow/flow/protobuf/go/flow/execution"
 import grpc "google.golang.org/grpc"
 import mock "github.com/stretchr/testify/mock"
 

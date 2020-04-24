@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/cadence/runtime"
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -30,7 +30,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	t.Run("transaction success", func(t *testing.T) {
 		tx := &flow.TransactionBody{
-			ScriptAccounts: []flow.Address{unittest.AddressFixture()},
+			Authorizers: []flow.Address{unittest.AddressFixture()},
 			Script: []byte(`
                 transaction {
                   prepare(signer: AuthAccount) {}
