@@ -20,8 +20,11 @@ type TransactionBody struct {
 	// user can adjust this reference to older blocks if he/she wants to make tx expire faster
 	ReferenceBlockID Identifier
 
-	// the script part of the transaction in Cadence Language
+	// the transaction script as UTF-8 encoded Cadence source code
 	Script []byte
+
+	// arguments passed to the Cadence transaction
+	Arguments [][]byte
 
 	// Max amount of computation which is allowed to be done during this transaction
 	GasLimit uint64
@@ -61,6 +64,18 @@ func (tb TransactionBody) Checksum() Identifier {
 // SetScript sets the Cadence script for this transaction.
 func (tb *TransactionBody) SetScript(script []byte) *TransactionBody {
 	tb.Script = script
+	return tb
+}
+
+// SetArguments sets the Cadence arguments list for this transaction.
+func (tb *TransactionBody) SetArguments(args [][]byte) *TransactionBody {
+	tb.Arguments = args
+	return tb
+}
+
+// AddArgument adds an argument to the Cadence arguments list for this transaction.
+func (tb *TransactionBody) AddArgument(arg []byte) *TransactionBody {
+	tb.Arguments = append(tb.Arguments, arg)
 	return tb
 }
 
