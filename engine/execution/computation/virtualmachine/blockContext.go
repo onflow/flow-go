@@ -77,7 +77,7 @@ func (bc *blockContext) ExecuteTransaction(
 	location := runtime.TransactionLocation(txID[:])
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
-	err := bc.vm.executeTransaction(tx.Script, ctx, location)
+	err := bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts

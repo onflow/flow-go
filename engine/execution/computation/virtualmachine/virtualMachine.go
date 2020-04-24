@@ -33,9 +33,11 @@ func (vm *virtualMachine) NewBlockContext(header *flow.Header) BlockContext {
 
 func (vm *virtualMachine) executeTransaction(
 	script []byte,
+	arguments [][]byte,
 	runtimeInterface runtime.Interface,
 	location runtime.Location,
 ) error {
+	// TODO: decode transaction arguments and pass to runtime
 	return vm.rt.ExecuteTransaction(script, runtimeInterface, location)
 }
 
