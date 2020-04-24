@@ -2707,7 +2707,6 @@ func TestTrieConstructionCase1(t *testing.T) {
 		values = [][]byte{value6, value7, value8}
 
 		newRoot2, err := smt.Update(keys, values, newRoot)
-		require.NoError(t, err)
 
 		keys = [][]byte{key4, key5, key8, key9}
 		_, _, err = smt.Read(keys, false, newRoot2)

@@ -1023,7 +1023,6 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 	if err != nil {
 		return fmt.Errorf("error while copying DB: %s", err)
 	}
-
 	numStates := newTree.historicalStateRoots.Len()
 	switch {
 	case numStates > s.numHistoricalStates:
@@ -1031,8 +1030,8 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 
 	case numStates >= int(s.snapshotInterval):
 		if newTree.height%s.snapshotInterval != 0 {
-			stateToPrune := newTree.historicalStateRoots.At(int(s.snapshotInterval)).(Root)
-			referenceState := newTree.historicalStateRoots.At(int(s.snapshotInterval - 1)).(Root)
+			stateToPrune := newTree.historicalStateRoots.At(int(s.snapshotInterval) - 1).(Root)
+			referenceState := newTree.historicalStateRoots.At(int(s.snapshotInterval - 2)).(Root)
 			dbToPrune, err := s.forest.Get(stateToPrune)
 			if err != nil {
 				return fmt.Errorf("cannot get tree referenced in history: %w", err)
@@ -1129,7 +1128,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	for i := 0; i < t.historicalStateRoots.Len(); i++ {
 		newHistoricalStatRoots.PushBack(t.historicalStateRoots.At(i))
 	}
-	newHistoricalStatRoots.PushBack(newRootNode)
+	newHistoricalStatRoots.PushBack(newRootNode.value)
 
 	newTree := &tree{
 		root:                 newRootNode.value,
@@ -1155,7 +1154,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	s.forest.Add(newTree)
 
 	return newRootNode.value, nil
