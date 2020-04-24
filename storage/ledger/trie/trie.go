@@ -1063,6 +1063,10 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 // Update takes a sorted list of keys and associated values and inserts
 // them into the trie, and if that is successful updates the databases.
 func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
+	// if no update
+	if len(keys) < 1 {
+		return root, nil
+	}
 
 	t, err := s.forest.Get(root)
 	if err != nil {
@@ -1099,13 +1103,14 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	keys = sortedKeys
 	values = sortedValues
 
-	batcher := t.database.NewBatcher()
-
 	treeRoot, err := t.Root()
 	if err != nil {
 		return nil, fmt.Errorf("cannot load tree root: %w", err)
 	}
-	newRootNode, err := s.UpdateAtomically(treeRoot.deepCopy(), keys, values, s.height-1, batcher, t.database)
+
+	newTreeRoot := treeRoot.deepCopy()
+	batcher := t.database.NewBatcher()
+	newRootNode, err := s.UpdateAtomically(newTreeRoot, keys, values, s.height-1, batcher, t.database)
 
 	if err != nil {
 		return nil, err
@@ -1121,12 +1126,21 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		return nil, fmt.Errorf("cannot create new DB: %w", err)
 	}
 
-	var newHistoricalStatRoots deque.Deque
+	err = db.UpdateTrieDB(batcher)
+	if err != nil {
+		return nil, err
+	}
 
+	err = db.UpdateKVDB(keys, values)
+	if err != nil {
+		return nil, err
+	}
+
+	var newHistoricalStatRoots deque.Deque
 	for i := 0; i < t.historicalStateRoots.Len(); i++ {
 		newHistoricalStatRoots.PushBack(t.historicalStateRoots.At(i))
 	}
-	newHistoricalStatRoots.PushBack(root)
+	newHistoricalStatRoots.PushBack(newRootNode)
 
 	newTree := &tree{
 		root:                 newRootNode.value,
@@ -1140,16 +1154,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	}
 
 	err = s.updateHistoricalStates(t, newTree, batcher)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.UpdateTrieDB(batcher)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.UpdateKVDB(keys, values)
 	if err != nil {
 		return nil, err
 	}
