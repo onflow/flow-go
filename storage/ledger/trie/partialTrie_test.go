@@ -282,7 +282,7 @@ func TestMixProof(t *testing.T) {
 		keys = append(keys, key2, key3)
 
 		values = make([][]byte, 0)
-		values = append(keys, []byte{'X'}, []byte{'Y'})
+		values = append(values, []byte{'X'}, []byte{'Y'})
 
 		root2, err := smt.Update(keys, values, newRoot)
 		require.NoError(t, err, "error updating trie")

@@ -1075,7 +1075,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 
 	// sort keys and deduplicate keys (we only consider the first occurance, and ignore the rest)
 	sortedKeys := make([][]byte, 0)
-	valueMap := make(map[string][]byte, 0)
+	valueMap := make(map[string][]byte)
 	for i, key := range keys {
 		// check key sizes
 		if len(key) != s.keyByteSize {
@@ -1086,7 +1086,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 			//do something here
 			sortedKeys = append(sortedKeys, key)
 			valueMap[string(key)] = values[i]
-			i++
 		}
 	}
 

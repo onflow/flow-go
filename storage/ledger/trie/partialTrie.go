@@ -49,14 +49,14 @@ func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, 
 	return p.root.ComputeValue(), failedKeys, nil
 }
 
-type proofEntry struct {
-	key         []byte
-	value       []byte
-	flags       []byte
-	proof       [][]byte
-	size        uint8
-	isInclusion bool
-}
+// type proofEntry struct {
+// 	key         []byte
+// 	value       []byte
+// 	flags       []byte
+// 	proof       [][]byte
+// 	size        uint8
+// 	isInclusion bool
+// }
 
 // NewPSMT builds a Partial Sparse Merkle Tree (PMST) given a chunkdatapack registertouches
 func NewPSMT(
@@ -157,45 +157,45 @@ func NewPSMT(
 	return &psmt, nil
 }
 
-func getProofEntries(keys [][]byte,
-	values [][]byte,
-	proofs [][]byte,
-	acceptableKeyByteSize int,
-) ([]proofEntry, error) {
-	// We need to decode proof encodings
-	proofholder, err := DecodeProof(proofs)
-	if err != nil {
-		return nil, fmt.Errorf("decoding proof failed: %w", err)
-	}
+// func getProofEntries(keys [][]byte,
+// 	values [][]byte,
+// 	proofs [][]byte,
+// 	acceptableKeyByteSize int,
+// ) ([]proofEntry, error) {
+// 	// We need to decode proof encodings
+// 	proofholder, err := DecodeProof(proofs)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("decoding proof failed: %w", err)
+// 	}
 
-	// check size of key, values and proofs
-	if len(keys) != len(values) {
-		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(values))
-	}
+// 	// check size of key, values and proofs
+// 	if len(keys) != len(values) {
+// 		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(values))
+// 	}
 
-	if len(keys) != len(proofholder.sizes) {
-		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(proofholder.sizes))
-	}
+// 	if len(keys) != len(proofholder.sizes) {
+// 		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(proofholder.sizes))
+// 	}
 
-	// sort proofs
-	proofItems := make([]proofEntry, 0)
+// 	// sort proofs
+// 	proofItems := make([]proofEntry, 0)
 
-	// validate and generate proof entries
-	for i, proofSize := range proofholder.sizes {
-		// check key size
-		if len(keys[i]) != acceptableKeyByteSize {
-			return nil, fmt.Errorf("key [%x] size (%d) doesn't match the acceptable key size (%d bytes)", keys[i], len(keys[i]), acceptableKeyByteSize)
-		}
-		pe := proofEntry{
-			key:         keys[i],
-			value:       values[i],
-			flags:       proofholder.flags[i],
-			proof:       proofholder.proofs[i],
-			size:        proofSize,
-			isInclusion: proofholder.inclusions[i],
-		}
-		proofItems = append(proofItems, pe)
-	}
-	return proofItems, nil
+// 	// validate and generate proof entries
+// 	for i, proofSize := range proofholder.sizes {
+// 		// check key size
+// 		if len(keys[i]) != acceptableKeyByteSize {
+// 			return nil, fmt.Errorf("key [%x] size (%d) doesn't match the acceptable key size (%d bytes)", keys[i], len(keys[i]), acceptableKeyByteSize)
+// 		}
+// 		pe := proofEntry{
+// 			key:         keys[i],
+// 			value:       values[i],
+// 			flags:       proofholder.flags[i],
+// 			proof:       proofholder.proofs[i],
+// 			size:        proofSize,
+// 			isInclusion: proofholder.inclusions[i],
+// 		}
+// 		proofItems = append(proofItems, pe)
+// 	}
+// 	return proofItems, nil
 
-}
+// }
