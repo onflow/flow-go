@@ -130,6 +130,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // RequestBlock is an external provider allowing users to request block downloads
 // by block ID.
 func (e *Engine) RequestBlock(blockID flow.Identifier) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	e.queueByBlockID(blockID)
 }
 
@@ -323,8 +326,6 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 
 // queueByHeight queues a request for the finalized block at the given height.
 func (e *Engine) queueByHeight(height uint64) {
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	// if we already have the height, skip
 	_, ok := e.heights[height]
@@ -345,8 +346,6 @@ func (e *Engine) queueByHeight(height uint64) {
 
 // queueByBlockID queues a request for a block by block ID.
 func (e *Engine) queueByBlockID(blockID flow.Identifier) {
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	// Do not bother with the zero ID
 	if blockID == flow.ZeroID {

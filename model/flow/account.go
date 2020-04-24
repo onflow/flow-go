@@ -44,9 +44,3 @@ func (a AccountPrivateKey) PublicKey(weight int) AccountPublicKey {
 		Weight:    weight,
 	}
 }
-
-// AccountSignature is a signature associated with an account.
-type AccountSignature struct {
-	Account   Address
-	Signature []byte
-}

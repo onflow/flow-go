@@ -68,12 +68,12 @@ func TestPayloadOrderedSeals(t *testing.T) {
 
 		block := unittest.BlockFixture()
 
-		seal1 := unittest.SealFixture()
-		seal2 := unittest.SealFixture()
-		seal3 := unittest.SealFixture()
+		seal1 := unittest.BlockSealFixture()
+		seal2 := unittest.BlockSealFixture()
+		seal3 := unittest.BlockSealFixture()
 
 		block.Payload.Seals = []*flow.Seal{
-			&seal1, &seal2, &seal3,
+			seal1, seal2, seal3,
 		}
 
 		check(t, db, &block.Header, &block.Payload)
