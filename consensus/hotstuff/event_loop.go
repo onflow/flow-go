@@ -49,7 +49,7 @@ func (el *EventLoop) loop() {
 	// if hotstuff hits any unknown error, it will exit the loop
 
 	for {
-		quited := el.unit.Quit()
+		quitted := el.unit.Quit()
 
 		// Giving timeout events the priority to be processed first
 		// This is to prevent attacks from malicious nodes that attempt
@@ -63,7 +63,7 @@ func (el *EventLoop) loop() {
 		select {
 
 		// if we receive the shutdown signal, exit the loop
-		case <-quited:
+		case <-quitted:
 			return
 
 		// if we receive a time out, process it and log errors
@@ -92,7 +92,7 @@ func (el *EventLoop) loop() {
 		select {
 
 		// same as before
-		case <-quited:
+		case <-quitted:
 			return
 
 		// same as before
@@ -182,7 +182,8 @@ func (el *EventLoop) Ready() <-chan struct{} {
 	if err != nil {
 		el.log.Fatal().Err(err).Msg("could not start event handler")
 	}
-	return el.unit.Ready(el.loop)
+	el.unit.Launch(el.loop)
+	return el.unit.Ready()
 }
 
 // Done implements interface module.ReadyDoneAware
