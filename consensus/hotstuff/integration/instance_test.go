@@ -147,10 +147,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		func(nodeID flow.Identifier) bool { return nodeID == in.localID },
 	)
 	in.membersState.On("LeaderForView", mock.Anything).Return(
-		func(view uint64) (flow.Identifier, error) {
-			return in.participants[int(view)%len(in.participants)].NodeID, nil
-		},
+		func(view uint64) flow.Identifier {
+			return in.participants[int(view)%len(in.participants)].NodeID
+		}, nil,
 	)
+	//in.membersState.On("LeaderForView", mock.Anything).Return(in.participants[0].NodeID, nil)
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(

@@ -102,15 +102,10 @@ func (m *Members) LeaderForView(view uint64) (flow.Identifier, error) {
 	return leaderIdentity.NodeID, nil
 }
 
-// IsSelf returns true if and only the nodeID refers to this node.
+// Self returns our own node identifier.
 // TODO: ultimately, the own identity of the node is necessary for signing.
 //       Ideally, we would move the method for checking whether an Identifier refers to this node to the signer.
 //       This would require some refactoring of EventHandler (postponed to later)
-func (m *Members) IsSelf(nodeID flow.Identifier) bool {
-	return nodeID == m.myID
-}
-
-// Self returns our own node identifier.
 func (m *Members) Self() flow.Identifier {
 	return m.myID
 }

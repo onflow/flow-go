@@ -42,13 +42,10 @@ type MembersState interface {
 	// Can error if view is in a future Epoch for which the consensus committee hasn't been determined yet.
 	LeaderForView(view uint64) (flow.Identifier, error)
 
-	// IsSelf returns true if and only the nodeID refers to this node.
+	// Self returns our own node identifier.
 	// TODO: ultimately, the own identity of the node is necessary for signing.
 	//       Ideally, we would move the method for checking whether an Identifier refers to this node to the signer.
 	//       This would require some refactoring of EventHandler (postponed to later)
-	IsSelf(nodeID flow.Identifier) bool
-
-	// Self returns our own node identifier.
 	Self() flow.Identifier
 }
 

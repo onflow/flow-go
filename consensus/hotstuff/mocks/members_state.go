@@ -27,20 +27,6 @@ func (_m *MembersState) AtBlockID(blockID flow.Identifier) hotstuff.MembersSnaps
 	return r0
 }
 
-// IsSelf provides a mock function with given fields: nodeID
-func (_m *MembersState) IsSelf(nodeID flow.Identifier) bool {
-	ret := _m.Called(nodeID)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(nodeID)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // LeaderForView provides a mock function with given fields: view
 func (_m *MembersState) LeaderForView(view uint64) (flow.Identifier, error) {
 	ret := _m.Called(view)
