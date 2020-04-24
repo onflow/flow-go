@@ -80,7 +80,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 		seal, err := state.Final().Seal()
 		assert.NoError(t, err)
-		assert.Equal(t, genesis.Seals[0], &seal)
+		assert.Equal(t, genesis.Seals[0], seal)
 		assert.Equal(t, flow.ZeroID, seal.BlockID) //genesis seal seals block with ID 0x00
 
 		block := unittest.BlockFixture()
@@ -93,9 +93,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 		// seal
 		newSeal := flow.Seal{
-			BlockID:       block.ID(),
-			PreviousState: genesis.Seals[0].FinalState,
-			FinalState:    unittest.StateCommitmentFixture(),
+			BlockID:      block.ID(),
+			InitialState: genesis.Seals[0].FinalState,
+			FinalState:   unittest.StateCommitmentFixture(),
 		}
 
 		sealingBlock := unittest.BlockFixture()
@@ -322,7 +322,7 @@ func TestBootstrapInvalidSealPrevState(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 		genesis := flow.Genesis(identities)
-		genesis.Seals[0].PreviousState = unittest.SealFixture().PreviousState
+		genesis.Seals[0].InitialState = unittest.BlockSealFixture().InitialState
 		genesis.PayloadHash = genesis.Payload.Hash()
 
 		err := mutator.Bootstrap(genesis)
@@ -349,7 +349,7 @@ func TestExtendValid(t *testing.T) {
 
 		seal, err := mutator.state.Final().Seal()
 		assert.NoError(t, err)
-		assert.Equal(t, genesis.Seals[0], &seal)
+		assert.Equal(t, genesis.Seals[0], seal)
 		assert.Equal(t, flow.ZeroID, seal.BlockID) //genesis seal seals block with ID 0x00
 	})
 }
@@ -432,9 +432,9 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		sealingBlock.View = 2
 		sealingBlock.ParentID = block.ID()
 		sealingBlock.Seals = []*flow.Seal{&flow.Seal{
-			BlockID:       block.ID(),
-			PreviousState: genesis.Seals[0].FinalState,
-			FinalState:    unittest.StateCommitmentFixture(),
+			BlockID:      block.ID(),
+			InitialState: genesis.Seals[0].FinalState,
+			FinalState:   unittest.StateCommitmentFixture(),
 		}}
 		sealingBlock.PayloadHash = sealingBlock.Payload.Hash()
 
@@ -477,7 +477,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
-		require.EqualError(t, err, "extend header not valid: block doesn't connect to finalized state (0 < 1), ancestorID (816c4a92f3393aafc052558370fb81f0bb8a5da4def9253619d698c42dc0bf95)")
+		require.EqualError(t, err, "extend header not valid: block doesn't connect to finalized state (0 < 1), ancestorID (2b1e6fa1db03e599c66f6ee4746c02045657eb45ba48bab948c4da4175aa4462)")
 
 		// verify seal not indexed
 		var seal flow.Identifier
@@ -489,14 +489,14 @@ func TestExtendBlockNotConnected(t *testing.T) {
 func TestExtendSealNotConnected(t *testing.T) {
 	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		seal1 := &flow.Seal{
-			BlockID:       genesis.ID(),
-			PreviousState: genesis.Seals[0].FinalState,
-			FinalState:    unittest.StateCommitmentFixture(),
+			BlockID:      genesis.ID(),
+			InitialState: genesis.Seals[0].FinalState,
+			FinalState:   unittest.StateCommitmentFixture(),
 		}
 		seal2 := &flow.Seal{
-			BlockID:       genesis.ID(),
-			PreviousState: unittest.StateCommitmentFixture(), // not seal1.FinalState, this will cause the error
-			FinalState:    unittest.StateCommitmentFixture(),
+			BlockID:      genesis.ID(),
+			InitialState: unittest.StateCommitmentFixture(), // not seal1.FinalState, this will cause the error
+			FinalState:   unittest.StateCommitmentFixture(),
 		}
 
 		block := unittest.BlockFixture()

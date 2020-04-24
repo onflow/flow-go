@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
-	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
@@ -67,10 +67,7 @@ func (suite *Suite) SetupTest() {
 func (suite *Suite) TestSendAndGetTransaction() {
 
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		transaction := unittest.TransactionFixture(func(t *flow.Transaction) {
-			t.Nonce = 0
-			t.ComputeLimit = 0
-		})
+		transaction := unittest.TransactionFixture()
 
 		// create storage
 		collections := bstorage.NewCollections(db)
@@ -99,10 +96,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		require.NoError(suite.T(), err)
 		require.NotNil(suite.T(), gResp)
 
-		actual := gResp.Transaction
-
-		// the transaction should be reported as pending
-		expected.Status = entities.TransactionStatus_STATUS_PENDING
+		actual := gResp.GetTransaction()
 		require.Equal(suite.T(), expected, actual)
 	})
 }
@@ -210,6 +204,12 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
 		metrics := &mockmodule.Metrics{}
 
+		exeEventResp := execution.EventsResponse{
+			Results: nil,
+		}
+		// assume execution node returns an empty list of events
+		suite.execClient.On("GetEventsForBlockIDTransactionID", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
+
 		// initialize storage
 		blocks := bstorage.NewBlocks(db)
 		headers := bstorage.NewHeaders(db)
@@ -221,12 +221,12 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
-		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, collections, transactions)
+		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, collections, transactions)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Seal").Return(seal, nil).Once()
+		suite.snapshot.On("Seal").Return(&seal, nil).Once()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
@@ -250,10 +250,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 		getReq := &access.GetTransactionRequest{
 			Id: id[:],
 		}
-		gResp, err := handler.GetTransaction(context.Background(), getReq)
+		gResp, err := handler.GetTransactionResult(context.Background(), getReq)
 		require.NoError(suite.T(), err)
 		// assert that the transaction is reported as Sealed
-		require.Equal(suite.T(), entities.TransactionStatus_STATUS_SEALED, gResp.Transaction.Status)
+		require.Equal(suite.T(), entities.TransactionStatus_SEALED, gResp.GetStatus())
 	})
 }
 
@@ -276,7 +276,7 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.InsertNumber(lastBlock.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Seal").Return(seal, nil).Once()
+		suite.snapshot.On("Seal").Return(&seal, nil).Once()
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockFixture()

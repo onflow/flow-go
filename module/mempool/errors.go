@@ -7,6 +7,6 @@ import (
 )
 
 var (
-	ErrEntityNotFound      = errors.New("entity not found in memory pool")
-	ErrEntityAlreadyExists = errors.New("entity already exists in memory pool")
+	ErrNotFound      = errors.New("entity not found in memory pool")
+	ErrAlreadyExists = errors.New("entity already exists in memory pool")
 )

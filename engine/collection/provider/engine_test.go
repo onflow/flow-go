@@ -207,6 +207,6 @@ func (suite *Suite) TestTransactionRequest() {
 
 		// provider should return error
 		err := suite.colNode.ProviderEngine.ProcessLocal(req)
-		assert.True(t, errors.Is(err, storage.ErrNotFound) || errors.Is(err, mempool.ErrEntityNotFound))
+		assert.True(t, errors.Is(err, storage.ErrNotFound) || errors.Is(err, mempool.ErrNotFound))
 	})
 }

@@ -41,7 +41,7 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 
 func (b *Blocks) Has(blockID flow.Identifier) bool {
 	_, err := b.ByID(blockID)
-	return err != nil
+	return err == nil
 }
 
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
