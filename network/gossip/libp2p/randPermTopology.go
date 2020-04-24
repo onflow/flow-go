@@ -32,11 +32,9 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 		return nil, fmt.Errorf("cannot sample topology idList %d smaller than desired fanout %d", len(idList), size)
 	}
 
-	// computing hash of node's identifier
-	rndSeed := make([]byte, 16)
+	// use the node's identifier as the random generator seed
+	rndSeed := make([]byte, 32)
 	copy(rndSeed, []byte(seed))
-
-	// creates a new random generator based on the hash as a seed
 	rng, err := random.NewRand(rndSeed)
 	if err != nil {
 		return nil, fmt.Errorf("cannot seec the prng: %w", err)
