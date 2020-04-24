@@ -3,6 +3,7 @@ package integration
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -40,7 +41,7 @@ type Instance struct {
 
 	// instance data
 	queue   chan interface{}
-	headers map[flow.Identifier]*flow.Header
+	headers sync.Map //	headers map[flow.Identifier]*flow.Header
 
 	// mocked dependencies
 	membersSnapshot *mocks.MembersSnapshot
@@ -112,8 +113,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		stop:         cfg.StopCondition,
 
 		// instance data
-		queue:   make(chan interface{}, 1024),
-		headers: make(map[flow.Identifier]*flow.Header),
+		queue: make(chan interface{}, 1024),
 
 		// instance mocks
 		membersSnapshot: &mocks.MembersSnapshot{},
@@ -127,7 +127,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	}
 
 	// insert root block into headers register
-	in.headers[cfg.Root.ID()] = cfg.Root
+	in.headers.Store(cfg.Root.ID(), cfg.Root)
 
 	// program the protocol snapshot behaviour
 	in.membersSnapshot.On("Identities", mock.Anything).Return(
@@ -156,23 +156,23 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
 		func(parentID flow.Identifier, setter func(*flow.Header)) *flow.Header {
-			parent, ok := in.headers[parentID]
+			parent, ok := in.headers.Load(parentID)
 			if !ok {
 				return nil
 			}
 			header := &flow.Header{
 				ChainID:     "chain",
 				ParentID:    parentID,
-				Height:      parent.Height + 1,
+				Height:      parent.(*flow.Header).Height + 1,
 				PayloadHash: unittest.IdentifierFixture(),
 				Timestamp:   time.Now().UTC(),
 			}
 			setter(header)
-			in.headers[header.ID()] = header
+			in.headers.Store(header.ID(), header)
 			return header
 		},
 		func(parentID flow.Identifier, setter func(*flow.Header)) error {
-			_, ok := in.headers[parentID]
+			_, ok := in.headers.Load(parentID)
 			if !ok {
 				return fmt.Errorf("parent block not found (parent: %x)", parentID)
 			}
@@ -233,14 +233,14 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		func(header *flow.Header) error {
 
 			// check that we have the parent
-			parent, found := in.headers[header.ParentID]
+			parent, found := in.headers.Load(header.ParentID)
 			if !found {
 				return fmt.Errorf("can't broadcast with unknown parent")
 			}
 
 			// set the height and chain ID
-			header.ChainID = parent.ChainID
-			header.Height = parent.Height + 1
+			header.ChainID = parent.(*flow.Header).ChainID
+			header.Height = parent.(*flow.Header).Height + 1
 			return nil
 		},
 	)
@@ -252,7 +252,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 			// as we don't use mocks to assert expectations, but only to
 			// simulate behaviour, we should drop the call data regularly
-			if len(in.headers)%100 == 0 {
+			block, found := in.headers.Load(blockID)
+			if !found {
+				return fmt.Errorf("can't broadcast with unknown parent")
+			}
+			if block.(*flow.Header).Height%100 == 0 {
 				in.membersSnapshot.Calls = nil
 				in.membersState.Calls = nil
 				in.builder.Calls = nil
@@ -296,8 +300,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root, 0)
 	rootQC := &model.QuorumCertificate{
-		View:    rootBlock.View,
-		BlockID: rootBlock.BlockID,
+		View:      rootBlock.View,
+		BlockID:   rootBlock.BlockID,
+		SignerIDs: in.participants.NodeIDs(),
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)

@@ -109,11 +109,11 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	// validate the block. exit if the proposal is invalid
 	err := e.validator.ValidateProposal(proposal)
 	if errors.Is(err, model.ErrorInvalidBlock{}) {
-		log.Warn().Msg("invalid block proposal")
+		log.Warn().AnErr("ErrorInvalidBlock", err).Msg("invalid block proposal")
 		return nil
 	}
 	if errors.Is(err, model.ErrUnverifiableBlock) {
-		log.Warn().Msg("unverifiable block proposal")
+		log.Warn().AnErr("ErrUnverifiableBlock", err).Msg("unverifiable block proposal")
 
 		// even if the block is unverifiable because the QC has been
 		// pruned, it still needs to be added to the forks, otherwise,
@@ -234,7 +234,7 @@ func (e *EventHandler) startNewView() error {
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)
 	}
-	if e.membersState.IsSelf(currentLeader) {
+	if e.membersState.Self() == currentLeader {
 
 		log.Debug().Msg("generating block proposal as leader")
 
@@ -341,7 +341,7 @@ func (e *EventHandler) processBlockForCurrentView(block *model.Block) error {
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for next view %d: %w", nextView, err)
 	}
-	if e.membersState.IsSelf(nextLeader) {
+	if e.membersState.Self() == nextLeader {
 		return e.processBlockForCurrentViewIfIsNextLeader(block)
 	}
 
