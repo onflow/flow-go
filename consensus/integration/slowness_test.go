@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -197,10 +196,8 @@ func (s *Stopper) stopAll() {
 		wg.Add(1)
 		// stop compliance will also stop both hotstuff and synchronization engine
 		go func(i int) {
-			fmt.Printf("===> %v closing instance to done \n", i)
 			<-s.nodes[i].compliance.Done()
 			wg.Done()
-			fmt.Printf("===> %v instance is done\n", i)
 		}(i)
 	}
 	wg.Wait()
@@ -358,7 +355,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
-	hotstuffTimeout := 1000 * time.Millisecond
+	hotstuffTimeout := 100 * time.Millisecond
 
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
@@ -452,7 +449,7 @@ func blockProposals() BlockOrDelayFunc {
 	}
 }
 
-func start(nodes []*Node) {
+func runNodes(nodes []*Node) {
 	var wg sync.WaitGroup
 	for _, n := range nodes {
 		wg.Add(1)
@@ -466,11 +463,11 @@ func start(nodes []*Node) {
 }
 
 func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 3, 10)
+	nodes := createNodes(t, 3, 100)
 
 	connect(nodes, blockNothing)
 
-	start(nodes)
+	runNodes(nodes)
 
 	// verify all nodes arrive the same state
 	for i := 0; i < len(nodes); i++ {
@@ -481,12 +478,13 @@ func Test3Nodes(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
+// with 5 nodes, and one node completely blocked, the other nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
 	nodes := createNodes(t, 5, 100)
 
 	connect(nodes, blockNodes(nodes[0]))
 
-	start(nodes)
+	runNodes(nodes)
 
 	header, err := nodes[0].state.Final().Head()
 	require.NoError(t, err)
@@ -510,7 +508,7 @@ func TestOneDelayed(t *testing.T) {
 	// connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
 	connect(nodes, blockNothing)
 
-	start(nodes)
+	runNodes(nodes)
 
 	// verify all nodes arrive the same state
 	for i := 0; i < len(nodes); i++ {
