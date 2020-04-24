@@ -216,12 +216,16 @@ func NewForest(dbDir string, maxSize int, maxFullSize int, height int) (*forest,
 	}, nil
 }
 
-func (f *forest) Add(tree *tree) {
+func (f *forest) Add(t *tree) {
 	//if tree.numDeltas == 0 {
 	//	f.fullCache.Add(tree.root.String(), tree)
 	//	return
 	//}
-	f.cache.Add(tree.root.String(), tree)
+	// if db is already here safe close it before overriding
+	if foundTree, ok := f.cache.Get(t.root.String()); ok {
+		foundTree.(*tree).database.SafeClose()
+	}
+	f.cache.Add(t.root.String(), t)
 }
 
 func (f *forest) Has(root Root) bool {
