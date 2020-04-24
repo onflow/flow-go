@@ -312,7 +312,7 @@ func NewSMT(
 	emptyCommitment = append(emptyCommitment, emptyHash...)
 	emptyCommitment = append(emptyCommitment, emptyHash...)
 
-	emptyDB, err := forest.newDB(emptyHash)
+	emptyDB, err := forest.newDB(emptyCommitment)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create empty DB: %w", err)
 	}
