@@ -12,7 +12,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
@@ -61,6 +60,7 @@ func main() {
 		blocks       *badger.Blocks
 		colPayloads  *badger.ClusterPayloads
 		conPayloads  *badger.Payloads
+		views        *badger.Views
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
@@ -93,6 +93,7 @@ func main() {
 			blocks = badger.NewBlocks(node.DB)
 			colPayloads = badger.NewClusterPayloads(node.DB)
 			conPayloads = badger.NewPayloads(node.DB)
+			views = badger.NewViews(node.DB)
 			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -159,6 +160,8 @@ func main() {
 					Msg("bootstrapped cluster state")
 			}
 
+			// otherwise, we already have cluster state on-disk, no bootstrapping needed
+
 			return nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -184,12 +187,7 @@ func main() {
 			// so that it gets notified upon each new finalized block
 			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, notifier, &node.GenesisBlock.Header, node.GenesisQC, selector)
 			if err != nil {
-				//return nil, fmt.Errorf("could not create follower core logic: %w", err)
-				// TODO for now we ignore failures in follower
-				// this is necessary for integration tests to run, until they are
-				// updated to generate/use valid genesis QC and DKG files.
-				// ref https://github.com/dapperlabs/flow-go/issues/3057
-				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
+				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
 			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.State, headers, conPayloads, conCache, core)
@@ -228,21 +226,26 @@ func main() {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
 
-			memberFilter, err := protocol.ClusterFilterFor(node.State.Final(), node.Me.NodeID())
+			// create a filter for consensus members for our cluster
+			selector, err := protocol.ClusterFilterFor(node.State.Final(), node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not get cluster member filter: %w", err)
 			}
 
-			head := func() (*flow.Header, error) {
-				return clusterState.Final().Head()
-			}
+			// create a signing provider for signing votes
+			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
+			signer := verification.NewSingleSigner(node.State, staking, selector, node.Me.NodeID())
 
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, proposalInterval, proposalTimeout, head)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
-			}
+			// TODO implement notification consumer for col nodes
+			var notifier *notifications.NoopConsumer
 
-			prop = prop.WithConsensus(cold)
+			hot, err := consensus.NewParticipant(
+				node.Logger, notifier, node.Metrics, headers, views, node.State, node.Me,
+				build, final, signer, prop, selector, &clusterGenesis.Header, clusterQC,
+				consensus.WithTimeout(hotstuffTimeout),
+			)
+
+			prop = prop.WithConsensus(hot)
 			return prop, nil
 		}).
 		Run("collection")
