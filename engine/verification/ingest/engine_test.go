@@ -167,6 +167,9 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 
 	suite.net.AssertExpectations(suite.T())
 
+	// waits for the engine to be up and running
+	<-e.Ready()
+
 	return e
 }
 
@@ -217,8 +220,6 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
-	// mocks the functionality of registering a tracker for the collection
-	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil).Once()
 
 	// engine has not yet ingested the result of this receipt yet
 	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
@@ -232,9 +233,35 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 
+	/////
+	// mocks functionalities
+	//
+	// adding functionality of chunk tracker to trackers mempool
+	// mocks initial insertion of tracker into mempool
+	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil).Once()
+	// mocks tracker check
+	suite.collectionTrackers.On("All").Return([]*tracker.CollectionTracker{suite.collTracker}).Once()
+	suite.chunkDataPackTrackers.On("All").Return(nil)
+	// mocks update tracker functionality
+	suite.collectionTrackers.On("ByCollectionID", suite.collTracker.ID()).Return(suite.collTracker, nil).Once()
+	suite.collectionTrackers.On("Rem", suite.collTracker.ID()).Return(true).Once()
+	newTracker := &tracker.CollectionTracker{
+		CollectionID: suite.collTracker.CollectionID,
+		BlockID:      suite.collTracker.BlockID,
+		Counter:      1,
+	}
+	suite.collectionTrackers.On("Add", newTracker).Return(nil).Once()
+
+	// mocks expectation
+	//
 	// expect that the collection is requested
+	submitWG := sync.WaitGroup{}
+	submitWG.Add(1)
 	suite.collectionsConduit.
 		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), collIdentities[0].NodeID).
+		Run(func(args testifymock.Arguments) {
+			submitWG.Done()
+		}).
 		Return(nil).Once()
 
 	// mocks chunk assignment
@@ -254,6 +281,8 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	err := eng.Process(execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
 
+	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait, 5*time.Second)
+
 	// asserts necessary calls
 	suite.authReceipts.AssertExpectations(suite.T())
 	suite.collectionsConduit.AssertExpectations(suite.T())
@@ -269,8 +298,6 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 // but not the chunk data pack of it, it asks for the chunk data pack through the network
 func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	eng := suite.TestNewEngine()
-	// waits for the engine to be up and running
-	<-eng.Ready()
 
 	// mocks identities
 	//
@@ -362,6 +389,9 @@ func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// asserts necessary calls
 	suite.chunksConduit.AssertExpectations(suite.T())
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
+	suite.assigner.AssertExpectations(suite.T())
+	suite.ss.AssertExpectations(suite.T())
+	suite.state.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
