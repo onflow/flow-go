@@ -10,7 +10,6 @@ require (
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
 	github.com/hashicorp/go-multierror v1.0.0
-	github.com/m4ksio/testingdock v0.4.1
 	github.com/onflow/cadence v0.1.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200424184233-4767141296a0
 	github.com/rs/zerolog v1.15.0

@@ -112,6 +112,212 @@ type Transaction struct {
 	EndState         StateCommitment
 }
 
+// MissingFields checks if a transaction is missing any required fields and returns those that are missing.
+func (tb *TransactionBody) MissingFields() []string {
+	// Required fields are Script, ReferenceBlockHash, Nonce, GasLimit, Payer
+	missingFields := make([]string, 0)
+
+	if len(tb.Script) == 0 {
+		missingFields = append(missingFields, TransactionFieldScript.String())
+	}
+
+	if tb.ReferenceBlockID == ZeroID {
+		missingFields = append(missingFields, TransactionFieldRefBlockID.String())
+	}
+
+	if tb.Payer == ZeroAddress {
+		missingFields = append(missingFields, TransactionFieldPayer.String())
+	}
+
+	return missingFields
+}
+
+// signerList returns a list of unique accounts required to sign this transaction.
+//
+// The list is returned in the following order:
+// 1. PROPOSER
+// 2. PAYER
+// 2. AUTHORIZERS (in insertion order)
+//
+// The only exception to the above ordering is for deduplication; if the same account
+// is used in multiple signing roles, only the first occurrence is included in the list.
+func (tb *TransactionBody) signerList() []Address {
+	signers := make([]Address, 0)
+	seen := make(map[Address]struct{})
+
+	var addSigner = func(address Address) {
+		_, ok := seen[address]
+		if ok {
+			return
+		}
+
+		signers = append(signers, address)
+		seen[address] = struct{}{}
+	}
+
+	if tb.ProposalKey.Address != ZeroAddress {
+		addSigner(tb.ProposalKey.Address)
+	}
+
+	if tb.Payer != ZeroAddress {
+		addSigner(tb.Payer)
+	}
+
+	for _, authorizer := range tb.Authorizers {
+		addSigner(authorizer)
+	}
+
+	return signers
+}
+
+// signerMap returns a mapping from address to signer index.
+func (tb *TransactionBody) signerMap() map[Address]int {
+	signers := make(map[Address]int)
+
+	for i, signer := range tb.signerList() {
+		signers[signer] = i
+	}
+
+	return signers
+}
+
+//SignPayload signs the transaction payload with the specified account key.
+//
+//The resulting signature is combined with the account address and key ID before
+//being added to the transaction.
+//
+//This function returns an error if the signature cannot be generated.
+func (tb *TransactionBody) SignPayload(address Address, keyID int, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
+
+	sig, err := privateKey.Sign(tb.PayloadMessage(), hasher)
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)
+	}
+
+	tb.AddPayloadSignature(address, keyID, sig)
+
+	return nil
+}
+
+//SignEnvelope signs the full transaction (payload + payload signatures) with the specified account key.
+//
+//The resulting signature is combined with the account address and key ID before
+//being added to the transaction.
+//
+//This function returns an error if the signature cannot be generated.
+func (tb *TransactionBody) SignEnvelope(address Address, keyID int, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
+
+	sig, err := privateKey.Sign(tb.EnvelopeMessage(), hasher)
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction envelope with given key: %w", err)
+	}
+
+	tb.AddEnvelopeSignature(address, keyID, sig)
+
+	return nil
+}
+
+// AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
+func (tb *TransactionBody) AddPayloadSignature(address Address, keyID int, sig []byte) *TransactionBody {
+	s := tb.createSignature(address, keyID, sig)
+
+	tb.PayloadSignatures = append(tb.PayloadSignatures, s)
+	sort.Slice(tb.PayloadSignatures, compareSignatures(tb.PayloadSignatures))
+
+	return tb
+}
+
+// AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
+func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID int, sig []byte) *TransactionBody {
+	s := tb.createSignature(address, keyID, sig)
+
+	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s)
+	sort.Slice(tb.EnvelopeSignatures, compareSignatures(tb.EnvelopeSignatures))
+
+	return tb
+}
+
+func (tb *TransactionBody) createSignature(address Address, keyID int, sig []byte) TransactionSignature {
+	signerIndex, signerExists := tb.signerMap()[address]
+	if !signerExists {
+		signerIndex = -1
+	}
+
+	return TransactionSignature{
+		Address:     address,
+		SignerIndex: signerIndex,
+		KeyID:       keyID,
+		Signature:   sig,
+	}
+}
+
+func (tb *TransactionBody) PayloadMessage() []byte {
+	temp := tb.payloadCanonicalForm()
+	encoder := rlp.NewEncoder()
+	return encoder.MustEncode(temp)
+}
+
+func (tb *TransactionBody) payloadCanonicalForm() interface{} {
+	authorizers := make([][]byte, len(tb.Authorizers))
+	for i, auth := range tb.Authorizers {
+		authorizers[i] = auth.Bytes()
+	}
+
+	return struct {
+		Script                    []byte
+		ReferenceBlockID          []byte
+		GasLimit                  uint64
+		ProposalKeyAddress        []byte
+		ProposalKeyID             uint64
+		ProposalKeySequenceNumber uint64
+		Payer                     []byte
+		Authorizers               [][]byte
+	}{
+		tb.Script,
+		tb.ReferenceBlockID[:],
+		tb.GasLimit,
+		tb.ProposalKey.Address.Bytes(),
+		uint64(tb.ProposalKey.KeyID),
+		tb.ProposalKey.SequenceNumber,
+		tb.Payer.Bytes(),
+		authorizers,
+	}
+}
+
+// EnvelopeMessage returns the signable message for transaction envelope.
+//
+// This message is only signed by the payer account.
+func (tb *TransactionBody) EnvelopeMessage() []byte {
+	temp := tb.envelopeCanonicalForm()
+	return encoding.DefaultEncoder.MustEncode(temp)
+}
+
+func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
+	return struct {
+		Payload           interface{}
+		PayloadSignatures interface{}
+	}{
+		tb.payloadCanonicalForm(),
+		signaturesList(tb.PayloadSignatures).canonicalForm(),
+	}
+}
+
+// Encode serializes the full transaction data including the payload and all signatures.
+func (tb *TransactionBody) Encode() []byte {
+	temp := struct {
+		Payload            interface{}
+		PayloadSignatures  interface{}
+		EnvelopeSignatures interface{}
+	}{
+		tb.payloadCanonicalForm(),
+		signaturesList(tb.PayloadSignatures).canonicalForm(),
+		signaturesList(tb.EnvelopeSignatures).canonicalForm(),
+	}
+
+	encoder := rlp.NewEncoder()
+	return encoder.MustEncode(temp)
+}
+
 func (tx *Transaction) PayloadMessage() []byte {
 	body := tx.TransactionBody
 	temp := body.payloadCanonicalForm()
@@ -166,24 +372,51 @@ func (f TransactionField) String() string {
 	return [...]string{"Unknown", "Script", "ReferenceBlockHash", "GasLimit", "Payer"}[f]
 }
 
-// MissingFields checks if a transaction is missing any required fields and returns those that are missing.
-func (tb *TransactionBody) MissingFields() []string {
-	// Required fields are Script, ReferenceBlockHash, Nonce, GasLimit, Payer
-	missingFields := make([]string, 0)
+// A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.
+type ProposalKey struct {
+	Address        Address
+	KeyID          int
+	SequenceNumber uint64
+}
 
-	if len(tb.Script) == 0 {
-		missingFields = append(missingFields, TransactionFieldScript.String())
+// A TransactionSignature is a signature associated with a specific account key.
+type TransactionSignature struct {
+	Address     Address
+	SignerIndex int
+	KeyID       int
+	Signature   []byte
+}
+
+func (s TransactionSignature) canonicalForm() interface{} {
+	return struct {
+		SignerIndex uint
+		KeyID       uint
+		Signature   []byte
+	}{
+		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
+		KeyID:       uint(s.KeyID),       // int is not RLP-serializable
+		Signature:   s.Signature,
+	}
+}
+
+func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
+	return func(i, j int) bool {
+		sigA := signatures[i]
+		sigB := signatures[j]
+		return sigA.SignerIndex < sigB.SignerIndex || sigA.KeyID < sigB.KeyID
+	}
+}
+
+type signaturesList []TransactionSignature
+
+func (s signaturesList) canonicalForm() interface{} {
+	signatures := make([]interface{}, len(s))
+
+	for i, signature := range s {
+		signatures[i] = signature.canonicalForm()
 	}
 
-	if tb.ReferenceBlockID == ZeroID {
-		missingFields = append(missingFields, TransactionFieldRefBlockID.String())
-	}
-
-	if tb.Payer == ZeroAddress {
-		missingFields = append(missingFields, TransactionFieldPayer.String())
-	}
-
-	return missingFields
+	return signatures
 }
 
 // A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.

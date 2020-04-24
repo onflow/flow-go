@@ -4,7 +4,6 @@ package consensus
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"time"
 
@@ -161,37 +160,63 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		// get the finalized state commitment at the parent
-		var seal flow.Seal
-		err = procedure.LookupSealByBlock(parentID, &seal)(tx)
+		lastSeal := &flow.Seal{}
+		err = procedure.LookupSealByBlock(parentID, lastSeal)(tx)
 		if err != nil {
-			return fmt.Errorf("could not get parent state commit: %w", err)
+			return fmt.Errorf("could not get parent seal: %w", err)
 		}
 
-		// we then keep adding seals that follow this state commit from the pool
-		var seals []*flow.Seal
+		// collect all block headers from the last sealed block to the parent
+		var ancestorIDs []flow.Identifier
+		ancestorID = parentID
+		sealedID := lastSeal.BlockID
+		for ancestorID != sealedID {
 
-		// create a copy to avoid modifying when referenced in an array
-		loopSeal := &seal
-		for {
-			// get a seal that extends the last known state commitment
-			nextSeal, err := b.seals.ByPreviousState(loopSeal.FinalState)
-			if errors.Is(err, mempool.ErrEntityNotFound) {
-				break
-			} else if bytes.Equal(nextSeal.PreviousState, loopSeal.FinalState) {
-				// TODO Edgecase where no transactions happen in a block. Unlikely in mature system, but possible for tests
-				// https://github.com/dapperlabs/flow-go/issues/3348
+			// get the ancestor
+			var ancestor flow.Header
+			err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
+			if err != nil {
+				return fmt.Errorf("could not get ancestor: %w", err)
+			}
+
+			// add to list
+			ancestorIDs = append(ancestorIDs, ancestorID)
+			ancestorID = ancestor.ParentID
+		}
+
+		// for each ancestor on the path, we can now include the pending seals
+		// if available
+		var seals []*flow.Seal
+		for i := len(ancestorIDs); i > 0; i-- {
+
+			// get the ancestor from the list
+			ancestorID := ancestorIDs[i-1]
+
+			// try to get the seal from the memory pool
+			seal, err := b.seals.ByBlockID(ancestorID)
+			if err == mempool.ErrNotFound {
 				break
 			}
 			if err != nil {
-				return fmt.Errorf("could not get extending seal (%x): %w", loopSeal.FinalState, err)
+				return fmt.Errorf("could not get seal from cache: %w", err)
 			}
 
-			// add the seal to our list and forward to the known last valid state
-			seals = append(seals, nextSeal)
-			loopSeal = nextSeal
+			// add to list of seals to include
+			seals = append(seals, seal)
 		}
 
-		seal = *loopSeal
+		// sanity check: each seal should connect to previous final state
+		finalState := lastSeal.FinalState
+		for _, seal := range seals {
+
+			// check that the seal connects to previous initial state
+			if !bytes.Equal(seal.InitialState, finalState) {
+				return fmt.Errorf("state transition failure!")
+			}
+
+			// forward the final state
+			finalState = seal.FinalState
+		}
 
 		// STEP THREE: we have the guarantees and seals we can validly include
 		// in the payload built on top of the given block. Now we need to build
@@ -263,9 +288,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			return fmt.Errorf("could not index payload: %w", err)
 		}
 
-		// index the state commitment for this block
-		// TODO this is also done by Mutator.Extend, perhaps refactor that into a procedure
-		err = operation.IndexSealIDByBlock(header.ID(), seal.ID())(tx)
+		// update the last seal if we have new ones included
+		if len(seals) > 0 {
+			lastSeal = seals[len(seals)-1]
+		}
+
+		// index the last seal for this block
+		err = operation.IndexSealIDByBlock(header.ID(), lastSeal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index commit: %w", err)
 		}

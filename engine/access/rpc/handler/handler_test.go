@@ -84,7 +84,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	//setup the mocks
 	block := unittest.BlockHeaderFixture()
-	seal := unittest.SealFixture()
+	seal := unittest.BlockSealFixture()
 	suite.snapshot.On("Seal").Return(seal, nil).Once()
 
 	suite.headers.On("ByBlockID", seal.BlockID).Return(&block, nil).Once()
@@ -168,7 +168,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	headBlock := unittest.BlockFixture()
 	headBlock.Height = block.Height - 1 // head is behind the current block
 
-	seal := unittest.SealFixture()
+	seal := unittest.BlockSealFixture()
 	seal.BlockID = headBlock.ID()
 	suite.snapshot.On("Seal").Return(seal, nil)
 	suite.headers.On("ByBlockID", seal.BlockID).Return(&headBlock.Header, nil)
@@ -299,7 +299,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	setupHeadHeight := func(height uint64) {
 		header := unittest.BlockHeaderFixture() // create a mock header
 		header.Height = height                  // set the header height
-		seal := unittest.SealFixture()          // create a mock seal
+		seal := unittest.BlockSealFixture()     // create a mock seal
 		seal.BlockID = header.ID()              // make the seal point to the header
 		suite.snapshot.On("Seal").Return(seal, nil).Once()
 		suite.headers.On("ByBlockID", header.ID()).Return(&header, nil).Once()
@@ -415,7 +415,7 @@ func (suite *Suite) TestGetAccount() {
 
 	// setup the latest sealed block
 	header := unittest.BlockHeaderFixture() // create a mock header
-	seal := unittest.SealFixture()          // create a mock seal
+	seal := unittest.BlockSealFixture()     // create a mock seal
 	seal.BlockID = header.ID()              // make the seal point to the header
 	suite.snapshot.On("Seal").Return(seal, nil).Once()
 	suite.headers.On("ByBlockID", header.ID()).Return(&header, nil).Once()

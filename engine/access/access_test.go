@@ -226,7 +226,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Seal").Return(seal, nil).Once()
+		suite.snapshot.On("Seal").Return(&seal, nil).Once()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
@@ -276,7 +276,7 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.InsertNumber(lastBlock.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Seal").Return(seal, nil).Once()
+		suite.snapshot.On("Seal").Return(&seal, nil).Once()
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockFixture()

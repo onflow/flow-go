@@ -198,7 +198,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 			OriginID: originID,
 		}
 		err = e.pendingReceipts.Add(preceipt)
-		if err != nil && err != mempool.ErrEntityAlreadyExists {
+		if err != nil && err != mempool.ErrAlreadyExists {
 			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
 		}
 
@@ -212,7 +212,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		// store the execution receipt in the store of the engine
 		// this will fail if the receipt already exists in the store
 		err = e.authReceipts.Add(receipt)
-		if err != nil && err != mempool.ErrEntityAlreadyExists {
+		if err != nil && err != mempool.ErrAlreadyExists {
 			return fmt.Errorf("could not store execution receipt: %w", err)
 		}
 
@@ -290,7 +290,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 			OriginID:   originID,
 		}
 		err = e.pendingCollections.Add(pcoll)
-		if err != nil && err != mempool.ErrEntityAlreadyExists {
+		if err != nil && err != mempool.ErrAlreadyExists {
 			return fmt.Errorf("could not store collection in pending pool: %w", err)
 		}
 	} else {
@@ -398,7 +398,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Iden
 	}
 	err = e.chunkDataPackTackers.Add(tracker)
 	// Todo handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrEntityAlreadyExists {
+	if err != nil && err != mempool.ErrAlreadyExists {
 		return fmt.Errorf("could not store tracker of chunk data pack request in mempool: %w", err)
 	}
 	return nil
@@ -498,7 +498,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 	// the collection is missing, the receipt cannot yet be verified
 	// TODO rate limit these requests
 	err := e.requestCollection(collID, block.ID())
-	if err != nil && err != mempool.ErrEntityAlreadyExists {
+	if err != nil && err != mempool.ErrAlreadyExists {
 		log.Error().
 			Err(err).
 			Hex("collection_id", logging.ID(collID)).
@@ -726,7 +726,7 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 				// store the execution receipt in the store of the engine
 				// this will fail if the receipt already exists in the store
 				err = e.authReceipts.Add(p.Receipt)
-				if err != nil && err != mempool.ErrEntityAlreadyExists {
+				if err != nil && err != mempool.ErrAlreadyExists {
 					// TODO potential memory leakage
 					e.log.Error().
 						Err(err).
