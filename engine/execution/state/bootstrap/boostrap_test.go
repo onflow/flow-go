@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -18,10 +19,6 @@ func TestGenerateGenesisStateCommitment(t *testing.T) {
 
 		newStateCommitment, err := BootstrapLedger(ls)
 		require.NoError(t, err)
-		require.NotNil(t, newStateCommitment)
-		require.False(t, bytes.Equal(newStateCommitment, ls.EmptyStateCommitment()))
-
-		// TODO fix this
-		// assert.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
+		require.True(t, bytes.Equal(flow.GenesisStateCommitment, newStateCommitment))
 	})
 }
