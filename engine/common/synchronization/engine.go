@@ -130,6 +130,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // RequestBlock is an external provider allowing users to request block downloads
 // by block ID.
 func (e *Engine) RequestBlock(blockID flow.Identifier) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	e.queueByBlockID(blockID)
 }
 
@@ -401,16 +404,12 @@ CheckLoop:
 		case <-e.unit.Quit():
 			break CheckLoop
 		case <-poll.C:
-			e.unit.Lock()
-			defer e.unit.Unlock()
 			err := e.pollHeight()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not poll heights")
 				continue
 			}
 		case <-scan.C:
-			e.unit.Lock()
-			defer e.unit.Unlock()
 			heights, blockIDs, err := e.scanPending()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not scan pending")
@@ -431,6 +430,8 @@ CheckLoop:
 
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// get the last finalized header
 	final, err := e.state.Final().Head()
@@ -464,6 +465,8 @@ func (e *Engine) pollHeight() error {
 
 // scanPending will check which items shall be requested.
 func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// TODO: we will probably want to limit the maximum amount of in-flight
 	// requests and maximum amount of blocks requested at the same time here;
@@ -523,6 +526,8 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 // sendRequests will divide the given heights and block IDs appropriately and
 // request the desired blocks.
 func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// get all of the consensus nodes from the state
 	// NOTE: we want to request from consensus nodes even on other node roles

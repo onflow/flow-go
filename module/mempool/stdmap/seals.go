@@ -3,8 +3,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
 )
@@ -13,14 +11,14 @@ import (
 // used to store block seals.
 type Seals struct {
 	*Backend
-	byPrevious map[string]flow.Identifier
+	byBlock map[flow.Identifier]flow.Identifier
 }
 
 // NewSeals creates a new memory pool for block seals.
 func NewSeals(limit uint) (*Seals, error) {
 	s := &Seals{
-		Backend:    NewBackend(WithLimit(limit)),
-		byPrevious: make(map[string]flow.Identifier),
+		Backend: NewBackend(WithLimit(limit)),
+		byBlock: make(map[flow.Identifier]flow.Identifier),
 	}
 
 	return s, nil
@@ -28,14 +26,24 @@ func NewSeals(limit uint) (*Seals, error) {
 
 // Add adds an block seal to the mempool.
 func (s *Seals) Add(seal *flow.Seal) error {
-	return s.Backend.Run(func(backend *Backdata) error {
-		err := backend.Add(seal)
-		if err != nil {
-			return err
-		}
-		s.byPrevious[string(seal.PreviousState)] = seal.ID()
-		return nil
-	})
+	err := s.Backend.Add(seal)
+	if err != nil {
+		return err
+	}
+	s.byBlock[seal.BlockID] = seal.ID()
+	return nil
+}
+
+// Rem will remove a seal by ID.
+func (s *Seals) Rem(sealID flow.Identifier) bool {
+	entity, err := s.Backend.ByID(sealID)
+	if err != nil {
+		return false
+	}
+	_ = s.Backend.Rem(sealID)
+	seal := entity.(*flow.Seal)
+	delete(s.byBlock, seal.BlockID)
+	return true
 }
 
 // ByID returns the block seal with the given ID from the mempool.
@@ -44,33 +52,17 @@ func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	if err != nil {
 		return nil, err
 	}
-	seal, ok := entity.(*flow.Seal)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in seal pool (%T)", entity))
-	}
+	seal := entity.(*flow.Seal)
 	return seal, nil
 }
 
-// ByPreviousState returns the block seal associated with the given parent state
-// commitment.
-func (s *Seals) ByPreviousState(commit flow.StateCommitment) (*flow.Seal, error) {
-
-	var seal *flow.Seal
-	err := s.Backend.Run(func(backend *Backdata) error {
-		sealID, ok := s.byPrevious[string(commit)]
-		if !ok {
-			return mempool.ErrEntityNotFound
-		}
-		byID, err := s.ByID(sealID)
-		if err != nil {
-			return err
-		}
-
-		seal = byID
-		return nil
-	})
-
-	return seal, err
+// ByBlocID returns the block seal associated with the given sealed block.
+func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {
+	sealID, ok := s.byBlock[blockID]
+	if !ok {
+		return nil, mempool.ErrNotFound
+	}
+	return s.ByID(sealID)
 }
 
 // All returns all block seals from the pool.

@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/cadence/runtime"
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -23,6 +23,7 @@ type TransactionContext struct {
 	logs              []string
 	events            []runtime.Event
 	OnSetValueHandler func(owner, controller, key, value []byte)
+	gasUsed           uint64 // TODO fill with actual gas
 }
 
 type TransactionContextOption func(*TransactionContext)

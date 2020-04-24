@@ -1,7 +1,7 @@
 package wrapper
 
 import (
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // ExecutionAPIClient allows for generation of a mock (via mockery) for the real ExecutionAPIClient imported as a dependency

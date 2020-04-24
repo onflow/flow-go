@@ -152,6 +152,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("could not store receipt: %w", err)
 	}
 
+	// see if we can build a seal with what's in the mempools now
 	err = e.tryBuildSeal(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not match seals: %w", err)
@@ -230,7 +231,14 @@ func (e *Engine) tryBuildSeal(blockID flow.Identifier) error {
 		filter.HasRole(flow.RoleVerification),
 	))
 	if err != nil {
-		return fmt.Errorf("could not get verifier identities: %w", err)
+		// TODO Temp fix for receipt coming too fast (before the block in some cases)
+		approvers, err = e.state.Final().Identities(filter.And(
+			filter.HasStake(true),
+			filter.HasRole(flow.RoleVerification),
+		))
+		if err != nil {
+			return fmt.Errorf("could not get verifier identities: %w", err)
+		}
 	}
 
 	// make a list of all result IDs and each of their chunks
@@ -306,9 +314,10 @@ func (e *Engine) createSeal(result *flow.ExecutionResult) error {
 
 	// create and store the seal
 	seal := flow.Seal{
-		BlockID:       result.BlockID,
-		PreviousState: previous.FinalStateCommit,
-		FinalState:    result.FinalStateCommit,
+		BlockID:      result.BlockID,
+		ResultID:     result.ID(),
+		InitialState: previous.FinalStateCommit,
+		FinalState:   result.FinalStateCommit,
 	}
 	err = e.seals.Add(&seal)
 	if err != nil {

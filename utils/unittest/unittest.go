@@ -43,6 +43,24 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	}
 }
 
+// RequireReturnBefore requires that the given function returns before the
+// duration expires.
+func RequireReturnsBefore(t *testing.T, f func(), duration time.Duration) {
+	done := make(chan struct{})
+
+	go func() {
+		f()
+		close(done)
+	}()
+
+	select {
+	case <-time.After(duration):
+		require.Fail(t, "function did not return in time")
+	case <-done:
+		return
+	}
+}
+
 // AssertErrSubstringMatch asserts that two errors match with substring
 // checking on the Error method (`expected` must be a substring of `actual`, to
 // account for the actual error being wrapped). Fails the test if either error

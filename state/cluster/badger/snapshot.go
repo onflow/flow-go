@@ -72,20 +72,20 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 			var boundary uint64
 			err := operation.RetrieveBoundaryForCluster(s.state.chainID, &boundary)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve boundary: %w", err)
+				return fmt.Errorf("could not retrieve boundary (%s): %w", s.state.chainID, err)
 			}
 
 			// get the ID of the last finalized block
 			err = operation.RetrieveNumberForCluster(s.state.chainID, boundary, &s.blockID)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve block ID: %w", err)
+				return fmt.Errorf("could not retrieve block ID at boundary (%d): %w", boundary, err)
 			}
 		}
 
 		// get the snapshot header
 		err := operation.RetrieveHeader(s.blockID, head)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve header for block (%x): %w", s.blockID, err)
+			return fmt.Errorf("could not retrieve header for block (%s): %w", s.blockID, err)
 		}
 
 		return nil

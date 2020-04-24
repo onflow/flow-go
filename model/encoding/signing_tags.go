@@ -6,7 +6,9 @@ package encoding
 // type of the hashed-and-signed object.
 
 const (
-	RandomBeaconTag  = "RandomBeacon"
-	ConsensusVoteTag = "ConsensusVote"
-	CollectorVoteTag = "CollectorVote"
+	RandomBeaconTag     = "RandomBeacon"
+	ConsensusVoteTag    = "ConsensusVote"
+	CollectorVoteTag    = "CollectorVote"
+	ExecutionReceiptTag = "ExecutionReceipt"
+	ResultApprovalTag   = "ResultApproval"
 )
