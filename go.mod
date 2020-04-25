@@ -26,7 +26,6 @@ require (
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/onflow/cadence v0.1.0
-	github.com/onflow/flow-go-sdk v0.1.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.3
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.8.1 // indirect
