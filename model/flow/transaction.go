@@ -51,9 +51,7 @@ func NewTransactionBody() *TransactionBody {
 }
 
 func (tb TransactionBody) ID() Identifier {
-	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(tb.Encode())
-	return HashToID(hash)
+	return MakeID(tb)
 }
 
 func (tb TransactionBody) Checksum() Identifier {
@@ -305,7 +303,7 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 }
 
 // Encode serializes the full transaction data including the payload and all signatures.
-func (tb *TransactionBody) Encode() []byte {
+func (tb TransactionBody) Encode() []byte {
 	temp := struct {
 		Payload            interface{}
 		PayloadSignatures  interface{}
