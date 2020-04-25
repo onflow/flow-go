@@ -183,8 +183,7 @@ func (s *Stopper) onEnteringView(id flow.Identifier, view uint64) {
 	s.Lock()
 	defer s.Unlock()
 
-	if view < s.stopAtView && id == s.nodes[0].id.ID() {
-		fmt.Printf("instance %v entering view: %v\n", id, view)
+	if view < s.stopAtView {
 		return
 	}
 
@@ -372,7 +371,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
-	hotstuffTimeout := 100 * time.Millisecond
+	hotstuffTimeout := 200 * time.Millisecond
 
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
@@ -425,17 +424,27 @@ func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
 
 	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block, notBlock := true, false
+
+		switch event.(type) {
+		case *messages.BlockProposal:
+		case *messages.BlockVote:
+		default:
+			return notBlock, 0
+		}
+
 		if _, ok := blackDict[sender.id.ID()]; ok {
-			if sent > n {
+			if sent >= n {
 				return notBlock, 0
 			}
 			sent++
+			fmt.Printf("sent: %v\n", sent)
 			return block, 0
 		}
 		if _, ok := blackDict[receiver.id.ID()]; ok {
-			if received > n {
+			if received >= n {
 				return notBlock, 0
 			}
+			fmt.Printf("received: %v\n", received)
 			received++
 			return block, 0
 		}
@@ -483,9 +492,8 @@ func Test3Nodes(t *testing.T) {
 		headerN, err := nodes[i].state.Final().Head()
 		require.NoError(t, err)
 		require.Greater(t, headerN.View, uint64(90))
-		n := nodes[i]
-		fmt.Printf("instance %v received syncblock:%v,proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
-			i, n.syncblock, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
+		printState(t, nodes, i)
+
 	}
 	cleanupNodes(nodes)
 }
@@ -508,9 +516,7 @@ func Test5Nodes(t *testing.T) {
 
 	// verify all nodes arrive the same state
 	for i := 0; i < len(nodes); i++ {
-		n := nodes[i]
-		fmt.Printf("instance %v received syncblock:%v,proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
-			i, n.syncblock, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
+		printState(t, nodes, i)
 	}
 	for i := 1; i < len(nodes); i++ {
 		n := nodes[i]
@@ -525,7 +531,7 @@ func Test5Nodes(t *testing.T) {
 func TestOneDelayed(t *testing.T) {
 	nodes, stopper := createNodes(t, 5, 100)
 
-	connect(nodes, blockNodesForFirstNMessages(300, nodes[0]))
+	connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
 
 	runNodes(nodes)
 
@@ -533,9 +539,7 @@ func TestOneDelayed(t *testing.T) {
 
 	// verify all nodes arrive the same state
 	for i := 0; i < len(nodes); i++ {
-		n := nodes[i]
-		fmt.Printf("instance %v received syncblock:%v,proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
-			i, n.syncblock, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
+		printState(t, nodes, i)
 	}
 	for i := 1; i < len(nodes); i++ {
 		n := nodes[i]
@@ -545,6 +549,14 @@ func TestOneDelayed(t *testing.T) {
 	}
 
 	cleanupNodes(nodes)
+}
+
+func printState(t *testing.T, nodes []*Node, i int) {
+	n := nodes[i]
+	headerN, err := nodes[i].state.Final().Head()
+	require.NoError(t, err)
+	fmt.Printf("instance %v view:%v, height: %v,received syncblock:%v,proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
+		i, headerN.Height, headerN.View, n.syncblock, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
 }
 
 type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
