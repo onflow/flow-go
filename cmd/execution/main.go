@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/pflag"
+	"github.com/onflow/cadence/runtime"
 
-	"github.com/dapperlabs/cadence/runtime"
+	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
@@ -123,6 +123,7 @@ func main() {
 				providerEngine,
 				executionState,
 				6, //TODO - config param maybe?
+				node.Metrics,
 			)
 			return ingestionEng, err
 		}).

@@ -392,3 +392,75 @@ func TestRemove(t *testing.T) {
 		})
 	})
 }
+
+func TestIterateBoundaries(t *testing.T) {
+
+	// create range of keys covering all boundaries around our start/end values
+	start := []byte{0x10}
+	end := []byte{0x20}
+	keys := [][]byte{
+		// before start -> not included in range
+		{0x09, 0xff},
+		// shares prefix with start -> included in range
+		{0x10, 0x00},
+		{0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		{0x10, 0xff},
+		{0x10, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		// prefix between start and end -> included in range
+		{0x11, 0x00},
+		{0x19, 0xff},
+		// shares prefix with end -> included in range
+		{0x20, 0x00},
+		{0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		{0x20, 0xff},
+		{0x20, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		// after end -> not included in range
+		{0x21, 0x00},
+	}
+	// keys within the expected range
+	keysInRange := keys[1:11]
+
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		// insert the keys into the database
+		_ = db.Update(func(tx *badger.Txn) error {
+			for _, key := range keys {
+				err := tx.Set(key, []byte{0x00})
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		// define iteration function that simply appends all traversed keys
+		var found [][]byte
+		iteration := func() (checkFunc, createFunc, handleFunc) {
+			check := func(key []byte) bool {
+				found = append(found, key)
+				return false
+			}
+			create := func() interface{} {
+				return nil
+			}
+			handle := func() error {
+				return fmt.Errorf("shouldn't handle anything")
+			}
+			return check, create, handle
+		}
+
+		// iterate forward and check boundaries are included correctly
+		found = nil
+		err := db.View(iterate(start, end, iteration))
+		t.Log(found)
+		require.NoError(t, err, "should iterate forward without error")
+		assert.ElementsMatch(t, keysInRange, found, "forward iteration should go over correct keys")
+
+		// iterate backward and check boundaries are included correctly
+		found = nil
+		err = db.View(iterate(end, start, iteration))
+		t.Log(found)
+		require.NoError(t, err, "should iterate backward without error")
+		assert.ElementsMatch(t, keysInRange, found, "backward iteration should go over correct keys")
+	})
+}

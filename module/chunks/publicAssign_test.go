@@ -1,4 +1,4 @@
-package chunks
+package chunks_test
 
 import (
 	"crypto/rand"
@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto/random"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
+	chmodule "github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/test"
 )
 
@@ -176,13 +177,13 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.Equal(a.T(), copy(nodes2, nodes1), n)
 
 	// chunk assignment of the first set
-	a1, err := NewPublicAssignment(alpha)
+	a1, err := chmodule.NewPublicAssignment(alpha)
 	require.NoError(a.T(), err)
 	p1, err := a1.Assign(nodes1, chunks, rng1)
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
-	a2, err := NewPublicAssignment(alpha)
+	a2, err := chmodule.NewPublicAssignment(alpha)
 	require.NoError(a.T(), err)
 	p2, err := a2.Assign(nodes2, chunks, rng2)
 	require.NoError(a.T(), err)
@@ -235,7 +236,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	original := make([]*flow.Identity, verNum)
 	require.Equal(a.T(), copy(original, nodes), verNum)
 
-	a1, err := NewPublicAssignment(alpha)
+	a1, err := chmodule.NewPublicAssignment(alpha)
 	require.NoError(a.T(), err)
 	p1, err := a1.Assign(nodes, chunks, rng)
 	require.NoError(a.T(), err)
@@ -256,11 +257,11 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 
 	// creates nodes and keeps a copy of them
 	nodes := test.CreateIDs(5)
-	assigner, err := NewPublicAssignment(3)
+	assigner, err := chmodule.NewPublicAssignment(3)
 	require.NoError(a.T(), err)
 
 	// initially cache should be empty
-	require.Equal(a.T(), assigner.assignments.Size(), uint(0))
+	require.Equal(a.T(), assigner.Size(), uint(0))
 
 	// new assignment should be cached
 	// random generators are stateful and we need to
@@ -270,18 +271,18 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	require.NoError(a.T(), err)
 	_, err = assigner.Assign(nodes, chunks, sameRng)
 	require.NoError(a.T(), err)
-	require.Equal(a.T(), assigner.assignments.Size(), uint(1))
+	require.Equal(a.T(), assigner.Size(), uint(1))
 
 	// repetitive assignment should not be cached
 	_, err = assigner.Assign(nodes, chunks, rng)
 	require.NoError(a.T(), err)
-	require.Equal(a.T(), assigner.assignments.Size(), uint(1))
+	require.Equal(a.T(), assigner.Size(), uint(1))
 
 	// creates a new set of nodes, hence assigner should cache new assignment
 	newNodes := test.CreateIDs(6)
 	_, err = assigner.Assign(newNodes, chunks, rng)
 	require.NoError(a.T(), err)
-	require.Equal(a.T(), assigner.assignments.Size(), uint(2))
+	require.Equal(a.T(), assigner.Size(), uint(2))
 
 	// performs the assignment using a different seed
 	// should results in a different new assignment
@@ -290,7 +291,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	require.NoError(a.T(), err)
 	_, err = assigner.Assign(newNodes, chunks, otherRng)
 	require.NoError(a.T(), err)
-	require.Equal(a.T(), assigner.assignments.Size(), uint(3))
+	require.Equal(a.T(), assigner.Size(), uint(3))
 
 }
 

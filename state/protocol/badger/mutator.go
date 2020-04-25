@@ -76,7 +76,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		// create a lookup for each seal by parent
 		lookup := make(map[string]*flow.Seal, len(block.Seals))
 		for _, seal := range block.Seals {
-			lookup[string(seal.PreviousState)] = seal
+			lookup[string(seal.InitialState)] = seal
 		}
 
 		// starting with what was the state commitment at the parent block, we
@@ -217,7 +217,7 @@ func checkGenesisPayload(tx *badger.Txn, payload *flow.Payload) error {
 	}
 
 	// seal should have zero ID as parent state commit
-	if seal.PreviousState != nil {
+	if seal.InitialState != nil {
 		return fmt.Errorf("initial seal needs nil parent commit")
 	}
 
@@ -284,12 +284,12 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 		// is redundant for all but the first check, but cheap, and makes the
 		// code a lot simpler
 		if height != ancestor.Height+1 {
-			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", header.Height, ancestor.Height)
+			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", height, ancestor.Height)
 		}
 
 		// check if the ancestor is unfinalized, but already behind the last finalized height (orphaned fork)
 		if ancestor.Height < boundary {
-			return fmt.Errorf("block doesn't connect to finalized state")
+			return fmt.Errorf("block doesn't connect to finalized state (%d < %d), ancestorID (%v)", ancestor.Height, boundary, ancestorID)
 		}
 
 		// forward to next parent

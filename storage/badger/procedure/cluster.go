@@ -100,13 +100,13 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// insert block view -> ID mapping
-		err = operation.InsertNumberForCluster(chainID, header.View, header.ID())(tx)
+		err = operation.InsertNumberForCluster(chainID, header.Height, header.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert view->ID mapping: %w", err)
 		}
 
 		// update the finalized boundary
-		err = operation.UpdateBoundaryForCluster(chainID, header.View)(tx)
+		err = operation.UpdateBoundaryForCluster(chainID, header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update finalized boundary: %w", err)
 		}
