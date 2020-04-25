@@ -23,7 +23,7 @@ type EventHandler struct {
 	forks          hotstuff.Forks
 	persist        hotstuff.Persister
 	communicator   hotstuff.Communicator
-	membersState   hotstuff.MembersState
+	committee      hotstuff.Committee
 	voteAggregator hotstuff.VoteAggregator
 	voter          hotstuff.Voter
 	validator      hotstuff.Validator
@@ -38,7 +38,7 @@ func New(
 	forks hotstuff.Forks,
 	persist hotstuff.Persister,
 	communicator hotstuff.Communicator,
-	membersState hotstuff.MembersState,
+	committee hotstuff.Committee,
 	voteAggregator hotstuff.VoteAggregator,
 	voter hotstuff.Voter,
 	validator hotstuff.Validator,
@@ -54,7 +54,7 @@ func New(
 		voteAggregator: voteAggregator,
 		voter:          voter,
 		validator:      validator,
-		membersState:   membersState,
+		committee:      committee,
 		notifier:       notifier,
 	}
 	return e, nil
@@ -230,11 +230,11 @@ func (e *EventHandler) startNewView() error {
 
 	e.pruneSubcomponents()
 
-	currentLeader, err := e.membersState.LeaderForView(curView)
+	currentLeader, err := e.committee.LeaderForView(curView)
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)
 	}
-	if e.membersState.Self() == currentLeader {
+	if e.committee.Self() == currentLeader {
 
 		log.Debug().Msg("generating block proposal as leader")
 
@@ -337,11 +337,11 @@ func (e *EventHandler) processBlockForCurrentView(block *model.Block) error {
 
 	// checking if I'm the next leader
 	nextView := curView + 1
-	nextLeader, err := e.membersState.LeaderForView(nextView)
+	nextLeader, err := e.committee.LeaderForView(nextView)
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for next view %d: %w", nextView, err)
 	}
-	if e.membersState.Self() == nextLeader {
+	if e.committee.Self() == nextLeader {
 		return e.processBlockForCurrentViewIfIsNextLeader(block)
 	}
 

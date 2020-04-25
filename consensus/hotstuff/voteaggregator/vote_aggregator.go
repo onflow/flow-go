@@ -12,7 +12,7 @@ import (
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 type VoteAggregator struct {
 	notifier              hotstuff.Consumer
-	membersState          hotstuff.MembersState
+	committee             hotstuff.Committee
 	voteValidator         hotstuff.Validator
 	signer                hotstuff.Signer
 	highestPrunedView     uint64
@@ -25,11 +25,11 @@ type VoteAggregator struct {
 }
 
 // New creates an instance of vote aggregator
-func New(notifier hotstuff.Consumer, highestPrunedView uint64, membersState hotstuff.MembersState, voteValidator hotstuff.Validator, signer hotstuff.Signer) *VoteAggregator {
+func New(notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuff.Committee, voteValidator hotstuff.Validator, signer hotstuff.Signer) *VoteAggregator {
 	return &VoteAggregator{
 		notifier:              notifier,
 		highestPrunedView:     highestPrunedView,
-		membersState:          membersState,
+		committee:             committee,
 		voteValidator:         voteValidator,
 		signer:                signer,
 		pendingVotes:          NewPendingVotes(),
@@ -229,7 +229,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *model.Vote, blo
 	votingStatus, exists := va.blockIDToVotingStatus[vote.BlockID]
 	if !exists {
 		// get all identities
-		identities, err := va.membersState.AtBlockID(vote.BlockID).Identities(filter.Any)
+		identities, err := va.committee.Identities(vote.BlockID, filter.Any)
 		if err != nil {
 			return false, fmt.Errorf("error retrieving consensus participants: %w", err)
 		}

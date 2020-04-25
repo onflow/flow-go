@@ -5,7 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// MembersSnapshot provides a subset of the protocol.State:
+// Committee provides a subset of the protocol.State:
 // the state of all legitimate consensus participants for the specified block.
 // Legitimate consensus participants have NON-ZERO STAKE.
 //
@@ -14,31 +14,26 @@ import (
 // Given a collector block, some logic is required to find the main consensus block
 // for determining the valid collector consensus participants.
 // This logic is encapsulated in ParticipantState.
-type MembersSnapshot interface {
+type Committee interface {
 
-	// Identities returns a list of staked identities at the selected point of
-	// the protocol state history. It allows us to provide optional upfront
-	// filters which can be used by the implementation to speed up database
-	// lookups.
-	Identities(selector flow.IdentityFilter) (flow.IdentityList, error)
+	// Identities returns a IdentityList with legitimate consensus participants for the specified block.
+	// The list of participants is filtered by the provided selector. The returned list of consensus participants
+	//   * contains nodes that are allowed to sign the specified block (legitimate consensus participants with NON-ZERO STAKE)
+	//   * is ordered in the canonical order
+	//   * contains no duplicates.
+	// The list of all legitimate consensus participants for the specified block can be obtained by using `filter.Any`
+	Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error)
 
-	// Identity attempts to retrieve the node with the given identifier at the
-	// selected point of the protocol state history. It will error if it doesn't
-	// exist or if its stake is zero.
+	// Identity returns the full Identity for specified consensus participant.
+	// The node must be a legitimate consensus participant with NON-ZERO STAKE at the specified block.
 	// ERROR conditions:
 	//    * ErrInvalidConsensusParticipant if participantID does not correspond to a _staked_ consensus member at the specified block.
-	Identity(participantID flow.Identifier) (*flow.Identity, error)
-}
-
-// ConsensusMembers manages the consensus' MembersSnapshot for the different blocks.
-// It allows to retrieve MembersSnapshots of the state at any point of the protocol.State history.
-type MembersState interface {
-	// AtBlockID returns a the protocol state of all legitimate consensus participants for the specified block.
-	// It is available for any block that was introduced into the protocol state. Hence, the snapshot
-	// can thus represent an ambiguous state that was or will never be finalized.
-	AtBlockID(blockID flow.Identifier) MembersSnapshot
+	Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 
 	// LeaderForView returns the identity of the leader for a given view.
+	// CAUTION: per liveness requirement of HotStuff, the leader must be fork-independent.
+	//          Therefore, a node retains its proposer view slots even if it is slashed.
+	//          Its proposal is simply considered invalid, as it is not from a legitimate consensus participant.
 	// Can error if view is in a future Epoch for which the consensus committee hasn't been determined yet.
 	LeaderForView(view uint64) (flow.Identifier, error)
 

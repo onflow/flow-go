@@ -19,12 +19,12 @@ type SingleSigner struct {
 }
 
 // NewSingleSigner initializes a single signer with the given dependencies:
-// - the given consensusMembers' state is used to retrieve public keys for the verifier;
+// - the given consensus committee's state is used to retrieve public keys for the verifier;
 // - the given signer is used to generate signatures for the local node;
 // - the given signer ID is used as identifier for our signatures.
-func NewSingleSigner(consensusMembers hotstuff.MembersState, signer module.AggregatingSigner, signerID flow.Identifier) *SingleSigner {
+func NewSingleSigner(committee hotstuff.Committee, signer module.AggregatingSigner, signerID flow.Identifier) *SingleSigner {
 	sc := &SingleSigner{
-		SingleVerifier: NewSingleVerifier(consensusMembers, signer),
+		SingleVerifier: NewSingleVerifier(committee, signer),
 		signer:         signer,
 		signerID:       signerID,
 	}

@@ -27,14 +27,14 @@ type CombinedSigner struct {
 }
 
 // NewCombinedSigner creates a new combined signer with the given dependencies:
-// - the consensusMembers' state  is used to retrieve public keys for signers;
+// - the consensus committee's state is used to retrieve public keys for signers;
 // - the signer ID is used as the identity when creating signatures;
 // - the staking signer is used to create aggregatable signatures for the first signature part;
 // - the threshold signer is used to create threshold signture shres for the second signature part;
 // - the merger is used to join and split the two signature parts on our models;
-func NewCombinedSigner(consensusMembers hotstuff.MembersState, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, signerID flow.Identifier) *CombinedSigner {
+func NewCombinedSigner(committee hotstuff.Committee, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, signerID flow.Identifier) *CombinedSigner {
 	sc := &CombinedSigner{
-		CombinedVerifier: NewCombinedVerifier(consensusMembers, dkg, staking, beacon, merger),
+		CombinedVerifier: NewCombinedVerifier(committee, dkg, staking, beacon, merger),
 		dkg:              dkg,
 		staking:          staking,
 		beacon:           beacon,

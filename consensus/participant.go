@@ -26,7 +26,7 @@ import (
 )
 
 func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, headers storage.Headers,
-	views storage.Views, membersState hotstuff.MembersState, protocolState protocol.State, builder module.Builder, updater module.Finalizer,
+	views storage.Views, committee hotstuff.Committee, protocolState protocol.State, builder module.Builder, updater module.Finalizer,
 	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header,
 	rootQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
 
@@ -73,7 +73,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	forks := forks.New(finalizer, forkchoice)
 
 	// initialize the validator
-	validator := validator.New(membersState, forks, signer)
+	validator := validator.New(committee, forks, signer)
 
 	// get the last view we started
 	lastStarted, err := views.Retrieve(persister.ActionStarted)
@@ -114,7 +114,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	// initialize block producer
-	producer, err := blockproducer.New(signer, membersState, builder)
+	producer, err := blockproducer.New(signer, committee, builder)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize block producer: %w", err)
 	}
@@ -123,10 +123,10 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	voter := voter.New(signer, forks, persist, lastVoted)
 
 	// initialize the vote aggregator
-	aggregator := voteaggregator.New(notifier, 0, membersState, validator, signer)
+	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
 
 	// initialize the event handler
-	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, membersState, aggregator, voter, validator, notifier)
+	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event handler: %w", err)
 	}

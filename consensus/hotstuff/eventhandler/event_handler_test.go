@@ -127,31 +127,27 @@ func (v *VoteAggregator) PruneByView(view uint64) {
 	v.t.Logf("pruned at view:%v\n", view)
 }
 
-type MembersState struct {
-	mocks.MembersState
+type Committee struct {
+	mocks.Committee
 	// to mock I'm the leader of a certain view, add the view into the keys of leaders field
 	leaders map[uint64]struct{}
 }
 
-func NewMembersState() *MembersState {
-	return &MembersState{
+func NewCommittee() *Committee {
+	return &Committee{
 		leaders: make(map[uint64]struct{}),
 	}
 }
 
-func (m *MembersState) LeaderForView(view uint64) (flow.Identifier, error) {
-	_, isLeader := m.leaders[view]
+func (c *Committee) LeaderForView(view uint64) (flow.Identifier, error) {
+	_, isLeader := c.leaders[view]
 	if isLeader {
 		return flow.Identifier{0x01}, nil
 	}
 	return flow.Identifier{0x00}, nil
 }
 
-func (m *MembersState) IsSelf(nodeID flow.Identifier) bool {
-	return nodeID == flow.Identifier{0x01}
-}
-
-func (m *MembersState) Self() flow.Identifier {
+func (c *Committee) Self() flow.Identifier {
 	return flow.Identifier{0x01}
 }
 
@@ -318,7 +314,7 @@ type EventHandlerSuite struct {
 	persist        *mocks.Persister
 	blockProducer  *BlockProducer
 	communicator   *mocks.Communicator
-	membersState   *MembersState
+	committee      *Committee
 	voteAggregator *VoteAggregator
 	voter          *Voter
 	validator      *BlacklistValidator
@@ -344,7 +340,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.communicator = &mocks.Communicator{}
 	es.communicator.On("BroadcastProposal", mock.Anything).Return(nil)
 	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	es.membersState = NewMembersState()
+	es.committee = NewCommittee()
 	es.voteAggregator = NewVoteAggregator(es.T())
 	es.voter = NewVoter(es.T(), finalized)
 	es.validator = NewBlacklistValidator(es.T())
@@ -357,7 +353,7 @@ func (es *EventHandlerSuite) SetupTest() {
 		es.forks,
 		es.persist,
 		es.communicator,
-		es.membersState,
+		es.committee,
 		es.voteAggregator,
 		es.voter,
 		es.validator,
@@ -485,7 +481,7 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeade
 	// not to vote for the new view block
 
 	// I'm the next leader
-	es.membersState.leaders[es.newview.View+1] = struct{}{}
+	es.committee.leaders[es.newview.View+1] = struct{}{}
 
 	// no QC for the new view
 	err := es.eventhandler.OnReceiveVote(es.vote)
@@ -514,7 +510,7 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeade
 	// not to vote for the new view block
 
 	// I'm the next leader
-	es.membersState.leaders[es.newview.View+1] = struct{}{}
+	es.committee.leaders[es.newview.View+1] = struct{}{}
 
 	// qc built for the new view block
 	es.voteAggregator.qcs[newviewblock.BlockID] = createQC(newviewblock)
@@ -546,7 +542,7 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_IsNext
 	// not to vote for the new view block
 
 	// I'm the next leader
-	es.membersState.leaders[es.newview.View+1] = struct{}{}
+	es.committee.leaders[es.newview.View+1] = struct{}{}
 
 	// no qc for the newview block
 
@@ -677,7 +673,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_QCNewerThanCurView_CannotBuil
 func (es *EventHandlerSuite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLeader_NoQC() {
 	proposal := createProposal(es.initView, es.initView-1)
 	// I'm the next leader
-	es.membersState.leaders[es.initView+1] = struct{}{}
+	es.committee.leaders[es.initView+1] = struct{}{}
 	// no qc can be built for this block
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
@@ -689,7 +685,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLeade
 func (es *EventHandlerSuite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLeader_QCBuilt_ViewChange() {
 	proposal := createProposal(es.initView, es.initView-1)
 	// I'm the next leader
-	es.membersState.leaders[es.initView+1] = struct{}{}
+	es.committee.leaders[es.initView+1] = struct{}{}
 	// a qc can be built for this block
 	es.voteAggregator.qcs[proposal.Block.BlockID] = createQC(proposal.Block)
 	// qc triggered view change
@@ -741,7 +737,7 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 
 	for i := 0; i < 100; i++ {
 		// I'm the leader for 100 views
-		es.membersState.leaders[es.initView+uint64(i)] = struct{}{}
+		es.committee.leaders[es.initView+uint64(i)] = struct{}{}
 		// I can build qc for all 100 views
 		proposal := createProposal(es.initView+uint64(i), es.initView+uint64(i)-1)
 		es.voteAggregator.qcs[proposal.Block.BlockID] = createQC(proposal.Block)
