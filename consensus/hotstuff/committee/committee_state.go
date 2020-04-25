@@ -27,7 +27,7 @@ type ConsensusCommittee struct {
 	// are slashed!). Hence, we cache the initial list of consensus nodes for the current Epoch and compute
 	// primaries with respect to this list.
 	// TODO: very simple implementation; will be updated when introducing Epochs
-	epochConsensusMembers flow.IdentityList
+	epochConsensusMembers flow.IdentifierList
 
 	//TODO: ultimately, the own identity of the node is necessary for signing.
 	//      Ideally, we would move the method for checking whether an Identifier refers to this node to the signer.
@@ -76,8 +76,7 @@ func (c *ConsensusCommittee) LeaderForView(view uint64) (flow.Identifier, error)
 	// leaders can be pre-determined for every view. This will change, when Epochs are added.
 	// The API already contains the error return parameter, to be future-proof.
 	leaderIndex := int(view) % len(c.epochConsensusMembers)
-	leaderIdentity := c.epochConsensusMembers[leaderIndex]
-	return leaderIdentity.NodeID, nil
+	return c.epochConsensusMembers[leaderIndex], nil
 }
 
 // Self returns our own node identifier.
@@ -88,7 +87,7 @@ func (c *ConsensusCommittee) Self() flow.Identifier {
 	return c.myID
 }
 
-func New(protocolState protocol.State, blockTranslator BlockTranslator, myID flow.Identifier, filter flow.IdentityFilter, epochConsensusMembers flow.IdentityList) hotstuff.Committee {
+func New(protocolState protocol.State, blockTranslator BlockTranslator, myID flow.Identifier, filter flow.IdentityFilter, epochConsensusMembers flow.IdentifierList) hotstuff.Committee {
 	return &ConsensusCommittee{
 		protocolState:          protocolState,
 		blockTranslator:        blockTranslator,
@@ -110,5 +109,5 @@ func NewMainConsensusCommitteeState(protocolState protocol.State, myID flow.Iden
 
 	blockTranslator := func(blockID flow.Identifier) flow.Identifier { return blockID }
 	consensusNodeFilter := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
-	return New(protocolState, blockTranslator, myID, consensusNodeFilter, epochConsensusMembers), nil
+	return New(protocolState, blockTranslator, myID, consensusNodeFilter, epochConsensusMembers.NodeIDs()), nil
 }
