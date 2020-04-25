@@ -19,7 +19,7 @@ type SingleVerifier struct {
 }
 
 // NewSingleVerifier creates a new single verifier with the given dependencies:
-// - the consensusMembers' state is used to get the public staking key for signers;
+// - the consensus committee's state is used to get the public staking key for signers;
 // - the verifier is used to verify the signatures against the message;
 func NewSingleVerifier(committee hotstuff.Committee, verifier module.AggregatingVerifier) *SingleVerifier {
 	s := &SingleVerifier{

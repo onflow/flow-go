@@ -26,7 +26,7 @@ type CombinedVerifier struct {
 }
 
 // NewCombinedVerifier creates a new combined verifier with the given dependencies.
-// - the consensusMembers' state is used to retrieve the public keys for the staking signature;
+// - the consensus committee's state is used to retrieve the public keys for the staking signature;
 // - the DKG state is used to retrieve DKG data necessary to verify beacon signatures;
 // - the staking verifier is used to verify single & aggregated staking signatures;
 // - the beacon verifier is used to verify signature shares & threshold signatures;
