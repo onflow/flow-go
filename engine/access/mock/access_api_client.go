@@ -2,7 +2,7 @@
 
 package mock
 
-import access "github.com/dapperlabs/flow/protobuf/go/flow/access"
+import access "github.com/onflow/flow/protobuf/go/flow/access"
 import context "context"
 import grpc "google.golang.org/grpc"
 import mock "github.com/stretchr/testify/mock"

@@ -6,13 +6,12 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-
-	"github.com/dapperlabs/flow/protobuf/go/flow/access"
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"

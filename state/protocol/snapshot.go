@@ -22,7 +22,7 @@ type Snapshot interface {
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
 	// Seal return the highest seal at the selected snapshot.
-	Seal() (flow.Seal, error)
+	Seal() (*flow.Seal, error)
 
 	// Cluster selects the given cluster from the node selection. You have to
 	// manually filter the identities to the desired set of nodes before

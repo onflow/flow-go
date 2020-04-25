@@ -13,7 +13,7 @@ import (
 // NewResultApprovalHasher generates and returns a hasher for signing
 // and verification of result approvals
 func NewResultApprovalHasher() hash.Hasher {
-	h := crypto.NewBLS_KMAC("result approval")
+	h := crypto.NewBLS_KMAC(encoding.ResultApprovalTag)
 	return h
 }
 

@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dapperlabs/cadence/runtime"
+	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -233,6 +233,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		providerEngine,
 		execState,
 		syncThreshold,
+		node.Metrics,
 	)
 	require.NoError(t, err)
 

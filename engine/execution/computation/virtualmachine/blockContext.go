@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/cadence"
-	encoding "github.com/dapperlabs/cadence/encoding/xdr"
-	"github.com/dapperlabs/cadence/runtime"
+	"github.com/onflow/cadence"
+	encoding "github.com/onflow/cadence/encoding/xdr"
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
@@ -39,8 +39,8 @@ func (bc *blockContext) newTransactionContext(
 	options ...TransactionContextOption,
 ) *TransactionContext {
 
-	signingAccounts := make([]runtime.Address, len(tx.ScriptAccounts))
-	for i, addr := range tx.ScriptAccounts {
+	signingAccounts := make([]runtime.Address, len(tx.Authorizers))
+	for i, addr := range tx.Authorizers {
 		signingAccounts[i] = runtime.Address(addr)
 	}
 
@@ -77,7 +77,6 @@ func (bc *blockContext) ExecuteTransaction(
 	location := runtime.TransactionLocation(txID[:])
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
-
 	err := bc.vm.executeTransaction(tx.Script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
@@ -98,6 +97,7 @@ func (bc *blockContext) ExecuteTransaction(
 		Error:         nil,
 		Events:        ctx.Events(),
 		Logs:          ctx.Logs(),
+		GasUsed:       ctx.gasUsed,
 	}, nil
 }
 

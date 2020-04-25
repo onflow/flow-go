@@ -14,6 +14,7 @@ import (
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
+	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -76,9 +77,15 @@ func (suite *Suite) TestHandlePendingBlock() {
 	head.Height = 10
 	block.Height = 12
 
+	// not in cache
+	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
+
 	// don't return the parent when requested
 	suite.snapshot.On("Head").Return(&head.Header, nil).Once()
 	suite.cache.On("ByID", block.ParentID).Return(nil, false).Once()
+	suite.headers.On("ByBlockID", block.ParentID).Return(nil, realstorage.ErrNotFound).Once()
+
 	suite.cache.On("Add", mock.Anything, mock.Anything).Return(true).Once()
 	suite.sync.On("RequestBlock", block.ParentID).Return().Once()
 
@@ -102,12 +109,17 @@ func (suite *Suite) TestHandleProposal() {
 	block.Height = 11
 	block.ParentID = parent.ID()
 
+	// not in cache
+	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ParentID).Return(nil, false).Once()
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
+
 	// the parent is the last finalized state
 	suite.snapshot.On("Head").Return(&parent.Header, nil).Once()
 	// we should be able to extend the state with the block
 	suite.mutator.On("Extend", block.ID()).Return(nil).Once()
 	// we should be able to get the parent header by its ID
-	suite.headers.On("ByBlockID", block.ParentID).Return(&parent.Header, nil).Once()
+	suite.headers.On("ByBlockID", block.ParentID).Return(&parent.Header, nil).Twice()
 	// we do not have any children cached
 	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 	// the proposal should be forwarded to the follower
@@ -138,6 +150,13 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	// the parent is the last finalized state
 	suite.snapshot.On("Head").Return(&parent.Header, nil).Once()
 	suite.snapshot.On("Head").Return(&block.Header, nil).Once()
+
+	// both parent and child not in cache
+	// suite.cache.On("ByID", child.ID()).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	suite.cache.On("ByID", block.ParentID).Return(nil, false).Once()
+	// first time calling, assume it's not there
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// should extend state with new block
 	suite.mutator.On("Extend", block.ID()).Return(nil).Once()
 	suite.mutator.On("Extend", child.ID()).Return(nil).Once()

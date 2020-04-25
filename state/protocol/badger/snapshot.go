@@ -146,7 +146,7 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return identities[0], nil
 }
 
-func (s *Snapshot) Seal() (flow.Seal, error) {
+func (s *Snapshot) Seal() (*flow.Seal, error) {
 
 	var seal flow.Seal
 	err := s.state.db.View(func(tx *badger.Txn) error {
@@ -166,10 +166,10 @@ func (s *Snapshot) Seal() (flow.Seal, error) {
 		return nil
 	})
 	if err != nil {
-		return flow.Seal{}, fmt.Errorf("could not retrieve seal: %w", err)
+		return nil, fmt.Errorf("could not retrieve seal: %w", err)
 	}
 
-	return seal, nil
+	return &seal, nil
 }
 
 // Clusters sorts the list of node identities after filtering into the given
