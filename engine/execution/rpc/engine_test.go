@@ -223,7 +223,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	})
 }
 
-// TestGetTransactionResult tests the GetEventsForBlockIDTransactionID API call
+// TestGetTransactionResult tests the GetTransactionResult API call
 func (suite *Suite) TestGetTransactionResult() {
 
 	totalEvents := 10
