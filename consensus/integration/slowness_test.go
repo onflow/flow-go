@@ -428,6 +428,12 @@ func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
 		switch event.(type) {
 		case *messages.BlockProposal:
 		case *messages.BlockVote:
+		// case *events.SyncedBlock:
+		// case *messages.SyncRequest:
+		// case *messages.SyncResponse:
+		// case *messages.RangeRequest:
+		// case *messages.BatchRequest:
+		case *messages.BlockResponse:
 		default:
 			return notBlock, 0
 		}
@@ -605,6 +611,8 @@ func receiveWithDelay(channelID uint8, event interface{}, sender, receiver *Node
 	case *events.SyncedBlock:
 		receiver.syncblock++
 	case *messages.BlockProposal:
+		// add some delay to make sure slow nodes can catch up
+		time.Sleep(3 * time.Millisecond)
 		receiver.blockproposal++
 	case *messages.BlockVote:
 		receiver.blockvote++
