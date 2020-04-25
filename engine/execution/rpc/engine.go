@@ -188,6 +188,7 @@ func (h *handler) GetTransactionResult(_ context.Context,
 	var statusCode uint32 = 0
 	errMsg := ""
 
+	// lookup any transaction error that might have occurred
 	txError, err := h.transactionErrors.ByBlockIDTransactionID(blockID, txID)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
@@ -195,11 +196,11 @@ func (h *handler) GetTransactionResult(_ context.Context,
 		}
 		// noop if no tx error was found
 	} else {
-		statusCode = 1 // for now statusCode 1 indicates and error, 0 indicates no error
+		statusCode = 1 // for now a statusCode of 1 indicates an error, 0 indicates no error
 		errMsg = txError.Message
-
 	}
 
+	// compose a response with the events and the transaction error
 	return &execution.GetTransactionResultResponse{
 		StatusCode:   statusCode,
 		ErrorMessage: errMsg,
