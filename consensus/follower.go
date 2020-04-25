@@ -17,7 +17,7 @@ import (
 
 // TODO: this needs to be integrated with proper configuration and bootstrapping.
 
-func NewFollower(log zerolog.Logger, membersState hotstuff.MembersState, updater module.Finalizer, verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate, selector flow.IdentityFilter) (*hotstuff.FollowerLoop, error) {
+func NewFollower(log zerolog.Logger, committee hotstuff.Committee, updater module.Finalizer, verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate, selector flow.IdentityFilter) (*hotstuff.FollowerLoop, error) {
 
 	// initialize internal finalizer
 	rootBlock := &model.Block{
@@ -38,7 +38,7 @@ func NewFollower(log zerolog.Logger, membersState hotstuff.MembersState, updater
 	}
 
 	// initialize the validator
-	validator := validator.New(membersState, finalizer, verifier)
+	validator := validator.New(committee, finalizer, verifier)
 
 	// initialize the follower logic
 	logic, err := follower.New(log, validator, finalizer, notifier)

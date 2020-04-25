@@ -44,14 +44,13 @@ type Instance struct {
 	headers sync.Map //	headers map[flow.Identifier]*flow.Header
 
 	// mocked dependencies
-	membersSnapshot *mocks.MembersSnapshot
-	membersState    *mocks.MembersState
-	builder         *module.Builder
-	finalizer       *module.Finalizer
-	persist         *mocks.Persister
-	signer          *mocks.Signer
-	verifier        *mocks.Verifier
-	communicator    *mocks.Communicator
+	committee    *mocks.Committee
+	builder      *module.Builder
+	finalizer    *module.Finalizer
+	persist      *mocks.Persister
+	signer       *mocks.Signer
+	verifier     *mocks.Verifier
+	communicator *mocks.Communicator
 
 	// real dependencies
 	pacemaker  *pacemaker.FlowPaceMaker
@@ -116,42 +115,34 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		queue: make(chan interface{}, 1024),
 
 		// instance mocks
-		membersSnapshot: &mocks.MembersSnapshot{},
-		membersState:    &mocks.MembersState{},
-		builder:         &module.Builder{},
-		persist:         &mocks.Persister{},
-		signer:          &mocks.Signer{},
-		verifier:        &mocks.Verifier{},
-		communicator:    &mocks.Communicator{},
-		finalizer:       &module.Finalizer{},
+		committee:    &mocks.Committee{},
+		builder:      &module.Builder{},
+		persist:      &mocks.Persister{},
+		signer:       &mocks.Signer{},
+		verifier:     &mocks.Verifier{},
+		communicator: &mocks.Communicator{},
+		finalizer:    &module.Finalizer{},
 	}
 
 	// insert root block into headers register
 	in.headers.Store(cfg.Root.ID(), cfg.Root)
 
-	// program the protocol snapshot behaviour
-	in.membersSnapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+	// program the consensus committee state
+	in.committee.On("Identities", mock.Anything, mock.Anything).Return(
+		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
 			return in.participants.Filter(selector)
 		},
 		nil,
 	)
 	for _, participant := range in.participants {
-		in.membersSnapshot.On("Identity", participant.NodeID).Return(participant, nil)
+		in.committee.On("Identity", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
-
-	// program the protocol state behaviour
-	in.membersState.On("AtBlockID", mock.Anything).Return(in.membersSnapshot)
-	in.membersState.On("Self").Return(in.localID)
-	in.membersState.On("IsSelf", mock.Anything).Return(
-		func(nodeID flow.Identifier) bool { return nodeID == in.localID },
-	)
-	in.membersState.On("LeaderForView", mock.Anything).Return(
+	in.committee.On("Self").Return(in.localID)
+	in.committee.On("LeaderForView", mock.Anything).Return(
 		func(view uint64) flow.Identifier {
 			return in.participants[int(view)%len(in.participants)].NodeID
 		}, nil,
 	)
-	//in.membersState.On("LeaderForView", mock.Anything).Return(in.participants[0].NodeID, nil)
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
@@ -257,8 +248,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				return fmt.Errorf("can't broadcast with unknown parent")
 			}
 			if block.(*flow.Header).Height%100 == 0 {
-				in.membersSnapshot.Calls = nil
-				in.membersState.Calls = nil
+				in.committee.Calls = nil
 				in.builder.Calls = nil
 				in.signer.Calls = nil
 				in.verifier.Calls = nil
@@ -294,7 +284,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	require.NoError(t, err)
 
 	// initialize the block producer
-	in.producer, err = blockproducer.New(in.signer, in.membersState, in.builder)
+	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)
 	require.NoError(t, err)
 
 	// initialize the finalizer
@@ -316,16 +306,16 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.forks = forks.New(forkalizer, choice)
 
 	// initialize the validator
-	in.validator = validator.New(in.membersState, in.forks, in.verifier)
+	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
 	// initialize the vote aggregator
-	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.membersState, in.validator, in.signer)
+	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)
 
 	// initialize the voter
 	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
 
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.membersState, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
 	require.NoError(t, err)
 
 	return &in

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/members"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
@@ -101,7 +100,7 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 		signers[i] = signer
 
 		// create view state
-		vs, err := members.New(ps, participant.NodeID, selector)
+		vs, err := participants.New(ps, participant.NodeID, selector)
 		if err != nil {
 			return nil, nil, err
 		}

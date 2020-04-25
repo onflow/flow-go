@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/members"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
@@ -33,7 +33,7 @@ type AggregatorSuite struct {
 	snapshot     *protomock.Snapshot
 	signer       *mocks.Signer
 	forks        *mocks.Forks
-	membersState hotstuff.MembersState
+	committee    hotstuff.Committee
 	validator    hotstuff.Validator
 	aggregator   *VoteAggregator
 }
@@ -65,7 +65,7 @@ func (as *AggregatorSuite) SetupTest() {
 
 	// create MembersState
 	var err error
-	as.membersState, err = members.NewState(as.protocol, as.participants[0].NodeID)
+	as.committee, err = committee.NewMainConsensusCommitteeState(as.protocol, as.participants[0].NodeID)
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals
@@ -87,10 +87,10 @@ func (as *AggregatorSuite) SetupTest() {
 	)
 
 	// create a real validator
-	as.validator = validator.New(as.membersState, as.forks, as.signer)
+	as.validator = validator.New(as.committee, as.forks, as.signer)
 
 	// create the aggregator
-	as.aggregator = New(&mocks.Consumer{}, 0, as.membersState, as.validator, as.signer)
+	as.aggregator = New(&mocks.Consumer{}, 0, as.committee, as.validator, as.signer)
 }
 
 func (as *AggregatorSuite) RegisterProposal(proposal *model.Proposal) {

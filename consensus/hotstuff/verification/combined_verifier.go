@@ -18,11 +18,11 @@ import (
 // a signature from a threshold signer, which verifies either the signature share or
 // the reconstructed threshold signature.
 type CombinedVerifier struct {
-	consensusMembers hotstuff.MembersState
-	dkg              dkg.State
-	staking          module.AggregatingVerifier
-	beacon           module.ThresholdVerifier
-	merger           module.Merger
+	committee hotstuff.Committee
+	dkg       dkg.State
+	staking   module.AggregatingVerifier
+	beacon    module.ThresholdVerifier
+	merger    module.Merger
 }
 
 // NewCombinedVerifier creates a new combined verifier with the given dependencies.
@@ -31,13 +31,13 @@ type CombinedVerifier struct {
 // - the staking verifier is used to verify single & aggregated staking signatures;
 // - the beacon verifier is used to verify signature shares & threshold signatures;
 // - the merger is used to combined & split staking & random beacon signatures; and
-func NewCombinedVerifier(consensusMembers hotstuff.MembersState, dkg dkg.State, staking module.AggregatingVerifier, beacon module.ThresholdVerifier, merger module.Merger) *CombinedVerifier {
+func NewCombinedVerifier(committee hotstuff.Committee, dkg dkg.State, staking module.AggregatingVerifier, beacon module.ThresholdVerifier, merger module.Merger) *CombinedVerifier {
 	c := &CombinedVerifier{
-		consensusMembers: consensusMembers,
-		dkg:              dkg,
-		staking:          staking,
-		beacon:           beacon,
-		merger:           merger,
+		committee: committee,
+		dkg:       dkg,
+		staking:   staking,
+		beacon:    beacon,
+		merger:    merger,
 	}
 	return c
 }
@@ -49,7 +49,7 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	msg := makeVoteMessage(block.View, block.BlockID)
 
 	// get the set of signing participants
-	participants, err := c.consensusMembers.AtBlockID(block.BlockID).Identities(filter.Any)
+	participants, err := c.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
 		return false, fmt.Errorf("could not get participants: %w", err)
 	}
@@ -98,7 +98,7 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
 
 	// get the full Identities of the signers
-	signers, err := c.consensusMembers.AtBlockID(block.BlockID).Identities(filter.HasNodeID(voterIDs...))
+	signers, err := c.committee.Identities(block.BlockID, filter.HasNodeID(voterIDs...))
 	if err != nil {
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}

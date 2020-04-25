@@ -7,7 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/members"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
@@ -119,7 +119,7 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 		signers[i] = signer
 
 		// create view state
-		vs, err := members.New(ps, participant.NodeID, selector)
+		vs, err := committee.New(ps, participant.NodeID, selector)
 		if err != nil {
 			return nil, nil, err
 		}

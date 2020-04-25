@@ -13,17 +13,17 @@ import (
 
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
-	membersState hotstuff.MembersState
-	forks        hotstuff.ForksReader
-	verifier     hotstuff.Verifier
+	committee hotstuff.Committee
+	forks     hotstuff.ForksReader
+	verifier  hotstuff.Verifier
 }
 
 // New creates a new Validator instance
-func New(membersState hotstuff.MembersState, forks hotstuff.ForksReader, verifier hotstuff.Verifier) *Validator {
+func New(committee hotstuff.Committee, forks hotstuff.ForksReader, verifier hotstuff.Verifier) *Validator {
 	return &Validator{
-		membersState: membersState,
-		forks:        forks,
-		verifier:     verifier,
+		committee: committee,
+		forks:     forks,
+		verifier:  verifier,
 	}
 }
 
@@ -40,7 +40,7 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 
 	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
 	// IdentityList returned by MembersState contains only legitimate consensus participants for the specified block (must have positive stake)
-	allConsensusParticipants, err := v.membersState.AtBlockID(block.BlockID).Identities(filter.Any)
+	allConsensusParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for blcok %s: %w", block.BlockID, err)
 	}
@@ -85,7 +85,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	}
 
 	// check the proposer is the leader for the proposed block's view
-	leader, err := v.membersState.LeaderForView(proposal.Block.View)
+	leader, err := v.committee.LeaderForView(proposal.Block.View)
 	if err != nil {
 		return fmt.Errorf("error determining primary for block %x: %w", block.BlockID, err)
 	}
@@ -128,7 +128,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	}
 
 	// TODO: this lookup is duplicated in Verifier
-	voter, err := v.membersState.AtBlockID(block.BlockID).Identity(vote.SignerID)
+	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
 	if errors.Is(err, model.ErrInvalidConsensusParticipant) {
 		return nil, newInvalidVoteError(vote, fmt.Sprintf("vote is not from a staked consensus participant: %s", err.Error()))
 	}
