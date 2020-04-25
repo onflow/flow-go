@@ -5,7 +5,6 @@ package synchronization
 import (
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"sort"
 	"time"
@@ -65,9 +64,9 @@ func New(
 		heights:  make(map[uint64]*Status),
 		blockIDs: make(map[flow.Identifier]*Status),
 
-		pollInterval:  10 * time.Second,
-		scanInterval:  1 * time.Second,
-		retryInterval: 10 * time.Second,
+		pollInterval:  1 * time.Second,
+		scanInterval:  100 * time.Millisecond,
+		retryInterval: 300 * time.Second,
 		maxAttempts:   3,
 		maxSize:       64,
 		maxRequests:   2,
@@ -228,14 +227,8 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		return fmt.Errorf("could not get finalized head: %w", err)
 	}
 
-	// currently, we use `math.MaxUint64` as sentinel to indicate we want all finalized
-	// blocks, starting from the from field
-	if req.ToHeight == math.MaxUint64 {
-		req.ToHeight = head.Height
-	}
-
-	// if we don't have the full range, or there is nothing to send, bail
-	if head.Height < req.ToHeight || req.FromHeight > req.ToHeight {
+	// if we don't have anything to send, we can bail right away
+	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
 		return nil
 	}
 
@@ -253,6 +246,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		blocks = append(blocks, block)
 	}
 
+	// if there are no blocks to send, skip network message
 	if len(blocks) == 0 {
 		e.log.Debug().Msg("skipping empty range response")
 		return nil
@@ -274,16 +268,20 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 // onBatchRequest processes a request for a specific block by block ID.
 func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
 
-	// TODO: de-duplicate the elements in `req.BlockIDs` to prevent an uplink exhaustion attack (e.g. a request to send 500 times the same block).
-
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
 		return nil
 	}
 
-	// try to get all the blocks by ID
-	blocks := make([]*flow.Block, 0, len(req.BlockIDs))
+	// deduplicate the block IDs in the batch request
+	blockIDs := make(map[flow.Identifier]struct{})
 	for _, blockID := range req.BlockIDs {
+		blockIDs[blockID] = struct{}{}
+	}
+
+	// try to get all the blocks by ID
+	blocks := make([]*flow.Block, 0, len(blockIDs))
+	for blockID := range blockIDs {
 		block, err := e.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
@@ -295,12 +293,13 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 		blocks = append(blocks, block)
 	}
 
+	// if there are no blocks to send, skip network message
 	if len(blocks) == 0 {
 		e.log.Debug().Msg("skipping empty batch response")
 		return nil
 	}
 
-	// build the response
+	// send the response
 	res := &messages.BlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
@@ -352,11 +351,6 @@ func (e *Engine) queueByHeight(height uint64) {
 // queueByBlockID queues a request for a block by block ID.
 func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 
-	// Do not bother with the zero ID
-	if blockID == flow.ZeroID {
-		return
-	}
-
 	// if we already have the blockID, skip
 	_, ok := e.blockIDs[blockID]
 	if ok {
@@ -378,7 +372,7 @@ func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 // overlap between block IDs and heights.
 func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Block) {
 
-	// check if we still need to process this height or it is stale already
+	// check if we still need to process this block or it is stale already
 	blockID := block.ID()
 	_, wantHeight := e.heights[block.Height]
 	_, wantBlockID := e.blockIDs[blockID]

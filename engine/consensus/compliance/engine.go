@@ -285,7 +285,7 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 		Header:  &synced.Block.Header,
 		Payload: &synced.Block.Payload,
 	}
-	return e.onBlockProposal(synced.OriginID, proposal)
+	return e.onBlockProposal(synced.Block.ProposerID, proposal)
 }
 
 // onBlockProposal handles incoming block proposals.

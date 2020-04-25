@@ -165,7 +165,7 @@ func (e *Engine) onTransactionRequest(originID flow.Identifier, req *messages.Tr
 
 		err = e.con.Submit(res, originID)
 		if err != nil {
-			return fmt.Errorf("could not submit transaction resopnse: %w", err)
+			return fmt.Errorf("could not submit transaction response: %w", err)
 		}
 
 		return nil

@@ -42,6 +42,11 @@ func NewEventLoop(log zerolog.Logger, metrics module.Metrics, eventHandler Event
 
 func (el *EventLoop) loop() {
 
+	err := el.eventHandler.Start()
+	if err != nil {
+		el.log.Fatal().Err(err).Msg("could not start event handler")
+	}
+
 	// hotstuff will run in an event loop to process all events synchronously. And this is what will happen when hitting errors:
 	// if hotstuff hits a known critical error, it will exit the loop (for instance, there is a conflicting block with a QC against finalized blocks
 	// if hotstuff hits a known error indicating some assumption between components is broken, it will exit the loop (for instance, hotstuff receives a block whose parent is missing)
