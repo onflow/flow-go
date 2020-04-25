@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence"
 	flowgosdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
+	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -26,7 +27,7 @@ type Client struct {
 // address, using the given account key for signing transactions.
 func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error) {
 
-	client, err := client.New(addr)
+	client, err := client.New(addr, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
