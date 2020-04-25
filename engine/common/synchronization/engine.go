@@ -316,6 +316,11 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
 
+	if len(res.Blocks) == 1 {
+		fmt.Printf("onBlockResponse: %v\n", res.Blocks[0].View)
+	} else {
+		fmt.Printf("onBlockResponse: %v-%v\n", res.Blocks[0].View, res.Blocks[1].View)
+	}
 	// process the blocks one by one
 	for _, block := range res.Blocks {
 		e.processIncomingBlock(originID, block)

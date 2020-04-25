@@ -562,7 +562,7 @@ func printState(t *testing.T, nodes []*Node, i int) {
 	headerN, err := nodes[i].state.Final().Head()
 	require.NoError(t, err)
 	fmt.Printf("instance %v view:%v, height: %v,received syncblock:%v,proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
-		i, headerN.Height, headerN.View, n.syncblock, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
+		i, headerN.View, headerN.Height, n.syncblock, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
 }
 
 type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
