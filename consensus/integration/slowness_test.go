@@ -34,6 +34,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network"
+	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -146,6 +147,7 @@ type Stopper struct {
 	nodes      []*Node
 	stopping   bool
 	stopAtView uint64
+	stopped    chan struct{}
 }
 
 // How to stop nodes?
@@ -161,6 +163,7 @@ func NewStopper(stopAtView uint64) *Stopper {
 		nodes:      make([]*Node, 0),
 		stopping:   false,
 		stopAtView: stopAtView,
+		stopped:    make(chan struct{}),
 	}
 }
 
@@ -210,12 +213,13 @@ func (s *Stopper) stopAll() {
 		// stop compliance will also stop both hotstuff and synchronization engine
 		go func(i int) {
 			fmt.Printf("node %v shutting down\n", i)
-			<-s.nodes[i].compliance.Done()
+			s.nodes[i].compliance.Done()
 			fmt.Printf("node %v done\n", i)
 			wg.Done()
 		}(i)
 	}
 	wg.Wait()
+	close(s.stopped)
 	fmt.Printf("all nodes have been stopped\n")
 }
 
@@ -273,7 +277,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64) ([]*Node, *Stopper) {
 		nodes = append(nodes, node)
 	}
 
-	return nodes
+	return nodes, stopper
 }
 
 func createNode(t *testing.T, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, stopper *Stopper) *Node {
@@ -358,7 +362,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, guarantees, seals)
 
-	prov := &Engine{}
+	prov := &networkmock.Engine{}
 
 	// initialize the compliance engine
 	comp, err := compliance.New(log, net, local, state, headersDB, payloadsDB, prov, cache)
@@ -368,7 +372,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
-	hotstuffTimeout := 10 * time.Millisecond
+	hotstuffTimeout := 100 * time.Millisecond
 
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
@@ -466,11 +470,13 @@ func runNodes(nodes []*Node) {
 }
 
 func Test3Nodes(t *testing.T) {
-	nodes := createNodes(t, 3, 1000)
+	nodes, stopper := createNodes(t, 3, 100)
 
 	connect(nodes, blockProposals())
 
 	runNodes(nodes)
+
+	<-stopper.stopped
 
 	// verify all nodes arrive the same state
 	for i := 0; i < len(nodes); i++ {
@@ -486,11 +492,13 @@ func Test3Nodes(t *testing.T) {
 
 // with 5 nodes, and one node completely blocked, the other nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
-	nodes := createNodes(t, 5, 1000)
+	nodes, stopper := createNodes(t, 5, 100)
 
 	connect(nodes, blockNodes(nodes[0]))
 
 	runNodes(nodes)
+
+	<-stopper.stopped
 
 	header, err := nodes[0].state.Final().Head()
 	require.NoError(t, err)
@@ -499,28 +507,39 @@ func Test5Nodes(t *testing.T) {
 	require.Equal(t, uint64(0), header.View)
 
 	// verify all nodes arrive the same state
-	for i := 1; i < len(nodes); i++ {
-		headerN, err := nodes[i].state.Final().Head()
-		require.NoError(t, err)
-		require.Greater(t, headerN.View, uint64(90))
+	for i := 0; i < len(nodes); i++ {
 		n := nodes[i]
 		fmt.Printf("instance %v received syncblock:%v,proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
 			i, n.syncblock, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
+	}
+	for i := 1; i < len(nodes); i++ {
+		n := nodes[i]
+		headerN, err := n.state.Final().Head()
+		require.NoError(t, err)
+		require.Greater(t, headerN.View, uint64(90))
 	}
 
 	cleanupNodes(nodes)
 }
 
 func TestOneDelayed(t *testing.T) {
-	nodes := createNodes(t, 5, 1000)
+	nodes, stopper := createNodes(t, 5, 100)
 
-	connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
+	connect(nodes, blockNodesForFirstNMessages(300, nodes[0]))
 
 	runNodes(nodes)
 
+	<-stopper.stopped
+
 	// verify all nodes arrive the same state
 	for i := 0; i < len(nodes); i++ {
-		headerN, err := nodes[i].state.Final().Head()
+		n := nodes[i]
+		fmt.Printf("instance %v received syncblock:%v,proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
+			i, n.syncblock, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
+	}
+	for i := 1; i < len(nodes); i++ {
+		n := nodes[i]
+		headerN, err := n.state.Final().Head()
 		require.NoError(t, err)
 		require.Greater(t, headerN.View, uint64(90))
 	}
