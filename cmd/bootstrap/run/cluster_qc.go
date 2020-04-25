@@ -92,7 +92,8 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 		}
 
 		// create consensus committee state
-		blockTranslator := func(blockID flow.Identifier) flow.Identifier { return block.ID() }
+		genesisBlockID := block.ID()
+		blockTranslator := func(clusterBlock flow.Identifier) flow.Identifier { return genesisBlockID }
 		committee := committee.New(ps, blockTranslator, participant.NodeID, selector, nodeIDs)
 
 		// create signer for participant

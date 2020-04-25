@@ -41,7 +41,8 @@ type ConsensusCommittee struct {
 //   * contains no duplicates.
 // The list of all legitimate consensus participants for the specified block can be obtained by using `filter.Any`
 func (c *ConsensusCommittee) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	identities, err := c.protocolState.AtBlockID(blockID).Identities(
+	mainConsensusBlockID := c.blockTranslator(blockID)
+	identities, err := c.protocolState.AtBlockID(mainConsensusBlockID).Identities(
 		filter.And(c.consensusMembersFilter, selector),
 	)
 	if err != nil {
@@ -55,7 +56,8 @@ func (c *ConsensusCommittee) Identities(blockID flow.Identifier, selector flow.I
 // ERROR conditions:
 //    * ErrInvalidConsensusParticipant if participantID does not correspond to a _staked_ consensus member at the specified block.
 func (c *ConsensusCommittee) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
-	identity, err := c.protocolState.AtBlockID(blockID).Identity(participantID)
+	mainConsensusBlockID := c.blockTranslator(blockID)
+	identity, err := c.protocolState.AtBlockID(mainConsensusBlockID).Identity(participantID)
 	if err != nil {
 		// ToDo: differentiate between internal error and participantID not being found
 		return nil, fmt.Errorf("%x is not a valid node ID at block %x: %w", participantID, blockID, model.ErrInvalidConsensusParticipant)
