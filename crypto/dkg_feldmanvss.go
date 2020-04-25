@@ -10,8 +10,8 @@ import (
 	"errors"
 )
 
-// Implements Feldman Verifiable Secret Sharing using BLS set up on BLS381 curve.
-// Private keys are Zr elements while public keys are G2 elements
+// Implements Feldman Verifiable Secret Sharing using the BLS set up on BLS12-381 curve.
+// Private keys are in Zr while public keys are in G2
 
 type feldmanVSSstate struct {
 	// common DKG state
@@ -35,6 +35,8 @@ type feldmanVSSstate struct {
 }
 
 func (s *feldmanVSSstate) init() {
+	// initialize the bls context
+	_ = newBLSBLS12381()
 	s.running = false
 	s.y = nil
 	s.xReceived = false
@@ -144,7 +146,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	s.y = make([]pointG2, s.size)
 	for i := 0; i < s.threshold+1; i++ {
 		randZr(&s.a[i])
-		_G2scalarGenMult(&s.A[i], &s.a[i])
+		genScalarMultG2(&s.A[i], &s.a[i])
 	}
 
 	// compute the shares

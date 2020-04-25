@@ -116,7 +116,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 
 	// maps the seed to a private key
 	// error is not checked as it is guaranteed to be nil; len(seed)<maxScalarSize
-	mapKeyZr(&(sk.scalar), seed)
+	mapToZr(&(sk.scalar), seed)
 	return sk, nil
 }
 
@@ -176,7 +176,7 @@ func (sk *PrKeyBLSBLS12381) Size() int {
 func (sk *PrKeyBLSBLS12381) computePublicKey() {
 	var newPk PubKeyBLSBLS12381
 	// compute public key pk = g2^sk
-	_G2scalarGenMult(&(newPk.point), &(sk.scalar))
+	genScalarMultG2(&(newPk.point), &(sk.scalar))
 	sk.pk = &newPk
 }
 
@@ -252,9 +252,9 @@ func (pk *PubKeyBLSBLS12381) String() string {
 }
 
 // Get Macro definitions from the C layer as Cgo does not export macros
-var signatureLengthBLSBLS12381 = int(C.getSignatureLengthBLS_BLS12381())
-var pubKeyLengthBLSBLS12381 = int(C.getPubKeyLengthBLS_BLS12381())
-var prKeyLengthBLSBLS12381 = int(C.getPrKeyLengthBLS_BLS12381())
+var signatureLengthBLSBLS12381 = int(C.get_signature_len())
+var pubKeyLengthBLSBLS12381 = int(C.get_pk_len())
+var prKeyLengthBLSBLS12381 = int(C.get_sk_len())
 
 // init sets the context of BLS12381 curve
 func (a *blsBLS12381Algo) init() error {
@@ -280,20 +280,11 @@ func (a *blsBLS12381Algo) reInit() {
 	a.context.reInitContext()
 }
 
-// This is only a TEST/DEBUG/BENCH function
-// wraps a call to optimized SwU algorithm since cgo can't be used
-// in go test files
-func OpSwUUnitTest(output []byte, input []byte) {
-	C.opswu_test((*C.uchar)(&output[0]),
-		(*C.uchar)(&input[0]),
-		SignatureLenBLSBLS12381)
-}
-
 // computes a bls signature through the C layer
 func (a *blsBLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
 	s := make([]byte, SignatureLenBLSBLS12381)
 
-	C._blsSign((*C.uchar)(&s[0]),
+	C.bls_sign((*C.uchar)(&s[0]),
 		(*C.bn_st)(sk),
 		(*C.uchar)(&data[0]),
 		(C.int)(len(data)))
@@ -305,7 +296,7 @@ func (a *blsBLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool 
 	if len(s) != signatureLengthBLSBLS12381 {
 		return false
 	}
-	verif := C._blsVerify((*C.ep2_st)(pk),
+	verif := C.bls_verify((*C.ep2_st)(pk),
 		(*C.uchar)(&s[0]),
 		(*C.uchar)(&data[0]),
 		(C.int)(len(data)))
@@ -313,9 +304,9 @@ func (a *blsBLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool 
 	return (verif == valid)
 }
 
-// checkMembershipZr checks a scalar is less than the groups order (r)
+// checkMembershipZr checks a scalar is less than the group order (r)
 func (sk *scalar) checkMembershipZr() bool {
-	verif := C.checkMembership_Zr((*C.bn_st)(sk))
+	verif := C.check_membership_Zr((*C.bn_st)(sk))
 	return verif == valid
 }
 
@@ -328,6 +319,24 @@ func (sk *scalar) checkMembershipZr() bool {
 // The membership check is separated from the signature verification to optimize
 // multiple verification calls using the same public key
 func (pk *pointG2) checkMembershipG2() bool {
-	verif := C.checkMembership_G2((*C.ep2_st)(pk))
+	verif := C.check_membership_G2((*C.ep2_st)(pk))
 	return verif == valid
+}
+
+// This is only a TEST/DEBUG/BENCH function
+// returns the hash to G1 point from a slice of 128 bytes
+func hashToG1(data []byte) *pointG1 {
+	l := len(data)
+	var h pointG1
+	C.map_to_G1((*C.ep_st)(&h), (*C.uchar)(&data[0]), (C.int)(l))
+	return &h
+}
+
+// This is only a TEST function
+// wraps a call to optimized SwU algorithm since cgo can't be used
+// in go test files
+func OpSwUUnitTest(output []byte, input []byte) {
+	C.opswu_test((*C.uchar)(&output[0]),
+		(*C.uchar)(&input[0]),
+		SignatureLenBLSBLS12381)
 }
