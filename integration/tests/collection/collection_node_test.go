@@ -5,9 +5,14 @@ import (
 	"testing"
 	"time"
 
+	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/client"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/examples"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/integration/testnet"
@@ -56,34 +61,59 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	defer net.Stop()
 
 	// we will test against COL1
-	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
-	assert.True(t, ok)
+	colNode1 := net.ContainerByID(colNodeConfig1.Identifier)
 
-	client, err := testnet.NewClient(colNode1.Addr(testnet.ColNodeAPIPort))
+	addr := colNode1.Addr(testnet.ColNodeAPIPort)
+	client, err := client.New(addr, grpc.WithInsecure())
 	require.Nil(t, err)
+
+	key := examples.RandomPrivateKey()
+	acct := sdk.NewAccountKey().
+		FromPrivateKey(key).
+		SetHashAlgo(sdkcrypto.SHA3_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	signer := sdkcrypto.NewInMemorySigner(key, acct.HashAlgo)
 
 	t.Run("missing reference block hash", func(t *testing.T) {
 		txDSL := unittest.TransactionDSLFixture()
-		malformed := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
-		malformed.ReferenceBlockID = flow.ZeroID
+		malformed := sdk.NewTransaction().
+			SetScript([]byte(txDSL.ToCadence())).
+			SetProposalKey(sdk.RootAddress, acct.ID, acct.SequenceNumber).
+			SetPayer(sdk.RootAddress).
+			AddAuthorizer(sdk.RootAddress)
 
-		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
+		malformed.SetReferenceBlockID(sdk.ZeroID)
+
+		err = malformed.SignEnvelope(sdk.RootAddress, acct.ID, signer)
+		require.Nil(t, err)
+
+		expected := ingest.ErrIncompleteTransaction{
+			Missing: []string{flow.TransactionFieldRefBlockID.String()},
+		}
 
 		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 		defer cancel()
-		err := client.SignAndSendTransaction(ctx, malformed)
+		err := client.SendTransaction(ctx, *malformed)
 		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
 
 	t.Run("missing script", func(t *testing.T) {
-		malformed := unittest.TransactionBodyFixture()
-		malformed.Script = nil
+		malformed := sdk.NewTransaction().
+			SetReferenceBlockID(sdk.ZeroID).
+			SetProposalKey(sdk.RootAddress, acct.ID, acct.SequenceNumber).
+			SetPayer(sdk.RootAddress).
+			AddAuthorizer(sdk.RootAddress)
 
-		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
+		malformed.SetScript(nil)
+
+		expected := ingest.ErrIncompleteTransaction{
+			Missing: []string{flow.TransactionFieldScript.String()},
+		}
 
 		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 		defer cancel()
-		err := client.SignAndSendTransaction(ctx, malformed)
+		err := client.SendTransaction(ctx, *malformed)
 		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
 
@@ -130,20 +160,35 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	defer net.Cleanup()
 
 	// we will test against COL1
-	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
-	assert.True(t, ok)
+	colNode1 := net.ContainerByID(colNodeConfig1.Identifier)
 
-	client, err := testnet.NewClient(colNode1.Addr(testnet.ColNodeAPIPort))
+	addr := colNode1.Addr(testnet.ColNodeAPIPort)
+	client, err := client.New(addr, grpc.WithInsecure())
 	require.Nil(t, err)
 
-	tx := unittest.TransactionBodyFixture()
-	tx, err = client.SignTransaction(tx)
-	assert.Nil(t, err)
+	key := examples.RandomPrivateKey()
+	acct := sdk.NewAccountKey().
+		FromPrivateKey(key).
+		SetHashAlgo(sdkcrypto.SHA3_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	signer := sdkcrypto.NewInMemorySigner(key, acct.HashAlgo)
+
+	tx := sdk.NewTransaction().
+		SetScript(unittest.NoopTxScript()).
+		SetReferenceBlockID(sdk.BytesToID([]byte{1})).
+		SetProposalKey(sdk.RootAddress, acct.ID, acct.SequenceNumber).
+		SetPayer(sdk.RootAddress).
+		AddAuthorizer(sdk.RootAddress)
+
+	err = tx.SignEnvelope(sdk.RootAddress, acct.ID, signer)
+	require.Nil(t, err)
+
 	t.Log("sending transaction: ", tx.ID())
 
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
-	err = client.SendTransaction(ctx, tx)
+	err = client.SendTransaction(ctx, *tx)
 	assert.Nil(t, err)
 
 	// wait for consensus to complete
@@ -151,8 +196,7 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	// ref: https://github.com/dapperlabs/flow-go/issues/3021
 	time.Sleep(waitTime)
 
-	err = net.Stop()
-	assert.Nil(t, err)
+	net.Stop()
 
 	identities := net.Identities()
 	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
@@ -164,10 +208,14 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	state, err := clusterstate.NewState(db, chainID)
 	assert.Nil(t, err)
 
+	// TODO utility for this?
+	txID, err := flow.HexStringToIdentifier(tx.ID().String())
+	assert.Nil(t, err)
+
 	// the transaction should be included in exactly one collection
 	checker := unittest.NewClusterStateChecker(state)
 	checker.
-		ExpectContainsTx(tx.ID()).
+		ExpectContainsTx(txID).
 		ExpectTxCount(1).
 		Assert(t)
 }
@@ -204,8 +252,7 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 	require.True(t, ok)
 
 	// pick a member of the cluster
-	targetNode, ok := net.ContainerByID(targetIdentity.NodeID)
-	require.True(t, ok)
+	targetNode := net.ContainerByID(targetIdentity.NodeID)
 
 	// get a client pointing to the cluster member
 	client, err := testnet.NewClient(targetNode.Addr(testnet.ColNodeAPIPort))
@@ -229,13 +276,11 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 
 	// wait for consensus to complete
 	time.Sleep(waitTime)
-	err = net.Stop()
-	require.Nil(t, err)
+	net.Stop()
 
 	// ensure the transaction IS included in target cluster collection
 	for _, id := range targetCluster.NodeIDs() {
-		node, ok := net.ContainerByID(id)
-		require.True(t, ok)
+		node := net.ContainerByID(id)
 		db, err := node.DB()
 		require.Nil(t, err)
 
@@ -261,8 +306,7 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 		chainID := protocol.ChainIDForCluster(cluster)
 
 		for _, id := range cluster.NodeIDs() {
-			node, ok := net.ContainerByID(id)
-			require.True(t, ok)
+			node := net.ContainerByID(id)
 			db, err := node.DB()
 			require.Nil(t, err)
 
@@ -312,13 +356,13 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 	otherCluster1 := clusters.ByIndex(1)
 	otherIdentity1, ok := otherCluster1.ByIndex(0)
 	require.True(t, ok)
-	otherNode1, ok := net.ContainerByID(otherIdentity1.NodeID)
+	otherNode1 := net.ContainerByID(otherIdentity1.NodeID)
 	require.True(t, ok)
 
 	otherCluster2 := clusters.ByIndex(2)
 	otherIdentity2, ok := otherCluster2.ByIndex(0)
 	require.True(t, ok)
-	otherNode2, ok := net.ContainerByID(otherIdentity2.NodeID)
+	otherNode2 := net.ContainerByID(otherIdentity2.NodeID)
 	require.True(t, ok)
 
 	// create a key to sign the transaction with
@@ -355,13 +399,11 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 
 	// wait for consensus to complete
 	time.Sleep(waitTime)
-	err = net.Stop()
-	require.Nil(t, err)
+	net.Stop()
 
 	// ensure the transaction IS included in target cluster collection
 	for _, id := range targetCluster.NodeIDs() {
-		node, ok := net.ContainerByID(id)
-		require.True(t, ok)
+		node := net.ContainerByID(id)
 		db, err := node.DB()
 		require.Nil(t, err)
 
@@ -387,8 +429,7 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 		chainID := protocol.ChainIDForCluster(cluster)
 
 		for _, id := range cluster.NodeIDs() {
-			node, ok := net.ContainerByID(id)
-			require.True(t, ok)
+			node := net.ContainerByID(id)
 			db, err := node.DB()
 			require.Nil(t, err)
 

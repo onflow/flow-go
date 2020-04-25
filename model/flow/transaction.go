@@ -51,7 +51,9 @@ func NewTransactionBody() *TransactionBody {
 }
 
 func (tb TransactionBody) ID() Identifier {
-	return MakeID(tb)
+	hasher := hash.NewSHA3_256()
+	hash := hasher.ComputeHash(tb.Encode())
+	return HashToID(hash)
 }
 
 func (tb TransactionBody) Checksum() Identifier {

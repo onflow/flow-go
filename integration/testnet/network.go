@@ -14,10 +14,9 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/dapperlabs/testingdock"
 
@@ -55,11 +54,11 @@ const (
 
 func init() {
 	testingdock.Verbose = true
-	//testingdock.SpawnSequential = true
 }
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
+	t           *testing.T
 	suite       *testingdock.Suite
 	config      NetworkConfig
 	cli         *dockerclient.Client
@@ -79,73 +78,55 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
-
 	// makes it easier to see logs for a specific test case
 	fmt.Println(">>>> starting network: ", net.config.Name)
-
 	net.suite.Start(ctx)
 }
 
 // Remove stops the network and cleans up all resources. If you need to inspect
 // state, first stop the containers, then check state, then clean up resources.
-func (net *FlowNetwork) Remove() error {
-
-	err := net.Stop()
-	if err != nil {
-		return fmt.Errorf("could not stop network: %w", err)
-	}
-
-	err = net.Cleanup()
-	if err != nil {
-		return fmt.Errorf("could not clean up network resources: %w", err)
-	}
-
-	return nil
+func (net *FlowNetwork) Remove() {
+	net.Stop()
+	net.Cleanup()
 }
 
 // Stop disconnects and stops all containers in the network, then
 // removes the network.
-func (net *FlowNetwork) Stop() error {
-
+func (net *FlowNetwork) Stop() {
 	fmt.Println("<<<< stopping network: ", net.config.Name)
-
 	err := net.suite.Close()
-	if err != nil {
-		return fmt.Errorf("could not stop containers: %w", err)
-	}
-
-	return nil
+	require.Nil(net.t, err, "failed to stop network")
 }
 
 // Cleanup cleans up all temporary files used by the network.
-func (net *FlowNetwork) Cleanup() error {
-
+func (net *FlowNetwork) Cleanup() {
 	// remove data directories
-	var merr *multierror.Error
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
-		if err != nil {
-			merr = multierror.Append(merr, err)
-		}
+		assert.Nil(net.t, err)
 	}
-
-	return merr.ErrorOrNil()
 }
 
-// ContainerByID returns the container with the given node ID. If such a
-// container exists, returns true. Otherwise returns false.
-func (net *FlowNetwork) ContainerByID(id flow.Identifier) (*Container, bool) {
+// ContainerByID returns the container with the given node ID, if it exists.
+// Otherwise fails the test.
+func (net *FlowNetwork) ContainerByID(id flow.Identifier) *Container {
 	for _, c := range net.Containers {
 		if c.Config.NodeID == id {
-			return c, true
+			return c
 		}
 	}
-	return nil, false
+	net.t.FailNow()
+	return nil
 }
 
-func (net *FlowNetwork) ContainerByName(name string) (*Container, bool) {
+// ContainerByName returns the container with the given name, if it exists.
+// Otherwise fails the test.
+func (net *FlowNetwork) ContainerByName(name string) *Container {
 	container, exists := net.Containers[name]
-	return container, exists
+	if !exists {
+		net.t.FailNow()
+	}
+	return container
 }
 
 // NetworkConfig is the config for the network.
@@ -334,6 +315,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	}
 
 	flowNetwork := &FlowNetwork{
+		t:           t,
 		cli:         dockerClient,
 		config:      networkConf,
 		suite:       suite,
@@ -346,6 +328,10 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	for _, nodeConf := range confs {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.Nil(t, err)
+	}
+
+	for _, cont := range flowNetwork.Containers {
+		t.Log(cont.Name(), cont.Ports)
 	}
 
 	return flowNetwork
@@ -474,7 +460,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	net.Containers[nodeContainer.Name()] = nodeContainer
 	if nodeConf.Role == flow.RoleAccess {
 		// collection1, _ := net.ContainerByName("collection_1")
-		execution1, _ := net.ContainerByName("execution_1")
+		execution1 := net.ContainerByName("execution_1")
 		// collection1.After(suiteContainer)
 		execution1.After(suiteContainer)
 	} else {
