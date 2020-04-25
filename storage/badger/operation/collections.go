@@ -47,7 +47,8 @@ func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flo
 	if height > 10 {
 		limit = height - 10
 	}
-	return iterate(makePrefix(codeIndexCollection, height), makePrefix(codeIndexCollection, limit), validatepayload(blockID, txIDs))
+	start, end := payloadIterRange(codeIndexCollection, height, limit)
+	return iterate(start, end, validatepayload(blockID, txIDs))
 }
 
 // CheckCollectionPayload populates `invalidIDs` with any IDs in the candidate
@@ -58,7 +59,8 @@ func CheckCollectionPayload(height uint64, blockID flow.Identifier, candidateIDs
 	if height > 10 {
 		limit = height - 10
 	}
-	return iterate(makePrefix(codeIndexCollection, height), makePrefix(codeIndexCollection, limit), searchduplicates(blockID, candidateIDs, invalidIDs))
+	start, end := payloadIterRange(codeIndexCollection, height, limit)
+	return iterate(start, end, searchduplicates(blockID, candidateIDs, invalidIDs))
 }
 
 // IndexCollectionByTransaction inserts a collection id keyed by a transaction id

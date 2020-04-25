@@ -34,7 +34,8 @@ func VerifySealPayload(height uint64, blockID flow.Identifier, sealIDs []flow.Id
 	if height > 10 {
 		limit = height - 10
 	}
-	return iterate(makePrefix(codeIndexSeal, height), makePrefix(codeIndexSeal, limit), validatepayload(blockID, sealIDs))
+	start, end := payloadIterRange(codeIndexSeal, height, limit)
+	return iterate(start, end, validatepayload(blockID, sealIDs))
 }
 
 // CheckSealPayload populates `invalidIDs` with any IDs in the candidate
@@ -45,5 +46,6 @@ func CheckSealPayload(height uint64, blockID flow.Identifier, candidateIDs []flo
 	if height > 10 {
 		limit = height - 10
 	}
-	return iterate(makePrefix(codeIndexSeal, height), makePrefix(codeIndexSeal, limit), searchduplicates(blockID, candidateIDs, invalidIDs))
+	start, end := payloadIterRange(codeIndexSeal, height, limit)
+	return iterate(start, end, searchduplicates(blockID, candidateIDs, invalidIDs))
 }
