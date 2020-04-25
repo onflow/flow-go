@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
+	"github.com/dapperlabs/flow-go/integration/convert"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -58,30 +59,22 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Stop()
+	defer net.Remove()
 
 	// we will test against COL1
 	colNode1 := net.ContainerByID(colNodeConfig1.Identifier)
 
-	addr := colNode1.Addr(testnet.ColNodeAPIPort)
-	client, err := client.New(addr, grpc.WithInsecure())
+	client, err := client.New(colNode1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	key := examples.RandomPrivateKey()
-	acct := sdk.NewAccountKey().
-		FromPrivateKey(key).
-		SetHashAlgo(sdkcrypto.SHA3_256).
-		SetWeight(sdk.AccountKeyWeightThreshold)
-
-	signer := sdkcrypto.NewInMemorySigner(key, acct.HashAlgo)
+	addr, acct, signer := getAccount()
 
 	t.Run("missing reference block hash", func(t *testing.T) {
-		txDSL := unittest.TransactionDSLFixture()
 		malformed := sdk.NewTransaction().
-			SetScript([]byte(txDSL.ToCadence())).
-			SetProposalKey(sdk.RootAddress, acct.ID, acct.SequenceNumber).
-			SetPayer(sdk.RootAddress).
-			AddAuthorizer(sdk.RootAddress)
+			SetScript(unittest.NoopTxScript()).
+			SetProposalKey(addr, acct.ID, acct.SequenceNumber).
+			SetPayer(addr).
+			AddAuthorizer(addr)
 
 		malformed.SetReferenceBlockID(sdk.ZeroID)
 
@@ -100,7 +93,7 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 
 	t.Run("missing script", func(t *testing.T) {
 		malformed := sdk.NewTransaction().
-			SetReferenceBlockID(sdk.ZeroID).
+			SetReferenceBlockID(sdk.Identifier{1}).
 			SetProposalKey(sdk.RootAddress, acct.ID, acct.SequenceNumber).
 			SetPayer(sdk.RootAddress).
 			AddAuthorizer(sdk.RootAddress)
@@ -162,26 +155,19 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 	// we will test against COL1
 	colNode1 := net.ContainerByID(colNodeConfig1.Identifier)
 
-	addr := colNode1.Addr(testnet.ColNodeAPIPort)
-	client, err := client.New(addr, grpc.WithInsecure())
+	client, err := client.New(colNode1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	key := examples.RandomPrivateKey()
-	acct := sdk.NewAccountKey().
-		FromPrivateKey(key).
-		SetHashAlgo(sdkcrypto.SHA3_256).
-		SetWeight(sdk.AccountKeyWeightThreshold)
-
-	signer := sdkcrypto.NewInMemorySigner(key, acct.HashAlgo)
+	addr, acct, signer := getAccount()
 
 	tx := sdk.NewTransaction().
 		SetScript(unittest.NoopTxScript()).
 		SetReferenceBlockID(sdk.BytesToID([]byte{1})).
-		SetProposalKey(sdk.RootAddress, acct.ID, acct.SequenceNumber).
-		SetPayer(sdk.RootAddress).
-		AddAuthorizer(sdk.RootAddress)
+		SetProposalKey(addr, acct.ID, acct.SequenceNumber).
+		SetPayer(addr).
+		AddAuthorizer(addr)
 
-	err = tx.SignEnvelope(sdk.RootAddress, acct.ID, signer)
+	err = tx.SignEnvelope(addr, acct.ID, signer)
 	require.Nil(t, err)
 
 	t.Log("sending transaction: ", tx.ID())
@@ -255,23 +241,33 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 	targetNode := net.ContainerByID(targetIdentity.NodeID)
 
 	// get a client pointing to the cluster member
-	client, err := testnet.NewClient(targetNode.Addr(testnet.ColNodeAPIPort))
+	client, err := client.New(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	// create a transaction for the target cluster
-	tx := unittest.AlterTransactionForCluster(unittest.TransactionBodyFixture(), clusters, targetCluster, func(clusterTx *flow.TransactionBody) {
-		signed, err := client.SignTransaction(*clusterTx)
-		require.Nil(t, err)
-		*clusterTx = signed
-	})
+	addr, acct, signer := getAccount()
 
-	assert.Equal(t, clusters.ByTxID(tx.ID()).Fingerprint(), targetCluster.Fingerprint())
-	t.Log("tx id: ", tx.ID().String())
+	tx := sdk.NewTransaction().
+		SetScript(unittest.NoopTxScript()).
+		SetReferenceBlockID(sdk.Identifier{1}).
+		SetProposalKey(addr, acct.ID, acct.SequenceNumber).
+		SetPayer(addr).
+		AddAuthorizer(addr)
+
+	// hash-grind the script until the transaction will be routed to target cluster
+	for {
+		tx.SetScript(append(tx.Script, '/', '/'))
+		err = tx.SignEnvelope(sdk.RootAddress, acct.ID, signer)
+		require.Nil(t, err)
+		routed := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
+		if routed.Fingerprint() == targetCluster.Fingerprint() {
+			break
+		}
+	}
 
 	// submit the transaction
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
-	err = client.SendTransaction(ctx, tx)
+	err = client.SendTransaction(ctx, *tx)
 	assert.Nil(t, err)
 
 	// wait for consensus to complete
@@ -291,7 +287,7 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 		// the transaction should be included exactly once
 		checker := unittest.NewClusterStateChecker(state)
 		checker.
-			ExpectContainsTx(tx.ID()).
+			ExpectContainsTx(convert.IDFromSDK(tx.ID())).
 			ExpectTxCount(1).
 			Assert(t)
 	}
@@ -314,10 +310,9 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 			require.Nil(t, err)
 
 			// the transaction should not be included
-			// the transaction should be included exactly once
 			checker := unittest.NewClusterStateChecker(state)
 			checker.
-				ExpectOmitsTx(tx.ID()).
+				ExpectOmitsTx(convert.IDFromSDK(tx.ID())).
 				ExpectTxCount(0).
 				Assert(t)
 		}
@@ -357,45 +352,57 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 	otherIdentity1, ok := otherCluster1.ByIndex(0)
 	require.True(t, ok)
 	otherNode1 := net.ContainerByID(otherIdentity1.NodeID)
-	require.True(t, ok)
 
 	otherCluster2 := clusters.ByIndex(2)
 	otherIdentity2, ok := otherCluster2.ByIndex(0)
 	require.True(t, ok)
 	otherNode2 := net.ContainerByID(otherIdentity2.NodeID)
-	require.True(t, ok)
 
-	// create a key to sign the transaction with
-	key, err := unittest.AccountKeyFixture()
-	require.Nil(t, err)
+	addr, acct, signer := getAccount()
 
-	// get a client pointing to the other nodes, using the same key
-	client1, err := testnet.NewClientWithKey(otherNode1.Addr(testnet.ColNodeAPIPort), key)
+	// create clients pointing to each other node
+	client1, err := client.New(otherNode1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
-	client2, err := testnet.NewClientWithKey(otherNode2.Addr(testnet.ColNodeAPIPort), key)
+	client2, err := client.New(otherNode2.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
 	// create a transaction for the target cluster
-	tx := unittest.AlterTransactionForCluster(unittest.TransactionBodyFixture(), clusters, targetCluster, func(clusterTx *flow.TransactionBody) {
-		signed, err := client1.SignTransaction(*clusterTx)
+	tx := sdk.NewTransaction().
+		SetScript(unittest.NoopTxScript()).
+		SetReferenceBlockID(sdk.Identifier{1}).
+		SetProposalKey(addr, acct.ID, acct.SequenceNumber).
+		SetPayer(addr).
+		AddAuthorizer(addr)
+
+	// hash-grind the script until the transaction will be routed to target cluster
+	for {
+		tx.SetScript(append(tx.Script, '/', '/'))
+		err = tx.SignEnvelope(addr, acct.ID, signer)
 		require.Nil(t, err)
-		*clusterTx = signed
-	})
+		routed := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
+		if routed.Fingerprint() == targetCluster.Fingerprint() {
+			break
+		}
+	}
 
-	assert.Equal(t, clusters.ByTxID(tx.ID()).Fingerprint(), targetCluster.Fingerprint())
-	t.Log("tx id: ", tx.ID().String())
+	go func() {
+		for i := 0; i < 3; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * 2):
+			}
+			// submit the transaction to other cluster 1
+			ctx, _ := context.WithTimeout(ctx, defaultTimeout)
+			err = client1.SendTransaction(ctx, *tx)
+			assert.Nil(t, err)
 
-	// submit the transaction to other cluster 1
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-	err = client1.SendTransaction(ctx, tx)
-	assert.Nil(t, err)
-
-	// submit the transaction to other cluster 2
-	ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-	err = client2.SendTransaction(ctx, tx)
-	assert.Nil(t, err)
+			// submit the transaction to other cluster 2
+			ctx, _ = context.WithTimeout(ctx, defaultTimeout)
+			err = client2.SendTransaction(ctx, *tx)
+			assert.Nil(t, err)
+		}
+	}()
 
 	// wait for consensus to complete
 	time.Sleep(waitTime)
@@ -414,7 +421,7 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 		// the transaction should be included exactly once
 		checker := unittest.NewClusterStateChecker(state)
 		checker.
-			ExpectContainsTx(tx.ID()).
+			ExpectContainsTx(convert.IDFromSDK(tx.ID())).
 			ExpectTxCount(1).
 			Assert(t)
 	}
@@ -437,12 +444,26 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 			require.Nil(t, err)
 
 			// the transaction should not be included
-			// the transaction should be included exactly once
 			checker := unittest.NewClusterStateChecker(state)
 			checker.
-				ExpectOmitsTx(tx.ID()).
+				ExpectOmitsTx(convert.IDFromSDK(tx.ID())).
 				ExpectTxCount(0).
 				Assert(t)
 		}
 	}
+}
+
+func getAccount() (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer) {
+
+	addr := convert.ToSDKAddress(unittest.AddressFixture())
+
+	key := examples.RandomPrivateKey()
+	signer := sdkcrypto.NewInMemorySigner(key, sdkcrypto.SHA3_256)
+
+	acct := sdk.NewAccountKey().
+		FromPrivateKey(key).
+		SetHashAlgo(sdkcrypto.SHA3_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	return addr, acct, signer
 }
