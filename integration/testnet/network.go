@@ -96,14 +96,12 @@ func (net *FlowNetwork) Stop() {
 	fmt.Println("<<<< stopping network: ", net.config.Name)
 	err := net.suite.Close()
 	require.Nil(net.t, err, "failed to stop network")
+	err = net.suite.Remove()
+	require.Nil(net.t, err, "failed to remove network")
 }
 
 // Cleanup cleans up all temporary files used by the network.
 func (net *FlowNetwork) Cleanup() {
-	// remove stopped containers
-	err := net.suite.Remove()
-	require.Nil(net.t, err, "failed to remove network")
-
 	// remove data directories
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
@@ -496,7 +494,7 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 	for i, conf := range networkConf.Nodes {
 
 		// define the node's name <role>_<n> and address <name>:<port>
-		name := fmt.Sprintf("%s_%s_%d", networkConf.Name, conf.Role.String(), roleCounter[conf.Role]+1)
+		name := fmt.Sprintf("%s_%d", conf.Role.String(), roleCounter[conf.Role]+1)
 
 		addr := fmt.Sprintf("%s:%d", name, 2137)
 		roleCounter[conf.Role]++
