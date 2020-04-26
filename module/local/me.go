@@ -10,8 +10,9 @@ import (
 )
 
 type Local struct {
-	me *flow.Identity
-	sk crypto.PrivateKey // instance of the node's private key
+	me    *flow.Identity
+	sk    crypto.PrivateKey // instance of the node's private key
+	index int
 }
 
 func New(id *flow.Identity, sk crypto.PrivateKey) (*Local, error) {
@@ -20,6 +21,14 @@ func New(id *flow.Identity, sk crypto.PrivateKey) (*Local, error) {
 		sk: sk,
 	}
 	return l, nil
+}
+
+func (l *Local) SetIndex(index int) {
+	l.index = index
+}
+
+func (l *Local) Index() int {
+	return l.index
 }
 
 func (l *Local) NodeID() flow.Identifier {

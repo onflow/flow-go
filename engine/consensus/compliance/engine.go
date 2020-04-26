@@ -107,11 +107,8 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		fmt.Printf("sync Done\n")
 		<-e.sync.Done()
-		fmt.Printf("hotstuff Done\n")
 		<-e.hotstuff.Done()
-		fmt.Printf("CCL Done\n")
 	})
 }
 
@@ -263,7 +260,8 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	case *events.SyncedBlock:
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
-		return e.onBlockProposal(originID, v)
+		err := e.onBlockProposal(originID, v)
+		return err
 	case *messages.BlockVote:
 		return e.onBlockVote(originID, v)
 	default:
@@ -440,7 +438,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// see if the block is a valid extension of the protocol state
 	err = e.state.Mutate().Extend(header.ID())
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state: %w", err)
+		return fmt.Errorf("could not extend protocol state: %v, %w", header.View, err)
 	}
 
 	// retrieve the parent

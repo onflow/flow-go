@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"sync"
@@ -23,7 +22,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
-	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -192,7 +190,6 @@ func (s *Stopper) onEnteringView(id flow.Identifier, view uint64) {
 
 	// if there is no running nodes, stop all
 	if len(s.running) == 0 {
-		fmt.Printf("stopall!\n")
 		s.stopAll()
 	}
 }
@@ -211,21 +208,19 @@ func (s *Stopper) stopAll() {
 		wg.Add(1)
 		// stop compliance will also stop both hotstuff and synchronization engine
 		go func(i int) {
-			fmt.Printf("node %v shutting down\n", i)
 			s.nodes[i].compliance.Done()
-			fmt.Printf("node %v done\n", i)
 			wg.Done()
 		}(i)
 	}
 	wg.Wait()
 	close(s.stopped)
-	fmt.Printf("all nodes have been stopped\n")
 }
 
 type Node struct {
 	db            *badger.DB
 	dbDir         string
 	index         int
+	log           zerolog.Logger
 	id            *flow.Identity
 	compliance    *compliance.Engine
 	sync          *synchronization.Engine
@@ -234,7 +229,6 @@ type Node struct {
 	headers       *storage.Headers
 	views         *storage.Views
 	net           *Network
-	syncblock     int
 	blockproposal int
 	blockvote     int
 	syncreq       int
@@ -271,31 +265,21 @@ func createNodes(t *testing.T, n int, stopAtView uint64) ([]*Node, *Stopper) {
 
 	stopper := NewStopper(stopAtView)
 	nodes := make([]*Node, 0, len(participants))
-	for _, identity := range participants {
-		node := createNode(t, identity, participants, &genesis, stopper)
+	for i, identity := range participants {
+		node := createNode(t, i, identity, participants, &genesis, stopper)
 		nodes = append(nodes, node)
 	}
 
 	return nodes, stopper
 }
 
-func createNode(t *testing.T, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, stopper *Stopper) *Node {
+func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, stopper *Stopper) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
 	state, err := protocol.NewState(db)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(genesis)
 	require.NoError(t, err)
-
-	// find index
-	index := len(participants)
-	for i := 0; i < len(participants); i++ {
-		if identity == participants[i] {
-			index = i
-			break
-		}
-	}
-	require.NotEqual(t, index, len(participants), "can not find identity in participants")
 
 	localID := identity.ID()
 
@@ -310,8 +294,8 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 
 	// log with node index
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(ioutil.Discard).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
-	// log := zerolog.New(os.Stderr).Level(zerolog.InfoLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
+	// log := zerolog.New(ioutil.Discard).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
+	log := zerolog.New(os.Stderr).Level(zerolog.InfoLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(stopConsumer)
@@ -326,6 +310,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	// make local
 	priv := helper.MakeBLSKey(t)
 	local, err := local.New(identity, priv)
+	local.SetIndex(index)
 	require.NoError(t, err)
 
 	// make network
@@ -389,6 +374,7 @@ func createNode(t *testing.T, identity *flow.Identity, participants flow.Identit
 	node.headers = headersDB
 	node.views = viewsDB
 	node.net = net
+	node.log = log
 
 	return node
 }
@@ -425,15 +411,17 @@ func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
 	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block, notBlock := true, false
 
-		switch event.(type) {
+		switch m := event.(type) {
 		case *messages.BlockProposal:
 		case *messages.BlockVote:
-		// case *events.SyncedBlock:
 		// case *messages.SyncRequest:
 		// case *messages.SyncResponse:
 		// case *messages.RangeRequest:
 		// case *messages.BatchRequest:
 		case *messages.BlockResponse:
+			log := receiver.log.With().Int("blocks", len(m.Blocks)).Uint64("first", m.Blocks[0].View).
+				Uint64("last", m.Blocks[len(m.Blocks)-1].View).Logger()
+			log.Info().Msg("receives BlockResponse")
 		default:
 			return notBlock, 0
 		}
@@ -443,14 +431,12 @@ func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
 				return notBlock, 0
 			}
 			sent++
-			fmt.Printf("sent: %v\n", sent)
 			return block, 0
 		}
 		if _, ok := blackDict[receiver.id.ID()]; ok {
 			if received >= n {
 				return notBlock, 0
 			}
-			fmt.Printf("received: %v\n", received)
 			received++
 			return block, 0
 		}
@@ -463,7 +449,6 @@ func blockProposals() BlockOrDelayFunc {
 		switch event.(type) {
 		case *messages.BlockProposal:
 		case *messages.BlockVote:
-		case *events.SyncedBlock:
 		case *messages.SyncRequest:
 		case *messages.SyncResponse:
 		case *messages.RangeRequest:
@@ -561,8 +546,35 @@ func printState(t *testing.T, nodes []*Node, i int) {
 	n := nodes[i]
 	headerN, err := nodes[i].state.Final().Head()
 	require.NoError(t, err)
-	fmt.Printf("instance %v view:%v, height: %v,received syncblock:%v,proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
-		i, headerN.View, headerN.Height, n.syncblock, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
+	// fmt.Printf("instance %v view:%v, height: %v,received proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
+	// 	i, headerN.View, headerN.Height, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
+	log := n.log.With().
+		Uint64("finalview", headerN.View).
+		Uint64("finalheight", headerN.Height).
+		Int("proposal", n.blockproposal).
+		Int("vote", n.blockvote).
+		Int("syncreq", n.syncreq).
+		Int("syncresp", n.syncresp).
+		Int("rangereq", n.rangereq).
+		Int("batchreq", n.batchreq).
+		Int("batchresp", n.batchresp).
+		Str("views", fmt.Sprintf("%v", chainViews(t, n))).
+		Logger()
+
+	log.Info().Msg("stats")
+}
+
+func chainViews(t *testing.T, node *Node) []uint64 {
+	views := make([]uint64, 0)
+
+	head, err := node.state.Final().Head()
+	require.NoError(t, err)
+	for head != nil && head.View > 0 {
+		views = append(views, head.View)
+		head, err = node.headers.ByBlockID(head.ParentID)
+		require.NoError(t, err)
+	}
+	return views
 }
 
 type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
@@ -608,8 +620,6 @@ func receiveWithDelay(channelID uint8, event interface{}, sender, receiver *Node
 	// statics
 	receiver.Lock()
 	switch event.(type) {
-	case *events.SyncedBlock:
-		receiver.syncblock++
 	case *messages.BlockProposal:
 		// add some delay to make sure slow nodes can catch up
 		time.Sleep(3 * time.Millisecond)
