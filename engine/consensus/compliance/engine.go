@@ -113,11 +113,11 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		fmt.Printf("sync Done\n")
+		e.log.Debug().Msg("shutting down synchronization engine")
 		<-e.sync.Done()
-		fmt.Printf("hotstuff Done\n")
+		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
-		fmt.Printf("CCL Done\n")
+		e.log.Debug().Msg("all components have been shut down")
 	})
 }
 
