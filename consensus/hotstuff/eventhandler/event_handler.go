@@ -228,6 +228,8 @@ func (e *EventHandler) startNewView() error {
 
 	log.Debug().Msg("entering new view")
 
+	e.notifier.OnEnteringView(curView)
+
 	e.pruneSubcomponents()
 
 	if e.viewState.IsSelfLeaderForView(curView) {
