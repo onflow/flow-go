@@ -38,7 +38,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 }
 
 func (m *Mutator) Extend(blockID flow.Identifier) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return m.state.db.Update(operation.RetryOnConflict(func(tx *badger.Txn) error {
 
 		// retrieve the block
 		var block flow.Block
@@ -102,11 +102,11 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		}
 
 		return nil
-	})
+	}))
 }
 
 func (m *Mutator) Finalize(blockID flow.Identifier) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return m.state.db.Update(operation.RetryOnConflict(func(tx *badger.Txn) error {
 
 		// retrieve the block to make sure we have it
 		var header flow.Header
@@ -120,6 +120,11 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		err = operation.RetrieveBoundary(&boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
+		}
+
+		// check if we are finalizing an invalid block
+		if header.Height <= boundary {
+			return fmt.Errorf("height below or equal to boundary (height: %d, boundary: %d)", header.Height, boundary)
 		}
 
 		// retrieve the hash of the boundary
@@ -160,7 +165,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		}
 
 		return nil
-	})
+	}))
 }
 
 func checkGenesisHeader(header *flow.Header) error {
