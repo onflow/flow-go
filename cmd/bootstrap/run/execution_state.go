@@ -57,7 +57,8 @@ func createRootAccount(view *delta.View, privateKey flow.AccountPrivateKey) erro
 	if err != nil {
 		return fmt.Errorf("cannot encode public key of hardcoded private key: %w", err)
 	}
-	_, err = virtualmachine.CreateAccountInLedger(view, [][]byte{publicKeyBytes})
+	ledgerAccess := virtualmachine.LedgerAccess{view}
+	_, err = ledgerAccess.CreateAccountInLedger([][]byte{publicKeyBytes})
 	if err != nil {
 		return fmt.Errorf("error while creating account in ledger: %w", err)
 	}

@@ -66,7 +66,9 @@ func BootstrapView(view *delta.View) {
 	if err != nil {
 		panic("Cannot encode public key of hardcoded private key!")
 	}
-	_, err = virtualmachine.CreateAccountInLedger(view, [][]byte{publicKeyBytes})
+
+	ledgerAccess := virtualmachine.LedgerAccess{view}
+	_, err = ledgerAccess.CreateAccountInLedger([][]byte{publicKeyBytes})
 	if err != nil {
 		panic(fmt.Sprintf("error while creating account in ledger: %s ", err))
 	}

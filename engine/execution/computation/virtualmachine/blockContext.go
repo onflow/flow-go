@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	encoding "github.com/onflow/cadence/encoding/xdr"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -23,12 +24,10 @@ type BlockContext interface {
 
 	// ExecuteScript computes the result of a read-only script.
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
-
-	// GetAccount looks up the flow account for the given address
-	GetAccount(ledger Ledger, address flow.Address) *flow.Account
 }
 
 type blockContext struct {
+	LedgerAccess
 	vm     *virtualMachine
 	header *flow.Header
 }
@@ -45,7 +44,7 @@ func (bc *blockContext) newTransactionContext(
 	}
 
 	ctx := &TransactionContext{
-		ledger:          ledger,
+		LedgerAccess:    LedgerAccess{ledger},
 		signingAccounts: signingAccounts,
 	}
 
@@ -58,7 +57,7 @@ func (bc *blockContext) newTransactionContext(
 
 func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
-		ledger: ledger,
+		LedgerAccess: LedgerAccess{ledger},
 	}
 }
 
@@ -129,14 +128,6 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 	}, nil
 }
 
-func (bc *blockContext) GetAccount(ledger Ledger, address flow.Address) *flow.Account {
-	ctx := bc.newScriptContext(ledger)
-
-	account := ctx.GetAccount(address)
-
-	return account
-}
-
 // ConvertEvents creates flow.Events from runtime.events
 func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) {
 
@@ -152,7 +143,8 @@ func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) 
 
 		eventValue := cadence.NewEvent(fields)
 
-		payload, err := encoding.Encode(eventValue)
+		payload, err := jsoncdc.Encode(eventValue)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode event: %w", err)
 		}

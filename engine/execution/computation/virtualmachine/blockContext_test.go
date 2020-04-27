@@ -189,6 +189,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	bc := vm.NewBlockContext(&h)
 
 	ledger := make(virtualmachine.MapLedger)
+	ledgerAccess := virtualmachine.LedgerAccess{ledger}
+
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 
@@ -254,7 +256,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
 
-			account := bc.GetAccount(ledger, address)
+			account := ledgerAccess.GetAccount(address)
 
 			assert.Len(t, account.Keys, 1)
 			actualKey := account.Keys[0].PublicKey
@@ -265,7 +267,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	// non-happy path - get an account that was never created
 	t.Run("get a non-existing account", func(t *testing.T) {
 		address := flow.HexToAddress(fmt.Sprintf("%d", count+1))
-		account := bc.GetAccount(ledger, address)
+		account := ledgerAccess.GetAccount(address)
 		assert.Nil(t, account)
 	})
 }

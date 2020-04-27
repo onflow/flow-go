@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
@@ -578,14 +579,11 @@ func (e *Engine) GetAccount(address flow.Address, blockID flow.Identifier) (*flo
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
 	}
-	block, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
-	}
 
 	blockView := e.execState.NewView(stateCommit)
 
-	return e.computationManager.GetAccount(address, block, blockView)
+	ledgerAccess := virtualmachine.LedgerAccess{blockView}
+	return ledgerAccess.GetAccount(address), nil
 }
 
 func (e *Engine) handleComputationResult(result *execution.ComputationResult, startState flow.StateCommitment) (flow.StateCommitment, error) {
