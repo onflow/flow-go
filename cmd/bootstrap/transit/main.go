@@ -13,8 +13,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"golang.org/x/crypto/nacl/box"
+
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 )
 
 const (
@@ -75,7 +76,7 @@ func main() {
 		return
 	}
 
-	var err error = nil
+	var err error
 	if pull && push {
 		flag.Usage()
 		log.Fatal("Only one of -pull or -push may be specified\n")

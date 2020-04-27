@@ -26,7 +26,10 @@ func TestEndToEnd(t *testing.T) {
 	// Create test files
 	//bootcmd.WriteText(filepath.Join(bootdir, bootstrap.FilenameNodeId), []byte(nodeID)
 	randomBeaconPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, nodeID))
-	ioutil.WriteFile(randomBeaconPath, []byte("test data"), 0644)
+	err = ioutil.WriteFile(randomBeaconPath, []byte("test data"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write random beacon file: %s", err)
+	}
 
 	// Client:
 	// create the transit keys
