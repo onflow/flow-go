@@ -1087,7 +1087,6 @@ func TestGetHistoricalProofs(t *testing.T) {
 }
 
 func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
-	// TODO (Ramtin Fix me)
 	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}

@@ -361,18 +361,6 @@ func (n *node) ComputeValue() []byte {
 	return HashInterNode(h1, h2)
 }
 
-// func (n node) String() string {
-// 	right := ""
-// 	if n.rChild != nil {
-// 		right = n.rChild.String()
-// 	}
-// 	left := ""
-// 	if n.lChild != nil {
-// 		left = n.lChild.String()
-// 	}
-// 	return fmt.Sprintf("%v: (%v,%v) left> %v right> %v ", n.height, n.key, hex.EncodeToString(n.value), left, right)
-// }
-
 // FmtStr provides formated string represntation of the node and sub tree
 func (n node) FmtStr(prefix string, path string) string {
 	right := ""

@@ -90,11 +90,6 @@ func (f *TrieStorage) UpdateRegisters(
 	return newStateCommitment, nil
 }
 
-// Warning this should only be used on small trees
-func (f *TrieStorage) Print(stateCommitment flow.StateCommitment) {
-	f.tree.Print(stateCommitment)
-}
-
 // GetRegistersWithProof read the values at the given registers at the given flow.StateCommitment
 // This is untrusted so a proof is generated
 func (f *TrieStorage) GetRegistersWithProof(
