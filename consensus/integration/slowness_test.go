@@ -531,6 +531,9 @@ func TestOneDelayed(t *testing.T) {
 
 	<-stopper.stopped
 
+	for i := range nodes {
+		printState(t, nodes, i)
+	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
 	assertLiveness(t, allViews, 90)

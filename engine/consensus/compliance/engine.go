@@ -127,7 +127,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			e.log.Error().Err(err).Msg("compliance could not process submitted event")
 		}
 	})
 }
@@ -441,7 +441,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// see if the block is a valid extension of the protocol state
 	err = e.state.Mutate().Extend(header.ID())
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state: %w", err)
+		return fmt.Errorf("could not extend protocol state: %v %w", header.View, err)
 	}
 
 	// retrieve the parent

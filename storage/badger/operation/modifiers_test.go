@@ -3,6 +3,8 @@
 package operation
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -39,5 +41,53 @@ func TestSkipDuplicates(t *testing.T) {
 		})
 
 		assert.Equal(t, val, act)
+	})
+}
+
+func TestRetryOnConflict(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		t.Run("good op", func(t *testing.T) {
+			goodOp := func(*badger.Txn) error {
+				return nil
+			}
+			err := db.Update(RetryOnConflict(goodOp))
+			require.NoError(t, err)
+		})
+
+		t.Run("conflict op should be retried", func(t *testing.T) {
+			n := 0
+			conflictOp := func(*badger.Txn) error {
+				n++
+				if n > 3 {
+					return nil
+				}
+				return badger.ErrConflict
+			}
+			err := db.Update(RetryOnConflict(conflictOp))
+			require.NoError(t, err)
+		})
+
+		t.Run("wrapped conflict op should be retried", func(t *testing.T) {
+			n := 0
+			conflictOp := func(*badger.Txn) error {
+				n++
+				if n > 3 {
+					return nil
+				}
+				return fmt.Errorf("wrap error: %w", badger.ErrConflict)
+			}
+			err := db.Update(RetryOnConflict(conflictOp))
+			require.NoError(t, err)
+		})
+
+		t.Run("other error should be returned", func(t *testing.T) {
+			otherError := errors.New("other error")
+			failOp := func(*badger.Txn) error {
+				return otherError
+			}
+
+			err := db.Update(RetryOnConflict(failOp))
+			require.Equal(t, otherError, err)
+		})
 	})
 }
