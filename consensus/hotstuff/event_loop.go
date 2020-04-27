@@ -191,8 +191,3 @@ func (el *EventLoop) Ready() <-chan struct{} {
 func (el *EventLoop) Done() <-chan struct{} {
 	return el.unit.Done()
 }
-
-// Wait implements a function to wait for the event loop to exit.
-func (el *EventLoop) Wait() <-chan struct{} {
-	return el.unit.Quit()
-}
