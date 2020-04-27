@@ -33,6 +33,7 @@ import (
 
 // TestSuite contains the context of a verifier engine test using mocked components.
 type TestSuite struct {
+	sync.Mutex // to provide mutual exclusion of mocked objects
 	suite.Suite
 	net   *module.Network
 	state *protocol.State
@@ -176,14 +177,25 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 // TestHandleBlock passes a block to ingest engine and evaluates internal path
 // as ingest engine only accepts a block through consensus follower, it should return an error
 func (suite *TestSuite) TestHandleBlock() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	eng := suite.TestNewEngine()
 	err := eng.Process(unittest.IdentifierFixture(), suite.block)
 	assert.Equal(suite.T(), err, ingest.ErrInvType)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 // TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
 // but not the collections, it asks for the collections through the network
 func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	eng := suite.TestNewEngine()
 
 	// mocks identities
@@ -233,7 +245,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 
-	/////
+	//
 	// mocks functionalities
 	//
 	// adding functionality of chunk tracker to trackers mempool
@@ -292,11 +304,18 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 // TestHandleReceipt_MissingChunkDataPack evaluates that when ingest engine has both a receipt and its block
 // but not the chunk data pack of it, it asks for the chunk data pack through the network
 func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	eng := suite.TestNewEngine()
 
 	// mocks identities
@@ -395,10 +414,17 @@ func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 // TestIngestedResult evaluates the happy path of submitting an execution receipt with an already ingested result
 func (suite *TestSuite) TestIngestedResult() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	eng := suite.TestNewEngine()
 
 	// mocks this receipt's result as ingested
@@ -407,10 +433,17 @@ func (suite *TestSuite) TestIngestedResult() {
 	// nothing else is mocked, hence the process should simply return nil
 	err := eng.Process(unittest.IdentifierFixture(), suite.receipt)
 	require.NoError(suite.T(), err)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 // TestIngestedChunk evaluates the happy path of submitting a chunk data pack for an already ingested chunk
 func (suite *TestSuite) TestIngestedChunk() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	eng := suite.TestNewEngine()
 
 	// creates a chunk fixture, its data pack, and the data pack response
@@ -423,6 +456,9 @@ func (suite *TestSuite) TestIngestedChunk() {
 	// nothing else is mocked, hence the process should simply return nil
 	err := eng.Process(unittest.IdentifierFixture(), chunkDataPackResponse)
 	require.NoError(suite.T(), err)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 // TestHandleReceipt_UnstakedSender evaluates sending an execution receipt from an unstaked node
@@ -430,6 +466,10 @@ func (suite *TestSuite) TestIngestedChunk() {
 // Todo dropping unauthenticated receipts from cache
 // https://github.com/dapperlabs/flow-go/issues/2966
 func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	eng := suite.TestNewEngine()
 
 	myIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -469,6 +509,9 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
@@ -476,6 +519,10 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 
 	for _, role := range invalidRoles {
 		suite.Run(fmt.Sprintf("role: %s", role), func() {
+			// locks to run the test cases sequentially
+			suite.Lock()
+			defer suite.Unlock()
+
 			// refresh test state in between each loop
 			suite.SetupTest()
 			eng := suite.TestNewEngine()
@@ -497,14 +544,20 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 
 			// verifier should not be called
 			suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+			// waits for the engine to get shutdown
+			<-eng.Done()
 		})
-
 	}
+
 }
 
 // TestHandleCollection_Tracked evaluates receiving a tracked collection without any other receipt-dependent resources
 // the collection should be added to the authenticate collection pool, and tracker should be removed
 func (suite *TestSuite) TestHandleCollection_Tracked() {
+	// locks to run the tests sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	eng := suite.TestNewEngine()
 
 	// mock the collection coming from an collection node
@@ -531,11 +584,18 @@ func (suite *TestSuite) TestHandleCollection_Tracked() {
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 // TestHandleCollection_Untracked evaluates receiving an  un-tracked collection
 // It expects that the collection to be added to the pending receipts
 func (suite *TestSuite) TestHandleCollection_Untracked() {
+	// Locks to run the tests sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	eng := suite.TestNewEngine()
 
 	// mock the collection coming from an collection node
@@ -563,6 +623,8 @@ func (suite *TestSuite) TestHandleCollection_Untracked() {
 	// does not expect tracker to be removed from trackers mempool
 	suite.collectionTrackers.AssertNotCalled(suite.T(), "Rem", suite.collection.ID())
 
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 // TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
@@ -570,6 +632,10 @@ func (suite *TestSuite) TestHandleCollection_Untracked() {
 // TODO pending collections cleanup
 // https://github.com/dapperlabs/flow-go/issues/2966
 func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
+	// locks to run the tests sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	eng := suite.TestNewEngine()
 
 	// mock the receipt coming from an unstaked node
@@ -589,15 +655,20 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 
 	// should not call verifier
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 // TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
 // process method should return an error
 func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
-
 	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
 
 	for _, role := range invalidRoles {
+		// locks to run the test sequentially
+		suite.Lock()
+
 		// refresh test state in between each loop
 		suite.SetupTest()
 		eng := suite.TestNewEngine()
@@ -615,13 +686,16 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 
 		// should not add collection to mempool
 		suite.authCollections.AssertNotCalled(suite.T(), "Add", suite.collection)
+
+		// waits for the engine to get shutdown
+		<-eng.Done()
+		suite.Unlock()
 	}
 }
 
 // TestVerifyReady evaluates that a verifiable chunk is locally passed to the verifier engine
 // whenever all of its relevant resources are ready regardless of the order in which dependent resources are received.
 func (suite *TestSuite) TestVerifyReady() {
-
 	// Mocking identities
 	//
 	// required roles
@@ -647,6 +721,10 @@ func (suite *TestSuite) TestVerifyReady() {
 
 	for _, testcase := range testcases {
 		suite.Run(testcase.label, func() {
+			// locks to run the tests sequentially
+			suite.Lock()
+			defer suite.Unlock()
+
 			suite.SetupTest()
 			eng := suite.TestNewEngine()
 			// mocks state snapshot to validate identity of test case origin
@@ -753,6 +831,9 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, collIdentity)
 			// asserts the chunk state should not be requested
 			suite.statesConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, execIdentity)
+
+			// waits for the engine to get shutdown
+			<-eng.Done()
 		})
 	}
 }
@@ -760,6 +841,10 @@ func (suite *TestSuite) TestVerifyReady() {
 // TestChunkDataPackTracker_UntrackedChunkDataPack tests that ingest engine process method returns an error
 // if it receives a ChunkDataPackResponse that does not have any tracker in the engine's mempool
 func (suite *TestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
+	// locks to run the tests sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	suite.SetupTest()
 	eng := suite.TestNewEngine()
 
@@ -781,10 +866,17 @@ func (suite *TestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
 	// asserts that process of an untracked chunk data pack returns with an error
 	suite.Assert().NotNil(err)
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
 
 // TestChunkDataPackTracker_HappyPath evaluates the happy path of receiving a chunk data pack upon a request
 func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
 	suite.SetupTest()
 	eng := suite.TestNewEngine()
 
@@ -830,4 +922,7 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.state.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
 	suite.authReceipts.AssertExpectations(suite.T())
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 }
