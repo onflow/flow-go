@@ -188,16 +188,20 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 	}
 }
 
-// iterate iterates over a range of keys defined by a start and end key.
+// iterate iterates over a range of keys defined by a start and end key. The
+// start key may be higher than the end key, in which case we iterate in
+// reverse order.
 //
-// The start key is the first key in the iteration and the lexicographically
-// smallest key in the iteration. The end key is last key in the iteration
-// and the lexicographically largest key in the iteration.
+// The iteration range uses prefix-wise semantics. Specifically, all keys that
+// meet ANY of the following conditions are included in the iteration:
+//   * have a prefix equal to the start key OR
+//   * have a prefix equal to the end key OR
+//   * have a prefix that is lexicographically between start and end
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
 //
-// TODO: this function is unbounded – pass context.Context to this or calling
+//TODO: this function is unbounded – pass context.Context to this or calling
 // functions to allow timing functions out.
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
@@ -206,21 +210,47 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 		modifier := 1
 		options := badger.DefaultIteratorOptions
 
+		// In order to satisfy this function's prefix-wise inclusion semantics,
+		// we append 256 0xff bytes to the largest of start and end.
+		// This ensures Badger will seek to the largest key with that prefix
+		// for reverse iteration, thus including all keys with a prefix matching
+		// the starting key. It also enables us to detect boundary conditions by
+		// simple lexicographic comparison (ie. bytes.Compare) rather than
+		// explicitly comparing prefixes.
+		//
+		// NOTE: This is guaranteed to work, so long as keys don't have lengths
+		// greater than 256 bytes above and beyond the specified start/end keys.
+		// It will also work for larger keys, so long as their 256 bytes above
+		// the top-most prefix contain any zeroes.
+		//
+		// See https://github.com/dapperlabs/flow-go/pull/3310#issuecomment-618127494
+		// for discussion and more detail on this.
+		suffix := make([]byte, 256)
+		for i := range suffix {
+			suffix[i] = 0xff
+		}
+
 		// If start is bigger than end, we have a backwards iteration:
-		// 1) Seek will go to the first key that is equal or lesser than the
-		// start prefix. However, this will only include the first key with the
-		// start prefix; we need to add 0xff to the start prefix to cover all
-		// items with the start prefix.
-		// 2) We break the loop upon hitting the first item that has a key
-		// higher than the end prefix. In order to reverse this, we use a
-		// modifier for the comparison that reverses the check and makes it
-		// stop upon the first item before the end prefix.
-		// 3) We also set the reverse option on the iterator, so we step through
-		// all of the keys backwards.
+		// 1) We set the reverse option on the iterator, so we step through all
+		//    the keys backwards. This modifies the behaviour of Seek to go to
+		//    the first key that is less than or equal to the start key (as
+		//    opposed to greater than or equal in a regular iteration).
+		// 2) In order to satisfy this function's prefix-wise inclusion semantics,
+		//    we append the 256-0xff-byte suffix to the start key so the seek
+		//    will go to the right place.
+		// 3) For a regular iteration, we break the loop upon hitting the first
+		//    item that has a key higher than the end prefix. In order to reverse
+		//    this, we use a modifier for the comparison that reverses the check
+		//    and makes it stop upon the first item lower than the end prefix.
 		if bytes.Compare(start, end) > 0 {
-			options.Reverse = true      // make sure to go in reverse order
-			start = append(start, 0xff) // make sure to start after start prefix
-			modifier = -1               // make sure to stop before end prefix
+			options.Reverse = true           // make sure to go in reverse order
+			start = append(start, suffix...) // include all keys with prefix matching start
+			modifier = -1                    // make sure to stop after end prefix
+		} else {
+			// for forward iteration, add the 256-0xff-byte suffix to the end
+			// prefix, to ensure we include all keys with that prefix before
+			// finishing.
+			end = append(end, suffix...)
 		}
 
 		it := tx.NewIterator(options)
@@ -230,16 +260,10 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 
 			item := it.Item()
 
-			// check if we have reached the end of our iteration
-			// NOTE: we have to cut down the prefix to the same length as the
-			// end prefix in order to go through all items that have the same
-			// partial prefix before breaking
 			key := item.Key()
-			if len(end) > len(key) {
-				continue
-			}
-			prefix := key[0:len(end)]
-			if bytes.Compare(prefix, end)*modifier > 0 {
+			// for forward iteration, check whether key > end, for backward
+			// iteration check whether key < end
+			if bytes.Compare(key, end)*modifier > 0 {
 				break
 			}
 
@@ -340,6 +364,16 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 	}
 }
 
+// payloadIterRange determines start and end prefixes for an iteration through
+// a range of block heights within a payload index created using `toPayloadIndex`
+// `from` and `to` are the endpoints of the iteration range. Both will be
+// included in the iteration.
+func payloadIterRange(code uint8, from, to uint64) (start, end []byte) {
+	start = makePrefix(code, from)
+	end = makePrefix(code, to)
+	return
+}
+
 func toPayloadIndex(code uint8, height uint64, blockID flow.Identifier, parentID flow.Identifier) []byte {
 	return makePrefix(code, height, blockID, parentID)
 }
@@ -359,6 +393,9 @@ func fromPayloadIndex(key []byte) (uint64, flow.Identifier, flow.Identifier) {
 //
 // This is useful for verifying an existing payload, for example in a block
 // proposal from another node, where the desired output is accept/reject.
+//
+// Use `payloadIterRange` to obtain start/end prefixes for iterations using
+// this function.
 func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterationFunc {
 
 	// build lookup table for payload entities
@@ -411,6 +448,9 @@ func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterat
 //
 // This is useful when building a payload locally, where we want to know which
 // entities are valid for inclusion so we can produce a valid block proposal.
+//
+// Use `payloadIterRange` to obtain start/end prefixes for iterations using
+// this function.
 func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) iterationFunc {
 
 	// build lookup table for candidate payload entities

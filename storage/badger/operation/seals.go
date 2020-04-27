@@ -29,11 +29,13 @@ func LookupSealPayload(height uint64, blockID flow.Identifier, parentID flow.Ide
 // VerifySealPayload verifies that the candidate seal IDs don't exist
 // in any ancestor block.
 func VerifySealPayload(height uint64, blockID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
-	return iterate(makePrefix(codeIndexSeal, height), makePrefix(codeIndexSeal, uint64(0)), validatepayload(blockID, sealIDs))
+	start, end := payloadIterRange(codeIndexSeal, height, 0)
+	return iterate(start, end, validatepayload(blockID, sealIDs))
 }
 
 // CheckSealPayload populates `invalidIDs` with any IDs in the candidate
 // set that already exist in an ancestor block.
 func CheckSealPayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	return iterate(makePrefix(codeIndexSeal, height), makePrefix(codeIndexSeal, uint64(0)), searchduplicates(blockID, candidateIDs, invalidIDs))
+	start, end := payloadIterRange(codeIndexSeal, height, 0)
+	return iterate(start, end, searchduplicates(blockID, candidateIDs, invalidIDs))
 }
