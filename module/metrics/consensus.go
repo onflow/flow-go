@@ -53,6 +53,12 @@ var (
 		Subsystem: "hotstuff",
 		Help:      "the duration of how long hotstuff's event loop has been busy processing one event",
 	}, []string{"event_type"})
+	hotstuffBusySecondsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name:      "busy_seconds_total",
+		Namespace: namespaceConsensus,
+		Subsystem: "hotstuff",
+		Help:      "the total seconds hotstuff has spent in a busy state",
+	}, []string{"event_type"})
 	hotstuffIdleDuration = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "idle_duration",
 		Namespace: namespaceConsensus,
@@ -117,6 +123,10 @@ func (c *Collector) SealsInFinalizedBlock(count int) {
 // HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
 func (c *Collector) HotStuffBusyDuration(duration time.Duration, event string) {
 	hotstuffBusyDuration.WithLabelValues(event).Set(float64(duration))
+}
+
+func (c *Collector) HotStuffBusySecondsTotalAdd(duration time.Duration, event string) {
+	hotstuffBusySecondsTotal.WithLabelValues(event).Add(duration.Seconds())
 }
 
 // HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
