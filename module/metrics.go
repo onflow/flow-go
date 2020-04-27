@@ -59,9 +59,6 @@ type Metrics interface {
 	// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
 	HotStuffBusyDuration(duration time.Duration, event string)
 
-	// Total time HotStuff has spent in a busy state
-	HotStuffBusySecondsTotalAdd(duration time.Duration, event string)
-
 	// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 	HotStuffIdleDuration(duration time.Duration)
 

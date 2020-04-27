@@ -123,9 +123,6 @@ func (c *Collector) SealsInFinalizedBlock(count int) {
 // HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
 func (c *Collector) HotStuffBusyDuration(duration time.Duration, event string) {
 	hotstuffBusyDuration.WithLabelValues(event).Set(float64(duration))
-}
-
-func (c *Collector) HotStuffBusySecondsTotalAdd(duration time.Duration, event string) {
 	hotstuffBusySecondsTotal.WithLabelValues(event).Add(duration.Seconds())
 }
 

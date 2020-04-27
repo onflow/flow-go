@@ -82,10 +82,6 @@ func (_m *Metrics) HotStuffBusyDuration(duration time.Duration, event string) {
 	_m.Called(duration, event)
 }
 
-func (_m *Metrics) HotStuffBusySecondsTotalAdd(duration time.Duration, event string) {
-	_m.Called(duration, event)
-}
-
 // HotStuffIdleDuration provides a mock function with given fields: duration
 func (_m *Metrics) HotStuffIdleDuration(duration time.Duration) {
 	_m.Called(duration)

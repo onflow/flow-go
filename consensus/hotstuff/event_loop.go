@@ -79,7 +79,6 @@ func (el *EventLoop) loop() {
 
 			// measure how long it takes for a timeout event to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
-			el.metrics.HotStuffBusySecondsTotalAdd(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
 
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process timeout")
@@ -108,7 +107,6 @@ func (el *EventLoop) loop() {
 
 			// measure how long it takes for a timeout event to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
-			el.metrics.HotStuffBusySecondsTotalAdd(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
 
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process timeout")
@@ -126,7 +124,6 @@ func (el *EventLoop) loop() {
 
 			// measure how long it takes for a proposal to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
-			el.metrics.HotStuffBusySecondsTotalAdd(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
 
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process proposal")
@@ -144,7 +141,6 @@ func (el *EventLoop) loop() {
 
 			// measure how long it takes for a vote to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnVote)
-			el.metrics.HotStuffBusySecondsTotalAdd(time.Since(processStart), metrics.HotstuffEventTypeOnVote)
 
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process vote")
@@ -163,7 +159,6 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
 	el.metrics.HotStuffBusyDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
-	el.metrics.HotStuffBusySecondsTotalAdd(time.Since(received), metrics.HotstuffEventTypeOnProposal)
 }
 
 // SubmitVote pushes the received vote to the votes channel
