@@ -23,7 +23,7 @@ Running `-push` will perform the following actions:
    - `<id>.node-info.pub.json`
 
 ## Pull
-After Genesis, rulling `-pull` will:
+After Genesis, running `-pull` will:
 
 1. Fetch the following files:
    - `dkg-data.pub.json`

@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
@@ -42,7 +43,11 @@ var (
 var gcsClient *storage.Client
 
 func init() {
-	cli, err := storage.NewClient(context.Background())
+	// timeout for setting up the client
+	ctx, err := context.WithTimeout(context.Background(), time.Second * 30)
+	defer cancel()
+
+	cli, err := storage.NewClient(ctx)
 	if err != nil {
 		log.Fatalf("Failed to initialize GCS client: %s", err)
 	}
@@ -254,7 +259,8 @@ func wrapFile(bootdir, nodeId string) error {
 func bucketUpload(bootdir, filename, token string) error {
 	path := filepath.Join(bootdir, filename)
 	log.Printf("Uploading %s\n", path)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 30)
+	defer cancel()
 
 	upload := gcsClient.Bucket(flowBucket).
 		Object(filepath.Join(token, filename)).
@@ -278,7 +284,8 @@ func bucketUpload(bootdir, filename, token string) error {
 func bucketDownload(bootdir, filename, token string) error {
 	path := filepath.Join(bootdir, filename)
 	log.Printf("Uploading %s\n", path)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 30)
+	defer cancel()
 
 	download, err := gcsClient.Bucket(flowBucket).
 		Object(filepath.Join(token, filename)).
