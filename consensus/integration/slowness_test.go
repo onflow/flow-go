@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -528,23 +529,55 @@ func TestOneDelayed(t *testing.T) {
 
 	<-stopper.stopped
 
-	// verify all nodes arrive the same state
-	for i := 0; i < len(nodes); i++ {
-		printState(t, nodes, i)
-	}
-	for i := 1; i < len(nodes); i++ {
-		n := nodes[i]
-		headerN, err := n.state.Final().Head()
-		require.NoError(t, err)
-		require.Greater(t, headerN.View, uint64(90))
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, 90)
+	cleanupNodes(nodes)
+}
+
+func allFinalizedViews(t *testing.T, nodes []*Node) [][]uint64 {
+	allViews := make([][]uint64, 0)
+
+	// verify all nodes arrive at the same state
+	for _, node := range nodes {
+		views := chainViews(t, node)
+		allViews = append(allViews, views)
 	}
 
-	cleanupNodes(nodes)
+	// sort all Views by chain length
+	sort.Slice(allViews, func(i, j int) bool {
+		return len(allViews[i]) < len(allViews[j])
+	})
+
+	return allViews
+}
+
+func assertSafety(t *testing.T, allViews [][]uint64) {
+	// find the longest chain of finalized views
+	longest := allViews[len(allViews)-1]
+
+	for _, views := range allViews {
+		// each view in a chain should match with the longest chain
+		for j, view := range views {
+			require.Equal(t, longest[j], view, "each view in a chain must match with the view in longest chain at the same height, but didn't")
+		}
+	}
+}
+
+// assert all finalized views must have reached a given view to ensure enough process has been made
+func assertLiveness(t *testing.T, allViews [][]uint64, view uint64) {
+	// the shortest chain must made enough progress
+	shortest := allViews[0]
+	highestView := shortest[len(shortest)-1]
+	require.Greater(t, highestView, view)
+}
+
+func TestSomeDelayed(t *testing.T) {
 }
 
 func printState(t *testing.T, nodes []*Node, i int) {
 	n := nodes[i]
-	headerN, err := nodes[i].state.Final().Head()
+	headerN, err := n.state.Final().Head()
 	require.NoError(t, err)
 	// fmt.Printf("instance %v view:%v, height: %v,received proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
 	// 	i, headerN.View, headerN.Height, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
@@ -574,7 +607,14 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 		head, err = node.headers.ByBlockID(head.ParentID)
 		require.NoError(t, err)
 	}
-	return views
+
+	// reverse all views to start from lower view to higher view
+
+	low2high := make([]uint64, 0)
+	for i := len(views) - 1; i >= 0; i-- {
+		low2high = append(low2high, views[i])
+	}
+	return low2high
 }
 
 type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
