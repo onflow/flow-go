@@ -1,8 +1,6 @@
 package convert
 
 import (
-	"fmt"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkconvert "github.com/onflow/flow-go-sdk/client/convert"
 
@@ -11,14 +9,11 @@ import (
 )
 
 func TxFromSDK(sdkTx sdk.Transaction) flow.TransactionBody {
-	fmt.Printf("sdk: %s\n", sdkTx.ReferenceBlockID)
 	proto := sdkconvert.TransactionToMessage(sdkTx)
-	fmt.Printf("proto: %x\n", proto.GetReferenceBlockId())
 	tx, err := convert.MessageToTransaction(proto)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("flow: %s\n", tx.ReferenceBlockID)
 	return tx
 }
 
