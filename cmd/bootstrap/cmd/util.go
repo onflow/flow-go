@@ -52,7 +52,7 @@ func writeJSON(filename string, data interface{}) {
 func writeText(filename string, data []byte) {
 	path := filepath.Join(flagOutdir, filename)
 
-	err = os.MkdirAll(filepath.Dir(path), 0755)
+	err := os.MkdirAll(filepath.Dir(path), 0755)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not create output dir")
 	}
@@ -63,14 +63,6 @@ func writeText(filename string, data []byte) {
 	}
 
 	log.Info().Msgf("wrote file %v", path)
-}
-
-func pubKeyToBytes(key crypto.PublicKey) []byte {
-	enc, err := key.Encode()
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot encode public key")
-	}
-	return enc
 }
 
 func pubKeyToString(key crypto.PublicKey) string {

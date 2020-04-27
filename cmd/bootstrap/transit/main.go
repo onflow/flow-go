@@ -44,7 +44,7 @@ var gcsClient *storage.Client
 
 func init() {
 	// timeout for setting up the client
-	ctx, err := context.WithTimeout(context.Background(), time.Second * 30)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 30)
 	defer cancel()
 
 	cli, err := storage.NewClient(ctx)
@@ -212,7 +212,7 @@ func unwrapFile(bootdir, nodeId string) error {
 	plaintext := make([]byte, 0, len(ciphertext)-box.AnonymousOverhead)
 	plaintext, ok := box.OpenAnonymous(plaintext, ciphertext, &pubKeyBytes, &privKeyBytes)
 	if !ok {
-		return fmt.Errorf("Failed to decrypt ciphertext: unknown error")
+		return fmt.Errorf("Failed to decrypt ciphertext: unknown error in NaCl")
 	}
 
 	err = ioutil.WriteFile(plaintextPath, plaintext, fileMode)
