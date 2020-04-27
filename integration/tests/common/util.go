@@ -49,7 +49,12 @@ func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
 	script := dsl.Main{
 		ReturnType: "Int",
-		Code:       "return getAccount(0x01).published[&Testing.Counter]?.count ?? -3",
+		Code: `
+			let account = getAccount(0x01)
+			if let cap = account.getCapability(/public/counter) {
+				return cap.borrow<&Testing.Counter>()?.count ?? -3
+			}
+			return -3`,
 	}
 
 	res, err := client.ExecuteScript(ctx, script)
@@ -74,12 +79,17 @@ func createCounter(ctx context.Context, client *testnet.Client) error {
 		Import: dsl.Import{Address: flow.RootAddress},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
-				if signer.storage[Testing.Counter] == nil {
-				let existing <- signer.storage[Testing.Counter] <- Testing.createCounter()
-            	    destroy existing
-            	    signer.published[&Testing.Counter] = &signer.storage[Testing.Counter] as Testing.Counter
-            	}
-            	signer.published[&Testing.Counter]?.add(2)`),
+				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
+				
+				if maybeCounter == nil {
+					maybeCounter <-! Testing.createCounter()
+				}
+				
+				maybeCounter?.add(2)
+				signer.save(<-maybeCounter!, to: /storage/counter)
+				
+				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+				`),
 		},
 	}
 
