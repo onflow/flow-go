@@ -86,8 +86,9 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 // Remove stops the network and cleans up all resources. If you need to inspect
 // state, first stop the containers, then check state, then clean up resources.
 func (net *FlowNetwork) Remove() {
+	// defer Cleanup to ensure it is run, even if Stop fails
+	defer net.Cleanup()
 	net.Stop()
-	net.Cleanup()
 }
 
 // Stop disconnects and stops all containers in the network, then
@@ -95,9 +96,13 @@ func (net *FlowNetwork) Remove() {
 func (net *FlowNetwork) Stop() {
 	fmt.Println("<<<< stopping network: ", net.config.Name)
 	err := net.suite.Close()
-	require.Nil(net.t, err, "failed to stop network")
+	if !assert.Nil(net.t, err, "failed to stop network") {
+		defer net.t.FailNow()
+	}
 	err = net.suite.Remove()
-	require.Nil(net.t, err, "failed to remove network")
+	if !assert.Nil(net.t, err, "failed to remove network") {
+		defer net.t.FailNow()
+	}
 }
 
 // Cleanup cleans up all temporary files used by the network.
