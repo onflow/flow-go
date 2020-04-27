@@ -208,7 +208,9 @@ func (s *Stopper) stopAll() {
 		wg.Add(1)
 		// stop compliance will also stop both hotstuff and synchronization engine
 		go func(i int) {
-			<-s.nodes[i].compliance.Done()
+			// TODO better to wait until it's done, but needs to figure out why hotstuff.Done doesn't finish
+			s.nodes[i].compliance.Done()
+			<-s.nodes[i].hot.Wait()
 			wg.Done()
 		}(i)
 	}
