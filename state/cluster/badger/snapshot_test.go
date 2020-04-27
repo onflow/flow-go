@@ -2,135 +2,153 @@ package badger
 
 import (
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
+	model "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+type SnapshotSuite struct {
+	suite.Suite
+	db    *badger.DB
+	dbdir string
+
+	genesis *model.Block
+	chainID string
+
+	state   cluster.State
+	mutator cluster.Mutator
+}
+
+// runs before each test runs
+func (suite *SnapshotSuite) SetupTest() {
+	var err error
+
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
+
+	suite.genesis = model.Genesis()
+	suite.chainID = suite.genesis.ChainID
+
+	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
+
+	suite.state, err = NewState(suite.db, suite.chainID)
+	suite.Assert().Nil(err)
+	suite.mutator = suite.state.Mutate()
+
+	suite.Bootstrap()
+}
+
+// runs after each test finishes
+func (suite *SnapshotSuite) TearDownTest() {
+	err := suite.db.Close()
+	suite.Assert().Nil(err)
+	err = os.RemoveAll(suite.dbdir)
+	suite.Assert().Nil(err)
+}
+
+func (suite *SnapshotSuite) Bootstrap() {
+	err := suite.mutator.Bootstrap(suite.genesis)
+	suite.Assert().Nil(err)
+}
+
+func (suite *SnapshotSuite) InsertBlock(block model.Block) {
+	err := suite.db.Update(procedure.InsertClusterBlock(&block))
+	suite.Assert().Nil(err)
+}
+
 func TestSnapshot(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	suite.Run(t, new(SnapshotSuite))
+}
 
-		genesis := cluster.Genesis()
-		chainID := genesis.ChainID
+func (suite *SnapshotSuite) TestNonexistentBlock() {
+	t := suite.T()
 
-		// a helper function to wipe the DB to clean up in between tests
-		cleanup := func() {
-			err := db.DropAll()
-			require.Nil(t, err)
-		}
+	nonexistentBlockID := unittest.IdentifierFixture()
+	snapshot := suite.state.AtBlockID(nonexistentBlockID)
 
-		// seed the RNG
-		rand.Seed(time.Now().UnixNano())
+	_, err := snapshot.Collection()
+	assert.Error(t, err)
 
-		state, err := NewState(db, chainID)
-		require.Nil(t, err)
-		mutator := state.Mutate()
+	_, err = snapshot.Head()
+	assert.Error(t, err)
+}
 
-		// a helper function to bootstrap with the genesis block
-		bootstrap := func() {
-			err = mutator.Bootstrap(genesis)
-			assert.Nil(t, err)
-		}
+func (suite *SnapshotSuite) TestAtBlockID() {
+	t := suite.T()
 
-		// a helper function to insert a block
-		insert := func(block cluster.Block) {
-			err = db.Update(procedure.InsertClusterBlock(&block))
-			assert.Nil(t, err)
-		}
+	snapshot := suite.state.AtBlockID(suite.genesis.ID())
 
-		t.Run("nonexistent block", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
+	// ensure collection is correct
+	coll, err := snapshot.Collection()
+	assert.Nil(t, err)
+	assert.Equal(t, &suite.genesis.Collection, coll)
 
-			nonexistentBlockID := unittest.IdentifierFixture()
-			snapshot := state.AtBlockID(nonexistentBlockID)
+	// ensure head is correct
+	head, err := snapshot.Head()
+	assert.Nil(t, err)
+	assert.Equal(t, suite.genesis.ID(), head.ID())
+}
 
-			_, err = snapshot.Collection()
-			assert.Error(t, err)
+func (suite *SnapshotSuite) TestEmptyCollection() {
+	t := suite.T()
 
-			_, err = snapshot.Head()
-			assert.Error(t, err)
-		})
+	// create a block with an empty collection
+	block := unittest.ClusterBlockWithParent(suite.genesis)
+	block.SetPayload(model.EmptyPayload())
+	suite.InsertBlock(block)
 
-		t.Run("at block ID", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
+	snapshot := suite.state.AtBlockID(block.ID())
 
-			snapshot := state.AtBlockID(genesis.ID())
+	// ensure collection is correct
+	coll, err := snapshot.Collection()
+	assert.Nil(t, err)
+	assert.Equal(t, &block.Collection, coll)
+}
 
-			// ensure collection is correct
-			coll, err := snapshot.Collection()
-			assert.Nil(t, err)
-			assert.Equal(t, &genesis.Collection, coll)
+func (suite *SnapshotSuite) TestFinalizedBlock() {
+	t := suite.T()
 
-			// ensure head is correct
-			head, err := snapshot.Head()
-			assert.Nil(t, err)
-			assert.Equal(t, genesis.ID(), head.ID())
-		})
+	// create a new finalized block on genesis (height=1)
+	finalizedBlock1 := unittest.ClusterBlockWithParent(suite.genesis)
+	suite.InsertBlock(finalizedBlock1)
+	err := suite.mutator.Extend(finalizedBlock1.ID())
+	assert.Nil(t, err)
 
-		t.Run("with empty collection", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
+	// create an un-finalized block on genesis (height=1)
+	unFinalizedBlock1 := unittest.ClusterBlockWithParent(suite.genesis)
+	suite.InsertBlock(unFinalizedBlock1)
+	err = suite.mutator.Extend(unFinalizedBlock1.ID())
+	assert.Nil(t, err)
 
-			// create a block with an empty collection
-			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(cluster.EmptyPayload())
-			insert(block)
+	// create a second un-finalized on top of the finalized block (height=2)
+	unFinalizedBlock2 := unittest.ClusterBlockWithParent(&finalizedBlock1)
+	suite.InsertBlock(unFinalizedBlock2)
+	err = suite.mutator.Extend(unFinalizedBlock2.ID())
+	assert.Nil(t, err)
 
-			snapshot := state.AtBlockID(block.ID())
+	// finalize the block
+	err = suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock1.ID()))
+	assert.Nil(t, err)
 
-			// ensure collection is correct
-			coll, err := snapshot.Collection()
-			assert.Nil(t, err)
-			assert.Equal(t, &block.Collection, coll)
-		})
+	// get the final snapshot, should map to finalizedBlock1
+	snapshot := suite.state.Final()
 
-		t.Run("finalized block", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
+	// ensure collection is correct
+	coll, err := snapshot.Collection()
+	assert.Nil(t, err)
+	assert.Equal(t, &finalizedBlock1.Collection, coll)
 
-			// create a new finalized block on genesis (height=1)
-			finalizedBlock1 := unittest.ClusterBlockWithParent(genesis)
-			insert(finalizedBlock1)
-			err = mutator.Extend(finalizedBlock1.ID())
-			assert.Nil(t, err)
-
-			// create an un-finalized block on genesis (height=1)
-			unFinalizedBlock1 := unittest.ClusterBlockWithParent(genesis)
-			insert(unFinalizedBlock1)
-			err = mutator.Extend(unFinalizedBlock1.ID())
-			assert.Nil(t, err)
-
-			// create a second un-finalized on top of the finalized block (height=2)
-			unFinalizedBlock2 := unittest.ClusterBlockWithParent(&finalizedBlock1)
-			insert(unFinalizedBlock2)
-			err = mutator.Extend(unFinalizedBlock2.ID())
-			assert.Nil(t, err)
-
-			// finalize the block
-			err = db.Update(procedure.FinalizeClusterBlock(finalizedBlock1.ID()))
-			assert.Nil(t, err)
-
-			// get the final snapshot, should map to finalizedBlock1
-			snapshot := state.Final()
-
-			// ensure collection is correct
-			coll, err := snapshot.Collection()
-			assert.Nil(t, err)
-			assert.Equal(t, &finalizedBlock1.Collection, coll)
-
-			// ensure head is correct
-			head, err := snapshot.Head()
-			assert.Nil(t, err)
-			assert.Equal(t, finalizedBlock1.ID(), head.ID())
-		})
-	})
+	// ensure head is correct
+	head, err := snapshot.Head()
+	assert.Nil(t, err)
+	assert.Equal(t, finalizedBlock1.ID(), head.ID())
 }

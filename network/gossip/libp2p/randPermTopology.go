@@ -34,10 +34,10 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 
 	// use the node's identifier as the random generator seed
 	rndSeed := make([]byte, 32)
-	copy(rndSeed, []byte(seed))
+	copy(rndSeed, seed)
 	rng, err := random.NewRand(rndSeed)
 	if err != nil {
-		return nil, fmt.Errorf("cannot seec the prng: %w", err)
+		return nil, fmt.Errorf("cannot seed the prng: %w", err)
 	}
 
 	// find a random subset of the given size from the list
