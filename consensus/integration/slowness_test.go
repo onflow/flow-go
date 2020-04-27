@@ -133,7 +133,6 @@ func (c *StopperConsumer) OnEnteringView(view uint64) {
 }
 
 func (c *StopperConsumer) OnStartingTimeout(info *model.TimerInfo) {
-	// fmt.Printf("start timeout for view %v, timeout ends %v\n", info.View, info.Duration)
 	threshold := 30 * time.Second
 	if info.Duration > threshold {
 		panic(fmt.Sprintf("stop,%v", info.Duration))
@@ -209,7 +208,7 @@ func (s *Stopper) stopAll() {
 		wg.Add(1)
 		// stop compliance will also stop both hotstuff and synchronization engine
 		go func(i int) {
-			s.nodes[i].compliance.Done()
+			<-s.nodes[i].compliance.Done()
 			wg.Done()
 		}(i)
 	}
@@ -296,7 +295,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	// log with node index
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	// log := zerolog.New(ioutil.Discard).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
-	log := zerolog.New(os.Stderr).Level(zerolog.InfoLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(stopConsumer)
@@ -465,7 +464,7 @@ func blockProposals() BlockOrDelayFunc {
 func runNodes(nodes []*Node) {
 	for _, n := range nodes {
 		go func(n *Node) {
-			<-n.compliance.Ready()
+			n.compliance.Ready()
 		}(n)
 	}
 }
@@ -521,9 +520,11 @@ func Test5Nodes(t *testing.T) {
 }
 
 func TestOneDelayed(t *testing.T) {
-	nodes, stopper := createNodes(t, 5, 100)
+	// nodes, stopper := createNodes(t, 5, 100)
+	nodes, stopper := createNodes(t, 2, 100)
 
-	connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
+	// connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
+	connect(nodes, blockNothing)
 
 	runNodes(nodes)
 
