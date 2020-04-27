@@ -1,11 +1,11 @@
 package main
 
 import (
-	"testing"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
-	"io/ioutil"
-	"fmt"
+	"testing"
 
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 )
@@ -13,7 +13,6 @@ import (
 const nodeID string = "0000000000000000000000000000000000000000000000000000000000000001"
 
 func TestEndToEnd(t *testing.T) {
-
 
 	// Create a temp directory to work as "bootstrap"
 	bootdir, err := ioutil.TempDir("", "bootstrap.*")

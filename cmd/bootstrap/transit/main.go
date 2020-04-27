@@ -44,7 +44,7 @@ var gcsClient *storage.Client
 
 func init() {
 	// timeout for setting up the client
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 30)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	cli, err := storage.NewClient(ctx)
@@ -160,7 +160,7 @@ func generateKeys(bootdir, nodeId string) error {
 	log.Print("Generating keypair")
 
 	// Generate the keypair
-	priv, pub, err := box.GenerateKey(rand.Reader)
+	pub, priv, err := box.GenerateKey(rand.Reader)
 	if err != nil {
 		return fmt.Errorf("Failed to create keys: %w", err)
 	}
@@ -196,12 +196,12 @@ func unwrapFile(bootdir, nodeId string) error {
 
 	publicKey, err := ioutil.ReadFile(pubKeyPath)
 	if err != nil {
-		return fmt.Errorf("Faield to open public keyfile %s: %w", pubKeyPath, err)
+		return fmt.Errorf("Failed to open public keyfile %s: %w", pubKeyPath, err)
 	}
 
 	privateKey, err := ioutil.ReadFile(privKeyPath)
 	if err != nil {
-		return fmt.Errorf("Faield to open private keyfile %s: %w", privKeyPath, err)
+		return fmt.Errorf("Failed to open private keyfile %s: %w", privKeyPath, err)
 	}
 
 	// NaCl is picky and wants its type to be exactly a [32]byte, but readfile reads a slice
@@ -259,7 +259,7 @@ func wrapFile(bootdir, nodeId string) error {
 func bucketUpload(bootdir, filename, token string) error {
 	path := filepath.Join(bootdir, filename)
 	log.Printf("Uploading %s\n", path)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 30)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	upload := gcsClient.Bucket(flowBucket).
@@ -284,7 +284,7 @@ func bucketUpload(bootdir, filename, token string) error {
 func bucketDownload(bootdir, filename, token string) error {
 	path := filepath.Join(bootdir, filename)
 	log.Printf("Uploading %s\n", path)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 30)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	download, err := gcsClient.Bucket(flowBucket).
