@@ -46,19 +46,7 @@ func writeJSON(filename string, data interface{}) {
 		log.Fatal().Err(err).Msg("cannot marshal json")
 	}
 
-	path := filepath.Join(flagOutdir, filename)
-
-	err = os.MkdirAll(filepath.Dir(path), 0755)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not create output dir")
-	}
-
-	err = ioutil.WriteFile(path, bz, 0644)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not write file")
-	}
-
-	log.Info().Msgf("wrote file %v", path)
+	writeText(filename, bz)
 }
 
 func writeText(filename string, data []byte) {
