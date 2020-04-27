@@ -202,15 +202,15 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 
 // NewNodeConfigSet creates a set of node configs with the given role. The nodes
 // are given sequential IDs with a common prefix to make reading logs easier.
-func NewNodeConfigSet(n int, role flow.Role, opts ...func(*NodeConfig)) []NodeConfig {
+func NewNodeConfigSet(n uint, role flow.Role, opts ...func(*NodeConfig)) []NodeConfig {
 
 	// each node in the set has a common 4-digit prefix, separated from their
 	// index with a `0` character
-	idPrefix := rand.Intn(10000) * 100
+	idPrefix := uint(rand.Intn(10000) * 100)
 
 	confs := make([]NodeConfig, n)
-	for i := 0; i < n; i++ {
-		confs[i] = NewNodeConfig(role, append(opts, WithIDInt(uint(idPrefix+i+1)))...)
+	for i := uint(0); i < n; i++ {
+		confs[i] = NewNodeConfig(role, append(opts, WithIDInt(idPrefix+i+1))...)
 	}
 
 	return confs
