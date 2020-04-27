@@ -73,7 +73,7 @@ func (gs *GuaranteeSuite) SetupTest() {
 
 	// add the ghost node config
 	gs.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.ghostID), testnet.AsGhost(true))
+	ghostConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.ghostID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, ghostConfig)
 
 	// generate the network config

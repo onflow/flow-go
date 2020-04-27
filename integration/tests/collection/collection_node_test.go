@@ -109,7 +109,14 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 		err := client.SendTransaction(ctx, *malformed)
 		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
-
+	t.Run("expired transaction", func(t *testing.T) {
+		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
+		t.Skip()
+	})
+	t.Run("non-existent reference block ID", func(t *testing.T) {
+		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
+		t.Skip()
+	})
 	t.Run("unparseable script", func(t *testing.T) {
 		// TODO script parsing not implemented
 		t.Skip()
@@ -118,20 +125,12 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 		// TODO signature validation not implemented
 		t.Skip()
 	})
-	t.Run("invalid nonce", func(t *testing.T) {
+	t.Run("invalid sequence number", func(t *testing.T) {
 		// TODO nonce validation not implemented
 		t.Skip()
 	})
 	t.Run("insufficient payer balance", func(t *testing.T) {
 		// TODO balance checking not implemented
-		t.Skip()
-	})
-	t.Run("expired transaction", func(t *testing.T) {
-		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
-		t.Skip()
-	})
-	t.Run("non-existent reference block ID", func(t *testing.T) {
-		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
 		t.Skip()
 	})
 }
@@ -393,13 +392,12 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 			case <-time.After(time.Second * 2):
 			}
 			// submit the transaction to other cluster 1
-			ctx, _ := context.WithTimeout(ctx, defaultTimeout)
-			err = client1.SendTransaction(ctx, *tx)
+			childCtx, _ := context.WithTimeout(ctx, defaultTimeout)
+			err = client1.SendTransaction(childCtx, *tx)
 			assert.Nil(t, err)
 
 			// submit the transaction to other cluster 2
-			ctx, _ = context.WithTimeout(ctx, defaultTimeout)
-			err = client2.SendTransaction(ctx, *tx)
+			err = client2.SendTransaction(childCtx, *tx)
 			assert.Nil(t, err)
 		}
 	}()

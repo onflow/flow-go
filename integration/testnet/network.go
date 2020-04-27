@@ -245,9 +245,10 @@ func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 		config.LogLevel = level
 	}
 }
-func AsGhost(ghost bool) func(config *NodeConfig) {
+
+func AsGhost() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
-		config.Ghost = ghost
+		config.Ghost = true
 	}
 }
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {

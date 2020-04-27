@@ -36,7 +36,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 		// a ghost node masquerading as an execution node
 		ghostExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(3),
-			testnet.AsGhost(true))
+			testnet.AsGhost())
 
 		// a verification node
 		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
@@ -100,7 +100,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 
 		// a ghost node masquerading as a collection node
 		ghostCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(2),
-			testnet.AsGhost(true))
+			testnet.AsGhost())
 
 		// three consensus nodes
 		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
