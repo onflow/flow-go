@@ -210,7 +210,8 @@ func (s *Stopper) stopAll() {
 		go func(i int) {
 			// TODO better to wait until it's done, but needs to figure out why hotstuff.Done doesn't finish
 			s.nodes[i].compliance.Done()
-			<-s.nodes[i].hot.Wait()
+			s.nodes[i].hot.Done()
+			time.Sleep(1 * time.Second)
 			wg.Done()
 		}(i)
 	}
@@ -522,11 +523,9 @@ func Test5Nodes(t *testing.T) {
 }
 
 func TestOneDelayed(t *testing.T) {
-	// nodes, stopper := createNodes(t, 5, 100)
-	nodes, stopper := createNodes(t, 2, 100)
+	nodes, stopper := createNodes(t, 5, 100)
 
-	// connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
-	connect(nodes, blockNothing)
+	connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
 
 	runNodes(nodes)
 
