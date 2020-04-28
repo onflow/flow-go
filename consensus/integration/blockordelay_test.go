@@ -10,12 +10,18 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 )
 
+// This file includes functions to simulate network conditions.
+// The network conditions are simulated by defining whether a message sent to a receiver should be
+// blocked or delayed.
+
 type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
 
+// block nothing
 func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 	return false, 0
 }
 
+// block all messages sent by or received by a list of black listed nodes
 func blockNodes(blackList ...*Node) BlockOrDelayFunc {
 	blackDict := make(map[flow.Identifier]*Node, len(blackList))
 	for _, n := range blackList {
@@ -33,6 +39,7 @@ func blockNodes(blackList ...*Node) BlockOrDelayFunc {
 	}
 }
 
+// block all messages sent by or received by a list of black listed nodes for the first N messages
 func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
 	blackDict := make(map[flow.Identifier]*Node, len(blackList))
 	for _, n := range blackList {
