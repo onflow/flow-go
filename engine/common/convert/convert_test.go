@@ -17,4 +17,5 @@ func TestConvertTransaction(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, tx, converted)
+	assert.Equal(t, tx.ID(), converted.ID())
 }
