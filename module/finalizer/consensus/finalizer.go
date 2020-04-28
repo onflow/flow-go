@@ -99,3 +99,8 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		return nil
 	})
 }
+
+func (f *Finalizer) MakeTentative(blockID flow.Identifier, parentID flow.Identifier) error {
+	return f.db.Update(func(tx *badger.Txn) error {
+	})
+}

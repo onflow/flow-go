@@ -14,4 +14,6 @@ type Finalizer interface {
 	// makes it an immutable part of the blockchain. Returning an error indicates
 	// some fatal condition and will cause the finalization logic to terminate.
 	MakeFinal(blockID flow.Identifier) error
+
+	MakeTentative(blockID flow.Identifier, parentID flow.Identifier) error
 }
