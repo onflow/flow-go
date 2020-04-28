@@ -491,7 +491,7 @@ func Test3Nodes(t *testing.T) {
 }
 
 // with 5 nodes, and one node completely blocked, the other nodes can still reach consensus
-func est5Nodes(t *testing.T) {
+func Test5Nodes(t *testing.T) {
 	nodes, stopper := createNodes(t, 5, 100)
 
 	connect(nodes, blockNodes(nodes[0]))
