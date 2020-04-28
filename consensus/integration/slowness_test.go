@@ -123,7 +123,7 @@ func TestMessagesDelayAcrossNetwork(t *testing.T) {
 	connect(nodes, func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		switch event.(type) {
 		case *messages.BlockProposal:
-			return false, nextDelay(hotstuffTimeout/10, hotstuffTimeout*2/3)
+			return false, nextDelay(hotstuffTimeout/10, hotstuffTimeout/2)
 		case *messages.BlockVote:
 			return false, nextDelay(hotstuffTimeout/10, hotstuffTimeout/5)
 		// case *messages.SyncRequest:
