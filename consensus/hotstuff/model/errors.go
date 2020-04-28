@@ -33,8 +33,13 @@ type ErrorMissingBlock struct {
 	BlockID flow.Identifier
 }
 
-func (e *ErrorMissingBlock) Error() string {
+func (e ErrorMissingBlock) Error() string {
 	return fmt.Sprintf("missing Block at view %d with ID %v", e.View, e.BlockID)
+}
+
+func (e ErrorMissingBlock) Is(other error) bool {
+	_, ok := other.(ErrorMissingBlock)
+	return ok
 }
 
 type ErrorInvalidBlock struct {

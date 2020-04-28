@@ -13,8 +13,8 @@ import (
 
 type BlockTranslator func(blockID flow.Identifier) flow.Identifier
 
-// ConsensusCommittee implements hotstuff.Committee
-type ConsensusCommittee struct {
+// Committee implements hotstuff.Committee
+type Committee struct {
 	protocolState   protocol.State
 	blockTranslator BlockTranslator
 
@@ -40,7 +40,7 @@ type ConsensusCommittee struct {
 //   * is ordered in the canonical order
 //   * contains no duplicates.
 // The list of all legitimate consensus participants for the specified block can be obtained by using `filter.Any`
-func (c *ConsensusCommittee) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (c *Committee) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	mainConsensusBlockID := c.blockTranslator(blockID)
 	identities, err := c.protocolState.AtBlockID(mainConsensusBlockID).Identities(
 		filter.And(c.consensusMembersFilter, selector),
@@ -55,7 +55,7 @@ func (c *ConsensusCommittee) Identities(blockID flow.Identifier, selector flow.I
 // The node must be a legitimate consensus participant with NON-ZERO STAKE at the specified block.
 // ERROR conditions:
 //    * ErrInvalidConsensusParticipant if participantID does not correspond to a _staked_ consensus member at the specified block.
-func (c *ConsensusCommittee) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+func (c *Committee) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
 	mainConsensusBlockID := c.blockTranslator(blockID)
 	identity, err := c.protocolState.AtBlockID(mainConsensusBlockID).Identity(participantID)
 	if err != nil {
@@ -73,7 +73,7 @@ func (c *ConsensusCommittee) Identity(blockID flow.Identifier, participantID flo
 //          Therefore, a node retains its proposer view slots even if it is slashed.
 //          Its proposal is simply considered invalid, as it is not from a legitimate consensus participant.
 // Can error if view is in a future Epoch for which the consensus committee hasn't been determined yet.
-func (c *ConsensusCommittee) LeaderForView(view uint64) (flow.Identifier, error) {
+func (c *Committee) LeaderForView(view uint64) (flow.Identifier, error) {
 	// As long as there are no Epochs, this implementation will never return an error, as
 	// leaders can be pre-determined for every view. This will change, when Epochs are added.
 	// The API already contains the error return parameter, to be future-proof.
@@ -85,12 +85,12 @@ func (c *ConsensusCommittee) LeaderForView(view uint64) (flow.Identifier, error)
 // TODO: ultimately, the own identity of the node is necessary for signing.
 //       Ideally, we would move the method for checking whether an Identifier refers to this node to the signer.
 //       This would require some refactoring of EventHandler (postponed to later)
-func (c *ConsensusCommittee) Self() flow.Identifier {
+func (c *Committee) Self() flow.Identifier {
 	return c.myID
 }
 
 func New(protocolState protocol.State, blockTranslator BlockTranslator, myID flow.Identifier, filter flow.IdentityFilter, epochConsensusMembers flow.IdentifierList) hotstuff.Committee {
-	return &ConsensusCommittee{
+	return &Committee{
 		protocolState:          protocolState,
 		blockTranslator:        blockTranslator,
 		consensusMembersFilter: filter,

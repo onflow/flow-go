@@ -12,7 +12,7 @@ func FinalizedBlocks(in *Instance) []*flow.Header {
 	}
 	finalizedBlock := finalizedBlockBlob.(*flow.Header)
 
-	for true {
+	for {
 		finalized = append(finalized, finalizedBlock)
 		finalizedBlockBlob, found = in.headers.Load(finalizedBlock.ParentID)
 		if !found {

@@ -104,8 +104,7 @@ func (ps *ProposalSuite) TestProposalSignatureError() {
 	assert.Error(ps.T(), err, "a proposal should be rejected if signature check fails")
 
 	// check that the error is not one that leads to invalid
-	var invalid *model.ErrorInvalidBlock
-	assert.True(ps.T(), errors.As(err, &invalid), "if signature check fails, we should not generate a invalid error")
+	assert.True(ps.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if signature check fails, we should not generate a invalid error")
 }
 
 func (ps *ProposalSuite) TestProposalSignatureInvalidFormat() {
@@ -120,8 +119,7 @@ func (ps *ProposalSuite) TestProposalSignatureInvalidFormat() {
 	assert.Error(ps.T(), err, "a proposal with an invalid signature should be rejected")
 
 	// check that the error is an invalid proposal error to allow creating slashing challenge
-	var invalid *model.ErrorInvalidBlock
-	assert.True(ps.T(), errors.As(err, &invalid), "if signature is invalid, we should generate an invalid error")
+	assert.True(ps.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if signature is invalid, we should generate an invalid error")
 }
 
 func (ps *ProposalSuite) TestProposalSignatureInvalid() {
@@ -136,8 +134,7 @@ func (ps *ProposalSuite) TestProposalSignatureInvalid() {
 	assert.Error(ps.T(), err, "a proposal with an invalid signature should be rejected")
 
 	// check that the error is an invalid proposal error to allow creating slashing challenge
-	var invalid *model.ErrorInvalidBlock
-	assert.True(ps.T(), errors.As(err, &invalid), "if signature is invalid, we should generate an invalid error")
+	assert.True(ps.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if signature is invalid, we should generate an invalid error")
 }
 
 func (ps *ProposalSuite) TestProposalWrongLeader() {
@@ -154,8 +151,7 @@ func (ps *ProposalSuite) TestProposalWrongLeader() {
 	assert.Error(ps.T(), err, "a proposal from the wrong proposer should be rejected")
 
 	// check that the error is an invalid proposal error to allow creating slashing challenge
-	var invalid *model.ErrorInvalidBlock
-	assert.True(ps.T(), errors.As(err, &invalid), "if the proposal has wrong proposer, we should generate a invalid error")
+	assert.True(ps.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if the proposal has wrong proposer, we should generate a invalid error")
 }
 
 func (ps *ProposalSuite) TestProposalMismatchingView() {
@@ -168,8 +164,7 @@ func (ps *ProposalSuite) TestProposalMismatchingView() {
 	assert.Error(ps.T(), err, "a proposal with a mismatching QC view should be rejected")
 
 	// check that the error is an invalid proposal error to allow creating slashing challenge
-	var invalid *model.ErrorInvalidBlock
-	assert.True(ps.T(), errors.As(err, &invalid), "if the QC has a mismatching view, we should generate a invalid error")
+	assert.True(ps.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if the QC has a mismatching view, we should generate a invalid error")
 }
 
 func (ps *ProposalSuite) TestProposalMissingParentHigher() {
@@ -185,8 +180,7 @@ func (ps *ProposalSuite) TestProposalMissingParentHigher() {
 	assert.Error(ps.T(), err, "a proposal with a missing parent should be rejected")
 
 	// check that the error is a missing block error because we should have the block but we don't
-	var missing *model.ErrorMissingBlock
-	assert.True(ps.T(), errors.As(err, &missing), "if we don't have the proposal parent for a QC above or equal finalized view, we should generate an missing block error")
+	assert.True(ps.T(), errors.Is(err, model.ErrorMissingBlock{}), "if we don't have the proposal parent for a QC above or equal finalized view, we should generate an missing block error")
 }
 
 func (ps *ProposalSuite) TestProposalMissingParentLower() {
@@ -202,7 +196,7 @@ func (ps *ProposalSuite) TestProposalMissingParentLower() {
 	assert.Error(ps.T(), err, "a proposal with a missing parent should be rejected")
 
 	// check that the error is an unverifiable block because we can't verify the block
-	assert.True(ps.T(), errors.As(err, &model.ErrUnverifiableBlock), "if we don't have the proposal parent for a QC below finalized view, we should generate an unverifiable block error")
+	assert.True(ps.T(), errors.Is(err, model.ErrUnverifiableBlock), "if we don't have the proposal parent for a QC below finalized view, we should generate an unverifiable block error")
 }
 
 func (ps *ProposalSuite) TestProposalQCInvalid() {
@@ -217,8 +211,7 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 	assert.Error(ps.T(), err, "a proposal with an invalid QC should be rejected")
 
 	// check that the error is an invalid proposal error to allow creating slashing challenge
-	var invalid *model.ErrorInvalidBlock
-	assert.True(ps.T(), errors.As(err, &invalid), "if the block's QC signature is invalid, an ErrorInvalidBlock error should be raised")
+	assert.True(ps.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if the block's QC signature is invalid, an ErrorInvalidBlock error should be raised")
 }
 
 func (ps *ProposalSuite) TestProposalQCError() {
@@ -233,8 +226,7 @@ func (ps *ProposalSuite) TestProposalQCError() {
 	assert.Error(ps.T(), err, "a proposal with an invalid QC should be rejected")
 
 	// check that the error is an invalid proposal error to allow creating slashing challenge
-	var invalid *model.ErrorInvalidBlock
-	assert.False(ps.T(), errors.As(err, &invalid), "if we can't verify the QC, we should not generate a invalid error")
+	assert.False(ps.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if we can't verify the QC, we should not generate a invalid error")
 }
 
 func TestValidateVote(t *testing.T) {
@@ -301,8 +293,7 @@ func (vs *VoteSuite) TestVoteMismatchingView() {
 	assert.Error(vs.T(), err, "a vote with a mismatching view should be rejected")
 
 	// TODO: this should raise an error that allows a slashing challenge
-	var malformedVote *model.ErrorInvalidVote
-	assert.True(vs.T(), errors.As(err, &malformedVote), "a mismatching view should create a invalid vote error")
+	assert.True(vs.T(), errors.Is(err, model.ErrorInvalidVote{}), "a mismatching view should create a invalid vote error")
 }
 
 func (vs *VoteSuite) TestVoteSignatureError() {
@@ -414,8 +405,7 @@ func (qs *QCSuite) TestQCInsufficientStake() {
 	assert.Error(qs.T(), err, "a QC should be rejected if it has insufficient voted stake")
 
 	// we should get a threshold error to bubble up for extra info
-	var invalid *model.ErrorInvalidBlock
-	assert.True(qs.T(), errors.As(err, &invalid), "if there is insufficient voted stake, an invalid block error should be raised")
+	assert.True(qs.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if there is insufficient voted stake, an invalid block error should be raised")
 }
 
 // TestQCSignatureError tests that validation errors if:
@@ -429,8 +419,7 @@ func (qs *QCSuite) TestQCSignatureError() {
 	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidBlock
 	err := qs.validator.ValidateQC(qs.qc, qs.block)
 	assert.Error(qs.T(), err, "unspecific sig verification error should be escalated to surrounding logic")
-	var expectedError *model.ErrorInvalidBlock
-	assert.False(qs.T(), errors.As(err, &expectedError), "unspecific internal errors should not result in ErrorInvalidBlock error")
+	assert.False(qs.T(), errors.Is(err, model.ErrorInvalidBlock{}), "unspecific internal errors should not result in ErrorInvalidBlock error")
 }
 
 func (qs *QCSuite) TestQCSignatureInvalid() {
@@ -441,8 +430,7 @@ func (qs *QCSuite) TestQCSignatureInvalid() {
 
 	// the QC should no longer be validation
 	err := qs.validator.ValidateQC(qs.qc, qs.block)
-	var expectedError *model.ErrorInvalidBlock
-	assert.True(qs.T(), errors.As(err, &expectedError), "if the signature is invalid an ErrorInvalidBlock error should be raised")
+	assert.True(qs.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if the signature is invalid an ErrorInvalidBlock error should be raised")
 }
 
 func (qs *QCSuite) TestQCSignatureInvalidFormat() {
@@ -453,6 +441,5 @@ func (qs *QCSuite) TestQCSignatureInvalidFormat() {
 
 	// the QC should no longer be validation
 	err := qs.validator.ValidateQC(qs.qc, qs.block)
-	var expectedError *model.ErrorInvalidBlock
-	assert.True(qs.T(), errors.As(err, &expectedError), "if the signature has an invalid format, an ErrorInvalidBlock error should be raised")
+	assert.True(qs.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if the signature has an invalid format, an ErrorInvalidBlock error should be raised")
 }
