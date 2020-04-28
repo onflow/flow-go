@@ -104,7 +104,7 @@ func (ps *ProposalSuite) TestProposalSignatureError() {
 	assert.Error(ps.T(), err, "a proposal should be rejected if signature check fails")
 
 	// check that the error is not one that leads to invalid
-	assert.True(ps.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if signature check fails, we should not generate a invalid error")
+	assert.False(ps.T(), errors.Is(err, model.ErrorInvalidBlock{}), "if signature check fails, we should not receive an ErrorInvalidBlock")
 }
 
 func (ps *ProposalSuite) TestProposalSignatureInvalidFormat() {

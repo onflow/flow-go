@@ -21,6 +21,7 @@ func (e NoVoteError) Is(other error) bool {
 var ErrInsufficientVotes = errors.New("received insufficient votes")
 var ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
 var ErrInvalidSigner = errors.New("invalid signer(s)")
+var ErrInvalidSignature = errors.New("invalid signature")
 
 type ErrorConfiguration struct {
 	Msg string
@@ -43,33 +44,33 @@ func (e ErrorMissingBlock) Is(other error) bool {
 }
 
 type ErrorInvalidBlock struct {
-	View    uint64
 	BlockID flow.Identifier
-	Msg     string
+	View    uint64
+	Err     error
 }
 
 func (e ErrorInvalidBlock) Error() string {
-	return fmt.Sprintf("invalid block (view %d; ID %x): %s", e.View, e.BlockID, e.Msg)
+	return fmt.Sprintf("invalid block %x at view %d: %s", e.BlockID, e.View, e.Err.Error())
 }
 
 func (e ErrorInvalidBlock) Is(other error) bool {
 	_, ok := other.(ErrorInvalidBlock)
-	return ok
+	return ok || errors.Is(other, e.Err)
 }
 
 type ErrorInvalidVote struct {
 	VoteID flow.Identifier
 	View   uint64
-	Msg    string
+	Err    error
 }
 
 func (e ErrorInvalidVote) Error() string {
-	return fmt.Sprintf("invalid vote (view %d; ID %x): %s", e.View, e.VoteID, e.Msg)
+	return fmt.Sprintf("invalid vote %x for view %d: %s", e.VoteID, e.View, e.Err.Error())
 }
 
 func (e ErrorInvalidVote) Is(other error) bool {
 	_, ok := other.(ErrorInvalidVote)
-	return ok
+	return ok || errors.Is(other, e.Err)
 }
 
 // ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which
