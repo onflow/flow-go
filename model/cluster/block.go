@@ -52,13 +52,16 @@ type Payload struct {
 	// chain in order to have a reference point for assessing validity of
 	// cluster blocks.
 	//
-	//TODO currently this is not checked by the proposal engine. For safety in
+	// TODO: set this in builder, update storage layer etc. -- not used yet
+	//
+	//TODO: currently this is not checked by the proposal engine. For safety in
 	// Byzantine environments, we need additional rules for this field to ensure
 	// it remains up-to-date with the main chain.
 	ReferenceBlockID flow.Identifier
 }
 
-// EmptyPayload returns a payload containing an empty collection.
+// EmptyPayload returns a payload containing an empty collection and an un-set
+// reference block ID.
 func EmptyPayload() Payload {
 	return PayloadFromTransactions()
 }
@@ -73,6 +76,7 @@ func PayloadFromTransactions(transactions ...*flow.TransactionBody) Payload {
 		Collection: flow.Collection{
 			Transactions: transactions,
 		},
+		ReferenceBlockID: flow.ZeroID,
 	}
 }
 
