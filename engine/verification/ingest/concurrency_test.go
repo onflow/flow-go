@@ -91,7 +91,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 
 	// ingest engine parameters
 	// retries trackers every one second for a total of 5 times
-	requestInterval := uint(1000)
+	requestInterval := uint(100)
 	failureThreshold := uint(5)
 
 	// creates test id for each role
