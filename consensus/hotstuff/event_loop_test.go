@@ -38,7 +38,6 @@ func TestReadyDone(t *testing.T) {
 		<-eventLoop.Done()
 		wg.Done()
 	}()
-	<-eventLoop.Done()
 
 	// wait until Wait returns
 	wg.Wait()
