@@ -75,8 +75,8 @@ type TestSuite struct {
 	failureThreshold uint
 }
 
-// Invoking this method executes all TestSuite tests.
-func TestReceiptsEngine(t *testing.T) {
+// TestIngestEngine executes all TestSuite tests.
+func TestIngestEngine(t *testing.T) {
 	suite.Run(t, new(TestSuite))
 }
 
@@ -245,7 +245,6 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 
-	//
 	// mocks functionalities
 	//
 	// adding functionality of chunk tracker to trackers mempool

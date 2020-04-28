@@ -42,41 +42,41 @@ func TestConcurrency(t *testing.T) {
 			senderCount: 1,
 			chunksNum:   2,
 		},
-		//{
-		//	erCount:     1,
-		//	senderCount: 10,
-		//	chunksNum:   2,
-		//},
-		//{
-		//	erCount:     10,
-		//	senderCount: 1,
-		//	chunksNum:   2,
-		//},
-		//{
-		//	erCount:     5,
-		//	senderCount: 10,
-		//	chunksNum:   2,
-		//},
-		//{
-		//	erCount:     1,
-		//	senderCount: 1,
-		//	chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
-		//},
-		//{
-		//	erCount:     1,
-		//	senderCount: 10,
-		//	chunksNum:   20,
-		//},
-		//{
-		//	erCount:     3,
-		//	senderCount: 1,
-		//	chunksNum:   10,
-		//},
-		//{
-		//	erCount:     3,
-		//	senderCount: 5,
-		//	chunksNum:   4,
-		//},
+		{
+			erCount:     1,
+			senderCount: 10,
+			chunksNum:   2,
+		},
+		{
+			erCount:     10,
+			senderCount: 1,
+			chunksNum:   2,
+		},
+		{
+			erCount:     5,
+			senderCount: 10,
+			chunksNum:   2,
+		},
+		{
+			erCount:     1,
+			senderCount: 1,
+			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
+		},
+		{
+			erCount:     1,
+			senderCount: 10,
+			chunksNum:   20,
+		},
+		{
+			erCount:     3,
+			senderCount: 1,
+			chunksNum:   10,
+		},
+		{
+			erCount:     3,
+			senderCount: 5,
+			chunksNum:   4,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -90,8 +90,9 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	hub := stub.NewNetworkHub()
 
 	// ingest engine parameters
-	requestInterval := uint(100)
-	failureThreshold := uint(1)
+	// retries trackers every one second for a total of 5 times
+	requestInterval := uint(1000)
+	failureThreshold := uint(5)
 
 	// creates test id for each role
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -156,10 +157,11 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	exeNode := testutil.GenericNode(t, hub, exeID, identities)
 	setupMockExeNode(t, exeNode, verID.NodeID, ers)
 
+	// creates a network instance for verification node
+	// and sets it in continuous delivery mode
 	verNet, ok := hub.GetNetwork(verID.NodeID)
 	assert.True(t, ok)
-
-	quite := deliveryService(verNet, requestInterval)
+	verNet.StartConDev(requestInterval, true)
 
 	// the wait group tracks goroutines for each ER sending it to VER
 	var senderWG sync.WaitGroup
@@ -209,14 +211,12 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 				case 0:
 					// block then receipt
 					sendBlock()
-					verNet.DeliverAll(true)
 					// allow another goroutine to run before sending receipt
 					time.Sleep(time.Nanosecond)
 					sendReceipt()
 				case 1:
 					// receipt then block
 					sendReceipt()
-					verNet.DeliverAll(true)
 					// allow another goroutine to run before sending block
 					time.Sleep(time.Nanosecond)
 					sendBlock()
@@ -228,11 +228,16 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.RequireReturnsBefore(t, senderWG.Wait, 5*time.Second)
-	verNet.DeliverAll(false)
-	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, 5*time.Second)
-	verNet.DeliverAll(false)
-	close(quite)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, 10*time.Second)
+	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, 10*time.Second)
+
+	// stops ingest engine of verification node
+	// Note: this should be done prior to any evaluation to make sure that
+	// the process method of Ingest engine is done working.
+	<-verNode.IngestEngine.Done()
+
+	// stops the network continuous delivery mode
+	verNet.StopConDev()
 
 	for _, c := range vChunks {
 		if isAssigned(c.ChunkIndex) {
@@ -240,9 +245,6 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 			assert.True(t, verNode.IngestedResultIDs.Has(c.Receipt.ExecutionResult.ID()))
 		}
 	}
-
-	// stops ingest engine of verification node
-	<-verNode.IngestEngine.Done()
 
 	exeNode.Done()
 	colNode.Done()
@@ -385,21 +387,4 @@ func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng 
 func isAssigned(chunkIndex uint64) bool {
 	answer := chunkIndex%2 == 0
 	return answer
-}
-
-func deliveryService(net *stub.Network, updateInterval uint) chan<- struct{} {
-	quit := make(chan struct{})
-	timer := time.NewTicker(time.Duration(updateInterval))
-	go func() {
-		for {
-			select {
-			case <-timer.C:
-				net.DeliverAll(true)
-			case <-quit:
-				break
-			}
-		}
-	}()
-
-	return quit
 }

@@ -125,7 +125,7 @@ func New(
 // Ready returns a channel that is closed when the verifier engine is ready.
 func (e *Engine) Ready() <-chan struct{} {
 	// runs cleanup periodically every `requestInterval` milliseconds
-	e.unit.LaunchPeriodically(e.trackersCleanup,
+	e.unit.LaunchPeriodically(e.checkTrackers,
 		time.Duration(e.requestInterval)*time.Millisecond)
 	return e.unit.Ready()
 }
@@ -330,7 +330,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 }
 
 // requestCollection submits a request for the given collection to collection nodes.
-func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifier) error {
+func (e *Engine) requestCollection(collID flow.Identifier) error {
 	// updates tracker for this request
 	tracker, err := e.updateCollectionTracker(collID)
 	if err != nil {
@@ -648,6 +648,7 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 		// no un-ingested chunk remains with this receipt
 		// marks execution result as ingested
 		err := e.ingestedResultIDs.Add(vc.Receipt.ExecutionResult.ID())
+
 		if err != nil {
 			e.log.Error().
 				Err(err).
@@ -768,9 +769,9 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 	}
 }
 
-// trackersCleanup should be called periodically at intervals
+// checkTrackers should be called periodically at intervals
 // It retries the requests of all registered trackers a the node
-func (e *Engine) trackersCleanup() {
+func (e *Engine) checkTrackers() {
 	e.checkTrackerLock.Lock()
 	defer e.checkTrackerLock.Unlock()
 
@@ -816,7 +817,7 @@ func (e *Engine) trackersCleanup() {
 		}
 
 		// retries requesting collection
-		err := e.requestCollection(ct.CollectionID, ct.BlockID)
+		err := e.requestCollection(ct.CollectionID)
 		if err != nil {
 			e.log.Error().
 				Err(err).
