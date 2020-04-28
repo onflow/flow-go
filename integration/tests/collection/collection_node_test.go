@@ -6,7 +6,7 @@ import (
 	"time"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	sdkclient "github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
-	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
+	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -203,7 +203,7 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 
 // ClusterStateFor returns a cluster state instance for the collector node
 // with the given ID.
-func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.State {
+func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *cluster.State {
 
 	myCluster, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
@@ -214,7 +214,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	db, err := node.DB()
 	require.Nil(suite.T(), err, "could not get node db")
 
-	state, err := clusterstate.NewState(db, chainID)
+	state, err := cluster.NewState(db, chainID)
 	require.Nil(suite.T(), err, "could not get cluster state")
 
 	return state
@@ -231,7 +231,7 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	// pick a collector to test against
 	col1 := suite.Collector(0, 0)
 
-	client, err := client.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
 	acct := suite.acct
@@ -312,7 +312,7 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	// pick a collector to test against
 	col1 := suite.Collector(0, 0)
 
-	client, err := client.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
 	acct := suite.acct
@@ -372,7 +372,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	targetNode := suite.Collector(0, 0)
 
 	// get a client pointing to the cluster member
-	client, err := client.New(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
 	tx := suite.TxForCluster(targetCluster)
@@ -446,7 +446,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
 	otherNode := suite.Collector(1, 0)
 
 	// create clients pointing to each other node
-	client, err := client.New(otherNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(otherNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
 	// create a transaction that will be routed to the target cluster
