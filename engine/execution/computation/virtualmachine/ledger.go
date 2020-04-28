@@ -200,8 +200,10 @@ func (r *LedgerAccess) CreateAccountInLedger(publicKeys [][]byte) (flow.Address,
 	accountID := accountAddress[:]
 
 	accountIDInt := big.NewInt(0).SetBytes(accountID)
-	newAccountID := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
+	newAccountBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
 
+	newAccountAddress := flow.BytesToAddress(newAccountBytes)
+	newAccountID := newAccountAddress[:]
 
 	// mark that account with this ID exists
 	r.Ledger.Set(fullKeyHash(string(newAccountID), "", keyExists), []byte{1})
