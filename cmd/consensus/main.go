@@ -151,7 +151,7 @@ func main() {
 			// initialize consensus committee's membership state
 			committee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
 			if err != nil {
-				return nil, fmt.Errorf("could not hotstuff Committee: %w", err)
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the combined signer for hotstuff

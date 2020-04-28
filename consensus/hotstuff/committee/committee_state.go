@@ -13,18 +13,28 @@ import (
 
 type BlockTranslator func(blockID flow.Identifier) flow.Identifier
 
-// Committee implements hotstuff.Committee
+// Committee accounts for the fact that we might have multiple hotstuff instances
+// (collector committees and main consensus committee). Each hostuff instance is supposed to
+// have a dedicated Committee state.
+// A Committee provides subset of the protocol.State, which is restricted to exactly those
+// nodes that participate in the current hotstuff instance: the state of all legitimate consensus
+// participants for the specified block. Legitimate consensus participants have NON-ZERO STAKE.
+//
+// The intended use case is to support collector consensus within Flow. Specifically,
+// the collectors produced their own blocks, independently of the Consensus Nodes (aka the main consensus).
+// Given a collector block, some logic is required to find the main consensus block
+// for determining the valid collector consensus participants.
 type Committee struct {
 	protocolState   protocol.State
 	blockTranslator BlockTranslator
 
-	consensusMembersFilter flow.IdentityFilter // identityFilter to find only the consensus members for the cluster
+	membersFilter flow.IdentityFilter // identityFilter to find only the members for this particular hotstuff instance
 
-	// The constant set of consensus members for the entire Epoch.
+	// The constant set of hotstuff members for the entire Epoch.
 	// HotStuff requires that the primary for a view is fork-independent and only depend
-	// on the view number. Therefore, all nodes that were part of the initially released list of consensus
-	// nodes for the current Epoch retain their spot as primaries for the respective views (even if they
-	// are slashed!). Hence, we cache the initial list of consensus nodes for the current Epoch and compute
+	// on the view number. Therefore, all nodes that were part of the initially released list of hotstuff
+	// members for the current Epoch retain their spot as primaries for the respective views (even if they
+	// are slashed!). Hence, we cache the initial list of hotstuff nodes for the current Epoch and compute
 	// primaries with respect to this list.
 	// TODO: very simple implementation; will be updated when introducing Epochs
 	epochConsensusMembers flow.IdentifierList
@@ -43,7 +53,7 @@ type Committee struct {
 func (c *Committee) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	mainConsensusBlockID := c.blockTranslator(blockID)
 	identities, err := c.protocolState.AtBlockID(mainConsensusBlockID).Identities(
-		filter.And(c.consensusMembersFilter, selector),
+		filter.And(c.membersFilter, selector),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
@@ -62,7 +72,7 @@ func (c *Committee) Identity(blockID flow.Identifier, participantID flow.Identif
 		// ToDo: differentiate between internal error and participantID not being found
 		return nil, fmt.Errorf("%x is not a valid node ID at block %x: %w", participantID, blockID, model.ErrInvalidSigner)
 	}
-	if !c.consensusMembersFilter(identity) { // participantID is not a consensus participant
+	if !c.membersFilter(identity) { // participantID is not a consensus participant
 		return nil, fmt.Errorf("node %x has wrong role or zero stake at block %x: %w", participantID, blockID, model.ErrInvalidSigner)
 	}
 	return identity, nil
@@ -89,16 +99,35 @@ func (c *Committee) Self() flow.Identifier {
 	return c.myID
 }
 
+// New creates hotstuff committee. This is the generic constructor covering all potential cases.
+// It requires:
+//    * protocolState: the protocol state for the entire network
+//    * blockTranslator: translates a block fromt eh current hotsuff committee to a block of the main consensus committee to determine legitimacy of nodes
+//    * myID: ID of the current node. CAUTION: this does not make the current node part of the hotstuff committee
+//    * filter: filter which retains only legitimate participants for the current consensus instance.
+//      It must filter for: node role, non-zero stake, and potentially the collector cluster (if applicable)
+//    * epochConsensusMembers: all nodes that were part of the initially released list of participants for this hotstuff instance.
+//	    All participants for the current Epoch retain their spot as primaries for the respective views (even if they are slashed!)
+//
+// While you can use this constructor to generate a committee state for the main consensus,
+// the function `NewMainConsensusCommitteeState` provides a more concise API.
 func New(protocolState protocol.State, blockTranslator BlockTranslator, myID flow.Identifier, filter flow.IdentityFilter, epochConsensusMembers flow.IdentifierList) hotstuff.Committee {
 	return &Committee{
-		protocolState:          protocolState,
-		blockTranslator:        blockTranslator,
-		consensusMembersFilter: filter,
-		epochConsensusMembers:  epochConsensusMembers,
-		myID:                   myID,
+		protocolState:         protocolState,
+		blockTranslator:       blockTranslator,
+		membersFilter:         filter,
+		epochConsensusMembers: epochConsensusMembers,
+		myID:                  myID,
 	}
 }
 
+// NewMainConsensusCommitteeState creates hotstuff committee consisting of the MAIN CONSENSUS NODES.
+// It requires:
+//    * protocolState: the protocol state for the entire network
+//    * myID: ID of the current node. CAUTION: this does not make the current node part of the hotstuff committee
+//
+// For constructing committees for other hotstuff instances (such as collector hotstuff instances), please use the
+// generic `New` function.
 func NewMainConsensusCommitteeState(protocolState protocol.State, myID flow.Identifier) (hotstuff.Committee, error) {
 	// finding all consensus members
 	epochConsensusMembers, err := protocolState.Final().Identities(filter.HasRole(flow.RoleConsensus))

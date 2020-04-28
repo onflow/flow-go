@@ -100,17 +100,19 @@ func main() {
 			merger := signature.NewCombiner()
 
 			// initialize consensus committee's membership state
-			committee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			// This committee state is for the HotStuff follower, which needs to know which nodes are part of the main consensus committee.
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
 			if err != nil {
-				return nil, fmt.Errorf("could not hotstuff Committee: %w", err)
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(committee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, committee, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				// TODO for now we ignore failures in follower
 				// this is necessary for integration tests to run, until they are

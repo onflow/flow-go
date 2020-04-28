@@ -5,15 +5,17 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Committee provides a subset of the protocol.State:
-// the state of all legitimate consensus participants for the specified block.
-// Legitimate consensus participants have NON-ZERO STAKE.
+// Committee accounts for the fact that we might have multiple hotstuff instances
+// (collector committees and main consensus committee). Each hostuff instance is supposed to
+// have a dedicated Committee state.
+// A Committee provides subset of the protocol.State, which is restricted to exactly those
+// nodes that participate in the current hotstuff instance: the state of all legitimate consensus
+// participants for the specified block. Legitimate consensus participants have NON-ZERO STAKE.
 //
 // The intended use case is to support collector consensus within Flow. Specifically,
 // the collectors produced their own blocks, independently of the Consensus Nodes (aka the main consensus).
 // Given a collector block, some logic is required to find the main consensus block
 // for determining the valid collector consensus participants.
-// This logic is encapsulated in ParticipantState.
 type Committee interface {
 
 	// Identities returns a IdentityList with legitimate consensus participants for the specified block.
