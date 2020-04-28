@@ -168,9 +168,6 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 
 	suite.net.AssertExpectations(suite.T())
 
-	// waits for the engine to be up and running
-	<-e.Ready()
-
 	return e
 }
 
@@ -184,21 +181,18 @@ func (suite *TestSuite) TestHandleBlock() {
 	eng := suite.TestNewEngine()
 	err := eng.Process(unittest.IdentifierFixture(), suite.block)
 	assert.Equal(suite.T(), err, ingest.ErrInvType)
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 // TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
 // but not the collections, it asks for the collections through the network
 func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
-	suite.T().Skip()
-
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
 
 	eng := suite.TestNewEngine()
+	// waits till the engine gets up and running
+	<-eng.Ready()
 
 	// mocks identities
 	//
@@ -274,8 +268,6 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), collIdentities[0].NodeID).
 		Run(func(args testifymock.Arguments) {
 			submitWG.Done()
-			// waits for the engine to get shutdown
-			<-eng.Done()
 		}).
 		Return(nil).Once()
 
@@ -298,6 +290,9 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait, 5*time.Second)
 
+	// waits for the engine to get shutdown
+	<-eng.Done()
+
 	// asserts necessary calls
 	suite.authReceipts.AssertExpectations(suite.T())
 	suite.collectionsConduit.AssertExpectations(suite.T())
@@ -312,13 +307,13 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 // TestHandleReceipt_MissingChunkDataPack evaluates that when ingest engine has both a receipt and its block
 // but not the chunk data pack of it, it asks for the chunk data pack through the network
 func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
-	suite.T().Skip()
-
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
 
 	eng := suite.TestNewEngine()
+	// waits till the engine gets up and running
+	<-eng.Ready()
 
 	// mocks identities
 	//
@@ -400,14 +395,14 @@ func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), execIdentities[0].NodeID).
 		Run(func(args testifymock.Arguments) {
 			submitWG.Done()
-			// waits for the engine to get shutdown
-			<-eng.Done()
 		}).Return(nil).Once()
 
 	err := eng.Process(execIdentities[0].NodeID, suite.receipt)
 	suite.Assert().Nil(err)
 
 	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait, 5*time.Second)
+	// waits for the engine to get shutdown
+	<-eng.Done()
 
 	// asserts necessary calls
 	suite.chunksConduit.AssertExpectations(suite.T())
@@ -435,9 +430,6 @@ func (suite *TestSuite) TestIngestedResult() {
 	// nothing else is mocked, hence the process should simply return nil
 	err := eng.Process(unittest.IdentifierFixture(), suite.receipt)
 	require.NoError(suite.T(), err)
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 // TestIngestedChunk evaluates the happy path of submitting a chunk data pack for an already ingested chunk
@@ -458,9 +450,6 @@ func (suite *TestSuite) TestIngestedChunk() {
 	// nothing else is mocked, hence the process should simply return nil
 	err := eng.Process(unittest.IdentifierFixture(), chunkDataPackResponse)
 	require.NoError(suite.T(), err)
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 // TestHandleReceipt_UnstakedSender evaluates sending an execution receipt from an unstaked node
@@ -511,9 +500,6 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
@@ -546,8 +532,6 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 
 			// verifier should not be called
 			suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-			// waits for the engine to get shutdown
-			<-eng.Done()
 		})
 	}
 
@@ -586,9 +570,6 @@ func (suite *TestSuite) TestHandleCollection_Tracked() {
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 // TestHandleCollection_Untracked evaluates receiving an  un-tracked collection
@@ -624,9 +605,6 @@ func (suite *TestSuite) TestHandleCollection_Untracked() {
 	suite.authCollections.AssertNotCalled(suite.T(), "Add", suite.collection)
 	// does not expect tracker to be removed from trackers mempool
 	suite.collectionTrackers.AssertNotCalled(suite.T(), "Rem", suite.collection.ID())
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 // TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
@@ -658,8 +636,6 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	// should not call verifier
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 // TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
@@ -689,8 +665,6 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 		// should not add collection to mempool
 		suite.authCollections.AssertNotCalled(suite.T(), "Add", suite.collection)
 
-		// waits for the engine to get shutdown
-		<-eng.Done()
 		suite.Unlock()
 	}
 }
@@ -833,9 +807,6 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, collIdentity)
 			// asserts the chunk state should not be requested
 			suite.statesConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, execIdentity)
-
-			// waits for the engine to get shutdown
-			<-eng.Done()
 		})
 	}
 }
@@ -868,9 +839,6 @@ func (suite *TestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
 	// asserts that process of an untracked chunk data pack returns with an error
 	suite.Assert().NotNil(err)
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 // TestChunkDataPackTracker_HappyPath evaluates the happy path of receiving a chunk data pack upon a request
@@ -924,7 +892,4 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.state.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
 	suite.authReceipts.AssertExpectations(suite.T())
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
