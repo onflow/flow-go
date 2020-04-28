@@ -248,7 +248,7 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 		err = malformed.SignEnvelope(sdk.RootAddress, acct.key.ID, acct.signer)
 		require.Nil(t, err)
 
-		expected := ingest.ErrIncompleteTransaction{
+		expected := ingest.IncompleteTransactionError{
 			Missing: []string{flow.TransactionFieldRefBlockID.String()},
 		}
 
@@ -267,7 +267,7 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 
 		malformed.SetScript(nil)
 
-		expected := ingest.ErrIncompleteTransaction{
+		expected := ingest.IncompleteTransactionError{
 			Missing: []string{flow.TransactionFieldScript.String()},
 		}
 
