@@ -40,6 +40,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+const hotstuffTimeout = 200 * time.Millisecond
+
 type Signer struct {
 	localID flow.Identifier
 }
@@ -359,8 +361,6 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
-	hotstuffTimeout := 200 * time.Millisecond
-
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
 		viewsDB, state, local, build, final, signer, comp, selector, rootHeader,
@@ -452,6 +452,15 @@ func blockReceiverMessagesByPercentage(percent int) BlockOrDelayFunc {
 	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block := rand.Intn(100) <= percent
 		return block, 0
+	}
+}
+
+func delayReceiverMessagesByRange(low time.Duration, high time.Duration) BlockOrDelayFunc {
+	rand.Seed(time.Now().UnixNano())
+	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		rng := high - low
+		delay := int64(low) + rand.Int63n(int64(rng))
+		return false, time.Duration(delay)
 	}
 }
 
@@ -547,7 +556,7 @@ func TestMessagesLost(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// verify if each receiver lost 10 percent messages, the network can still reach consensus
+// verify if each receiver lost 10% messages, the network can still reach consensus
 func TestMessagesLostAcrossNetwork(t *testing.T) {
 	nodes, stopper := createNodes(t, 5, 150)
 
@@ -564,6 +573,47 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
 	assertLiveness(t, allViews, 90)
+	cleanupNodes(nodes)
+}
+
+// TODO: verify if each receiver lost 50% messages, the network can't reach consensus
+
+func nextDelay(low, high time.Duration) time.Duration {
+	return time.Duration(int64(low) + rand.Int63n(int64(high-low)))
+}
+
+// verify if messages were delayed, can still reach consensus
+func TestMessagesDelayAcrossNetwork(t *testing.T) {
+	endBlock := uint64(150)
+	nodes, stopper := createNodes(t, 5, endBlock)
+
+	connect(nodes, func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		switch event.(type) {
+		case *messages.BlockProposal:
+			return false, nextDelay(hotstuffTimeout/10, hotstuffTimeout*2/3)
+		case *messages.BlockVote:
+			return false, nextDelay(hotstuffTimeout/10, hotstuffTimeout/5)
+		// case *messages.SyncRequest:
+		// case *messages.SyncResponse:
+		// case *messages.RangeRequest:
+		// case *messages.BatchRequest:
+		// case *messages.BlockResponse:
+		default:
+			return false, time.Duration(hotstuffTimeout / 10)
+		}
+	})
+
+	runNodes(nodes)
+
+	<-stopper.stopped
+
+	for i := range nodes {
+		printState(t, nodes, i)
+	}
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+	// should finalize at least 1/3 of blocks
+	assertLiveness(t, allViews, endBlock*1/3)
 	cleanupNodes(nodes)
 }
 
@@ -600,8 +650,9 @@ func assertSafety(t *testing.T, allViews [][]uint64) {
 func assertLiveness(t *testing.T, allViews [][]uint64, view uint64) {
 	// the shortest chain must made enough progress
 	shortest := allViews[0]
+	require.Greater(t, len(shortest), 0, "no block was finalized")
 	highestView := shortest[len(shortest)-1]
-	require.Greater(t, highestView, view)
+	require.Greater(t, highestView, view, "did not finalize enough block")
 }
 
 func TestSomeDelayed(t *testing.T) {
