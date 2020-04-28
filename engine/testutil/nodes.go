@@ -263,7 +263,7 @@ func VerificationNode(t *testing.T,
 	identity *flow.Identity,
 	identities []*flow.Identity,
 	assigner module.ChunkAssigner,
-	requestInterval uint,
+	requestIntervalMs uint,
 	failureThreshold uint,
 	opts ...VerificationOpt) mock.VerificationNode {
 
@@ -352,7 +352,7 @@ func VerificationNode(t *testing.T,
 			node.IngestedResultIDs,
 			node.BlockStorage,
 			assigner,
-			requestInterval,
+			requestIntervalMs,
 			failureThreshold,
 		)
 		require.Nil(t, err)

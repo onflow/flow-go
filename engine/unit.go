@@ -62,6 +62,7 @@ func (u *Unit) LaunchPeriodically(f func(), interval time.Duration) {
 			select {
 			case <-u.quit:
 				u.wg.Done()
+				timer.Stop()
 				return
 			case <-timer.C:
 				u.Launch(f)
