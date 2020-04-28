@@ -44,17 +44,17 @@ func TestConcurrency(t *testing.T) {
 		},
 		{
 			erCount:     1,
-			senderCount: 10,
+			senderCount: 5,
 			chunksNum:   2,
 		},
 		{
-			erCount:     10,
+			erCount:     5,
 			senderCount: 1,
 			chunksNum:   2,
 		},
 		{
 			erCount:     5,
-			senderCount: 10,
+			senderCount: 5,
 			chunksNum:   2,
 		},
 		{
