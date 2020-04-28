@@ -26,7 +26,7 @@ func GetTxBodyDeployCounterContract() *flow.TransactionBody {
 			access(all) contract Container {
 				access(all) resource Counter {
 					pub var count: Int
-		
+
 					init(_ v: Int) {
 						self.count = v
 					}
@@ -120,7 +120,8 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
-		vm := virtualmachine.New(rt)
+		vm, err := virtualmachine.New(rt)
+		require.NoError(t, err)
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))

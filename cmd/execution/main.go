@@ -52,7 +52,10 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(rt)
+			if err != nil {
+				return err
+			}
 			computationManager = computation.New(
 				node.Logger,
 				node.Me,

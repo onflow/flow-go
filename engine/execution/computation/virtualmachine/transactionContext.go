@@ -19,7 +19,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	ledger            Ledger
-	blockContext      *blockContext
+	astCache          ASTCache
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
@@ -289,17 +289,12 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 // GetCachedProgram attempts to get a parsed program from a cache.
 func (r *TransactionContext) GetCachedProgram(location ast.Location) (*ast.Program, error) {
-	program, found := r.blockContext.vm.cache.Get(location.ID())
-	if found {
-		return program.(*ast.Program), nil
-	}
-	return nil, nil
+	return r.astCache.GetProgram(location)
 }
 
 // CacheProgram adds a parsed program to a cache.
 func (r *TransactionContext) CacheProgram(location ast.Location, program *ast.Program) error {
-	_ = r.blockContext.vm.cache.Add(location.ID(), program)
-	return nil
+	return r.astCache.SetProgram(location, program)
 }
 
 // Log captures a log message from the runtime.

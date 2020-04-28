@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	MaxProgramCacheSize = 256
+	MaxProgramASTCacheSize = 256
 )
 
 // VirtualMachine augments the Cadence runtime with the Flow host functionality required
@@ -22,9 +22,9 @@ type VirtualMachine interface {
 
 // New creates a new virtual machine instance with the provided runtime.
 func New(rt runtime.Runtime) (VirtualMachine, error) {
-	cache, err := lru.New(MaxProgramCacheSize)
+	cache, err := lru.New(MaxProgramASTCacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vm, %w", err)
+		return nil, fmt.Errorf("failed to create vm cache, %w", err)
 	}
 	return &virtualMachine{
 		rt:    rt,
