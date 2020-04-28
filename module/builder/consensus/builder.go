@@ -168,21 +168,22 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// collect all block headers from the last sealed block to the parent
 		var ancestorIDs []flow.Identifier
-		ancestorID = parentID
-		sealedID := lastSeal.BlockID
-		for ancestorID != sealedID {
+		// TODO: Fix seals
+		// ancestorID = parentID
+		// sealedID := lastSeal.BlockID
+		// for ancestorID != sealedID {
 
-			// get the ancestor
-			var ancestor flow.Header
-			err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
-			if err != nil {
-				return fmt.Errorf("could not get ancestor: %w", err)
-			}
+		// 	// get the ancestor
+		// 	var ancestor flow.Header
+		// 	err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
+		// 	if err != nil {
+		// 		return fmt.Errorf("could not get ancestor: %w", err)
+		// 	}
 
-			// add to list
-			ancestorIDs = append(ancestorIDs, ancestorID)
-			ancestorID = ancestor.ParentID
-		}
+		// 	// add to list
+		// 	ancestorIDs = append(ancestorIDs, ancestorID)
+		// 	ancestorID = ancestor.ParentID
+		// }
 
 		// for each ancestor on the path, we can now include the pending seals
 		// if available
