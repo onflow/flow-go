@@ -56,6 +56,36 @@ func (_m *Headers) ByNumber(number uint64) (*flow.Header, error) {
 	return r0, r1
 }
 
+// ByParentID provides a mock function with given fields: parentID
+func (_m *Headers) ByParentID(parentID flow.Identifier) (*flow.Header, bool, error) {
+	ret := _m.Called(parentID)
+
+	var r0 *flow.Header
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Header); ok {
+		r0 = rf(parentID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Header)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(parentID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(flow.Identifier) error); ok {
+		r2 = rf(parentID)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 // Store provides a mock function with given fields: header
 func (_m *Headers) Store(header *flow.Header) error {
 	ret := _m.Called(header)

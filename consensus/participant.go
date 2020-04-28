@@ -19,7 +19,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -27,8 +26,7 @@ import (
 
 func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, headers storage.Headers,
 	views storage.Views, committee hotstuff.Committee, protocolState protocol.State, builder module.Builder, updater module.Finalizer,
-	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header,
-	rootQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
+	signer hotstuff.Signer, communicator hotstuff.Communicator, options ...Option) (*hotstuff.EventLoop, error) {
 
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
@@ -45,32 +43,18 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		option(&cfg)
 	}
 
-	// initialize internal finalizer
-	rootBlock := &model.Block{
-		View:        rootHeader.View,
-		BlockID:     rootHeader.ID(),
-		ProposerID:  rootHeader.ProposerID,
-		QC:          nil,
-		PayloadHash: rootHeader.PayloadHash,
-		Timestamp:   rootHeader.Timestamp,
-	}
-	trustedRoot := &forks.BlockQC{
-		QC:    rootQC,
-		Block: rootBlock,
-	}
-	finalizer, err := finalizer.New(trustedRoot, updater, notifier)
+	// initialize forks with only finalized block.
+	// unfinalized blocks was not recovered yet
+	forks, err := initForks(state, headers, updater, notifier)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
+		return nil, fmt.Errorf("could not recover forks: %w", err)
 	}
 
-	// initialize the fork choice
-	forkchoice, err := forkchoice.NewNewestForkChoice(finalizer, notifier)
+	// initialize view state
+	viewState, err := viewstate.New(state, me.NodeID(), selector)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize fork choice: %w", err)
+		return nil, fmt.Errorf("could not initialize view state: %w", err)
 	}
-
-	// initialize the forks manager
-	forks := forks.New(finalizer, forkchoice)
 
 	// initialize the validator
 	validator := validator.New(committee, forks, signer)
@@ -87,8 +71,9 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		return nil, fmt.Errorf("could not recover last voted: %w", err)
 	}
 
-	// recover the hotstuff state
-	err = Recover(log, forks, validator, headers, protocolState)
+	// recover the hotstuff state, mainly to recover all unfinalized blocks
+	// in forks
+	err = Recover(log, forks, validator, headers, state)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -138,4 +123,63 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	return loop, nil
+}
+
+func initForks(state protocol.State, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer) (*forks.Forks, error) {
+	// recover the trusted root
+	trustedRoot, err := recoverTrustedRoot(state, headers)
+	if err != nil {
+		return nil, fmt.Errorf("could not recover trusted root: %w", err)
+	}
+
+	// initialize the finalizer
+	finalizer, err := finalizer.New(trustedRoot, updater, notifier)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
+	}
+
+	// initialize the fork choice
+	forkchoice, err := forkchoice.NewNewestForkChoice(finalizer, notifier)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize fork choice: %w", err)
+	}
+
+	// initialize the forks manager
+	forks := forks.New(finalizer, forkchoice)
+	return forks, nil
+}
+
+func recoverTrustedRoot(state protocol.State, headers storage.Headers) (*forks.BlockQC, error) {
+	// get the latest finalized block
+	final, err := state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get last finalized block: %w", err)
+	}
+
+	// get the parent for the latest finalized block
+	parent, err := headers.ByBlockID(final.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get parent for finalized: %w", err)
+	}
+
+	// find a valid child of the finalized block in order to get its QC
+	childHeader, err := headers.ByParentID(final.ID())
+	if err == storage.ErrNotFound {
+		// use genesis block
+	}
+
+	child := model.BlockFromFlow(childHeader, final.View)
+
+	parentView := uint64(0)
+	if parent != nil {
+		parentView = parent.View
+	}
+
+	// create the root block to use
+	trustedRoot := &forks.BlockQC{
+		Block: model.BlockFromFlow(final, parentView),
+		QC:    child.QC,
+	}
+
+	return trustedRoot, nil
 }

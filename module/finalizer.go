@@ -15,5 +15,7 @@ type Finalizer interface {
 	// some fatal condition and will cause the finalization logic to terminate.
 	MakeFinal(blockID flow.Identifier) error
 
+	// MakeTentative will declare a block has passed all the validation, and is
+	// incorporated to a certain branch that is waiting to be finalized.
 	MakeTentative(blockID flow.Identifier, parentID flow.Identifier) error
 }
