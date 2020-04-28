@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	_ "net/http/pprof"
 	"strconv"
 	"time"
 
@@ -24,6 +25,7 @@ func NewServer(log zerolog.Logger, port uint) *Server {
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/debug/pprof/", http.DefaultServeMux)
 
 	m := &Server{
 		server: &http.Server{Addr: addr, Handler: mux},
