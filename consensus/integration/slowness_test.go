@@ -313,7 +313,6 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	// make local
 	priv := helper.MakeBLSKey(t)
 	local, err := local.New(identity, priv)
-	local.SetIndex(index)
 	require.NoError(t, err)
 
 	// make network
