@@ -1,4 +1,4 @@
-# Transit Bootstrap scripts
+-# Transit Bootstrap scripts
 The transit script facilitates nodes uploading their public keys to dapper servers.
 
 It also then handles securely recieving their RB Keys and network metadata after genesis is created.

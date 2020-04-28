@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -41,20 +42,6 @@ var (
 	}
 )
 
-var gcsClient *storage.Client
-
-func init() {
-	// timeout for setting up the client
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-
-	cli, err := storage.NewClient(ctx)
-	if err != nil {
-		log.Fatalf("Failed to initialize GCS client: %s", err)
-	}
-	gcsClient = cli
-}
-
 func main() {
 
 	var bootdir, keydir, wrapId string
@@ -69,6 +56,7 @@ func main() {
 
 	// Wrap takes prescedence, so we just do that first
 	if wrapId != "" {
+		log.Printf("Wrapping response for node %s\n", wrapId)
 		err := wrapFile(bootdir, wrapId)
 		if err != nil {
 			log.Fatalf("Failed to wrap response: %s\n", err)
@@ -97,13 +85,17 @@ func main() {
 		log.Fatalf("Could not determine node ID: %s\n", err)
 	}
 
+	// timeout remote operations
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
 	if push {
-		runPush(bootdir, keydir, nodeId)
+		runPush(ctx, bootdir, keydir, nodeId)
 		return
 	}
 
 	if pull {
-		runPull(bootdir, keydir, nodeId)
+		runPull(ctx, bootdir, keydir, nodeId)
 		return
 	}
 }
@@ -116,31 +108,31 @@ func fetchNodeId(bootdir string) (string, error) {
 		return "", fmt.Errorf("Error reading file %s: %w", path, err)
 	}
 
-	return string(data), nil
+	return strings.TrimSpace(string(data)), nil
 }
 
 // Run the push process
 // - create transit keypair
 // - upload files to GCS bucket
-func runPush(bootdir, token, nodeId string) {
+func runPush(ctx context.Context, bootdir, token, nodeId string) {
 	log.Println("Running push")
 	err := generateKeys(bootdir, nodeId)
 	if err != nil {
 		log.Fatalf("Failed to push: %s", err)
 	}
 	for _, file := range filesToUpload {
-		err = bucketUpload(bootdir, fmt.Sprintf(file, nodeId), token)
+		err = bucketUpload(ctx, bootdir, fmt.Sprintf(file, nodeId), token)
 		if err != nil {
 			log.Fatalf("Failed to push: %s", err)
 		}
 	}
 }
 
-func runPull(bootdir, token, nodeId string) {
+func runPull(ctx context.Context, bootdir, token, nodeId string) {
 	log.Println("Running pull")
 	var err error
 	for _, file := range filesToDownload {
-		err = bucketDownload(bootdir, fmt.Sprintf(file, nodeId), token)
+		err = bucketDownload(ctx, bootdir, fmt.Sprintf(file, nodeId), token)
 		if err != nil {
 			log.Fatalf("Failed to pull: %s", err)
 		}
@@ -257,16 +249,26 @@ func wrapFile(bootdir, nodeId string) error {
 	return nil
 }
 
-func bucketUpload(bootdir, filename, token string) error {
+func bucketUpload(ctx context.Context, bootdir, filename, token string) error {
+
+	gcsClient, err := storage.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize GCS client: %w", err)
+	}
+	defer gcsClient.Close()
+
 	path := filepath.Join(bootdir, filename)
 	log.Printf("Uploading %s\n", path)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
 
 	upload := gcsClient.Bucket(flowBucket).
 		Object(filepath.Join(token, filename)).
 		NewWriter(ctx)
-	defer upload.Close()
+	defer func () {
+		err := upload.Close()
+		if err != nil {
+			log.Fatalf("Failed to close writer stream: %s\n", err)
+		}
+	}()
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -274,19 +276,26 @@ func bucketUpload(bootdir, filename, token string) error {
 	}
 	defer file.Close()
 
-	_, err = io.Copy(upload, file)
+	n, err := io.Copy(upload, file)
 	if err != nil {
 		return fmt.Errorf("Error uploading file: %w", err)
 	}
 
+	log.Printf("Uploaded %d bytes\n", n)
+
 	return nil
 }
 
-func bucketDownload(bootdir, filename, token string) error {
+func bucketDownload(ctx context.Context, bootdir, filename, token string) error {
+
+	gcsClient, err := storage.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize GCS client: %w", err)
+	}
+	defer gcsClient.Close()
+
 	path := filepath.Join(bootdir, filename)
 	log.Printf("Uploading %s\n", path)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
 
 	download, err := gcsClient.Bucket(flowBucket).
 		Object(filepath.Join(token, filename)).

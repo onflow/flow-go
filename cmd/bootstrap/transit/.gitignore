@@ -2,3 +2,4 @@
 *.priv
 *.enc
 transit
+demo/
