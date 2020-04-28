@@ -144,6 +144,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // SendVote will send a vote to the desired node.
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	log := e.log.With().
 		Uint64("block_view", view).
@@ -174,6 +176,8 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
 // Note the header has incomplete fields, because it was converted from a hotstuff.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
@@ -281,7 +285,7 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 		Header:  &synced.Block.Header,
 		Payload: &synced.Block.Payload,
 	}
-	return e.onBlockProposal(synced.OriginID, proposal)
+	return e.onBlockProposal(synced.Block.ProposerID, proposal)
 }
 
 // onBlockProposal handles incoming block proposals.
