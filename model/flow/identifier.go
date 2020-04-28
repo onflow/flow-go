@@ -13,10 +13,13 @@ import (
 	"github.com/dapperlabs/flow-go/storage/merkle"
 )
 
-// Identifier represents a 32-byte unique identifier for a node.
+// Identifier represents a 32-byte unique identifier for an entity.
 type Identifier [32]byte
 
-var ZeroID = Identifier{}
+var (
+	// ZeroID is the lowest value in the 32-byte ID space.
+	ZeroID = Identifier{}
+)
 
 var GenesisParentID = ZeroID
 var GenesisExecutionResultParentID = ZeroID
@@ -68,10 +71,17 @@ func HashToID(hash []byte) Identifier {
 }
 
 // MakeID creates an ID from the hash of encoded data.
+// By default, uses the default encoder. If the input defines its own
+// canonical encoding by implementing Encodable, uses that instead.
 func MakeID(body interface{}) Identifier {
-	data := encoding.DefaultEncoder.MustEncode(body)
+	var encoded []byte
+	if encodable, ok := body.(encoding.Encodable); ok {
+		encoded = encodable.Encode()
+	} else {
+		encoded = encoding.DefaultEncoder.MustEncode(body)
+	}
 	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(data)
+	hash := hasher.ComputeHash(encoded)
 	return HashToID(hash)
 }
 

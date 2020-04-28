@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/runner"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -20,7 +20,7 @@ type EventLoop struct {
 	proposals    chan *model.Proposal
 	votes        chan *model.Vote
 
-	runner runner.SingleRunner // lock for preventing concurrent state transitions
+	unit *engine.Unit // lock for preventing concurrent state transitions
 }
 
 // NewEventLoop creates an instance of EventLoop.
@@ -34,13 +34,18 @@ func NewEventLoop(log zerolog.Logger, metrics module.Metrics, eventHandler Event
 		metrics:      metrics,
 		proposals:    proposals,
 		votes:        votes,
-		runner:       runner.NewSingleRunner(),
+		unit:         engine.NewUnit(),
 	}
 
 	return el, nil
 }
 
 func (el *EventLoop) loop() {
+
+	err := el.eventHandler.Start()
+	if err != nil {
+		el.log.Fatal().Err(err).Msg("could not start event handler")
+	}
 
 	// hotstuff will run in an event loop to process all events synchronously. And this is what will happen when hitting errors:
 	// if hotstuff hits a known critical error, it will exit the loop (for instance, there is a conflicting block with a QC against finalized blocks
@@ -49,7 +54,7 @@ func (el *EventLoop) loop() {
 	// if hotstuff hits any unknown error, it will exit the loop
 
 	for {
-		shutdownSignal := el.runner.ShutdownSignal()
+		quitted := el.unit.Quit()
 
 		// Giving timeout events the priority to be processed first
 		// This is to prevent attacks from malicious nodes that attempt
@@ -63,7 +68,7 @@ func (el *EventLoop) loop() {
 		select {
 
 		// if we receive the shutdown signal, exit the loop
-		case <-shutdownSignal:
+		case <-quitted:
 			return
 
 		// if we receive a time out, process it and log errors
@@ -92,7 +97,7 @@ func (el *EventLoop) loop() {
 		select {
 
 		// same as before
-		case <-shutdownSignal:
+		case <-quitted:
 			return
 
 		// same as before
@@ -178,19 +183,11 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 // Multiple calls are handled gracefully and the event loop will only start
 // once.
 func (el *EventLoop) Ready() <-chan struct{} {
-	err := el.eventHandler.Start()
-	if err != nil {
-		el.log.Fatal().Err(err).Msg("could not start event handler")
-	}
-	return el.runner.Start(el.loop)
+	el.unit.Launch(el.loop)
+	return el.unit.Ready()
 }
 
 // Done implements interface module.ReadyDoneAware
 func (el *EventLoop) Done() <-chan struct{} {
-	return el.runner.Abort()
-}
-
-// Wait implements a function to wait for the event loop to exit.
-func (el *EventLoop) Wait() <-chan struct{} {
-	return el.runner.Completed()
+	return el.unit.Done()
 }

@@ -42,13 +42,15 @@ func LookupCollectionPayload(height uint64, blockID, parentID flow.Identifier, t
 // VerifyCollectionPayload verifies that the candidate transaction IDs don't
 // exist in any ancestor block.
 func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flow.Identifier) func(*badger.Txn) error {
-	return iterate(makePrefix(codeIndexCollection, height), makePrefix(codeIndexCollection, uint64(0)), validatepayload(blockID, txIDs))
+	start, end := payloadIterRange(codeIndexCollection, height, 0)
+	return iterate(start, end, validatepayload(blockID, txIDs))
 }
 
 // CheckCollectionPayload populates `invalidIDs` with any IDs in the candidate
 // set that already exist in an ancestor block.
 func CheckCollectionPayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	return iterate(makePrefix(codeIndexCollection, height), makePrefix(codeIndexCollection, uint64(0)), searchduplicates(blockID, candidateIDs, invalidIDs))
+	start, end := payloadIterRange(codeIndexCollection, height, 0)
+	return iterate(start, end, searchduplicates(blockID, candidateIDs, invalidIDs))
 }
 
 // IndexCollectionByTransaction inserts a collection id keyed by a transaction id

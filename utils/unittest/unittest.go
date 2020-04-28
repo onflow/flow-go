@@ -68,26 +68,27 @@ func RequireReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 //
 // NOTE: This should only be used in cases where `errors.Is` cannot be, like
 // when errors are transmitted over the network without type information.
-func AssertErrSubstringMatch(t *testing.T, expected, actual error) {
-	assert.NotNil(t, expected)
-	assert.NotNil(t, actual)
-	assert.True(t, strings.Contains(actual.Error(), expected.Error()))
+func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
+	require.NotNil(t, expected)
+	require.NotNil(t, actual)
+	assert.True(t, strings.Contains(actual.Error(), expected.Error()),
+		"expected error: '%s', got: '%s'", expected.Error(), actual.Error())
 }
 
-func TempDBDir(t *testing.T) string {
+func TempDBDir(t testing.TB) string {
 	dir, err := ioutil.TempDir("", "flow-test-db")
 	require.NoError(t, err)
 	return dir
 }
 
-func RunWithTempDBDir(t *testing.T, f func(string)) {
+func RunWithTempDBDir(t testing.TB, f func(string)) {
 	dbDir := TempDBDir(t)
 	defer os.RemoveAll(dbDir)
 
 	f(dbDir)
 }
 
-func TempBadgerDB(t *testing.T) (*badger.DB, string) {
+func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 
 	dir := TempDBDir(t)
 
@@ -97,7 +98,7 @@ func TempBadgerDB(t *testing.T) (*badger.DB, string) {
 	return db, dir
 }
 
-func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
+func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	RunWithTempDBDir(t, func(dir string) {
 		// Ref: https://github.com/dgraph-io/badger#memory-usage
 		db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))

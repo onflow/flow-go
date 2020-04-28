@@ -13,7 +13,15 @@ import (
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 )
 
-// GhostClient is a client for the Ghost Node
+// GhostClient is a client for the ghost node.
+//
+// The ghost node is a special node type, used for testing purposes. It can
+// "impersonate" any other node role, send messages to other nodes on the
+// network, and listen to broadcast messages.
+//
+// NOTE: currently the ghost node is limited to 1-K messages (ie. messages sent
+// to at least 2 other nodes). The ghost node WILL NOT receive a 1-1 message,
+// unless the message is explicitly sent to it.
 type GhostClient struct {
 	rpcClient ghost.GhostNodeAPIClient
 	close     func() error
