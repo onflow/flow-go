@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 )
 
+// ASTCache is an interface to a cache for parsed program ASTs.
 type ASTCache interface {
 	GetProgram(ast.Location) (*ast.Program, error)
 	SetProgram(ast.Location, *ast.Program) error
