@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -57,6 +58,10 @@ func main() {
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
 
+			if !strings.Contains(rpcConf.CollectionAddr, ":") {
+				rpcConf.CollectionAddr = rpcConf.CollectionAddr + ":9000"
+			}
+
 			collectionRPCConn, err := grpc.Dial(rpcConf.CollectionAddr, grpc.WithInsecure())
 			if err != nil {
 				return err
@@ -66,6 +71,10 @@ func main() {
 		}).
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Execution node Addr: %s", rpcConf.ExecutionAddr)
+
+			if !strings.Contains(rpcConf.ExecutionAddr, ":") {
+				rpcConf.ExecutionAddr = rpcConf.ExecutionAddr + ":9000"
+			}
 
 			executionRPCConn, err := grpc.Dial(rpcConf.ExecutionAddr, grpc.WithInsecure())
 			if err != nil {
