@@ -63,9 +63,9 @@ func TestConcurrency(t *testing.T) {
 			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
 		},
 		{
-			erCount:     1,
+			erCount:     2,
 			senderCount: 10,
-			chunksNum:   20,
+			chunksNum:   10,
 		},
 	}
 
@@ -82,7 +82,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// ingest engine parameters
 	// retries trackers every one second for a total of 5 times
 	requestInterval := uint(1000)
-	failureThreshold := uint(5)
+	failureThreshold := uint(10)
 
 	// creates test id for each role
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))

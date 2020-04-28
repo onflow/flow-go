@@ -30,7 +30,6 @@ import (
 // distinct chunk by each verification node. The result approvals should be
 // sent to the consensus nodes
 func TestHappyPath(t *testing.T) {
-	mu := sync.Mutex{}
 	testcases := []struct {
 		verNodeCount,
 		chunkCount int
@@ -51,20 +50,10 @@ func TestHappyPath(t *testing.T) {
 			verNodeCount: 2,
 			chunkCount:   10,
 		},
-		//{
-		//	verNodeCount: 5,
-		//	chunkCount:   2,
-		//},
-		//{
-		//	verNodeCount: 5,
-		//	chunkCount:   10,
-		//},
 	}
 
 	for _, tc := range testcases {
-		mu.Lock()
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
-			defer mu.Unlock()
 			testHappyPath(t, tc.verNodeCount, tc.chunkCount)
 		})
 	}
@@ -82,7 +71,7 @@ func TestHappyPath(t *testing.T) {
 func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	// ingest engine parameters
 	requestInterval := uint(2000)
-	failureThreshold := uint(1)
+	failureThreshold := uint(10)
 
 	// generates network hub
 	hub := stub.NewNetworkHub()
@@ -213,13 +202,6 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 
 		verNets = append(verNets, verNet)
 	}
-
-	//// flush the collection response
-	//colNet, ok := hub.GetNetwork(colIdentity.NodeID)
-	//assert.True(t, ok)
-	//colNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-	//	return m.ChannelID == engine.CollectionProvider
-	//})
 
 	conWG.Wait()
 	// assert that the RA was received
