@@ -330,9 +330,9 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 }
 
 // requestCollection submits a request for the given collection to collection nodes.
-func (e *Engine) requestCollection(collID flow.Identifier) error {
+func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifier) error {
 	// updates tracker for this request
-	tracker, err := e.updateCollectionTracker(collID)
+	tracker, err := e.updateCollectionTracker(collID, blockID)
 	if err != nil {
 		return fmt.Errorf("could not update the collection tracker: %w", err)
 	}
@@ -516,22 +516,15 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		return nil, false
 	}
 
-	// registers a tracker for collection
-	//
-	tracker := &trackers.CollectionTracker{
-		CollectionID: collID,
-		BlockID:      block.ID(),
-		Counter:      0,
-	}
-
-	err := e.collectionTrackers.Add(tracker)
-	// Todo handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrAlreadyExists {
-		e.log.Error().
+	// requests the collection from network
+	err := e.requestCollection(collID, block.ID())
+	if err != nil {
+		log.Error().
 			Err(err).
 			Hex("collection_id", logging.ID(collID)).
-			Msg("could not store tracker collection request in mempool")
+			Msg("could make a request of collection to the network")
 	}
+
 	return nil, false
 }
 
@@ -816,7 +809,7 @@ func (e *Engine) checkTrackers() {
 		}
 
 		// retries requesting collection
-		err := e.requestCollection(ct.CollectionID)
+		err := e.requestCollection(ct.CollectionID, ct.BlockID)
 		if err != nil {
 			e.log.Error().
 				Err(err).
@@ -848,23 +841,32 @@ func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier) (*trackers.
 
 // updateCollectionTracker performs the following
 // If there is a tracker for this collection ID, it pulls it out of mempool, increases its counter by one, and returns it
-// Else it creates a new empty tracker for this collection with counter value of one and returns it
-func (e *Engine) updateCollectionTracker(collectionID flow.Identifier) (*trackers.CollectionTracker, error) {
+// Else it creates a new empty tracker for this collection with counter value of one and returns it.
+func (e *Engine) updateCollectionTracker(collectionID flow.Identifier, blockID flow.Identifier) (*trackers.CollectionTracker, error) {
+	if e.collectionTrackers.Has(collectionID) {
+		// there is a tracker for this collection
+		// pulls tracker out of mempool
+		tracker, err := e.collectionTrackers.ByCollectionID(collectionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+		}
 
-	// pulls tracker out of mempool
-	tracker, err := e.collectionTrackers.ByCollectionID(collectionID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+		removed := e.collectionTrackers.Rem(collectionID)
+		if !removed {
+			return nil, fmt.Errorf("could not remove collection tracker from mempool")
+		}
+		// increases tracker retry counter
+		tracker.Counter += 1
+
+		return tracker, nil
+	} else {
+		// creates and returns a new collector
+		return &trackers.CollectionTracker{
+			CollectionID: collectionID,
+			BlockID:      blockID,
+			Counter:      1,
+		}, nil
 	}
-
-	removed := e.collectionTrackers.Rem(collectionID)
-	if !removed {
-		return nil, fmt.Errorf("could not remove collection tracker from mempool")
-	}
-	// increases tracker retry counter
-	tracker.Counter += 1
-
-	return tracker, nil
 
 }
 

@@ -225,9 +225,6 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
 	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false).Once()
 
-	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
-	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
-
 	// engine has not yet ingested the result of this receipt yet
 	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
 
@@ -244,7 +241,12 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	//
 	// adding functionality of chunk tracker to trackers mempool
 	// mocks initial insertion of tracker into mempool
-	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil).Once()
+	has := false
+	suite.collectionTrackers.On("Add", suite.collTracker).Run(func(args testifymock.Arguments) {
+		has = true
+	}).Return(nil).Once()
+	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
+	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(has)
 	// mocks tracker check
 	suite.collectionTrackers.On("All").Return([]*tracker.CollectionTracker{suite.collTracker}).Once()
 	suite.chunkDataPackTrackers.On("All").Return(nil)
