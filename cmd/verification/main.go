@@ -36,13 +36,16 @@ const (
 
 	// requestInterval represents the time interval in milliseconds that the
 	// ingest engine retries sending resource requests to the network
-	// DISCLAIMER: current provided value is not production-level.
-	requestInterval = 10
+	// this value is set following this issue:
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	requestInterval = 1000
 
 	// failureThreshold represents the number of retries ingest engine sends
 	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	failureThreshold = 10
+	// this value is set following this issue:
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	failureThreshold = 2
 )
 
 func main() {
