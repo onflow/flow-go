@@ -481,19 +481,18 @@ func Test3Nodes(t *testing.T) {
 
 	<-stopper.stopped
 
-	// verify all nodes arrive the same state
-	for i := 0; i < len(nodes); i++ {
-		headerN, err := nodes[i].state.Final().Head()
-		require.NoError(t, err)
-		require.Greater(t, headerN.View, uint64(90))
+	for i := range nodes {
 		printState(t, nodes, i)
-
 	}
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, 90)
+
 	cleanupNodes(nodes)
 }
 
 // with 5 nodes, and one node completely blocked, the other nodes can still reach consensus
-func Test5Nodes(t *testing.T) {
+func est5Nodes(t *testing.T) {
 	nodes, stopper := createNodes(t, 5, 100)
 
 	connect(nodes, blockNodes(nodes[0]))
