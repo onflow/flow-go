@@ -41,7 +41,7 @@ func (s *SingleVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, blo
 	// get the identity of the voter
 	voter, ok := participants.ByNodeID(voterID)
 	if !ok {
-		return false, fmt.Errorf("voter %x is not a valid consensus participant at block %x: %w", voterID, block.BlockID, model.ErrInvalidConsensusParticipant)
+		return false, fmt.Errorf("voter %x is not a valid consensus participant at block %x: %w", voterID, block.BlockID, model.ErrInvalidSigner)
 	}
 
 	// create the message we verify against and check signature
@@ -63,7 +63,7 @@ func (s *SingleVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, bl
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
 	if len(signers) < len(voterIDs) { // check we have valid consensus member Identities for all signers
-		return false, fmt.Errorf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidConsensusParticipant)
+		return false, fmt.Errorf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner)
 	}
 	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 

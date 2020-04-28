@@ -46,7 +46,7 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 	}
 	signers := allConsensusParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
 	if len(signers) < len(qc.SignerIDs) {
-		return newInvalidBlockError(block, fmt.Sprintf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidConsensusParticipant))
+		return newInvalidBlockError(block, fmt.Sprintf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner))
 	}
 
 	// determine whether signers reach minimally required stake threshold for consensus
@@ -129,7 +129,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 
 	// TODO: this lookup is duplicated in Verifier
 	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
-	if errors.Is(err, model.ErrInvalidConsensusParticipant) {
+	if errors.Is(err, model.ErrInvalidSigner) {
 		return nil, newInvalidVoteError(vote, fmt.Sprintf("vote is not from a staked consensus participant: %s", err.Error()))
 	}
 	if err != nil {
@@ -142,7 +142,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		switch {
 		case errors.Is(err, verification.ErrInvalidFormat):
 			return nil, newInvalidVoteError(vote, fmt.Sprintf("vote signature has bad format: %s", err.Error()))
-		case errors.Is(err, model.ErrInvalidConsensusParticipant):
+		case errors.Is(err, model.ErrInvalidSigner):
 			return nil, newInvalidVoteError(vote, fmt.Sprintf("vote is not from a staked consensus participant: %s", err.Error()))
 		default:
 			return nil, fmt.Errorf("cannot verify signature for vote (%s): %w", vote.ID(), err.Error())

@@ -54,16 +54,16 @@ func (c *Committee) Identities(blockID flow.Identifier, selector flow.IdentityFi
 // Identity returns the full Identity for specified consensus participant.
 // The node must be a legitimate consensus participant with NON-ZERO STAKE at the specified block.
 // ERROR conditions:
-//    * ErrInvalidConsensusParticipant if participantID does not correspond to a _staked_ consensus member at the specified block.
+//    * ErrInvalidSigner if participantID does not correspond to a _staked_ consensus member at the specified block.
 func (c *Committee) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
 	mainConsensusBlockID := c.blockTranslator(blockID)
 	identity, err := c.protocolState.AtBlockID(mainConsensusBlockID).Identity(participantID)
 	if err != nil {
 		// ToDo: differentiate between internal error and participantID not being found
-		return nil, fmt.Errorf("%x is not a valid node ID at block %x: %w", participantID, blockID, model.ErrInvalidConsensusParticipant)
+		return nil, fmt.Errorf("%x is not a valid node ID at block %x: %w", participantID, blockID, model.ErrInvalidSigner)
 	}
 	if !c.consensusMembersFilter(identity) { // participantID is not a consensus participant
-		return nil, fmt.Errorf("node %x has wrong role or zero stake at block %x: %w", participantID, blockID, model.ErrInvalidConsensusParticipant)
+		return nil, fmt.Errorf("node %x has wrong role or zero stake at block %x: %w", participantID, blockID, model.ErrInvalidSigner)
 	}
 	return identity, nil
 }

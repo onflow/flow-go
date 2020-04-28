@@ -57,7 +57,7 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	// get the specific identity
 	signer, ok := participants.ByNodeID(voterID)
 	if !ok {
-		return false, fmt.Errorf("voter %x is not a valid consensus participant at block %x: %w", voterID, block.BlockID, model.ErrInvalidConsensusParticipant)
+		return false, fmt.Errorf("voter %x is not a valid consensus participant at block %x: %w", voterID, block.BlockID, model.ErrInvalidSigner)
 	}
 
 	// split the two signatures from the vote
@@ -103,7 +103,7 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
 	if len(signers) < len(voterIDs) { // check we have valid consensus member Identities for all signers
-		return false, fmt.Errorf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidConsensusParticipant)
+		return false, fmt.Errorf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner)
 	}
 	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 

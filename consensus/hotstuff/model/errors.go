@@ -20,7 +20,7 @@ func (e NoVoteError) Is(other error) bool {
 
 var ErrInsufficientVotes = errors.New("received insufficient votes")
 var ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
-var ErrInvalidConsensusParticipant = errors.New("invalid consensus participant(s)")
+var ErrInvalidSigner = errors.New("invalid signer(s)")
 
 type ErrorConfiguration struct {
 	Msg string

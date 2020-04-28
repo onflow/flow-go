@@ -27,7 +27,7 @@ type Committee interface {
 	// Identity returns the full Identity for specified consensus participant.
 	// The node must be a legitimate consensus participant with NON-ZERO STAKE at the specified block.
 	// ERROR conditions:
-	//    * ErrInvalidConsensusParticipant if participantID does not correspond to a _staked_ consensus member at the specified block.
+	//    * ErrInvalidSigner if participantID does not correspond to a _staked_ consensus member at the specified block.
 	Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 
 	// LeaderForView returns the identity of the leader for a given view.
