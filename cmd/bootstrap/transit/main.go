@@ -15,6 +15,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"golang.org/x/crypto/nacl/box"
+	"google.golang.org/api/option"
 
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 )
@@ -35,7 +36,6 @@ var (
 		bootstrap.FilenameNodeInfoPub,
 	}
 	filesToDownload = []string{
-		FilenameRandomBeaconCipher,
 		bootstrap.FilenameDKGDataPub,
 		bootstrap.FilenameNodeInfosPub,
 		bootstrap.FilenameGenesisBlock,
@@ -129,10 +129,11 @@ func runPush(ctx context.Context, bootdir, token, nodeId string) {
 }
 
 func runPull(ctx context.Context, bootdir, token, nodeId string) {
+	filesToDownload = append(filesToDownload, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
 	log.Println("Running pull")
 	var err error
 	for _, file := range filesToDownload {
-		err = bucketDownload(ctx, bootdir, fmt.Sprintf(file, nodeId), token)
+		err = bucketDownload(ctx, bootdir, file, token)
 		if err != nil {
 			log.Fatalf("Failed to pull: %s", err)
 		}
@@ -251,7 +252,7 @@ func wrapFile(bootdir, nodeId string) error {
 
 func bucketUpload(ctx context.Context, bootdir, filename, token string) error {
 
-	gcsClient, err := storage.NewClient(ctx)
+	gcsClient, err := storage.NewClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return fmt.Errorf("Failed to initialize GCS client: %w", err)
 	}
@@ -288,14 +289,14 @@ func bucketUpload(ctx context.Context, bootdir, filename, token string) error {
 
 func bucketDownload(ctx context.Context, bootdir, filename, token string) error {
 
-	gcsClient, err := storage.NewClient(ctx)
+	gcsClient, err := storage.NewClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return fmt.Errorf("Failed to initialize GCS client: %w", err)
 	}
 	defer gcsClient.Close()
 
 	path := filepath.Join(bootdir, filename)
-	log.Printf("Uploading %s\n", path)
+	log.Printf("Downloading %s\n", path)
 
 	download, err := gcsClient.Bucket(flowBucket).
 		Object(filepath.Join(token, filename)).

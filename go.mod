@@ -45,6 +45,7 @@ require (
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
 	golang.org/x/tools v0.0.0-20200413161937-250b2131eb8b // indirect
+	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
 )
 
