@@ -20,7 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -151,8 +150,8 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 
 func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 
-	// the block the transaction is included in
-	var blockID flow.Identifier
+	// the height at which the collection is included
+	var height uint64
 
 	waitFor := time.Second * 30
 	deadline := time.Now().Add(waitFor)
@@ -160,24 +159,27 @@ func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 
 		_, msg, err := suite.reader.Next()
 		require.Nil(suite.T(), err, "could not read next message")
+		suite.T().Logf("ghost recv: %T", msg)
 
-		proposal, ok := msg.(*messages.ClusterBlockProposal)
-		if !ok {
-			continue
-		}
+		switch val := msg.(type) {
+		case *messages.ClusterBlockProposal:
+			header := val.Header
+			collection := val.Payload.Collection
+			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
 
-		header := proposal.Header
-		collection := proposal.Payload.Collection
-		suite.T().Logf("proposal height=%d id=%x size=%d", header.Height, header.ID(), collection.Len())
+			// note the height when transaction is includedj
+			if collection.Light().Has(txID) {
+				height = header.Height
+			}
 
-		if proposal.Payload.Collection.Light().Has(txID) {
-			blockID = proposal.Header.ID()
-		}
+			// use building two blocks as an indication of inclusion
+			// TODO replace this with finalization by listening to guarantees
+			if height > 0 && header.Height-height >= 2 {
+				return
+			}
 
-		// we consider the transaction included once a block is built on its
-		// containing collection
-		if proposal.Header.ParentID == blockID {
-			return
+		case *flow.CollectionGuarantee:
+			// TODO use this as indication of finalization w/ HotStuff
 		}
 	}
 
@@ -336,15 +338,7 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	suite.AwaitTransactionIncluded(convert.IDFromSDK(tx.ID()))
 	suite.net.Stop()
 
-	identities := suite.net.Identities()
-	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
-
-	// get database for COL1
-	db, err := col1.DB()
-	require.Nil(t, err)
-
-	state, err := clusterstate.NewState(db, chainID)
-	assert.Nil(t, err)
+	state := suite.ClusterStateFor(col1.Config.NodeID)
 
 	// the transaction should be included in exactly one collection
 	checker := unittest.NewClusterStateChecker(state)
