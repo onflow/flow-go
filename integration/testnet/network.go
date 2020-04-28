@@ -14,10 +14,9 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/dapperlabs/testingdock"
 
@@ -55,11 +54,11 @@ const (
 
 func init() {
 	testingdock.Verbose = true
-	//testingdock.SpawnSequential = true
 }
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
+	t           *testing.T
 	suite       *testingdock.Suite
 	config      NetworkConfig
 	cli         *dockerclient.Client
@@ -79,83 +78,73 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
-
 	// makes it easier to see logs for a specific test case
 	fmt.Println(">>>> starting network: ", net.config.Name)
-
 	net.suite.Start(ctx)
 }
 
 // Remove stops the network, removes all the containers and cleans up all resources.
 // If you need to inspect state, first `Stop` the containers, then check state, then `Cleanup` resources.
 // If you need to restart containers, use `Stop` instead, which does not remove containers.
-func (net *FlowNetwork) Remove() error {
+func (net *FlowNetwork) Remove() {
 
-	err := net.Stop()
-	if err != nil {
-		return fmt.Errorf("could not stop network: %w", err)
-	}
-
-	err = net.RemoveContainers()
-	if err != nil {
-		return fmt.Errorf("could not remove containers: %w", err)
-	}
-
-	err = net.Cleanup()
-	if err != nil {
-		return fmt.Errorf("could not clean up network resources: %w", err)
-	}
-
-	return nil
+	defer net.Cleanup()          // defer to ensure it runs, even if stop fails
+	defer net.RemoveContainers() // defer to ensure it runs, even if stop fails
+	net.Stop()
 }
 
 // Stop stops all containers in the network, without removing them. This allows containers to be
 // restarted. To remove them, call `RemoveContainers`.
-func (net *FlowNetwork) Stop() error {
+func (net *FlowNetwork) Stop() {
 
 	fmt.Println("<<<< stopping network: ", net.config.Name)
-
 	err := net.suite.Close()
-	if err != nil {
-		return fmt.Errorf("could not stop containers: %w", err)
+	if !assert.Nil(net.t, err, "failed to stop network") {
+		defer net.t.FailNow()
 	}
-
-	return nil
 }
 
 // RemoveContainers removes all the containers in the network. Containers need to be stopped first using `Stop`.
-func (net *FlowNetwork) RemoveContainers() error {
-	return net.suite.Remove()
+func (net *FlowNetwork) RemoveContainers() {
+
+	err := net.suite.Remove()
+	if !assert.Nil(net.t, err, "failed to remove containers") {
+		defer net.t.FailNow()
+	}
 }
 
 // Cleanup cleans up all temporary files used by the network.
-func (net *FlowNetwork) Cleanup() error {
+func (net *FlowNetwork) Cleanup() {
+
 	// remove data directories
-	var merr *multierror.Error
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
-		if err != nil {
-			merr = multierror.Append(merr, err)
+		if !assert.Nil(net.t, err, "failed to cleanup") {
+			defer net.t.FailNow()
 		}
 	}
-
-	return merr.ErrorOrNil()
 }
 
-// ContainerByID returns the container with the given node ID. If such a
-// container exists, returns true. Otherwise returns false.
-func (net *FlowNetwork) ContainerByID(id flow.Identifier) (*Container, bool) {
+// ContainerByID returns the container with the given node ID, if it exists.
+// Otherwise fails the test.
+func (net *FlowNetwork) ContainerByID(id flow.Identifier) *Container {
 	for _, c := range net.Containers {
 		if c.Config.NodeID == id {
-			return c, true
+			return c
 		}
 	}
-	return nil, false
+	net.t.FailNow()
+	return nil
 }
 
-func (net *FlowNetwork) ContainerByName(name string) (*Container, bool) {
+// ContainerByName returns the container with the given name, if it exists.
+// Otherwise fails the test.
+func (net *FlowNetwork) ContainerByName(name string) *Container {
 	container, exists := net.Containers[name]
-	return container, exists
+	if !exists {
+		net.t.FailNow()
+	}
+	return container
 }
 
 // NetworkConfig is the config for the network.
@@ -224,15 +213,15 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 
 // NewNodeConfigSet creates a set of node configs with the given role. The nodes
 // are given sequential IDs with a common prefix to make reading logs easier.
-func NewNodeConfigSet(n int, role flow.Role, opts ...func(*NodeConfig)) []NodeConfig {
+func NewNodeConfigSet(n uint, role flow.Role, opts ...func(*NodeConfig)) []NodeConfig {
 
 	// each node in the set has a common 4-digit prefix, separated from their
 	// index with a `0` character
-	idPrefix := rand.Intn(10000) * 100
+	idPrefix := uint(rand.Intn(10000) * 100)
 
 	confs := make([]NodeConfig, n)
-	for i := 0; i < n; i++ {
-		confs[i] = NewNodeConfig(role, append(opts, WithIDInt(uint(idPrefix+i+1)))...)
+	for i := uint(0); i < n; i++ {
+		confs[i] = NewNodeConfig(role, append(opts, WithIDInt(idPrefix+i+1))...)
 	}
 
 	return confs
@@ -267,9 +256,10 @@ func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 		config.LogLevel = level
 	}
 }
-func AsGhost(ghost bool) func(config *NodeConfig) {
+
+func AsGhost() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
-		config.Ghost = ghost
+		config.Ghost = true
 	}
 }
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
@@ -344,6 +334,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	}
 
 	flowNetwork := &FlowNetwork{
+		t:           t,
 		cli:         dockerClient,
 		config:      networkConf,
 		suite:       suite,
@@ -484,7 +475,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	net.Containers[nodeContainer.Name()] = nodeContainer
 	if nodeConf.Role == flow.RoleAccess {
 		// collection1, _ := net.ContainerByName("collection_1")
-		execution1, _ := net.ContainerByName("execution_1")
+		execution1 := net.ContainerByName("execution_1")
 		// collection1.After(suiteContainer)
 		execution1.After(suiteContainer)
 	} else {

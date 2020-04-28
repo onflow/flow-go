@@ -41,7 +41,7 @@ func (c Contract) ToCadence() string {
 		memberStrings[i] = member.ToCadence()
 	}
 
-	return fmt.Sprintf("pub contract %s { %s }", c.Name, strings.Join(memberStrings, "\n"))
+	return fmt.Sprintf("access(all) contract %s { %s }", c.Name, strings.Join(memberStrings, "\n"))
 }
 
 type Resource struct {
@@ -50,7 +50,7 @@ type Resource struct {
 }
 
 func (r Resource) ToCadence() string {
-	return fmt.Sprintf("pub resource %s { %s }", r.Name, r.Code)
+	return fmt.Sprintf("access(all) resource %s { %s }", r.Name, r.Code)
 }
 
 type Import struct {

@@ -24,6 +24,7 @@ import (
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protoint "github.com/dapperlabs/flow-go/state/protocol"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
+	storerr "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -115,7 +116,7 @@ func (ss *SyncSuite) SetupTest() {
 		func(height uint64) error {
 			_, enabled := ss.heights[height]
 			if !enabled {
-				return fmt.Errorf("height not found (%d)", height)
+				return storerr.ErrNotFound
 			}
 			return nil
 		},
@@ -127,7 +128,7 @@ func (ss *SyncSuite) SetupTest() {
 		func(blockID flow.Identifier) error {
 			_, enabled := ss.blockIDs[blockID]
 			if !enabled {
-				return fmt.Errorf("blockID not found (%x)", blockID)
+				return storerr.ErrNotFound
 			}
 			return nil
 		},
@@ -215,41 +216,67 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		ToHeight:   0,
 	}
 
-	// if we don't have the full range, we should bail (for now)
-	req.FromHeight = ss.head.Height
-	req.ToHeight = ss.head.Height + 1
+	// fill in blocks at heights -1 to -4 from head
+	ref := ss.head.Height
+	for height := ref; height >= ref-4; height-- {
+		block := unittest.BlockFixture()
+		block.Height = height
+		ss.heights[height] = &block
+	}
+
+	// empty range should be a no-op
+	req.FromHeight = ref
+	req.ToHeight = ref - 1
 	err := ss.e.onRangeRequest(originID, req)
-	require.NoError(ss.T(), err, "range request with higher to height should pass")
-	ss.con.AssertNotCalled(ss.T(), "Submit", mock.Anything, mock.Anything)
-
-	// if we the request specifies no heights, we should also bail
-	req.FromHeight = ss.head.Height
-	req.ToHeight = ss.head.Height - 1
-	err = ss.e.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "empty range request should pass")
-	ss.con.AssertNotCalled(ss.T(), "Submit", mock.Anything, mock.Anything)
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
 
-	// if we have a valid range with missing blocks, we should fail
-	req.FromHeight = ss.head.Height - 2
-	req.ToHeight = ss.head.Height
+	// range with only unknown block should be a no-op
+	req.FromHeight = ref + 1
+	req.ToHeight = ref + 3
 	err = ss.e.onRangeRequest(originID, req)
-	require.Error(ss.T(), err, "valid range with missing blocks should fail")
-	ss.con.AssertNotCalled(ss.T(), "Submit", mock.Anything, mock.Anything)
+	require.NoError(ss.T(), err, "unknown range request should pass")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
 
-	// if we have a valid range and blocks are in DB, check we send the right blocks
-	block1 := unittest.BlockFixture()
-	block2 := unittest.BlockFixture()
-	block3 := unittest.BlockFixture()
-	block1.Height = ss.head.Height - 2
-	block2.Height = ss.head.Height - 1
-	block3.Height = ss.head.Height
-	ss.heights[block1.Height] = &block1
-	ss.heights[block2.Height] = &block2
-	ss.heights[block3.Height] = &block3
-	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
+	// a request for same from and to should send single block
+	req.FromHeight = ref - 1
+	req.ToHeight = ref - 1
+	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.BlockResponse)
-			expected := []*flow.Block{&block1, &block2, &block3}
+			expected := []*flow.Block{ss.heights[ref-1]}
+			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
+		},
+	)
+	err = ss.e.onRangeRequest(originID, req)
+	require.NoError(ss.T(), err, "range request with higher to height should pass")
+
+	// a request for a range that we partially have should send partial response
+	req.FromHeight = ref - 2
+	req.ToHeight = ref + 2
+	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.BlockResponse)
+			expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
+			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
+		},
+	)
+	err = ss.e.onRangeRequest(originID, req)
+	require.NoError(ss.T(), err, "valid range with missing blocks should fail")
+
+	// a request for a range we entirely have should send all blocks
+	req.FromHeight = ref - 2
+	req.ToHeight = ref
+	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.BlockResponse)
+			expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
@@ -273,13 +300,13 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	req.BlockIDs = []flow.Identifier{}
 	err := ss.e.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass empty request")
-	ss.con.AssertNotCalled(ss.T(), "Submit", mock.Anything, mock.Anything)
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
 
-	// a non-empty request for missing block ID should error
+	// a non-empty request for missing block ID should be a no-op
 	req.BlockIDs = []flow.Identifier{ss.head.ID()}
 	err = ss.e.onBatchRequest(originID, req)
-	require.Error(ss.T(), err, "should fail request for missing block")
-	ss.con.AssertNotCalled(ss.T(), "Submit", mock.Anything, mock.Anything)
+	require.NoError(ss.T(), err, "should pass request for missing block")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
 
 	// a non-empty request for existing block IDs should send right response
 	block := unittest.BlockFixture()
@@ -542,17 +569,23 @@ func (ss *SyncSuite) TestScanPending() {
 
 }
 
-func (ss *SyncSuite) TestSendRequests() {
-	maxSize := uint64(ss.e.maxSize)
+func (ss *SyncSuite) TestSendRequestsContinuousRangeMaxSizeExact() {
+
+	// configure request parameters
+	ss.e.maxSize = 10
+	ss.e.maxRequests = 100
 
 	// create a maximum sized batch of heights
 	var maximum []uint64
+	maxSize := uint64(ss.e.maxSize)
 	start := uint64(100)
 	end := start + maxSize
 	for n := start; n < end; n++ {
 		maximum = append(maximum, n)
+		ss.e.heights[n] = &Status{}
 	}
-	calls := 1
+
+	// set up checks for desired sequence of submit calls
 	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.RangeRequest)
@@ -560,18 +593,38 @@ func (ss *SyncSuite) TestSendRequests() {
 			assert.Equal(ss.T(), end-1, req.ToHeight, "request should end at end")
 		},
 	)
+
+	// set up one additional catch-all to log info on superfluous calls
+	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.RangeRequest)
+			assert.Fail(ss.T(), fmt.Sprintf("additional request (from: %d, to: %d)", req.FromHeight, req.ToHeight))
+		},
+	)
+
+	// send requests and do checks
 	err := ss.e.sendRequests(maximum, nil)
 	require.NoError(ss.T(), err, "should pass maximum height batch")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", calls)
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 1)
+}
 
-	// create a batch of heights that is one too big
+func (ss *SyncSuite) TestSendRequestsContinuousRangeMaxSizePlusOne() {
+
+	// configure the request parameters
+	ss.e.maxSize = 10
+	ss.e.maxRequests = 100
+
+	// create a batch of heights one longer than maximum size
 	var oversized []uint64
-	start = uint64(200)
-	end = start + maxSize + 1
+	maxSize := uint64(ss.e.maxSize)
+	start := uint64(200)
+	end := start + maxSize + 1
 	for n := start; n < end; n++ {
 		oversized = append(oversized, n)
+		ss.e.heights[n] = &Status{}
 	}
-	calls += 2
+
+	// set up checks for desired sequence of submit calls
 	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.RangeRequest)
@@ -586,12 +639,70 @@ func (ss *SyncSuite) TestSendRequests() {
 			assert.Equal(ss.T(), end-1, req.ToHeight, "second request should end at end")
 		},
 	)
-	err = ss.e.sendRequests(oversized, nil)
-	require.NoError(ss.T(), err, "should pass oversized height batch")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", calls) // need to use total number (1+2)
 
-	// create a slice with 5 ranges to check with maximum requests 4
+	// set up one additional catch-all to log info on superfluous calls
+	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.RangeRequest)
+			assert.Fail(ss.T(), fmt.Sprintf("additional request (from: %d, to: %d)", req.FromHeight, req.ToHeight))
+		},
+	)
+
+	// send the requests and do checks
+	err := ss.e.sendRequests(oversized, nil)
+	require.NoError(ss.T(), err, "should pass oversized height batch")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 2)
+}
+
+func (ss *SyncSuite) TestSendRequestsTwoRangesEachMaxSizeExact() {
+
+	// configure request parameters
+	ss.e.maxSize = 1
+	ss.e.maxRequests = 100
+
+	// create a slice of two heights, which should be split into two of one each
+	batches := []uint64{1, 2}
+	for _, n := range batches {
+		ss.e.heights[n] = &Status{}
+	}
+
+	// set up checks for desired sequence of submit calls
+	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.RangeRequest)
+			assert.Equal(ss.T(), uint64(1), req.FromHeight, "first request should start at start")
+			assert.Equal(ss.T(), uint64(1), req.ToHeight, "first request should end at end")
+		},
+	)
+	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.RangeRequest)
+			assert.Equal(ss.T(), uint64(2), req.FromHeight, "second request should start at start")
+			assert.Equal(ss.T(), uint64(2), req.ToHeight, "second request should end at end")
+		},
+	)
+
+	// set up one additional catch-all to log info on superfluous calls
+	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.RangeRequest)
+			assert.Fail(ss.T(), fmt.Sprintf("additional request (from: %d, to: %d)", req.FromHeight, req.ToHeight))
+		},
+	)
+
+	// send the requests and do checks
+	err := ss.e.sendRequests(batches, nil)
+	require.NoError(ss.T(), err, "should pass two one-height batches")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 2)
+}
+
+func (ss *SyncSuite) TestSendRequestsFiveRangesWithMaxRequestsFour() {
+
+	// configure request parameters
 	ss.e.maxRequests = 4
+	ss.e.maxSize = 100
+
+	// create a slice of 5 contiguous ranges, which is one more than max requests
 	batches := []uint64{
 		1,
 		3, 4,
@@ -599,7 +710,11 @@ func (ss *SyncSuite) TestSendRequests() {
 		10, 11, 12, 13,
 		15, 16, 17, 18, 19,
 	}
-	calls += 4
+	for _, n := range batches {
+		ss.e.heights[n] = &Status{}
+	}
+
+	// set up checks for desired sequence of submit calls
 	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.RangeRequest)
@@ -628,16 +743,37 @@ func (ss *SyncSuite) TestSendRequests() {
 			assert.Equal(ss.T(), uint64(13), req.ToHeight, "second request should end at end")
 		},
 	)
-	err = ss.e.sendRequests(batches, nil)
-	require.NoError(ss.T(), err, "should pass five height batches")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", calls) // need to use total number (1+2)
 
-	// create three requests with block IDs, with one just overflowing
+	// set up one additional catch-all to log info on superfluous calls
+	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.RangeRequest)
+			assert.Fail(ss.T(), fmt.Sprintf("additional request (from: %d, to: %d)", req.FromHeight, req.ToHeight))
+		},
+	)
+
+	// send the requests and do checks
+	err := ss.e.sendRequests(batches, nil)
+	require.NoError(ss.T(), err, "should pass five height batches")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 4)
+}
+
+func (ss *SyncSuite) TestSendRequestsBlockIDs() {
+
+	// configure request parameters
+	ss.e.maxSize = 1024
+	ss.e.maxRequests = 100
+
+	// create a batch twice maximum size plus one, which should lead to 3 requests
+	maxSize := uint64(ss.e.maxSize)
 	var blockIDs []flow.Identifier
 	for n := uint64(0); n < maxSize*2+1; n++ {
-		blockIDs = append(blockIDs, unittest.IdentifierFixture())
+		blockID := unittest.IdentifierFixture()
+		blockIDs = append(blockIDs, blockID)
+		ss.e.blockIDs[blockID] = &Status{}
 	}
-	calls += 3
+
+	// set up checks for desired sequence of submit calls
 	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.BatchRequest)
@@ -656,8 +792,18 @@ func (ss *SyncSuite) TestSendRequests() {
 			assert.ElementsMatch(ss.T(), blockIDs[maxSize*2:], req.BlockIDs, "last batch request should have last slice")
 		},
 	)
-	err = ss.e.sendRequests(nil, blockIDs)
+
+	// set up one additional catch-all to log info on superfluous calls
+	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.BatchRequest)
+			assert.Fail(ss.T(), fmt.Sprintf("additional request (blocks: %s)", req.BlockIDs))
+		},
+	)
+
+	// send the requests and do checks
+	err := ss.e.sendRequests(nil, blockIDs)
 	require.NoError(ss.T(), err, "should pass three block ID batches")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", calls) // need to use total number (1+2)
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
 
 }

@@ -5,103 +5,276 @@ import (
 	"testing"
 	"time"
 
+	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/client"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
+	ghostclient "github.com/dapperlabs/flow-go/engine/ghost/client"
+	"github.com/dapperlabs/flow-go/integration/convert"
 	"github.com/dapperlabs/flow-go/integration/testnet"
+	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/messages"
 	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 const (
-	// the timeout for individual actions (eg. send a transaction)
+	// the default timeout for individual actions (eg. send a transaction)
 	defaultTimeout = 10 * time.Second
-	// the period we wait to give consensus/routing time to complete
-	waitTime = 20 * time.Second
 )
 
-// default set of non-collection nodes
-func defaultOtherNodes() []testnet.NodeConfig {
-	var (
-		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
-		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
-		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
-		exeNode  = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel))
-		verNode  = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
-	)
+// CollectorSuite represents a test suite for collector nodes.
+type CollectorSuite struct {
+	suite.Suite
 
-	return []testnet.NodeConfig{conNode1, conNode2, conNode3, exeNode, verNode}
+	// root context for the current test
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	net       *testnet.FlowNetwork
+	nClusters uint
+
+	// account info
+	acct struct {
+		key    *sdk.AccountKey
+		addr   sdk.Address
+		signer sdkcrypto.Signer
+	}
+
+	// ghost node
+	ghostID flow.Identifier
+	reader  *ghostclient.FlowMessageStreamReader
+}
+
+func TestCollectorSuite(t *testing.T) {
+	suite.Run(t, new(CollectorSuite))
+}
+
+// SetupTest generates a test network with the given number of collector nodes
+// and clusters and starts the network.
+//
+// NOTE: This must be called explicitly by each test, since nodes/clusters vary
+//       between test cases.
+func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
+
+	// default set of non-collector nodes
+	var (
+		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
+		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
+		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
+	)
+	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection)
+
+	suite.nClusters = nClusters
+
+	// set one of the non-collector nodes to be the ghost
+	suite.ghostID = conNode.Identifier
+
+	// instantiate the network
+	nodes := append(colNodes, conNode, exeNode, verNode)
+	conf := testnet.NewNetworkConfig(name, nodes, testnet.WithClusters(nClusters))
+	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
+
+	// start the network
+	suite.ctx, suite.cancel = context.WithCancel(context.Background())
+	suite.net.Start(suite.ctx)
+
+	// create an account to use for sending transactions
+	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount()
+
+	// subscribe to the ghost
+	for attempts := 0; ; attempts++ {
+		reader, err := suite.Ghost().Subscribe(suite.ctx)
+		if err == nil {
+			suite.reader = reader
+			break
+		}
+		if attempts >= 10 {
+			require.NoError(suite.T(), err, "could not subscribe to ghost (%d attempts)", attempts)
+		}
+	}
+}
+
+func (suite *CollectorSuite) TearDownTest() {
+	suite.net.Remove()
+	suite.cancel()
+}
+
+// Ghost returns a client for the ghost node.
+func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
+	ghost := suite.net.ContainerByID(suite.ghostID)
+	client, err := common.GetGhostClient(ghost)
+	require.NoError(suite.T(), err, "could not get ghost client")
+	return client
+}
+
+func (suite *CollectorSuite) Clusters() *flow.ClusterList {
+	identities := suite.net.Identities()
+	clusters := protocol.Clusters(suite.nClusters, identities)
+	return clusters
+}
+
+func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
+	acct := suite.acct
+
+	tx := sdk.NewTransaction().
+		SetScript(unittest.NoopTxScript()).
+		SetReferenceBlockID(convert.ToSDKID(unittest.IdentifierFixture())).
+		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
+		SetPayer(acct.addr).
+		AddAuthorizer(acct.addr)
+
+	clusters := suite.Clusters()
+
+	// hash-grind the script until the transaction will be routed to target cluster
+	for {
+		tx.SetScript(append(tx.Script, '/', '/'))
+		err := tx.SignEnvelope(sdk.RootAddress, acct.key.ID, acct.signer)
+		require.Nil(suite.T(), err)
+		routed := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
+		if routed.Fingerprint() == target.Fingerprint() {
+			break
+		}
+	}
+
+	return tx
+}
+
+func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
+
+	// the height at which the collection is included
+	var height uint64
+
+	waitFor := time.Second * 30
+	deadline := time.Now().Add(waitFor)
+	for time.Now().Before(deadline) {
+
+		_, msg, err := suite.reader.Next()
+		require.Nil(suite.T(), err, "could not read next message")
+		suite.T().Logf("ghost recv: %T", msg)
+
+		switch val := msg.(type) {
+		case *messages.ClusterBlockProposal:
+			header := val.Header
+			collection := val.Payload.Collection
+			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
+
+			// note the height when transaction is includedj
+			if collection.Light().Has(txID) {
+				height = header.Height
+			}
+
+			// use building two blocks as an indication of inclusion
+			// TODO replace this with finalization by listening to guarantees
+			if height > 0 && header.Height-height >= 2 {
+				return
+			}
+
+		case *flow.CollectionGuarantee:
+			// TODO use this as indication of finalization w/ HotStuff
+		}
+	}
+
+	suite.T().Logf("timed out waiting for inclusion (timeout=%s, txid=%s)", waitFor.String(), txID)
+	suite.T().FailNow()
+}
+
+// Collector returns the collector node with the given index in the
+// given cluster.
+func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Container {
+
+	clusters := suite.Clusters()
+	require.True(suite.T(), clusterIdx < uint(clusters.Size()), "invalid cluster index")
+
+	cluster := clusters.ByIndex(clusterIdx)
+	node, ok := cluster.ByIndex(nodeIdx)
+	require.True(suite.T(), ok, "invalid node index")
+
+	return suite.net.ContainerByID(node.ID())
+}
+
+// ClusterStateFor returns a cluster state instance for the collector node
+// with the given ID.
+func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.State {
+
+	myCluster, ok := suite.Clusters().ByNodeID(id)
+	require.True(suite.T(), ok, "could not get node %s in clusters", id)
+
+	chainID := protocol.ChainIDForCluster(myCluster)
+	node := suite.net.ContainerByID(id)
+
+	db, err := node.DB()
+	require.Nil(suite.T(), err, "could not get node db")
+
+	state, err := clusterstate.NewState(db, chainID)
+	require.Nil(suite.T(), err, "could not get cluster state")
+
+	return state
 }
 
 // Test sending various invalid transactions to a single-cluster configuration.
 // The transactions should be rejected by the collection node and not included
 // in any collection.
-func TestTransactionIngress_InvalidTransaction(t *testing.T) {
+func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
+	t := suite.T()
 
-	colNodeConfigs := testnet.NewNodeConfigSet(3, flow.RoleCollection)
-	colNodeConfig1 := colNodeConfigs[0]
-	nodes := append(colNodeConfigs, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig("col_txingress_invalidtx", nodes)
+	suite.SetupTest("col_txingress_invalid", 3, 1)
 
-	net := testnet.PrepareFlowNetwork(t, conf)
+	// pick a collector to test against
+	col1 := suite.Collector(0, 0)
 
-	ctx := context.Background()
-
-	net.Start(ctx)
-	defer net.Remove()
-
-	// we will test against COL1
-	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
-	assert.True(t, ok)
-
-	client, err := testnet.NewClient(colNode1.Addr(testnet.ColNodeAPIPort))
+	client, err := client.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
+	acct := suite.acct
+
 	t.Run("missing reference block hash", func(t *testing.T) {
-		txDSL := unittest.TransactionDSLFixture()
-		malformed := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
-		malformed.ReferenceBlockID = flow.ZeroID
+		malformed := sdk.NewTransaction().
+			SetScript(unittest.NoopTxScript()).
+			SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
+			SetPayer(acct.addr).
+			AddAuthorizer(acct.addr)
 
-		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
+		malformed.SetReferenceBlockID(sdk.ZeroID)
 
-		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		err = malformed.SignEnvelope(sdk.RootAddress, acct.key.ID, acct.signer)
+		require.Nil(t, err)
+
+		expected := ingest.ErrIncompleteTransaction{
+			Missing: []string{flow.TransactionFieldRefBlockID.String()},
+		}
+
+		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 		defer cancel()
-		err := client.SignAndSendTransaction(ctx, malformed)
+		err := client.SendTransaction(ctx, *malformed)
 		unittest.AssertErrSubstringMatch(t, expected, err)
 	})
 
 	t.Run("missing script", func(t *testing.T) {
-		malformed := unittest.TransactionBodyFixture()
-		malformed.Script = nil
+		malformed := sdk.NewTransaction().
+			SetReferenceBlockID(sdk.Identifier{1}).
+			SetProposalKey(sdk.RootAddress, acct.key.ID, acct.key.SequenceNumber).
+			SetPayer(sdk.RootAddress).
+			AddAuthorizer(sdk.RootAddress)
 
-		expected := ingest.ErrIncompleteTransaction{Missing: malformed.MissingFields()}
+		malformed.SetScript(nil)
 
-		ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		expected := ingest.ErrIncompleteTransaction{
+			Missing: []string{flow.TransactionFieldScript.String()},
+		}
+
+		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 		defer cancel()
-		err := client.SignAndSendTransaction(ctx, malformed)
+		err := client.SendTransaction(ctx, *malformed)
 		unittest.AssertErrSubstringMatch(t, expected, err)
-	})
-
-	t.Run("unparseable script", func(t *testing.T) {
-		// TODO script parsing not implemented
-		t.Skip()
-	})
-	t.Run("invalid signature", func(t *testing.T) {
-		// TODO signature validation not implemented
-		t.Skip()
-	})
-	t.Run("invalid nonce", func(t *testing.T) {
-		// TODO nonce validation not implemented
-		t.Skip()
-	})
-	t.Run("insufficient payer balance", func(t *testing.T) {
-		// TODO balance checking not implemented
-		t.Skip()
 	})
 	t.Run("expired transaction", func(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
@@ -111,64 +284,66 @@ func TestTransactionIngress_InvalidTransaction(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
 		t.Skip()
 	})
+	t.Run("unparseable script", func(t *testing.T) {
+		// TODO script parsing not implemented
+		t.Skip()
+	})
+	t.Run("invalid signature", func(t *testing.T) {
+		// TODO signature validation not implemented
+		t.Skip()
+	})
+	t.Run("invalid sequence number", func(t *testing.T) {
+		// TODO nonce validation not implemented
+		t.Skip()
+	})
+	t.Run("insufficient payer balance", func(t *testing.T) {
+		// TODO balance checking not implemented
+		t.Skip()
+	})
 }
 
 // Test sending a single valid transaction to a single cluster.
 // The transaction should be included in a collection.
-func TestTxIngress_SingleCluster(t *testing.T) {
+func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
+	t := suite.T()
 
-	colNodeConfigs := testnet.NewNodeConfigSet(3, flow.RoleCollection)
-	colNodeConfig1 := colNodeConfigs[0]
-	nodes := append(colNodeConfigs, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig("col_txingress_singlecluster", nodes)
+	suite.SetupTest("col_txingress_singlecluster", 3, 1)
 
-	net := testnet.PrepareFlowNetwork(t, conf)
+	// pick a collector to test against
+	col1 := suite.Collector(0, 0)
 
-	ctx := context.Background()
-
-	net.Start(ctx)
-	defer net.Cleanup()
-	defer net.RemoveContainers()
-
-	// we will test against COL1
-	colNode1, ok := net.ContainerByID(colNodeConfig1.Identifier)
-	assert.True(t, ok)
-
-	client, err := testnet.NewClient(colNode1.Addr(testnet.ColNodeAPIPort))
+	client, err := client.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	tx := unittest.TransactionBodyFixture()
-	tx, err = client.SignTransaction(tx)
-	assert.Nil(t, err)
+	acct := suite.acct
+
+	tx := sdk.NewTransaction().
+		SetScript(unittest.NoopTxScript()).
+		SetReferenceBlockID(sdk.BytesToID([]byte{1})).
+		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
+		SetPayer(acct.addr).
+		AddAuthorizer(acct.addr)
+
+	err = tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
+	require.Nil(t, err)
+
 	t.Log("sending transaction: ", tx.ID())
 
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-	err = client.SendTransaction(ctx, tx)
+	ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
+	err = client.SendTransaction(ctx, *tx)
+	cancel()
 	assert.Nil(t, err)
 
-	// wait for consensus to complete
-	//TODO we should listen for collection guarantees instead, but this is blocked
-	// ref: https://github.com/dapperlabs/flow-go/issues/3021
-	time.Sleep(waitTime)
+	// wait for the transaction to be included in a collection
+	suite.AwaitTransactionIncluded(convert.IDFromSDK(tx.ID()))
+	suite.net.Stop()
 
-	err = net.Stop()
-	assert.Nil(t, err)
-
-	identities := net.Identities()
-	chainID := protocol.ChainIDForCluster(identities.Filter(filter.HasRole(flow.RoleCollection)))
-
-	// get database for COL1
-	db, err := colNode1.DB()
-	require.Nil(t, err)
-
-	state, err := clusterstate.NewState(db, chainID)
-	assert.Nil(t, err)
+	state := suite.ClusterStateFor(col1.Config.NodeID)
 
 	// the transaction should be included in exactly one collection
 	checker := unittest.NewClusterStateChecker(state)
 	checker.
-		ExpectContainsTx(tx.ID()).
+		ExpectContainsTx(convert.IDFromSDK(tx.ID())).
 		ExpectTxCount(1).
 		Assert(t)
 }
@@ -178,77 +353,48 @@ func TestTxIngress_SingleCluster(t *testing.T) {
 //
 // The transaction should not be routed and should be included in exactly one
 // collection in only the responsible cluster.
-func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
+func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
+	t := suite.T()
 
-	const nClusters uint = 3
+	// NOTE: we use 3-node clusters so that proposal messages are sent 1-K
+	// as 1-1 messages are not picked up by the ghost node.
+	const (
+		nNodes    uint = 6
+		nClusters uint = 2
+	)
 
-	colNodes := testnet.NewNodeConfigSet(6, flow.RoleCollection)
+	suite.SetupTest("col_txingress_multicluster_correctcluster", nNodes, nClusters)
 
-	nodes := append(colNodes, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig("col_txingres_multicluster_correct_cluster", nodes, testnet.WithClusters(nClusters))
-
-	net := testnet.PrepareFlowNetwork(t, conf)
-
-	ctx := context.Background()
-
-	net.Start(ctx)
-	defer net.Cleanup()
-	defer net.RemoveContainers()
-
-	// sleep for a few seconds to let the nodes discover each other and build the libp2p pubsub mesh
-	time.Sleep(5 * time.Second)
-
-	clusters := protocol.Clusters(nClusters, net.Identities())
+	clusters := suite.Clusters()
 
 	// pick a cluster to target
 	targetCluster := clusters.ByIndex(0)
-	targetIdentity, ok := targetCluster.ByIndex(0)
-	require.True(t, ok)
-
-	// pick a member of the cluster
-	targetNode, ok := net.ContainerByID(targetIdentity.NodeID)
-	require.True(t, ok)
+	targetNode := suite.Collector(0, 0)
 
 	// get a client pointing to the cluster member
-	client, err := testnet.NewClient(targetNode.Addr(testnet.ColNodeAPIPort))
+	client, err := client.New(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	// create a transaction for the target cluster
-	tx := unittest.AlterTransactionForCluster(unittest.TransactionBodyFixture(), clusters, targetCluster, func(clusterTx *flow.TransactionBody) {
-		signed, err := client.SignTransaction(*clusterTx)
-		require.Nil(t, err)
-		*clusterTx = signed
-	})
-
-	assert.Equal(t, clusters.ByTxID(tx.ID()).Fingerprint(), targetCluster.Fingerprint())
-	t.Log("tx id: ", tx.ID().String())
+	tx := suite.TxForCluster(targetCluster)
 
 	// submit the transaction
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-	err = client.SendTransaction(ctx, tx)
+	ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
+	err = client.SendTransaction(ctx, *tx)
+	cancel()
 	assert.Nil(t, err)
 
-	// wait for consensus to complete
-	time.Sleep(waitTime)
-	err = net.Stop()
-	require.Nil(t, err)
+	// wait for the transaction to be included in a collection
+	suite.AwaitTransactionIncluded(convert.IDFromSDK(tx.ID()))
+	suite.net.Stop()
 
 	// ensure the transaction IS included in target cluster collection
 	for _, id := range targetCluster.NodeIDs() {
-		node, ok := net.ContainerByID(id)
-		require.True(t, ok)
-		db, err := node.DB()
-		require.Nil(t, err)
-
-		chainID := protocol.ChainIDForCluster(targetCluster)
-		state, err := clusterstate.NewState(db, chainID)
-		require.Nil(t, err)
+		state := suite.ClusterStateFor(id)
 
 		// the transaction should be included exactly once
 		checker := unittest.NewClusterStateChecker(state)
 		checker.
-			ExpectContainsTx(tx.ID()).
+			ExpectContainsTx(convert.IDFromSDK(tx.ID())).
 			ExpectTxCount(1).
 			Assert(t)
 	}
@@ -260,22 +406,13 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 			continue
 		}
 
-		chainID := protocol.ChainIDForCluster(cluster)
-
 		for _, id := range cluster.NodeIDs() {
-			node, ok := net.ContainerByID(id)
-			require.True(t, ok)
-			db, err := node.DB()
-			require.Nil(t, err)
-
-			state, err := clusterstate.NewState(db, chainID)
-			require.Nil(t, err)
+			state := suite.ClusterStateFor(id)
 
 			// the transaction should not be included
-			// the transaction should be included exactly once
 			checker := unittest.NewClusterStateChecker(state)
 			checker.
-				ExpectOmitsTx(tx.ID()).
+				ExpectOmitsTx(convert.IDFromSDK(tx.ID())).
 				ExpectTxCount(0).
 				Assert(t)
 		}
@@ -287,95 +424,64 @@ func TestTxIngressMultiCluster_CorrectCluster(t *testing.T) {
 //
 // The transaction should be routed to the responsible cluster and should be
 // included in a collection in only the responsible cluster's state.
-func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
+func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
+	t := suite.T()
 
-	const nClusters uint = 3
+	// NOTE: we use 3-node clusters so that proposal messages are sent 1-K
+	// as 1-1 messages are not picked up by the ghost node.
+	const (
+		nNodes    uint = 6
+		nClusters uint = 2
+	)
 
-	colNodes := testnet.NewNodeConfigSet(6, flow.RoleCollection)
+	suite.SetupTest("col_txingress_multicluster_othercluster", nNodes, nClusters)
 
-	nodes := append(colNodes, defaultOtherNodes()...)
-	conf := testnet.NewNetworkConfig("col_txingress_multicluster_othercluster", nodes, testnet.WithClusters(nClusters))
-
-	net := testnet.PrepareFlowNetwork(t, conf)
-
-	ctx := context.Background()
-
-	net.Start(ctx)
-	defer net.Cleanup()
-	defer net.RemoveContainers()
-
-	clusters := protocol.Clusters(nClusters, net.Identities())
+	clusters := suite.Clusters()
 
 	// pick a cluster to target
 	// this cluster is responsible for the transaction
 	targetCluster := clusters.ByIndex(0)
 
-	// pick nodes from the other clusters
-	// these nodes will receive the transaction, but are not responsible for it
-	otherCluster1 := clusters.ByIndex(1)
-	otherIdentity1, ok := otherCluster1.ByIndex(0)
-	require.True(t, ok)
-	otherNode1, ok := net.ContainerByID(otherIdentity1.NodeID)
-	require.True(t, ok)
+	// pick 1 node from the other cluster to send the transaction to
+	otherNode := suite.Collector(1, 0)
 
-	otherCluster2 := clusters.ByIndex(2)
-	otherIdentity2, ok := otherCluster2.ByIndex(0)
-	require.True(t, ok)
-	otherNode2, ok := net.ContainerByID(otherIdentity2.NodeID)
-	require.True(t, ok)
-
-	// create a key to sign the transaction with
-	key, err := unittest.AccountKeyFixture()
+	// create clients pointing to each other node
+	client, err := client.New(otherNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	// get a client pointing to the other nodes, using the same key
-	client1, err := testnet.NewClientWithKey(otherNode1.Addr(testnet.ColNodeAPIPort), key)
-	require.Nil(t, err)
-	client2, err := testnet.NewClientWithKey(otherNode2.Addr(testnet.ColNodeAPIPort), key)
-	require.Nil(t, err)
+	// create a transaction that will be routed to the target cluster
+	tx := suite.TxForCluster(targetCluster)
 
-	// create a transaction for the target cluster
-	tx := unittest.AlterTransactionForCluster(unittest.TransactionBodyFixture(), clusters, targetCluster, func(clusterTx *flow.TransactionBody) {
-		signed, err := client1.SignTransaction(*clusterTx)
-		require.Nil(t, err)
-		*clusterTx = signed
-	})
+	// submit the transaction to the other NON-TARGET cluster and retry
+	// several times to give the mesh network a chance to form
+	go func() {
+		for i := 0; i < 10; i++ {
+			select {
+			case <-suite.ctx.Done():
+				// exit when suite is finished
+				return
+			case <-time.After(100 * time.Millisecond << time.Duration(i)):
+				// retry on an exponential backoff
+			}
 
-	assert.Equal(t, clusters.ByTxID(tx.ID()).Fingerprint(), targetCluster.Fingerprint())
-	t.Log("tx id: ", tx.ID().String())
+			ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
+			_ = client.SendTransaction(ctx, *tx)
+			cancel()
+		}
+	}()
 
-	// submit the transaction to other cluster 1
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-	err = client1.SendTransaction(ctx, tx)
-	assert.Nil(t, err)
-
-	// submit the transaction to other cluster 2
-	ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	defer cancel()
-	err = client2.SendTransaction(ctx, tx)
-	assert.Nil(t, err)
-
-	// wait for consensus to complete
-	time.Sleep(waitTime)
-	err = net.Stop()
-	require.Nil(t, err)
+	// wait for the transaction to be included in a collection
+	suite.AwaitTransactionIncluded(convert.IDFromSDK(tx.ID()))
+	suite.net.Stop()
 
 	// ensure the transaction IS included in target cluster collection
 	for _, id := range targetCluster.NodeIDs() {
-		node, ok := net.ContainerByID(id)
-		require.True(t, ok)
-		db, err := node.DB()
-		require.Nil(t, err)
-
-		chainID := protocol.ChainIDForCluster(targetCluster)
-		state, err := clusterstate.NewState(db, chainID)
-		require.Nil(t, err)
+		state := suite.ClusterStateFor(id)
 
 		// the transaction should be included exactly once
 		checker := unittest.NewClusterStateChecker(state)
 		checker.
-			ExpectContainsTx(tx.ID()).
+			ExpectContainsTx(convert.IDFromSDK(tx.ID())).
 			ExpectTxCount(1).
 			Assert(t)
 	}
@@ -387,22 +493,13 @@ func TestTxIngressMultiCluster_OtherCluster(t *testing.T) {
 			continue
 		}
 
-		chainID := protocol.ChainIDForCluster(cluster)
-
 		for _, id := range cluster.NodeIDs() {
-			node, ok := net.ContainerByID(id)
-			require.True(t, ok)
-			db, err := node.DB()
-			require.Nil(t, err)
-
-			state, err := clusterstate.NewState(db, chainID)
-			require.Nil(t, err)
+			state := suite.ClusterStateFor(id)
 
 			// the transaction should not be included
-			// the transaction should be included exactly once
 			checker := unittest.NewClusterStateChecker(state)
 			checker.
-				ExpectOmitsTx(tx.ID()).
+				ExpectOmitsTx(convert.IDFromSDK(tx.ID())).
 				ExpectTxCount(0).
 				Assert(t)
 		}

@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -37,7 +36,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 		// a ghost node masquerading as an execution node
 		ghostExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(3),
-			testnet.AsGhost(true))
+			testnet.AsGhost())
 
 		// a verification node
 		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
@@ -54,8 +53,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	defer net.Remove()
 
 	// get the ghost container
-	ghostContainer, ok := net.ContainerByID(ghostExeNode.Identifier)
-	assert.True(t, ok)
+	ghostContainer := net.ContainerByID(ghostExeNode.Identifier)
 
 	// get a ghost client connected to the ghost node
 	ghostClient, err := GetGhostClient(ghostContainer)
@@ -101,7 +99,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 
 		// a ghost node masquerading as a collection node
 		ghostCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(2),
-			testnet.AsGhost(true))
+			testnet.AsGhost())
 
 		// three consensus nodes
 		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
@@ -126,8 +124,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	defer net.Remove()
 
 	// get the ghost container
-	ghostContainer, ok := net.ContainerByID(ghostCollNode.Identifier)
-	assert.True(t, ok)
+	ghostContainer := net.ContainerByID(ghostCollNode.Identifier)
 
 	// get a ghost client connected to the ghost node
 	ghostClient, err := GetGhostClient(ghostContainer)
@@ -142,13 +139,9 @@ func TestGhostNodeExample_Send(t *testing.T) {
 }
 
 func sendTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.Identifier) {
-	colContainer1, ok := net.ContainerByID(collectionID)
-	assert.True(t, ok)
+	colContainer1 := net.ContainerByID(collectionID)
 
-	port, ok := colContainer1.Ports[testnet.ColNodeAPIPort]
-	assert.True(t, ok)
-
-	collectionClient, err := testnet.NewClient(fmt.Sprintf(":%s", port))
+	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort))
 	assert.Nil(t, err)
 
 	tx := unittest.TransactionBodyFixture()
@@ -165,13 +158,9 @@ func sendTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.I
 }
 
 func generateTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.Identifier) flow.TransactionBody {
-	colContainer1, ok := net.ContainerByID(collectionID)
-	assert.True(t, ok)
+	colContainer1 := net.ContainerByID(collectionID)
 
-	port, ok := colContainer1.Ports[testnet.ColNodeAPIPort]
-	assert.True(t, ok)
-
-	collectionClient, err := testnet.NewClient(fmt.Sprintf(":%s", port))
+	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort))
 	assert.Nil(t, err)
 
 	tx := unittest.TransactionBodyFixture()
