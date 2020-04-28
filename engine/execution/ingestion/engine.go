@@ -514,7 +514,7 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 
 		// TODO - Once collection can map to multiple blocks
 		maybeBlockByCollection, err := backdata.ByID(guarantee.ID())
-		if err == mempool.ErrEntityNotFound {
+		if err == mempool.ErrNotFound {
 			executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
 				Guarantee:    guarantee,
 				Transactions: nil,

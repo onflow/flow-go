@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dapperlabs/cadence/runtime"
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
@@ -45,7 +45,7 @@ func GetTxBodyDeployCounterContract() *flow.TransactionBody {
                 signer.setCode("%s".decodeHex())
               }
 			}`, encoded)),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
@@ -62,7 +62,7 @@ func GetTxBodyCreateCounter() *flow.TransactionBody {
 					}
               	}
             }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 
@@ -76,7 +76,7 @@ func GetTxBodyAddToCounter() *flow.TransactionBody {
 					acc.storage[Container.Counter]?.add(2)
               	}
             }`),
-		ScriptAccounts: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.RootAddress},
 	}
 }
 

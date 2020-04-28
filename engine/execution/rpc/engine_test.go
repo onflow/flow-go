@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow/protobuf/go/flow/entities"
-	"github.com/dapperlabs/flow/protobuf/go/flow/execution"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
