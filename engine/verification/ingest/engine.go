@@ -439,7 +439,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 			log.Error().
 				Err(err).
 				Hex("chunk_id", logging.ID(chunkID)).
-				Msg("could not get chunk data pack")
+				Msg("could not get chunk data pack from mempool")
 			return nil, false
 		}
 		return chunkDataPack, true

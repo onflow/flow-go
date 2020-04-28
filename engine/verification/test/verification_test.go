@@ -93,8 +93,10 @@ func TestHappyPath(t *testing.T) {
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
 func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	// ingest engine parameters
-	requestInterval := uint(2000)
-	failureThreshold := uint(10)
+	// set based on following issue
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	requestInterval := uint(1000)
+	failureThreshold := uint(2)
 
 	// generates network hub
 	hub := stub.NewNetworkHub()

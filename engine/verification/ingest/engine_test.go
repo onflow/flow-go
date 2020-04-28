@@ -120,11 +120,10 @@ func (suite *TestSuite) SetupTest() {
 		BlockID: suite.receipt.ExecutionResult.BlockID,
 	}
 
-	// each request should be send only once
-	suite.failureThreshold = 1
-
-	// retry intervals is 2 sec
-	suite.requestInterval = 2000
+	// parameters set based on following issue
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	suite.failureThreshold = 2
+	suite.requestInterval = 1000
 
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
