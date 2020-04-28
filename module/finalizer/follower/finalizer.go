@@ -48,3 +48,14 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		return nil
 	})
 }
+
+func (f *Finalizer) MakeTentative(blockID flow.Identifier, parentID flow.Identifier) error {
+	return f.db.Update(func(tx *badger.Txn) error {
+		err := procedure.IndexChildByBlockID(parentID, blockID)(tx)
+		if err != nil {
+			return fmt.Errorf("cannot index child by blockID: %w", err)
+		}
+
+		return nil
+	})
+}

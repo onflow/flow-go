@@ -3,10 +3,11 @@ package procedure
 import (
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dgraph-io/badger/v2"
 )
 
 func IndexChildByBlockID(blockID flow.Identifier, childID flow.Identifier) func(tx *badger.Txn) error {

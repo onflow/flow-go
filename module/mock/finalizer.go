@@ -23,3 +23,17 @@ func (_m *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 	return r0
 }
+
+// MakeTentative provides a mock function with given fields: blockID, parentID
+func (_m *Finalizer) MakeTentative(blockID flow.Identifier, parentID flow.Identifier) error {
+	ret := _m.Called(blockID, parentID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) error); ok {
+		r0 = rf(blockID, parentID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
