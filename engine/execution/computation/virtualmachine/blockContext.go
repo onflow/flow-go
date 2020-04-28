@@ -47,6 +47,7 @@ func (bc *blockContext) newTransactionContext(
 	ctx := &TransactionContext{
 		ledger:          ledger,
 		signingAccounts: signingAccounts,
+		blockContext:    bc,
 	}
 
 	for _, option := range options {
@@ -58,7 +59,8 @@ func (bc *blockContext) newTransactionContext(
 
 func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
-		ledger: ledger,
+		ledger:       ledger,
+		blockContext: bc,
 	}
 }
 

@@ -1,9 +1,16 @@
 package virtualmachine
 
 import (
+	"fmt"
+
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+)
+
+const (
+	MaxProgramCacheSize = 256
 )
 
 // VirtualMachine augments the Cadence runtime with the Flow host functionality required
@@ -14,14 +21,20 @@ type VirtualMachine interface {
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime) VirtualMachine {
-	return &virtualMachine{
-		rt: rt,
+func New(rt runtime.Runtime) (VirtualMachine, error) {
+	cache, err := lru.New(MaxProgramCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vm, %w", err)
 	}
+	return &virtualMachine{
+		rt:    rt,
+		cache: cache,
+	}, nil
 }
 
 type virtualMachine struct {
-	rt runtime.Runtime
+	rt    runtime.Runtime
+	cache *lru.Cache
 }
 
 func (vm *virtualMachine) NewBlockContext(header *flow.Header) BlockContext {

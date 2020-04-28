@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/ast"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -18,6 +19,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	ledger            Ledger
+	blockContext      *blockContext
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
@@ -283,6 +285,21 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 	}
 
 	return code, nil
+}
+
+// GetCachedProgram attempts to get a parsed program from a cache.
+func (r *TransactionContext) GetCachedProgram(location ast.Location) (*ast.Program, error) {
+	program, found := r.blockContext.vm.cache.Get(location.ID())
+	if found {
+		return program.(*ast.Program), nil
+	}
+	return nil, nil
+}
+
+// CacheProgram adds a parsed program to a cache.
+func (r *TransactionContext) CacheProgram(location ast.Location, program *ast.Program) error {
+	_ = r.blockContext.vm.cache.Add(location.ID(), program)
+	return nil
 }
 
 // Log captures a log message from the runtime.

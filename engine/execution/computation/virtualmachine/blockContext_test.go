@@ -22,7 +22,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm := virtualmachine.New(rt)
+	vm, _ := virtualmachine.New(rt)
 	bc := vm.NewBlockContext(&h)
 
 	t.Run("transaction success", func(t *testing.T) {
@@ -125,7 +125,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm := virtualmachine.New(rt)
+	vm, _ := virtualmachine.New(rt)
 	bc := vm.NewBlockContext(&h)
 
 	t.Run("script success", func(t *testing.T) {
@@ -185,7 +185,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm := virtualmachine.New(rt)
+	vm, _ := virtualmachine.New(rt)
 	bc := vm.NewBlockContext(&h)
 
 	ledger := make(virtualmachine.MapLedger)
