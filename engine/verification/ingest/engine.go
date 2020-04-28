@@ -330,7 +330,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 }
 
 // requestCollection submits a request for the given collection to collection nodes.
-func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifier) error {
+func (e *Engine) requestCollection(collID, blockID flow.Identifier) error {
 	// updates tracker for this request
 	tracker, err := e.updateCollectionTracker(collID, blockID)
 	if err != nil {
@@ -368,9 +368,9 @@ func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifi
 }
 
 // requestChunkDataPack submits a request for the given chunk ID to the execution nodes.
-func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
+func (e *Engine) requestChunkDataPack(chunkID, blockID flow.Identifier) error {
 	// updates tracker for this request
-	tracker, err := e.updateChunkDataPackTracker(chunkID)
+	tracker, err := e.updateChunkDataPackTracker(chunkID, blockID)
 	if err != nil {
 		return fmt.Errorf("could not update the chunk data pack tracker: %w", err)
 	}
@@ -451,21 +451,15 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 		return nil, false
 	}
 
-	// registers a tracker for the chunk data pack
-	//
-	tracker := &trackers.ChunkDataPackTracker{
-		ChunkID: chunkID,
-		BlockID: receipt.ExecutionResult.BlockID,
-		Counter: 0,
-	}
-	err := e.chunkDataPackTackers.Add(tracker)
-	// TODO handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrAlreadyExists {
-		e.log.Error().
+	// requests the chunk data pack from network
+	err := e.requestChunkDataPack(chunkID, receipt.ExecutionResult.BlockID)
+	if err != nil {
+		log.Error().
 			Err(err).
 			Hex("chunk_id", logging.ID(chunkID)).
-			Msg("could not store tracker of chunk data pack request in mempool")
+			Msg("could make a request of chunk data pack to the network")
 	}
+
 	return nil, false
 }
 
@@ -784,7 +778,7 @@ func (e *Engine) checkTrackers() {
 			continue
 		}
 		// retries requesting chunk data pack
-		err := e.requestChunkDataPack(cdpt.ChunkID)
+		err := e.requestChunkDataPack(cdpt.ChunkID, cdpt.BlockID)
 		if err != nil {
 			e.log.Error().
 				Err(err).
@@ -822,21 +816,28 @@ func (e *Engine) checkTrackers() {
 // updateChunkDataPackTracker performs the following
 // If there is a tracker for this chunk ID, it pulls it out of mempool, increases its counter by one, and returns it
 // Else it creates a new empty tracker with counter value of one and returns it
-func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier) (*trackers.ChunkDataPackTracker, error) {
-	// pulls tracker out of mempool
-	tracker, err := e.chunkDataPackTackers.ByChunkID(chunkID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flow.Identifier) (*trackers.ChunkDataPackTracker, error) {
+	if e.chunkDataPackTackers.Has(chunkID) {
+		// there is a tracker for this chunk
+		// pulls tracker out of mempool
+		tracker, err := e.chunkDataPackTackers.ByChunkID(chunkID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+		}
+
+		removed := e.chunkDataPackTackers.Rem(tracker.ChunkID)
+		if !removed {
+			return nil, fmt.Errorf("could not remove data pack tracker from mempool")
+		}
+		// increases tracker retry counter
+		tracker.Counter += 1
+
+		return tracker, nil
+	} else {
+		// creates and returns a new chunk data pack tracker
+		return trackers.NewChunkDataPackTracker(chunkID, blockID), nil
 	}
 
-	removed := e.chunkDataPackTackers.Rem(tracker.ChunkID)
-	if !removed {
-		return nil, fmt.Errorf("could not remove data pack tracker from mempool")
-	}
-	// increases tracker retry counter
-	tracker.Counter += 1
-
-	return tracker, nil
 }
 
 // updateCollectionTracker performs the following
@@ -860,12 +861,8 @@ func (e *Engine) updateCollectionTracker(collectionID flow.Identifier, blockID f
 
 		return tracker, nil
 	} else {
-		// creates and returns a new collector
-		return &trackers.CollectionTracker{
-			CollectionID: collectionID,
-			BlockID:      blockID,
-			Counter:      1,
-		}, nil
+		// creates and returns a new collection tracker
+		return trackers.NewCollectionTracker(collectionID, blockID), nil
 	}
 
 }
