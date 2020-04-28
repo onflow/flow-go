@@ -125,7 +125,21 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 		ScriptID: flow.HashToID(scriptHash),
 		Value:    value,
 		Logs:     ctx.Logs(),
+		Events:   ctx.events,
 	}, nil
+}
+
+func RuntimeEventToCadenceEvent(runtimeEvent runtime.Event) cadence.Event {
+	fields := make([]cadence.Value, len(runtimeEvent.Fields))
+
+	for j, field := range runtimeEvent.Fields {
+		convertedField := cadence.ConvertValue(field)
+		fields[j] = convertedField
+	}
+
+	eventValue := cadence.NewEvent(fields)
+
+	return eventValue
 }
 
 // ConvertEvents creates flow.Events from runtime.events
@@ -134,14 +148,7 @@ func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) 
 	flowEvents := make([]flow.Event, len(tr.Events))
 
 	for i, event := range tr.Events {
-		fields := make([]cadence.Value, len(event.Fields))
-
-		for j, field := range event.Fields {
-			convertedField := cadence.ConvertValue(field)
-			fields[j] = convertedField
-		}
-
-		eventValue := cadence.NewEvent(fields)
+		eventValue := RuntimeEventToCadenceEvent(event)
 
 		payload, err := jsoncdc.Encode(eventValue)
 

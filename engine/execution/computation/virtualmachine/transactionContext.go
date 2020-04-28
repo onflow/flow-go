@@ -71,7 +71,7 @@ func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %x", accountAddress))
 
-	return accountAddress, err
+	return runtime.Address(accountAddress), err
 }
 
 // AddAccountKey adds a public key to an existing account.

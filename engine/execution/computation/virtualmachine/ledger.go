@@ -6,8 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/encoding/rlp"
@@ -82,7 +80,7 @@ func (r *LedgerAccess) CheckAccountExists(accountID []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("account with ID %s does not exist", accountID)
+	return fmt.Errorf("account with ID %x does not exist", accountID)
 }
 
 func (r *LedgerAccess) GetAccountPublicKeys(accountID []byte) (publicKeys [][]byte, err error) {
@@ -193,31 +191,32 @@ func decodePublicKey(b []byte) (a flow.AccountPublicKey, err error) {
 func (r* LedgerAccess) GetLatestAccount() flow.Address {
 	latestAccountID, _ := r.Ledger.Get(fullKeyHash("", "", keyLatestAccount))
 
-	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
-	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
-
-	return flow.BytesToAddress(accountIDBytes)
+	return flow.BytesToAddress(latestAccountID)
 }
 
-func (r *LedgerAccess) CreateAccountInLedger(publicKeys [][]byte) (runtime.Address, error) {
+func (r *LedgerAccess) CreateAccountInLedger(publicKeys [][]byte) (flow.Address, error) {
 	accountAddress := r.GetLatestAccount()
 
 	accountID := accountAddress[:]
 
+	accountIDInt := big.NewInt(0).SetBytes(accountID)
+	newAccountID := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
+
+
 	// mark that account with this ID exists
-	r.Ledger.Set(fullKeyHash(string(accountID), "", keyExists), []byte{1})
+	r.Ledger.Set(fullKeyHash(string(newAccountID), "", keyExists), []byte{1})
 
 	// set account balance to 0
-	r.Ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
+	r.Ledger.Set(fullKeyHash(string(newAccountID), "", keyBalance), big.NewInt(0).Bytes())
 
-	err := r.SetAccountPublicKeys(accountID, publicKeys)
+	err := r.SetAccountPublicKeys(newAccountID, publicKeys)
 	if err != nil {
-		return runtime.Address{}, err
+		return flow.Address{}, err
 	}
 
-	r.Ledger.Set(fullKeyHash("", "", keyLatestAccount), accountID)
+	r.Ledger.Set(fullKeyHash("", "", keyLatestAccount), newAccountID)
 
-	return runtime.Address(accountAddress), nil
+	return flow.BytesToAddress(newAccountID), nil
 }
 
 func (r *LedgerAccess) SetAccountPublicKeys(accountID []byte, publicKeys [][]byte) error {

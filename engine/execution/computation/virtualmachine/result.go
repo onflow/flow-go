@@ -25,6 +25,7 @@ type ScriptResult struct {
 	Value    runtime.Value
 	Logs     []string
 	Error    error
+	Events	[]runtime.Event
 }
 
 func (r ScriptResult) Succeeded() bool {
