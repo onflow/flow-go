@@ -34,14 +34,14 @@ const (
 	// DISCLAIMER: alpha down there is not a production-level value
 	chunkAssignmentAlpha = 1
 
-	// requestInterval represents the time interval in milliseconds that the
+	// requestIntervalMs represents the time interval in milliseconds that the
 	// ingest engine retries sending resource requests to the network
 	// this value is set following this issue:
 	// https://github.com/dapperlabs/flow-go/issues/3443
-	requestInterval = 1000
+	requestIntervalMs = 1000
 
 	// failureThreshold represents the number of retries ingest engine sends
-	// at `requestInterval` milliseconds for each of the missing resources.
+	// at `requestIntervalMs` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
 	// this value is set following this issue:
 	// https://github.com/dapperlabs/flow-go/issues/3443
@@ -161,7 +161,7 @@ func main() {
 				ingestedResultIDs,
 				blockStorage,
 				assigner,
-				requestInterval,
+				requestIntervalMs,
 				failureThreshold)
 			return ingestEng, err
 		}).

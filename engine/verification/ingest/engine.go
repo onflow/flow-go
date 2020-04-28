@@ -72,7 +72,7 @@ func New(
 	ingestedResultIDs mempool.Identifiers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
-	requestInterval uint,
+	requestIntervalMs uint,
 	failureThreshold uint,
 ) (*Engine, error) {
 
@@ -94,7 +94,7 @@ func New(
 		blockStorage:         blockStorage,
 		assigner:             assigner,
 		failureThreshold:     failureThreshold,
-		requestInterval:      requestInterval,
+		requestInterval:      requestIntervalMs,
 	}
 
 	var err error
