@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"reflect"
 	"sort"
@@ -446,6 +447,14 @@ func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
 	}
 }
 
+func blockReceiverMessagesByPercentage(percent int) BlockOrDelayFunc {
+	rand.Seed(time.Now().UnixNano())
+	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		block := rand.Intn(100) <= percent
+		return block, 0
+	}
+}
+
 func blockProposals() BlockOrDelayFunc {
 	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		switch event.(type) {
@@ -471,6 +480,7 @@ func runNodes(nodes []*Node) {
 	}
 }
 
+// happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
 	nodes, stopper := createNodes(t, 3, 100)
 
@@ -490,7 +500,7 @@ func Test3Nodes(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// with 5 nodes, and one node completely blocked, the other nodes can still reach consensus
+// with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
 	nodes, stopper := createNodes(t, 5, 100)
 
@@ -506,24 +516,43 @@ func Test5Nodes(t *testing.T) {
 	// the first node was blocked, never finalize any block
 	require.Equal(t, uint64(0), header.View)
 
-	// verify all nodes arrive the same state
-	for i := 0; i < len(nodes); i++ {
+	nodes = nodes[1:]
+
+	for i := range nodes {
 		printState(t, nodes, i)
 	}
-	for i := 1; i < len(nodes); i++ {
-		n := nodes[i]
-		headerN, err := n.state.Final().Head()
-		require.NoError(t, err)
-		require.Greater(t, headerN.View, uint64(90))
-	}
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, 90)
 
 	cleanupNodes(nodes)
 }
 
-func TestOneDelayed(t *testing.T) {
+// verify if a node lost some messages, it's still able to catch up.
+func TestMessagesLost(t *testing.T) {
 	nodes, stopper := createNodes(t, 5, 100)
 
 	connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
+
+	runNodes(nodes)
+
+	<-stopper.stopped
+
+	for i := range nodes {
+		printState(t, nodes, i)
+	}
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, 90)
+	cleanupNodes(nodes)
+}
+
+// verify if each receiver lost 10 percent messages, the network can still reach consensus
+func TestMessagesLostAcrossNetwork(t *testing.T) {
+	nodes, stopper := createNodes(t, 5, 150)
+
+	// block 10% messages on receiver
+	connect(nodes, blockReceiverMessagesByPercentage(10))
 
 	runNodes(nodes)
 
