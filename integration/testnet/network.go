@@ -338,10 +338,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		require.Nil(t, err)
 	}
 
-	for _, cont := range flowNetwork.Containers {
-		t.Log(cont.Name(), cont.Ports)
-	}
-
 	return flowNetwork
 }
 
