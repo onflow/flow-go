@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -26,7 +27,8 @@ import (
 
 func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, headers storage.Headers,
 	views storage.Views, committee hotstuff.Committee, protocolState protocol.State, builder module.Builder, updater module.Finalizer,
-	signer hotstuff.Signer, communicator hotstuff.Communicator, options ...Option) (*hotstuff.EventLoop, error) {
+	signer hotstuff.Signer, communicator hotstuff.Communicator, genesisHeader *flow.Header,
+	genesisQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
 
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
@@ -45,7 +47,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// initialize forks with only finalized block.
 	// unfinalized blocks was not recovered yet
-	forks, err := initForks(state, headers, updater, notifier)
+	forks, err := initForks(state, headers, updater, notifier, genesisHeader, genesisQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover forks: %w", err)
 	}
@@ -125,9 +127,9 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	return loop, nil
 }
 
-func initForks(state protocol.State, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer) (*forks.Forks, error) {
+func initForks(state protocol.State, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, genesisHeader *flow.Header, genesisQC *model.QuorumCertificate) (*forks.Forks, error) {
 	// recover the trusted root
-	trustedRoot, err := recoverTrustedRoot(state, headers)
+	trustedRoot, err := recoverTrustedRoot(state, headers, genesisHeader, genesisQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover trusted root: %w", err)
 	}
@@ -149,11 +151,21 @@ func initForks(state protocol.State, headers storage.Headers, updater module.Fin
 	return forks, nil
 }
 
-func recoverTrustedRoot(state protocol.State, headers storage.Headers) (*forks.BlockQC, error) {
+func recoverTrustedRoot(state protocol.State, headers storage.Headers, genesisHeader *flow.Header, genesisQC *model.QuorumCertificate) (*forks.BlockQC, error) {
 	// get the latest finalized block
 	final, err := state.Final().Head()
 	if err != nil {
+		// when bootstrapping the node, there is no finalized block in storage,
+		// in this case we will use genesisHeader as trustedRoot
+		if err == storage.ErrNotFound {
+			return trustedRootFromGenesis(genesisHeader, genesisQC), nil
+		}
 		return nil, fmt.Errorf("could not get last finalized block: %w", err)
+	}
+
+	// if finalized view is genesis block, then use genesis block as the trustedRoot
+	if final.View == 1 {
+		return trustedRootFromGenesis(genesisHeader, genesisQC), nil
 	}
 
 	// get the parent for the latest finalized block
@@ -164,22 +176,21 @@ func recoverTrustedRoot(state protocol.State, headers storage.Headers) (*forks.B
 
 	// find a valid child of the finalized block in order to get its QC
 	childHeader, err := headers.ByParentID(final.ID())
-	if err == storage.ErrNotFound {
-		// use genesis block
+	if err != nil {
+		// a finalized block must have a valid child, if err happens, we exit
+		return nil, fmt.Errorf("could not get a valid child for finalized block: %w", err)
 	}
 
 	child := model.BlockFromFlow(childHeader, final.View)
 
-	parentView := uint64(0)
-	if parent != nil {
-		parentView = parent.View
-	}
-
 	// create the root block to use
 	trustedRoot := &forks.BlockQC{
-		Block: model.BlockFromFlow(final, parentView),
+		Block: model.BlockFromFlow(final, parent.View),
 		QC:    child.QC,
 	}
 
 	return trustedRoot, nil
+}
+
+func trustedRootFromGenesis(genesisHeader *flow.Header, genesisQC *model.QuorumCertificate) *model.BlockQC {
 }
