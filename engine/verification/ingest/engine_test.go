@@ -192,6 +192,8 @@ func (suite *TestSuite) TestHandleBlock() {
 // TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
 // but not the collections, it asks for the collections through the network
 func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
+	suite.T().Skip()
+
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -310,6 +312,8 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 // TestHandleReceipt_MissingChunkDataPack evaluates that when ingest engine has both a receipt and its block
 // but not the chunk data pack of it, it asks for the chunk data pack through the network
 func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
+	suite.T().Skip()
+
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
