@@ -33,14 +33,12 @@ type GuaranteeSuite struct {
 
 func (gs *GuaranteeSuite) Consensus(index int) *testnet.Container {
 	require.True(gs.T(), index < len(gs.nodeIDs), "invalid node index (%d)", index)
-	node, found := gs.net.ContainerByID(gs.nodeIDs[index])
-	require.True(gs.T(), found, "could not find node")
+	node := gs.net.ContainerByID(gs.nodeIDs[index])
 	return node
 }
 
 func (gs *GuaranteeSuite) Ghost() *client.GhostClient {
-	ghost, found := gs.net.ContainerByID(gs.ghostID)
-	require.True(gs.T(), found, "could not find ghost containter")
+	ghost := gs.net.ContainerByID(gs.ghostID)
 	client, err := common.GetGhostClient(ghost)
 	require.NoError(gs.T(), err, "could not get ghost client")
 	return client
@@ -75,7 +73,7 @@ func (gs *GuaranteeSuite) SetupTest() {
 
 	// add the ghost node config
 	gs.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.ghostID), testnet.AsGhost(true))
+	ghostConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.ghostID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, ghostConfig)
 
 	// generate the network config
@@ -103,9 +101,8 @@ func (gs *GuaranteeSuite) SetupTest() {
 }
 
 func (gs *GuaranteeSuite) TearDownTest() {
-	err := gs.net.Stop()
+	gs.net.Remove()
 	gs.cancel()
-	require.NoError(gs.T(), err, "should stop without error")
 }
 
 func (gs *GuaranteeSuite) TestCollectionGuaranteeIncluded() {

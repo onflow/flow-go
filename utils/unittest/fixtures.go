@@ -615,3 +615,8 @@ func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
 		HashAlgo:   hash.SHA3_256,
 	}, nil
 }
+
+// NoopTxScript returns a Cadence script for a no-op transaction.
+func NoopTxScript() []byte {
+	return []byte("transaction {}")
+}
