@@ -38,128 +38,137 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 }
 
 func (m *Mutator) Extend(blockID flow.Identifier) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(func() error {
+		return m.state.db.Update(func(tx *badger.Txn) error {
 
-		// retrieve the block
-		var block flow.Block
-		err := procedure.RetrieveBlock(blockID, &block)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve block: %w", err)
-		}
-
-		// retrieve the seal for the parent
-		var parentSeal flow.Seal
-		err = procedure.LookupSealByBlock(block.ParentID, &parentSeal)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve parent seal: %w", err)
-		}
-
-		// check the header validity
-		err = checkExtendHeader(tx, &block.Header)
-		if err != nil {
-			return fmt.Errorf("extend header not valid: %w", err)
-		}
-
-		// check the payload validity
-		err = checkExtendPayload(tx, &block)
-		if err != nil {
-			return fmt.Errorf("extend payload not valid: %w", err)
-		}
-
-		// check the block integrity
-		if block.Payload.Hash() != block.Header.PayloadHash {
-			return fmt.Errorf("block integrity check failed")
-		}
-
-		// TODO: update the stakes with the stake deltas
-
-		// create a lookup for each seal by parent
-		lookup := make(map[string]*flow.Seal, len(block.Seals))
-		for _, seal := range block.Seals {
-			lookup[string(seal.InitialState)] = seal
-		}
-
-		// starting with what was the state commitment at the parent block, we
-		// match each seal into the chain of commits
-		nextSeal := &parentSeal
-		for len(lookup) > 0 {
-
-			// first check if we have a seal connecting to current latest commit
-			possibleNextSeal, ok := lookup[string(nextSeal.FinalState)]
-			if !ok {
-				return fmt.Errorf("seals not connected to state chain (%x)", nextSeal.FinalState)
+			// retrieve the block
+			var block flow.Block
+			err := procedure.RetrieveBlock(blockID, &block)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve block: %w", err)
 			}
 
-			// delete matched seal from lookup and forward to point to seal commit
-			delete(lookup, string(nextSeal.FinalState))
-			nextSeal = possibleNextSeal
-		}
+			// retrieve the seal for the parent
+			var parentSeal flow.Seal
+			err = procedure.LookupSealByBlock(block.ParentID, &parentSeal)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve parent seal: %w", err)
+			}
 
-		// insert the the seal into our seals timeline
-		err = operation.IndexSealIDByBlock(blockID, nextSeal.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index seal by block: %w", err)
-		}
+			// check the header validity
+			err = checkExtendHeader(tx, &block.Header)
+			if err != nil {
+				return fmt.Errorf("extend header not valid: %w", err)
+			}
 
-		return nil
+			// check the payload validity
+			err = checkExtendPayload(tx, &block)
+			if err != nil {
+				return fmt.Errorf("extend payload not valid: %w", err)
+			}
+
+			// check the block integrity
+			if block.Payload.Hash() != block.Header.PayloadHash {
+				return fmt.Errorf("block integrity check failed")
+			}
+
+			// TODO: update the stakes with the stake deltas
+
+			// create a lookup for each seal by parent
+			lookup := make(map[string]*flow.Seal, len(block.Seals))
+			for _, seal := range block.Seals {
+				lookup[string(seal.InitialState)] = seal
+			}
+
+			// starting with what was the state commitment at the parent block, we
+			// match each seal into the chain of commits
+			nextSeal := &parentSeal
+			for len(lookup) > 0 {
+
+				// first check if we have a seal connecting to current latest commit
+				possibleNextSeal, ok := lookup[string(nextSeal.FinalState)]
+				if !ok {
+					return fmt.Errorf("seals not connected to state chain (%x)", nextSeal.FinalState)
+				}
+
+				// delete matched seal from lookup and forward to point to seal commit
+				delete(lookup, string(nextSeal.FinalState))
+				nextSeal = possibleNextSeal
+			}
+
+			// insert the the seal into our seals timeline
+			err = operation.IndexSealIDByBlock(blockID, nextSeal.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not index seal by block: %w", err)
+			}
+
+			return nil
+		})
 	})
 }
 
 func (m *Mutator) Finalize(blockID flow.Identifier) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(func() error {
+		return m.state.db.Update(func(tx *badger.Txn) error {
 
-		// retrieve the block to make sure we have it
-		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve block: %w", err)
-		}
-
-		// retrieve the current finalized state boundary
-		var boundary uint64
-		err = operation.RetrieveBoundary(&boundary)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
-
-		// retrieve the hash of the boundary
-		var headID flow.Identifier
-		err = operation.RetrieveNumber(boundary, &headID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve head: %w", err)
-		}
-
-		// in order to validate the validity of all changes, we need to iterate
-		// through the blocks that need to be finalized from oldest to youngest;
-		// we thus start at the youngest remember all of the intermediary steps
-		// while tracing back until we reach the finalized state
-		headers := []*flow.Header{&header}
-
-		// create a copy of header for the loop to not change the header the slice above points to
-		loopHeader := header
-		for loopHeader.ParentID != headID {
-			var retrievedHeader flow.Header
-			err = operation.RetrieveHeader(loopHeader.ParentID, &retrievedHeader)(tx)
+			// retrieve the block to make sure we have it
+			var header flow.Header
+			err := operation.RetrieveHeader(blockID, &header)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve parent (%x): %w", header.ParentID, err)
+				return fmt.Errorf("could not retrieve block: %w", err)
 			}
-			headers = append(headers, &retrievedHeader)
-			loopHeader = retrievedHeader
-		}
 
-		// now we can step backwards in order to go from oldest to youngest; for
-		// each header, we reconstruct the block and then apply the related
-		// changes to the protocol state
-		for i := len(headers) - 1; i >= 0; i-- {
-
-			// Finalize the block
-			err = procedure.FinalizeBlock(headers[i].ID())(tx)
+			// retrieve the current finalized state boundary
+			var boundary uint64
+			err = operation.RetrieveBoundary(&boundary)(tx)
 			if err != nil {
-				return fmt.Errorf("could not finalize block (%s): %w", header.ID(), err)
+				return fmt.Errorf("could not retrieve boundary: %w", err)
 			}
-		}
 
-		return nil
+			// check if we are finalizing an invalid block
+			if header.Height <= boundary {
+				return fmt.Errorf("height below or equal to boundary (height: %d, boundary: %d)", header.Height, boundary)
+			}
+
+			// retrieve the hash of the boundary
+			var headID flow.Identifier
+			err = operation.RetrieveNumber(boundary, &headID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve head: %w", err)
+			}
+
+			// in order to validate the validity of all changes, we need to iterate
+			// through the blocks that need to be finalized from oldest to youngest;
+			// we thus start at the youngest remember all of the intermediary steps
+			// while tracing back until we reach the finalized state
+			headers := []*flow.Header{&header}
+
+			// create a copy of header for the loop to not change the header the slice above points to
+			loopHeader := header
+			for loopHeader.ParentID != headID {
+				var retrievedHeader flow.Header
+				err = operation.RetrieveHeader(loopHeader.ParentID, &retrievedHeader)(tx)
+				if err != nil {
+					return fmt.Errorf("could not retrieve parent (%x): %w", header.ParentID, err)
+				}
+				headers = append(headers, &retrievedHeader)
+				loopHeader = retrievedHeader
+			}
+
+			// now we can step backwards in order to go from oldest to youngest; for
+			// each header, we reconstruct the block and then apply the related
+			// changes to the protocol state
+			for i := len(headers) - 1; i >= 0; i-- {
+
+				// Finalize the block
+				err = procedure.FinalizeBlock(headers[i].ID())(tx)
+				if err != nil {
+					return fmt.Errorf("could not finalize block (%s): %w", header.ID(), err)
+				}
+			}
+
+			return nil
+		})
 	})
 }
 
