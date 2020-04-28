@@ -42,9 +42,23 @@ func (b *Block) SetPayload(payload Payload) {
 // Payload is the payload for blocks in collection node cluster consensus.
 // It contains only a single collection.
 type Payload struct {
+
+	// Collection is the collection being proposed as part of this block.
 	Collection flow.Collection
+
+	// ReferenceBlockID is the ID of a block on the main chain (ie. that run by
+	// consensus nodes). Since canonical staking information is maintained on
+	// the main chain, we need to link cluster blocks to blocks on the main
+	// chain in order to have a reference point for assessing validity of
+	// cluster blocks.
+	//
+	//TODO currently this is not checked by the proposal engine. For safety in
+	// Byzantine environments, we need additional rules for this field to ensure
+	// it remains up-to-date with the main chain.
+	ReferenceBlockID flow.Identifier
 }
 
+// EmptyPayload returns a payload containing an empty collection.
 func EmptyPayload() Payload {
 	return PayloadFromTransactions()
 }
@@ -62,9 +76,9 @@ func PayloadFromTransactions(transactions ...*flow.TransactionBody) Payload {
 	}
 }
 
-// Hash returns the hash of the payload, simply the ID of the collection.
+// Hash returns the hash of the payload.
 func (p Payload) Hash() flow.Identifier {
-	return p.Collection.ID()
+	return flow.MakeID(p)
 }
 
 // PendingBlock is a wrapper type representing a block that cannot yet be
