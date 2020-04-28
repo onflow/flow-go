@@ -264,7 +264,7 @@ func bucketUpload(ctx context.Context, bootdir, filename, token string) error {
 	upload := gcsClient.Bucket(flowBucket).
 		Object(filepath.Join(token, filename)).
 		NewWriter(ctx)
-	defer func () {
+	defer func() {
 		err := upload.Close()
 		if err != nil {
 			log.Fatalf("Failed to close writer stream: %s\n", err)
