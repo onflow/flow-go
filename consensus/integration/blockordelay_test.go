@@ -10,6 +10,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 )
 
+type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
+
 func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 	return false, 0
 }
