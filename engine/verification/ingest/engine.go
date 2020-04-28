@@ -361,7 +361,7 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 	// stores collection tracker in the memory
 	err = e.collectionTrackers.Add(tracker)
 	// Todo handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrEntityAlreadyExists {
+	if err != nil && err != mempool.ErrAlreadyExists {
 		return fmt.Errorf("could not store tracker of collection request in mempool: %w", err)
 	}
 	return nil
@@ -399,7 +399,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
 	// stores chunk data pack tracker in the memory
 	err = e.chunkDataPackTackers.Add(tracker)
 	// TODO handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrEntityAlreadyExists {
+	if err != nil && err != mempool.ErrAlreadyExists {
 		return fmt.Errorf("could not store tracker of chunk data pack request in mempool: %w", err)
 	}
 	return nil
@@ -461,7 +461,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 	}
 	err := e.chunkDataPackTackers.Add(tracker)
 	// TODO handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrEntityAlreadyExists {
+	if err != nil && err != mempool.ErrAlreadyExists {
 		e.log.Error().
 			Err(err).
 			Hex("chunk_id", logging.ID(chunkID)).
@@ -527,7 +527,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 
 	err := e.collectionTrackers.Add(tracker)
 	// Todo handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrEntityAlreadyExists {
+	if err != nil && err != mempool.ErrAlreadyExists {
 		e.log.Error().
 			Err(err).
 			Hex("collection_id", logging.ID(collID)).
