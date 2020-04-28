@@ -681,6 +681,9 @@ func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, err
 	return true, nil
 }
 
+// GetBatchProof returns proof for a batch of keys
+// no dupplicated keys are allowed for this method
+// split key with trie has some issues.
 func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 
 	tree, err := s.forest.Get(root)

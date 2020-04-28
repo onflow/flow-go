@@ -300,78 +300,84 @@ func TestMixProof(t *testing.T) {
 
 func TestRandomProofs(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
+	experimentRep := 20
+	for e := 0; e < experimentRep; e++ {
+		withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
-	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+			// insert some values to an empty trie
+			keys := make([][]byte, 0)
+			values := make([][]byte, 0)
+			rand.Seed(time.Now().UnixNano())
 
-		// insert some values to an empty trie
-		keys := make([][]byte, 0)
-		values := make([][]byte, 0)
+			numberOfKeys := rand.Intn(256)
+			if numberOfKeys == 0 {
+				numberOfKeys = 1
+			}
 
-		rand.Seed(time.Now().UnixNano())
+			alreadySelectKeys := make(map[string]bool)
+			i := 0
+			for i < numberOfKeys {
+				key := make([]byte, 2)
+				rand.Read(key)
+				// deduplicate
+				if _, found := alreadySelectKeys[string(key)]; !found {
+					keys = append(keys, key)
+					alreadySelectKeys[string(key)] = true
+					value := make([]byte, 4)
+					rand.Read(value)
+					values = append(values, value)
+					i++
+				}
+			}
 
-		numberOfKeys := rand.Intn(256)
-		if numberOfKeys == 0 {
-			numberOfKeys = 1
-		}
+			// keep a subset as initial insert and keep the rest as default value read
+			split := rand.Intn(numberOfKeys)
+			insertKeys := keys[:split]
+			insertValues := values[:split]
 
-		for i := 0; i < numberOfKeys; i++ {
-			key := make([]byte, 2)
-			rand.Read(key)
-			keys = append(keys, key)
+			root, err := smt.Update(insertKeys, insertValues, emptyTree.root)
+			require.NoError(t, err, "error updating trie")
 
-			value := make([]byte, 4)
-			rand.Read(value)
-			values = append(values, value)
-		}
+			// shuffle keys for read
+			rand.Shuffle(len(keys), func(i, j int) {
+				keys[i], keys[j] = keys[j], keys[i]
+				values[i], values[j] = values[j], values[i]
+			})
 
-		// keep a subset as initial insert and keep the rest as default value read
-		split := rand.Intn(numberOfKeys)
-		insertKeys := keys[:split]
-		insertValues := values[:split]
+			retvalues, _, err := smt.Read(keys, true, root)
+			require.NoError(t, err, "error reading values")
 
-		root, err := smt.Update(insertKeys, insertValues, emptyTree.root)
-		require.NoError(t, err, "error updating trie")
+			proofHldr, err := smt.GetBatchProof(keys, root)
+			require.NoError(t, err, "error getting batch proof")
 
-		// shuffle keys for read
-		rand.Shuffle(len(keys), func(i, j int) {
-			keys[i], keys[j] = keys[j], keys[i]
-			values[i], values[j] = values[j], values[i]
+			psmt, err := NewPSMT(root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
+			require.NoError(t, err, "error building partial trie")
+
+			if !bytes.Equal(root, psmt.root.ComputeValue()) {
+				t.Fatal("root hash doesn't match")
+			}
+
+			// select a subset of shuffled keys for random updates
+			split = rand.Intn(numberOfKeys)
+			updateKeys := keys[:split]
+			updateValues := values[:split]
+			// random updates
+			rand.Shuffle(len(updateValues), func(i, j int) {
+				updateValues[i], updateValues[j] = updateValues[j], updateValues[i]
+			})
+
+			root2, err := smt.Update(updateKeys, updateValues, root)
+			require.NoError(t, err, "error updating trie")
+
+			proot2, _, err := psmt.Update(updateKeys, updateValues)
+			require.NoError(t, err, "error updating partial trie")
+
+			if !bytes.Equal(root2, proot2) {
+				t.Fatalf("root2 hash doesn't match [%x] != [%x]", root2, proot2)
+			}
+
 		})
-
-		retvalues, _, err := smt.Read(keys, true, root)
-		require.NoError(t, err, "error reading values")
-
-		proofHldr, err := smt.GetBatchProof(keys, root)
-		require.NoError(t, err, "error getting batch proof")
-
-		psmt, err := NewPSMT(root, trieHeight, keys, retvalues, EncodeProof(proofHldr))
-		require.NoError(t, err, "error building partial trie")
-
-		if !bytes.Equal(root, psmt.root.ComputeValue()) {
-			t.Fatal("root hash doesn't match")
-		}
-
-		// select a subset of shuffled keys for random updates
-		split = rand.Intn(numberOfKeys)
-		updateKeys := keys[:split]
-		updateValues := values[:split]
-		// random updates
-		rand.Shuffle(len(updateValues), func(i, j int) {
-			updateValues[i], updateValues[j] = updateValues[j], updateValues[i]
-		})
-
-		root2, err := smt.Update(updateKeys, updateValues, root)
-		require.NoError(t, err, "error updating trie")
-
-		proot2, _, err := psmt.Update(updateKeys, updateValues)
-		require.NoError(t, err, "error updating partial trie")
-
-		if !bytes.Equal(root2, proot2) {
-			t.Fatalf("root2 hash doesn't match [%x] != [%x]", root2, proot2)
-		}
-
-	})
-
+	}
 }
 
 // TODO add test for incompatible proofs [Byzantine milestone]
