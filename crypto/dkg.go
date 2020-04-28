@@ -2,37 +2,62 @@
 
 package crypto
 
+// DKG stands for Distributed Key Generation. In this library, DKG
+// refers to specific protocols that generate keys for a BLS-based
+// threshold signature scheme.
+// BLS is used with the BLS12381 curve.
+
+// These protocols mainly generate a BLS key pair and share the secret key
+// among (n)) particapants in a way that any (t+1) key shares allow reconstructing
+// the initial key (and also reconstructing a BLS signature of the initial key).
+// We refer to the initial key pair by group private and group public key.
+// (t) is the threshold parameter, it is fixed for all protocols to maximize
+// the unforgeability and robustness, t = floor((n-1)/2).
+
+// Private keys are scalar in Zr, where r is the group order of G1/G2
+// Public keys are in G2.
+
 import (
 	"fmt"
 )
 
-// DKGType is the supported DKG type
+// DKGType is the type for supported protocols
 type DKGType int
 
-// Supported DKG protocols
+// Supported Key Generation protocols
 const (
 	// FeldmanVSS is Feldman Verifiable Secret Sharing
+	// (non distributed generation)
 	FeldmanVSS DKGType = iota
 	// FeldmanVSSQual is Feldman Verifiable Secret Sharing using a complaint
-	// system to qualify/disqualify the leader
+	// mechanism to qualify/disqualify the leader
+	// (non distributed generation)
 	FeldmanVSSQual
-	// Joint Feldman (Pedersen)
+	// Joint Feldman (Pedersen) is a protocol made of (n) parallel Feldman VSS
+	// with a complaint mechanism
+	// (distributed generation)
 	JointFeldman
 )
 
-type DKGstate interface {
+type dkgState interface {
 	// Size returns the size of the DKG group n
 	Size() int
 	// Threshold returns the threshold value t
 	Threshold() int
-	// StartDKG starts running a DKG
-	StartDKG(seed []byte) error
-	// HandleMsg processes a new DKG message received by the current node
+	// Start starts running a DKG in the current node
+	Start(seed []byte) error
+	// HandleMsg processes a new message received by the current node
 	// orig is the message origin index
 	HandleMsg(orig int, msg []byte) error
-	// EndDKG ends a DKG protocol, the public data and node private key are finalized
-	EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
+	// End ends a DKG protocol in the current node
+	// It returns the finalized public data and node private key share.
+	// - the group public key corresponding to the group secret key
+	// - all the public key shares corresponding to the nodes private
+	// key shares.
+	// - the finalized private key which is the current node's own private key share
+	End() (PrivateKey, PublicKey, []PublicKey, error)
 	// NextTimeout set the next timeout of the protocol if any timeout applies
+	// Some protocols could require more than one timeout
 	NextTimeout() error
 	// Running returns the running state of the DKG protocol
 	Running() bool
@@ -57,8 +82,9 @@ func optimalThreshold(size int) int {
 // NewDKG creates a new instance of a DKG protocol.
 // An instance is run by a single node and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
+// leaderIndex value is ignored if the protocol does not require a leader (JointFeldman for instance)
 func NewDKG(dkg DKGType, size int, currentIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGstate, error) {
+	processor DKGProcessor, leaderIndex int) (dkgState, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d", DKGMinSize, DKGMaxSize)
 	}
@@ -149,16 +175,31 @@ const (
 )
 
 // DKGProcessor is an interface that implements the DKG output actions
-// an instance of a DKGactor is needed for each DKG
+// an instance of a DKGProcessor is needed for each node in order to
+// particpate in a DKG protocol
 type DKGProcessor interface {
-	// sends a private message to a destination
-	Send(dest int, data []byte)
-	// broadcasts a message to all dkg nodes
-	// This function needs to make sure all nodes have received the same message
+	// PrivateSend sends a private message to a destination
+	// The data to be sent is confidential and the function
+	// must make sure data is encrypted before being shared
+	// on a public channel, in a way that it is only received
+	// by the destination participant.
+	PrivateSend(dest int, data []byte)
+	// Broadcast broadcasts a message to all participants
+	// This function assumes all nodes have received the same message,
+	// failing to do so, the protocol can be broken.
+	// The broadcasted message is public and not confidential.
 	Broadcast(data []byte)
-	// flags that a node is misbehaving (deserves slashing)
+	// Blacklist flags that a node is misbehaving and that it got
+	// disqualified from the protocol. Such behavior deserves
+	// disqualifying as it is flagged to all honest nodes in
+	// the protocol.
 	Blacklist(node int)
-	// flags that a node is misbehaving (but can't be slashed)
+	// FlagMisbehavior warns that a node is misbehaving.
+	// Such behavior is not necessarily flagged to all nodes and therefore
+	// the node is not disqualified from the protocol. Other mechanisms
+	// outside DKG could be implemented to synchronize slashing the misbehaving
+	// node by all participating nodes, using the api `Disqualify`. Failing to
+	// do so, the protocol can be broken.
 	FlagMisbehavior(node int, log string)
 }
 

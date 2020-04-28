@@ -12,10 +12,25 @@ import (
 	"fmt"
 )
 
-// Implements Joint Feldman protocol using BLS set up on BLS381 curve.
-// the protocol runs (n) parallel instances of Feldman vss with the complaints system
-// Private keys are Zr elements while public keys are G2 elements
+// Implements Joint Feldman (Pedersen) protocol using
+// the BLS set up on the BLS12-381 curve.
+// The protocol runs (n) parallel instances of Feldman vss with
+// the complaints mechanism, each participant being a leader
+// once.
 
+// This is a fully distributed generation. The secret is a BLS
+// private key generated jointly by all the participants.
+
+// In each feldman VSS istance, the leader generates a chunk of the
+// the private key of a BLS threshold signature scheme.
+// Using the complaints mechanism, each leader is qualified or disqualified
+// from the protocol, and the overall key is taking into account
+// all chunks from qualified leaders.
+
+// Private keys are scalar in Zr, where r is the group order of G1/G2
+// Public keys are in G2.
+
+// Joint Feldman protocol, with complaint mechanism, implements dkgState
 type JointFeldmanState struct {
 	*dkgCommon
 	// jointRunning is true if and only if all parallel Feldman vss protocols are running
@@ -45,8 +60,11 @@ func (s *JointFeldmanState) init() {
 	}
 }
 
-// StartDKG starts running a DKG
-func (s *JointFeldmanState) StartDKG(seed []byte) error {
+// Start starts running Joint Feldman protocol in the current node
+// The seed is used to generate the FVSS secret polynomial
+// (including the instance group private key) when the current
+// node is the leader.
+func (s *JointFeldmanState) Start(seed []byte) error {
 	if s.jointRunning {
 		return errors.New("dkg is already running")
 	}
@@ -54,14 +72,14 @@ func (s *JointFeldmanState) StartDKG(seed []byte) error {
 	for i := index(0); int(i) < s.size; i++ {
 		if i != s.currentIndex {
 			s.fvss[i].running = false
-			err := s.fvss[i].StartDKG(seed)
+			err := s.fvss[i].Start(seed)
 			if err != nil {
 				return fmt.Errorf("error when starting dkg: %w", err)
 			}
 		}
 	}
 	s.fvss[s.currentIndex].running = false
-	err := s.fvss[s.currentIndex].StartDKG(seed)
+	err := s.fvss[s.currentIndex].Start(seed)
 	if err != nil {
 		return fmt.Errorf("error when starting dkg: %w", err)
 	}
@@ -84,8 +102,13 @@ func (s *JointFeldmanState) NextTimeout() error {
 	return nil
 }
 
-// EndDKG ends a DKG protocol, the public data and node private key are finalized
-func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error) {
+// End ends the protocol in the current node
+// It returns the finalized public data and node private key share.
+// - the group public key corresponding to the group secret key
+// - all the public key shares corresponding to the nodes private
+// key shares.
+// - the finalized private key which is the current node's own private key share
+func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.jointRunning {
 		return nil, nil, nil, errors.New("dkg protocol is not running")
 	}
@@ -142,7 +165,8 @@ func (s *JointFeldmanState) EndDKG() (PrivateKey, PublicKey, []PublicKey, error)
 	return x, Y, y, nil
 }
 
-// HandleMsg processes a new DKG message received by the current node
+// HandleMsg processes a new message received by the current node
+// orig is the message origin index
 func (s *JointFeldmanState) HandleMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
 		return errors.New("dkg protocol is not running")
@@ -157,11 +181,14 @@ func (s *JointFeldmanState) HandleMsg(orig int, msg []byte) error {
 }
 
 // Running returns the running state of Joint Feldman protocol
-// It is true if all parallel Feldman vss protocols are running
 func (s *JointFeldmanState) Running() bool {
 	return s.jointRunning
 }
 
+// Disqualify forces a node to get disqualified
+// for a reason outside of the DKG protocol
+// The caller should make sure all honest nodes call this function,
+// otherwise, the protocol can be broken
 func (s *JointFeldmanState) Disqualify(node int) error {
 	if !s.jointRunning {
 		return errors.New("dkg is not running")
@@ -181,16 +208,16 @@ func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2
 
 	// sum up x
 	var jointx scalar
-	C.sumScalarVector((*C.bn_st)(&jointx), (*C.bn_st)(&qualifiedx[0]),
+	C.bn_sum_vector((*C.bn_st)(&jointx), (*C.bn_st)(&qualifiedx[0]),
 		(C.int)(qualified))
 	// sum up Y
 	var jointPublicKey pointG2
-	C.sumPointG2Vector((*C.ep2_st)(&jointPublicKey),
+	C.ep2_sum_vector((*C.ep2_st)(&jointPublicKey),
 		(*C.ep2_st)(&qualifiedPubKey[0]), (C.int)(qualified))
 	// sum up []y
 	jointy := make([]pointG2, s.size)
 	for i := 0; i < s.size; i++ {
-		C.sumPointG2Vector((*C.ep2_st)(&jointy[i]),
+		C.ep2_sum_vector((*C.ep2_st)(&jointy[i]),
 			(*C.ep2_st)(&qualifiedy[i][0]), (C.int)(qualified))
 	}
 	return &jointx, &jointPublicKey, jointy
@@ -208,7 +235,7 @@ func (s *JointFeldmanState) getQualifiedKeys(qualified int) ([]scalar, []pointG2
 	for i := 0; i < s.size; i++ {
 		if !s.fvss[i].disqualified {
 			qualifiedx = append(qualifiedx, s.fvss[i].x)
-			qualifiedPubKey = append(qualifiedPubKey, s.fvss[i].A[0])
+			qualifiedPubKey = append(qualifiedPubKey, s.fvss[i].vA[0])
 			for j := 0; j < s.size; j++ {
 				qualifiedy[j] = append(qualifiedy[j], s.fvss[i].y[j])
 			}

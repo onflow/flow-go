@@ -100,7 +100,7 @@ func RunDKG(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []crypt
 
 	wg.Add(n)
 	for current := 0; current < n; current++ {
-		err := processors[current].dkg.StartDKG(seed)
+		err := processors[current].dkg.Start(seed)
 		require.NoError(t, err)
 		go tsDkgRunChan(&processors[current], &wg, t, 2)
 	}
@@ -142,7 +142,7 @@ func tsDkgRunChan(proc *TestDKGProcessor,
 				err := proc.dkg.NextTimeout()
 				assert.Nil(t, err)
 			case 2:
-				sk, groupPK, nodesPK, err := proc.dkg.EndDKG()
+				sk, groupPK, nodesPK, err := proc.dkg.End()
 				assert.NotNil(t, sk)
 				assert.NotNil(t, groupPK)
 				assert.NotNil(t, nodesPK)
