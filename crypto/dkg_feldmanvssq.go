@@ -29,7 +29,7 @@ import (
 // Private keys are scalar in Zr, where r is the group order of G1/G2
 // Public keys are in G2.
 
-// feldman VSS protocol, with complaint mechanism, implements dkgState
+// feldman VSS protocol, with complaint mechanism, implements DKGState
 type feldmanVSSQualState struct {
 	// feldmanVSSstate state
 	*feldmanVSSstate

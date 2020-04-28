@@ -39,7 +39,7 @@ const (
 	JointFeldman
 )
 
-type dkgState interface {
+type DKGState interface {
 	// Size returns the size of the DKG group n
 	Size() int
 	// Threshold returns the threshold value t
@@ -84,7 +84,7 @@ func optimalThreshold(size int) int {
 // In order to run the protocol again, a new instance needs to be created
 // leaderIndex value is ignored if the protocol does not require a leader (JointFeldman for instance)
 func NewDKG(dkg DKGType, size int, currentIndex int,
-	processor DKGProcessor, leaderIndex int) (dkgState, error) {
+	processor DKGProcessor, leaderIndex int) (DKGState, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d", DKGMinSize, DKGMaxSize)
 	}

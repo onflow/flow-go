@@ -27,7 +27,7 @@ type message struct {
 // implements DKGProcessor interface
 type TestDKGProcessor struct {
 	current int
-	dkg     crypto.DKGstate
+	dkg     crypto.DKGState
 	chans   []chan *message
 	msgType int
 	pkBytes []byte
@@ -48,7 +48,7 @@ func (proc *TestDKGProcessor) honestSend(dest int, data []byte) {
 
 // This is a testing function
 // it simulates sending a message from one node to another
-func (proc *TestDKGProcessor) Send(dest int, data []byte) {
+func (proc *TestDKGProcessor) PrivateSend(dest int, data []byte) {
 	proc.honestSend(dest, data)
 }
 

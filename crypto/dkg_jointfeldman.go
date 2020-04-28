@@ -30,7 +30,7 @@ import (
 // Private keys are scalar in Zr, where r is the group order of G1/G2
 // Public keys are in G2.
 
-// Joint Feldman protocol, with complaint mechanism, implements dkgState
+// Joint Feldman protocol, with complaint mechanism, implements DKGState
 type JointFeldmanState struct {
 	*dkgCommon
 	// jointRunning is true if and only if all parallel Feldman vss protocols are running

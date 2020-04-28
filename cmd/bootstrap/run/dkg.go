@@ -90,7 +90,7 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 // localDKGProcessor implements DKGProcessor interface
 type localDKGProcessor struct {
 	current     int
-	dkg         crypto.DKGstate
+	dkg         crypto.DKGState
 	chans       []chan *message
 	privkey     crypto.PrivateKey
 	pubgroupkey crypto.PublicKey
@@ -102,8 +102,8 @@ type message struct {
 	data []byte
 }
 
-// Send a message from one node to another
-func (proc *localDKGProcessor) Send(dest int, data []byte) {
+// PrivateSend a message from one node to another
+func (proc *localDKGProcessor) PrivateSend(dest int, data []byte) {
 	newMsg := &message{proc.current, data}
 	proc.chans[dest] <- newMsg
 }
