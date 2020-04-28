@@ -272,6 +272,8 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), collIdentities[0].NodeID).
 		Run(func(args testifymock.Arguments) {
 			submitWG.Done()
+			// waits for the engine to get shutdown
+			<-eng.Done()
 		}).
 		Return(nil).Once()
 
@@ -303,9 +305,6 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 // TestHandleReceipt_MissingChunkDataPack evaluates that when ingest engine has both a receipt and its block
@@ -397,6 +396,8 @@ func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), execIdentities[0].NodeID).
 		Run(func(args testifymock.Arguments) {
 			submitWG.Done()
+			// waits for the engine to get shutdown
+			<-eng.Done()
 		}).Return(nil).Once()
 
 	err := eng.Process(execIdentities[0].NodeID, suite.receipt)
@@ -414,8 +415,6 @@ func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 
-	// waits for the engine to get shutdown
-	<-eng.Done()
 }
 
 // TestIngestedResult evaluates the happy path of submitting an execution receipt with an already ingested result
