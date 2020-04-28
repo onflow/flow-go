@@ -309,8 +309,11 @@ func TestRandomProofs(t *testing.T) {
 
 		rand.Seed(time.Now().UnixNano())
 
-		// numberOfKeys := rand.Intn(256)
-		numberOfKeys := rand.Intn(100)
+		numberOfKeys := rand.Intn(256)
+		if numberOfKeys == 0 {
+			numberOfKeys = 1
+		}
+
 		for i := 0; i < numberOfKeys; i++ {
 			key := make([]byte, 2)
 			rand.Read(key)

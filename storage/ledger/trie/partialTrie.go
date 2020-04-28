@@ -58,6 +58,9 @@ func NewPSMT(
 	proofs [][]byte,
 ) (*PSMT, error) {
 
+	if len(proofs) < 1 {
+		return nil, fmt.Errorf("at least a proof is needed to be able to contruct a partial trie")
+	}
 	if height < 1 {
 		return nil, fmt.Errorf("minimum acceptable value for the  hight is 1")
 	}
