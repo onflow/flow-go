@@ -4,6 +4,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding/json"
 )
 
+// Encodable is a type that defines a canonical encoding.
+type Encodable interface {
+	Encode() []byte
+}
+
 // Encoder encodes and decodes values to and from bytes.
 type Encoder interface {
 	// Encode encodes a value as bytes.

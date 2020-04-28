@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -29,38 +30,52 @@ import (
 // the happy path should result in dissemination of a result approval for each
 // distinct chunk by each verification node. The result approvals should be
 // sent to the consensus nodes
+//
+// NOTE: some test cases are meant to solely run locally when FLOWLOCAL environmental
+// variable is set to TRUE
 func TestHappyPath(t *testing.T) {
 	testcases := []struct {
 		verNodeCount,
 		chunkCount int
+		ci bool // indicates if this test should run on CI
 	}{
 		{
 			verNodeCount: 1,
 			chunkCount:   2,
+			ci:           true,
 		},
 		{
 			verNodeCount: 1,
 			chunkCount:   10,
+			ci:           true,
 		},
 		{
 			verNodeCount: 2,
 			chunkCount:   2,
+			ci:           true,
 		},
 		{
 			verNodeCount: 2,
 			chunkCount:   10,
+			ci:           true,
 		},
 		{
 			verNodeCount: 5,
 			chunkCount:   2,
+			ci:           false,
 		},
 		{
 			verNodeCount: 5,
 			chunkCount:   10,
+			ci:           false,
 		},
 	}
 
 	for _, tc := range testcases {
+		if os.Getenv("FLOWLOCAL") != "TRUE" && !tc.ci {
+			// skip the test case if it is not meant for CI
+			continue
+		}
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
 			testHappyPath(t, tc.verNodeCount, tc.chunkCount)
 		})

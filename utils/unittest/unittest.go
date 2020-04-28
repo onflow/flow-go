@@ -69,9 +69,10 @@ func RequireReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 // NOTE: This should only be used in cases where `errors.Is` cannot be, like
 // when errors are transmitted over the network without type information.
 func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
-	assert.NotNil(t, expected)
-	assert.NotNil(t, actual)
-	assert.True(t, strings.Contains(actual.Error(), expected.Error()))
+	require.NotNil(t, expected)
+	require.NotNil(t, actual)
+	assert.True(t, strings.Contains(actual.Error(), expected.Error()),
+		"expected error: '%s', got: '%s'", expected.Error(), actual.Error())
 }
 
 func TempDBDir(t testing.TB) string {
