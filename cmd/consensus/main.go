@@ -149,6 +149,10 @@ func main() {
 			merger := signature.NewCombiner()
 
 			// initialize consensus committee's membership state
+
+			UPDATE me
+
+
 			committee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)

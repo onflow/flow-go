@@ -5,38 +5,38 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Committee accounts for the fact that we might have multiple hotstuff instances
+// Committee accounts for the fact that we might have multiple HotStuff instances
 // (collector committees and main consensus committee). Each hostuff instance is supposed to
 // have a dedicated Committee state.
 // A Committee provides subset of the protocol.State, which is restricted to exactly those
-// nodes that participate in the current hotstuff instance: the state of all legitimate consensus
-// participants for the specified block. Legitimate consensus participants have NON-ZERO STAKE.
+// nodes that participate in the current HotStuff instance: the state of all legitimate HotStuff
+// participants for the specified block. Legitimate HotStuff participants have NON-ZERO STAKE.
 //
-// The intended use case is to support collector consensus within Flow. Specifically,
+// The intended use case is to support collectors running HotStuff within Flow. Specifically,
 // the collectors produced their own blocks, independently of the Consensus Nodes (aka the main consensus).
 // Given a collector block, some logic is required to find the main consensus block
-// for determining the valid collector consensus participants.
+// for determining the valid collector-HotStuff participants.
 type Committee interface {
 
-	// Identities returns a IdentityList with legitimate consensus participants for the specified block.
-	// The list of participants is filtered by the provided selector. The returned list of consensus participants
-	//   * contains nodes that are allowed to sign the specified block (legitimate consensus participants with NON-ZERO STAKE)
+	// Identities returns a IdentityList with legitimate HotStuff participants for the specified block.
+	// The list of participants is filtered by the provided selector. The returned list of HotStuff participants
+	//   * contains nodes that are allowed to sign the specified block (legitimate participants with NON-ZERO STAKE)
 	//   * is ordered in the canonical order
 	//   * contains no duplicates.
-	// The list of all legitimate consensus participants for the specified block can be obtained by using `filter.Any`
+	// The list of all legitimate HotStuff participants for the specified block can be obtained by using `filter.Any`
 	Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error)
 
-	// Identity returns the full Identity for specified consensus participant.
-	// The node must be a legitimate consensus participant with NON-ZERO STAKE at the specified block.
+	// Identity returns the full Identity for specified HotStuff participant.
+	// The node must be a legitimate HotStuff participant with NON-ZERO STAKE at the specified block.
 	// ERROR conditions:
-	//    * ErrInvalidSigner if participantID does not correspond to a _staked_ consensus member at the specified block.
+	//    * ErrInvalidSigner if participantID does NOT correspond to a _staked_ HotStuff participant at the specified block.
 	Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 
 	// LeaderForView returns the identity of the leader for a given view.
 	// CAUTION: per liveness requirement of HotStuff, the leader must be fork-independent.
 	//          Therefore, a node retains its proposer view slots even if it is slashed.
-	//          Its proposal is simply considered invalid, as it is not from a legitimate consensus participant.
-	// Can error if view is in a future Epoch for which the consensus committee hasn't been determined yet.
+	//          Its proposal is simply considered invalid, as it is not from a legitimate participant.
+	// Can error if view is in a future Epoch for which the HotStuff committee hasn't been determined yet.
 	LeaderForView(view uint64) (flow.Identifier, error)
 
 	// Self returns our own node identifier.

@@ -139,7 +139,7 @@ func (ps *ProposalSuite) TestProposalSignatureInvalid() {
 
 func (ps *ProposalSuite) TestProposalWrongLeader() {
 
-	// change the MembersState to return a different leader
+	// change the hotstuff.Committee to return a different leader
 	*ps.committee = mocks.Committee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.participants[1].NodeID, nil)
 	for _, participant := range ps.participants {
@@ -383,7 +383,7 @@ func (qs *QCSuite) TestQCInvalidSignersError() {
 // TestQCRetrievingParticipantsError tests that validation errors if:
 // there is an error retrieving identities of consensus participants
 func (qs *QCSuite) TestQCRetrievingParticipantsError() {
-	// change the MembersState to fail on retrieving participants
+	// change the hotstuff.Committee to fail on retrieving participants
 	*qs.committee = mocks.Committee{}
 	qs.committee.On("Identities", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
 

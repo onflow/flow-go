@@ -39,18 +39,18 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 	}
 
 	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
-	// IdentityList returned by MembersState contains only legitimate consensus participants for the specified block (must have positive stake)
-	allConsensusParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
+	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive stake)
+	allParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for blcok %s: %w", block.BlockID, err)
 	}
-	signers := allConsensusParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
+	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
 	if len(signers) < len(qc.SignerIDs) {
 		return newInvalidBlockError(block, fmt.Sprintf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner))
 	}
 
 	// determine whether signers reach minimally required stake threshold for consensus
-	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(allConsensusParticipants.TotalStake()) // compute required stake threshold
+	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake()) // compute required stake threshold
 	if signers.TotalStake() < threshold {
 		return newInvalidBlockError(block, fmt.Sprintf("qc signers have insufficient stake of %d (required=%d)", signers.TotalStake(), threshold))
 	}

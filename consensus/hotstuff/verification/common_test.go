@@ -57,7 +57,7 @@ func MakeBeaconSigner(t *testing.T, committee hotstuff.Committee, dkg dkg.State,
 	return signer
 }
 
-func MakeConsensusMemberState(t *testing.T, identities flow.IdentityList, beaconEnabled bool) (hotstuff.Committee, dkg.State, []crypto.PrivateKey, []crypto.PrivateKey) {
+func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beaconEnabled bool) (hotstuff.Committee, dkg.State, []crypto.PrivateKey, []crypto.PrivateKey) {
 
 	// initialize the dkg snapshot
 	dkg := &dkgmock.State{}

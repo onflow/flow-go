@@ -63,7 +63,7 @@ func (as *AggregatorSuite) SetupTest() {
 	// create a mocked forks
 	as.forks = &mocks.Forks{}
 
-	// create MembersState
+	// create hotstuff.Committee
 	var err error
 	as.committee, err = committee.NewMainConsensusCommitteeState(as.protocol, as.participants[0].NodeID)
 	require.NoError(as.T(), err)
