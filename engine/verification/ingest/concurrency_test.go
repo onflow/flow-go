@@ -80,9 +80,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	hub := stub.NewNetworkHub()
 
 	// ingest engine parameters
-	// retries trackers every one second for a total of 5 times
+	// parameters added based on following issue:
+
 	requestInterval := uint(1000)
-	failureThreshold := uint(10)
+	failureThreshold := uint(2)
 
 	// creates test id for each role
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -223,7 +224,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 
 	// stops ingest engine of verification node
 	// Note: this should be done prior to any evaluation to make sure that
-	// the process method of Ingest engine is done working.
+	// the checkTrackers method of Ingest engine is done working.
 	<-verNode.IngestEngine.Done()
 
 	// stops the network continuous delivery mode
