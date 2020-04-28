@@ -67,16 +67,6 @@ func TestConcurrency(t *testing.T) {
 			senderCount: 10,
 			chunksNum:   20,
 		},
-		{
-			erCount:     3,
-			senderCount: 1,
-			chunksNum:   10,
-		},
-		{
-			erCount:     3,
-			senderCount: 5,
-			chunksNum:   4,
-		},
 	}
 
 	for _, tc := range testcases {
@@ -91,7 +81,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 
 	// ingest engine parameters
 	// retries trackers every one second for a total of 5 times
-	requestInterval := uint(100)
+	requestInterval := uint(1000)
 	failureThreshold := uint(5)
 
 	// creates test id for each role
