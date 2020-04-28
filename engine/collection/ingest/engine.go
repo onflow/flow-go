@@ -3,8 +3,10 @@
 package ingest
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence/runtime/parser"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -14,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -28,6 +31,10 @@ type Engine struct {
 	me      module.Local
 	state   protocol.State
 	pool    mempool.Transactions
+
+	// the number of blocks that can be between the reference block and the
+	// finalized head before we consider the transaction expired
+	expiry uint64
 }
 
 // New creates a new collection ingest engine.
@@ -44,6 +51,9 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, metrics m
 		me:      me,
 		state:   state,
 		pool:    pool,
+		// add 20 blocks of leeway -- this means a transaction has at minimum 20
+		// blocks to be included in a block before it expires
+		expiry: flow.DefaultTransactionExpiry - 20,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
@@ -180,14 +190,40 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 // the transaction should be included in a collection.
 func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 
+	// ensure all required fields are set
 	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
-		return ErrIncompleteTransaction{Missing: missingFields}
+		return IncompleteTransactionError{Missing: missingFields}
+	}
+
+	// ensure the transaction is not expired
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized header: %w", err)
+	}
+
+	ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
+	if errors.Is(err, storage.ErrNotFound) {
+		return ErrUnknownReferenceBlock
+	}
+	if err != nil {
+		return fmt.Errorf("could not get reference block: %w", err)
+	}
+
+	if final.Height > ref.Height && final.Height-ref.Height > e.expiry {
+		return ExpiredTransactionError{
+			RefHeight:   ref.Height,
+			FinalHeight: final.Height,
+		}
+	}
+
+	// ensure the script is at least parse-able
+	_, _, err = parser.ParseProgram(string(tx.Script))
+	if err != nil {
+		return InvalidScriptError{ParserErr: err}
 	}
 
 	// TODO check account/payer signatures
-
-	// TODO parse Cadence script
 
 	return nil
 }
