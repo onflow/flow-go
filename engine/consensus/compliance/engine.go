@@ -441,7 +441,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// see if the block is a valid extension of the protocol state
 	err = e.state.Mutate().Extend(header.ID())
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state: %v %w", header.View, err)
+		return fmt.Errorf("could not extend protocol state for block (%v) at view %v: %w", header.ID(), header.View, err)
 	}
 
 	// retrieve the parent
