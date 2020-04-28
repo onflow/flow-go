@@ -438,7 +438,6 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 			// couldn't get chunk state from mempool, the chunk cannot yet be verified
 			log.Error().
 				Err(err).
-				Hex("chunk_id", logging.ID(chunkID)).
 				Msg("could not get chunk data pack from mempool")
 			return nil, false
 		}
