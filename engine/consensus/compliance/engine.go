@@ -452,7 +452,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	e.hotstuff.SubmitProposal(header, parent.View)
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(header.ID())
+	err = e.processPendingChildren(header)
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}
@@ -482,10 +482,10 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 // processPendingChildren checks if there are proposals connected to the given
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
-func (e *Engine) processPendingChildren(parentID flow.Identifier) error {
+func (e *Engine) processPendingChildren(header *flow.Header) error {
 
 	// check if there are any children for this parent in the cache
-	children, has := e.pending.ByParentID(parentID)
+	children, has := e.pending.ByParentID(header.ID())
 	if !has {
 		return nil
 	}
@@ -504,7 +504,7 @@ func (e *Engine) processPendingChildren(parentID flow.Identifier) error {
 	}
 
 	// drop all of the children that should have been processed now
-	e.pending.DropForParent(parentID)
+	e.pending.DropForParent(header)
 
 	return result.ErrorOrNil()
 }
