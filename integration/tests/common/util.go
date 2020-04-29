@@ -6,8 +6,12 @@ import (
 	"fmt"
 
 	encoding "github.com/onflow/cadence/encoding/xdr"
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/examples"
 
 	"github.com/dapperlabs/flow-go/engine/ghost/client"
+	"github.com/dapperlabs/flow-go/integration/convert"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/dsl"
@@ -111,4 +115,20 @@ func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, err
 	addr := fmt.Sprintf(":%s", ghostPort)
 
 	return client.NewGhostClient(addr)
+}
+
+// GetAccount returns a new account address, key, and signer.
+func GetAccount() (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer) {
+
+	addr := convert.ToSDKAddress(unittest.AddressFixture())
+
+	key := examples.RandomPrivateKey()
+	signer := sdkcrypto.NewInMemorySigner(key, sdkcrypto.SHA3_256)
+
+	acct := sdk.NewAccountKey().
+		FromPrivateKey(key).
+		SetHashAlgo(sdkcrypto.SHA3_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	return addr, acct, signer
 }
