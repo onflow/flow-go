@@ -262,7 +262,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 
 func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	t := suite.T()
-
+	t.Skip()
 	var err error
 
 	// use a mempool with 2000 transactions, one per block

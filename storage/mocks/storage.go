@@ -5,11 +5,9 @@
 package mocks
 
 import (
-	reflect "reflect"
-
-	gomock "github.com/golang/mock/gomock"
-
 	flow "github.com/dapperlabs/flow-go/model/flow"
+	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
 )
 
 // MockBlocks is a mock of Blocks interface

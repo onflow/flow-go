@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,6 @@ func TestDecodePrivateKey(t *testing.T) {
 		panic("Cannot decode hardcoded private key!")
 	}
 	rawEncodedPrivateKey := privateKey.PrivateKey.Encode()
-	// fmt.Println(rawEncodedPrivateKey)
-	t.Fatalf(hex.EncodeToString(rawEncodedPrivateKey))
+	fmt.Println(rawEncodedPrivateKey)
+	// t.Fatalf(hex.EncodeToString(rawEncodedPrivateKey))
 }
