@@ -1,7 +1,6 @@
 package execution
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -20,8 +19,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const nextBlockTimeout = 60 * time.Second
-
 func TestExecution(t *testing.T) {
 	suite.Run(t, new(ExecutionSuite))
 }
@@ -35,8 +32,8 @@ type ExecutionSuite struct {
 	exe1ID        flow.Identifier
 	exe2ID        flow.Identifier
 	ghostTracking bool
-	blockState    BlockState
-	receiptState  ReceiptState
+	blockState    common.BlockState
+	receiptState  common.ReceiptState
 }
 
 func (es *ExecutionSuite) Start(timeout time.Duration) {
@@ -131,7 +128,7 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 	err = common.DeployCounter(context.Background(), gs.AccessClient())
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, _ := WaitUntilFinalizedStateCommitmentChanged(gs.T(), &gs.blockState, &gs.receiptState)
+	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(gs.T(), &gs.blockState, &gs.receiptState)
 	gs.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// wait for execution receipt for blockB from execution node 1
@@ -156,8 +153,6 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 
 	// require that state between blockB and blockC has not changed
 	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, erExe1BlockC.ExecutionResult.FinalStateCommit)
-
-	// // TODO listen for messages for execution state sync
 
 	// wait for execution receipt for blockA from execution node 2 (this one must have been synced)
 	erExe2BlockA := gs.receiptState.WaitForAtFrom(gs.T(), blockA.Header.ID(), gs.exe2ID)
@@ -219,7 +214,7 @@ func (gs *ExecutionSuite) trackBlocksAndReceipts() {
 			return
 		}
 
-		// don't allow other errers
+		// don't allow other errors
 		require.NoError(gs.T(), err, "could not read next message")
 
 		switch m := msg.(type) {
@@ -238,188 +233,4 @@ func (gs *ExecutionSuite) trackBlocksAndReceipts() {
 
 func (gs *ExecutionSuite) stopBlocksAndReceiptsTracking() {
 	gs.ghostTracking = false
-}
-
-type BlockState struct {
-	blocksByID        map[flow.Identifier]*messages.BlockProposal
-	finalizedByHeight map[uint64]*messages.BlockProposal
-	highestFinalized  uint64
-	highestProposed   uint64
-}
-
-func (bs *BlockState) Add(b *messages.BlockProposal) {
-	if bs.blocksByID == nil {
-		bs.blocksByID = make(map[flow.Identifier]*messages.BlockProposal)
-	}
-	bs.blocksByID[b.Header.ID()] = b
-	bs.highestProposed = b.Header.Height
-
-	// add confirmations
-	confirmsHeight := b.Header.Height - 3
-	if b.Header.Height >= 3 && confirmsHeight > bs.highestFinalized {
-		if bs.finalizedByHeight == nil {
-			bs.finalizedByHeight = make(map[uint64]*messages.BlockProposal)
-		}
-		// put all ancestors into `finalizedByHeight`
-		for ancestor, ok := b, true; ancestor.Header.Height > bs.highestFinalized; {
-			h := ancestor.Header.Height
-
-			// if ancestor is confirmed put it into the finalized map
-			if h <= confirmsHeight {
-				bs.finalizedByHeight[h] = ancestor
-
-				// if ancestor confirms a heigher height than highestFinalized, increase highestFinalized
-				if h > bs.highestFinalized {
-					bs.highestFinalized = h
-				}
-			}
-
-			// find parent
-			ancestor, ok = bs.blocksByID[ancestor.Header.ParentID]
-
-			// stop if parent not found
-			if !ok {
-				return
-			}
-		}
-	}
-}
-
-// WaitForFirstFinalized waits until the first block is finalized
-func (bs *BlockState) WaitForFirstFinalized(t *testing.T) *messages.BlockProposal {
-	require.Eventually(t, func() bool {
-		return bs.highestFinalized > 0
-	}, nextBlockTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive first finalized block within %v seconds", nextBlockTimeout))
-
-	return bs.finalizedByHeight[bs.highestFinalized]
-}
-
-// WaitForNextFinalized waits until the next block is finalized: If the latest proposed block has height 13, and the
-// latest finalized block is 10, this will wait until block height 11 is finalized
-func (bs *BlockState) WaitForNextFinalized(t *testing.T) *messages.BlockProposal {
-	currentFinalized := bs.highestFinalized
-	require.Eventually(t, func() bool {
-		return bs.highestFinalized > currentFinalized
-	}, nextBlockTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive next finalizedblock (height %v) within %v seconds", currentFinalized+1,
-			nextBlockTimeout))
-
-	return bs.finalizedByHeight[currentFinalized+1]
-}
-
-// WaitUntilNextHeightFinalized waits until the next block height that will be proposed is finalized: If the latest
-// proposed block has height 13, and the latest finalized block is 10, this will wait until block height 14 is finalized
-func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T) *messages.BlockProposal {
-	currentProposed := bs.highestProposed
-	require.Eventually(t, func() bool {
-		return bs.highestFinalized > currentProposed
-	}, nextBlockTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive finalized block for next block height (%v) within %v seconds", currentProposed+1,
-			nextBlockTimeout))
-
-	return bs.finalizedByHeight[currentProposed+1]
-}
-
-// WaitForFinalizedChild waits until any child of the passed parent will be finalized: If the latest proposed block has
-// height 13, and the latest finalized block is 10 and we are waiting for the first finalized child of a parent at
-// height 11, this will wait until block height 12 is finalized
-func (bs *BlockState) WaitForFinalizedChild(t *testing.T, parent *messages.BlockProposal) *messages.BlockProposal {
-	require.Eventually(t, func() bool {
-		_, ok := bs.finalizedByHeight[parent.Header.Height+1]
-		return ok
-	}, nextBlockTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive finalized child block for parent block height %v within %v seconds",
-			parent.Header.Height, nextBlockTimeout))
-
-	return bs.finalizedByHeight[parent.Header.Height+1]
-}
-
-func (bs *BlockState) HighestFinalized() (*messages.BlockProposal, bool) {
-	if bs.highestFinalized == 0 {
-		return nil, false
-	}
-	block, ok := bs.finalizedByHeight[bs.highestFinalized]
-	return block, ok
-}
-
-type ReceiptState struct {
-	// receipts contains execution receipts are indexed by blockID, then by executorID
-	receipts map[flow.Identifier]map[flow.Identifier]*flow.ExecutionReceipt
-}
-
-func (rs *ReceiptState) Add(er *flow.ExecutionReceipt) {
-	if rs.receipts == nil {
-		rs.receipts = make(map[flow.Identifier]map[flow.Identifier]*flow.ExecutionReceipt)
-	}
-
-	if rs.receipts[er.ExecutionResult.BlockID] == nil {
-		rs.receipts[er.ExecutionResult.BlockID] = make(map[flow.Identifier]*flow.ExecutionReceipt)
-	}
-
-	rs.receipts[er.ExecutionResult.BlockID][er.ExecutorID] = er
-}
-
-// WaitForAtFromAny waits for an execution receipt for the given blockID from any execution node and returns it
-func (rs *ReceiptState) WaitForAtFromAny(t *testing.T, blockID flow.Identifier) *flow.ExecutionReceipt {
-	require.Eventually(t, func() bool {
-		return len(rs.receipts[blockID]) > 0
-	}, nextBlockTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive execution receipt for block ID %x from any node within %v seconds", blockID,
-			nextBlockTimeout))
-	for _, r := range rs.receipts[blockID] {
-		return r
-	}
-	panic("there needs to be an entry in rs.receipts[blockID]")
-}
-
-// WaitForAtFrom waits for an execution receipt for the given blockID and the given executorID and returns it
-func (rs *ReceiptState) WaitForAtFrom(t *testing.T, blockID, executorID flow.Identifier) *flow.ExecutionReceipt {
-	var r *flow.ExecutionReceipt
-	require.Eventually(t, func() bool {
-		var ok bool
-		r, ok = rs.receipts[blockID][executorID]
-		return ok
-	}, nextBlockTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive execution receipt for block ID %x from %x within %v seconds", blockID, executorID,
-			nextBlockTimeout))
-	return r
-}
-
-// WaitUntilFinalizedStateCommitmentChanged waits until a different state commitment for a finalized block is received
-// compared to the latest one from any execution node and returns the corresponding block and execution receipt
-func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState) (*messages.BlockProposal, *flow.ExecutionReceipt) {
-	// get the state commitment for the highest finalized block
-	initialFinalizedSC := flow.GenesisStateCommitment
-	b1, ok := bs.HighestFinalized()
-	if ok {
-		r1 := rs.WaitForAtFromAny(t, b1.Header.ID())
-		initialFinalizedSC = r1.ExecutionResult.FinalStateCommit
-	}
-
-	currentHeight := b1.Header.Height + 1
-	currentID := b1.Header.ID()
-	var b2 *messages.BlockProposal
-	var r2 *flow.ExecutionReceipt
-	require.Eventually(t, func() bool {
-		var ok bool
-		b2, ok = bs.finalizedByHeight[currentHeight]
-		if !ok {
-			return false
-		}
-		currentID = b2.Header.ID()
-		r2 = rs.WaitForAtFromAny(t, b2.Header.ID())
-		if bytes.Compare(initialFinalizedSC, r2.ExecutionResult.FinalStateCommit) == 0 {
-			// received a new execution result for the next finalized block, but it has the same final state commitment
-			// check the next finalized block
-			currentHeight++
-			return false
-		}
-		return true
-	}, nextBlockTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive an execution receipt with a different state commitment from %x within %v seconds,"+
-			" last block checked height %v, last block checked ID %x", initialFinalizedSC, nextBlockTimeout,
-			currentHeight, currentID))
-
-	return b2, r2
 }
