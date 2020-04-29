@@ -27,7 +27,7 @@ type CombinedSigner struct {
 }
 
 // NewCombinedSigner creates a new combined signer with the given dependencies:
-// - the consensus committee's state is used to retrieve public keys for signers;
+// - the hotstuff committee's state is used to retrieve public keys for signers;
 // - the signer ID is used as the identity when creating signatures;
 // - the staking signer is used to create aggregatable signatures for the first signature part;
 // - the threshold signer is used to create threshold signture shres for the second signature part;

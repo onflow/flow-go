@@ -148,11 +148,7 @@ func main() {
 			// initialize the simple merger to combine staking & beacon signatures
 			merger := signature.NewCombiner()
 
-			// initialize consensus committee's membership state
-
-			UPDATE me
-
-
+			// initialize Main consensus committee's state
 			committee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)

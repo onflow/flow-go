@@ -160,7 +160,7 @@ func main() {
 			merger := signature.NewCombiner()
 
 			// initialize consensus committee's membership state
-			// This committee state is for the HotStuff follower, which needs to know which nodes are part of the main consensus committee.
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
 			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
 			if err != nil {

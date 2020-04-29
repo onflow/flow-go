@@ -58,7 +58,7 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.proposal = &model.Proposal{Block: ps.block}
 	ps.vote = ps.proposal.ProposerVote()
 
-	// set up the mocked Consensus Committee state
+	// set up the mocked hotstuff Committee state
 	ps.committee = &mocks.Committee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.leader.NodeID, nil)
 	ps.committee.On("Identities", mock.Anything, mock.Anything).Return(

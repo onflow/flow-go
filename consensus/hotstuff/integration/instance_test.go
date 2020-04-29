@@ -127,7 +127,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// insert root block into headers register
 	in.headers.Store(cfg.Root.ID(), cfg.Root)
 
-	// program the consensus committee state
+	// program the hotstuff committee state
 	in.committee.On("Identities", mock.Anything, mock.Anything).Return(
 		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
 			return in.participants.Filter(selector)

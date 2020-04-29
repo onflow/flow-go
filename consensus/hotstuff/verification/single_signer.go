@@ -19,7 +19,7 @@ type SingleSigner struct {
 }
 
 // NewSingleSigner initializes a single signer with the given dependencies:
-// - the given consensus committee's state is used to retrieve public keys for the verifier;
+// - the given hotstuff committee's state is used to retrieve public keys for the verifier;
 // - the given signer is used to generate signatures for the local node;
 // - the given signer ID is used as identifier for our signatures.
 func NewSingleSigner(committee hotstuff.Committee, signer module.AggregatingSigner, signerID flow.Identifier) *SingleSigner {
