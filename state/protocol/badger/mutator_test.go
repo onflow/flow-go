@@ -70,13 +70,10 @@ func TestBootstrapValid(t *testing.T) {
 		assert.Equal(t, genesis.ID(), storedID)
 		assert.Equal(t, genesis.Header, storedHeader)
 
-		for _, identity := range identities {
-			var delta int64
-			err = db.View(operation.RetrieveDelta(genesis.Header.Height, identity.Role, identity.NodeID, &delta))
-			require.Nil(t, err)
-
-			assert.Equal(t, int64(identity.Stake), delta)
-		}
+		var retrieved flow.IdentityList
+		err = db.View(operation.RetrieveIdentities(&retrieved))
+		require.NoError(t, err)
+		assert.ElementsMatch(t, identities, retrieved)
 	})
 }
 
@@ -536,25 +533,21 @@ func TestExtendSealNotConnected(t *testing.T) {
 func TestExtendIdentities(t *testing.T) {
 	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		block := unittest.BlockFixture()
-		block.Payload.Identities = flow.IdentityList{block.Identities[0]}
+		block.Payload.Identities = unittest.IdentityListFixture(4)
 		block.Payload.Guarantees = nil
 		block.Height = 1
 		block.View = 1
 		block.ParentID = genesis.ID()
 		block.PayloadHash = block.Payload.Hash()
 
-		err := db.Update(operation.InsertIdentity(block.Identities[0]))
-		require.NoError(t, err)
-		err = db.Update(procedure.InsertBlock(&block))
+		// this should pass, even with identities in the payload
+		err := db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
 
-		err = mutator.Extend(block.ID())
-		require.EqualError(t, err, "extend payload not valid: extend block has identities")
-
-		// verify seal not indexed
-		var seal flow.Identifier
-		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
-		assert.EqualError(t, err, "key not found")
+		// we should not store or retrieve identities with the block for now
+		var retrieved flow.Block
+		err = db.View(procedure.RetrieveBlock(block.ID(), &retrieved))
+		require.Empty(t, retrieved.Identities)
 	})
 }
 

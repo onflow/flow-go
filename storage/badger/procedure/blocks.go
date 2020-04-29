@@ -199,12 +199,6 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
-		// apply the stake deltas
-		err = ApplyDeltas(genesis.Height, genesis.Identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not apply stake deltas: %w", err)
-		}
-
 		// generate genesis execution result
 		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: flow.ZeroID,
@@ -266,6 +260,12 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 		err = operation.InsertBoundary(genesis.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update boundary: %w", err)
+		}
+
+		// insert the block identities
+		err = operation.InsertIdentities(genesis.Identities)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert identities: %w", err)
 		}
 
 		return nil
