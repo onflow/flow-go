@@ -30,13 +30,8 @@ func LookupGuaranteePayload(height uint64, blockID flow.Identifier, parentID flo
 
 // VerifyGuaranteePayload verifies that the candidate collection IDs
 // don't exist in any ancestor block.
-func VerifyGuaranteePayload(height uint64, blockID flow.Identifier, guaranteeIDs []flow.Identifier) func(*badger.Txn) error {
-	// TODO: Currently Hard coded to only checking the last 10 blocks
-	limit := uint64(0)
-	if height > 10 {
-		limit = height - 10
-	}
-	start, end := payloadIterRange(codeIndexGuarantee, height, limit)
+func VerifyGuaranteePayload(upper uint64, lower uint64, blockID flow.Identifier, guaranteeIDs []flow.Identifier) func(*badger.Txn) error {
+	start, end := payloadIterRange(codeIndexGuarantee, upper, lower)
 	return iterate(start, end, validatepayload(blockID, guaranteeIDs))
 }
 

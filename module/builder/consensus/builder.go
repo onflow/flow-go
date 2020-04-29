@@ -29,8 +29,9 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 
 	// initialize default config
 	cfg := Config{
-		minInterval: 500 * time.Millisecond,
-		maxInterval: 10 * time.Second,
+		minInterval:  500 * time.Millisecond,
+		maxInterval:  10 * time.Second,
+		expiryBlocks: 1000,
 	}
 
 	// apply option parameters
@@ -64,6 +65,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
+		// calculate how many blocks we look back
+		limit := boundary - b.cfg.expiryBlocks
+		if limit > boundary { // overflow check
+			limit = 0
+		}
+
 		// get the last finalized block ID
 		var finalizedID flow.Identifier
 		err = operation.RetrieveNumber(boundary, &finalizedID)(tx)
@@ -86,8 +93,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 				return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 			}
 
-			// if we have reached the finalized boundary, stop indexing
-			if ancestor.Height <= boundary {
+			// if we have reached the limit, stop indexing
+			if ancestor.Height <= limit {
 				break
 			}
 
@@ -168,22 +175,26 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// collect all block headers from the last sealed block to the parent
 		var ancestorIDs []flow.Identifier
-		// TODO: Fix seals
-		// ancestorID = parentID
-		// sealedID := lastSeal.BlockID
-		// for ancestorID != sealedID {
+		ancestorID = parentID
+		sealedID := lastSeal.BlockID
+		for ancestorID != sealedID {
 
-		// 	// get the ancestor
-		// 	var ancestor flow.Header
-		// 	err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
-		// 	if err != nil {
-		// 		return fmt.Errorf("could not get ancestor: %w", err)
-		// 	}
+			// get the ancestor
+			var ancestor flow.Header
+			err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
+			if err != nil {
+				return fmt.Errorf("could not get ancestor: %w", err)
+			}
 
-		// 	// add to list
-		// 	ancestorIDs = append(ancestorIDs, ancestorID)
-		// 	ancestorID = ancestor.ParentID
-		// }
+			// sanity check; should never be going that long without seal
+			if ancestor.Height <= limit {
+				break
+			}
+
+			// add to list
+			ancestorIDs = append(ancestorIDs, ancestorID)
+			ancestorID = ancestor.ParentID
+		}
 
 		// for each ancestor on the path, we can now include the pending seals
 		// if available
