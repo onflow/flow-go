@@ -367,46 +367,14 @@ func (suite *TestSuite) TestHandleReceipt_RetryMissingCollection() {
 	// mocks identities
 	//
 	// required roles
-	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 
-	// mocks identity of the verification node
-	suite.me.On("NodeID").Return(verIdentity.NodeID)
-
-	// mocks state snapshot to validate identity of execution node as an staked origin id at the `suite.block` height
+	// mocking state
+	//
+	// mocks state snapshot to return identity of collection node
 	suite.state.On("Final").Return(suite.ss, nil)
-	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.ss, nil).Once()
-	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
 	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
-	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(collIdentities, nil).Twice()
-
-	// mocks existing resources at the engine's disposal
-	//
-	// mocks the possession of 'suite.block` in the storage
-	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
-	// mocks the possession of chunk data pack associated with the `suite.block`
-	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
-	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil).Once()
-
-	// mocks missing collection
-	//
-	// mocks the absence of `suite.collection` which is the associated collection to this block
-	// the collection does not exist in authenticated and pending collections mempools
-	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
-	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false).Once()
-
-	// engine has not yet ingested the result of this receipt yet
-	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
-
-	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-		suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
-	}
-
-	// expect that we already have the receipt in the authenticated receipts mempool
-	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
-	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
-	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(collIdentities, nil)
 
 	// mocks functionalities
 	//
@@ -427,42 +395,26 @@ func (suite *TestSuite) TestHandleReceipt_RetryMissingCollection() {
 
 	// mocks expectation
 	//
-	// expect that the collection is requested
-	submitWG := sync.WaitGroup{}
-	// we expect the retry to be submitted `failureThreshold` - 1 many times
+	// expect that the collection is requested `failureThreshold` - 1 many times
 	// the -1 is to exclude the initial request submission made before adding tracker to
 	// mempool
+	submitWG := sync.WaitGroup{}
 	submitWG.Add(int(suite.failureThreshold) - 1)
 	suite.collectionsConduit.
 		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), collIdentities[0].NodeID).
 		Run(func(args testifymock.Arguments) {
 			submitWG.Done()
-			fmt.Println("submit is called")
 		}).
 		Return(nil)
 
-	// mocks chunk assignment
-	//
-	// assigns all chunks in the receipt to this node through mocking
-	a := chmodel.NewAssignment()
-	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
-	}
-	suite.assigner.On("Assign",
-		testifymock.Anything,
-		testifymock.Anything,
-		testifymock.Anything).
-		Return(a, nil).
-		Once()
-
+	// starts engine
 	<-eng.Ready()
 
+	// starts timer for receiving retries
 	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait, 5*time.Second)
 
 	// waits for the engine to get shutdown
 	<-eng.Done()
-
-	// asserts necessary calls
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
