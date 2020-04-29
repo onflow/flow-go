@@ -55,7 +55,11 @@ func (e ErrorInvalidBlock) Error() string {
 
 func (e ErrorInvalidBlock) Is(other error) bool {
 	_, ok := other.(ErrorInvalidBlock)
-	return ok || errors.Is(other, e.Err)
+	return ok
+}
+
+func (e ErrorInvalidBlock) Unwrap() error {
+	return e.Err
 }
 
 type ErrorInvalidVote struct {
@@ -70,7 +74,11 @@ func (e ErrorInvalidVote) Error() string {
 
 func (e ErrorInvalidVote) Is(other error) bool {
 	_, ok := other.(ErrorInvalidVote)
-	return ok || errors.Is(other, e.Err)
+	return ok
+}
+
+func (e ErrorInvalidVote) Unwrap() error {
+	return e.Err
 }
 
 // ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which
