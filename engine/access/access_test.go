@@ -203,6 +203,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
 		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
 		metrics := &mockmodule.Metrics{}
+		metrics.On("FinalizedBlocks", mock.Anything).Return()
 
 		exeEventResp := execution.EventsResponse{
 			Results: nil,
