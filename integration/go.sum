@@ -558,11 +558,7 @@ github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn
 github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/onflow/cadence v0.0.0-20200419191218-7825e473e791/go.mod h1:T2EWFkpigNIK4Kwn0zWcQbDXrVpjstyRXML/lK8qltY=
-github.com/onflow/cadence v0.1.0 h1:oyq1wEysvkq46kGALYEMcht/5ul5isir6mDF4rlmeJ8=
-github.com/onflow/cadence v0.1.0/go.mod h1:T2EWFkpigNIK4Kwn0zWcQbDXrVpjstyRXML/lK8qltY=
-github.com/onflow/cadence v0.1.1-0.20200425002544-0da1e448ec16/go.mod h1:W3ykbuy2rzqMBC6U4UIn5+1Y45fEs6W1++b+xw+Gc/s=
-github.com/onflow/cadence v0.1.1-0.20200428175910-6e107a87c37a/go.mod h1:W3ykbuy2rzqMBC6U4UIn5+1Y45fEs6W1++b+xw+Gc/s=
-github.com/onflow/cadence v0.1.1-0.20200429001246-6407fe3bca9d/go.mod h1:W3ykbuy2rzqMBC6U4UIn5+1Y45fEs6W1++b+xw+Gc/s=
+github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80 h1:5K+4gxhIgSSrKqE93q2tLFnH4VxKty2U8Cjba8ZWM/E=
 github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80/go.mod h1:W3ykbuy2rzqMBC6U4UIn5+1Y45fEs6W1++b+xw+Gc/s=
 github.com/onflow/flow-go-sdk v0.1.0 h1:fRc9H6prHO0O8acsYwtu5pG893go8bn5RLVMKifA0JU=
 github.com/onflow/flow-go-sdk v0.1.0/go.mod h1:ShDDEC0Nb1PXtb3sGhwnFnbu+Hmib5uDfuC8H383PNE=
@@ -570,8 +566,7 @@ github.com/onflow/flow/protobuf/go/flow v0.1.3 h1:xT/wjpc0CyGo6Jldn3H+5Y2G42tp+T
 github.com/onflow/flow/protobuf/go/flow v0.1.3/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.1.3/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200424224414-b66f9c038796/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
-github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200427172538-223aae761ecd h1:D6NdWLbuBxCyTTRNm8Tdq2oUT+u5O63hQHye5fE+NJM=
-github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200427172538-223aae761ecd/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
+github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200428201807-a8d05f02b9ce h1:M8xNKR090stZmpSWkE6MAo0A6tak9hpKIfaaGY+BlUI=
 github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200428201807-a8d05f02b9ce/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
@@ -761,6 +756,7 @@ golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443/go.mod h1:yigFU9vqHzYiE8U
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20200117160349-530e935923ad h1:Jh8cai0fqIK+f6nG0UgPW5wFk8wmiMhM3AyciDBdtQg=
 golang.org/x/crypto v0.0.0-20200117160349-530e935923ad/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
+golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5 h1:Q7tZBpemrlsc2I7IyODzhtallWRSm4Q0d09pL6XbQtU=
 golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/exp v0.0.0-20180321215751-8460e604b9de/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20180807140117-3d87b88a115f/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
