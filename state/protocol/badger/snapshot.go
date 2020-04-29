@@ -34,92 +34,16 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	var identities flow.IdentityList
 	err := s.state.db.View(func(tx *badger.Txn) error {
 
-		// get the top header at the requested snapshot
-		var head flow.Header
-		err := s.head(&head)(tx)
+		// retrieve the identities from the state
+		err := operation.RetrieveIdentities(&identities)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve head: %w", err)
+			return fmt.Errorf("could not retrieve identities: %w", err)
 		}
 
-		// get the latest finalized height
-		var boundary uint64
-		err = operation.RetrieveBoundary(&boundary)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
-
-		// if the target number is before finalized state, set it as new limit
-		if head.Height < boundary {
-			boundary = head.Height
-		}
-
-		// get finalized stakes within the boundary
-		deltas, err := computeFinalizedDeltas(tx, boundary, selector)
-		if err != nil {
-			return fmt.Errorf("could not compute finalized stakes: %w", err)
-		}
-
-		// if there are unfinalized blocks, retrieve stakes there
-		if head.Height > boundary {
-
-			// get the final block we want to reach
-			var finalID flow.Identifier
-			err = operation.RetrieveNumber(boundary, &finalID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not get final hash: %w", err)
-			}
-
-			// track back from parent block to latest finalized block
-			parentID := head.ParentID
-			for parentID != finalID {
-
-				// get the stake deltas
-				// TODO: separate this from identities
-				var identities []*flow.Identity
-				err = procedure.RetrieveIdentities(parentID, &identities)(tx)
-				if err != nil {
-					return fmt.Errorf("could not add deltas: %w", err)
-				}
-
-				// manually add the deltas for valid ids
-				for _, identity := range identities {
-					if !selector(identity) {
-						continue
-					}
-					deltas[identity.NodeID] += int64(identity.Stake)
-				}
-
-				// get the next parent and forward pointer
-				var parent flow.Header
-				err = operation.RetrieveHeader(parentID, &parent)(tx)
-				if err != nil {
-					return fmt.Errorf("could not retrieve parent (%s): %w", parentID, err)
-				}
-				parentID = parent.ParentID
-			}
-
-		}
-
-		// get identity for each non-zero stake
-		for nodeID, delta := range deltas {
-
-			// retrieve the identity
-			var identity flow.Identity
-			err = operation.RetrieveIdentity(nodeID, &identity)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve identity (%x): %w", nodeID, err)
-			}
-
-			// set the stake for the node
-			identity.Stake = uint64(delta)
-
-			identities = append(identities, &identity)
-		}
-
-		// apply filters again to filter on stuff that wasn't available while
-		// running through the delta index in the key-value store
+		// filter identities
 		identities = identities.Filter(selector)
 
+		// sort the identities
 		sort.Slice(identities, func(i int, j int) bool {
 			return order.ByNodeIDAsc(identities[i], identities[j])
 		})
@@ -280,16 +204,4 @@ func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
 	}
 
 	return unfinalizedBlockIDs, nil
-}
-
-func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, selector flow.IdentityFilter) (map[flow.Identifier]int64, error) {
-
-	// define start and end prefixes for the range scan
-	deltas := make(map[flow.Identifier]int64)
-	err := operation.TraverseDeltas(0, boundary, selector, func(nodeID flow.Identifier, delta int64) error {
-		deltas[nodeID] += delta
-		return nil
-	})(tx)
-
-	return deltas, err
 }

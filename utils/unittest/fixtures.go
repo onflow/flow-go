@@ -93,7 +93,7 @@ func StateDeltaFixture() *messages.ExecutionStateDelta {
 
 func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := flow.Payload{
-		Identities: IdentityListFixture(32),
+		Identities: nil,
 		Guarantees: CollectionGuaranteesFixture(16),
 		Seals:      BlockSealsFixture(16),
 	}
@@ -123,6 +123,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 
 func BlockHeaderFixture() flow.Header {
 	return BlockHeaderWithParentFixture(&flow.Header{
+		ChainID:  "testing",
 		ParentID: IdentifierFixture(),
 		Height:   rand.Uint64(),
 	})
