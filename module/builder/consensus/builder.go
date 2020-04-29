@@ -188,7 +188,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 			// sanity check; should never be going that long without seal
 			if ancestor.Height <= limit {
-				return fmt.Errorf("looking too far back for seals")
+				break
 			}
 
 			// add to list
