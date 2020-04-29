@@ -26,6 +26,7 @@ type StateCommitment = []byte
 //	HashAlgo:   hash.SHA2_256,
 //}
 
+// UTKFwTqTQVfBej/XQT4lVNHgFtK6KLnvqPSTfSDmI5Q=
 const RootAccountPrivateKeyHex = "e3a08ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc430201"
 
 // Pre-calculated state commitment with root account with the above private key

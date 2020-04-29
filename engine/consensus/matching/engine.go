@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -309,6 +310,15 @@ func (e *Engine) createSeal(result *flow.ExecutionResult) error {
 	// persist the result on disk
 	err = e.results.Store(result)
 	if err != nil {
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			// TODO: Already stored result, therefore this is a late/duplicate execution result
+			// Drop for now
+
+			// clear up the caches
+			e.receipts.DropForBlock(result.BlockID)
+			e.approvals.DropForBlock(result.BlockID)
+			return nil
+		}
 		return fmt.Errorf("could not store result: %w", err)
 	}
 
