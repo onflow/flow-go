@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
@@ -17,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
@@ -42,7 +42,6 @@ type Node struct {
 	log           zerolog.Logger
 	id            *flow.Identity
 	compliance    *compliance.Engine
-	committee     *committee.Committee
 	sync          *synchronization.Engine
 	hot           *hotstuff.EventLoop
 	state         *protocol.State
@@ -127,8 +126,8 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	metrics.On("HotStuffIdleDuration", mock.Anything, mock.Anything)
 	metrics.On("HotStuffWaitDuration", mock.Anything, mock.Anything)
 
-	com, err := committee.NewMainConsensusCommitteeState(state, localID)
-	require.NoError(t, err)
+	// com, err := committee.NewMainConsensusCommitteeState(state, localID)
+	// require.NoError(t, err)
 
 	// make local
 	priv := helper.MakeBLSKey(t)
@@ -163,7 +162,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 		SignerIDs: nil, // TODO
 		SigData:   nil,
 	}
-	// selector := filter.HasRole(flow.RoleConsensus)
+	selector := filter.HasRole(flow.RoleConsensus)
 
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, guarantees, seals)
@@ -180,7 +179,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
-		viewsDB, com, state, build, final, signer, comp, rootHeader,
+		viewsDB, state, local, build, final, signer, comp, selector, rootHeader,
 		rootQC, consensus.WithTimeout(hotstuffTimeout))
 
 	require.NoError(t, err)
