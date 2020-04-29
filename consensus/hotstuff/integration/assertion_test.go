@@ -6,19 +6,14 @@ func FinalizedBlocks(in *Instance) []*flow.Header {
 	finalized := make([]*flow.Header, 0)
 
 	lastFinalID := in.forks.FinalizedBlock().BlockID
-	finalizedBlockBlob, found := in.headers.Load(lastFinalID)
+	fin, found := in.headers[lastFinalID]
 	if !found {
 		return finalized
 	}
-	finalizedBlock := finalizedBlockBlob.(*flow.Header)
 
-	for {
-		finalized = append(finalized, finalizedBlock)
-		finalizedBlockBlob, found = in.headers.Load(finalizedBlock.ParentID)
-		if !found {
-			break
-		}
-		finalizedBlock = finalizedBlockBlob.(*flow.Header)
+	for fin != nil {
+		finalized = append(finalized, fin)
+		fin, _ = in.headers[fin.ParentID]
 	}
 	return finalized
 }

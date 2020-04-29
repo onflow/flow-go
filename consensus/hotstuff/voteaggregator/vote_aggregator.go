@@ -6,13 +6,12 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 )
 
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 type VoteAggregator struct {
 	notifier              hotstuff.Consumer
-	committee             hotstuff.Committee
+	viewState             hotstuff.ViewState
 	voteValidator         hotstuff.Validator
 	signer                hotstuff.Signer
 	highestPrunedView     uint64
@@ -25,11 +24,11 @@ type VoteAggregator struct {
 }
 
 // New creates an instance of vote aggregator
-func New(notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuff.Committee, voteValidator hotstuff.Validator, signer hotstuff.Signer) *VoteAggregator {
+func New(notifier hotstuff.Consumer, highestPrunedView uint64, viewState hotstuff.ViewState, voteValidator hotstuff.Validator, signer hotstuff.Signer) *VoteAggregator {
 	return &VoteAggregator{
 		notifier:              notifier,
 		highestPrunedView:     highestPrunedView,
-		committee:             committee,
+		viewState:             viewState,
 		voteValidator:         voteValidator,
 		signer:                signer,
 		pendingVotes:          NewPendingVotes(),
@@ -229,7 +228,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *model.Vote, blo
 	votingStatus, exists := va.blockIDToVotingStatus[vote.BlockID]
 	if !exists {
 		// get all identities
-		identities, err := va.committee.Identities(vote.BlockID, filter.Any)
+		identities, err := va.viewState.AllConsensusParticipants(vote.BlockID)
 		if err != nil {
 			return false, fmt.Errorf("error retrieving consensus participants: %w", err)
 		}

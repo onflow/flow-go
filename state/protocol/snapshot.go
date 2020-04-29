@@ -11,14 +11,15 @@ import (
 // point in a deterministic manner.
 type Snapshot interface {
 
-	// Identities returns a list of identities at the selected point of
+	// Identities returns a list of staked identities at the selected point of
 	// the protocol state history. It allows us to provide optional upfront
 	// filters which can be used by the implementation to speed up database
 	// lookups.
 	Identities(selector flow.IdentityFilter) (flow.IdentityList, error)
 
 	// Identity attempts to retrieve the node with the given identifier at the
-	// selected point of the protocol state history. It will error if it doesn't exist.
+	// selected point of the protocol state history. It will error if it doesn't
+	// exist or if its stake is zero.
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
 	// Seal return the highest seal at the selected snapshot.
