@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/y"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -16,6 +17,8 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
+	"github.com/dapperlabs/flow-go/state/protocol"
+	protocolkv "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -33,6 +36,9 @@ type BuilderSuite struct {
 	state   cluster.State
 	mutator cluster.Mutator
 
+	// protocol state for reference blocks for transactions
+	protoState protocol.State
+
 	pool    *stdmap.Transactions
 	builder *builder.Builder
 }
@@ -45,13 +51,16 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.chainID = suite.genesis.ChainID
 
 	suite.pool, err = stdmap.NewTransactions(1000)
-	suite.Assert().Nil(err)
+	suite.Require().Nil(err)
 
 	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
 
 	suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
-	suite.Assert().Nil(err)
+	suite.Require().Nil(err)
 	suite.mutator = suite.state.Mutate()
+
+	suite.protoState, err = protocolkv.NewState(suite.db)
+	suite.Require().Nil(err)
 
 	suite.Bootstrap()
 
@@ -67,8 +76,16 @@ func (suite *BuilderSuite) TearDownTest() {
 }
 
 func (suite *BuilderSuite) Bootstrap() {
+	// bootstrap cluster chain
 	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Nil(err)
+
+	// bootstrap main chain so we have valid reference blocks
+	genesis := flow.Genesis(unittest.IdentityListFixture(5, func(id *flow.Identity) {
+
+	}))
+	suite.protoState.Mutate().Bootstrap()
+	y.NumBytesRead
 
 	// add some transactions to transaction pool
 	for i := 0; i < 3; i++ {
@@ -108,7 +125,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	}
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter)
-	suite.Assert().Nil(err)
+	suite.Require().Nil(err)
 
 	// setter should have been run
 	suite.Assert().Equal(expectedHeight, header.Height)

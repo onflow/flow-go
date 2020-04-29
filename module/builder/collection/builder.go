@@ -82,6 +82,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 				return fmt.Errorf("could not retrieve reference block: %w", err)
 			}
 
+			// sanity check: ensure the reference block is from the main chain
+			if ref.ChainID != flow.DefaultChainID {
+				return fmt.Errorf("invalid reference block (chain_id=%s)", ref.ChainID)
+			}
+
 			// ensure the reference block is not too old, using a 10-block buffer
 			if final.Height > ref.Height && final.Height-ref.Height > flow.DefaultTransactionExpiry-10 {
 				// the transaction is expired, it will never be valid
