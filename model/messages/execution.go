@@ -23,11 +23,12 @@ type ExecutionStateSyncRequest struct {
 }
 
 type ExecutionStateDelta struct {
-	Block             *flow.Block
-	StateInteractions []*delta.Snapshot
-	StartState        flow.StateCommitment
-	EndState          flow.StateCommitment
-	Events            []flow.Event
+	Block              *flow.Block
+	StateInteractions  []*delta.Snapshot
+	StartState         flow.StateCommitment
+	EndState           flow.StateCommitment
+	Events             []flow.Event
+	TransactionResults []flow.TransactionResult
 }
 
 func (b *ExecutionStateDelta) ID() flow.Identifier {

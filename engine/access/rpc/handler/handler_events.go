@@ -94,35 +94,28 @@ func (h *Handler) getBlockEventsFromExecutionNode(ctx context.Context, blockIDs 
 	}, nil
 }
 
-func (h *Handler) getTransactionEventsFromExecutionNode(ctx context.Context, blockID []byte, transactionID []byte) ([]*entities.Event, error) {
+func (h *Handler) getTransactionResultFromExecutionNode(ctx context.Context, blockID []byte, transactionID []byte) ([]*entities.Event, uint32, string, error) {
 
 	// create an execution API request for events at blockID and transactionID
-	req := execution.GetEventsForBlockIDTransactionIDRequest{
+	req := execution.GetTransactionResultRequest{
 		BlockId:       blockID,
 		TransactionId: transactionID,
 	}
 
 	// call the execution node GRPC
-	resp, err := h.executionRPC.GetEventsForBlockIDTransactionID(ctx, &req)
+	resp, err := h.executionRPC.GetTransactionResult(ctx, &req)
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
-	// collect all events in the execution node api response
-	exeResults := resp.GetResults()
-	results := make([]*entities.Event, 0)
+	exeResults := resp.GetEvents()
 
-	// should be only exeResult since the request was for a single block
-	for _, r := range exeResults {
-		results = append(results, r.GetEvents()...)
-	}
-
-	return results, nil
+	return exeResults, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }
 
 // accessEvents converts execution node api result to access node api result
-func accessEvents(execEvents []*execution.EventsResponse_Result) []*access.EventsResponse_Result {
+func accessEvents(execEvents []*execution.GetEventsForBlockIDsResponse_Result) []*access.EventsResponse_Result {
 
 	results := make([]*access.EventsResponse_Result, len(execEvents))
 

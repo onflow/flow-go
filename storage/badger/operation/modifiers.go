@@ -17,13 +17,15 @@ func SkipDuplicates(op func(*badger.Txn) error) func(tx *badger.Txn) error {
 	}
 }
 
-func RetryOnConflict(op func(*badger.Txn) error) func(tx *badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		for {
-			err := op(tx)
-			if !errors.Is(err, badger.ErrConflict) {
-				return err
-			}
+func RetryOnConflict(op func() error) error {
+	for {
+		err := op()
+		if err == nil {
+			return nil
+		}
+
+		if !errors.Is(err, badger.ErrConflict) {
+			return err
 		}
 	}
 }

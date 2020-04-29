@@ -144,8 +144,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // SendVote will send a vote to the desired node.
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	log := e.log.With().
 		Uint64("block_view", view).
@@ -176,8 +174,6 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
 // Note the header has incomplete fields, because it was converted from a hotstuff.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
@@ -203,7 +199,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -302,7 +298,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -420,7 +416,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
