@@ -16,6 +16,8 @@ import (
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
+var keyCache = map[string]crypto.PublicKey{}
+
 // Identity represents a node identity.
 type Identity struct {
 	NodeID        Identifier
@@ -91,13 +93,23 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 	iy.Stake = m.Stake
 	var err error
 	if m.StakingPubKey != nil {
-		if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, m.StakingPubKey); err != nil {
-			return err
+		cachedKey, ok := keyCache[string(m.StakingPubKey)]
+		if ok {
+			iy.StakingPubKey = cachedKey
+		} else {
+			if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, m.StakingPubKey); err != nil {
+				return err
+			}
 		}
 	}
 	if m.NetworkPubKey != nil {
-		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, m.NetworkPubKey); err != nil {
-			return err
+		cachedKey, ok := keyCache[string(m.NetworkPubKey)]
+		if ok {
+			iy.NetworkPubKey = cachedKey
+		} else {
+			if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, m.NetworkPubKey); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -107,9 +119,12 @@ func (iy Identity) MarshalJSON() ([]byte, error) {
 	m := jsonMarshalIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
 	if iy.StakingPubKey != nil {
 		m.StakingPubKey = iy.StakingPubKey.Encode()
+		keyCache[string(m.StakingPubKey)] = iy.StakingPubKey
 	}
 	if iy.NetworkPubKey != nil {
 		m.NetworkPubKey = iy.NetworkPubKey.Encode()
+		keyCache[string(m.NetworkPubKey)] = iy.NetworkPubKey
+
 	}
 
 	return json.Marshal(m)
