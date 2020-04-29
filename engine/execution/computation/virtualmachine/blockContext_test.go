@@ -122,8 +122,6 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 }
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
-	t.Skip("TODO: feed transaction args to runtime")
-
 	rt := runtime.NewInterpreterRuntime()
 
 	h := unittest.BlockHeaderFixture()
@@ -132,7 +130,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	bc := vm.NewBlockContext(&h)
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
-	arg2, _ := jsoncdc.Encode(cadence.String("foo"))
+	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
 
 	var transactionArgsTests = []struct {
 		label       string
@@ -144,13 +142,13 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 		{
 			label:  "no parameters",
 			script: `transaction { execute { log("Hello, World!") } }`,
-			args:   nil,
+			args:   [][]byte{arg1},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
 				assert.Error(t, result.Error)
 			},
 		},
 		{
-			label:  "single parameters",
+			label:  "single parameter",
 			script: `transaction(x: Int) { execute { log(x) } }`,
 			args:   [][]byte{arg1},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
@@ -175,16 +173,13 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			script: `
 				transaction(x: Int, y: String) { 
 					prepare(acct: AuthAccount) { log(acct.address) } 
-					execute { log(x); log(y) } 
+					execute { log(x); log(y) }
 				}`,
 			args:        [][]byte{arg1, arg2},
 			authorizers: []flow.Address{flow.HexToAddress("01")},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
 				require.NoError(t, result.Error)
-				require.Len(t, result.Logs, 3)
-				assert.Equal(t, "0x01", result.Logs[0])
-				assert.Equal(t, "42", result.Logs[1])
-				assert.Equal(t, `"foo"`, result.Logs[2])
+				assert.ElementsMatch(t, []string{"0x1", "42", `"foo"`}, result.Logs)
 			},
 		},
 	}
@@ -194,6 +189,10 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			tx := flow.NewTransactionBody().
 				SetScript([]byte(tt.script)).
 				SetArguments(tt.args)
+
+			for _, authorizer := range tt.authorizers {
+				tx.AddAuthorizer(authorizer)
+			}
 
 			ledger := make(virtualmachine.MapLedger)
 
