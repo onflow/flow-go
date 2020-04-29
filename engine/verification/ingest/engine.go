@@ -285,25 +285,20 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 // after a request. It adds the collection to the mempool and checks for
 // pending receipts that are ready for verification.
 func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
+	collID := coll.ID()
+
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("collection_id", logging.Entity(coll)).
 		Msg("collection received")
 
-	// checks if this event is a reply of a prior request extracts the tracker
-	collID := coll.ID()
-	tracker, err := e.collectionTrackers.ByCollectionID(collID)
-	if err != nil {
-		// collections with no tracker add to the pending collections mempool
-		pcoll := &verificationmodel.PendingCollection{
-			Collection: coll,
-			OriginID:   originID,
+	if e.collectionTrackers.Has(collID) {
+		// this event is a reply to a prior request
+		tracker, err := e.collectionTrackers.ByCollectionID(collID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve collection tracker from mempool")
 		}
-		err = e.pendingCollections.Add(pcoll)
-		if err != nil && err != mempool.ErrAlreadyExists {
-			return fmt.Errorf("could not store collection in pending pool: %w", err)
-		}
-	} else {
+
 		// a tracker exists for the requesting collection
 		// verifies identity of origin
 		origin, err := e.state.AtBlockID(tracker.BlockID).Identity(originID)
@@ -325,7 +320,19 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		e.collectionTrackers.Rem(collID)
 
 		e.checkPendingChunks()
+	} else {
+		// this collection came passively
+		// collections with no tracker add to the pending collections mempool
+		pcoll := &verificationmodel.PendingCollection{
+			Collection: coll,
+			OriginID:   originID,
+		}
+		err := e.pendingCollections.Add(pcoll)
+		if err != nil && err != mempool.ErrAlreadyExists {
+			return fmt.Errorf("could not store collection in pending pool: %w", err)
+		}
 	}
+
 	return nil
 }
 
