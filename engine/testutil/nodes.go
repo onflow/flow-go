@@ -260,7 +260,14 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, assigner module.ChunkAssigner, opts ...VerificationOpt) mock.VerificationNode {
+func VerificationNode(t *testing.T,
+	hub *stub.Hub,
+	identity *flow.Identity,
+	identities []*flow.Identity,
+	assigner module.ChunkAssigner,
+	requestIntervalMs uint,
+	failureThreshold uint,
+	opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
@@ -346,7 +353,10 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, iden
 			node.IngestedChunkIDs,
 			node.IngestedResultIDs,
 			node.BlockStorage,
-			assigner)
+			assigner,
+			requestIntervalMs,
+			failureThreshold,
+		)
 		require.Nil(t, err)
 	}
 

@@ -3,6 +3,7 @@ package ingest
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -47,7 +48,10 @@ type Engine struct {
 	ingestedChunkIDs     mempool.Identifiers           // keeps ids of ingested chunks
 	blockStorage         storage.Blocks
 	checkChunksLock      sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
+	checkTrackerLock     sync.Mutex           // provides mutual exclusion for checkTrackers method to prevent race condition
 	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
+	requestInterval      uint                 // determines time in milliseconds for retrying tracked requests
+	failureThreshold     uint                 // determines number of retries for tracked requests before raising a challenge
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -68,6 +72,8 @@ func New(
 	ingestedResultIDs mempool.Identifiers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
+	requestIntervalMs uint,
+	failureThreshold uint,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -87,6 +93,8 @@ func New(
 		ingestedResultIDs:    ingestedResultIDs,
 		blockStorage:         blockStorage,
 		assigner:             assigner,
+		failureThreshold:     failureThreshold,
+		requestInterval:      requestIntervalMs,
 	}
 
 	var err error
@@ -116,6 +124,9 @@ func New(
 
 // Ready returns a channel that is closed when the verifier engine is ready.
 func (e *Engine) Ready() <-chan struct{} {
+	// runs cleanup periodically every `requestInterval` milliseconds
+	e.unit.LaunchPeriodically(e.checkTrackers,
+		time.Duration(e.requestInterval)*time.Millisecond)
 	return e.unit.Ready()
 }
 
@@ -274,7 +285,6 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 // after a request. It adds the collection to the mempool and checks for
 // pending receipts that are ready for verification.
 func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
-
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("collection_id", logging.Entity(coll)).
@@ -320,26 +330,14 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 }
 
 // requestCollection submits a request for the given collection to collection nodes.
-func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifier) error {
-	// checks collection does not have a tracker yet
-	if e.collectionTrackers.Has(collID) {
-		// collection has been already requested
-		// request is dropped
-		// TODO trackers should expire after a while for liveness
-		// https://github.com/dapperlabs/flow-go/issues/3054
-		return nil
-	}
-	// requesting the collection if it has not yet been requested
-	tracker := &trackers.CollectionTracker{
-		BlockID:      blockID,
-		CollectionID: collID,
-	}
-	err := e.collectionTrackers.Add(tracker)
+func (e *Engine) requestCollection(collID flow.Identifier) error {
+	// updates tracker for this request
+	tracker, err := e.updateCollectionTracker(collID)
 	if err != nil {
-		return fmt.Errorf("could not add a tracker for collection to mempool: %w", err)
+		return fmt.Errorf("could not update the collection tracker: %w", err)
 	}
 
-	// extracts list of verifier nodes id
+	// extracts list of collection nodes id
 	//
 	collNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
@@ -357,18 +355,25 @@ func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifi
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
 	}
 
+	e.log.Debug().
+		Hex("collection_id", logging.ID(collID)).
+		Msg("collection request submitted")
+
+	// stores collection tracker in the memory
+	err = e.collectionTrackers.Add(tracker)
+	// Todo handle the case of duplicate trackers
+	if err != nil && err != mempool.ErrAlreadyExists {
+		return fmt.Errorf("could not store tracker of collection request in mempool: %w", err)
+	}
 	return nil
 }
 
 // requestChunkDataPack submits a request for the given chunk ID to the execution nodes.
-func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Identifier) error {
-	// checks chunk data pack does not have a tracker yet
-	if e.chunkDataPackTackers.Has(chunkID) {
-		// chunk data pack has been already requested
-		// request is dropped
-		// TODO trackers should expire after a while for liveness
-		// https://github.com/dapperlabs/flow-go/issues/3054
-		return nil
+func (e *Engine) requestChunkDataPack(chunkID flow.Identifier) error {
+	// updates tracker for this request
+	tracker, err := e.updateChunkDataPackTracker(chunkID)
+	if err != nil {
+		return fmt.Errorf("could not update the chunk data pack tracker: %w", err)
 	}
 
 	// extracts list of execution nodes
@@ -392,13 +397,9 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, blockID flow.Iden
 		Hex("chunk_id", logging.ID(chunkID)).
 		Msg("chunk data pack request submitted")
 
-	// caches a tracker for successfully submitted requests
-	tracker := &trackers.ChunkDataPackTracker{
-		ChunkID: chunkID,
-		BlockID: blockID,
-	}
+	// stores chunk data pack tracker in the memory
 	err = e.chunkDataPackTackers.Add(tracker)
-	// Todo handle the case of duplicate trackers
+	// TODO handle the case of duplicate trackers
 	if err != nil && err != mempool.ErrAlreadyExists {
 		return fmt.Errorf("could not store tracker of chunk data pack request in mempool: %w", err)
 	}
@@ -422,44 +423,56 @@ func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block
 // getChunkDataPackForReceipt checks the chunk data pack associated with a chunk ID and
 // execution receipt. If the chunk data pack is available locally, returns true
 // as well as the chunk data pack itself.
-// Otherwise, returns false and requests the chunk data pack
 func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
-
 	log := e.log.With().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("chunk_id", logging.ID(chunkID)).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Logger()
 
-	if !e.chunkDataPacks.Has(chunkID) {
-		// the chunk data pack is missing, the chunk cannot yet be verified
-		// TODO rate limit these requests
-		err := e.requestChunkDataPack(chunkID, receipt.ExecutionResult.BlockID)
+	// checks mempool
+	//
+	if e.chunkDataPacks.Has(chunkID) {
+		// chunk data pack exists and retrieved and returned
+		chunkDataPack, err := e.chunkDataPacks.ByChunkID(chunkID)
 		if err != nil {
+			// couldn't get chunk state from mempool, the chunk cannot yet be verified
 			log.Error().
 				Err(err).
-				Hex("chunk_id", logging.ID(chunkID)).
-				Msg("could not request chunk data pack")
+				Msg("could not get chunk data pack from mempool")
+			return nil, false
 		}
+		return chunkDataPack, true
+	}
+
+	// checks trackers
+	//
+	if e.chunkDataPackTackers.Has(chunkID) {
+		// chunk data pack has been already requested from network
 		return nil, false
 	}
 
-	// chunk data pack exists and retrieved and returned
-	chunkDataPack, err := e.chunkDataPacks.ByChunkID(chunkID)
-	if err != nil {
-		// couldn't get chunk state from mempool, the chunk cannot yet be verified
-		log.Error().
+	// registers a tracker for the chunk data pack
+	//
+	tracker := &trackers.ChunkDataPackTracker{
+		ChunkID: chunkID,
+		BlockID: receipt.ExecutionResult.BlockID,
+		Counter: 0,
+	}
+	err := e.chunkDataPackTackers.Add(tracker)
+	// TODO handle the case of duplicate trackers
+	if err != nil && err != mempool.ErrAlreadyExists {
+		e.log.Error().
 			Err(err).
 			Hex("chunk_id", logging.ID(chunkID)).
-			Msg("could not get chunk data pack")
-		return nil, false
+			Msg("could not store tracker of chunk data pack request in mempool")
 	}
-	return chunkDataPack, true
+	return nil, false
 }
 
 // getCollectionForChunk checks the collection depended on the
 // given execution receipt and chunk. Returns true if the collections is available
-// locally. If the collections is not available locally, it is requested.
+// locally. If the collections is not available locally, registers a tracker for it.
 func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.ExecutionReceipt, chunk *flow.Chunk) (*flow.Collection, bool) {
 
 	log := e.log.With().
@@ -479,10 +492,11 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		return nil, false
 	}
 
-	// request the collection if we don't already have it
 	collID := block.Guarantees[collIndex].ID()
 
-	// checks authenticated collections
+	// checks authenticated collections mempool
+	//
+	//
 	if e.authCollections.Has(collID) {
 		coll, err := e.authCollections.ByID(collID)
 		if err != nil {
@@ -496,14 +510,28 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		return coll, true
 	}
 
-	// the collection is missing, the receipt cannot yet be verified
-	// TODO rate limit these requests
-	err := e.requestCollection(collID, block.ID())
+	// checks collection trackers mempool
+	//
+	if e.collectionTrackers.Has(collID) {
+		// collection has been already requested from network
+		return nil, false
+	}
+
+	// registers a tracker for collection
+	//
+	tracker := &trackers.CollectionTracker{
+		CollectionID: collID,
+		BlockID:      block.ID(),
+		Counter:      0,
+	}
+
+	err := e.collectionTrackers.Add(tracker)
+	// Todo handle the case of duplicate trackers
 	if err != nil && err != mempool.ErrAlreadyExists {
-		log.Error().
+		e.log.Error().
 			Err(err).
 			Hex("collection_id", logging.ID(collID)).
-			Msg("could not request collection")
+			Msg("could not store tracker collection request in mempool")
 	}
 	return nil, false
 }
@@ -620,6 +648,7 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 		// no un-ingested chunk remains with this receipt
 		// marks execution result as ingested
 		err := e.ingestedResultIDs.Add(vc.Receipt.ExecutionResult.ID())
+
 		if err != nil {
 			e.log.Error().
 				Err(err).
@@ -738,6 +767,106 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 			}
 		}
 	}
+}
+
+// checkTrackers should be called periodically at intervals
+// It retries the requests of all registered trackers a the node
+func (e *Engine) checkTrackers() {
+	e.checkTrackerLock.Lock()
+	defer e.checkTrackerLock.Unlock()
+
+	// chunk data packs
+	//
+	// iterates over all chunk data pack trackers
+	for _, cdpt := range e.chunkDataPackTackers.All() {
+		if cdpt.Counter > e.failureThreshold {
+			// tracker met maximum retry chances
+			// drops out of memory
+			e.chunkDataPackTackers.Rem(cdpt.ChunkID)
+
+			// TODO raise a missing chunk data pack challenge
+			e.log.Info().
+				Hex("chunk_id", logging.ID(cdpt.ChunkID)).
+				Msg("chunk data pack tracker met maximum retries")
+
+			continue
+		}
+		// retries requesting chunk data pack
+		err := e.requestChunkDataPack(cdpt.ChunkID)
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Hex("chunk_id", logging.ID(cdpt.ChunkID)).
+				Msg("could not request chunk data pack")
+		}
+	}
+
+	// collection trackers
+	//
+	for _, ct := range e.collectionTrackers.All() {
+		if ct.Counter > e.failureThreshold {
+			// tracker met maximum retry chances
+			// drops out of memory
+			e.collectionTrackers.Rem(ct.CollectionID)
+			// TODO raise a missing collection
+			e.log.Info().
+				Hex("collection_id", logging.ID(ct.CollectionID)).
+				Msg("collection tracker met maximum retries")
+
+			continue
+		}
+
+		// retries requesting collection
+		err := e.requestCollection(ct.CollectionID)
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Hex("collection_id", logging.ID(ct.CollectionID)).
+				Msg("could not request collection")
+		}
+	}
+}
+
+// updateChunkDataPackTracker performs the following
+// If there is a tracker for this chunk ID, it pulls it out of mempool, increases its counter by one, and returns it
+// Else it creates a new empty tracker with counter value of one and returns it
+func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier) (*trackers.ChunkDataPackTracker, error) {
+	// pulls tracker out of mempool
+	tracker, err := e.chunkDataPackTackers.ByChunkID(chunkID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+	}
+
+	removed := e.chunkDataPackTackers.Rem(tracker.ChunkID)
+	if !removed {
+		return nil, fmt.Errorf("could not remove data pack tracker from mempool")
+	}
+	// increases tracker retry counter
+	tracker.Counter += 1
+
+	return tracker, nil
+}
+
+// updateCollectionTracker performs the following
+// If there is a tracker for this collection ID, it pulls it out of mempool, increases its counter by one, and returns it
+// Else it creates a new empty tracker for this collection with counter value of one and returns it
+func (e *Engine) updateCollectionTracker(collectionID flow.Identifier) (*trackers.CollectionTracker, error) {
+
+	// pulls tracker out of mempool
+	tracker, err := e.collectionTrackers.ByCollectionID(collectionID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+	}
+
+	removed := e.collectionTrackers.Rem(collectionID)
+	if !removed {
+		return nil, fmt.Errorf("could not remove collection tracker from mempool")
+	}
+	// increases tracker retry counter
+	tracker.Counter += 1
+
+	return tracker, nil
+
 }
 
 // To implement FinalizationConsumer
