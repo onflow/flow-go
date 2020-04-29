@@ -700,8 +700,8 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 		Hex("prev_block_id", logging.ID(eb.Block.ParentID)).
 		Int("block_height", int(eb.Block.Height)).
 		Int("number_of_collections", len(eb.Collections())).
-		RawJSON("block", logging.AsJSON(eb.Block)).
-		Msg("extensive log: block content")
+		RawJSON("block_header", logging.AsJSON(eb.Block.Header)).
+		Msg("extensive log: block header")
 
 	// logs transactions
 	// TODO check the tx hash
