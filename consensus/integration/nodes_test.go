@@ -58,7 +58,7 @@ type Node struct {
 	sync.Mutex
 }
 
-func createNodes(t *testing.T, n int, stopAtView uint64) ([]*Node, *Stopper) {
+func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*Node, *Stopper) {
 	// create n consensus nodes
 	participants := make([]*flow.Identity, 0)
 	for i := 0; i < n; i++ {
@@ -82,7 +82,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64) ([]*Node, *Stopper) {
 	// create and bootstrap consensus node with the genesis
 	genesis := run.GenerateRootBlock(allParitipants, run.GenerateRootSeal([]byte{}))
 
-	stopper := NewStopper(stopAtView)
+	stopper := NewStopper(stopAtView, stopCountAt)
 	nodes := make([]*Node, 0, len(participants))
 	for i, identity := range participants {
 		node := createNode(t, i, identity, participants, &genesis, stopper)
@@ -109,13 +109,12 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 		id:    identity,
 	}
 
-	stopConsumer := stopper.AddNode(node)
+	stopConsumer, counterConsumer := stopper.AddNode(node)
 
 	// log with node index
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
-	counterConsumer := NewCounterConsumer(log)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(stopConsumer)
 	dis.AddConsumer(counterConsumer)
@@ -143,9 +142,9 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	blocksDB := storage.NewBlocks(db)
 	viewsDB := storage.NewViews(db)
 
-	guarantees, err := stdmap.NewGuarantees(100000)
+	guarantees, err := stdmap.NewGuarantees(10000)
 	require.NoError(t, err)
-	seals, err := stdmap.NewSeals(100000)
+	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
 	// initialize the block builder

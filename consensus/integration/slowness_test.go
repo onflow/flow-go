@@ -21,8 +21,8 @@ func runNodes(nodes []*Node) {
 }
 
 // happy path: with 3 nodes, they can reach consensus
-func Test3Nodes(t *testing.T) {
-	nodes, stopper := createNodes(t, 10, 10000)
+func TestSlowdown(t *testing.T) {
+	nodes, stopper := createNodes(t, 10, 10000, 1000)
 
 	connect(nodes, blockProposals())
 
@@ -42,7 +42,7 @@ func Test3Nodes(t *testing.T) {
 
 // with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
-	nodes, stopper := createNodes(t, 5, 100)
+	nodes, stopper := createNodes(t, 5, 100, 1000)
 
 	connect(nodes, blockNodes(nodes[0]))
 
@@ -70,7 +70,7 @@ func Test5Nodes(t *testing.T) {
 
 // verify if a node lost some messages, it's still able to catch up.
 func TestMessagesLost(t *testing.T) {
-	nodes, stopper := createNodes(t, 5, 100)
+	nodes, stopper := createNodes(t, 5, 100, 1000)
 
 	connect(nodes, blockNodesForFirstNMessages(100, nodes[0]))
 
@@ -89,7 +89,7 @@ func TestMessagesLost(t *testing.T) {
 
 // verify if each receiver lost 10% messages, the network can still reach consensus
 func TestMessagesLostAcrossNetwork(t *testing.T) {
-	nodes, stopper := createNodes(t, 5, 150)
+	nodes, stopper := createNodes(t, 5, 150, 1500)
 
 	// block 10% messages on receiver
 	connect(nodes, blockReceiverMessagesByPercentage(10))
@@ -116,7 +116,7 @@ func nextDelay(low, high time.Duration) time.Duration {
 // verify if messages were delayed, can still reach consensus
 func TestMessagesDelayAcrossNetwork(t *testing.T) {
 	endBlock := uint64(150)
-	nodes, stopper := createNodes(t, 5, endBlock)
+	nodes, stopper := createNodes(t, 5, endBlock, 1000)
 
 	connect(nodes, func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		switch event.(type) {

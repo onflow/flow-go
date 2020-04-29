@@ -199,12 +199,6 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
-		// apply the stake deltas
-		err = ApplyDeltas(genesis.Height, genesis.Identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not apply stake deltas: %w", err)
-		}
-
 		// get first seal
 		seal := genesis.Seals[0]
 
@@ -248,6 +242,12 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 		err = operation.InsertBoundary(genesis.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update boundary: %w", err)
+		}
+
+		// insert the block identities
+		err = operation.InsertIdentities(genesis.Identities)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert identities: %w", err)
 		}
 
 		return nil
