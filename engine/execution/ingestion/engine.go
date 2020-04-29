@@ -704,8 +704,6 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 		Msg("extensive log: block header")
 
 	// logs transactions
-	// TODO check the tx hash
-	// TODO check json for Tx body (payment envelope)
 	for i, col := range eb.Collections() {
 		for j, tx := range col.Transactions {
 			e.log.Info().
