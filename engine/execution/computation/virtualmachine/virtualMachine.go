@@ -38,8 +38,7 @@ func (vm *virtualMachine) executeTransaction(
 	runtimeInterface runtime.Interface,
 	location runtime.Location,
 ) error {
-	// TODO: decode transaction arguments and pass to runtime
-	return vm.rt.ExecuteTransaction(script, runtimeInterface, location)
+	return vm.rt.ExecuteTransaction(script, arguments, runtimeInterface, location)
 }
 
 func (vm *virtualMachine) executeScript(
