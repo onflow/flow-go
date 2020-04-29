@@ -95,17 +95,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 		}
 
-		expectedErrors := make([]flow.TransactionError, 0)
+		expectedResults := make([]flow.TransactionResult, 0)
 		for _, c := range block.CompleteCollections {
 			for _, t := range c.Transactions {
-				txError := flow.TransactionError{
+				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					Message:       "runtime error",
+					ErrorMessage:  "runtime error",
 				}
-				expectedErrors = append(expectedErrors, txError)
+				expectedResults = append(expectedResults, txResult)
 			}
 		}
-		assert.EqualValues(t, expectedErrors, result.TransactionErrors)
+		assert.ElementsMatch(t, expectedResults, result.TransactionResult)
 
 		vm.AssertExpectations(t)
 		bc.AssertExpectations(t)

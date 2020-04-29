@@ -55,7 +55,7 @@ func (e *blockComputer) executeBlock(
 	interactions := make([]*delta.Snapshot, len(collections))
 
 	events := make([]flow.Event, 0)
-	allTxErrors := make([]flow.TransactionError, 0)
+	blockTxResults := make([]flow.TransactionResult, 0)
 
 	var txIndex uint32
 
@@ -63,7 +63,7 @@ func (e *blockComputer) executeBlock(
 
 		collectionView := stateView.NewChild()
 
-		collEvents, txErrors, nextIndex, gas, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
+		collEvents, txResults, nextIndex, gas, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
@@ -72,7 +72,7 @@ func (e *blockComputer) executeBlock(
 
 		txIndex = nextIndex
 		events = append(events, collEvents...)
-		allTxErrors = append(allTxErrors, txErrors...)
+		blockTxResults = append(blockTxResults, txResults...)
 
 		interactions[i] = collectionView.Interactions()
 
@@ -83,7 +83,7 @@ func (e *blockComputer) executeBlock(
 		ExecutableBlock:   block,
 		StateSnapshots:    interactions,
 		Events:            events,
-		TransactionErrors: allTxErrors,
+		TransactionResult: blockTxResults,
 		GasUsed:           gasUsed,
 		StateReads:        stateView.ReadsCount(),
 	}, nil
@@ -94,9 +94,9 @@ func (e *blockComputer) executeCollection(
 	blockCtx virtualmachine.BlockContext,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
-) ([]flow.Event, []flow.TransactionError, uint32, uint64, error) {
+) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
 	var events []flow.Event
-	var txErrors []flow.TransactionError
+	var txResults []flow.TransactionResult
 	var gasUsed uint64
 	for _, tx := range collection.Transactions {
 		txView := collectionView.NewChild()
@@ -115,18 +115,20 @@ func (e *blockComputer) executeCollection(
 		}
 		events = append(events, txEvents...)
 
-		if result.Error != nil {
-			txErr := flow.TransactionError{
-				TransactionID: tx.ID(),
-				Message:       result.Error.Error(),
-			}
-			txErrors = append(txErrors, txErr)
+		txResult := flow.TransactionResult{
+			TransactionID: tx.ID(),
 		}
+
+		if result.Error != nil {
+			txResult.ErrorMessage = result.Error.Error()
+		}
+
+		txResults = append(txResults, txResult)
 
 		if result.Succeeded() {
 			collectionView.MergeView(txView)
 		}
 	}
 
-	return events, txErrors, txIndex, gasUsed, nil
+	return events, txResults, txIndex, gasUsed, nil
 }

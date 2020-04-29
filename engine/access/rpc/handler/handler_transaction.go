@@ -72,7 +72,7 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 	txID := tx.ID()
 
 	// get events for the transaction
-	events, statusCode, txError, err := h.lookupEvents(ctx, txID)
+	events, statusCode, txError, err := h.lookupTransactionResult(ctx, txID)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
@@ -142,7 +142,7 @@ func (h *Handler) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 	return block, nil
 }
 
-func (h *Handler) lookupEvents(ctx context.Context, txID flow.Identifier) ([]*entities.Event, uint32, string, error) {
+func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identifier) ([]*entities.Event, uint32, string, error) {
 
 	// find the block ID for the transaction
 	block, err := h.lookupBlock(txID)
@@ -155,5 +155,5 @@ func (h *Handler) lookupEvents(ctx context.Context, txID flow.Identifier) ([]*en
 	}
 
 	blockID := block.ID()
-	return h.getTransactionEventsFromExecutionNode(ctx, blockID[:], txID[:])
+	return h.getTransactionResultFromExecutionNode(ctx, blockID[:], txID[:])
 }

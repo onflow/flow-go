@@ -1,13 +1,11 @@
 package badger
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -80,14 +78,4 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, event flow.EventTyp
 	}
 
 	return *events, nil
-}
-
-func handleError(err error, t interface{}) error {
-	if err != nil {
-		if errors.Is(err, badger.ErrKeyNotFound) {
-			return fmt.Errorf("could not retrieve %T: %w", t, storage.ErrNotFound)
-		}
-		return fmt.Errorf("could not retrieve %T: %w", t, err)
-	}
-	return nil
 }

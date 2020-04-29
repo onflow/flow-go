@@ -19,7 +19,7 @@ type ComputationResult struct {
 	ExecutableBlock   *entity.ExecutableBlock
 	StateSnapshots    []*delta.Snapshot
 	Events            []flow.Event
-	TransactionErrors []flow.TransactionError
+	TransactionResult []flow.TransactionResult
 	GasUsed           uint64
 	StateReads        uint64
 }

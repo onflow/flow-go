@@ -94,7 +94,7 @@ func (h *Handler) getBlockEventsFromExecutionNode(ctx context.Context, blockIDs 
 	}, nil
 }
 
-func (h *Handler) getTransactionEventsFromExecutionNode(ctx context.Context, blockID []byte, transactionID []byte) ([]*entities.Event, uint32, string, error) {
+func (h *Handler) getTransactionResultFromExecutionNode(ctx context.Context, blockID []byte, transactionID []byte) ([]*entities.Event, uint32, string, error) {
 
 	// create an execution API request for events at blockID and transactionID
 	req := execution.GetTransactionResultRequest{
@@ -106,7 +106,7 @@ func (h *Handler) getTransactionEventsFromExecutionNode(ctx context.Context, blo
 	resp, err := h.executionRPC.GetTransactionResult(ctx, &req)
 
 	if err != nil {
-		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
 	exeResults := resp.GetEvents()

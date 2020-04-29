@@ -16,17 +16,16 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
-	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 type Suite struct {
 	suite.Suite
-	log      zerolog.Logger
-	events   *storage.Events
-	txErrors *storage.TransactionErrors
-	blocks   *storage.Blocks
+	log       zerolog.Logger
+	events    *storage.Events
+	txResults *storage.TransactionResults
+	blocks    *storage.Blocks
 }
 
 func TestHandler(t *testing.T) {
@@ -36,7 +35,7 @@ func TestHandler(t *testing.T) {
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.Logger{}
 	suite.events = new(storage.Events)
-	suite.txErrors = new(storage.TransactionErrors)
+	suite.txResults = new(storage.TransactionResults)
 	suite.blocks = new(storage.Blocks)
 }
 
@@ -78,9 +77,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// create the handler
 	handler := &handler{
-		blocks:            suite.blocks,
-		events:            suite.events,
-		transactionErrors: suite.txErrors,
+		blocks:             suite.blocks,
+		events:             suite.events,
+		transactionResults: suite.txResults,
 	}
 
 	concoctReq := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
@@ -248,11 +247,11 @@ func (suite *Suite) TestGetTransactionResult() {
 	suite.blocks.On("ByID", block.ID()).Return(&block, nil)
 
 	// create the handler
-	createHandler := func(txErrors *storage.TransactionErrors) *handler {
+	createHandler := func(txResults *storage.TransactionResults) *handler {
 		handler := &handler{
-			blocks:            suite.blocks,
-			events:            suite.events,
-			transactionErrors: txErrors,
+			blocks:             suite.blocks,
+			events:             suite.events,
+			transactionResults: txResults,
 		}
 		return handler
 	}
@@ -281,11 +280,15 @@ func (suite *Suite) TestGetTransactionResult() {
 			Events:       eventMessages,
 		}
 
-		// expect a call to lookup transaction error by block ID and transaction ID, return a not found error
-		txErrors := new(storage.TransactionErrors)
-		txErrors.On("ByBlockIDTransactionID", bID, txID).Return(nil, realstorage.ErrNotFound).Once()
+		// expect a call to lookup transaction result by block ID and transaction ID, return a result with no error
+		txResults := new(storage.TransactionResults)
+		txResult := flow.TransactionResult{
+			TransactionID: flow.Identifier{},
+			ErrorMessage:  "",
+		}
+		txResults.On("ByBlockIDTransactionID", bID, txID).Return(&txResult, nil).Once()
 
-		handler := createHandler(txErrors)
+		handler := createHandler(txResults)
 
 		// create a valid API request
 		req := concoctReq(bID[:], txID[:])
@@ -301,7 +304,7 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// check that appropriate storage calls were made
 		suite.events.AssertExpectations(suite.T())
-		txErrors.AssertExpectations(suite.T())
+		txResults.AssertExpectations(suite.T())
 	})
 
 	// happy path - valid requests receives all events and an error for the given transaction
@@ -315,14 +318,14 @@ func (suite *Suite) TestGetTransactionResult() {
 		}
 
 		// setup the storage to return a transaction error
-		txErrors := new(storage.TransactionErrors)
-		txErr := flow.TransactionError{
+		txResults := new(storage.TransactionResults)
+		txResult := flow.TransactionResult{
 			TransactionID: txID,
-			Message:       "runtime error",
+			ErrorMessage:  "runtime error",
 		}
-		txErrors.On("ByBlockIDTransactionID", bID, txID).Return(&txErr, nil).Once()
+		txResults.On("ByBlockIDTransactionID", bID, txID).Return(&txResult, nil).Once()
 
-		handler := createHandler(txErrors)
+		handler := createHandler(txResults)
 
 		// create a valid API request
 		req := concoctReq(bID[:], txID[:])
@@ -338,7 +341,7 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// check that appropriate storage calls were made
 		suite.events.AssertExpectations(suite.T())
-		txErrors.AssertExpectations(suite.T())
+		txResults.AssertExpectations(suite.T())
 	})
 
 	// failure path - nil transaction ID in the request results in an error

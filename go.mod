@@ -3,6 +3,7 @@ module github.com/dapperlabs/flow-go
 go 1.13
 
 require (
+	cloud.google.com/go/storage v1.6.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
@@ -26,7 +27,7 @@ require (
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/onflow/cadence v0.1.0
-	github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200424184233-4767141296a0
+	github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200427172538-223aae761ecd
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
@@ -44,6 +45,7 @@ require (
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
 	golang.org/x/tools v0.0.0-20200413161937-250b2131eb8b // indirect
+	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
 )
 

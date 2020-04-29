@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"errors"
 	"net"
 
 	"github.com/rs/zerolog"
@@ -35,17 +34,17 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events, txErrors storage.TransactionErrors) *Engine {
+func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events, txResults storage.TransactionResults) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine:            e,
-			blocks:            blocks,
-			events:            events,
-			transactionErrors: txErrors,
+			engine:             e,
+			blocks:             blocks,
+			events:             events,
+			transactionResults: txResults,
 		},
 		server: grpc.NewServer(),
 		config: config,
@@ -90,10 +89,10 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	engine            ingestion.IngestRPC
-	blocks            storage.Blocks
-	events            storage.Events
-	transactionErrors storage.TransactionErrors
+	engine             ingestion.IngestRPC
+	blocks             storage.Blocks
+	events             storage.Events
+	transactionResults storage.TransactionResults
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
@@ -183,21 +182,19 @@ func (h *handler) GetTransactionResult(_ context.Context,
 		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 	}
 
-	events := h.entityEvents(blockEvents)
+	events := convert.EventsToMessages(blockEvents)
 
 	var statusCode uint32 = 0
 	errMsg := ""
 
 	// lookup any transaction error that might have occurred
-	txError, err := h.transactionErrors.ByBlockIDTransactionID(blockID, txID)
+	txResult, err := h.transactionResults.ByBlockIDTransactionID(blockID, txID)
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.Internal, "failed to get transaction error: %v", err)
-		}
-		// noop if no tx error was found
-	} else {
-		statusCode = 1 // for now a statusCode of 1 indicates an error, 0 indicates no error
-		errMsg = txError.Message
+		return nil, status.Errorf(codes.Internal, "failed to get transaction error: %v", err)
+	}
+	if txResult.ErrorMessage != "" {
+		statusCode = 1 // for now a statusCode of 1 indicates an error and 0 indicates no error
+		errMsg = txResult.ErrorMessage
 	}
 
 	// compose a response with the events and the transaction error
@@ -213,7 +210,7 @@ func (h *handler) eventResult(blockID flow.Identifier,
 	flowEvents []flow.Event) (*execution.GetEventsForBlockIDsResponse_Result, error) {
 
 	// convert events to event message
-	events := h.entityEvents(flowEvents)
+	events := convert.EventsToMessages(flowEvents)
 
 	// lookup block
 	block, err := h.blocks.ByID(blockID)
