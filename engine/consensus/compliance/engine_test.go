@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -62,6 +63,8 @@ type ComplianceSuite struct {
 }
 
 func (cs *ComplianceSuite) SetupTest() {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
@@ -230,7 +233,6 @@ func (cs *ComplianceSuite) SetupTest() {
 }
 
 func (cs *ComplianceSuite) TestSendVote() {
-
 	// create parameters to send a vote
 	blockID := unittest.IdentifierFixture()
 	view := rand.Uint64()
