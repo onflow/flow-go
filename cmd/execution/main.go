@@ -124,6 +124,7 @@ func main() {
 				executionState,
 				6, //TODO - config param maybe?
 				node.Metrics,
+				true,
 			)
 			return ingestionEng, err
 		}).

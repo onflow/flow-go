@@ -124,7 +124,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21, metrics)
+	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21, metrics, false)
 	require.NoError(t, err)
 
 	f(testingContext{
