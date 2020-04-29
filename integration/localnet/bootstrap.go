@@ -18,7 +18,7 @@ func main() {
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 
-	conf := testnet.NewNetworkConfig("mvp", net)
+	conf := testnet.NewNetworkConfig("localnet", net)
 
 	_, err := testnet.BootstrapNetwork(conf, "./bootstrap")
 	if err != nil {
