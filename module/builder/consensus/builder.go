@@ -31,7 +31,7 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 	cfg := Config{
 		minInterval:  500 * time.Millisecond,
 		maxInterval:  10 * time.Second,
-		expiryBlocks: 1000,
+		expiryBlocks: 100,
 	}
 
 	// apply option parameters
