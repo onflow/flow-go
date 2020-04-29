@@ -45,72 +45,57 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			return fmt.Errorf("could not retrieve parent: %w", err)
 		}
 
-		// STEP ONE: get the payload contents that are included in ancestor
-		// blocks which are not finalized yet; this allows us to avoid
-		// including them in a block on the same fork twice.
+		// retrieve the finalized head in order to know which transactions
+		// have expired and should be discarded
 		var boundary uint64
 		err = operation.RetrieveBoundaryForCluster(parent.ChainID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
-		var finalizedID flow.Identifier
-		err = operation.RetrieveNumberForCluster(parent.ChainID, boundary, &finalizedID)(tx)
+		var finalID flow.Identifier
+		err = operation.RetrieveNumberForCluster(parent.ChainID, boundary, &finalID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized ID: %w", err)
 		}
 
-		// for each un-finalized ancestor of our new block, retrieve the list
-		// of pending transactions; we use this to exclude transactions that
-		// already exist in this fork.
-		ancestorID := parentID
-		txLookup := make(map[flow.Identifier]struct{})
-		for {
-
-			// retrieve the header for the ancestor
-			var ancestor flow.Header
-			err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve ancestor (id=%x): %w", ancestorID, err)
-			}
-
-			// if we have reached the finalized boundary, stop indexing
-			if ancestor.Height <= boundary {
-				break
-			}
-
-			// look up the cluster payload (ie. the collection)
-			var payload cluster.Payload
-			err = procedure.RetrieveClusterPayload(ancestor.ID(), &payload)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve ancestor payload: %w", err)
-			}
-
-			// insert the transactions into the lookup
-			for _, colTx := range payload.Collection.Transactions {
-				txLookup[colTx.ID()] = struct{}{}
-			}
-
-			// continue with the next ancestor in the chain
-			ancestorID = ancestor.ParentID
+		var final flow.Header
+		err = operation.RetrieveHeader(finalID, &final)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized header: %w", err)
 		}
 
-		// STEP TWO: build a payload that includes as many transactions from the
-		// memory pool as possible without including any that already exist on
-		// our fork.
+		// build a payload that includes as many transactions from the memory
+		// that have not expired
 		// TODO make empty collections / limit size based on collection min/max size constraints
 		var candidateTxIDs []flow.Identifier
-		for _, flowTx := range b.transactions.All() {
-			_, exists := txLookup[flowTx.ID()]
-			if exists {
+		for _, candidateTx := range b.transactions.All() {
+
+			candidateID := candidateTx.ID()
+			refID := candidateTx.ReferenceBlockID
+
+			// find the transaction's reference block and ensure it has not expired
+			// we haven't retrieved this yet, get it from storage first
+			var ref flow.Header
+			err = operation.RetrieveHeader(refID, &ref)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve reference block: %w", err)
+			}
+
+			// ensure the reference block is not too old, using a 10-block buffer
+			if final.Height > ref.Height && final.Height-ref.Height > flow.DefaultTransactionExpiry-10 {
+				// the transaction is expired, it will never be valid
+				b.transactions.Rem(candidateID)
 				continue
 			}
-			candidateTxIDs = append(candidateTxIDs, flowTx.ID())
+
+			candidateTxIDs = append(candidateTxIDs, candidateTx.ID())
 		}
 
-		// find any guarantees that conflict with FINALIZED blocks
+		// find any transactions that conflict with finalized or un-finalized
+		// blocks
 		var invalidIDs map[flow.Identifier]struct{}
-		err = operation.CheckCollectionPayload(boundary, finalizedID, candidateTxIDs, &invalidIDs)(tx)
+		err = operation.CheckCollectionPayload(parent.Height, parent.ID(), candidateTxIDs, &invalidIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not check collection payload: %w", err)
 		}

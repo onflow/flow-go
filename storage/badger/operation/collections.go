@@ -41,15 +41,29 @@ func LookupCollectionPayload(height uint64, blockID, parentID flow.Identifier, t
 
 // VerifyCollectionPayload verifies that the candidate transaction IDs don't
 // exist in any ancestor block.
+//
+// NOTE: This only checks back to the last valid reference block, it is up to
+// the caller to ensure the input transactions have not expired.
 func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flow.Identifier) func(*badger.Txn) error {
-	start, end := payloadIterRange(codeIndexCollection, height, 0)
+	var to uint64
+	if height > flow.DefaultTransactionExpiry {
+		to = height - flow.DefaultTransactionExpiry
+	}
+	start, end := payloadIterRange(codeIndexCollection, height, to)
 	return iterate(start, end, validatepayload(blockID, txIDs))
 }
 
 // CheckCollectionPayload populates `invalidIDs` with any IDs in the candidate
 // set that already exist in an ancestor block.
+//
+// NOTE: This only checks back to the last valid reference block, it is up to
+// the caller to ensure the input transactions have not expired.
 func CheckCollectionPayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	start, end := payloadIterRange(codeIndexCollection, height, 0)
+	var to uint64
+	if height > flow.DefaultTransactionExpiry {
+		to = height - flow.DefaultTransactionExpiry
+	}
+	start, end := payloadIterRange(codeIndexCollection, height, to)
 	return iterate(start, end, searchduplicates(blockID, candidateIDs, invalidIDs))
 }
 
