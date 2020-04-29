@@ -62,6 +62,15 @@ func (lc LightCollection) Len() int {
 	return len(lc.Transactions)
 }
 
+func (lc LightCollection) Has(txID Identifier) bool {
+	for _, id := range lc.Transactions {
+		if txID == id {
+			return true
+		}
+	}
+	return false
+}
+
 // Note that this is the basic version of the List, we need to substitute it with something like Merkle tree at some point
 type CollectionList struct {
 	collections []*Collection
