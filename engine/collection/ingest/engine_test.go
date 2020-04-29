@@ -57,9 +57,6 @@ func TestInvalidTransaction(t *testing.T) {
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		t.Log(err)
-		t.Log(errors.Unwrap(err))
-		_, ok := errors.Unwrap(err).(ingest.InvalidScriptError)
-		t.Logf("ok as script %v, %T", ok, errors.Unwrap(err))
 		assert.True(t, errors.Is(err, ingest.InvalidScriptError{}))
 	})
 
