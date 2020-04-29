@@ -83,6 +83,11 @@ var (
 		Subsystem: "hotstuff",
 		Help:      "The view of the newest known qc from hotstuff",
 	})
+	blockProposalCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "block_proposals",
+		Namespace: namespaceConsensus,
+		Help:      "the number of block proposals made",
+	})
 	mempoolGuaranteesSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "mempool_guarantees_size",
 		Namespace: namespaceConsensus,
@@ -169,6 +174,11 @@ func (c *Collector) StartNewView(view uint64) {
 // NewestKnownQC reports Metrics C9: View of Newest Known QC
 func (c *Collector) NewestKnownQC(view uint64) {
 	newestKnownQC.Set(float64(view))
+}
+
+// MadeBlockProposal reports that a block proposal has been made
+func (c *Collector) MadeBlockProposal() {
+	blockProposalCounter.Inc()
 }
 
 // MempoolGuaranteesSize reports the size of the guarantees mempool

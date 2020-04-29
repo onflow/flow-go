@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/model/flow"
+	module "github.com/dapperlabs/flow-go/module/mock"
 )
 
 const (
@@ -350,8 +351,13 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.validator = NewBlacklistValidator(es.T())
 	es.notifier = &notifications.NoopConsumer{}
 
+	// initialize no-op metrics mock
+	metrics := &module.Metrics{}
+	metrics.On("MadeBlockProposal")
+
 	eventhandler, err := eventhandler.New(
 		zerolog.New(os.Stderr),
+		metrics,
 		es.paceMaker,
 		es.blockProducer,
 		es.forks,

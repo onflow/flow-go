@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -18,6 +19,7 @@ import (
 // responsible for running the event loop to ensure that.
 type EventHandler struct {
 	log            zerolog.Logger
+	metrics        module.Metrics
 	paceMaker      hotstuff.PaceMaker
 	blockProducer  hotstuff.BlockProducer
 	forks          hotstuff.Forks
@@ -33,6 +35,7 @@ type EventHandler struct {
 // New creates an EventHandler instance with initial components.
 func New(
 	log zerolog.Logger,
+	metrics module.Metrics,
 	paceMaker hotstuff.PaceMaker,
 	blockProducer hotstuff.BlockProducer,
 	forks hotstuff.Forks,
@@ -253,6 +256,8 @@ func (e *EventHandler) startNewView() error {
 		}
 
 		block := proposal.Block
+
+		e.metrics.MadeBlockProposal()
 
 		log.Debug().
 			Uint64("block_view", block.View).

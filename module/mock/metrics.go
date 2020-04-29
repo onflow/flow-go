@@ -92,6 +92,11 @@ func (_m *Metrics) HotStuffWaitDuration(duration time.Duration, event string) {
 	_m.Called(duration, event)
 }
 
+// MadeBlockProposal provides a mock function with given fields:
+func (_m *Metrics) MadeBlockProposal() {
+	_m.Called()
+}
+
 // MempoolApprovalsSize provides a mock function with given fields: size
 func (_m *Metrics) MempoolApprovalsSize(size uint) {
 	_m.Called(size)
