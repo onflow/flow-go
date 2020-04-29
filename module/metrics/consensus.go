@@ -83,6 +83,26 @@ var (
 		Subsystem: "hotstuff",
 		Help:      "The view of the newest known qc from hotstuff",
 	})
+	mempoolGuaranteesSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "mempool_guarantees_size",
+		Namespace: namespaceConsensus,
+		Help:      "the size of the guarantees mempool",
+	})
+	mempoolReceiptsSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "mempool_receipts_size",
+		Namespace: namespaceConsensus,
+		Help:      "the size of the receipts mempool",
+	})
+	mempoolApprovalsSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "mempool_approvals_size",
+		Namespace: namespaceConsensus,
+		Help:      "the size of the approvals mempool",
+	})
+	mempoolSealsSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "mempool_seals_size",
+		Namespace: namespaceConsensus,
+		Help:      "the size of the seals mempool",
+	})
 )
 
 // StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
@@ -149,4 +169,24 @@ func (c *Collector) StartNewView(view uint64) {
 // NewestKnownQC reports Metrics C9: View of Newest Known QC
 func (c *Collector) NewestKnownQC(view uint64) {
 	newestKnownQC.Set(float64(view))
+}
+
+// MempoolGuaranteesSize reports the size of the guarantees mempool
+func (c *Collector) MempoolGuaranteesSize(size uint) {
+	mempoolGuaranteesSizeGauge.Set(float64(size))
+}
+
+// MempoolReceiptsSize reports the size of the receipts mempool
+func (c *Collector) MempoolReceiptsSize(size uint) {
+	mempoolReceiptsSizeGauge.Set(float64(size))
+}
+
+// MempoolApprovalsSize reports the size of the approvals mempool
+func (c *Collector) MempoolApprovalsSize(size uint) {
+	mempoolApprovalsSizeGauge.Set(float64(size))
+}
+
+// MempoolSealsSize reports the size of the seals mempool
+func (c *Collector) MempoolSealsSize(size uint) {
+	mempoolSealsSizeGauge.Set(float64(size))
 }

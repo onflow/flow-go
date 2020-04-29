@@ -92,6 +92,26 @@ func (_m *Metrics) HotStuffWaitDuration(duration time.Duration, event string) {
 	_m.Called(duration, event)
 }
 
+// MempoolApprovalsSize provides a mock function with given fields: size
+func (_m *Metrics) MempoolApprovalsSize(size uint) {
+	_m.Called(size)
+}
+
+// MempoolGuaranteesSize provides a mock function with given fields: size
+func (_m *Metrics) MempoolGuaranteesSize(size uint) {
+	_m.Called(size)
+}
+
+// MempoolReceiptsSize provides a mock function with given fields: size
+func (_m *Metrics) MempoolReceiptsSize(size uint) {
+	_m.Called(size)
+}
+
+// MempoolSealsSize provides a mock function with given fields: size
+func (_m *Metrics) MempoolSealsSize(size uint) {
+	_m.Called(size)
+}
+
 // NetworkMessageSent provides a mock function with given fields: sizeBytes
 func (_m *Metrics) NetworkMessageSent(sizeBytes int) {
 	_m.Called(sizeBytes)
