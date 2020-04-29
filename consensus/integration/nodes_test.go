@@ -113,11 +113,12 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 
 	// log with node index
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	// log := zerolog.New(ioutil.Discard).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
+	counterConsumer := NewCounterConsumer(log)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(stopConsumer)
+	dis.AddConsumer(counterConsumer)
 	dis.AddConsumer(notifier)
 
 	// initialize no-op metrics mock
