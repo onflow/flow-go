@@ -4,11 +4,14 @@ go 1.13
 
 require (
 	cloud.google.com/go/storage v1.6.0
+	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dchest/siphash v1.2.1
-	github.com/dgraph-io/badger/v2 v2.0.2
+	github.com/dgraph-io/badger/v2 v2.0.3
+	github.com/dgraph-io/ristretto v0.0.2 // indirect
+	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896
 	github.com/gogo/protobuf v1.3.1
@@ -32,7 +35,7 @@ require (
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.3.0
 	github.com/rs/zerolog v1.15.0
 	github.com/spf13/cobra v0.0.6
@@ -46,6 +49,8 @@ require (
 	github.com/whyrusleeping/go-logging v0.0.1
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
+	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0 // indirect
+	golang.org/x/sys v0.0.0-20200428200454-593003d681fa // indirect
 	golang.org/x/tools v0.0.0-20200413161937-250b2131eb8b // indirect
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
