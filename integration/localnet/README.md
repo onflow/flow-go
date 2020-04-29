@@ -2,16 +2,26 @@
 
 ## Start the network
 
+This command will automatically build new Docker images from your latest code changes and then start the test network:
+
 ```sh
-DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose up --build
+make start
 ```
 
-### Stop the network
+## Stop the network
 
 The network needs to be stopped between each consecutive run to clear the chain state:
 
 ```sh
-docker-compose down -v
+make stop
+```
+
+## Logs
+
+You can view log output from all nodes:
+
+```sh
+make logs
 ```
 
 ## Metrics
