@@ -494,6 +494,12 @@ func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {
 	}
 }
 
+func WithReferenceBlock(id flow.Identifier) func(tx *flow.TransactionBody) {
+	return func(tx *flow.TransactionBody) {
+		tx.ReferenceBlockID = id
+	}
+}
+
 func TransactionDSLFixture() dsl.Transaction {
 	return dsl.Transaction{
 		Import: dsl.Import{Address: flow.RootAddress},
