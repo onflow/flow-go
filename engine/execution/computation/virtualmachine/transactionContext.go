@@ -6,7 +6,10 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/ast"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -21,7 +24,7 @@ type TransactionContext struct {
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
-	events            []runtime.Event
+	events            []cadence.Event
 	OnSetValueHandler func(owner, controller, key, value []byte)
 	gasUsed           uint64 // TODO fill with actual gas
 }
@@ -42,7 +45,7 @@ func (r *TransactionContext) SetChecker(checker CheckerFunc) {
 }
 
 // Events returns all events emitted by the runtime to this context.
-func (r *TransactionContext) Events() []runtime.Event {
+func (r *TransactionContext) Events() []cadence.Event {
 	return r.events
 }
 
@@ -291,8 +294,33 @@ func (r *TransactionContext) Log(message string) {
 }
 
 // EmitEvent is called when an event is emitted by the runtime.
-func (r *TransactionContext) EmitEvent(event runtime.Event) {
+func (r *TransactionContext) EmitEvent(event cadence.Event) {
 	r.events = append(r.events, event)
+}
+
+func (r *TransactionContext) GetCachedProgram(runtime.Location) (*ast.Program, error) {
+	return nil, nil
+}
+
+func (r *TransactionContext) CacheProgram(runtime.Location, *ast.Program) error {
+	return nil
+}
+
+func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists bool, err error) {
+	panic("implement me")
+}
+
+func (r *TransactionContext) GenerateUUID() uint64 {
+	panic("implement me")
+}
+
+func (r *TransactionContext) GetComputationLimit() uint64 {
+	// TODO: implement me
+	return 100
+}
+
+func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
+	return jsoncdc.Decode(b)
 }
 
 // GetAccount gets an account by address.

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
@@ -217,7 +217,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id1, UpdatedValue1)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
 			Error:         nil,
 			GasUsed:       0,
@@ -229,7 +229,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id1, UpdatedValue1)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          nil,
 			Error:         errors.New("runtime error"), // inside the runtime (e.g. div by zero, access account)
 			GasUsed:       0,
@@ -243,7 +243,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id2, UpdatedValue2)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
 			Error:         nil,
 			GasUsed:       0,

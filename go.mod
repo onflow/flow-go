@@ -25,7 +25,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
-	github.com/onflow/cadence v0.1.0
+	github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80
 	github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200427172538-223aae761ecd
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
@@ -42,7 +42,8 @@ require (
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	github.com/whyrusleeping/go-logging v0.0.1
 	go.uber.org/atomic v1.5.1
-	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
+	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
+	golang.org/x/tools v0.0.0-20200413161937-250b2131eb8b // indirect
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
 )

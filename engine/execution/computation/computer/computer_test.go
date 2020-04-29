@@ -5,8 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -159,11 +158,11 @@ func generateCollection(transactionCount int) *entity.CompleteCollection {
 	}
 }
 
-func generateEvents(eventCount int) []runtime.Event {
-	events := make([]runtime.Event, eventCount)
+func generateEvents(eventCount int) []cadence.Event {
+	events := make([]cadence.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := runtime.Event{Type: &sema.StringType{}}
+		event := cadence.Event{EventType: cadence.EventType{TypeID: "foo"}}
 		events[i] = event
 	}
 	return events

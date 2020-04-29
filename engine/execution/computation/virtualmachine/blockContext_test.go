@@ -117,7 +117,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		assert.NoError(t, result.Error)
 
 		require.Len(t, result.Events, 1)
-		assert.EqualValues(t, "flow.AccountCreated", result.Events[0].Type.ID())
+		assert.EqualValues(t, "flow.AccountCreated", result.Events[0].EventType.ID())
 	})
 }
 
@@ -319,15 +319,14 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		// execute the transaction
 		result, err := bc.ExecuteTransaction(ledger, tx)
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
-		assert.NoError(t, result.Error)
+		require.NoError(t, err)
+		require.True(t, result.Succeeded())
+		require.NoError(t, result.Error)
 		require.Len(t, result.Events, 1)
-		assert.EqualValues(t, flow.EventAccountCreated, result.Events[0].Type.ID())
+		require.EqualValues(t, flow.EventAccountCreated, result.Events[0].EventType.ID())
 
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-		value := fmt.Sprintf("%v", result.Events[0].Fields[0].Value)
-		address := flow.HexToAddress(fmt.Sprintf("0%s", value[2:]))
+		address := flow.BytesToAddress(result.Events[0].Fields[0].(cadence.Address).Bytes())
 
 		return address, key.PublicKey()
 	}
@@ -342,7 +341,6 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	// happy path - get each of the created account and check if it is the right one
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
-
 			account := bc.GetAccount(ledger, address)
 
 			assert.Len(t, account.Keys, 1)

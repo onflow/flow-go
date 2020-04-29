@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -45,6 +46,6 @@ func (vm *virtualMachine) executeScript(
 	script []byte,
 	runtimeInterface runtime.Interface,
 	location runtime.Location,
-) (runtime.Value, error) {
+) (cadence.Value, error) {
 	return vm.rt.ExecuteScript(script, runtimeInterface, location)
 }
