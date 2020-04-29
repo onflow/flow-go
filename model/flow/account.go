@@ -3,6 +3,8 @@
 package flow
 
 import (
+	"github.com/pkg/errors"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 )
@@ -26,6 +28,22 @@ type AccountPublicKey struct {
 	HashAlgo  hash.HashingAlgorithm
 	SeqNumber uint64
 	Weight    int
+}
+
+// Validate returns an error if this account key is invalid.
+//
+// An account key can be invalid for the following reasons:
+// - It specifies an incompatible signature/hash algorithm pairing
+// - (TODO) It specifies a negative key weight
+func (a AccountPublicKey) Validate() error {
+	if !crypto.CompatibleAlgorithms(a.SignAlgo, a.HashAlgo) {
+		return errors.Errorf(
+			"signing algorithm (%s) is incompatible with hashing algorithm (%s)",
+			a.SignAlgo,
+			a.HashAlgo,
+		)
+	}
+	return nil
 }
 
 // AccountPrivateKey is a private key associated with an account.

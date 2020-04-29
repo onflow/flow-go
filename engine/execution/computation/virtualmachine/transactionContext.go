@@ -129,7 +129,6 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 	return removedKey, nil
 }
 
-
 // CheckCode checks the code for its validity.
 func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (err error) {
 	return r.checkProgram(code, address)

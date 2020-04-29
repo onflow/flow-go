@@ -150,7 +150,7 @@ func generateEvents(eventCount int) []runtime.Event {
 	events := make([]runtime.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := runtime.Event{Type: &sema.CompositeType{Location:ast.StringLocation("whatever"), Kind:common.CompositeKindEvent}}
+		event := runtime.Event{Type: &sema.CompositeType{Location: ast.StringLocation("whatever"), Kind: common.CompositeKindEvent}}
 		events[i] = event
 	}
 	return events

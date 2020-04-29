@@ -36,7 +36,6 @@ func (m MapLedger) Delete(key flow.RegisterID) {
 	delete(m, string(key))
 }
 
-
 const (
 	keyLatestAccount  = "latest_account"
 	keyExists         = "exists"
@@ -44,7 +43,6 @@ const (
 	keyCode           = "code"
 	keyPublicKeyCount = "public_key_count"
 )
-
 
 func fullKey(owner, controller, key string) string {
 	return strings.Join([]string{owner, controller, key}, "__")
@@ -63,7 +61,6 @@ func keyPublicKey(index int) string {
 type LedgerAccess struct {
 	Ledger Ledger
 }
-
 
 func (r *LedgerAccess) CheckAccountExists(accountID []byte) error {
 	exists, err := r.Ledger.Get(fullKeyHash(string(accountID), "", keyExists))
@@ -155,7 +152,6 @@ func (r *LedgerAccess) GetAccount(address flow.Address) *flow.Account {
 	}
 }
 
-
 // TODO: replace once public key format changes @psiemens
 func decodePublicKey(b []byte) (a flow.AccountPublicKey, err error) {
 	var temp struct {
@@ -188,7 +184,7 @@ func decodePublicKey(b []byte) (a flow.AccountPublicKey, err error) {
 	}, nil
 }
 
-func (r* LedgerAccess) GetLatestAccount() flow.Address {
+func (r *LedgerAccess) GetLatestAccount() flow.Address {
 	latestAccountID, _ := r.Ledger.Get(fullKeyHash("", "", keyLatestAccount))
 
 	return flow.BytesToAddress(latestAccountID)
@@ -245,6 +241,17 @@ func (r *LedgerAccess) SetAccountPublicKeys(accountID []byte, publicKeys [][]byt
 	)
 
 	for i, publicKey := range publicKeys {
+
+		accountPublicKey, err := decodePublicKey(publicKey)
+		if err != nil {
+			return err
+		}
+
+		err = accountPublicKey.Validate()
+		if err != nil {
+			return err
+		}
+
 		r.Ledger.Set(
 			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
 			publicKey,
@@ -258,4 +265,3 @@ func (r *LedgerAccess) SetAccountPublicKeys(accountID []byte, publicKeys [][]byt
 
 	return nil
 }
-

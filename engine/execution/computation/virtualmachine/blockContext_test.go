@@ -191,7 +191,6 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	ledger := make(virtualmachine.MapLedger)
 	ledgerAccess := virtualmachine.LedgerAccess{ledger}
 
-
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 
 		// create a random seed for the key

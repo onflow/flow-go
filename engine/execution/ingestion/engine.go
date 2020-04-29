@@ -582,7 +582,7 @@ func (e *Engine) GetAccount(address flow.Address, blockID flow.Identifier) (*flo
 
 	blockView := e.execState.NewView(stateCommit)
 
-	ledgerAccess := virtualmachine.LedgerAccess{blockView}
+	ledgerAccess := virtualmachine.LedgerAccess{Ledger: blockView}
 	return ledgerAccess.GetAccount(address), nil
 }
 
