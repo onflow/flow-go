@@ -21,7 +21,8 @@ type SubmitTransactionRequest struct {
 // CollectionRequest request all transactions from a collection with the given
 // fingerprint.
 type CollectionRequest struct {
-	ID flow.Identifier
+	ID        flow.Identifier
+	Requester flow.Identifier
 }
 
 // CollectionResponse is a response to a request for a collection.

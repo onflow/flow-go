@@ -347,7 +347,8 @@ func (e *Engine) requestCollection(collID flow.Identifier, blockID flow.Identifi
 	}
 
 	req := &messages.CollectionRequest{
-		ID: collID,
+		ID:        collID,
+		Requester: e.me.NodeID(),
 	}
 
 	// TODO we should only submit to cluster which owns the collection

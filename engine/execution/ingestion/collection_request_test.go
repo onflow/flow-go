@@ -30,11 +30,11 @@ func TestCollectionRequests(t *testing.T) {
 		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
 		ctx.state.On("AtBlockID", block.ID()).Return(ctx.snapshot).Maybe()
 
-		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: guarantees[0].ID()}), gomock.Eq([]flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}))
+		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: guarantees[0].ID(), Requester: ctx.engine.me.NodeID()}), gomock.Eq([]flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}))
 
-		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: guarantees[1].ID()}), gomock.Eq(collection2Identity.NodeID))
+		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: guarantees[1].ID(), Requester: ctx.engine.me.NodeID()}), gomock.Eq(collection2Identity.NodeID))
 
-		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: guarantees[2].ID()}), gomock.Eq([]flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}))
+		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: guarantees[2].ID(), Requester: ctx.engine.me.NodeID()}), gomock.Eq([]flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}))
 
 		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(unittest.StateCommitmentFixture(), nil)
 
@@ -87,7 +87,7 @@ func TestValidatingCollectionResponse(t *testing.T) {
 
 		ctx.state.On("AtBlockID", executableBlock.Block.ID()).Return(ctx.snapshot).Maybe()
 
-		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id}), gomock.Eq(collection1Identity.NodeID)).Return(nil)
+		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id, Requester: ctx.engine.me.NodeID()}), gomock.Eq(collection1Identity.NodeID)).Return(nil)
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(executableBlock.StartState, nil)
 
 		proposal := unittest.ProposalFromBlock(executableBlock.Block)
@@ -132,7 +132,7 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		)
 
 		for _, col := range executableBlock.Block.Guarantees {
-			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collection1Identity.NodeID))
+			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID(), Requester: ctx.engine.me.NodeID()}), gomock.Eq(collection1Identity.NodeID))
 		}
 
 		ctx.state.On("AtBlockID", executableBlock.ID()).Return(ctx.snapshot)
