@@ -27,11 +27,10 @@ func Connect(instances []*Instance) {
 			func(header *flow.Header) error {
 
 				// sender should always have the parent
-				parentBlob, exists := sender.headers.Load(header.ParentID)
+				parent, exists := sender.headers[header.ParentID]
 				if !exists {
 					return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, header.ParentID)
 				}
-				parent := parentBlob.(*flow.Header)
 
 				// fill in the header chain ID and height
 				header.ChainID = parent.ChainID
@@ -59,7 +58,7 @@ func Connect(instances []*Instance) {
 					}
 
 					// put the proposal header into the receivers map
-					receiver.headers.Store(header.ID(), header)
+					receiver.headers[header.ID()] = header
 
 					// submit the proposal to the receiving event loop (non-blocking)
 					receiver.queue <- proposal

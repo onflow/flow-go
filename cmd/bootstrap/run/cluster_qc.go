@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
@@ -28,7 +28,7 @@ func GenerateClusterGenesisQC(participants []bootstrap.NodeInfo, block *flow.Blo
 	}
 	defer db.Close()
 
-	validators, signers, err := createClusterValidators(ps, participants, block)
+	_, signers, err := createClusterValidators(ps, participants, block)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,11 @@ func GenerateClusterGenesisQC(participants []bootstrap.NodeInfo, block *flow.Blo
 	}
 
 	// validate QC
-	err = validators[0].ValidateQC(qc, &hotBlock)
+	// The following check fails right now since the validation logic assumes that the block passed will also be used
+	// for looking up the identities that signed it. That is not the case for collector blocks, they do not act as a
+	// reference point for the protocol state right now.
+	// TODO Uncomment as soon as the protocol state is fetched from a reference consensus block
+	// err = validators[0].ValidateQC(qc, &hotBlock)
 
 	return qc, err
 }
@@ -76,7 +80,7 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 	for _, participant := range participants {
 		nodeIDs = append(nodeIDs, participant.NodeID)
 	}
-	selector := filter.And(filter.HasNodeID(nodeIDs...), filter.HasStake(true))
+	selector := filter.HasNodeID(nodeIDs...)
 
 	for i, participant := range participants {
 		// get the participant keys
@@ -91,18 +95,19 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 			return nil, nil, err
 		}
 
-		// create cluster committee state
-		genesisBlockID := block.ID()
-		blockTranslator := func(clusterBlock flow.Identifier) (flow.Identifier, error) { return genesisBlockID, nil }
-		committee := committee.New(ps, blockTranslator, participant.NodeID, selector, nodeIDs)
-
 		// create signer for participant
 		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, local)
-		signer := verification.NewSingleSigner(committee, provider, participant.NodeID)
+		signer := verification.NewSingleSigner(ps, provider, selector, participant.NodeID)
 		signers[i] = signer
 
+		// create view state
+		vs, err := viewstate.New(ps, participant.NodeID, selector)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		// create validator
-		v := validator.New(committee, forks, signer)
+		v := validator.New(vs, forks, signer)
 		validators[i] = v
 	}
 	return validators, signers, nil
