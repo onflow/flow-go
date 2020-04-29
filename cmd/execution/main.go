@@ -33,6 +33,7 @@ func main() {
 		ledgerStorage      storage.Ledger
 		blocks             storage.Blocks
 		events             storage.Events
+		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
 		computationManager *computation.Manager
 		ingestionEng       *ingestion.Engine
@@ -110,6 +111,7 @@ func main() {
 			collections := badger.NewCollections(node.DB)
 			payloads := badger.NewPayloads(node.DB)
 			events := badger.NewEvents(node.DB)
+			txResults := badger.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
@@ -119,6 +121,7 @@ func main() {
 				payloads,
 				collections,
 				events,
+				txResults,
 				computationManager,
 				providerEngine,
 				executionState,
@@ -128,7 +131,7 @@ func main() {
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events, txResults)
 			return rpcEng, nil
 		}).Run("execution")
 

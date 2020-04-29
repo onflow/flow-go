@@ -11,13 +11,12 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	protomock "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -34,7 +33,7 @@ type AggregatorSuite struct {
 	snapshot     *protomock.Snapshot
 	signer       *mocks.Signer
 	forks        *mocks.Forks
-	viewstate    hotstuff.ViewState
+	committee    hotstuff.Committee
 	validator    hotstuff.Validator
 	aggregator   *VoteAggregator
 }
@@ -64,9 +63,9 @@ func (as *AggregatorSuite) SetupTest() {
 	// create a mocked forks
 	as.forks = &mocks.Forks{}
 
-	// create a real viewstate
+	// create hotstuff.Committee
 	var err error
-	as.viewstate, err = viewstate.New(as.protocol, as.participants[0].NodeID, filter.HasRole(flow.RoleConsensus))
+	as.committee, err = committee.NewMainConsensusCommitteeState(as.protocol, as.participants[0].NodeID)
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals
@@ -88,10 +87,10 @@ func (as *AggregatorSuite) SetupTest() {
 	)
 
 	// create a real validator
-	as.validator = validator.New(as.viewstate, as.forks, as.signer)
+	as.validator = validator.New(as.committee, as.forks, as.signer)
 
 	// create the aggregator
-	as.aggregator = New(&mocks.Consumer{}, 0, as.viewstate, as.validator, as.signer)
+	as.aggregator = New(&mocks.Consumer{}, 0, as.committee, as.validator, as.signer)
 }
 
 func (as *AggregatorSuite) RegisterProposal(proposal *model.Proposal) {
