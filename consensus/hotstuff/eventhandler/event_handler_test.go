@@ -287,7 +287,11 @@ func (v *BlacklistValidator) ValidateProposal(proposal *model.Proposal) error {
 	_, ok := v.invalidProposals[proposal.Block.BlockID]
 	if ok {
 		v.t.Logf("invalid proposal: %v\n", proposal.Block.View)
-		return &model.ErrorInvalidBlock{}
+		return &model.ErrorInvalidBlock{
+			BlockID: proposal.Block.BlockID,
+			View:    proposal.Block.View,
+			Err:     fmt.Errorf("some error"),
+		}
 	}
 
 	// check if is unverifiable

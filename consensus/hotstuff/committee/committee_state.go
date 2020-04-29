@@ -11,6 +11,11 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
+// BlockTranslator is a support function for determining the protocol for the current hotstuff instance.
+// Only for the main consensus, their blocks can be directly used to retrieve protocol.state Snapshots.
+// Hence, For main consensus, this is an identity method f(x) = x.
+// For collector consensus, the collector Blocks need to be translated to some reference block on the main chain.
+// Ideally, it's the most recently finalized block on the main chain.
 type BlockTranslator func(blockID flow.Identifier) (flow.Identifier, error)
 
 // Committee accounts for the fact that we might have multiple HotStuff instances
