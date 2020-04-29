@@ -32,6 +32,19 @@ const (
 	// chunkAssignmentAlpha represents number of verification
 	// DISCLAIMER: alpha down there is not a production-level value
 	chunkAssignmentAlpha = 1
+
+	// requestIntervalMs represents the time interval in milliseconds that the
+	// ingest engine retries sending resource requests to the network
+	// this value is set following this issue:
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	requestIntervalMs = 1000
+
+	// failureThreshold represents the number of retries ingest engine sends
+	// at `requestIntervalMs` milliseconds for each of the missing resources.
+	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
+	// this value is set following this issue:
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	failureThreshold = 2
 )
 
 func main() {
@@ -146,7 +159,9 @@ func main() {
 				ingestedChunkIDs,
 				ingestedResultIDs,
 				blockStorage,
-				assigner)
+				assigner,
+				requestIntervalMs,
+				failureThreshold)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
