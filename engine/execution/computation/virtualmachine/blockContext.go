@@ -142,8 +142,6 @@ func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) 
 	flowEvents := make([]flow.Event, len(tr.Events))
 
 	for i, event := range tr.Events {
-		fmt.Println(event.Fields)
-		fmt.Println(event.Type())
 		payload, err := jsoncdc.Encode(event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode event: %w", err)
