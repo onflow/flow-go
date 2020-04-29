@@ -508,8 +508,8 @@ github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXW
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80 h1:5K+4gxhIgSSrKqE93q2tLFnH4VxKty2U8Cjba8ZWM/E=
 github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80/go.mod h1:W3ykbuy2rzqMBC6U4UIn5+1Y45fEs6W1++b+xw+Gc/s=
-github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200427172538-223aae761ecd h1:D6NdWLbuBxCyTTRNm8Tdq2oUT+u5O63hQHye5fE+NJM=
-github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200427172538-223aae761ecd/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
+github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200424224414-b66f9c038796 h1:Y0wnMUyaSnyToMApoD3uspBAInSW1YVZRqiXRqeu7b8=
+github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200424224414-b66f9c038796/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.8.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=

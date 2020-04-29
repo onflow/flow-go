@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80
 	github.com/onflow/flow-go-sdk v0.1.0
-	github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200427172538-223aae761ecd
+	github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200428201807-a8d05f02b9ce
 	github.com/rs/zerolog v1.15.0
 	github.com/stretchr/testify v1.5.1
 	google.golang.org/grpc v1.28.0
