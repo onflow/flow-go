@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -354,124 +355,118 @@ func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
-//// TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
-//// but not the collections, it asks for the collections through the network
-//func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
-//	// locks to run the test sequentially
-//	suite.Lock()
-//	defer suite.Unlock()
-//
-//	eng := suite.TestNewEngine()
-//	// waits till the engine gets up and running
-//	<-eng.Ready()
-//
-//	// mocks identities
-//	//
-//	// required roles
-//	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-//	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-//	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-//
-//	// mocks identity of the verification node
-//	suite.me.On("NodeID").Return(verIdentity.NodeID)
-//
-//	// mocks state snapshot to validate identity of execution node as an staked origin id at the `suite.block` height
-//	suite.state.On("Final").Return(suite.ss, nil)
-//	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.ss, nil).Once()
-//	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
-//	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
-//	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(collIdentities, nil).Twice()
-//
-//	// mocks existing resources at the engine's disposal
-//	//
-//	// mocks the possession of 'suite.block` in the storage
-//	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
-//	// mocks the possession of chunk data pack associated with the `suite.block`
-//	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
-//	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil).Once()
-//
-//	// mocks missing collection
-//	//
-//	// mocks the absence of `suite.collection` which is the associated collection to this block
-//	// the collection does not exist in authenticated and pending collections mempools
-//	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
-//	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false).Once()
-//
-//	// engine has not yet ingested the result of this receipt yet
-//	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
-//
-//	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-//		suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
-//	}
-//
-//	// expect that we already have the receipt in the authenticated receipts mempool
-//	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
-//	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
-//	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
-//
-//	// mocks functionalities
-//	//
-//	// adding functionality of chunk tracker to trackers mempool
-//	// mocks initial insertion of tracker into mempool
-//	has := false
-//	suite.collectionTrackers.On("Add", suite.collTracker).Run(func(args testifymock.Arguments) {
-//		has = true
-//	}).Return(nil).Once()
-//	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
-//	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(has)
-//	// mocks tracker check
-//	suite.collectionTrackers.On("All").Return([]*tracker.CollectionTracker{suite.collTracker}).Once()
-//	suite.chunkDataPackTrackers.On("All").Return(nil)
-//	// mocks update tracker functionality
-//	suite.collectionTrackers.On("ByCollectionID", suite.collTracker.ID()).Return(suite.collTracker, nil).Once()
-//	suite.collectionTrackers.On("Rem", suite.collTracker.ID()).Return(true).Once()
-//	newTracker := tracker.NewCollectionTracker(suite.collection.ID(), suite.block.ID())
-//	suite.collectionTrackers.On("Add", newTracker).Return(nil).Once()
-//
-//	// mocks expectation
-//	//
-//	// expect that the collection is requested
-//	submitWG := sync.WaitGroup{}
-//	submitWG.Add(1)
-//	suite.collectionsConduit.
-//		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), collIdentities[0].NodeID).
-//		Run(func(args testifymock.Arguments) {
-//			submitWG.Done()
-//		}).
-//		Return(nil).Once()
-//
-//	// mocks chunk assignment
-//	//
-//	// assigns all chunks in the receipt to this node through mocking
-//	a := chmodel.NewAssignment()
-//	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-//		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
-//	}
-//	suite.assigner.On("Assign",
-//		testifymock.Anything,
-//		testifymock.Anything,
-//		testifymock.Anything).
-//		Return(a, nil).
-//		Once()
-//
-//	err := eng.Process(execIdentity.NodeID, suite.receipt)
-//	suite.Assert().Nil(err)
-//
-//	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait, 5*time.Second)
-//
-//	// waits for the engine to get shutdown
-//	<-eng.Done()
-//
-//	// asserts necessary calls
-//	suite.authReceipts.AssertExpectations(suite.T())
-//	suite.collectionsConduit.AssertExpectations(suite.T())
-//	suite.assigner.AssertExpectations(suite.T())
-//	suite.ss.AssertExpectations(suite.T())
-//	suite.state.AssertExpectations(suite.T())
-//
-//	// verifier should not be called
-//	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-//}
+// TestHandleReceipt_RetryMissingCollection evaluates that when ingest engine has the missing collections with
+// a tracker registered, it retries its request `failureThreshold` many times and then drops it
+func (suite *TestSuite) TestHandleReceipt_RetryMissingCollection() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
+	eng := suite.TestNewEngine()
+
+	// mocks identities
+	//
+	// required roles
+	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
+
+	// mocks identity of the verification node
+	suite.me.On("NodeID").Return(verIdentity.NodeID)
+
+	// mocks state snapshot to validate identity of execution node as an staked origin id at the `suite.block` height
+	suite.state.On("Final").Return(suite.ss, nil)
+	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.ss, nil).Once()
+	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
+	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
+	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(collIdentities, nil).Twice()
+
+	// mocks existing resources at the engine's disposal
+	//
+	// mocks the possession of 'suite.block` in the storage
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
+	// mocks the possession of chunk data pack associated with the `suite.block`
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil).Once()
+
+	// mocks missing collection
+	//
+	// mocks the absence of `suite.collection` which is the associated collection to this block
+	// the collection does not exist in authenticated and pending collections mempools
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false).Once()
+
+	// engine has not yet ingested the result of this receipt yet
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+
+	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+		suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
+	}
+
+	// expect that we already have the receipt in the authenticated receipts mempool
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
+	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+
+	// mocks functionalities
+	//
+	// adding functionality of chunk tracker to trackers mempool
+	// mocks initial insertion of tracker into mempool
+	suite.collectionTrackers.On("Add", suite.collTracker).Run(func(args testifymock.Arguments) {
+		suite.collTracker.Counter += 1
+	}).Return(nil)
+	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
+	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
+	// mocks tracker check
+	suite.collectionTrackers.On("All").Return([]*tracker.CollectionTracker{suite.collTracker})
+	suite.chunkDataPackTrackers.On("All").Return(nil)
+	// mocks update tracker functionality
+	suite.collectionTrackers.On("ByCollectionID", suite.collTracker.ID()).Return(suite.collTracker, nil)
+	suite.collectionTrackers.On("Rem", suite.collTracker.ID()).Return(true)
+	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil)
+
+	// mocks expectation
+	//
+	// expect that the collection is requested
+	submitWG := sync.WaitGroup{}
+	// we expect the retry to be submitted `failureThreshold` - 1 many times
+	// the -1 is to exclude the initial request submission made before adding tracker to
+	// mempool
+	submitWG.Add(int(suite.failureThreshold) - 1)
+	suite.collectionsConduit.
+		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), collIdentities[0].NodeID).
+		Run(func(args testifymock.Arguments) {
+			submitWG.Done()
+			fmt.Println("submit is called")
+		}).
+		Return(nil)
+
+	// mocks chunk assignment
+	//
+	// assigns all chunks in the receipt to this node through mocking
+	a := chmodel.NewAssignment()
+	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+	}
+	suite.assigner.On("Assign",
+		testifymock.Anything,
+		testifymock.Anything,
+		testifymock.Anything).
+		Return(a, nil).
+		Once()
+
+	<-eng.Ready()
+
+	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait, 5*time.Second)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
+
+	// asserts necessary calls
+
+	// verifier should not be called
+	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+}
 
 //// TestHandleReceipt_MissingChunkDataPack evaluates that when ingest engine has both a receipt and its block
 //// but not the chunk data pack of it, it asks for the chunk data pack through the network
