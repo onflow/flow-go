@@ -540,7 +540,7 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 				Hex("collection_id", logging.ID(guarantee.ID())).
 				Msg("requesting collection")
 
-			err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID()}, collectionGuaranteesIdentifiers...)
+			err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID(), Requester: e.me.NodeID()}, collectionGuaranteesIdentifiers...)
 			if err != nil {
 				// TODO - this should be handled, maybe retried or put into some form of a queue
 				e.log.Err(err).Msg("cannot submit collection requests")

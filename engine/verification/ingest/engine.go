@@ -345,7 +345,8 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 	}
 
 	req := &messages.CollectionRequest{
-		ID: collID,
+		ID:        collID,
+		Requester: e.me.NodeID(),
 	}
 
 	// TODO we should only submit to cluster which owns the collection

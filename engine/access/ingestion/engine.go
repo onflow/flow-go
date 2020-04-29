@@ -198,7 +198,7 @@ func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) err
 
 	// Request all the collections for this block
 	for _, g := range guarantees {
-		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID()}, ids...)
+		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID(), Requester: e.me.NodeID()}, ids...)
 		if err != nil {
 			return err
 		}
