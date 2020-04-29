@@ -65,6 +65,7 @@ type FlowNetwork struct {
 	network     *testingdock.Network
 	Containers  map[string]*Container
 	AccessPorts map[string]string
+	genesis     flow.Block
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -74,6 +75,11 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 		il = append(il, c.Config.Identity())
 	}
 	return il
+}
+
+// Genesis returns the genesis block generated for the network.
+func (net *FlowNetwork) Genesis() flow.Block {
+	return net.genesis
 }
 
 // Start starts the network.
@@ -330,6 +336,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		network:     network,
 		Containers:  make(map[string]*Container, nNodes),
 		AccessPorts: make(map[string]string),
+		genesis:     genesis,
 	}
 
 	// add each node to the network
