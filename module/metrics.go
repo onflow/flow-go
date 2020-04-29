@@ -74,6 +74,9 @@ type Metrics interface {
 	// NewestKnownQC reports Metrics C9: View of Newest Known QC
 	NewestKnownQC(view uint64)
 
+	// SyncRequestReceived
+	SyncRequestReceived(originID flow.Identifier)
+
 	// Verification Metrics
 	//
 

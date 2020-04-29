@@ -83,6 +83,10 @@ var (
 		Subsystem: "hotstuff",
 		Help:      "The view of the newest known qc from hotstuff",
 	})
+	syncRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name:      "sync_requests",
+		Namespace: namespaceConsensus,
+	}, []string{"originID"})
 )
 
 // StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
@@ -149,4 +153,8 @@ func (c *Collector) StartNewView(view uint64) {
 // NewestKnownQC reports Metrics C9: View of Newest Known QC
 func (c *Collector) NewestKnownQC(view uint64) {
 	newestKnownQC.Set(float64(view))
+}
+
+func (c *Collector) SyncRequestReceived(originID flow.Identifier) {
+	syncRequests.WithLabelValues(originID.String()).Inc()
 }

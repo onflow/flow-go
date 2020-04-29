@@ -26,6 +26,7 @@ import (
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
+	metrics  module.Metrics // used to report metrics
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
@@ -47,6 +48,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	net module.Network,
+	metrics module.Metrics,
 	me module.Local,
 	state protocol.State,
 	blocks storage.Blocks,
@@ -57,6 +59,7 @@ func New(
 	e := &Engine{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "consensus").Logger(),
+		metrics:  metrics,
 		me:       me,
 		state:    state,
 		blocks:   blocks,
@@ -162,6 +165,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
 func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
+
+	e.metrics.SyncRequestReceived(originID)
 
 	// get the header at the latest finalized state
 	final, err := e.state.Final().Head()

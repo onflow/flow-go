@@ -124,7 +124,15 @@ func main() {
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
-			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, blocks, follower)
+			sync, err := synchronization.New(
+				node.Logger,
+				node.Network,
+				node.Metrics,
+				node.Me,
+				node.State,
+				blocks,
+				follower,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}

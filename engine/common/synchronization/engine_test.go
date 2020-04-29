@@ -42,6 +42,7 @@ type SyncSuite struct {
 	blockIDs     map[flow.Identifier]*flow.Block
 	net          *module.Network
 	con          *network.Conduit
+	metrics      *module.Metrics
 	me           *module.Local
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
@@ -75,6 +76,8 @@ func (ss *SyncSuite) SetupTest() {
 
 	// set up the network conduit mock
 	ss.con = &network.Conduit{}
+
+	ss.metrics = &module.Metrics{}
 
 	// set up the local module mock
 	ss.me = &module.Local{}
@@ -140,7 +143,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
-	e, err := New(log, ss.net, ss.me, ss.state, ss.blocks, ss.comp)
+	e, err := New(log, ss.net, ss.metrics, ss.me, ss.state, ss.blocks, ss.comp)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e

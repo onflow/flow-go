@@ -124,7 +124,15 @@ func main() {
 			}
 
 			// initialize the synchronization engine
-			sync, err = synchronization.New(node.Logger, node.Network, node.Me, node.State, blocksDB, comp)
+			sync, err = synchronization.New(
+				node.Logger,
+				node.Network,
+				node.Metrics,
+				node.Me,
+				node.State,
+				blocksDB,
+				comp,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
