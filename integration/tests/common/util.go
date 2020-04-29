@@ -24,8 +24,8 @@ var (
 	CounterKey        = "count"
 )
 
-// deployCounter deploys a counter contract using the given client.
-func deployCounter(ctx context.Context, client *testnet.Client) error {
+// DeployCounter deploys a counter contract using the given client.
+func DeployCounter(ctx context.Context, client *testnet.Client) error {
 
 	contract := dsl.Contract{
 		Name: "Testing",
@@ -90,14 +90,14 @@ func createCounter(ctx context.Context, client *testnet.Client) error {
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
-				
+
 				if maybeCounter == nil {
 					maybeCounter <-! Testing.createCounter()
 				}
-				
+
 				maybeCounter?.add(2)
 				signer.save(<-maybeCounter!, to: /storage/counter)
-				
+
 				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
 				`),
 		},

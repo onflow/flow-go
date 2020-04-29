@@ -65,7 +65,7 @@ func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 	counter, err := readCounter(ctx, accessClient)
 	require.Error(t, err)
 
-	err = deployCounter(ctx, accessClient)
+	err = DeployCounter(ctx, accessClient)
 	require.NoError(t, err)
 
 	// script executes eventually, but no counter instance is created
