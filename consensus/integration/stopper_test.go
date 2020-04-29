@@ -54,7 +54,7 @@ func NewStopper(stopAtView uint64, stopAtCount uint) *Stopper {
 	}
 }
 
-func (s *Stopper) AddNode(n *Node) (*StopperConsumer, *CounterConsumer) {
+func (s *Stopper) AddNode(n *Node) *StopperConsumer {
 	s.Lock()
 	defer s.Unlock()
 	s.running[n.id.ID()] = struct{}{}
@@ -64,12 +64,7 @@ func (s *Stopper) AddNode(n *Node) (*StopperConsumer, *CounterConsumer) {
 			s.onEnteringView(n.id.ID(), view)
 		},
 	}
-	counterConsumer := &CounterConsumer{
-		finalized: func(total uint) {
-			s.onFinalizedTotal(n.id.ID(), total)
-		},
-	}
-	return stopConsumer, counterConsumer
+	return stopConsumer
 }
 
 func (s *Stopper) onEnteringView(id flow.Identifier, view uint64) {

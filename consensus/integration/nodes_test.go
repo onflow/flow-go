@@ -109,11 +109,22 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 		id:    identity,
 	}
 
-	stopConsumer, counterConsumer := stopper.AddNode(node)
+	// log with node index an ID
+	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("node_id", localID[:]).Logger()
+
+	stopConsumer := stopper.AddNode(node)
+
+	counterConsumer := &CounterConsumer{
+		log:      log,
+		interval: time.Second,
+		next:     time.Now().Add(time.Second),
+		finalized: func(total uint) {
+			stopper.onFinalizedTotal(node.id.ID(), total)
+		},
+	}
 
 	// log with node index
-	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(stopConsumer)

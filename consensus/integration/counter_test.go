@@ -18,18 +18,6 @@ type CounterConsumer struct {
 	finalized func(uint)
 }
 
-func NewCounterConsumer(log zerolog.Logger, finalized func(uint)) *CounterConsumer {
-	cc := CounterConsumer{
-		log:       log,
-		interval:  time.Second,
-		next:      time.Now().UTC().Add(time.Second),
-		rate:      0,
-		total:     0,
-		finalized: finalized,
-	}
-	return &cc
-}
-
 func (c *CounterConsumer) OnFinalizedBlock(block *model.Block) {
 
 	// count the finalized block
@@ -40,7 +28,7 @@ func (c *CounterConsumer) OnFinalizedBlock(block *model.Block) {
 	c.finalized(c.total)
 
 	// if we are still before the next printing, skip rest
-	now := time.Now().UTC()
+	now := time.Now()
 	if now.Before(c.next) {
 		return
 	}
