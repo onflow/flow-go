@@ -199,7 +199,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -298,7 +298,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -416,7 +416,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 

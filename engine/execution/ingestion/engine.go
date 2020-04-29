@@ -49,6 +49,7 @@ type Engine struct {
 	payloads           storage.Payloads
 	collections        storage.Collections
 	events             storage.Events
+	transactionResults storage.TransactionResults
 	computationManager computation.ComputationManager
 	providerEngine     provider.ProviderEngine
 	mempool            *Mempool
@@ -72,6 +73,7 @@ func New(
 	payloads storage.Payloads,
 	collections storage.Collections,
 	events storage.Events,
+	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
@@ -93,6 +95,7 @@ func New(
 		payloads:           payloads,
 		collections:        collections,
 		events:             events,
+		transactionResults: transactionResults,
 		computationManager: executionEngine,
 		providerEngine:     providerEngine,
 		mempool:            mempool,
@@ -599,7 +602,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
-	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateSnapshots, result.Events, startState)
+	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateSnapshots, result.Events, result.TransactionResult, startState)
 	if err != nil {
 		return nil, err
 	}
@@ -612,7 +615,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
 
-func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Snapshot, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Snapshot, events []flow.Event, txResults []flow.TransactionResult, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
 
 	originalState := startState
 
@@ -678,6 +681,13 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 		err = e.events.Store(block.ID(), events)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store events: %w", err)
+		}
+	}
+
+	for _, te := range txResults {
+		err = e.transactionResults.Store(block.ID(), &te)
+		if err != nil {
+			return nil, fmt.Errorf("failed to store transaction error: %w", err)
 		}
 	}
 
@@ -894,7 +904,8 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 	}
 
 	//TODO - validate state sync, reject invalid messages, change provider
-	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateInteractions, executionStateDelta.Events, executionStateDelta.StartState)
+	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateInteractions,
+		executionStateDelta.Events, executionStateDelta.TransactionResults, executionStateDelta.StartState)
 	if err != nil {
 		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).Err(err).Msg("fatal error while processing sync message")
 	}

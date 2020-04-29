@@ -161,9 +161,9 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint
 	proposal := model.ProposalFromFlow(proposalHeader, parentView)
 	el.proposals <- proposal
 
-	// the busy duration is measured as how long it takes from a block being
-	// received to a block being handled by the event handler.
-	el.metrics.HotStuffBusyDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
+	// the wait duration is measured as how long it takes from a block being
+	// received to event handler commencing the processing of the block
+	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
 }
 
 // SubmitVote pushes the received vote to the votes channel
@@ -174,7 +174,7 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 	el.votes <- vote
 
 	// the wait duration is measured as how long it takes from a vote being
-	// received to a vote being handled by the event handler.
+	// received to event handler commencing the processing of the vote
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnVote)
 }
 

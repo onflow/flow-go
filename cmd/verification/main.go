@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
@@ -16,8 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/chunks"
@@ -33,6 +32,19 @@ const (
 	// chunkAssignmentAlpha represents number of verification
 	// DISCLAIMER: alpha down there is not a production-level value
 	chunkAssignmentAlpha = 1
+
+	// requestIntervalMs represents the time interval in milliseconds that the
+	// ingest engine retries sending resource requests to the network
+	// this value is set following this issue:
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	requestIntervalMs = 1000
+
+	// failureThreshold represents the number of retries ingest engine sends
+	// at `requestIntervalMs` milliseconds for each of the missing resources.
+	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
+	// this value is set following this issue:
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	failureThreshold = 2
 )
 
 func main() {
@@ -147,7 +159,9 @@ func main() {
 				ingestedChunkIDs,
 				ingestedResultIDs,
 				blockStorage,
-				assigner)
+				assigner,
+				requestIntervalMs,
+				failureThreshold)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -160,15 +174,20 @@ func main() {
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 			merger := signature.NewCombiner()
 
-			// define the node set that is valid as signers
-			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+			// initialize consensus committee's membership state
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			if err != nil {
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC, selector)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower

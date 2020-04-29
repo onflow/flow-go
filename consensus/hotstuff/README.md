@@ -91,7 +91,7 @@ all blocks stored in `Forks` are guaranteed to be connected to the genesis block
    - vote: validity of signature and voter is staked 
 * `voteaggregator` caches votes on a per-block basis and builds qc if enough votes have been accumulated.
 * `voter` tracks the view of the latest vote and determines whether or not to vote for a block (by calling `forks.IsSafeBlock`)
-* `viewstate` maintains the list of all authorized network members and their respective stake on a per-block basis.
+* `members` maintains the list of all authorized network members and their respective stake on a per-block basis.
 
 # Implementation
 
@@ -142,7 +142,7 @@ Many HotStuff data models are built on top of basic data models defined in `/mod
 * `/consensus/hotstuff/pacemaker` contains the implementation of Flow's basic PaceMaker, as described above.
 * `/consensus/hotstuff/signature` contains integration of Flow's cryptography. 
 * `/consensus/hotstuff/validator` holds the logic for validating the HotStuff-relevant aspects of blocks, QCs, and votes
-* `/consensus/hotstuff/viewstate` maintains the list of all authorized network members and their respective stake on a per-block basis.
+* `/consensus/hotstuff/members` maintains the list of all authorized network members and their respective stake on a per-block basis.
 * `/consensus/hotstuff/voteaggregator` caches votes on a per-block basis and builds a QC if enough votes have been accumulated.
 * `/consensus/hotstuff/voter` tracks the view of the latest vote and determines whether or not to vote for a block
 
