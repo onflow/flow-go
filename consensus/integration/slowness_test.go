@@ -22,7 +22,7 @@ func runNodes(nodes []*Node) {
 
 // happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
-	nodes, stopper := createNodes(t, 3, 100)
+	nodes, stopper := createNodes(t, 3, 10000)
 
 	connect(nodes, blockProposals())
 
