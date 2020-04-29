@@ -356,7 +356,8 @@ func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 }
 
 // TestHandleReceipt_RetryMissingCollection evaluates that when ingest engine has the missing collections with
-// a tracker registered, it retries its request `failureThreshold` many times and then drops it
+// a tracker registered, it retries its request (`failureThreshold` - 1)-many times and then drops it.
+// The -1 is to account for the initial request of the collection directly without registering the tracker.
 func (suite *TestSuite) TestHandleReceipt_RetryMissingCollection() {
 	// locks to run the test sequentially
 	suite.Lock()
@@ -371,16 +372,16 @@ func (suite *TestSuite) TestHandleReceipt_RetryMissingCollection() {
 
 	// mocking state
 	//
-	// mocks state snapshot to return identity of collection node
-	suite.state.On("Final").Return(suite.ss, nil)
 	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
+	suite.state.On("Final").Return(suite.ss, nil)
 	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(collIdentities, nil)
 
 	// mocks functionalities
 	//
-	// adding functionality of chunk tracker to trackers mempool
+	// adding functionality of collection tracker to trackers mempool
 	// mocks initial insertion of tracker into mempool
 	suite.collectionTrackers.On("Add", suite.collTracker).Run(func(args testifymock.Arguments) {
+		// +1 accounts for updating the trackers counter
 		suite.collTracker.Counter += 1
 	}).Return(nil)
 	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
@@ -396,8 +397,7 @@ func (suite *TestSuite) TestHandleReceipt_RetryMissingCollection() {
 	// mocks expectation
 	//
 	// expect that the collection is requested `failureThreshold` - 1 many times
-	// the -1 is to exclude the initial request submission made before adding tracker to
-	// mempool
+	// the -1 is to exclude the initial request submission made before adding tracker to mempool
 	submitWG := sync.WaitGroup{}
 	submitWG.Add(int(suite.failureThreshold) - 1)
 	suite.collectionsConduit.
@@ -410,7 +410,7 @@ func (suite *TestSuite) TestHandleReceipt_RetryMissingCollection() {
 	// starts engine
 	<-eng.Ready()
 
-	// starts timer for receiving retries
+	// starts timer for submitting retries
 	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait, 5*time.Second)
 
 	// waits for the engine to get shutdown
