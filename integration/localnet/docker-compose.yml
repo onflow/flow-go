@@ -1,0 +1,129 @@
+version: '3.7'
+services:
+  consensus_1:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=ff0287806c5ea044cfcd21c37fb6874e12f3bf514703b9248ac1b22d18112df3"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+  consensus_2:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=b627622f3002488dc347bcd404c1932935d0ee0d22bb6f79070384a8b9e1174e"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+  consensus_3:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=79f85d166b12b4dd3f83403df911007b273f7eaaad169e3cb9ce63de1b34b2f8"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+
+#  prom-config:
+#    build: .
+#    image: shoot
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#      - node-endpoints:/node-endpoints/
+#    command: poetry run shoot-node-discovery --out /node-endpoints/node-endpoints.json
+#    environment:
+#      - LOGSPOUT=ignore
+#
+#  prom:
+#    image: prom/prometheus:latest
+#    volumes:
+#      - ./conf/prometheus.yaml:/etc/prometheus/prometheus.yaml
+#      - node-endpoints:/etc/node-endpoints/
+#    command: "--config.file=/etc/prometheus/prometheus.yaml --storage.tsdb.path=/prometheus"
+#    ports:
+#      - 9090:9090
+#    depends_on:
+#      - exporter
+#    environment:
+#      - LOGSPOUT=ignore
+#
+#  exporter:
+#    image: prom/node-exporter:latest
+#    ports:
+#      - "9100:9100"
+#    environment:
+#      - LOGSPOUT=ignore
+#
+#  grafana:
+#    image: grafana/grafana
+#    ports:
+#      - "3000:3000"
+#    environment:
+#      - LOGSPOUT=ignore
+#    depends_on:
+#      - prom
+#
+#  kibana:
+#    image: kibana:7.0.1
+#    environment:
+#      - LOGSPOUT=ignore
+#    depends_on:
+#      - elasticsearch
+#    ports:
+#      - '5601:5601'
+#
+#  elasticsearch:
+#    image: elasticsearch:7.0.1
+#    environment:
+#      - LOGSPOUT=ignore
+#    ports:
+#      - "9200:9200"
+#      - "9300:9300"
+#    volumes:
+#      - ./conf/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+#
+#  logstash:
+#    image: logstash:7.0.1
+#    environment:
+#      - LOGSPOUT=ignore
+#    depends_on:
+#      - elasticsearch
+#    ports:
+#      - "9600:9600"
+#      - "6000:6000"
+#    volumes:
+#      - ./conf/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+#      - ./conf/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+#
+#  logspout:
+#    image: gliderlabs/logspout
+#    command: 'syslog+udp://logstash:6000'
+#    depends_on:
+#      - logstash
+#    volumes:
+#      - '/var/run/docker.sock:/var/run/docker.sock'
+#
+#volumes:
+#  node-endpoints:
