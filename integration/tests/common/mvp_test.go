@@ -75,7 +75,7 @@ func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 			fmt.Println("EXECUTE SCRIPT ERR", err)
 		}
 		return err == nil && counter == -3
-	}, 2*time.Minute, time.Second)
+	}, 30*time.Second, time.Second)
 
 	//TODO: Fix Cadence code
 	err = createCounter(ctx, accessClient)
