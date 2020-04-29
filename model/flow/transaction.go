@@ -6,7 +6,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 )
 
@@ -289,7 +288,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 // This message is only signed by the payer account.
 func (tb *TransactionBody) EnvelopeMessage() []byte {
 	temp := tb.envelopeCanonicalForm()
-	return encoding.DefaultEncoder.MustEncode(temp)
+	return rlp.NewEncoder().MustEncode(temp)
 }
 
 func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
