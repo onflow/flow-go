@@ -17,8 +17,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
@@ -187,7 +189,7 @@ func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...fl
 		}
 		err = m.sendDirect(targetIDs[0], msg)
 	case OneToK:
-		err = m.publish(strconv.Itoa(int(channelID)), msg)
+		err = m.publish(channelID, msg)
 	default:
 		err = fmt.Errorf("invalid communcation mode: %d", mode)
 	}
@@ -259,7 +261,8 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) 
 	// close the stream immediately
 	go helpers.FullClose(stream)
 
-	go m.reportMsgSize(byteCount)
+	// OneToOne communication metrics are reported with topic OneToOne
+	go m.reportOutboundMsgSize(byteCount, metrics.TopicLabelOneToOne)
 
 	return nil
 }
@@ -329,6 +332,10 @@ ProcessLoop:
 				m.log.Info().Msg("exiting process loop: connection stops")
 				break ProcessLoop
 			}
+
+			msgSize := msg.Size()
+			m.reportInboundMsgSize(msgSize, metrics.TopicLabelOneToOne)
+
 			m.processMessage(msg)
 			continue ProcessLoop
 		}
@@ -339,8 +346,11 @@ ProcessLoop:
 
 // Subscribe will subscribe the middleware for a topic with the same name as the channelID
 func (m *Middleware) Subscribe(channelID uint8) error {
-	// A Flow ChannelID becomes the topic ID in libp2p.
-	s, err := m.libP2PNode.Subscribe(m.ctx, strconv.Itoa(int(channelID)))
+
+	// a Flow ChannelID becomes the topic ID in libp2p
+	topic := topicFromChannelID(channelID)
+
+	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %d: %w", channelID, err)
 	}
@@ -373,7 +383,17 @@ SubscriptionLoop:
 				m.log.Info().Msg("exiting subscription loop: connection stops")
 				break SubscriptionLoop
 			}
+
+			channelID, err := channelIDFromTopic(rs.sub.Topic())
+			if err != nil {
+				m.log.Error().Err(err).Str("channel_id", channelID).Msg("failed to report metric")
+			} else {
+				msgSize := msg.Size()
+				m.reportInboundMsgSize(msgSize, channelID)
+			}
+
 			m.processMessage(msg)
+
 			continue SubscriptionLoop
 		}
 	}
@@ -398,7 +418,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 }
 
 // Publish publishes the given payload on the topic
-func (m *Middleware) publish(topic string, msg *message.Message) error {
+func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 
 	// convert the message to bytes to be put on the wire.
 	data, err := msg.Marshal()
@@ -406,17 +426,37 @@ func (m *Middleware) publish(topic string, msg *message.Message) error {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}
 
+	topic := topicFromChannelID(channelID)
+
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
 	if err != nil {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
-	go m.reportMsgSize(len(data))
+	go m.reportOutboundMsgSize(len(data), engine.String(channelID))
 
 	return nil
 }
 
-func (m *Middleware) reportMsgSize(size int) {
-	m.metrics.NetworkMessageSent(size)
+func (m *Middleware) reportOutboundMsgSize(size int, topic string) {
+	m.metrics.NetworkMessageSent(size, topic)
+}
+
+func (m *Middleware) reportInboundMsgSize(size int, topic string) {
+	m.metrics.NetworkMessageReceived(size, topic)
+}
+
+// topicFromChannelID converts a Flow channel ID to LibP2P pub-sub topic id e.g. 10 -> "10"
+func topicFromChannelID(channelID uint8) string {
+	return strconv.Itoa(int(channelID))
+}
+
+// channelIDFromTopic converts a LibP2P pub-sub topic id to a channel ID string e.g. "10" -> "CollectionProvider"
+func channelIDFromTopic(topic string) (string, error) {
+	channelID, err := strconv.ParseUint(topic, 10, 8)
+	if err != nil {
+		return "", fmt.Errorf(" failed to get channeld ID from topic: %w", err)
+	}
+	return engine.String(uint8(channelID)), nil
 }

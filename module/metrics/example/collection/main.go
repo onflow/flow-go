@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
@@ -46,7 +47,12 @@ func main() {
 				collector.FinishBlockToSeal(flow.HashToID(entityID))
 			}
 
-			collector.NetworkMessageSent(rand.Intn(1000))
+			collector.NetworkMessageSent(rand.Intn(1000), engine.String(engine.CollectionProvider))
+			collector.NetworkMessageSent(rand.Intn(1000), engine.String(engine.CollectionIngest))
+
+			collector.NetworkMessageReceived(rand.Intn(1000), engine.String(engine.CollectionProvider))
+			collector.NetworkMessageReceived(rand.Intn(1000), engine.String(engine.CollectionIngest))
+
 			time.Sleep(1 * time.Second)
 		}
 	})
