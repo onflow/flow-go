@@ -145,6 +145,7 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
 		}
+		e.metrics.FinalizedBlocks(1)
 	})
 }
 
