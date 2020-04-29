@@ -4,7 +4,6 @@ package operation
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"

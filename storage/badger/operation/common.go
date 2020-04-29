@@ -5,15 +5,18 @@ package operation
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
+
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // insert will encode the given entity using JSON and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
