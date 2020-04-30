@@ -92,13 +92,9 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnForkChoiceGenerated(uint64, *model.QuorumCertificate)
 
-	// OnBlockProposalFormed notifications are produced by the EventHandler whenever a
-	// block proposal has been built (but not yet broadcast)
-	OnBlockProposalFormed(*model.Proposal)
-
-	// OnBlockProposalBroadcast notifications are produced by the EventHandler whenever a
-	// block proposal has been broadcast
-	OnBlockProposalBroadcast(*model.Proposal)
+	// OnBlockProposed notifications are produced by the EventHandler whenever a
+	// block proposal has been proposed (and broadcast)
+	OnBlockProposed(*model.Proposal)
 
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.

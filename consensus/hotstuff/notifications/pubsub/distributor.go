@@ -74,19 +74,11 @@ func (p *Distributor) OnForkChoiceGenerated(curView uint64, selectedQC *model.Qu
 	}
 }
 
-func (p *Distributor) OnBlockProposalFormed(proposal *model.Proposal) {
+func (p *Distributor) OnBlockProposed(proposal *model.Proposal) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnBlockProposalFormed(proposal)
-	}
-}
-
-func (p *Distributor) OnBlockProposalBroadcast(proposal *model.Proposal) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnBlockProposalBroadcast(proposal)
+		subscriber.OnBlockProposed(proposal)
 	}
 }
 

@@ -3,6 +3,7 @@ package module
 import (
 	"time"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -76,6 +77,14 @@ type Metrics interface {
 
 	// MadeBlockProposal reports that a block proposal has been made
 	MadeBlockProposal()
+
+	// BlockProposalFormed notifications are produced by the EventHandler whenever a
+	// block proposal has been built (but not yet broadcast)
+	BlockProposalFormed(*model.Proposal)
+
+	// OnBlockProposalBroadcast notifications are produced by the EventHandler whenever a
+	// block proposal has been broadcast
+	BlockProposalBroadcast(*model.Proposal)
 
 	// MempoolGuaranteesSize reports the size of the guarantees mempool
 	MempoolGuaranteesSize(size uint)

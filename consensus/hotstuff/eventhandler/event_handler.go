@@ -251,7 +251,6 @@ func (e *EventHandler) startNewView() error {
 		if err != nil {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 		}
-		e.notifier.OnBlockProposalFormed(proposal)
 
 		block := proposal.Block
 		log.Debug().
@@ -268,7 +267,7 @@ func (e *EventHandler) startNewView() error {
 		if err != nil {
 			log.Warn().Err(err).Msg("could not forward proposal")
 		}
-		e.notifier.OnBlockProposalBroadcast(proposal)
+		e.notifier.OnBlockProposed(proposal)
 
 		// store the proposer's vote in voteAggregator
 		// note: duplicate here to account for an edge case
