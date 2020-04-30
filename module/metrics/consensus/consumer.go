@@ -60,6 +60,10 @@ func (c *MetricsConsumer) OnEnteringView(view uint64) {
 	c.metrics.StartNewView(view)
 }
 
+func (c *MetricsConsumer) OnForkChoiceGenerated(uint64, *model.QuorumCertificate) {
+	c.metrics.MadeBlockProposal()
+}
+
 func (c *MetricsConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
 	c.metrics.NewestKnownQC(qc.View)
 }

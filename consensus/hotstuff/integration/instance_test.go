@@ -277,7 +277,6 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	metrics := &module.Metrics{}
 	metrics.On("HotStuffBusyDuration", mock.Anything)
 	metrics.On("HotStuffIdleDuration", mock.Anything)
-	metrics.On("MadeBlockProposal")
 
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
@@ -316,7 +315,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
 
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, metrics, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
 	require.NoError(t, err)
 
 	return &in
