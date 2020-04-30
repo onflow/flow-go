@@ -14,7 +14,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -288,7 +287,7 @@ func TestIterate(t *testing.T) {
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			for i, key := range keys {
-				enc, err := msgpack.Marshal(vals[i])
+				enc, err := json.Marshal(vals[i])
 				require.NoError(t, err)
 				err = tx.Set(key, enc)
 				require.NoError(t, err)
@@ -327,7 +326,7 @@ func TestTraverse(t *testing.T) {
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			for i, key := range keys {
-				enc, err := msgpack.Marshal(vals[i])
+				enc, err := json.Marshal(vals[i])
 				require.NoError(t, err)
 				err = tx.Set(key, enc)
 				require.NoError(t, err)

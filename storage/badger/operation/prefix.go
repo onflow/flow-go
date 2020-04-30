@@ -14,13 +14,14 @@ const (
 	// special database markers
 	codeBoundary             = 1 // latest finalized block number
 	codeFinalizedBlockNumber = 2 // lookup for block by number
+	codeIdentities           = 3 // stable set of identities
 	codeView                 = 4 // persisting the latest view for hotstuff
 
 	// block header and entities included in block contents
-	codeHeader     = 10
-	codeIdentities = 11
-	codeGuarantee  = 12
-	codeSeal       = 13
+	codeHeader    = 10
+	codeIdentity  = 11
+	codeGuarantee = 12
+	codeSeal      = 13
 
 	// entities that are related to block formation & validation
 	codeTransaction     = 21
