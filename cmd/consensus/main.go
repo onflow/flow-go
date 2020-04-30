@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/state/protocol"
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
@@ -33,6 +34,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	consensusMetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
+	sto "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -166,10 +168,14 @@ func main() {
 			// initialize a logging notifier for hotstuff
 			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, guaranteesDB, sealsDB)
 
+			// query the last finalized block and unfinalized blocks for recovery
+			finalized, unfinalized, err := findLatest(node.State, headersDB, &node.GenesisBlock.Header)
+
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger, notifier, node.Metrics, headersDB, viewsDB, committee, node.State,
 				build, final, signer, comp, &node.GenesisBlock.Header, node.GenesisQC,
+				finalized, unfinalized,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
 			if err != nil {
@@ -195,4 +201,36 @@ func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGPartic
 		return nil, err
 	}
 	return &priv, nil
+}
+
+func findLatest(state protocol.State, headers *storage.Headers, rootHeader *flow.Header) (*flow.Header, []*flow.Header, error) {
+	// find finalized block
+	finalized, err := state.Final().Head()
+
+	// when bootstrap, there is no block finalized, use the rootHeader instead
+	if err == sto.ErrNotFound {
+		finalized = rootHeader
+	}
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not find finalized block")
+	}
+
+	// find all unfinalized blockIDs
+	unfinalizedIDs, err := state.Final().Unfinalized()
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not find unfinalized block")
+	}
+
+	// find all unfinalized header by ID
+	unfinalized := make([]*flow.Header, 0, len(unfinalizedIDs))
+	for _, u := range unfinalizedIDs {
+		unfinalizedHeader, err := headers.ByBlockID(u)
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not find unfinalized block by ID: %w", err)
+		}
+		unfinalized = append(unfinalized, unfinalizedHeader)
+	}
+
+	return finalized, unfinalized, nil
 }

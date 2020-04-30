@@ -172,7 +172,7 @@ func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
 	var unfinalizedBlockIDs []flow.Identifier
 	err := s.state.db.View(func(tx *badger.Txn) error {
 		var boundary uint64
-		// retrieve the current finalized view
+		// retrieve the current finalized height
 		err := operation.RetrieveBoundary(&boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)

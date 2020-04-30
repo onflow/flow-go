@@ -25,9 +25,11 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
+// NewParticipant initialize the EventLoop instance and recover the forks' state with all unfinalized block
 func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, headers storage.Headers,
 	views storage.Views, committee hotstuff.Committee, protocolState protocol.State, builder module.Builder, updater module.Finalizer,
-	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header, rootQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
+	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header, rootQC *model.QuorumCertificate,
+	finalized *flow.Header, unfinalized []*flow.Header, options ...Option) (*hotstuff.EventLoop, error) {
 
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
@@ -46,7 +48,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// initialize forks with only finalized block.
 	// unfinalized blocks was not recovered yet
-	forks, err := initForks(protocolState, headers, updater, notifier, rootHeader, rootQC)
+	forks, err := initForks(finalized, unfinalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover forks: %w", err)
 	}
@@ -68,7 +70,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// recover the hotstuff state, mainly to recover all unfinalized blocks
 	// in forks
-	err = Recover(log, forks, validator, headers, protocolState)
+	err = Recover(log, forks, validator, unfinalized)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -120,9 +122,9 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	return loop, nil
 }
 
-func initForks(state protocol.State, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.Forks, error) {
+func initForks(final *flow.Header, unfinalized []*flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.Forks, error) {
 	// recover the trusted root
-	trustedRoot, err := recoverTrustedRoot(state, headers, rootHeader, rootQC)
+	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover trusted root: %w", err)
 	}
@@ -144,16 +146,9 @@ func initForks(state protocol.State, headers storage.Headers, updater module.Fin
 	return forks, nil
 }
 
-func recoverTrustedRoot(state protocol.State, headers storage.Headers, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.BlockQC, error) {
-	// get the latest finalized block
-	final, err := state.Final().Head()
-	if err != nil {
-		// when bootstrapping the node, there is no finalized block in storage,
-		// in this case we will use rootHeader as trustedRoot
-		if err == storage.ErrNotFound {
-			return makeRootBlockQC(rootHeader, rootQC), nil
-		}
-		return nil, fmt.Errorf("could not get last finalized block: %w", err)
+func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.BlockQC, error) {
+	if final == nil {
+		return makeRootBlockQC(rootHeader, rootQC), nil
 	}
 
 	if final.View < rootHeader.View {
