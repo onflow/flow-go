@@ -209,7 +209,6 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 		// initialize the default options and comparison modifier for iteration
 		modifier := 1
 		options := badger.DefaultIteratorOptions
-		options.PrefetchValues = false
 
 		// In order to satisfy this function's prefix-wise inclusion semantics,
 		// we append 256 0xff bytes to the largest of start and end.

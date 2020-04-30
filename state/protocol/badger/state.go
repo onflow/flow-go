@@ -25,7 +25,7 @@ func NewState(db *badger.DB, options ...func(*State)) (*State, error) {
 	s := &State{
 		db:               db,
 		clusters:         1,
-		validationBlocks: 10,
+		validationBlocks: 64,
 	}
 	for _, option := range options {
 		option(s)
@@ -34,6 +34,8 @@ func NewState(db *badger.DB, options ...func(*State)) (*State, error) {
 	if s.clusters < 1 {
 		return nil, fmt.Errorf("must have clusters>0 (actual=%d)", s.clusters)
 	}
+
+	go s.gc()
 
 	return s, nil
 }
