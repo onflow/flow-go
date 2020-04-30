@@ -2,7 +2,7 @@
 
 package engine
 
-// Enum of engine IDs to avoid accidental conflicts.
+// Enum of channel IDs to avoid accidental conflicts.
 const (
 
 	// Reserved 000-009
@@ -33,3 +33,37 @@ const (
 	// Testing 200-255
 	SimulationColdstuff = 200
 )
+
+func ChannelName(channelID uint8) string {
+	switch channelID {
+	case CollectionProvider:
+		return "CollectionProvider"
+	case CollectionIngest:
+		return "CollectionIngest"
+	case ProtocolClusterConsensus:
+		return "ProtocolClusterConsensus"
+	case BlockProvider:
+		return "BlockProvider"
+	case BlockPropagation:
+		return "BlockPropagation"
+	case ProtocolConsensus:
+		return "ProtocolConsensus"
+	case ProtocolSynchronization:
+		return "ProtocolSynchronization"
+	case ExecutionReceiptProvider:
+		return "ExecutionReceiptProvider"
+	case ExecutionStateProvider:
+		return "ExecutionStateProvider"
+	case ExecutionComputer:
+		return "ExecutionComputer"
+	case ChunkDataPackProvider:
+		return "ChunkDataPackProvider"
+	case ExecutionSync:
+		return "ExecutionSync"
+	case ApprovalProvider:
+		return "ApprovalProvider"
+	case SimulationColdstuff:
+		return "SimulationColdstuff"
+	}
+	return "Unknown"
+}

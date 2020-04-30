@@ -10,12 +10,27 @@ type Metrics interface {
 	// Common Metrics
 	//
 
-	// BadgerDBSize total size on-disk of the badger database.
-	BadgerDBSize(sizeBytes int64)
+	// BadgerLSMSize total size on-disk of the badger database.
+	BadgerLSMSize(sizeBytes int64)
+	BadgerVLogSize(sizeBytes int64)
+
+	// Badger built-in metrics (from badger/y/metrics.go)
+	BadgerNumReads(n int64)
+	BadgerNumWrites(n int64)
+	BadgerNumBytesRead(n int64)
+	BadgerNumBytesWritten(n int64)
+	BadgerNumGets(n int64)
+	BadgerNumPuts(n int64)
+	BadgerNumBlockedPuts(n int64)
+	BadgerNumMemtableGets(n int64)
 
 	// Network Metrics
-	// NetworkMessageSent size of the network message in bytes
-	NetworkMessageSent(sizeBytes int)
+	// NetworkMessageSent size in bytes and count of the network message sent
+	NetworkMessageSent(sizeBytes int, topic string)
+
+	// Network Metrics
+	// NetworkMessageReceived size in bytes and count of the network message received
+	NetworkMessageReceived(sizeBytes int, topic string)
 
 	// Collection Metrics
 	//

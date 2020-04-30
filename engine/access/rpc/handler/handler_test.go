@@ -2,7 +2,9 @@ package handler
 
 import (
 	"context"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -41,6 +43,7 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
+	rand.Seed(time.Now().UnixNano())
 	suite.log = zerolog.Logger{}
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)

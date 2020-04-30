@@ -209,16 +209,16 @@ func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 
 // Sample returns simple random sample from the `IdentityList`
 func (il IdentityList) Sample(size uint) IdentityList {
-	if size > uint(len(il)) {
-		size = uint(len(il))
+	n := uint(len(il))
+	if size > n {
+		size = n
 	}
-	dup := make([]*Identity, 0, len(il))
-	for _, identity := range il {
-		dup = append(dup, identity)
+	dup := make([]*Identity, 0, n)
+	dup = append(dup, il...)
+	for i := uint(0); i < size; i++ {
+		j := uint(rand.Intn(int(n - i)))
+		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
-	rand.Shuffle(len(dup), func(i int, j int) {
-		dup[i], dup[j] = dup[j], dup[i]
-	})
 	return dup[:size]
 }
 
