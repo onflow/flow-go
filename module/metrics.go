@@ -10,8 +10,9 @@ type Metrics interface {
 	// Common Metrics
 	//
 
-	// BadgerDBSize total size on-disk of the badger database.
-	BadgerDBSize(sizeBytes int64)
+	// BadgerLSMSize total size on-disk of the badger database.
+	BadgerLSMSize(sizeBytes int64)
+	BadgerVLogSize(sizeBytes int64)
 
 	// Badger built-in metrics (from badger/y/metrics.go)
 	BadgerNumReads(n int64)

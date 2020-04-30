@@ -51,7 +51,8 @@ func (m *Monitor) monitor() {
 			return
 		case <-ticker.C:
 			lsm, vlog := m.db.Size()
-			m.metrics.BadgerDBSize(lsm + vlog)
+			m.metrics.BadgerLSMSize(lsm)
+			m.metrics.BadgerVLogSize(vlog)
 
 			// sample default badger metrics (from badger/v2/y/metrics.go)
 			m.metrics.BadgerNumReads(badgermetrics.NumReads.Value())

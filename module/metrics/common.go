@@ -7,10 +7,15 @@ import (
 
 var (
 	// BADGER
-	badgerDBSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+	badgerLSMSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceCommon,
 		Subsystem: subsystemBadger,
-		Name:      "db_size_bytes",
+		Name:      "db_lsm_bytes",
+	})
+	badgerVLogSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceCommon,
+		Subsystem: subsystemBadger,
+		Name:      "db_vlog_bytes",
 	})
 	badgerDBNumReads = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceCommon,
@@ -68,10 +73,14 @@ var (
 	})
 )
 
-// BadgerDBSize sets the total badger database size on disk, measured in bytes.
-// This includes the LSM tree and value log.
-func (c *Collector) BadgerDBSize(sizeBytes int64) {
-	badgerDBSizeGauge.Set(float64(sizeBytes))
+// Badger DB size can be calculated by LSM plus VLog size
+// BadgerLSMSize
+func (c *Collector) BadgerLSMSize(sizeBytes int64) {
+	badgerLSMSizeGauge.Set(float64(sizeBytes))
+}
+
+func (c *Collector) BadgerVLogSize(sizeBytes int64) {
+	badgerVLogSizeGauge.Set(float64(sizeBytes))
 }
 
 func (c *Collector) BadgerNumReads(n int64) {
@@ -95,7 +104,7 @@ func (c *Collector) BadgerNumGets(n int64) {
 }
 
 func (c *Collector) BadgerNumPuts(n int64) {
-	badgerDBNumWrites.Set(float64(n))
+	badgerDBNumPuts.Set(float64(n))
 }
 
 func (c *Collector) BadgerNumBlockedPuts(n int64) {
