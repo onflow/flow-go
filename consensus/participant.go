@@ -27,8 +27,7 @@ import (
 
 func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, headers storage.Headers,
 	views storage.Views, committee hotstuff.Committee, protocolState protocol.State, builder module.Builder, updater module.Finalizer,
-	signer hotstuff.Signer, communicator hotstuff.Communicator, genesisHeader *flow.Header,
-	genesisQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
+	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header, rootQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
 
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
@@ -47,15 +46,9 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// initialize forks with only finalized block.
 	// unfinalized blocks was not recovered yet
-	forks, err := initForks(state, headers, updater, notifier, genesisHeader, genesisQC)
+	forks, err := initForks(protocolState, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover forks: %w", err)
-	}
-
-	// initialize view state
-	viewState, err := viewstate.New(state, me.NodeID(), selector)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize view state: %w", err)
 	}
 
 	// initialize the validator
@@ -75,7 +68,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// recover the hotstuff state, mainly to recover all unfinalized blocks
 	// in forks
-	err = Recover(log, forks, validator, headers, state)
+	err = Recover(log, forks, validator, headers, protocolState)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -127,9 +120,9 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	return loop, nil
 }
 
-func initForks(state protocol.State, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, genesisHeader *flow.Header, genesisQC *model.QuorumCertificate) (*forks.Forks, error) {
+func initForks(state protocol.State, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.Forks, error) {
 	// recover the trusted root
-	trustedRoot, err := recoverTrustedRoot(state, headers, genesisHeader, genesisQC)
+	trustedRoot, err := recoverTrustedRoot(state, headers, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover trusted root: %w", err)
 	}
@@ -151,21 +144,21 @@ func initForks(state protocol.State, headers storage.Headers, updater module.Fin
 	return forks, nil
 }
 
-func recoverTrustedRoot(state protocol.State, headers storage.Headers, genesisHeader *flow.Header, genesisQC *model.QuorumCertificate) (*forks.BlockQC, error) {
+func recoverTrustedRoot(state protocol.State, headers storage.Headers, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.BlockQC, error) {
 	// get the latest finalized block
 	final, err := state.Final().Head()
 	if err != nil {
 		// when bootstrapping the node, there is no finalized block in storage,
-		// in this case we will use genesisHeader as trustedRoot
+		// in this case we will use rootHeader as trustedRoot
 		if err == storage.ErrNotFound {
-			return trustedRootFromGenesis(genesisHeader, genesisQC), nil
+			return trustedRootFromGenesis(rootHeader, rootQC), nil
 		}
 		return nil, fmt.Errorf("could not get last finalized block: %w", err)
 	}
 
 	// if finalized view is genesis block, then use genesis block as the trustedRoot
-	if final.View == 1 {
-		return trustedRootFromGenesis(genesisHeader, genesisQC), nil
+	if final.View == rootHeader.View {
+		return trustedRootFromGenesis(rootHeader, rootQC), nil
 	}
 
 	// get the parent for the latest finalized block
@@ -192,5 +185,18 @@ func recoverTrustedRoot(state protocol.State, headers storage.Headers, genesisHe
 	return trustedRoot, nil
 }
 
-func trustedRootFromGenesis(genesisHeader *flow.Header, genesisQC *model.QuorumCertificate) *model.BlockQC {
+func trustedRootFromGenesis(rootHeader *flow.Header, rootQC *model.QuorumCertificate) *forks.BlockQC {
+	rootBlock := &model.Block{
+		View:        rootHeader.View,
+		BlockID:     rootHeader.ID(),
+		ProposerID:  rootHeader.ProposerID,
+		QC:          nil,
+		PayloadHash: rootHeader.PayloadHash,
+		Timestamp:   rootHeader.Timestamp,
+	}
+	trustedRoot := &forks.BlockQC{
+		QC:    rootQC,
+		Block: rootBlock,
+	}
+	return trustedRoot
 }
