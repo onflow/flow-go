@@ -48,16 +48,16 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ generating private key for account 0 and generating genesis execution state")
-		stateCommitment := genGenesisExecutionState()
+		genGenesisExecutionState()
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis seal and genesis block")
-		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgData)
+		block := constructGenesisBlock(stakingNodes, dkgData)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis QC")
 		constructGenesisQC(
-			&block,
+			block,
 			model.FilterByRole(stakingNodes, flow.RoleConsensus),
 			model.FilterByRole(internalNodes, flow.RoleConsensus),
 			dkgData,

@@ -205,7 +205,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		}(verNode)
 	}
 
-	unittest.AssertReturnsBefore(t, verWG.Wait, 5*time.Second)
+	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 
 	for _, verNode := range verNodes {
 		// both receipts should be added to the authenticated mempool of verification node
@@ -228,7 +228,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		verNets = append(verNets, verNet)
 	}
 
-	unittest.RequireReturnsBefore(t, conWG.Wait, 5*time.Second)
+	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 

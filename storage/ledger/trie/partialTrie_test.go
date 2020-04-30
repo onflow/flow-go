@@ -309,7 +309,7 @@ func TestRandomProofs(t *testing.T) {
 			values := make([][]byte, 0)
 			rand.Seed(time.Now().UnixNano())
 
-			numberOfKeys := rand.Intn(256)
+			numberOfKeys := rand.Intn(256) + 1
 			if numberOfKeys == 0 {
 				numberOfKeys = 1
 			}

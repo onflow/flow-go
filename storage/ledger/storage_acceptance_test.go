@@ -16,7 +16,7 @@ import (
 // GetRandomKeysRandN generate m random keys (size: byteSize),
 // assuming m is also randomly selected from zero to maxN
 func GetRandomKeysRandN(maxN int, byteSize int) [][]byte {
-	numberOfKeys := rand.Intn(maxN)
+	numberOfKeys := rand.Intn(maxN) + 1
 	// at least return 1 keys
 	if numberOfKeys == 0 {
 		numberOfKeys = 1
