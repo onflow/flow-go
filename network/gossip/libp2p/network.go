@@ -153,6 +153,7 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
+
 	// checks the cache for deduplication
 	if n.rcache.Seen(message.EventID, message.ChannelID) {
 		// drops duplicate message

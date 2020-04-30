@@ -1,12 +1,21 @@
 package metrics
 
 import (
+	"fmt"
+
+	opentracing "github.com/opentracing/opentracing-go"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // a label for OneToOne messaging for the networking related vector metrics
 const TopicLabelOneToOne = "OneToOne"
+
+// a duration metrics
+// time it takes from receiving a message by the network layer to delivering it to the application layer
+// in other words, overhead that the network layers adds to inbound message processing
+const networkMessageReceiveSpanner = "network_layer_processing_duration"
 
 var (
 	// BADGER
@@ -142,4 +151,12 @@ func (c *Collector) NetworkMessageSent(sizeBytes int, topic string) {
 func (c *Collector) NetworkMessageReceived(sizeBytes int, topic string) {
 	networkInboundMessageCounter.WithLabelValues(topic).Inc()
 	networkInboundMessageSizeGauge.WithLabelValues(topic).Set(float64(sizeBytes))
+}
+
+func (c *Collector) StartNetworkMessageReceive(eventID string, topic string) {
+	opentracing.StartSpan()
+	c.tracer.StartSpan(fmt.Sprintf("%s_%s", eventID, topic), networkMessageReceiveSpanner)
+}
+func (c *Collector) FinishNetworkMessageReceive(eventID string, topic string) {
+	c.tracer.FinishSpan(fmt.Sprintf("%s_%s", eventID, topic), networkMessageReceiveSpanner)
 }

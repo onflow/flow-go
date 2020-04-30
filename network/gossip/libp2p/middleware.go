@@ -334,7 +334,7 @@ ProcessLoop:
 			}
 
 			msgSize := msg.Size()
-			m.reportInboundMsgSize(msgSize, metrics.TopicLabelOneToOne)
+			go m.reportInboundMsg(msgSize, metrics.TopicLabelOneToOne)
 
 			m.processMessage(msg)
 			continue ProcessLoop
@@ -384,13 +384,16 @@ SubscriptionLoop:
 				break SubscriptionLoop
 			}
 
-			channelID, err := channelIDFromTopic(rs.sub.Topic())
-			if err != nil {
-				m.log.Error().Err(err).Str("channel_id", channelID).Msg("failed to report metric")
-			} else {
-				msgSize := msg.Size()
-				m.reportInboundMsgSize(msgSize, channelID)
-			}
+			// report metrics
+			go func() {
+				channelID, err := channelIDFromTopic(rs.sub.Topic())
+				if err != nil {
+					m.log.Error().Err(err).Str("channel_id", channelID).Msg("failed to report metric")
+				} else {
+					msgSize := msg.Size()
+					m.reportInboundMsg(msgSize, channelID, msg.EventID)
+				}
+			}()
 
 			m.processMessage(msg)
 
@@ -443,7 +446,8 @@ func (m *Middleware) reportOutboundMsgSize(size int, topic string) {
 	m.metrics.NetworkMessageSent(size, topic)
 }
 
-func (m *Middleware) reportInboundMsgSize(size int, topic string) {
+func (m *Middleware) reportInboundMsg(size int, topic string, eventID []byte) {
+	m.metrics.StartNetworkMessageReceive(string(eventID))
 	m.metrics.NetworkMessageReceived(size, topic)
 }
 

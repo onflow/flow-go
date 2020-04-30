@@ -32,6 +32,12 @@ type Metrics interface {
 	// NetworkMessageReceived size in bytes and count of the network message received
 	NetworkMessageReceived(sizeBytes int, topic string)
 
+	// StartNetworkMessageReceive starts a span to record the amount of time it takes to process a message in the network layer
+	StartNetworkMessageReceive(eventID string, topic string)
+
+	// FinishNetworkMessageReceive stops the span to record the amount of time it takes to process a message in the network layer
+	FinishNetworkMessageReceive(eventID string, topic string)
+
 	// Collection Metrics
 	//
 
