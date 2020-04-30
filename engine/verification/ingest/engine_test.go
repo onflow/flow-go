@@ -903,16 +903,16 @@ func (suite *TestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
 	chunkDataPack := unittest.ChunkDataPackFixture(chunk.ID())
 	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: chunkDataPack}
 
-	// mocks tracker to return an error for this chunk ID
-	suite.chunkDataPackTrackers.On("ByChunkID", chunkDataPack.ChunkID).
-		Return(nil, fmt.Errorf("does not exist"))
+	// mocks absence of chunk data pack tracker
+	suite.chunkDataPackTrackers.On("Has", chunkDataPack.ChunkID).Return(false)
 	// engine has not yet ingested this chunk
 	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false)
 
 	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
 
-	// asserts that process of an untracked chunk data pack returns with an error
-	suite.Assert().NotNil(err)
+	// asserts that process of an untracked chunk data pack return no error
+	// since the data pack is simply dropped
+	suite.Assert().Nil(err)
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
 }
 
@@ -941,6 +941,7 @@ func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
 	}
 
 	// mocks tracker to return the tracker for the chunk data pack
+	suite.chunkDataPackTrackers.On("Has", chunkDataPack.ChunkID).Return(true).Once()
 	suite.chunkDataPackTrackers.On("ByChunkID", chunkDataPack.ChunkID).Return(track, nil).Once()
 
 	// mocks state of ingest engine to return execution node ID

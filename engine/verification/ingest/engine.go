@@ -242,12 +242,17 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Msg("chunk data pack received")
 
 	if e.ingestedChunkIDs.Has(chunkDataPack.ChunkID) {
-		// discards the chunk data pack if it belongs to an already ingested chunk
+		// belongs to an already ingested chunk
+		// discards the chunk data pack
 		return nil
 	}
 
-	// checks if this event is a reply of a prior request
-	// extracts the tracker
+	if !e.chunkDataPackTackers.Has(chunkDataPack.ChunkID) {
+		// does not have a valid tracker
+		// discards the chunk data pack
+		return nil
+	}
+
 	tracker, err := e.chunkDataPackTackers.ByChunkID(chunkDataPack.ChunkID)
 	if err != nil {
 		return fmt.Errorf("no tracker available for chunk ID: %x", chunkDataPack.ChunkID)
