@@ -91,7 +91,7 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 
 	dir := TempDBDir(t)
 
-	opts := badger.LSMOnlyOptions(dir).WithLogger(nil)
+	opts := badger.DefaultOptions(dir).WithLogger(nil)
 
 	db, err := badger.Open(opts)
 	require.Nil(t, err)
@@ -102,7 +102,7 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	RunWithTempDBDir(t, func(dir string) {
 
-		opts := badger.LSMOnlyOptions(dir).WithLogger(nil)
+		opts := badger.DefaultOptions(dir).WithLogger(nil)
 
 		db, err := badger.Open(opts)
 		require.NoError(t, err)
