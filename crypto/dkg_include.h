@@ -4,7 +4,7 @@
 #define _REL_DKG_INCLUDE_H
 
 #include "relic.h"
-#include "misc.h"
+#include "bls12381_utils.h"
 
 // the highest index of a DKG node
 #define MAX_IND         255

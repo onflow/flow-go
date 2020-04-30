@@ -107,7 +107,7 @@ void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
     const int size = (G2_BYTES/(SERIALIZATION+1));
     byte* p = out;
     for (int i=0; i<len; i++){
-        _ep2_write_bin_compact(p, &A[i], size);
+        ep2_write_bin_compact(p, &A[i], size);
         p += size;
     }
 }

@@ -241,7 +241,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 					proc.pkBytes = groupPK.Encode()
 				}
 				n := proc.dkg.Size()
-				kmac := NewBLS_KMAC(ThresholdSignatureTag)
+				kmac := NewBLSKMAC(ThresholdSignatureTag)
 				proc.ts, err = NewThresholdSigner(n, proc.current, kmac)
 				require.NoError(t, err)
 				proc.ts.SetKeys(sk, groupPK, nodesPK)
@@ -307,7 +307,7 @@ type statelessKeys struct {
 func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 	n := proc.dkg.Size()
 	// Sign a share and broadcast it
-	kmac := NewBLS_KMAC(ThresholdSignatureTag)
+	kmac := NewBLSKMAC(ThresholdSignatureTag)
 	ownSignShare, _ := proc.keys.currentPrivateKey.Sign(messageToSign, kmac)
 	// the local valid signature shares
 	signShares := make([]Signature, 0, n)

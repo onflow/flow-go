@@ -20,7 +20,7 @@ type ThresholdVerifier struct {
 // KMAC tag.
 func NewThresholdVerifier(tag string) *ThresholdVerifier {
 	tv := &ThresholdVerifier{
-		hasher: crypto.NewBLS_KMAC(tag),
+		hasher: crypto.NewBLSKMAC(tag),
 	}
 	return tv
 }
