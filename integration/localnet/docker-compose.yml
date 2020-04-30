@@ -8,7 +8,7 @@ services:
         TARGET: consensus
       target: production
     command:
-      - "--nodeid=ff0287806c5ea044cfcd21c37fb6874e12f3bf514703b9248ac1b22d18112df3"
+      - "--nodeid=a801eed414dfd04b6ab77ce9497deb4e2902f51c82b925804219ae9e8549193c"
       - "--bootstrapdir=/bootstrap"
       - "--datadir=/flowdb"
       - "--loglevel=DEBUG"
@@ -23,7 +23,7 @@ services:
         TARGET: consensus
       target: production
     command:
-      - "--nodeid=b627622f3002488dc347bcd404c1932935d0ee0d22bb6f79070384a8b9e1174e"
+      - "--nodeid=2d37ad1c5c887ef6cc085a191243226c29f706054f034b58873d5f801bdc897d"
       - "--bootstrapdir=/bootstrap"
       - "--datadir=/flowdb"
       - "--loglevel=DEBUG"
@@ -38,7 +38,112 @@ services:
         TARGET: consensus
       target: production
     command:
-      - "--nodeid=79f85d166b12b4dd3f83403df911007b273f7eaaad169e3cb9ce63de1b34b2f8"
+      - "--nodeid=ba4bfc0dbc7081910ac4af581ea84e7f05ee2cdb228ca569288629cd39b64614"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+  consensus_4:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=8f4e2afddb65d97d08c817f07757350a1cffad595d19781edfa2d6e8685fd459"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+  consensus_5:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=92b61f249fdb19150fe3adad4f47601292da5f2f8f67b2997700f913a5fff681"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+  consensus_6:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=894492d638b4e8d80419f92760865a0c99eec243a96dcdac172f2163a5dc7e7f"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+  consensus_7:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=0f55aee74a4869236879f757d40998b2a2ed8c77958481a7b1bf0e6468f6b947"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+  consensus_8:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=55a74ef612116bcfc78e198518c04c6889a7a3632e19ac786483afd25fe631ed"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+  consensus_9:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=cb1faf7e034b93cb7431e3a02cb9c2e3acf69328c4643565950c37df26c2faa3"
+      - "--bootstrapdir=/bootstrap"
+      - "--datadir=/flowdb"
+      - "--loglevel=DEBUG"
+      - "--nclusters=1"
+    volumes:
+      - ./bootstrap:/bootstrap
+  consensus_10:
+    build:
+      context: ../../
+      dockerfile: cmd/Dockerfile
+      args:
+        TARGET: consensus
+      target: production
+    command:
+      - "--nodeid=20381b785a36aa0f4000447cf485b17d9e77e232d52986990fff1e396b043f30"
       - "--bootstrapdir=/bootstrap"
       - "--datadir=/flowdb"
       - "--loglevel=DEBUG"
