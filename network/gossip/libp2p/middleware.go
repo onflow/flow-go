@@ -339,8 +339,6 @@ ProcessLoop:
 			msgSize := msg.Size()
 			m.reportInboundMsgSize(msgSize, metrics.TopicLabelOneToOne)
 
-			// to keep the 1-1 connection simple, the processMessage is executed in the same routine.
-			// this will make the sender aware of any back pressure
 			m.processMessage(msg)
 			continue ProcessLoop
 		}
@@ -397,9 +395,7 @@ SubscriptionLoop:
 				m.reportInboundMsgSize(msgSize, channelID)
 			}
 
-			// kick off a go routine to handle message
-			// (application layer may take its own sweet time to process the message)
-			go m.processMessage(msg)
+			m.processMessage(msg)
 
 			continue SubscriptionLoop
 		}
