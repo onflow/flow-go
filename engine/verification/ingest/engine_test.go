@@ -572,6 +572,8 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
+// TestHandleReceipt_SenderWithWrongRole evaluates sending an execution receipt from a staked
+// node with a role rather than execution node discards that immediately
 func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleCollection, flow.RoleVerification, flow.RoleAccess}
 
@@ -654,8 +656,7 @@ func (suite *TestSuite) TestHandleCollection_Untracked() {
 
 	// mock the collection coming from an collection node
 	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).
-		Return(nil, fmt.Errorf("does not exit")).Once()
+	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
 	// mocks a pending collection
 	pcoll := &verificationmodel.PendingCollection{
 		Collection: suite.collection,
@@ -696,6 +697,7 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
 
 	// mocks a tracker for the collection
+	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 
 	err := eng.Process(unstakedIdentity, suite.collection)
@@ -728,6 +730,7 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 		suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 		// mocks a tracker for the collection
+		suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 		suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 
 		err := eng.Process(invalidIdentity.NodeID, suite.collection)
