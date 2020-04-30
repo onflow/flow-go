@@ -147,10 +147,6 @@ func initForks(final *flow.Header, unfinalized []*flow.Header, headers storage.H
 }
 
 func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.BlockQC, error) {
-	if final == nil {
-		return makeRootBlockQC(rootHeader, rootQC), nil
-	}
-
 	if final.View < rootHeader.View {
 		return nil, fmt.Errorf("finalized Block has older view than trusted root")
 	}
