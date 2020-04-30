@@ -62,8 +62,6 @@ func (el *EventLoop) loop() {
 		// other events.
 		timeoutChannel := el.eventHandler.TimeoutChannel()
 
-		idleStart := time.Now()
-
 		// the first select makes sure we process timeouts with priority
 		select {
 
@@ -73,10 +71,6 @@ func (el *EventLoop) loop() {
 
 		// if we receive a time out, process it and log errors
 		case <-timeoutChannel:
-
-			// meansure how long the event loop was idle waiting for an
-			// incoming event
-			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
 
@@ -92,6 +86,8 @@ func (el *EventLoop) loop() {
 		default:
 			// fall through to non-priority events
 		}
+
+		idleStart := time.Now()
 
 		// select for block headers/votes here
 		select {
