@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/cache"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	dbmetrics "github.com/dapperlabs/flow-go/module/metrics/badger"
@@ -84,6 +85,7 @@ type FlowNodeBuilder struct {
 	Metrics        *metrics.Collector
 	DB             *badger.DB
 	Me             *local.Local
+	Pcache         *cache.PayloadCache
 	State          *protocol.State
 	DKGState       *wrapper.State
 	modules        []namedModuleFunc
@@ -232,7 +234,10 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 }
 
 func (fnb *FlowNodeBuilder) initState() {
-	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
+	pcache, err := cache.NewPayloadCache(fnb.DB)
+	fnb.MustNot(err).Msg("could not initialize payload cache")
+
+	state, err := protocol.NewState(fnb.DB, pcache, protocol.SetClusters(fnb.BaseConfig.nClusters))
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	// check if database is initialized
@@ -292,6 +297,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.Me, err = local.New(id, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")
 
+	fnb.Pcache = pcache
 	fnb.State = state
 }
 

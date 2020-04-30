@@ -115,10 +115,10 @@ func main() {
 			viewsDB := storage.NewViews(node.DB)
 
 			// initialize the pending blocks cache
-			cache := buffer.NewPendingBlocks()
+			buf := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, prov, cache)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, prov, buf)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -133,13 +133,13 @@ func main() {
 			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
 
 			// initialize the block builder
-			build := builder.NewBuilder(node.DB, guarantees, seals,
+			build := builder.NewBuilder(node.DB, node.Pcache, guarantees, seals,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
 
 			// initialize the block finalizer
-			final := finalizer.NewFinalizer(node.DB, node.State, guarantees, seals)
+			final := finalizer.NewFinalizer(node.DB, node.Pcache, guarantees, seals)
 
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)

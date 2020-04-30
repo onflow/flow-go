@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
+	"github.com/dapperlabs/flow-go/module/cache"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
@@ -88,7 +89,11 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 
 func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, hub *Hub, stopper *Stopper) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
-	state, err := protocol.NewState(db)
+
+	pcache, err := cache.NewPayloadCache(db)
+	require.NoError(t, err)
+
+	state, err := protocol.NewState(db, pcache)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
@@ -153,7 +158,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(db, guarantees, seals)
+	build := builder.NewBuilder(db, pcache, guarantees, seals)
 
 	signer := &Signer{identity.ID()}
 
@@ -170,7 +175,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	selector := filter.HasRole(flow.RoleConsensus)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, state, guarantees, seals)
+	final := finalizer.NewFinalizer(db, pcache, guarantees, seals)
 
 	prov := &networkmock.Engine{}
 

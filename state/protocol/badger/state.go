@@ -9,22 +9,23 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 type State struct {
-	db               *badger.DB
-	clusters         uint
-	validationBlocks uint64
+	db       *badger.DB
+	pcache   module.PayloadCache
+	clusters uint
 }
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
-func NewState(db *badger.DB, options ...func(*State)) (*State, error) {
+func NewState(db *badger.DB, pcache module.PayloadCache, options ...func(*State)) (*State, error) {
 	s := &State{
-		db:               db,
-		clusters:         1,
-		validationBlocks: 1000,
+		db:       db,
+		pcache:   pcache,
+		clusters: 1,
 	}
 	for _, option := range options {
 		option(s)

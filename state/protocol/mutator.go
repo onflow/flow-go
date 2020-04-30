@@ -24,10 +24,4 @@ type Mutator interface {
 	// still checking that the given block is a valid extension of the protocol
 	// state.
 	Extend(blockID flow.Identifier) error
-
-	// Finalize finalizes the block with the given hash, and all of its parents
-	// up to the finalized protocol state. It modifies the persistent immutable
-	// protocol state accordingly and forwards the pointer to the latest
-	// finalized state.
-	Finalize(blockID flow.Identifier, cleanup func(*flow.Header) error) error
 }

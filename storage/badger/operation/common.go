@@ -572,3 +572,37 @@ func keyonly(handleKey handleKeyFunc) iterationFunc {
 		return check, create, handle
 	}
 }
+
+func indexidentifiers(blockID flow.Identifier, byHeight *map[uint64][]flow.Identifier) iterationFunc {
+	return func() (checkFunc, createFunc, handleFunc) {
+
+		// check will check whether we are on the next block we want to check
+		// if we are not on the block we care about, we ignore the entry
+		// otherwise, we forward to the next parent and check the entry
+		var height uint64
+		var currentID flow.Identifier
+		var nextID flow.Identifier
+		check := func(key []byte) bool {
+			height, currentID, nextID = fromPayloadIndex(key)
+			if currentID != blockID {
+				return false
+			}
+			blockID = nextID
+			return true
+		}
+
+		// create returns a slice of IDs to decode the payload index entry into
+		var entityIDs []flow.Identifier
+		create := func() interface{} {
+			return &entityIDs
+		}
+
+		// handle will insert the entity IDs at the block height
+		handle := func() error {
+			(*byHeight)[height] = entityIDs
+			return nil
+		}
+
+		return check, create, handle
+	}
+}

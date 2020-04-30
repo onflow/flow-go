@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/cache"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -21,7 +22,12 @@ func UncheckedState(db *badger.DB, commit flow.StateCommitment, participants flo
 		return nil, fmt.Errorf("could not bootstrap: %w", err)
 	}
 
-	state, err := protocol.NewState(db)
+	pcache, err := cache.NewPayloadCache(db)
+	if err != nil {
+		return nil, fmt.Errorf("could not load payload cache: %w", err)
+	}
+
+	state, err := protocol.NewState(db, pcache)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize state: %w", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -19,19 +20,19 @@ import (
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
 	db         *badger.DB
+	pcache     module.PayloadCache
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
 	cfg        Config
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals, options ...func(*Config)) *Builder {
+func NewBuilder(db *badger.DB, pcache module.PayloadCache, guarantees mempool.Guarantees, seals mempool.Seals, options ...func(*Config)) *Builder {
 
 	// initialize default config
 	cfg := Config{
-		minInterval:  500 * time.Millisecond,
-		maxInterval:  10 * time.Second,
-		expiryBlocks: 1000,
+		minInterval: 500 * time.Millisecond,
+		maxInterval: 10 * time.Second,
 	}
 
 	// apply option parameters
@@ -72,12 +73,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
-		// calculate how many blocks we look back
-		limit := boundary - b.cfg.expiryBlocks
-		if limit > boundary { // overflow check
-			limit = 0
-		}
-
 		// get the last finalized block ID
 		var finalID flow.Identifier
 		err = operation.RetrieveNumber(boundary, &finalID)(tx)
@@ -101,7 +96,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			}
 
 			// if we have reached the limit, stop indexing
-			if ancestor.Height <= limit {
+			if ancestor.Height <= boundary {
 				break
 			}
 
@@ -139,36 +134,17 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// collect guarantees from memory pool, excluding those already pending
 		// on this fork
-		var guaranteeIDs []flow.Identifier
+		var guarantees []*flow.CollectionGuarantee
 		for _, guarantee := range b.guarantees.All() {
-			_, ok := guaranteeLookup[guarantee.ID()]
+			guaranteeID := guarantee.ID()
+			_, ok := guaranteeLookup[guaranteeID]
 			if ok {
 				continue
 			}
-			guaranteeIDs = append(guaranteeIDs, guarantee.ID())
-		}
-
-		// find any guarantees that conflict with FINALIZED blocks
-		var invalidIDs map[flow.Identifier]struct{}
-		err = operation.CheckGuaranteePayload(boundary, finalID, guaranteeIDs, &invalidIDs)(tx)
-		if err != nil {
-			return fmt.Errorf("could not check guarantee payload: %w", err)
-		}
-
-		var guarantees []*flow.CollectionGuarantee
-		for _, guaranteeID := range guaranteeIDs {
-
-			_, isInvalid := invalidIDs[guaranteeID]
-			if isInvalid {
-				// remove from mempool, it will never be valid
-				b.guarantees.Rem(guaranteeID)
+			ok = b.pcache.HasGuarantee(guaranteeID)
+			if ok {
+				_ = b.guarantees.Rem(guaranteeID)
 				continue
-			}
-
-			// add ONLY non-conflicting guarantees to the final payload
-			guarantee, err := b.guarantees.ByID(guaranteeID)
-			if err != nil {
-				return fmt.Errorf("could not get guarantee from pool: %w", err)
 			}
 			guarantees = append(guarantees, guarantee)
 		}
@@ -192,11 +168,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
 			if err != nil {
 				return fmt.Errorf("could not get ancestor: %w", err)
-			}
-
-			// sanity check; should never be going that long without seal
-			if ancestor.Height <= limit {
-				break
 			}
 
 			// add to list
@@ -255,37 +226,39 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 	// STEP THREE: we have the guarantees and seals we can validly include
 	// in the payload built on top of the given block. Now we need to build
 	// and store the block header, as well as index the payload contents.
+
+	// calculate the timestamp and cutoffs
+	timestamp := time.Now().UTC()
+	from := parent.Timestamp.Add(b.cfg.minInterval)
+	to := parent.Timestamp.Add(b.cfg.maxInterval)
+
+	// adjust timestamp if outside of cutoffs
+	if timestamp.Before(from) {
+		timestamp = from
+	}
+	if timestamp.After(to) {
+		timestamp = to
+	}
+
+	// construct default block on top of the provided parent
+	header.ChainID = parent.ChainID
+	header.ParentID = parentID
+	header.Height = parent.Height + 1
+	header.Timestamp = timestamp
+	header.PayloadHash = payload.Hash()
+
+	// NOTE: the following are zero-valued and can be set by the setter
+	// header.View = 0
+	// header.ParentVoterIDs = nil
+	// header.ParentVoterSig = nil
+	// header.ProposerID = flow.ZeroID
+	// header.ProposerSig = nil
+
+	// apply the custom fields setter of the consensus algorithm
+	setter(&header)
+
+	// insert into the db
 	err = b.db.Update(func(tx *badger.Txn) error {
-
-		// calculate the timestamp and cutoffs
-		timestamp := time.Now().UTC()
-		from := parent.Timestamp.Add(b.cfg.minInterval)
-		to := parent.Timestamp.Add(b.cfg.maxInterval)
-
-		// adjust timestamp if outside of cutoffs
-		if timestamp.Before(from) {
-			timestamp = from
-		}
-		if timestamp.After(to) {
-			timestamp = to
-		}
-
-		// construct default block on top of the provided parent
-		header.ChainID = parent.ChainID
-		header.ParentID = parentID
-		header.Height = parent.Height + 1
-		header.Timestamp = timestamp
-		header.PayloadHash = payload.Hash()
-
-		// NOTE: the following are zero-valued and can be set by the setter
-		// header.View = 0
-		// header.ParentVoterIDs = nil
-		// header.ParentVoterSig = nil
-		// header.ProposerID = flow.ZeroID
-		// header.ProposerSig = nil
-
-		// apply the custom fields setter of the consensus algorithm
-		setter(&header)
 
 		// insert the header into the DB
 		err = operation.InsertHeader(&header)(tx)

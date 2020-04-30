@@ -137,9 +137,6 @@ func TestExtendSealedBoundary(t *testing.T) {
 		// so here we still want to check for genesis seal
 		assert.Equal(t, genesis.ID(), sealed.BlockID)
 
-		err = mutator.Finalize(sealingBlock.ID(), noop)
-		assert.NoError(t, err)
-
 		sealed, err = state.Final().Seal()
 		assert.NoError(t, err)
 
@@ -463,9 +460,6 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		assert.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
-		require.NoError(t, err)
-
-		err = mutator.Finalize(block.ID(), noop)
 		require.NoError(t, err)
 
 		// create a fork at view/height 1 and try to connect it to genesis

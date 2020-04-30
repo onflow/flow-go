@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/module/cache"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/dkg"
@@ -144,7 +145,12 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 		return nil, nil, err
 	}
 
-	state, err := protoBadger.NewState(db)
+	pcache, err := cache.NewPayloadCache(db)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	state, err := protoBadger.NewState(db, pcache)
 	if err != nil {
 		return nil, nil, err
 	}

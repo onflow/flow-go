@@ -6,14 +6,13 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
-func NewFollower(log zerolog.Logger, state protocol.State, me module.Local) *Follower {
+func NewFollower(log zerolog.Logger, final module.Finalizer, me module.Local) *Follower {
 	return &Follower{
 		unit:  engine.NewUnit(),
 		log:   log,
-		state: state,
+		final: final,
 		me:    me,
 	}
 }
@@ -21,12 +20,12 @@ func NewFollower(log zerolog.Logger, state protocol.State, me module.Local) *Fol
 type Follower struct {
 	unit  *engine.Unit // used to manage concurrency & shutdown
 	log   zerolog.Logger
-	state protocol.State
+	final module.Finalizer
 	me    module.Local
 }
 
 func (f *Follower) SubmitProposal(proposal *flow.Header, parentView uint64) {
-	err := f.state.Mutate().Finalize(proposal.ID(), func(*flow.Header) error { return nil })
+	err := f.final.MakeFinal(proposal.ID())
 	f.log.Err(err).Msg("cold stuff follower could not finalize proposal")
 }
 
