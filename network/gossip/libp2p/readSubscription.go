@@ -29,7 +29,7 @@ func NewReadSubscription(log zerolog.Logger, sub *pubsub.Subscription) *ReadSubs
 	r := ReadSubscription{
 		log:     log,
 		sub:     sub,
-		inbound: make(chan *message.Message),
+		inbound: make(chan *message.Message, InboundMessageQueueSize),
 		once:    &sync.Once{},
 		done:    make(chan struct{}),
 	}

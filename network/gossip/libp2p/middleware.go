@@ -35,6 +35,9 @@ const (
 	OneToK
 )
 
+// the inbound message queue size for One to One and One to K messages (each)
+const InboundMessageQueueSize = 1000
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -336,6 +339,8 @@ ProcessLoop:
 			msgSize := msg.Size()
 			m.reportInboundMsgSize(msgSize, metrics.TopicLabelOneToOne)
 
+			// to keep the 1-1 connection simple, the processMessage is executed in the same routine.
+			// this will make the sender aware of any back pressure
 			m.processMessage(msg)
 			continue ProcessLoop
 		}
@@ -392,7 +397,9 @@ SubscriptionLoop:
 				m.reportInboundMsgSize(msgSize, channelID)
 			}
 
-			m.processMessage(msg)
+			// kick off a go routine to handle message
+			// (application layer may take its own sweet time to process the message)
+			go m.processMessage(msg)
 
 			continue SubscriptionLoop
 		}
