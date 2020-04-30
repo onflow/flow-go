@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"math/rand"
 	"sort"
 	"testing"
@@ -17,33 +18,54 @@ func runNodes(nodes []*Node) {
 	}
 }
 
-// func TestSlowdown(t *testing.T) {
-//
-// 	nodes, stopper := createNodes(t, 10, 250000, 200000)
-//
-// 	runNodes(nodes)
-//
-// 	<-stopper.stopped
-//
-// 	require.True(t, true)
-// }
+func estSlowdown(t *testing.T) {
 
-// happy path: with 3 nodes, they can reach consensus
-func Test3Nodes(t *testing.T) {
+	// create a network hub for all nodes
+	hub := NewHub()
 
-	nodes, stopper := createNodes(t, 3, 100, 1000)
+	nodes, stopper := createNodes(t, 10, 250000, 200000, hub)
 
 	runNodes(nodes)
 
 	<-stopper.stopped
 
-	require.True(t, true)
+	for i := range nodes {
+		printState(t, nodes, i)
+	}
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, 90)
+
+	cleanupNodes(nodes)
+}
+
+// happy path: with 3 nodes, they can reach consensus
+func Test3Nodes(t *testing.T) {
+
+	hub := NewHub()
+
+	nodes, stopper := createNodes(t, 3, 100, 1000, hub)
+
+	runNodes(nodes)
+
+	<-stopper.stopped
+
+	for i := range nodes {
+		printState(t, nodes, i)
+	}
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, 90)
+
+	cleanupNodes(nodes)
 }
 
 // with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
 
-	nodes, stopper := createNodes(t, 5, 100, 1000)
+	hub := NewHub()
+
+	nodes, stopper := createNodes(t, 5, 100, 1000, hub)
 
 	runNodes(nodes)
 
@@ -70,7 +92,9 @@ func Test5Nodes(t *testing.T) {
 // verify if a node lost some messages, it's still able to catch up.
 func TestMessagesLost(t *testing.T) {
 
-	nodes, stopper := createNodes(t, 5, 100, 1000)
+	hub := NewHub()
+
+	nodes, stopper := createNodes(t, 5, 100, 1000, hub)
 
 	runNodes(nodes)
 
@@ -88,7 +112,9 @@ func TestMessagesLost(t *testing.T) {
 // verify if each receiver lost 10% messages, the network can still reach consensus
 func TestMessagesLostAcrossNetwork(t *testing.T) {
 
-	nodes, stopper := createNodes(t, 5, 150, 1500)
+	hub := NewHub()
+
+	nodes, stopper := createNodes(t, 5, 150, 1500, hub)
 
 	runNodes(nodes)
 
@@ -112,8 +138,10 @@ func nextDelay(low, high time.Duration) time.Duration {
 // verify if messages were delayed, can still reach consensus
 func TestMessagesDelayAcrossNetwork(t *testing.T) {
 
+	hub := NewHub()
+
 	endBlock := uint64(150)
-	nodes, stopper := createNodes(t, 5, endBlock, 1000)
+	nodes, stopper := createNodes(t, 5, endBlock, 1000, hub)
 
 	runNodes(nodes)
 
@@ -171,9 +199,8 @@ func printState(t *testing.T, nodes []*Node, i int) {
 	n := nodes[i]
 	headerN, err := n.state.Final().Head()
 	require.NoError(t, err)
-	// fmt.Printf("instance %v view:%v, height: %v,received proposal:%v,vote:%v,syncreq:%v,syncresp:%v,rangereq:%v,batchreq:%v,batchresp:%v\n",
-	// 	i, headerN.View, headerN.Height, n.blockproposal, n.blockvote, n.syncreq, n.syncresp, n.rangereq, n.batchreq, n.batchresp)
-	log := n.log.With().
+
+	n.log.Info().
 		Uint64("finalview", headerN.View).
 		Uint64("finalheight", headerN.Height).
 		Int("proposal", n.blockproposal).
@@ -183,9 +210,7 @@ func printState(t *testing.T, nodes []*Node, i int) {
 		Int("rangereq", n.rangereq).
 		Int("batchreq", n.batchreq).
 		Int("batchresp", n.batchresp).
-		Logger()
-
-	log.Info().Msg("stats")
+		Str("finalViews", fmt.Sprintf("%v", chainViews(t, nodes[i]))).Msg("stats")
 }
 
 func chainViews(t *testing.T, node *Node) []uint64 {

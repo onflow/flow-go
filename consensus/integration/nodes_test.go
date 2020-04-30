@@ -56,7 +56,7 @@ type Node struct {
 	batchresp     int
 }
 
-func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*Node, *Stopper) {
+func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint, hub *Hub) ([]*Node, *Stopper) {
 
 	// create n consensus node participants
 	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
@@ -68,9 +68,6 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 
 	// append additional nodes to consensus
 	participants := append(consensus, collection, verification, execution)
-
-	// create a network hub for all nodes
-	hub := NewHub()
 
 	// add all identities to genesis block and
 	// create and bootstrap consensus node with the genesis
@@ -158,6 +155,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	// initialize the pending blocks cache
 	cache := buffer.NewPendingBlocks()
 
+	// all participants will sign the genesis block
 	signerIDs := make([]flow.Identifier, 0)
 	for _, participant := range participants {
 		signerIDs = append(signerIDs, participant.ID())
