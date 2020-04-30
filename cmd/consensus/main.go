@@ -31,6 +31,7 @@ import (
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	consensusMetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -102,6 +103,10 @@ func main() {
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Metrics, node.Me)
 			return ing, err
+		}).
+		Component("mempool metrics monitor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			monitor := consensusMetrics.NewMonitor(node.Metrics, guarantees, receipts, approvals, seals)
+			return monitor, nil
 		}).
 		Component("consensus components", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
