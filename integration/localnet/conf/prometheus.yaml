@@ -13,7 +13,7 @@ scrape_configs:
   - job_name: flow
     scrape_interval: 5s
     static_configs:
-      - targets:
+      - targets: # unreachable targets will be ignored, so this list just needs to be larger than the node count
           - "consensus_1:8080"
           - "consensus_2:8080"
           - "consensus_3:8080"

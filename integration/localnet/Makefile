@@ -15,4 +15,3 @@ logs:
 .PHONY: stop
 stop:
 	docker-compose -f docker-compose.base.yml -f docker-compose.nodes.yml down -v
-

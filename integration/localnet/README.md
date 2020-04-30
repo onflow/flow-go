@@ -1,4 +1,4 @@
-# Local Instrumented Test Environment (LITE)
+# Flow Local Instrumented Test Environment (FLITE)
 
 ## Bootstrap the network
 
