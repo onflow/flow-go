@@ -2,6 +2,8 @@
 
 package engine
 
+import "fmt"
+
 // Enum of channel IDs to avoid accidental conflicts.
 const (
 
@@ -34,36 +36,36 @@ const (
 	SimulationColdstuff = 200
 )
 
-func ChannelName(channelID uint8) string {
+func ChannelName(channelID uint8) (string, error) {
 	switch channelID {
 	case CollectionProvider:
-		return "CollectionProvider"
+		return "CollectionProvider", nil
 	case CollectionIngest:
-		return "CollectionIngest"
+		return "CollectionIngest", nil
 	case ProtocolClusterConsensus:
-		return "ProtocolClusterConsensus"
+		return "ProtocolClusterConsensus", nil
 	case BlockProvider:
-		return "BlockProvider"
+		return "BlockProvider", nil
 	case BlockPropagation:
-		return "BlockPropagation"
+		return "BlockPropagation", nil
 	case ProtocolConsensus:
-		return "ProtocolConsensus"
+		return "ProtocolConsensus", nil
 	case ProtocolSynchronization:
-		return "ProtocolSynchronization"
+		return "ProtocolSynchronization", nil
 	case ExecutionReceiptProvider:
-		return "ExecutionReceiptProvider"
+		return "ExecutionReceiptProvider", nil
 	case ExecutionStateProvider:
-		return "ExecutionStateProvider"
+		return "ExecutionStateProvider", nil
 	case ExecutionComputer:
-		return "ExecutionComputer"
+		return "ExecutionComputer", nil
 	case ChunkDataPackProvider:
-		return "ChunkDataPackProvider"
+		return "ChunkDataPackProvider", nil
 	case ExecutionSync:
-		return "ExecutionSync"
+		return "ExecutionSync", nil
 	case ApprovalProvider:
-		return "ApprovalProvider"
+		return "ApprovalProvider", nil
 	case SimulationColdstuff:
-		return "SimulationColdstuff"
+		return "SimulationColdstuff", nil
 	}
-	return "Unknown"
+	return "", fmt.Errorf("invalid channel ID")
 }

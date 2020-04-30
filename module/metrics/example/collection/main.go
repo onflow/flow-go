@@ -20,6 +20,15 @@ func main() {
 			panic(err)
 		}
 
+		topic1, err := engine.ChannelName(engine.CollectionProvider)
+		if err != nil {
+			panic(err)
+		}
+		topic2, err := engine.ChannelName(engine.CollectionIngest)
+		if err != nil {
+			panic(err)
+		}
+
 		for i := 0; i < 100; i++ {
 			collector.CollectionsPerBlock(1)
 			collector.CollectionsInFinalizedBlock(3)
@@ -47,11 +56,11 @@ func main() {
 				collector.FinishBlockToSeal(flow.HashToID(entityID))
 			}
 
-			collector.NetworkMessageSent(rand.Intn(1000), engine.ChannelName(engine.CollectionProvider))
-			collector.NetworkMessageSent(rand.Intn(1000), engine.ChannelName(engine.CollectionIngest))
+			collector.NetworkMessageSent(rand.Intn(1000), topic1)
+			collector.NetworkMessageSent(rand.Intn(1000), topic2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), engine.ChannelName(engine.CollectionProvider))
-			collector.NetworkMessageReceived(rand.Intn(1000), engine.ChannelName(engine.CollectionIngest))
+			collector.NetworkMessageReceived(rand.Intn(1000), topic1)
+			collector.NetworkMessageReceived(rand.Intn(1000), topic2)
 
 			time.Sleep(1 * time.Second)
 		}
