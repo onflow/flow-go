@@ -63,7 +63,8 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("Bootstrapping success!")
+	fmt.Print("Bootstrapping success!\n\n")
+	fmt.Print("Run \"make start\" to launch the network.\n")
 }
 
 type Network struct {
