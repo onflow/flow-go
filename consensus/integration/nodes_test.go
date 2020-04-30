@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -55,44 +54,39 @@ type Node struct {
 	rangereq      int
 	batchreq      int
 	batchresp     int
-	sync.Mutex
 }
 
 func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*Node, *Stopper) {
-	// create n consensus nodes
-	participants := make([]*flow.Identity, 0)
-	for i := 0; i < n; i++ {
-		identity := unittest.IdentityFixture()
-		participants = append(participants, identity)
-	}
+
+	// create n consensus node participants
+	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
 
 	// create non-consensus nodes
-	collection := unittest.IdentityFixture()
-	collection.Role = flow.RoleCollection
+	collection := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	verification := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	execution := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
-	verification := unittest.IdentityFixture()
-	verification.Role = flow.RoleVerification
+	// append additional nodes to consensus
+	participants := append(consensus, collection, verification, execution)
 
-	execution := unittest.IdentityFixture()
-	execution.Role = flow.RoleExecution
-
-	allParitipants := append(participants, collection, verification, execution)
+	// create a network hub for all nodes
+	hub := NewHub()
 
 	// add all identities to genesis block and
 	// create and bootstrap consensus node with the genesis
-	genesis := run.GenerateRootBlock(allParitipants, run.GenerateRootSeal([]byte{}))
+	genesis := run.GenerateRootBlock(participants, run.GenerateRootSeal([]byte{}))
 
 	stopper := NewStopper(stopAtView, stopCountAt)
-	nodes := make([]*Node, 0, len(participants))
-	for i, identity := range participants {
-		node := createNode(t, i, identity, participants, &genesis, stopper)
+	nodes := make([]*Node, 0, len(consensus))
+	for i, identity := range consensus {
+		node := createNode(t, i, identity, consensus, &genesis, hub, stopper)
 		nodes = append(nodes, node)
 	}
 
 	return nodes, stopper
 }
 
-func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, stopper *Stopper) *Node {
+func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, hub *Hub, stopper *Stopper) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
 	state, err := protocol.NewState(db)
 	require.NoError(t, err)
@@ -145,8 +139,8 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	local, err := local.New(identity, priv)
 	require.NoError(t, err)
 
-	// make network
-	net := NewNetwork()
+	// add a network for this node to the hub
+	net := hub.AddNetwork(localID)
 
 	headersDB := storage.NewHeaders(db)
 	payloadsDB := storage.NewPayloads(db)
@@ -207,4 +201,11 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	node.log = log
 
 	return node
+}
+
+func cleanupNodes(nodes []*Node) {
+	for _, n := range nodes {
+		n.db.Close()
+		os.RemoveAll(n.dbDir)
+	}
 }

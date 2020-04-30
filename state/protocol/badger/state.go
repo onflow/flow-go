@@ -24,7 +24,7 @@ func NewState(db *badger.DB, options ...func(*State)) (*State, error) {
 	s := &State{
 		db:               db,
 		clusters:         1,
-		validationBlocks: 1,
+		validationBlocks: 1000,
 	}
 	for _, option := range options {
 		option(s)
