@@ -38,12 +38,12 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 	//find lowest common block
 	startDelta, err := ss.execState.RetrieveStateDelta(startID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", startID, err)
+		return nil, fmt.Errorf("failed to retrieve state delta for start (%s): %w", startID, err)
 	}
 
 	endDelta, err := ss.execState.RetrieveStateDelta(endID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", endID, err)
+		return nil, fmt.Errorf("failed to retrieve state delta for end (%s): %w", endID, err)
 	}
 
 	// start from higher block

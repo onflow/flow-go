@@ -2729,8 +2729,8 @@ func TestRandomUpdateRead(t *testing.T) {
 
 		rand.Seed(time.Now().UnixNano())
 
-		// numberOfKeys := rand.Intn(256)
-		numberOfKeys := rand.Intn(30)
+		// numberOfKeys := rand.Intn(256) + 1
+		numberOfKeys := rand.Intn(30) + 1
 		for i := 0; i < numberOfKeys; i++ {
 			key := make([]byte, 2)
 			rand.Read(key)
