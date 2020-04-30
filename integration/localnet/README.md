@@ -1,5 +1,19 @@
 # Local Instrumented Test Environment (LITE)
 
+## Bootstrap the network
+
+Bootstrap a new network:
+
+```sh
+make init
+```
+
+You can optionally specify the number of consensus nodes:
+
+```sh
+make -e CONSENSUS=5 init
+```
+
 ## Start the network
 
 This command will automatically build new Docker images from your latest code changes and then start the test network:
