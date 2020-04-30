@@ -5,6 +5,7 @@ package badger
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -24,7 +25,7 @@ func NewState(db *badger.DB, options ...func(*State)) (*State, error) {
 	s := &State{
 		db:               db,
 		clusters:         1,
-		validationBlocks: 1000,
+		validationBlocks: 100,
 	}
 	for _, option := range options {
 		option(s)
@@ -69,4 +70,13 @@ func (s *State) Mutate() protocol.Mutator {
 		state: s,
 	}
 	return m
+}
+
+func (s *State) gc() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.db.Flatten(2)
+		s.db.RunValueLogGC(0.5)
+	}
 }
