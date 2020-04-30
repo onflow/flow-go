@@ -34,7 +34,7 @@ const (
 	SimulationColdstuff = 200
 )
 
-func String(channelID uint8) string {
+func ChannelName(channelID uint8) string {
 	switch channelID {
 	case CollectionProvider:
 		return "CollectionProvider"

@@ -434,7 +434,7 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
-	go m.reportOutboundMsgSize(len(data), engine.String(channelID))
+	go m.reportOutboundMsgSize(len(data), engine.ChannelName(channelID))
 
 	return nil
 }
@@ -458,5 +458,5 @@ func channelIDFromTopic(topic string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf(" failed to get channeld ID from topic: %w", err)
 	}
-	return engine.String(uint8(channelID)), nil
+	return engine.ChannelName(uint8(channelID)), nil
 }

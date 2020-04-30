@@ -47,11 +47,11 @@ func main() {
 				collector.FinishBlockToSeal(flow.HashToID(entityID))
 			}
 
-			collector.NetworkMessageSent(rand.Intn(1000), engine.String(engine.CollectionProvider))
-			collector.NetworkMessageSent(rand.Intn(1000), engine.String(engine.CollectionIngest))
+			collector.NetworkMessageSent(rand.Intn(1000), engine.ChannelName(engine.CollectionProvider))
+			collector.NetworkMessageSent(rand.Intn(1000), engine.ChannelName(engine.CollectionIngest))
 
-			collector.NetworkMessageReceived(rand.Intn(1000), engine.String(engine.CollectionProvider))
-			collector.NetworkMessageReceived(rand.Intn(1000), engine.String(engine.CollectionIngest))
+			collector.NetworkMessageReceived(rand.Intn(1000), engine.ChannelName(engine.CollectionProvider))
+			collector.NetworkMessageReceived(rand.Intn(1000), engine.ChannelName(engine.CollectionIngest))
 
 			time.Sleep(1 * time.Second)
 		}
