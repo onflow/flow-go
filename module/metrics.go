@@ -25,8 +25,12 @@ type Metrics interface {
 	BadgerNumMemtableGets(n int64)
 
 	// Network Metrics
-	// NetworkMessageSent size of the network message in bytes
-	NetworkMessageSent(sizeBytes int)
+	// NetworkMessageSent size in bytes and count of the network message sent
+	NetworkMessageSent(sizeBytes int, topic string)
+
+	// Network Metrics
+	// NetworkMessageReceived size in bytes and count of the network message received
+	NetworkMessageReceived(sizeBytes int, topic string)
 
 	// Collection Metrics
 	//

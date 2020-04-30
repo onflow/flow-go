@@ -3,7 +3,6 @@ package libp2p
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -33,14 +32,12 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 		return nil, fmt.Errorf("cannot sample topology idList %d smaller than desired fanout %d", len(idList), size)
 	}
 
-	// computing hash of node's identifier
-	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash([]byte(seed))
-
-	// creates a new random generator based on the hash as a seed
-	rng, err := random.NewRand(hash)
+	// use the node's identifier as the random generator seed
+	rndSeed := make([]byte, 32)
+	copy(rndSeed, seed)
+	rng, err := random.NewRand(rndSeed)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse hash: %w", err)
+		return nil, fmt.Errorf("cannot seed the prng: %w", err)
 	}
 
 	// find a random subset of the given size from the list
@@ -68,12 +65,12 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 		}
 
 		// choose 1 out of all the remaining nodes of this role
-		selectedID, err := randomSubset(ids, 1, rng)
+		selectedID, err := rng.IntN(len(ids))
 		if err != nil {
 			return nil, fmt.Errorf("cannot sample topology: %w", err)
 		}
 
-		oneOfEachRoleIDs = append(oneOfEachRoleIDs, selectedID[0])
+		oneOfEachRoleIDs = append(oneOfEachRoleIDs, ids[selectedID])
 	}
 
 	remainder = remainder.Filter(filter.Not(filter.In(oneOfEachRoleIDs)))
@@ -103,25 +100,22 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 
 func randomSubset(ids flow.IdentityList, size int, rnd random.Rand) (flow.IdentityList, error) {
 
-	result := make(flow.IdentityList, 0, size)
-
 	if size == 0 {
-		return result, nil
+		return flow.IdentityList{}, nil
 	}
 
 	if len(ids) < size {
 		return ids, nil
 	}
 
-	indices, err := rnd.SubPermutation(len(ids), size)
+	copy := make(flow.IdentityList, 0, len(ids))
+	copy = append(copy, ids...)
+	err := rnd.Samples(len(copy), size, func(i int, j int) {
+		copy[i], copy[j] = copy[j], copy[i]
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	for _, index := range indices {
-		id := ids[index]
-		result = append(result, id)
-	}
-
-	return result, nil
+	return copy[:size], nil
 }
