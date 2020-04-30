@@ -226,6 +226,13 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 // onRangeRequest processes a request for a range of blocks by height.
 func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
 
+	reqSize := int(req.ToHeight - req.FromHeight)
+	if reqSize < 0 {
+		reqSize = 0
+	}
+
+	e.metrics.SyncRangeRequestReceived(originID, reqSize)
+
 	// get the latest final state to know if we can fulfill the request
 	head, err := e.state.Final().Head()
 	if err != nil {
@@ -272,6 +279,8 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 
 // onBatchRequest processes a request for a specific block by block ID.
 func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
+
+	e.metrics.SyncBatchRequestReceived(originID, len(req.BlockIDs))
 
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
@@ -365,6 +374,7 @@ func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 		Requested: time.Time{},
 		Attempts:  0,
 	}
+
 	e.blockIDs[blockID] = &status
 }
 

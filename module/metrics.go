@@ -35,10 +35,10 @@ type Metrics interface {
 	// Consensus Metrics
 	//
 
-	// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+	// StartCollectionToFinalized reports Metric C1: Collection Received by CCL→ Collection Included in Finalized Block
 	StartCollectionToFinalized(collectionID flow.Identifier)
 
-	// FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+	// FinishCollectionToFinalized reports Metric C1: Collection Received by CCL→ Collection Included in Finalized Block
 	FinishCollectionToFinalized(collectionID flow.Identifier)
 
 	// CollectionsInFinalizedBlock reports Metric C2: Counter: Number of Collections included in finalized Blocks (per second)
@@ -47,35 +47,41 @@ type Metrics interface {
 	// CollectionsPerBlock reports Metric C3: Gauge type: number of Collections per incorporated Block
 	CollectionsPerBlock(count int)
 
-	// StartBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+	// StartBlockToSeal reports Metric C4: Block Received by CCL → Block Seal in finalized block
 	StartBlockToSeal(blockID flow.Identifier)
 
-	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+	// FinishBlockToSeal reports Metric C4: Block Received by CCL → Block Seal in finalized block
 	FinishBlockToSeal(blockID flow.Identifier)
 
-	// SealsInFinalizedBlock reports Metrics C5 Number of Blocks which are sealed by finalized blocks (per second)
+	// SealsInFinalizedBlock reports Metric C5 Number of Blocks which are sealed by finalized blocks (per second)
 	SealsInFinalizedBlock(count int)
 
-	// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
+	// HotStuffBusyDuration reports Metric C6 HotStuff Busy Duration
 	HotStuffBusyDuration(duration time.Duration, event string)
 
-	// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
+	// HotStuffIdleDuration reports Metric C6 HotStuff Idle Duration
 	HotStuffIdleDuration(duration time.Duration)
 
-	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
+	// HotStuffWaitDuration reports Metric C6 HotStuff Idle Duration
 	HotStuffWaitDuration(duration time.Duration, event string)
 
 	// FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)
 	FinalizedBlocks(count int)
 
-	// StartNewView reports Metrics C8: Current View
+	// StartNewView reports Metric C8: Current View
 	StartNewView(view uint64)
 
-	// NewestKnownQC reports Metrics C9: View of Newest Known QC
+	// NewestKnownQC reports Metric C9: View of Newest Known QC
 	NewestKnownQC(view uint64)
 
-	// SyncRequestReceived
+	// SyncRequestReceived reports Metric C10: Synchronization request
 	SyncRequestReceived(originID flow.Identifier)
+
+	// SyncRangeRequestReceived reports Metric C11: Synchronization block range request
+	SyncRangeRequestReceived(originID flow.Identifier, size int)
+
+	// SyncBatchRequestReceived reports Metric C12: Synchronization block batch request
+	SyncBatchRequestReceived(originID flow.Identifier, size int)
 
 	// Verification Metrics
 	//

@@ -87,14 +87,30 @@ var (
 		Name:      "sync_requests",
 		Namespace: namespaceConsensus,
 	}, []string{"originID"})
+	syncRangeRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name:      "sync_range_requests",
+		Namespace: namespaceConsensus,
+	}, []string{"originID"})
+	syncRangeRequestSize = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:      "sync_range_request_size",
+		Namespace: namespaceConsensus,
+	}, []string{"originID"})
+	syncBatchRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name:      "sync_batch_requests",
+		Namespace: namespaceConsensus,
+	}, []string{"originID"})
+	syncBatchRequestSize = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:      "sync_batch_request_size",
+		Namespace: namespaceConsensus,
+	}, []string{"originID"})
 )
 
-// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+// StartCollectionToFinalized reports Metric C1: Collection Received by CCL→ Collection Included in Finalized Block
 func (c *Collector) StartCollectionToFinalized(collectionID flow.Identifier) {
 	c.tracer.StartSpan(collectionID, consensusCollectionToFinalized)
 }
 
-// FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+// FinishCollectionToFinalized reports Metric C1: Collection Received by CCL→ Collection Included in Finalized Block
 func (c *Collector) FinishCollectionToFinalized(collectionID flow.Identifier) {
 	c.tracer.FinishSpan(collectionID, consensusCollectionToFinalized)
 }
@@ -109,33 +125,33 @@ func (c *Collector) CollectionsPerBlock(count int) {
 	collectionsPerBlock.Set(float64(count))
 }
 
-// StartBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+// StartBlockToSeal reports Metric C4: Block Received by CCL → Block Seal in finalized block
 func (c *Collector) StartBlockToSeal(blockID flow.Identifier) {
 	c.tracer.StartSpan(blockID, consensusBlockToSeal)
 }
 
-// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+// FinishBlockToSeal reports Metric C4: Block Received by CCL → Block Seal in finalized block
 func (c *Collector) FinishBlockToSeal(blockID flow.Identifier) {
 	c.tracer.FinishSpan(blockID, consensusBlockToSeal)
 }
 
-// SealsInFinalizedBlock reports Metrics C5 Counter: Total number of Blocks which are sealed by finalized blocks (converted later to rate)
+// SealsInFinalizedBlock reports Metric C5 Counter: Total number of Blocks which are sealed by finalized blocks (converted later to rate)
 func (c *Collector) SealsInFinalizedBlock(count int) {
 	finalizedSealCounter.Add(float64(count))
 }
 
-// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
+// HotStuffBusyDuration reports Metric C6 HotStuff Busy Duration
 func (c *Collector) HotStuffBusyDuration(duration time.Duration, event string) {
 	hotstuffBusyDuration.WithLabelValues(event).Set(float64(duration))
 	hotstuffBusySecondsTotal.WithLabelValues(event).Add(duration.Seconds())
 }
 
-// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
+// HotStuffIdleDuration reports Metric C6 HotStuff Idle Duration
 func (c *Collector) HotStuffIdleDuration(duration time.Duration) {
 	hotstuffIdleDuration.Set(float64(duration))
 }
 
-// HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
+// HotStuffWaitDuration reports Metric C6 HotStuff Wait Duration
 func (c *Collector) HotStuffWaitDuration(duration time.Duration, event string) {
 	hotstuffWaitDuration.WithLabelValues(event).Set(float64(duration))
 }
@@ -145,16 +161,29 @@ func (c *Collector) FinalizedBlocks(count int) {
 	finalizedBlockCounter.Add(float64(count))
 }
 
-// StartNewView reports Metrics C8: Current View
+// StartNewView reports Metric C8: Current View
 func (c *Collector) StartNewView(view uint64) {
 	newviewGauge.Set(float64(view))
 }
 
-// NewestKnownQC reports Metrics C9: View of Newest Known QC
+// NewestKnownQC reports Metric C9: View of Newest Known QC
 func (c *Collector) NewestKnownQC(view uint64) {
 	newestKnownQC.Set(float64(view))
 }
 
+// SyncRequestReceived reports Metric C10: Synchronization request
 func (c *Collector) SyncRequestReceived(originID flow.Identifier) {
 	syncRequests.WithLabelValues(originID.String()).Inc()
+}
+
+// SyncRangeRequestReceived reports Metric C11: Synchronization block range request
+func (c *Collector) SyncRangeRequestReceived(originID flow.Identifier, size int) {
+	syncRangeRequests.WithLabelValues(originID.String()).Inc()
+	syncRangeRequestSize.WithLabelValues(originID.String()).Observe(float64(size))
+}
+
+// SyncBatchRequestReceived reports Metric C12: Synchronization block batch request
+func (c *Collector) SyncBatchRequestReceived(originID flow.Identifier, size int) {
+	syncBatchRequests.WithLabelValues(originID.String()).Inc()
+	syncBatchRequestSize.WithLabelValues(originID.String()).Observe(float64(size))
 }
