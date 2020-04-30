@@ -92,9 +92,14 @@ func (_m *Metrics) HotStuffWaitDuration(duration time.Duration, event string) {
 	_m.Called(duration, event)
 }
 
-// NetworkMessageSent provides a mock function with given fields: sizeBytes
-func (_m *Metrics) NetworkMessageSent(sizeBytes int) {
-	_m.Called(sizeBytes)
+// NetworkMessageReceived provides a mock function with given fields: sizeBytes, topic
+func (_m *Metrics) NetworkMessageReceived(sizeBytes int, topic string) {
+	_m.Called(sizeBytes, topic)
+}
+
+// NetworkMessageSent provides a mock function with given fields: sizeBytes, topic
+func (_m *Metrics) NetworkMessageSent(sizeBytes int, topic string) {
+	_m.Called(sizeBytes, topic)
 }
 
 // NewestKnownQC provides a mock function with given fields: view
