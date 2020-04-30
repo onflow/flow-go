@@ -98,8 +98,9 @@ type FlowNodeBuilder struct {
 	MsgValidators  []validators.MessageValidator
 
 	// genesis information
-	GenesisBlock *flow.Block
-	GenesisQC    *model.QuorumCertificate
+	GenesisCommit flow.StateCommitment
+	GenesisBlock  *flow.Block
+	GenesisQC     *model.QuorumCertificate
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -109,9 +110,9 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
-	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "./bootstrap", "path to the bootstrap directory")
+	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
 	fnb.flags.UintVar(&fnb.BaseConfig.nClusters, "nclusters", 2, "number of collection node clusters")
@@ -241,6 +242,12 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		fnb.Logger.Info().Msg("bootstrapping empty database")
 
+		// Load the genesis state commitment
+		fnb.GenesisCommit, err = loadGenesisCommit(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis commit")
+		}
+
 		// Load the rest of the genesis info, eventually needed for the consensus follower
 		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
@@ -259,7 +266,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 		fnb.DKGState = wrapper.NewState(dkgPubData)
 
-		err = state.Mutate().Bootstrap(fnb.GenesisBlock)
+		err = state.Mutate().Bootstrap(fnb.GenesisCommit, fnb.GenesisBlock)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
@@ -497,6 +504,16 @@ func loadDKGPublicData(path string) (*dkg.PublicData, error) {
 	dkgPubData := &bootstrap.DKGDataPub{}
 	err = json.Unmarshal(data, dkgPubData)
 	return dkgPubData.ForHotStuff(), err
+}
+
+func loadGenesisCommit(path string) (flow.StateCommitment, error) {
+	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisCommit))
+	if err != nil {
+		return nil, err
+	}
+	var commit flow.StateCommitment
+	err = json.Unmarshal(data, &commit)
+	return commit, err
 }
 
 func loadTrustedRootBlock(path string) (*flow.Block, error) {

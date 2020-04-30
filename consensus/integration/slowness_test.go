@@ -20,7 +20,7 @@ func runNodes(nodes []*Node) {
 // happy path: with 3 nodes, they can reach consensus
 func TestSlowdown(t *testing.T) {
 
-	nodes, stopper := createNodes(t, 10, 20000, 8000)
+	nodes, stopper := createNodes(t, 10, 20000, 2000)
 
 	runNodes(nodes)
 

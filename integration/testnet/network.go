@@ -2,6 +2,7 @@ package testnet
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -21,6 +22,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 
 	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
+	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -265,7 +267,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		dockerclient.FromEnv,
 		dockerclient.WithAPIVersionNegotiation(),
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	suite, _ := testingdock.GetOrCreateSuite(t, networkConf.Name, testingdock.SuiteOpts{
 		Client: dockerClient,
@@ -280,34 +282,48 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	// run DKG for all consensus nodes
 	dkg := runDKG(t, confs)
 
+	// create a temporary directory to store all bootstrapping files, these
+	// will be shared between all nodes
+	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
+	require.NoError(t, err)
+
+	// generate the root account
+	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
+	require.NoError(t, err)
+
+	account, err := flow.DecodeAccountPrivateKey(hardcoded)
+	require.NoError(t, err)
+
+	// generate the initial execution state
+	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
+	require.NoError(t, err)
+
 	// generate genesis block
-	seal := bootstraprun.GenerateRootSeal(flow.GenesisStateCommitment)
-	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), seal)
+	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs))
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
 	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
-	qc, err := bootstraprun.GenerateGenesisQC(signerData, &genesis)
-	require.Nil(t, err)
-
-	// create a temporary directory to store all bootstrapping files, these
-	// will be shared between all nodes
-	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
-	require.Nil(t, err)
+	qc, err := bootstraprun.GenerateGenesisQC(signerData, genesis)
+	require.NoError(t, err)
 
 	// write common genesis bootstrap files
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameAccount0Priv), account)
+	require.NoError(t, err)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisCommit), commit)
+	require.NoError(t, err)
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisBlock), genesis)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisQC), qc)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkg.Public())
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// write private key files for each DKG participant
 	for _, part := range dkg.Participants {
 		filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, part.NodeID)
 		err = writeJSON(filepath.Join(bootstrapDir, filename), part.Private())
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	// write private key files for each node
@@ -316,10 +332,10 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 		// retrieve private representation of the node
 		private, err := nodeConfig.NodeInfo.Private()
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		err = writeJSON(path, private)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	flowNetwork := &FlowNetwork{
@@ -335,7 +351,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	// add each node to the network
 	for _, nodeConf := range confs {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	return flowNetwork
@@ -381,7 +397,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// create a directory for the node database
 	flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
 	err = os.Mkdir(flowDBDir, 0700)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// Bind the host directory to the container's database directory
 	// Bind the common bootstrap directory to the container
@@ -424,7 +440,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// create directories for execution state trie and values in the tmp
 			// host directory.
 			tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(
 				opts.HostConfig.Binds,
@@ -485,11 +501,11 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 
 	// get networking keys for all nodes
 	networkKeys, err := unittest.NetworkingKeys(nNodes)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// get staking keys for all nodes
 	stakingKeys, err := unittest.StakingKeys(nNodes)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// create node container configs and corresponding public identities
 	confs := make([]ContainerConfig, 0, nNodes)
@@ -531,9 +547,9 @@ func runDKG(t *testing.T, confs []ContainerConfig) bootstrap.DKGData {
 
 	// run the core dkg algorithm
 	dkgSeeds, err := getSeeds(nConsensusNodes)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	dkg, err := bootstraprun.RunDKG(nConsensusNodes, dkgSeeds)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// sanity check
 	assert.Equal(t, nConsensusNodes, len(dkg.Participants))

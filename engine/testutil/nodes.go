@@ -44,7 +44,7 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 
 	db, dbDir := unittest.TempBadgerDB(t)
 
-	state, err := UncheckedState(db, identities)
+	state, err := UncheckedState(db, flow.GenesisStateCommitment, identities)
 	require.NoError(t, err)
 
 	for _, option := range options {
