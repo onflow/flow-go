@@ -217,7 +217,8 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
 
-	opts := badger.DefaultOptions(fnb.BaseConfig.datadir).WithLogger(nil)
+	opts := badger.LSMOnlyOptions(fnb.BaseConfig.datadir).WithLogger(nil)
+
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 	fnb.DB = db
