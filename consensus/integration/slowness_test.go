@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"fmt"
 	"math/rand"
 	"sort"
 	"testing"
@@ -22,7 +21,7 @@ func runNodes(nodes []*Node) {
 
 // happy path: with 3 nodes, they can reach consensus
 func TestSlowdown(t *testing.T) {
-	nodes, stopper := createNodes(t, 10, 20000, 100000)
+	nodes, stopper := createNodes(t, 10, 20000, 10000)
 
 	connect(nodes, blockProposals())
 
@@ -202,7 +201,6 @@ func printState(t *testing.T, nodes []*Node, i int) {
 		Int("rangereq", n.rangereq).
 		Int("batchreq", n.batchreq).
 		Int("batchresp", n.batchresp).
-		Str("views", fmt.Sprintf("%v", chainViews(t, n))).
 		Logger()
 
 	log.Info().Msg("stats")
