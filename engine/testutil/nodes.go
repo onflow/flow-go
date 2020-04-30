@@ -236,6 +236,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		execState,
 		syncThreshold,
 		node.Metrics,
+		false,
 	)
 	require.NoError(t, err)
 
