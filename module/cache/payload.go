@@ -20,7 +20,7 @@ type PayloadCache struct {
 func NewPayloadCache(db *badger.DB) (*PayloadCache, error) {
 
 	pc := &PayloadCache{
-		lookback:     1000,
+		lookback:     10000,
 		guaranteeIDs: make(map[uint64][]flow.Identifier),
 		sealIDs:      make(map[uint64][]flow.Identifier),
 	}
@@ -81,7 +81,7 @@ func (pc *PayloadCache) AddGuarantees(height uint64, guaranteeIDs []flow.Identif
 		return
 	}
 	for old := range pc.guaranteeIDs {
-		if old <= cutoff {
+		if old < cutoff {
 			delete(pc.guaranteeIDs, old)
 		}
 	}
@@ -99,7 +99,7 @@ func (pc *PayloadCache) AddSeals(height uint64, sealIDs []flow.Identifier) {
 		return
 	}
 	for old := range pc.sealIDs {
-		if old <= cutoff {
+		if old < cutoff {
 			delete(pc.sealIDs, old)
 		}
 	}
