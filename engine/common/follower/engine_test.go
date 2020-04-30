@@ -177,7 +177,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	}
 	suite.cache.On("ByParentID", block.ID()).Return(pending, true)
 	suite.cache.On("ByParentID", child.ID()).Return(nil, false)
-	suite.cache.On("DropForParent", block.ID()).Once()
+	suite.cache.On("DropForParent", &block.Header).Once()
 
 	// submit the block proposal
 	proposal := unittest.ProposalFromBlock(&block)
