@@ -11,8 +11,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
@@ -25,6 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
@@ -59,10 +58,10 @@ func main() {
 
 	cmd.FlowNode("consensus").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&guaranteeLimit, "guarantee-limit", 100000, "maximum number of guarantees in the memory pool")
-			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&approvalLimit, "approval-limit", 100000, "maximum number of result approvals in the memory pool")
-			flags.UintVar(&sealLimit, "seal-limit", 100000, "maximum number of block seals in the memory pool")
+			flags.UintVar(&guaranteeLimit, "guarantee-limit", 10000, "maximum number of guarantees in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
+			flags.UintVar(&sealLimit, "seal-limit", 1000, "maximum number of block seals in the memory pool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
@@ -116,10 +115,10 @@ func main() {
 			viewsDB := storage.NewViews(node.DB)
 
 			// initialize the pending blocks cache
-			cache := buffer.NewPendingBlocks()
+			buf := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, prov, cache)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, prov, buf)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -130,14 +129,17 @@ func main() {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
 
+			// define the selector for our consensus participant set
+			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+
 			// initialize the block builder
-			build := builder.NewBuilder(node.DB, guarantees, seals,
+			build := builder.NewBuilder(node.DB, node.Pcache, guarantees, seals,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
 
 			// initialize the block finalizer
-			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
+			final := finalizer.NewFinalizer(node.DB, node.Pcache, guarantees, seals)
 
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
@@ -148,22 +150,16 @@ func main() {
 			// initialize the simple merger to combine staking & beacon signatures
 			merger := signature.NewCombiner()
 
-			// initialize Main consensus committee's state
-			committee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
-
 			// initialize the combined signer for hotstuff
-			signer := verification.NewCombinedSigner(committee, node.DKGState, staking, beacon, merger, node.Me.NodeID())
+			signer := verification.NewCombinedSigner(node.State, node.DKGState, staking, beacon, merger, selector, node.Me.NodeID())
 
 			// initialize a logging notifier for hotstuff
 			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, guaranteesDB, sealsDB)
 
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, headersDB, viewsDB, committee, node.State,
-				build, final, signer, comp, &node.GenesisBlock.Header, node.GenesisQC,
+				node.Logger, notifier, node.Metrics, headersDB, viewsDB, node.State, node.Me,
+				build, final, signer, comp, selector, &node.GenesisBlock.Header, node.GenesisQC,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
 			if err != nil {

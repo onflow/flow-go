@@ -21,6 +21,11 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+type item struct {
+	originID flow.Identifier
+	event    interface{}
+}
+
 // Engine is the consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
 type Engine struct {
@@ -35,6 +40,7 @@ type Engine struct {
 	pending  module.PendingBlockBuffer
 	sync     module.Synchronization
 	hotstuff module.HotStuff
+	events   chan item
 }
 
 // New creates a new consensus propagation engine.
@@ -61,6 +67,7 @@ func New(
 		pending:  pending,
 		sync:     nil, // use `WithSynchronization`
 		hotstuff: nil, // use `WithConsensus`
+		events:   make(chan item, 1024),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -97,6 +104,7 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.hotstuff == nil {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
+	e.unit.Launch(e.loop)
 	return e.unit.Ready(func() {
 		<-e.sync.Ready()
 		<-e.hotstuff.Ready()
@@ -107,8 +115,11 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
+		e.log.Debug().Msg("shutting down synchronization engine")
 		<-e.sync.Done()
+		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
+		e.log.Debug().Msg("all components have been shut down")
 	})
 }
 
@@ -124,7 +135,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			e.log.Error().Err(err).Msg("compliance could not process submitted event")
 		}
 	})
 }
@@ -199,7 +210,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("parent_voters", len(header.ParentVoterIDs)).
+		Int("parent_voters_count", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -238,32 +249,73 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
 	// submit the proposal to the provider engine to forward it to other
 	// node roles
-	e.prov.SubmitLocal(msg)
+	// TODO: propagate once seals in payload infinite loop is fixed
+	// e.prov.SubmitLocal(msg)
 
 	return nil
 }
 
 // process processes events for the propagation engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, input interface{}) error {
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	// process one event at a time for now
-	e.unit.Lock()
-	defer e.unit.Unlock()
+	e.events <- item{originID: originID, event: event}
 
 	// skip any message as long as we don't have the dependencies
 	if e.hotstuff == nil || e.sync == nil {
 		return fmt.Errorf("still initializing")
 	}
 
-	switch v := input.(type) {
+	switch ev := event.(type) {
 	case *events.SyncedBlock:
-		return e.onSyncedBlock(originID, v)
+		return e.queue(originID, ev)
 	case *messages.BlockProposal:
-		return e.onBlockProposal(originID, v)
+		return e.queue(originID, ev)
 	case *messages.BlockVote:
-		return e.onBlockVote(originID, v)
+		return e.queue(originID, ev)
 	default:
-		return fmt.Errorf("invalid event type (%T)", v)
+		return fmt.Errorf("invalid event type (%T)", ev)
+	}
+}
+
+// queue will add the event to our processing queue.
+func (e *Engine) queue(originID flow.Identifier, event interface{}) error {
+	select {
+	case e.events <- item{originID: originID, event: event}:
+		return nil
+	default:
+		return fmt.Errorf("queue full")
+	}
+}
+
+// loop will execute a loop that processes our events
+func (e *Engine) loop() {
+Loop:
+	for {
+		select {
+		case <-e.unit.Quit():
+			break Loop
+		case item := <-e.events:
+			err := e.processItem(item)
+			if err != nil {
+				e.log.Error().Err(err).Msg("could not process event")
+			}
+		}
+	}
+}
+
+// processItem will synchronously process an event.
+func (e *Engine) processItem(item item) error {
+
+	switch ev := item.event.(type) {
+	case *events.SyncedBlock:
+		return e.onSyncedBlock(item.originID, ev)
+	case *messages.BlockProposal:
+		return e.onBlockProposal(item.originID, ev)
+	case *messages.BlockVote:
+		return e.onBlockVote(item.originID, ev)
+	default:
+		return fmt.Errorf("invalid event type (%T)", ev)
 	}
 }
 
@@ -298,7 +350,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("parent_voters", len(header.ParentVoterIDs)).
+		Int("parent_voters_count", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -437,7 +489,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// see if the block is a valid extension of the protocol state
 	err = e.state.Mutate().Extend(header.ID())
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state: %w", err)
+		return fmt.Errorf("could not extend protocol state for block (%v) at view %v: %w", header.ID(), header.View, err)
 	}
 
 	// retrieve the parent

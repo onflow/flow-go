@@ -3,6 +3,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -22,6 +24,8 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+var noop = func(*flow.Header) error { return nil }
+
 var identities = flow.IdentityList{
 	{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
 	{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
@@ -29,20 +33,23 @@ var identities = flow.IdentityList{
 	{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
 }
 
-var genesis = flow.Genesis(identities)
+var (
+	genesis = flow.Genesis(identities)
+	commit  = unittest.StateCommitmentFixture()
+)
 
-func testWithBootstraped(t *testing.T, f func(t *testing.T, mutator *Mutator, db *badger.DB)) {
+func testWithBootstrapped(t *testing.T, f func(t *testing.T, mutator *Mutator, db *badger.DB)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.Nil(t, err)
 
 		f(t, mutator, db)
 	})
 }
 
-func TestBootStrapValid(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
+func TestBootstrapValid(t *testing.T) {
+	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		var boundary uint64
 		err := db.View(operation.RetrieveBoundary(&boundary))
 		require.Nil(t, err)
@@ -58,30 +65,27 @@ func TestBootStrapValid(t *testing.T) {
 		var storedSeal flow.Seal
 		err = db.View(procedure.LookupSealByBlock(storedHeader.ID(), &storedSeal))
 		require.NoError(t, err)
-		require.Equal(t, flow.ZeroID, storedSeal.BlockID) //genesis seal is special
+		require.Equal(t, genesis.ID(), storedSeal.BlockID)
+		require.Equal(t, commit, storedSeal.FinalState)
 
 		assert.Zero(t, boundary)
 		assert.Equal(t, genesis.ID(), storedID)
 		assert.Equal(t, genesis.Header, storedHeader)
 
-		for _, identity := range identities {
-			var delta int64
-			err = db.View(operation.RetrieveDelta(genesis.Header.Height, identity.Role, identity.NodeID, &delta))
-			require.Nil(t, err)
-
-			assert.Equal(t, int64(identity.Stake), delta)
-		}
+		var retrieved flow.IdentityList
+		err = db.View(operation.RetrieveIdentities(&retrieved))
+		require.NoError(t, err)
+		assert.ElementsMatch(t, identities, retrieved)
 	})
 }
 
 func TestExtendSealedBoundary(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
+	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		state := State{db: db}
 
 		seal, err := state.Final().Seal()
 		assert.NoError(t, err)
-		assert.Equal(t, genesis.Seals[0], seal)
-		assert.Equal(t, flow.ZeroID, seal.BlockID) //genesis seal seals block with ID 0x00
+		assert.Equal(t, commit, seal.FinalState)
 
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
@@ -94,7 +98,8 @@ func TestExtendSealedBoundary(t *testing.T) {
 		// seal
 		newSeal := flow.Seal{
 			BlockID:      block.ID(),
-			InitialState: genesis.Seals[0].FinalState,
+			ResultID:     flow.ZeroID, // TODO: we should probably check this
+			InitialState: seal.FinalState,
 			FinalState:   unittest.StateCommitmentFixture(),
 		}
 
@@ -130,10 +135,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 		// Sealed only moves after a block is finalized
 		// so here we still want to check for genesis seal
-		assert.Equal(t, flow.ZeroID, sealed.BlockID)
-
-		err = mutator.Finalize(sealingBlock.ID())
-		assert.NoError(t, err)
+		assert.Equal(t, genesis.ID(), sealed.BlockID)
 
 		sealed, err = state.Final().Seal()
 		assert.NoError(t, err)
@@ -146,6 +148,7 @@ func TestBootstrapDuplicateID(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
+		commit := unittest.StateCommitmentFixture()
 		identities := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
@@ -155,7 +158,7 @@ func TestBootstrapDuplicateID(t *testing.T) {
 		}
 		genesis := flow.Genesis(identities)
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: duplicate node identifier "+
 			"(0100000000000000000000000000000000000000000000000000000000000000)")
 	})
@@ -165,6 +168,7 @@ func TestBootstrapZeroStake(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
+		commit := unittest.StateCommitmentFixture()
 		identities := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 0},
 			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
@@ -173,7 +177,7 @@ func TestBootstrapZeroStake(t *testing.T) {
 		}
 		genesis := flow.Genesis(identities)
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: zero stake identity "+
 			"(0100000000000000000000000000000000000000000000000000000000000000)")
 	})
@@ -183,6 +187,7 @@ func TestBootstrapNoCollection(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
+		commit := unittest.StateCommitmentFixture()
 		identities := flow.IdentityList{
 			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
 			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
@@ -190,7 +195,7 @@ func TestBootstrapNoCollection(t *testing.T) {
 		}
 		genesis := flow.Genesis(identities)
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: need at least one collection node")
 	})
 }
@@ -199,6 +204,7 @@ func TestBootstrapNoConsensus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
+		commit := unittest.StateCommitmentFixture()
 		identities := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
 			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
@@ -206,7 +212,7 @@ func TestBootstrapNoConsensus(t *testing.T) {
 		}
 		genesis := flow.Genesis(identities)
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: need at least one consensus node")
 	})
 }
@@ -215,6 +221,7 @@ func TestBootstrapNoExecution(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
+		commit := unittest.StateCommitmentFixture()
 		identities := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
 			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
@@ -222,7 +229,7 @@ func TestBootstrapNoExecution(t *testing.T) {
 		}
 		genesis := flow.Genesis(identities)
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: need at least one execution node")
 	})
 }
@@ -231,6 +238,7 @@ func TestBootstrapNoVerification(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
+		commit := unittest.StateCommitmentFixture()
 		identities := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
 			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
@@ -238,7 +246,7 @@ func TestBootstrapNoVerification(t *testing.T) {
 		}
 		genesis := flow.Genesis(identities)
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: need at least one verification node")
 	})
 }
@@ -247,6 +255,7 @@ func TestBootstrapExistingAddress(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
 
+		commit := unittest.StateCommitmentFixture()
 		identities := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
 			{NodeID: flow.Identifier{0x02}, Address: "a1", Role: flow.RoleConsensus, Stake: 2},
@@ -255,7 +264,7 @@ func TestBootstrapExistingAddress(t *testing.T) {
 		}
 		genesis := flow.Genesis(identities)
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: duplicate node address (6131)")
 	})
 }
@@ -263,10 +272,12 @@ func TestBootstrapExistingAddress(t *testing.T) {
 func TestBootstrapNonZeroHeight(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
+
+		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(identities)
 		genesis.Height = 42
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis header not valid: invalid initial height (42 != 0)")
 	})
 }
@@ -274,10 +285,12 @@ func TestBootstrapNonZeroHeight(t *testing.T) {
 func TestBootstrapNonZeroParent(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
+
+		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(identities)
 		genesis.ParentID = unittest.BlockFixture().ID()
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis header not valid: genesis parent must be zero hash")
 	})
 }
@@ -285,53 +298,33 @@ func TestBootstrapNonZeroParent(t *testing.T) {
 func TestBootstrapNonEmptyCollections(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
+
+		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(identities)
 		genesis.Guarantees = unittest.CollectionGuaranteesFixture(1)
 		genesis.PayloadHash = genesis.Payload.Hash()
 
-		err := mutator.Bootstrap(genesis)
+		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: genesis block must have zero guarantees")
 	})
 }
 
-func TestBootstrapNoSeal(t *testing.T) {
+func TestBootstraWithSeal(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		mutator := &Mutator{state: &State{db: db}}
+
+		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(identities)
-		genesis.Seals = nil
+		genesis.Seals = []*flow.Seal{unittest.BlockSealFixture()}
 		genesis.PayloadHash = genesis.Payload.Hash()
 
-		err := mutator.Bootstrap(genesis)
-		require.EqualError(t, err, "genesis identities not valid: genesis block must have one seal")
-	})
-}
-
-func TestBootstrapInvalidSeal(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		mutator := &Mutator{state: &State{db: db}}
-		genesis := flow.Genesis(identities)
-		genesis.Seals[0].BlockID = unittest.IdentifierFixture()
-		genesis.PayloadHash = genesis.Payload.Hash()
-
-		err := mutator.Bootstrap(genesis)
-		require.EqualError(t, err, "genesis identities not valid: initial seal needs zero block ID")
-	})
-}
-
-func TestBootstrapInvalidSealPrevState(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		mutator := &Mutator{state: &State{db: db}}
-		genesis := flow.Genesis(identities)
-		genesis.Seals[0].InitialState = unittest.BlockSealFixture().InitialState
-		genesis.PayloadHash = genesis.Payload.Hash()
-
-		err := mutator.Bootstrap(genesis)
-		require.EqualError(t, err, "genesis identities not valid: initial seal needs nil parent commit")
+		err := mutator.Bootstrap(commit, genesis)
+		require.EqualError(t, err, "genesis identities not valid: genesis block must have zero seals")
 	})
 }
 
 func TestExtendValid(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
+	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
@@ -349,13 +342,14 @@ func TestExtendValid(t *testing.T) {
 
 		seal, err := mutator.state.Final().Seal()
 		assert.NoError(t, err)
-		assert.Equal(t, genesis.Seals[0], seal)
-		assert.Equal(t, flow.ZeroID, seal.BlockID) //genesis seal seals block with ID 0x00
+		assert.Equal(t, flow.GenesisStateCommitment, seal.InitialState)
+		assert.Equal(t, commit, seal.FinalState)
+		assert.Equal(t, genesis.ID(), seal.BlockID)
 	})
 }
 
 func TestExtendMissingParent(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
+	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
@@ -369,17 +363,19 @@ func TestExtendMissingParent(t *testing.T) {
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
-		require.EqualError(t, err, "could not retrieve parent seal: could not lookup seal ID by block: key not found")
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// verify seal not indexed
 		var seal flow.Identifier
 		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
-		assert.EqualError(t, err, "key not found")
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
 
 func TestExtendHeightTooSmall(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
+	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
@@ -404,17 +400,17 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
-		require.EqualError(t, err, "extend header not valid: block needs height equal to ancestor height+1 (1 != 1+1)")
+		require.Error(t, err)
 
 		// verify seal not indexed
 		var seal flow.Identifier
 		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
-		assert.EqualError(t, err, "key not found")
+		require.True(t, errors.Is(err, storage.ErrNotFound), err)
 	})
 }
 
 func TestExtendBlockNotConnected(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
+	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		// add 2 blocks, the second finalizing/sealing the state of the first
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
@@ -433,7 +429,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		sealingBlock.ParentID = block.ID()
 		sealingBlock.Seals = []*flow.Seal{&flow.Seal{
 			BlockID:      block.ID(),
-			InitialState: genesis.Seals[0].FinalState,
+			InitialState: commit,
 			FinalState:   unittest.StateCommitmentFixture(),
 		}}
 		sealingBlock.PayloadHash = sealingBlock.Payload.Hash()
@@ -466,9 +462,6 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		err = mutator.Extend(block.ID())
 		require.NoError(t, err)
 
-		err = mutator.Finalize(block.ID())
-		require.NoError(t, err)
-
 		// create a fork at view/height 1 and try to connect it to genesis
 		block.Timestamp = block.Timestamp.Add(time.Second)
 		block.ParentID = genesis.ID()
@@ -487,76 +480,75 @@ func TestExtendBlockNotConnected(t *testing.T) {
 }
 
 func TestExtendSealNotConnected(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
-		seal1 := &flow.Seal{
-			BlockID:      genesis.ID(),
-			InitialState: genesis.Seals[0].FinalState,
-			FinalState:   unittest.StateCommitmentFixture(),
-		}
-		seal2 := &flow.Seal{
-			BlockID:      genesis.ID(),
-			InitialState: unittest.StateCommitmentFixture(), // not seal1.FinalState, this will cause the error
-			FinalState:   unittest.StateCommitmentFixture(),
-		}
+	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 
 		block := unittest.BlockFixture()
 		block.Identities = nil
 		block.Guarantees = nil
+		block.Seals = nil
 		block.Height = 1
 		block.View = 1
 		block.ParentID = genesis.ID()
-		block.Seals = []*flow.Seal{seal1, seal2}
 		block.PayloadHash = block.Payload.Hash()
 
-		err := db.Update(func(txn *badger.Txn) error {
-			if err := procedure.InsertPayload(&block.Payload)(txn); err != nil {
-				return err
-			}
-			if err := procedure.InsertBlock(&block)(txn); err != nil {
-				return err
-			}
-
-			return nil
-		})
-		assert.NoError(t, err)
+		err := db.Update(procedure.InsertBlock(&block))
+		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
-		require.EqualError(t, err, fmt.Sprintf("seals not connected to state chain (%x)", seal1.FinalState))
+		require.NoError(t, err)
+
+		// create seal for the block
+		seal := &flow.Seal{
+			BlockID:      block.ID(),
+			InitialState: unittest.StateCommitmentFixture(), // not genesis state
+			FinalState:   unittest.StateCommitmentFixture(),
+		}
+
+		sealingBlock := unittest.BlockFixture()
+		sealingBlock.Identities = nil
+		sealingBlock.Guarantees = nil
+		sealingBlock.Seals = []*flow.Seal{seal}
+		sealingBlock.Height = 2
+		sealingBlock.View = 2
+		sealingBlock.ParentID = block.ID()
+		sealingBlock.PayloadHash = sealingBlock.Payload.Hash()
+
+		err = db.Update(procedure.InsertBlock(&sealingBlock))
+		require.NoError(t, err)
+
+		err = mutator.Extend(sealingBlock.ID())
+		require.EqualError(t, err, "seal execution states do not connect")
 
 		// verify seal not indexed
-		var seal flow.Identifier
-		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
-		assert.EqualError(t, err, "key not found")
+		var sealID flow.Identifier
+		err = db.View(operation.LookupSealIDByBlock(sealingBlock.ID(), &sealID))
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
 
 func TestExtendIdentities(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
+	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		block := unittest.BlockFixture()
-		block.Payload.Identities = flow.IdentityList{block.Identities[0]}
+		block.Payload.Identities = unittest.IdentityListFixture(4)
 		block.Payload.Guarantees = nil
 		block.Height = 1
 		block.View = 1
 		block.ParentID = genesis.ID()
 		block.PayloadHash = block.Payload.Hash()
 
-		err := db.Update(operation.InsertIdentity(block.Identities[0]))
-		require.NoError(t, err)
-		err = db.Update(procedure.InsertBlock(&block))
+		// this should pass, even with identities in the payload
+		err := db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
 
-		err = mutator.Extend(block.ID())
-		require.EqualError(t, err, "extend payload not valid: extend block has identities")
-
-		// verify seal not indexed
-		var seal flow.Identifier
-		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
-		assert.EqualError(t, err, "key not found")
+		// we should not store or retrieve identities with the block for now
+		var retrieved flow.Block
+		err = db.View(procedure.RetrieveBlock(block.ID(), &retrieved))
+		require.Empty(t, retrieved.Identities)
 	})
 }
 
 func TestExtendWrongIdentity(t *testing.T) {
-	testWithBootstraped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
+	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil

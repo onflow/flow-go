@@ -8,23 +8,25 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Finalizer is a simple wrapper around our temporary state to clean up after a
 // block has been fully finalized to the persistent protocol state.
 type Finalizer struct {
 	db         *badger.DB
+	pcache     module.PayloadCache
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals) *Finalizer {
+func NewFinalizer(db *badger.DB, pcache module.PayloadCache, guarantees mempool.Guarantees, seals mempool.Seals) *Finalizer {
 	f := &Finalizer{
 		db:         db,
+		pcache:     pcache,
 		guarantees: guarantees,
 		seals:      seals,
 	}
@@ -39,63 +41,125 @@ func NewFinalizer(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Se
 // and being finalized, entities should be present in both the volatile memory
 // pools and persistent storage.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
-	return f.db.Update(func(tx *badger.Txn) error {
 
-		var toFinalize []*flow.Header
-		err := procedure.RetrieveUnfinalizedAncestors(blockID, &toFinalize)(tx)
+	// headers we want to finalize
+	var headers []*flow.Header
+
+	// execute the finalization checks needed
+	err := f.db.View(func(tx *badger.Txn) error {
+
+		// retrieve the block to make sure we have it
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not get blocks to finalize: %w", err)
+			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// if there are no blocks to finalize, we may have already finalized
-		// this block - exit early
-		if len(toFinalize) == 0 {
-			return nil
+		// retrieve the current finalized state boundary
+		var boundary uint64
+		err = operation.RetrieveBoundary(&boundary)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
-		// now we can step backwards in order to go from oldest to youngest; for
-		// each header, we reconstruct the block and then apply the related
-		// changes to the protocol state
-		for i := len(toFinalize) - 1; i >= 0; i-- {
+		// check if we are finalizing an invalid block
+		if header.Height <= boundary {
+			return fmt.Errorf("height below or equal to boundary (height: %d, boundary: %d)", header.Height, boundary)
+		}
 
-			// look up the list of guarantee IDs included in the payload
-			step := toFinalize[i]
-			var guaranteeIDs []flow.Identifier
-			err = operation.LookupGuaranteePayload(step.Height, step.ID(), step.ParentID, &guaranteeIDs)(tx)
+		// retrieve the finalized block ID
+		var finalID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &finalID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve head: %w", err)
+		}
+
+		// in order to validate the validity of all changes, we need to iterate
+		// through the blocks that need to be finalized from oldest to youngest;
+		// we thus start at the youngest remember all of the intermediary steps
+		// while tracing back until we reach the finalized state
+		headers = append(headers, &header)
+
+		// create a copy of header for the loop to not change the header the slice above points to
+		ancestorID := header.ParentID
+		for ancestorID != finalID {
+			var ancestor flow.Header
+			err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
 			if err != nil {
-				return fmt.Errorf("could not look up guarantees (block_id=%x): %w", step.ID(), err)
+				return fmt.Errorf("could not retrieve parent (%x): %w", header.ParentID, err)
 			}
-
-			// look up list of seal IDs included in the payload
-			var sealIDs []flow.Identifier
-			err = operation.LookupSealPayload(step.Height, step.ID(), step.ParentID, &sealIDs)(tx)
-			if err != nil {
-				return fmt.Errorf("could not look up seals (block_id=%x): %w", step.ID(), err)
-			}
-
-			// remove the guarantees from the memory pool
-			for _, guaranteeID := range guaranteeIDs {
-				ok := f.guarantees.Rem(guaranteeID)
-				if !ok {
-					return fmt.Errorf("could not remove guarantee (collID: %x)", guaranteeID)
-				}
-			}
-
-			// remove all seals from the memory pool
-			for _, sealID := range sealIDs {
-				ok := f.seals.Rem(sealID)
-				if !ok {
-					return fmt.Errorf("could not remove seal (sealID: %x)", sealID)
-				}
-			}
-
-			// finalize the block in the protocol state
-			err := procedure.FinalizeBlock(step.ID())(tx)
-			if err != nil {
-				return fmt.Errorf("could not finalize block (%x): %w", blockID, err)
-			}
+			headers = append(headers, &ancestor)
+			ancestorID = ancestor.ParentID
 		}
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("could not check finalization: %w", err)
+	}
+
+	// now we can step backwards in order to go from oldest to youngest; for
+	// each header, we reconstruct the block and then apply the related
+	// changes to the protocol state
+	for i := len(headers) - 1; i >= 0; i-- {
+		header := headers[i]
+
+		// finalize the block
+		err = operation.RetryOnConflict(func() error {
+			return f.db.Update(func(tx *badger.Txn) error {
+
+				// insert the number to block mapping
+				err = operation.InsertNumber(header.Height, header.ID())(tx)
+				if err != nil {
+					return fmt.Errorf("could not insert number mapping: %w", err)
+				}
+
+				// update the finalized boundary
+				err = operation.UpdateBoundary(header.Height)(tx)
+				if err != nil {
+					return fmt.Errorf("could not update finalized boundary: %w", err)
+				}
+
+				return nil
+			})
+		})
+		if err != nil {
+			return fmt.Errorf("could not execute finalization (header: %x): %w", header.ID(), err)
+		}
+
+		// allow other components to clean up after block
+		// retrieve IDs of entities to remove from memory pools
+		var guaranteeIDs []flow.Identifier
+		var sealIDs []flow.Identifier
+		err := f.db.View(func(tx *badger.Txn) error {
+			// TODO: can optimize by using mempool
+			err := operation.LookupGuaranteePayload(header.Height, header.ID(), header.ParentID, &guaranteeIDs)(tx)
+			if err != nil {
+				return fmt.Errorf("could not lookup guarantees: %w", err)
+			}
+			// TODO: can optimize by using mempool
+			err = operation.LookupSealPayload(header.Height, header.ID(), header.ParentID, &sealIDs)(tx)
+			if err != nil {
+				return fmt.Errorf("could not lookup seals: %w", err)
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("could not look up entities: %w", err)
+		}
+
+		// clean up the memory pools
+		for _, guaranteeID := range guaranteeIDs {
+			_ = f.guarantees.Rem(guaranteeID)
+		}
+		for _, sealID := range sealIDs {
+			_ = f.guarantees.Rem(sealID)
+		}
+
+		// clean up the payload cache
+		f.pcache.AddGuarantees(header.Height, guaranteeIDs)
+		f.pcache.AddSeals(header.Height, sealIDs)
+	}
+
+	return nil
 }

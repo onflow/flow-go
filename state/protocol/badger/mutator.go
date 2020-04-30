@@ -3,13 +3,13 @@
 package badger
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -18,7 +18,7 @@ type Mutator struct {
 	state *State
 }
 
-func (m *Mutator) Bootstrap(genesis *flow.Block) error {
+func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) error {
 	return m.state.db.Update(func(tx *badger.Txn) error {
 
 		// check that the genesis block is valid
@@ -33,143 +33,183 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 			return fmt.Errorf("genesis identities not valid: %w", err)
 		}
 
-		return procedure.Bootstrap(genesis)(tx)
+		return procedure.Bootstrap(commit, genesis)(tx)
 	})
 }
 
 func (m *Mutator) Extend(blockID flow.Identifier) error {
-	return operation.RetryOnConflict(func() error {
-		return m.state.db.Update(func(tx *badger.Txn) error {
 
-			// retrieve the block
-			var block flow.Block
-			err := procedure.RetrieveBlock(blockID, &block)(tx)
+	// sealed state we want to index for the block
+	var lastSeal flow.Seal
+
+	// check whether the block is a valid extension of the state
+	err := m.state.db.Update(func(tx *badger.Txn) error {
+
+		// 1) check that the introduced block directly connects to the last
+		// finalized state; otherwise, it can never become finalized:
+		// - get the header that is the state extension candidate
+		// - get the header that is the last finalized header
+		// - trace back from candidate through parents until we either:
+		// a) hit the last finalized block; we connect to the last finalized
+		// state and the candidate is potentially valid
+		// b) we hit a block that has lower height than the last finalized
+		// block; we thus don't connect to the latest finalized state and the
+		// candidate can not be valid
+
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header: %w", err)
+		}
+
+		var boundary uint64
+		err = operation.RetrieveBoundary(&boundary)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get boundary: %w", err)
+		}
+
+		var finalID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &finalID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve hash: %w", err)
+		}
+
+		aheight := header.Height
+		ancestorID := header.ParentID
+		for ancestorID != finalID {
+
+			var ancestor flow.Header
+			err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve block: %w", err)
+				return fmt.Errorf("could not get block's ancestor from state (%x): %w", ancestorID, err)
 			}
 
-			// retrieve the seal for the parent
-			var parentSeal flow.Seal
-			err = procedure.LookupSealByBlock(block.ParentID, &parentSeal)(tx)
+			// NOTE: we check for each ancestor if the height is one higher than
+			// the parent; we really just need to check for the candidate, but
+			// the check is cheap enough to do it for all of them
+			if aheight != ancestor.Height+1 {
+				return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", aheight, ancestor.Height)
+			}
+
+			// if this check is true, we are not connected to the finalized
+			// state, but instead (potentially) to an ancestor of the finalized
+			// state that already had a valid child finalized
+			if ancestor.Height < boundary {
+				return fmt.Errorf("block doesn't connect to finalized state (%d < %d), ancestorID (%v)", ancestor.Height, boundary, ancestorID)
+			}
+
+			// if we have neither hit the last finalized block, nor a block that
+			// is below its height, we forward our pointer to the next ancestor
+			ancestorID = ancestor.ParentID
+			aheight = ancestor.Height
+		}
+
+		// 2) check whether the block has guarantees that were already included
+		// in a previous finalized block on this chain
+
+		var guaranteeIDs []flow.Identifier
+		err = operation.LookupGuaranteePayload(header.Height, blockID, header.ParentID, &guaranteeIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not look up guarantees: %w", err)
+		}
+		for _, guaranteeID := range guaranteeIDs {
+			old := m.state.pcache.HasGuarantee(guaranteeID)
+			if old {
+				return fmt.Errorf("guarantee already finalized (%x)", guaranteeID)
+			}
+		}
+
+		// 3) check whether the block has seals that were already included in a
+		// a previous block on this chain
+
+		var sealIDs []flow.Identifier
+		err = operation.LookupSealPayload(header.Height, blockID, header.ParentID, &sealIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not look up seals: %w", err)
+		}
+		for _, sealID := range sealIDs {
+			old := m.state.pcache.HasSeal(sealID)
+			if old {
+				return fmt.Errorf("seal already finalized (%x)", sealID)
+			}
+		}
+
+		// 4) check that all seals validly connect to the last sealed state
+
+		// NOTE: we keep the following loop to simulate real performance, even
+		// if the check is currently useless, as we never include seals
+
+		// TODO: re-enable after we want to include seals
+		sealIDs = nil
+
+		// create a lookup for all seals by the parent of the block they sealed
+		byParent := make(map[flow.Identifier]*flow.Seal)
+		for _, sealID := range sealIDs {
+			var seal flow.Seal
+			err = operation.RetrieveSeal(sealID, &seal)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve parent seal: %w", err)
+				return fmt.Errorf("could not retrieve seal: %w", err)
 			}
-
-			// check the header validity
-			err = checkExtendHeader(tx, &block.Header)
-			if err != nil {
-				return fmt.Errorf("extend header not valid: %w", err)
-			}
-
-			// check the payload validity
-			err = checkExtendPayload(tx, &block, m.state.validationBlocks)
-			if err != nil {
-				return fmt.Errorf("extend payload not valid: %w", err)
-			}
-
-			// check the block integrity
-			if block.Payload.Hash() != block.Header.PayloadHash {
-				return fmt.Errorf("block integrity check failed")
-			}
-
-			// TODO: update the stakes with the stake deltas
-
-			// create a lookup for each seal by parent
-			lookup := make(map[string]*flow.Seal, len(block.Seals))
-			for _, seal := range block.Seals {
-				lookup[string(seal.InitialState)] = seal
-			}
-
-			// starting with what was the state commitment at the parent block, we
-			// match each seal into the chain of commits
-			nextSeal := &parentSeal
-			for len(lookup) > 0 {
-
-				// first check if we have a seal connecting to current latest commit
-				possibleNextSeal, ok := lookup[string(nextSeal.FinalState)]
-				if !ok {
-					return fmt.Errorf("seals not connected to state chain (%x)", nextSeal.FinalState)
-				}
-
-				// delete matched seal from lookup and forward to point to seal commit
-				delete(lookup, string(nextSeal.FinalState))
-				nextSeal = possibleNextSeal
-			}
-
-			// insert the the seal into our seals timeline
-			err = operation.IndexSealIDByBlock(blockID, nextSeal.ID())(tx)
-			if err != nil {
-				return fmt.Errorf("could not index seal by block: %w", err)
-			}
-
-			return nil
-		})
-	})
-}
-
-func (m *Mutator) Finalize(blockID flow.Identifier) error {
-	return operation.RetryOnConflict(func() error {
-		return m.state.db.Update(func(tx *badger.Txn) error {
-
-			// retrieve the block to make sure we have it
 			var header flow.Header
-			err := operation.RetrieveHeader(blockID, &header)(tx)
+			err = operation.RetrieveHeader(seal.BlockID, &header)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve block: %w", err)
+				return fmt.Errorf("could not retrieve sealed header: %w", err)
+			}
+			_, already := byParent[header.ParentID]
+			if already {
+				return fmt.Errorf("duplicate block seal (sealed: %x, parent: %x)", seal.BlockID, header.ParentID)
+			}
+			byParent[header.ParentID] = &seal
+		}
+
+		// start at the parent seal to extend execution state
+		err = procedure.LookupSealByBlock(header.ParentID, &lastSeal)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve parent seal: %w", err)
+		}
+
+		// we keep connecting seals from the map until they are all gone or we
+		// have errored
+		for len(byParent) > 0 {
+
+			// get a seal that has the last sealed block as parent
+			seal, found := byParent[lastSeal.BlockID]
+			if !found {
+				return fmt.Errorf("could not find connecting seal (parent: %x)", lastSeal.BlockID)
 			}
 
-			// retrieve the current finalized state boundary
-			var boundary uint64
-			err = operation.RetrieveBoundary(&boundary)(tx)
+			// check if the seal connects to the last known execution state
+			if !bytes.Equal(seal.InitialState, lastSeal.FinalState) {
+				return fmt.Errorf("seal execution states do not connect")
+			}
+
+			// delete the seal from the map and forward pointer
+			delete(byParent, lastSeal.BlockID)
+			lastSeal = *seal
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not check extension: %w", err)
+	}
+
+	// execute the write-portion of the extension (with retry)
+	err = operation.RetryOnConflict(func() error {
+		return m.state.db.Update(func(tx *badger.Txn) error {
+			err = operation.IndexSealIDByBlock(blockID, lastSeal.ID())(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve boundary: %w", err)
+				return fmt.Errorf("could not index seal for extension: %w", err)
 			}
-
-			// check if we are finalizing an invalid block
-			if header.Height <= boundary {
-				return fmt.Errorf("height below or equal to boundary (height: %d, boundary: %d)", header.Height, boundary)
-			}
-
-			// retrieve the hash of the boundary
-			var headID flow.Identifier
-			err = operation.RetrieveNumber(boundary, &headID)(tx)
+			err = operation.IndexStateCommitment(blockID, lastSeal.FinalState)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve head: %w", err)
+				return fmt.Errorf("could not index state commitment: %w", err)
 			}
-
-			// in order to validate the validity of all changes, we need to iterate
-			// through the blocks that need to be finalized from oldest to youngest;
-			// we thus start at the youngest remember all of the intermediary steps
-			// while tracing back until we reach the finalized state
-			headers := []*flow.Header{&header}
-
-			// create a copy of header for the loop to not change the header the slice above points to
-			loopHeader := header
-			for loopHeader.ParentID != headID {
-				var retrievedHeader flow.Header
-				err = operation.RetrieveHeader(loopHeader.ParentID, &retrievedHeader)(tx)
-				if err != nil {
-					return fmt.Errorf("could not retrieve parent (%x): %w", header.ParentID, err)
-				}
-				headers = append(headers, &retrievedHeader)
-				loopHeader = retrievedHeader
-			}
-
-			// now we can step backwards in order to go from oldest to youngest; for
-			// each header, we reconstruct the block and then apply the related
-			// changes to the protocol state
-			for i := len(headers) - 1; i >= 0; i-- {
-
-				// Finalize the block
-				err = procedure.FinalizeBlock(headers[i].ID())(tx)
-				if err != nil {
-					return fmt.Errorf("could not finalize block (%s): %w", header.ID(), err)
-				}
-			}
-
 			return nil
 		})
 	})
+
+	return nil
 }
 
 func checkGenesisHeader(header *flow.Header) error {
@@ -193,9 +233,9 @@ func checkGenesisPayload(tx *badger.Txn, payload *flow.Payload) error {
 		return fmt.Errorf("genesis block must have zero guarantees")
 	}
 
-	// we should have one seal
-	if len(payload.Seals) != 1 {
-		return fmt.Errorf("genesis block must have one seal")
+	// we should have no seals
+	if len(payload.Seals) > 0 {
+		return fmt.Errorf("genesis block must have zero seals")
 	}
 
 	// we should have one role of each type at least
@@ -215,19 +255,6 @@ func checkGenesisPayload(tx *badger.Txn, payload *flow.Payload) error {
 	}
 	if roles[flow.RoleVerification] < 1 {
 		return fmt.Errorf("need at least one verification node")
-	}
-
-	// check the one seal
-	seal := payload.Seals[0]
-
-	// seal should have zero ID as parent block
-	if seal.BlockID != flow.ZeroID {
-		return fmt.Errorf("initial seal needs zero block ID")
-	}
-
-	// seal should have zero ID as parent state commit
-	if seal.InitialState != nil {
-		return fmt.Errorf("initial seal needs nil parent commit")
 	}
 
 	// check that we don't have duplicate identity entries
@@ -255,93 +282,6 @@ func checkGenesisPayload(tx *badger.Txn, payload *flow.Payload) error {
 		if identity.Stake == 0 {
 			return fmt.Errorf("zero stake identity (%x)", identity.NodeID)
 		}
-	}
-
-	return nil
-}
-
-func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
-
-	// get the boundary number of the finalized state
-	var boundary uint64
-	err := operation.RetrieveBoundary(&boundary)(tx)
-	if err != nil {
-		return fmt.Errorf("could not get boundary: %w", err)
-	}
-
-	// get the hash of the latest finalized block
-	var finalID flow.Identifier
-	err = operation.RetrieveNumber(boundary, &finalID)(tx)
-	if err != nil {
-		return fmt.Errorf("could not retrieve hash: %w", err)
-	}
-
-	// trace back from new block until we find a block that has the latest
-	// finalized block as its parent
-	height := header.Height
-	ancestorID := header.ParentID
-	for ancestorID != finalID {
-
-		// get the parent of the block we current look at
-		var ancestor flow.Header
-		err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get block's ancestor from state (%x): %w", ancestorID, err)
-		}
-
-		// check that the parent is one less in height than previous block; this
-		// is redundant for all but the first check, but cheap, and makes the
-		// code a lot simpler
-		if height != ancestor.Height+1 {
-			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", height, ancestor.Height)
-		}
-
-		// check if the ancestor is unfinalized, but already behind the last finalized height (orphaned fork)
-		if ancestor.Height < boundary {
-			return fmt.Errorf("block doesn't connect to finalized state (%d < %d), ancestorID (%v)", ancestor.Height, boundary, ancestorID)
-		}
-
-		// forward to next parent
-		ancestorID = ancestor.ParentID
-		height = ancestor.Height
-	}
-
-	return nil
-}
-
-func checkExtendPayload(tx *badger.Txn, block *flow.Block, validationBlocks uint64) error {
-
-	// currently we don't support identities except for genesis block
-	if len(block.Payload.Identities) > 0 {
-		return fmt.Errorf("extend block has identities")
-	}
-
-	// we check contents for duplicates from parent height and block ID
-	height := block.Header.Height - 1
-	blockID := block.Header.ParentID
-
-	// all the way back to parent height minus validation blocks
-	limit := height - validationBlocks
-	if limit > height { // overflow check
-		limit = 0
-	}
-
-	// check we have no duplicate guarantees
-	err := operation.VerifyGuaranteePayload(height, limit, blockID, flow.GetIDs(block.Payload.Guarantees))(tx)
-	if errors.Is(err, storage.ErrAlreadyIndexed) {
-		return fmt.Errorf("found duplicate guarantee in payload: %w", err)
-	}
-	if err != nil {
-		return fmt.Errorf("could not verify guarantee payload: %w", err)
-	}
-
-	// check we have no duplicate block seals
-	err = operation.VerifySealPayload(height, limit, blockID, flow.GetIDs(block.Payload.Seals))(tx)
-	if errors.Is(err, storage.ErrAlreadyIndexed) {
-		return fmt.Errorf("found duplicate seal in payload: %w", err)
-	}
-	if err != nil {
-		return fmt.Errorf("could not verify seal payload: %w", err)
 	}
 
 	return nil

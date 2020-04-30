@@ -809,3 +809,10 @@ func (ss *SyncSuite) TestSendRequestsBlockIDs() {
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
 
 }
+
+// test a synchronization engine can be started and stopped
+func (ss *SyncSuite) TestStartStop() {
+	<-ss.e.Ready()
+	time.Sleep(2 * time.Second)
+	<-ss.e.Done()
+}

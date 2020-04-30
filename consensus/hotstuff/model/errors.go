@@ -20,8 +20,6 @@ func (e NoVoteError) Is(other error) bool {
 
 var ErrInsufficientVotes = errors.New("received insufficient votes")
 var ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
-var ErrInvalidSigner = errors.New("invalid signer(s)")
-var ErrInvalidSignature = errors.New("invalid signature")
 
 type ErrorConfiguration struct {
 	Msg string
@@ -34,23 +32,18 @@ type ErrorMissingBlock struct {
 	BlockID flow.Identifier
 }
 
-func (e ErrorMissingBlock) Error() string {
+func (e *ErrorMissingBlock) Error() string {
 	return fmt.Sprintf("missing Block at view %d with ID %v", e.View, e.BlockID)
 }
 
-func (e ErrorMissingBlock) Is(other error) bool {
-	_, ok := other.(ErrorMissingBlock)
-	return ok
-}
-
 type ErrorInvalidBlock struct {
-	BlockID flow.Identifier
 	View    uint64
-	Err     error
+	BlockID flow.Identifier
+	Msg     string
 }
 
 func (e ErrorInvalidBlock) Error() string {
-	return fmt.Sprintf("invalid block %x at view %d: %s", e.BlockID, e.View, e.Err.Error())
+	return fmt.Sprintf("invalid block (view %d; ID %x): %s", e.View, e.BlockID, e.Msg)
 }
 
 func (e ErrorInvalidBlock) Is(other error) bool {
@@ -58,27 +51,19 @@ func (e ErrorInvalidBlock) Is(other error) bool {
 	return ok
 }
 
-func (e ErrorInvalidBlock) Unwrap() error {
-	return e.Err
-}
-
 type ErrorInvalidVote struct {
 	VoteID flow.Identifier
 	View   uint64
-	Err    error
+	Msg    string
 }
 
 func (e ErrorInvalidVote) Error() string {
-	return fmt.Sprintf("invalid vote %x for view %d: %s", e.VoteID, e.View, e.Err.Error())
+	return fmt.Sprintf("invalid vote (view %d; ID %x): %s", e.View, e.VoteID, e.Msg)
 }
 
 func (e ErrorInvalidVote) Is(other error) bool {
 	_, ok := other.(ErrorInvalidVote)
 	return ok
-}
-
-func (e ErrorInvalidVote) Unwrap() error {
-	return e.Err
 }
 
 // ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which

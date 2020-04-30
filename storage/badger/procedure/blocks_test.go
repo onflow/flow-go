@@ -43,9 +43,6 @@ func TestFinalizeBlock(t *testing.T) {
 		err = db.Update(operation.InsertBoundary(parent.Height))
 		require.NoError(t, err)
 
-		err = db.Update(FinalizeBlock(block.Header.ID()))
-		require.NoError(t, err)
-
 		var boundary uint64
 		err = db.View(operation.RetrieveBoundary(&boundary))
 		require.NoError(t, err)

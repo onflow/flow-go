@@ -39,7 +39,7 @@ func computeCollectorClusters(stakingNodes []model.NodeInfo) *flow.ClusterList {
 	return clusters
 }
 
-func constructGenesisBlocksForCollectorClusters(clusters *flow.ClusterList) []cluster.Block {
+func constructGenesisBlocksForCollectorClusters(clusters *flow.ClusterList) []*cluster.Block {
 	clusterBlocks := run.GenerateGenesisClusterBlocks(clusters)
 
 	for i, clusterBlock := range clusterBlocks {
@@ -49,7 +49,7 @@ func constructGenesisBlocksForCollectorClusters(clusters *flow.ClusterList) []cl
 	return clusterBlocks
 }
 
-func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, nodeInfos []model.NodeInfo, block flow.Block, clusterBlocks []cluster.Block) {
+func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, nodeInfos []model.NodeInfo, block *flow.Block, clusterBlocks []*cluster.Block) {
 
 	if len(clusterBlocks) != clusterList.Size() {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("clusterList.Size()", clusterList.Size()).
@@ -59,7 +59,7 @@ func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, node
 	for i := 0; i < clusterList.Size(); i++ {
 		signers := filterClusterSigners(nodeInfos)
 
-		qc, err := run.GenerateClusterGenesisQC(signers, &block, &clusterBlocks[i])
+		qc, err := run.GenerateClusterGenesisQC(signers, block, clusterBlocks[i])
 		if err != nil {
 			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster genesis QC failed")
 		}

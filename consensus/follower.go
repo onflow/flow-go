@@ -11,13 +11,21 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 // TODO: this needs to be integrated with proper configuration and bootstrapping.
 
-func NewFollower(log zerolog.Logger, committee hotstuff.Committee, updater module.Finalizer, verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*hotstuff.FollowerLoop, error) {
+func NewFollower(log zerolog.Logger, state protocol.State, me module.Local, updater module.Finalizer, verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate, selector flow.IdentityFilter) (*hotstuff.FollowerLoop, error) {
+
+	// initialize view state
+	viewState, err := viewstate.New(state, me.NodeID(), selector)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize view state: %w", err)
+	}
 
 	// initialize internal finalizer
 	rootBlock := &model.Block{
@@ -38,7 +46,7 @@ func NewFollower(log zerolog.Logger, committee hotstuff.Committee, updater modul
 	}
 
 	// initialize the validator
-	validator := validator.New(committee, finalizer, verifier)
+	validator := validator.New(viewState, finalizer, verifier)
 
 	// initialize the follower logic
 	logic, err := follower.New(log, validator, finalizer, notifier)

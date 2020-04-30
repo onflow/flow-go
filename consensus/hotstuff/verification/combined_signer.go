@@ -3,12 +3,12 @@ package verification
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/dkg"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 // CombinedSigner is a signer capable of creating two signatures for each signing
@@ -19,22 +19,27 @@ import (
 // be used to reconstruct a threshold signature.
 type CombinedSigner struct {
 	*CombinedVerifier
+	state    protocol.State
 	dkg      dkg.State
 	staking  module.AggregatingSigner
 	beacon   module.ThresholdSigner
 	merger   module.Merger
+	selector flow.IdentityFilter
 	signerID flow.Identifier
 }
 
 // NewCombinedSigner creates a new combined signer with the given dependencies:
-// - the hotstuff committee's state is used to retrieve public keys for signers;
+// - the protocol state is used to retrieve public keys for signers;
+// - the selector is used to select the set of valid signers from the protocol state;
 // - the signer ID is used as the identity when creating signatures;
 // - the staking signer is used to create aggregatable signatures for the first signature part;
 // - the threshold signer is used to create threshold signture shres for the second signature part;
 // - the merger is used to join and split the two signature parts on our models;
-func NewCombinedSigner(committee hotstuff.Committee, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, signerID flow.Identifier) *CombinedSigner {
+// - the selector is used to select the set of scheme participants from the protocol state.
+func NewCombinedSigner(state protocol.State, dkg dkg.State, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, selector flow.IdentityFilter, signerID flow.Identifier) *CombinedSigner {
 	sc := &CombinedSigner{
-		CombinedVerifier: NewCombinedVerifier(committee, dkg, staking, beacon, merger),
+		CombinedVerifier: NewCombinedVerifier(state, dkg, staking, beacon, merger, selector),
+		state:            state,
 		dkg:              dkg,
 		staking:          staking,
 		beacon:           beacon,

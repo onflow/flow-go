@@ -118,11 +118,10 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	if readPointG2(&pk.point, publicKeyBytes) != nil {
 		return nil, errors.New("the input slice does not encode a public key")
 	}
-	if pk.point.checkMembershipG2() {
-		return &pk, nil
-	}
-	return nil, errors.New("the public key is not a valid BLS12-381 curve key")
-
+	// if !pk.point.checkMembershipG2() {
+	// 	return nil, errors.New("the public key is not a valid BLS12-381 curve key")
+	// }
+	return &pk, nil
 }
 
 // PrKeyBLSBLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey

@@ -2,6 +2,7 @@ package testnet
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -12,15 +13,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/testingdock"
-
 	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
+	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -266,7 +267,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		dockerclient.FromEnv,
 		dockerclient.WithAPIVersionNegotiation(),
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	suite, _ := testingdock.GetOrCreateSuite(t, networkConf.Name, testingdock.SuiteOpts{
 		Client: dockerClient,
@@ -296,7 +297,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	// add each node to the network
 	for _, nodeConf := range confs {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	return flowNetwork
@@ -342,7 +343,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// create a directory for the node database
 	flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
 	err = os.Mkdir(flowDBDir, 0700)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// Bind the host directory to the container's database directory
 	// Bind the common bootstrap directory to the container
@@ -385,7 +386,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// create directories for execution state trie and values in the tmp
 			// host directory.
 			tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(
 				opts.HostConfig.Binds,
