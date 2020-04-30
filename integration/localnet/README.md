@@ -1,4 +1,18 @@
-# Local Instrumented Test Environment (LITE)
+# Flow Local Instrumented Test Environment (FLITE)
+
+## Bootstrap the network
+
+Bootstrap a new network:
+
+```sh
+make init
+```
+
+You can optionally specify the number of consensus nodes:
+
+```sh
+make -e CONSENSUS=5 init
+```
 
 ## Start the network
 
