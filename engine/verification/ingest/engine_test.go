@@ -621,6 +621,7 @@ func (suite *TestSuite) TestHandleCollection_Tracked() {
 
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}, nil)
+	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
@@ -806,6 +807,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.authCollections.On("Has", suite.collection.ID()).Return(true)
 			suite.authCollections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
 			// tracker for the collection
+			suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 			suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
 			// chunk data pack in mempool
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
