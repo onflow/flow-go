@@ -36,12 +36,6 @@ type ExecutionSuite struct {
 	receiptState  common.ReceiptState
 }
 
-func (es *ExecutionSuite) Start(timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	es.cancel = cancel
-	es.net.Start(ctx)
-}
-
 func (gs *ExecutionSuite) Ghost() *client.GhostClient {
 	ghost := gs.net.ContainerByID(gs.ghostID)
 	client, err := common.GetGhostClient(ghost)
@@ -68,7 +62,7 @@ func (gs *ExecutionSuite) SetupTest() {
 	gs.nodeIDs = unittest.IdentifierListFixture(3)
 	for _, nodeID := range gs.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.InfoLevel))
+			testnet.WithLogLevel(zerolog.ErrorLevel))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 	}
 
@@ -101,16 +95,22 @@ func (gs *ExecutionSuite) SetupTest() {
 
 	// initialize the network
 	gs.net = testnet.PrepareFlowNetwork(gs.T(), netConfig)
+
+	// start the network
+	ctx, cancel := context.WithCancel(context.Background())
+	gs.cancel = cancel
+	gs.net.Start(ctx)
+
+	// start tracking blocks
+	gs.trackBlocksAndReceipts()
+}
+
+func (gs *ExecutionSuite) TearDownTest() {
+	gs.stopBlocksAndReceiptsTracking()
+	gs.net.Remove()
 }
 
 func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
-	// start the network and defer cleanup
-	gs.Start(time.Minute)
-	defer gs.net.Remove()
-
-	// start tracking blocks
-	go gs.trackBlocksAndReceipts()
-	defer gs.stopBlocksAndReceiptsTracking()
 
 	// pause execution node 2
 	err := gs.net.ContainerByID(gs.exe2ID).Pause()
@@ -179,15 +179,20 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 func (gs *ExecutionSuite) trackBlocksAndReceipts() {
 	var reader *client.FlowMessageStreamReader
 
+	gs.blockState = common.BlockState{}
+	gs.receiptState = common.ReceiptState{}
 	gs.ghostTracking = true
 
+	var reader *client.FlowMessageStreamReader
+
 	// subscribe to the ghost
-	timeout := time.After(5 * time.Second)
+	timeout := time.After(10 * time.Second)
 	ticker := time.Tick(100 * time.Millisecond)
-	for stay := true; stay && gs.ghostTracking; {
+	for retry := true; retry && gs.ghostTracking; {
 		select {
 		case <-timeout:
 			require.FailNowf(gs.T(), "could not subscribe to ghost", "%v", timeout)
+			return
 		case <-ticker:
 			if !gs.ghostTracking {
 				return
@@ -195,12 +200,16 @@ func (gs *ExecutionSuite) trackBlocksAndReceipts() {
 
 			var err error
 			reader, err = gs.Ghost().Subscribe(context.Background())
-			if err == nil {
-				stay = false
+			if err != nil {
+				gs.T().Logf("error subscribing to ghost: %v", err)
+			} else {
+				retry = false
 			}
 		}
 	}
 
+	// continue with processing of messages in the background
+	go func() {
 	for {
 		if !gs.ghostTracking {
 			return
@@ -229,6 +238,7 @@ func (gs *ExecutionSuite) trackBlocksAndReceipts() {
 			continue
 		}
 	}
+	}()
 }
 
 func (gs *ExecutionSuite) stopBlocksAndReceiptsTracking() {
