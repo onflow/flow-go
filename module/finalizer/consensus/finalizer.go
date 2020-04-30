@@ -100,7 +100,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	})
 }
 
-func (f *Finalizer) MakeTentative(blockID flow.Identifier, parentID flow.Identifier) error {
+// MakeConfirm indexes a block by its parent. The index is useful for looking up the child block
+// of a finalized block.
+func (f *Finalizer) MakeConfirm(blockID flow.Identifier, parentID flow.Identifier) error {
 	return f.db.Update(func(tx *badger.Txn) error {
 		err := procedure.IndexChildByBlockID(parentID, blockID)(tx)
 		if err != nil {

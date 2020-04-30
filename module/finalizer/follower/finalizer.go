@@ -49,7 +49,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	})
 }
 
-func (f *Finalizer) MakeTentative(blockID flow.Identifier, parentID flow.Identifier) error {
+// MakeConfirm will declare a block has passed all the validation, and is
+// incorporated to a certain branch that is waiting to be finalized.
+func (f *Finalizer) MakeConfirm(blockID flow.Identifier, parentID flow.Identifier) error {
 	return f.db.Update(func(tx *badger.Txn) error {
 		err := procedure.IndexChildByBlockID(parentID, blockID)(tx)
 		if err != nil {
