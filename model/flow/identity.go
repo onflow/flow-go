@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/crypto"
 )
@@ -71,7 +72,7 @@ func (iy Identity) Checksum() Identifier {
 	return MakeID(iy)
 }
 
-type jsonMarshalIdentity struct {
+type marshalIdentity struct {
 	NodeID        Identifier
 	Address       string
 	Role          Role
@@ -81,38 +82,75 @@ type jsonMarshalIdentity struct {
 }
 
 func (iy *Identity) UnmarshalJSON(b []byte) error {
-	var m jsonMarshalIdentity
+	var m marshalIdentity
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err
 	}
+
+	return iy.unmarshal(m)
+}
+
+func (iy Identity) MarshalJSON() ([]byte, error) {
+	m := iy.marshal()
+	return json.Marshal(m)
+}
+
+func (iy *Identity) unmarshal(m marshalIdentity) error {
 	iy.NodeID = m.NodeID
 	iy.Address = m.Address
 	iy.Role = m.Role
 	iy.Stake = m.Stake
+
 	var err error
+
 	if m.StakingPubKey != nil {
 		if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, m.StakingPubKey); err != nil {
 			return err
 		}
 	}
+
 	if m.NetworkPubKey != nil {
 		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, m.NetworkPubKey); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
-func (iy Identity) MarshalJSON() ([]byte, error) {
-	m := jsonMarshalIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
+func (iy Identity) marshal() marshalIdentity {
+	m := marshalIdentity{
+		iy.NodeID,
+		iy.Address,
+		iy.Role,
+		iy.Stake,
+		nil,
+		nil,
+	}
+
 	if iy.StakingPubKey != nil {
 		m.StakingPubKey = iy.StakingPubKey.Encode()
 	}
+
 	if iy.NetworkPubKey != nil {
 		m.NetworkPubKey = iy.NetworkPubKey.Encode()
 	}
 
-	return json.Marshal(m)
+	return m
+}
+
+func (iy Identity) EncodeMsgpack(enc *msgpack.Encoder) error {
+	m := iy.marshal()
+	return enc.Encode(&m)
+}
+
+func (iy *Identity) DecodeMsgpack(dec *msgpack.Decoder) error {
+	var m marshalIdentity
+	if err := dec.Decode(&m); err != nil {
+		return err
+	}
+
+	return iy.unmarshal(m)
 }
 
 // IdentityFilter is a filter on identities.
