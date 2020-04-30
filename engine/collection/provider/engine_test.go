@@ -2,6 +2,7 @@ package provider_test
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -102,7 +103,7 @@ func (suite *Suite) TestCollectionRequest() {
 		suite.reqEngine.On("Process", suite.colNode.Me.NodeID(), expectedRes).Return(nil).Once()
 
 		// send a request for the collection
-		req := messages.CollectionRequest{ID: coll.ID()}
+		req := messages.CollectionRequest{ID: coll.ID(), Nonce: rand.Uint64()}
 		err = suite.conduit.Submit(&req, suite.colNode.Me.NodeID())
 		assert.NoError(t, err)
 
@@ -124,7 +125,7 @@ func (suite *Suite) TestCollectionRequest() {
 		t := suite.T()
 
 		// create request with invalid/nonexistent fingerprint
-		req := &messages.CollectionRequest{ID: unittest.IdentifierFixture()}
+		req := &messages.CollectionRequest{ID: unittest.IdentifierFixture(), Nonce: rand.Uint64()}
 
 		// provider should return error
 		err := suite.colNode.ProviderEngine.ProcessLocal(req)

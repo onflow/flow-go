@@ -112,7 +112,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("collection_id", logging.Entity(guarantee)).
-		RawJSON("signers", logging.AsJSON(guarantee.SignerIDs)).
+		Int("signers", len(guarantee.SignerIDs)).
 		Logger()
 
 	log.Info().Msg("collection guarantee received from collection cluster")

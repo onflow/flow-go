@@ -8,17 +8,15 @@ import (
 )
 
 type TrieVerifier struct {
-	height        int
-	defaultHashes [257][]byte
+	trieHeight int
 }
 
 // NewTrieVerifier creates a new trie-backed ledger verifier.
 //
 // The verifier is configured with a height and a default hash value for each level.
-func NewTrieVerifier(height int, defaultHashes [257][]byte) *TrieVerifier {
+func NewTrieVerifier(trieHeight int) *TrieVerifier {
 	return &TrieVerifier{
-		height:        height,
-		defaultHashes: defaultHashes,
+		trieHeight: trieHeight,
 	}
 }
 
@@ -26,9 +24,9 @@ func NewTrieVerifier(height int, defaultHashes [257][]byte) *TrieVerifier {
 // and verifies if the proofs are correct
 func (v *TrieVerifier) VerifyRegistersProof(
 	registerIDs []flow.RegisterID,
-	stateCommitment flow.StateCommitment,
 	values []flow.RegisterValue,
 	proof []flow.StorageProof,
+	stateCommitment flow.StateCommitment,
 ) (verified bool, err error) {
 	proofHldr, err := trie.DecodeProof(proof)
 	if err != nil {
@@ -40,9 +38,9 @@ func (v *TrieVerifier) VerifyRegistersProof(
 	for i := 0; i < length; i++ {
 		flag, singleProof, inclusion, size := proofHldr.ExportProof(i)
 		if inclusion {
-			verify = trie.VerifyInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.height)
+			verify = trie.VerifyInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.trieHeight)
 		} else {
-			verify = trie.VerifyNonInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.height)
+			verify = trie.VerifyNonInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.trieHeight)
 		}
 		if !verify {
 			return verify, errors.New("Incorrect Proof")

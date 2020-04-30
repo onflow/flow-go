@@ -159,6 +159,7 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 
 func SetupMetrics() *mock.Metrics {
 	metrics := &mock.Metrics{}
-	metrics.On("NetworkMessageSent", mockery.Anything).Return()
+	metrics.On("NetworkMessageSent", mockery.Anything, mockery.Anything).Return()
+	metrics.On("NetworkMessageReceived", mockery.Anything, mockery.Anything).Return()
 	return metrics
 }

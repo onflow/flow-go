@@ -8,6 +8,7 @@ import (
 type CollectionTracker struct {
 	BlockID      flow.Identifier
 	CollectionID flow.Identifier
+	Counter      uint // keeps track of number of retries
 }
 
 func (c *CollectionTracker) ID() flow.Identifier {

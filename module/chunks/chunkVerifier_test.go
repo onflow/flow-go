@@ -2,7 +2,9 @@ package chunks_test
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
@@ -25,6 +27,8 @@ type ChunkVerifierTestSuite struct {
 // Make sure variables are set properly
 // SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupTest() {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{})
 }
 

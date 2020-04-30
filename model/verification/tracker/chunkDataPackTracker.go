@@ -8,6 +8,7 @@ import (
 type ChunkDataPackTracker struct {
 	BlockID flow.Identifier
 	ChunkID flow.Identifier
+	Counter uint // keeps track of number of retries
 }
 
 func (c *ChunkDataPackTracker) ID() flow.Identifier {

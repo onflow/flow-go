@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
@@ -24,7 +26,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
@@ -174,18 +175,23 @@ func main() {
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 			merger := signature.NewCombiner()
 
-			// define the node set that is valid as signers
-			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+			// initialize consensus committee's membership state
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			if err != nil {
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
 			// TODO: use proper engine for notifier to follower
 			notifier := notifications.NewNoopConsumer()
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, notifier, &node.GenesisBlock.Header, node.GenesisQC, selector)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, notifier, &node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
