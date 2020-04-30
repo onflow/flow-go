@@ -7,9 +7,8 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-
 	"github.com/dapperlabs/flow-go/integration/testnet"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 const (
