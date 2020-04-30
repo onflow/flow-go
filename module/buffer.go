@@ -17,7 +17,7 @@ type PendingBlockBuffer interface {
 
 	ByParentID(parentID flow.Identifier) ([]*flow.PendingBlock, bool)
 
-	DropForParent(parentID flow.Identifier)
+	DropForParent(header *flow.Header)
 }
 
 // PendingClusterBlockBuffer is the same thing as PendingBlockBuffer, but for

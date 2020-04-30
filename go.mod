@@ -29,7 +29,7 @@ require (
 	github.com/onflow/cadence v0.1.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200427172538-223aae761ecd
 	github.com/onsi/ginkgo v1.10.1 // indirect
-	github.com/onsi/gomega v1.8.1 // indirect
+	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.3.0
@@ -50,6 +50,8 @@ require (
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
+
+replace github.com/dapperlabs/flow-go => ./
 
 replace github.com/dapperlabs/flow-go/crypto => ./crypto
 
