@@ -151,14 +151,21 @@ func recoverTrustedRoot(state protocol.State, headers storage.Headers, rootHeade
 		// when bootstrapping the node, there is no finalized block in storage,
 		// in this case we will use rootHeader as trustedRoot
 		if err == storage.ErrNotFound {
-			return trustedRootFromGenesis(rootHeader, rootQC), nil
+			return makeRootBlockQC(rootHeader, rootQC), nil
 		}
 		return nil, fmt.Errorf("could not get last finalized block: %w", err)
 	}
 
+	if final.View < rootHeader.View {
+		return nil, fmt.Errorf("finalized Block has older view than trusted root")
+	}
+
 	// if finalized view is genesis block, then use genesis block as the trustedRoot
 	if final.View == rootHeader.View {
-		return trustedRootFromGenesis(rootHeader, rootQC), nil
+		if final.ID() != rootHeader.ID() {
+			return nil, fmt.Errorf("finalized Block conflicts with trusted root")
+		}
+		return makeRootBlockQC(rootHeader, rootQC), nil
 	}
 
 	// get the parent for the latest finalized block
@@ -185,18 +192,22 @@ func recoverTrustedRoot(state protocol.State, headers storage.Headers, rootHeade
 	return trustedRoot, nil
 }
 
-func trustedRootFromGenesis(rootHeader *flow.Header, rootQC *model.QuorumCertificate) *forks.BlockQC {
+func makeRootBlockQC(header *flow.Header, qc *model.QuorumCertificate) *forks.BlockQC {
+	// By convention of Forks, the trusted root block does not need to have a qc
+	// (as is the case for the genesis block). For simplify of the implementation, we always omit
+	// the QC of the root block. Thereby, we have one algorithm which handles all cases,
+	// instead of having to distinguish between a genesis block without a qc
+	// and a later-finalized root block where we can retrieve the qc.
 	rootBlock := &model.Block{
-		View:        rootHeader.View,
-		BlockID:     rootHeader.ID(),
-		ProposerID:  rootHeader.ProposerID,
-		QC:          nil,
-		PayloadHash: rootHeader.PayloadHash,
-		Timestamp:   rootHeader.Timestamp,
+		View:        header.View,
+		BlockID:     header.ID(),
+		ProposerID:  header.ProposerID,
+		QC:          nil, // QC is omitted
+		PayloadHash: header.PayloadHash,
+		Timestamp:   header.Timestamp,
 	}
-	trustedRoot := &forks.BlockQC{
-		QC:    rootQC,
+	return &forks.BlockQC{
+		QC:    qc,
 		Block: rootBlock,
 	}
-	return trustedRoot
 }
