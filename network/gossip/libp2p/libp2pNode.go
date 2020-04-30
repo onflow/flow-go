@@ -220,6 +220,10 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 			// choose a random interval between 0 and 5 ms to retry
 			r := rand.Intn(5)
 			time.Sleep(time.Duration(r) * time.Millisecond)
+
+			// remove the peer from the peer store if present
+			p.libP2PHost.Peerstore().ClearAddrs(targetID)
+
 			// cancel the dial back off, since we want to retry immediately
 			n := p.libP2PHost.Network()
 			if s, ok := n.(*swarm.Swarm); ok {

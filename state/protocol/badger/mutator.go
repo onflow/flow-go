@@ -62,7 +62,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			}
 
 			// check the payload validity
-			err = checkExtendPayload(tx, &block)
+			err = checkExtendPayload(tx, &block, m.state.validationBlocks)
 			if err != nil {
 				return fmt.Errorf("extend payload not valid: %w", err)
 			}
@@ -309,19 +309,25 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	return nil
 }
 
-func checkExtendPayload(tx *badger.Txn, block *flow.Block) error {
+func checkExtendPayload(tx *badger.Txn, block *flow.Block, validationBlocks uint64) error {
 
 	// currently we don't support identities except for genesis block
 	if len(block.Payload.Identities) > 0 {
 		return fmt.Errorf("extend block has identities")
 	}
 
-	// we check contents for duplicates from the parent height and ID
+	// we check contents for duplicates from parent height and block ID
 	height := block.Header.Height - 1
 	blockID := block.Header.ParentID
 
+	// all the way back to parent height minus validation blocks
+	limit := height - validationBlocks
+	if limit > height { // overflow check
+		limit = 0
+	}
+
 	// check we have no duplicate guarantees
-	err := operation.VerifyGuaranteePayload(height, blockID, flow.GetIDs(block.Payload.Guarantees))(tx)
+	err := operation.VerifyGuaranteePayload(height, limit, blockID, flow.GetIDs(block.Payload.Guarantees))(tx)
 	if errors.Is(err, storage.ErrAlreadyIndexed) {
 		return fmt.Errorf("found duplicate guarantee in payload: %w", err)
 	}
@@ -330,7 +336,7 @@ func checkExtendPayload(tx *badger.Txn, block *flow.Block) error {
 	}
 
 	// check we have no duplicate block seals
-	err = operation.VerifySealPayload(height, blockID, flow.GetIDs(block.Payload.Seals))(tx)
+	err = operation.VerifySealPayload(height, limit, blockID, flow.GetIDs(block.Payload.Seals))(tx)
 	if errors.Is(err, storage.ErrAlreadyIndexed) {
 		return fmt.Errorf("found duplicate seal in payload: %w", err)
 	}

@@ -40,7 +40,7 @@ func ProposalKeyFixture() flow.ProposalKey {
 // AccountKeyFixture returns a randomly generated ECDSA/SHA3 account key.
 func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
-	_, err := rand.Read(seed)
+	_, err := crand.Read(seed)
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +330,7 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 
 func StateCommitmentFixture() flow.StateCommitment {
 	var state = make([]byte, 20)
-	_, _ = rand.Read(state[0:20])
+	_, _ = crand.Read(state[0:20])
 	return state
 }
 
@@ -352,7 +352,7 @@ func IdentifierListFixture(n int) []flow.Identifier {
 
 func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
-	_, _ = rand.Read(id[:])
+	_, _ = crand.Read(id[:])
 	return id
 }
 
@@ -449,7 +449,7 @@ func ChunkFixture() *flow.Chunk {
 
 func SignatureFixture() crypto.Signature {
 	sig := make([]byte, 32)
-	_, _ = rand.Read(sig)
+	_, _ = crand.Read(sig)
 	return sig
 }
 
@@ -577,7 +577,7 @@ func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 // SeedFixture returns a random []byte with length n
 func SeedFixture(n int) []byte {
 	var seed = make([]byte, n)
-	_, _ = rand.Read(seed[0:n])
+	_, _ = crand.Read(seed[0:n])
 	return seed
 }
 
