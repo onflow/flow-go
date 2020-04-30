@@ -22,6 +22,21 @@ type SECCurve struct {
 	goec.CurveParams
 }
 
+// IsOnCurve checks if a point (x,y) is on curve
+// The function assumes x and y are Fp elements
+func (curve *SECCurve) IsOnCurve(x, y *big.Int) bool {
+	// y² = x³ + b
+	y2 := new(big.Int).Mul(y, y)
+	y2.Mod(y2, curve.P)
+
+	x3 := new(big.Int).Mul(x, x)
+	x3.Mul(x3, x)
+	x3.Add(x3, curve.B)
+	x3.Mod(x3, curve.P)
+
+	return x3.Cmp(y2) == 0
+}
+
 // affineFromJacobian reverses the Jacobian transform.
 // If the point is ∞ it returns 0, 0.
 // (taken from Go/crypto/elliptic)

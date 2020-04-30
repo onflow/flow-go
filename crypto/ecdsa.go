@@ -142,12 +142,17 @@ func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 }
 
 func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
-	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
-	if len(der) != Nlen {
-		return nil, errors.New("raw private key is not valid")
+	n := a.curve.Params().N
+	nlen := bitsToBytes(n.BitLen())
+	if len(der) != nlen {
+		return nil, errors.New("raw private key size is not valid")
 	}
 	var d big.Int
 	d.SetBytes(der)
+
+	if d.Cmp(n) >= 0 {
+		return nil, errors.New("raw public key value is not valid")
+	}
 
 	priv := goecdsa.PrivateKey{
 		D: &d,
@@ -162,13 +167,18 @@ func (a *ecdsaAlgo) decodePrivateKey(der []byte) (PrivateKey, error) {
 }
 
 func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
-	Plen := bitsToBytes((a.curve.Params().P).BitLen())
-	if len(der) != 2*Plen {
-		return nil, errors.New("raw public key is not valid")
+	p := (a.curve.Params().P)
+	plen := bitsToBytes(p.BitLen())
+	if len(der) != 2*plen {
+		return nil, errors.New("raw public key size is not valid")
 	}
 	var x, y big.Int
-	x.SetBytes(der[:Plen])
-	y.SetBytes(der[Plen:])
+	x.SetBytes(der[:plen])
+	y.SetBytes(der[plen:])
+
+	if x.Cmp(p) >= 0 || y.Cmp(p) >= 0 || !a.curve.IsOnCurve(&x, &y) {
+		return nil, errors.New("raw public key value is not valid")
+	}
 
 	pk := goecdsa.PublicKey{
 		Curve: a.curve,
