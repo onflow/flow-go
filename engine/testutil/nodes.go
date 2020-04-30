@@ -44,7 +44,7 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 
 	db, dbDir := unittest.TempBadgerDB(t)
 
-	state, err := UncheckedState(db, identities)
+	state, err := UncheckedState(db, flow.GenesisStateCommitment, identities)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -183,6 +183,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	payloadsStorage := storage.NewPayloads(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
 	eventsStorage := storage.NewEvents(node.DB)
+	txResultStorage := storage.NewTransactionResults(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
@@ -229,11 +230,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		payloadsStorage,
 		collectionsStorage,
 		eventsStorage,
+		txResultStorage,
 		computationEngine,
 		providerEngine,
 		execState,
 		syncThreshold,
 		node.Metrics,
+		false,
 	)
 	require.NoError(t, err)
 

@@ -11,6 +11,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
@@ -23,13 +25,13 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	consensusMetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -102,6 +104,10 @@ func main() {
 			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Metrics, node.Me)
 			return ing, err
 		}).
+		Component("mempool metrics monitor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			monitor := consensusMetrics.NewMonitor(node.Metrics, guarantees, receipts, approvals, seals)
+			return monitor, nil
+		}).
 		Component("consensus components", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
@@ -129,9 +135,6 @@ func main() {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
 
-			// define the selector for our consensus participant set
-			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
-
 			// initialize the block builder
 			build := builder.NewBuilder(node.DB, guarantees, seals,
 				builder.WithMinInterval(minInterval),
@@ -150,16 +153,22 @@ func main() {
 			// initialize the simple merger to combine staking & beacon signatures
 			merger := signature.NewCombiner()
 
+			// initialize Main consensus committee's state
+			committee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			if err != nil {
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+			}
+
 			// initialize the combined signer for hotstuff
-			signer := verification.NewCombinedSigner(node.State, node.DKGState, staking, beacon, merger, selector, node.Me.NodeID())
+			signer := verification.NewCombinedSigner(committee, node.DKGState, staking, beacon, merger, node.Me.NodeID())
 
 			// initialize a logging notifier for hotstuff
 			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, guaranteesDB, sealsDB)
 
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, headersDB, viewsDB, node.State, node.Me,
-				build, final, signer, comp, selector, &node.GenesisBlock.Header, node.GenesisQC,
+				node.Logger, notifier, node.Metrics, headersDB, viewsDB, committee, node.State,
+				build, final, signer, comp, &node.GenesisBlock.Header, node.GenesisQC,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
 			if err != nil {

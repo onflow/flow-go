@@ -109,9 +109,7 @@ func (x *xorshifts) Permutation(n int) ([]int, error) {
 	items := make([]int, n)
 	for i := 0; i < n; i++ {
 		j, _ := x.IntN(i + 1)
-		if j != i {
-			items[i] = items[j]
-		}
+		items[i] = items[j]
 		items[j] = i
 	}
 	return items, nil

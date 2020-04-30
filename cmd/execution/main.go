@@ -33,6 +33,7 @@ func main() {
 		ledgerStorage      storage.Ledger
 		blocks             storage.Blocks
 		events             storage.Events
+		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
 		computationManager *computation.Manager
 		ingestionEng       *ingestion.Engine
@@ -75,7 +76,7 @@ func main() {
 			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
 				panic("error while boostrapping execution state - resulting state is different than precalculated!")
 			}
-			if !bytes.Equal(flow.GenesisStateCommitment, block.Seals[0].FinalState) {
+			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
 				panic("genesis seal state commitment different from precalculated")
 			}
 
@@ -110,6 +111,7 @@ func main() {
 			collections := badger.NewCollections(node.DB)
 			payloads := badger.NewPayloads(node.DB)
 			events := badger.NewEvents(node.DB)
+			txResults := badger.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
@@ -119,16 +121,18 @@ func main() {
 				payloads,
 				collections,
 				events,
+				txResults,
 				computationManager,
 				providerEngine,
 				executionState,
 				6, //TODO - config param maybe?
 				node.Metrics,
+				true,
 			)
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events, txResults)
 			return rpcEng, nil
 		}).Run("execution")
 

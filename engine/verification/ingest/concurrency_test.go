@@ -219,8 +219,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.RequireReturnsBefore(t, senderWG.Wait, 10*time.Second)
-	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, 10*time.Second)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
+	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
 
 	// stops ingest engine of verification node
 	// Note: this should be done prior to any evaluation to make sure that

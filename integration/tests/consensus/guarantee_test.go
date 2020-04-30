@@ -26,7 +26,6 @@ type GuaranteeSuite struct {
 	cancel  context.CancelFunc
 	net     *testnet.FlowNetwork
 	nodeIDs []flow.Identifier
-	ghostID flow.Identifier
 	collID  flow.Identifier
 	reader  *client.FlowMessageStreamReader
 }
@@ -38,7 +37,7 @@ func (gs *GuaranteeSuite) Consensus(index int) *testnet.Container {
 }
 
 func (gs *GuaranteeSuite) Ghost() *client.GhostClient {
-	ghost := gs.net.ContainerByID(gs.ghostID)
+	ghost := gs.net.ContainerByID(gs.collID)
 	client, err := common.GetGhostClient(ghost)
 	require.NoError(gs.T(), err, "could not get ghost client")
 	return client
@@ -53,17 +52,12 @@ func (gs *GuaranteeSuite) SetupTest() {
 	gs.nodeIDs = unittest.IdentifierListFixture(3)
 
 	// need one execution node
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution)
+	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
 	// need one verification node
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification)
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
-
-	// need one collection node
-	gs.collID = unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.collID))
-	nodeConfigs = append(nodeConfigs, collConfig)
 
 	// generate consensus node config for each consensus identity
 	for _, nodeID := range gs.nodeIDs {
@@ -72,8 +66,8 @@ func (gs *GuaranteeSuite) SetupTest() {
 	}
 
 	// add the ghost node config
-	gs.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.ghostID), testnet.AsGhost())
+	gs.collID = unittest.IdentifierFixture()
+	ghostConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(gs.collID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, ghostConfig)
 
 	// generate the network config

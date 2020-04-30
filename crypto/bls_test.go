@@ -15,20 +15,20 @@ func TestBLSBLS12381(t *testing.T) {
 	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(t, err)
-	halg := NewBLS_KMAC("test tag")
+	halg := NewBLSKMAC("test tag")
 	// test the consistency with different inputs
 	testGenSignVerify(t, BLSBLS12381, halg)
 }
 
 // Signing bench
 func BenchmarkBLSBLS12381Sign(b *testing.B) {
-	halg := NewBLS_KMAC("bench tag")
+	halg := NewBLSKMAC("bench tag")
 	benchSign(b, BLSBLS12381, halg)
 }
 
 // Verifying bench
 func BenchmarkBLSBLS12381Verify(b *testing.B) {
-	halg := NewBLS_KMAC("bench tag")
+	halg := NewBLSKMAC("bench tag")
 	benchVerify(b, BLSBLS12381, halg)
 }
 

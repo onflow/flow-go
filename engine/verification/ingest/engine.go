@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -357,7 +358,8 @@ func (e *Engine) requestCollection(collID, blockID flow.Identifier) error {
 	}
 
 	req := &messages.CollectionRequest{
-		ID: collID,
+		ID:    collID,
+		Nonce: rand.Uint64(),
 	}
 
 	// TODO we should only submit to cluster which owns the collection

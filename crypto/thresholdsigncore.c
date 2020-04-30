@@ -112,7 +112,7 @@ void G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t*
         ep_add_projc(&acc, &acc, &mult);
     }
     // export the result
-    _ep_write_bin_compact(dest, &acc, SIGNATURE_LEN);
+    ep_write_bin_compact(dest, &acc, SIGNATURE_LEN);
 
     // free the temp memory
     ep2_free(&acc);

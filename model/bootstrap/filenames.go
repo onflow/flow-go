@@ -3,6 +3,8 @@ package bootstrap
 // Canonical filenames for bootstrapping files.
 const (
 	DirnameExecutionState         = "execution-state"
+	FilenameNodeId                = "node-id"
+	FilenameGenesisCommit         = "genesis-commit.json"
 	FilenameGenesisBlock          = "genesis-block.json"
 	FilenameGenesisClusterBlock   = "%v.genesis-cluster-block.json" // %v will be replaced by cluster ID
 	FilenameNodeInfosPub          = "node-infos.pub.json"

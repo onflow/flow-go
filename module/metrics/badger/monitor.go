@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	badgermetrics "github.com/dgraph-io/badger/v2/y"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/module"
@@ -50,7 +51,16 @@ func (m *Monitor) monitor() {
 			return
 		case <-ticker.C:
 			lsm, vlog := m.db.Size()
-			m.metrics.BadgerDBSize(lsm + vlog)
+			m.metrics.BadgerLSMSize(lsm)
+			m.metrics.BadgerVLogSize(vlog)
+
+			// sample default badger metrics (from badger/v2/y/metrics.go)
+			m.metrics.BadgerNumReads(badgermetrics.NumReads.Value())
+			m.metrics.BadgerNumWrites(badgermetrics.NumWrites.Value())
+			m.metrics.BadgerNumBytesRead(badgermetrics.NumBytesRead.Value())
+			m.metrics.BadgerNumBytesWritten(badgermetrics.NumBytesWritten.Value())
+			m.metrics.BadgerNumGets(badgermetrics.NumGets.Value())
+			m.metrics.BadgerNumMemtableGets(badgermetrics.NumMemtableGets.Value())
 		}
 	}
 }

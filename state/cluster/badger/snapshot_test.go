@@ -1,8 +1,10 @@
 package badger
 
 import (
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -29,6 +31,9 @@ type SnapshotSuite struct {
 // runs before each test runs
 func (suite *SnapshotSuite) SetupTest() {
 	var err error
+
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.ChainID
