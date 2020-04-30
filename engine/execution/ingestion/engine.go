@@ -61,6 +61,7 @@ type Engine struct {
 	syncTargetBlockID  atomic.Value
 	stateSync          executionSync.StateSynchronizer
 	mc                 module.Metrics
+	extensiveLogging   bool
 }
 
 func New(
@@ -78,6 +79,7 @@ func New(
 	execState state.ExecutionState,
 	syncThreshold uint64,
 	mc module.Metrics,
+	extLog bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
@@ -102,6 +104,7 @@ func New(
 		syncInProgress:     atomic.NewBool(false),
 		stateSync:          executionSync.NewStateSynchronizer(execState),
 		mc:                 mc,
+		extensiveLogging:   extLog,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -411,7 +414,9 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		if executableBlock.IsComplete() {
 
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
-
+			if e.extensiveLogging {
+				e.logExecutableBlock(executableBlock)
+			}
 			e.wg.Add(1)
 			go e.executeBlock(executableBlock)
 		}
@@ -694,6 +699,36 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 	}
 
 	return receipt, nil
+}
+
+// logExecutableBlock logs all data about an executable block
+// over time we should skip this
+func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
+	// log block
+	e.log.Info().
+		Hex("block_id", logging.Entity(eb.Block)).
+		Hex("prev_block_id", logging.ID(eb.Block.ParentID)).
+		Int("block_height", int(eb.Block.Height)).
+		Int("number_of_collections", len(eb.Collections())).
+		RawJSON("block_header", logging.AsJSON(eb.Block.Header)).
+		Msg("extensive log: block header")
+
+	// logs transactions
+	for i, col := range eb.Collections() {
+		for j, tx := range col.Transactions {
+			e.log.Info().
+				Hex("block_id", logging.Entity(eb.Block)).
+				Int("block_height", int(eb.Block.Height)).
+				Hex("prev_block_id", logging.ID(eb.Block.ParentID)).
+				Int("collection_index", i).
+				Int("tx_index", j).
+				Hex("collection_id", logging.ID(col.Guarantee.CollectionID)).
+				Hex("tx_hash", logging.Entity(tx)).
+				Hex("start_state_commitment", eb.StartState).
+				RawJSON("transaction", logging.AsJSON(tx)).
+				Msg("extensive log: executed tx content")
+		}
+	}
 }
 
 // generateChunk creates a chunk from the provided computation data.

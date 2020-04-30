@@ -89,6 +89,21 @@ type Metrics interface {
 	// NewestKnownQC reports Metrics C9: View of Newest Known QC
 	NewestKnownQC(view uint64)
 
+	// MadeBlockProposal reports that a block proposal has been made
+	MadeBlockProposal()
+
+	// MempoolGuaranteesSize reports the size of the guarantees mempool
+	MempoolGuaranteesSize(size uint)
+
+	// MempoolReceiptsSize reports the size of the receipts mempool
+	MempoolReceiptsSize(size uint)
+
+	// MempoolApprovalsSize reports the size of the approvals mempool
+	MempoolApprovalsSize(size uint)
+
+	// MempoolSealsSize reports the size of the seals mempool
+	MempoolSealsSize(size uint)
+
 	// Verification Metrics
 	//
 

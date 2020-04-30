@@ -281,7 +281,6 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 // path assuming a single collection (including transactions on counter example)
 // are submited to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
-	t.Skip()
 
 	// ingest engine parameters
 	requestInterval := uint(1)
