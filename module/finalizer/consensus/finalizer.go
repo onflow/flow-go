@@ -9,22 +9,24 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Finalizer is a simple wrapper around our temporary state to clean up after a
 // block has been fully finalized to the persistent protocol state.
 type Finalizer struct {
 	db         *badger.DB
+	state      protocol.State
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals) *Finalizer {
+func NewFinalizer(db *badger.DB, state protocol.State, guarantees mempool.Guarantees, seals mempool.Seals) *Finalizer {
 	f := &Finalizer{
 		db:         db,
+		state:      state,
 		guarantees: guarantees,
 		seals:      seals,
 	}
@@ -39,63 +41,38 @@ func NewFinalizer(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Se
 // and being finalized, entities should be present in both the volatile memory
 // pools and persistent storage.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
-	return f.db.Update(func(tx *badger.Txn) error {
 
-		var toFinalize []*flow.Header
-		err := procedure.RetrieveUnfinalizedAncestors(blockID, &toFinalize)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get blocks to finalize: %w", err)
-		}
+	// define cleanup function
+	cleanup := func(header *flow.Header) error {
 
-		// if there are no blocks to finalize, we may have already finalized
-		// this block - exit early
-		if len(toFinalize) == 0 {
+		// retrieve IDs of entities to remove from memory pools
+		var guaranteeIDs []flow.Identifier
+		var sealIDs []flow.Identifier
+		err := f.db.View(func(tx *badger.Txn) error {
+			err := operation.LookupGuaranteePayload(header.Height, header.ID(), header.ParentID, &guaranteeIDs)(tx)
+			if err != nil {
+				return fmt.Errorf("could not lookup guarantees: %w", err)
+			}
+			err = operation.LookupSealPayload(header.Height, header.ID(), header.ParentID, &sealIDs)(tx)
+			if err != nil {
+				return fmt.Errorf("could not lookup seals: %w", err)
+			}
 			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("could not look up entities: %w", err)
 		}
 
-		// now we can step backwards in order to go from oldest to youngest; for
-		// each header, we reconstruct the block and then apply the related
-		// changes to the protocol state
-		for i := len(toFinalize) - 1; i >= 0; i-- {
-
-			// look up the list of guarantee IDs included in the payload
-			step := toFinalize[i]
-			var guaranteeIDs []flow.Identifier
-			err = operation.LookupGuaranteePayload(step.Height, step.ID(), step.ParentID, &guaranteeIDs)(tx)
-			if err != nil {
-				return fmt.Errorf("could not look up guarantees (block_id=%x): %w", step.ID(), err)
-			}
-
-			// look up list of seal IDs included in the payload
-			var sealIDs []flow.Identifier
-			err = operation.LookupSealPayload(step.Height, step.ID(), step.ParentID, &sealIDs)(tx)
-			if err != nil {
-				return fmt.Errorf("could not look up seals (block_id=%x): %w", step.ID(), err)
-			}
-
-			// remove the guarantees from the memory pool
-			for _, guaranteeID := range guaranteeIDs {
-				ok := f.guarantees.Rem(guaranteeID)
-				if !ok {
-					return fmt.Errorf("could not remove guarantee (collID: %x)", guaranteeID)
-				}
-			}
-
-			// remove all seals from the memory pool
-			for _, sealID := range sealIDs {
-				ok := f.seals.Rem(sealID)
-				if !ok {
-					return fmt.Errorf("could not remove seal (sealID: %x)", sealID)
-				}
-			}
-
-			// finalize the block in the protocol state
-			err := procedure.FinalizeBlock(step.ID())(tx)
-			if err != nil {
-				return fmt.Errorf("could not finalize block (%x): %w", blockID, err)
-			}
+		// clean up the memory pools
+		for _, guaranteeID := range guaranteeIDs {
+			_ = f.guarantees.Rem(guaranteeID)
+		}
+		for _, sealID := range sealIDs {
+			_ = f.guarantees.Rem(sealID)
 		}
 
 		return nil
-	})
+	}
+
+	return f.state.Mutate().Finalize(blockID, cleanup)
 }

@@ -170,7 +170,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	selector := filter.HasRole(flow.RoleConsensus)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, guarantees, seals)
+	final := finalizer.NewFinalizer(db, state, guarantees, seals)
 
 	prov := &networkmock.Engine{}
 

@@ -8,6 +8,7 @@ require (
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dapperlabs/flow-go/integration v0.0.0-20200430042019-c68be52e6e34 // indirect
 	github.com/dchest/siphash v1.2.1
+	github.com/dgraph-io/badger v1.6.0
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896

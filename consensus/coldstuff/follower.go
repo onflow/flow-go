@@ -26,7 +26,7 @@ type Follower struct {
 }
 
 func (f *Follower) SubmitProposal(proposal *flow.Header, parentView uint64) {
-	err := f.state.Mutate().Finalize(proposal.ID())
+	err := f.state.Mutate().Finalize(proposal.ID(), func(*flow.Header) error { return nil })
 	f.log.Err(err).Msg("cold stuff follower could not finalize proposal")
 }
 

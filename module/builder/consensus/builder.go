@@ -51,8 +51,15 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 // BuildOn creates a new block header build on the provided parent, using the given view and applying the
 // custom setter function to allow the caller to make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
-	var header *flow.Header
-	err := b.db.Update(func(tx *badger.Txn) error {
+
+	// the parent and the payload for what we are building
+	var parent flow.Header
+	var payload flow.Payload
+	var header flow.Header
+	var lastSeal flow.Seal
+
+	// execute read-only part of the block building
+	err := b.db.View(func(tx *badger.Txn) error {
 
 		// STEP ONE: get the payload entity IDs for all entities that are included
 		// in ancestor blocks which are not finalized yet; this allows us to avoid
@@ -72,8 +79,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		// get the last finalized block ID
-		var finalizedID flow.Identifier
-		err = operation.RetrieveNumber(boundary, &finalizedID)(tx)
+		var finalID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &finalID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized ID: %w", err)
 		}
@@ -143,7 +150,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// find any guarantees that conflict with FINALIZED blocks
 		var invalidIDs map[flow.Identifier]struct{}
-		err = operation.CheckGuaranteePayload(boundary, finalizedID, guaranteeIDs, &invalidIDs)(tx)
+		err = operation.CheckGuaranteePayload(boundary, finalID, guaranteeIDs, &invalidIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not check guarantee payload: %w", err)
 		}
@@ -165,10 +172,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			}
 			guarantees = append(guarantees, guarantee)
 		}
+		payload.Guarantees = guarantees
 
 		// get the finalized state commitment at the parent
-		lastSeal := &flow.Seal{}
-		err = procedure.LookupSealByBlock(parentID, lastSeal)(tx)
+		err = procedure.LookupSealByBlock(parentID, &lastSeal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not get parent seal: %w", err)
 		}
@@ -176,8 +183,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// collect all block headers from the last sealed block to the parent
 		var ancestorIDs []flow.Identifier
 		ancestorID = parentID
-		sealedID := lastSeal.BlockID
-		for ancestorID != sealedID {
+		// sealedID := lastSeal.BlockID
+		// for ancestorID != sealedID {
+		for false { // re-enable after we want to include seals in payload
 
 			// get the ancestor
 			var ancestor flow.Header
@@ -215,6 +223,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 			// add to list of seals to include
 			seals = append(seals, seal)
+			lastSeal = *seal
 		}
 
 		// sanity check: each seal should connect to previous final state
@@ -229,24 +238,24 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			// forward the final state
 			finalState = seal.FinalState
 		}
-
-		// STEP THREE: we have the guarantees and seals we can validly include
-		// in the payload built on top of the given block. Now we need to build
-		// and store the block header, as well as index the payload contents.
-
-		// build the payload so we can get the hash
-		payload := flow.Payload{
-			Identities: nil,
-			Guarantees: guarantees,
-			Seals:      seals,
-		}
+		payload.Seals = seals
 
 		// retrieve the parent to set the height
-		var parent flow.Header
 		err = operation.RetrieveHeader(parentID, &parent)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve parent: %w", err)
 		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not compute payload: %w", err)
+	}
+
+	// STEP THREE: we have the guarantees and seals we can validly include
+	// in the payload built on top of the given block. Now we need to build
+	// and store the block header, as well as index the payload contents.
+	err = b.db.Update(func(tx *badger.Txn) error {
 
 		// calculate the timestamp and cutoffs
 		timestamp := time.Now().UTC()
@@ -262,28 +271,24 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		// construct default block on top of the provided parent
-		header = &flow.Header{
-			ChainID:     parent.ChainID,
-			ParentID:    parentID,
-			Height:      parent.Height + 1,
-			Timestamp:   timestamp,
-			PayloadHash: payload.Hash(),
+		header.ChainID = parent.ChainID
+		header.ParentID = parentID
+		header.Height = parent.Height + 1
+		header.Timestamp = timestamp
+		header.PayloadHash = payload.Hash()
 
-			// the following fields should be set by the custom function as needed
-			// NOTE: we could abstract all of this away into an interface{} field,
-			// but that would be over the top as we will probably always use hotstuff
-			View:           0,
-			ParentVoterIDs: nil,
-			ParentVoterSig: nil,
-			ProposerID:     flow.ZeroID,
-			ProposerSig:    nil,
-		}
+		// NOTE: the following are zero-valued and can be set by the setter
+		// header.View = 0
+		// header.ParentVoterIDs = nil
+		// header.ParentVoterSig = nil
+		// header.ProposerID = flow.ZeroID
+		// header.ProposerSig = nil
 
 		// apply the custom fields setter of the consensus algorithm
-		setter(header)
+		setter(&header)
 
 		// insert the header into the DB
-		err = operation.InsertHeader(header)(tx)
+		err = operation.InsertHeader(&header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
@@ -295,14 +300,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		// index the payload for the block
-		err = procedure.IndexPayload(header, &payload)(tx)
+		err = procedure.IndexPayload(&header, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
-		}
-
-		// update the last seal if we have new ones included
-		if len(seals) > 0 {
-			lastSeal = seals[len(seals)-1]
 		}
 
 		// index the last seal for this block
@@ -311,8 +311,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 			return fmt.Errorf("could not index commit: %w", err)
 		}
 
+		// index the last state commitment
+		err = operation.IndexStateCommitment(header.ID(), lastSeal.FinalState)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index state commitment: %w", err)
+		}
+
 		return nil
 	})
 
-	return header, err
+	return &header, err
 }

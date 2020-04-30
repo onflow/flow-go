@@ -38,13 +38,13 @@ func (_m *Mutator) Extend(blockID flow.Identifier) error {
 	return r0
 }
 
-// Finalize provides a mock function with given fields: blockID
-func (_m *Mutator) Finalize(blockID flow.Identifier) error {
-	ret := _m.Called(blockID)
+// Finalize provides a mock function with given fields: blockID, cleanup
+func (_m *Mutator) Finalize(blockID flow.Identifier, cleanup func(*flow.Header) error) error {
+	ret := _m.Called(blockID, cleanup)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
-		r0 = rf(blockID)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error) error); ok {
+		r0 = rf(blockID, cleanup)
 	} else {
 		r0 = ret.Error(0)
 	}

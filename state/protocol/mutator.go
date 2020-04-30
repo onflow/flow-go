@@ -29,5 +29,5 @@ type Mutator interface {
 	// up to the finalized protocol state. It modifies the persistent immutable
 	// protocol state accordingly and forwards the pointer to the latest
 	// finalized state.
-	Finalize(blockID flow.Identifier) error
+	Finalize(blockID flow.Identifier, cleanup func(*flow.Header) error) error
 }

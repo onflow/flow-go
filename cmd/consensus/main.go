@@ -139,7 +139,7 @@ func main() {
 			)
 
 			// initialize the block finalizer
-			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
+			final := finalizer.NewFinalizer(node.DB, node.State, guarantees, seals)
 
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)

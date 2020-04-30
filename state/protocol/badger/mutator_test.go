@@ -24,6 +24,8 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+var noop = func(*flow.Header) error { return nil }
+
 var identities = flow.IdentityList{
 	{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
 	{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
@@ -135,7 +137,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 		// so here we still want to check for genesis seal
 		assert.Equal(t, genesis.ID(), sealed.BlockID)
 
-		err = mutator.Finalize(sealingBlock.ID())
+		err = mutator.Finalize(sealingBlock.ID(), noop)
 		assert.NoError(t, err)
 
 		sealed, err = state.Final().Seal()
@@ -463,7 +465,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		err = mutator.Extend(block.ID())
 		require.NoError(t, err)
 
-		err = mutator.Finalize(block.ID())
+		err = mutator.Finalize(block.ID(), noop)
 		require.NoError(t, err)
 
 		// create a fork at view/height 1 and try to connect it to genesis
