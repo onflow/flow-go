@@ -31,6 +31,10 @@ func (*NoopConsumer) OnQcIncorporated(*model.QuorumCertificate) {}
 
 func (*NoopConsumer) OnForkChoiceGenerated(uint64, *model.QuorumCertificate) {}
 
+func (*NoopConsumer) OnBlockProposalFormed(*model.Proposal) {}
+
+func (*NoopConsumer) OnBlockProposalBroadcast(*model.Proposal) {}
+
 func (*NoopConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
 func (*NoopConsumer) OnInvalidVoteDetected(*model.Vote) {}

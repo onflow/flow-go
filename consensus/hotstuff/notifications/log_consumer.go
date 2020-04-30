@@ -104,6 +104,32 @@ func (lc *LogConsumer) OnForkChoiceGenerated(view uint64, qc *model.QuorumCertif
 		Msg("fork choice generated")
 }
 
+func (lc *LogConsumer) OnBlockProposalFormed(proposal *model.Proposal) {
+	block := proposal.Block
+	qc := block.QC
+	lc.log.Debug().
+		Uint64("block_view", block.View).
+		Hex("block_id", block.BlockID[:]).
+		Hex("proposer_id", logging.ID(block.ProposerID)).
+		Hex("payload_hash", logging.ID(block.PayloadHash)).
+		Uint64("parent_view", qc.View).
+		Hex("parent_id", logging.ID(qc.BlockID)).
+		Msg("block proposal formed")
+}
+
+func (lc *LogConsumer) OnBlockProposalBroadcast(proposal *model.Proposal) {
+	block := proposal.Block
+	qc := block.QC
+	lc.log.Debug().
+		Uint64("block_view", block.View).
+		Hex("block_id", block.BlockID[:]).
+		Hex("proposer_id", logging.ID(block.ProposerID)).
+		Hex("payload_hash", logging.ID(block.PayloadHash)).
+		Uint64("parent_view", qc.View).
+		Hex("parent_id", logging.ID(qc.BlockID)).
+		Msg("block proposal broadcast")
+}
+
 func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote) {
 	lc.log.Warn().
 		Uint64("vote_view", vote.View).

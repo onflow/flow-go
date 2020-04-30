@@ -15,6 +15,16 @@ func (_m *Consumer) OnBlockIncorporated(_a0 *model.Block) {
 	_m.Called(_a0)
 }
 
+// OnBlockProposalBroadcast provides a mock function with given fields: _a0
+func (_m *Consumer) OnBlockProposalBroadcast(_a0 *model.Proposal) {
+	_m.Called(_a0)
+}
+
+// OnBlockProposalFormed provides a mock function with given fields: _a0
+func (_m *Consumer) OnBlockProposalFormed(_a0 *model.Proposal) {
+	_m.Called(_a0)
+}
+
 // OnDoubleProposeDetected provides a mock function with given fields: _a0, _a1
 func (_m *Consumer) OnDoubleProposeDetected(_a0 *model.Block, _a1 *model.Block) {
 	_m.Called(_a0, _a1)

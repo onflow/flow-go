@@ -126,7 +126,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
 
 	// initialize the event handler
-	handler, err := eventhandler.New(log, metrics, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
+	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event handler: %w", err)
 	}

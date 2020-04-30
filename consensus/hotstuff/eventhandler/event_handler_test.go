@@ -357,7 +357,6 @@ func (es *EventHandlerSuite) SetupTest() {
 
 	eventhandler, err := eventhandler.New(
 		zerolog.New(os.Stderr),
-		metrics,
 		es.paceMaker,
 		es.blockProducer,
 		es.forks,
