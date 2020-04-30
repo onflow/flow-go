@@ -158,11 +158,16 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	// initialize the pending blocks cache
 	cache := buffer.NewPendingBlocks()
 
+	signerIDs := make([]flow.Identifier, 0)
+	for _, participant := range participants {
+		signerIDs = append(signerIDs, participant.ID())
+	}
+
 	rootHeader := &genesis.Header
 	rootQC := &model.QuorumCertificate{
 		View:      genesis.View,
 		BlockID:   genesis.ID(),
-		SignerIDs: nil, // TODO
+		SignerIDs: signerIDs,
 		SigData:   nil,
 	}
 	// selector := filter.HasRole(flow.RoleConsensus)
