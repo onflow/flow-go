@@ -13,6 +13,12 @@ type Metrics interface {
 	// BadgerDBSize total size on-disk of the badger database.
 	BadgerDBSize(sizeBytes int64)
 
+	// https://github.com/dgraph-io/badger/blob/master/y/metrics.go#L31-L38
+	BadgerDBNumReads(int64)
+	BadgerDBNumWrites(int64)
+	BadgerDBNumBytesRead(int64)
+	BadgerDBNumBytesWrite(int64)
+
 	// Network Metrics
 	// NetworkMessageSent size of the network message in bytes
 	NetworkMessageSent(sizeBytes int)

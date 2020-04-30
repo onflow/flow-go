@@ -51,6 +51,10 @@ func (m *Monitor) monitor() {
 		case <-ticker.C:
 			lsm, vlog := m.db.Size()
 			m.metrics.BadgerDBSize(lsm + vlog)
+			m.metrics.BadgerDBNumReads(y.NumReads.Value())
+			m.metrics.BadgerDBNumWrites(y.NumWrites.Value())
+			m.metrics.BadgerDBNumBytesRead(y.NumBytesReads.Value())
+			m.metrics.BadgerDBNumBytesWrite(y.NumBytesWritten.Value())
 		}
 	}
 }
