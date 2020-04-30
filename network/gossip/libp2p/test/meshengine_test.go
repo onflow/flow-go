@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
@@ -82,7 +83,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 	// log[i][j] keeps the message that node i sends to node j
 	log := make(map[int][]string)
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, 1)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.CollectionProvider)
 		engs = append(engs, eng)
 		log[i] = make([]string, 0)
 	}
@@ -155,7 +156,7 @@ func (m *MeshNetTestSuite) TestTargetValidator() {
 	wg := sync.WaitGroup{}
 
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, 1)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.CollectionIngest)
 		engs = append(engs, eng)
 	}
 
