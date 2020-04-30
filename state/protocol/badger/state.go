@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -15,9 +14,9 @@ import (
 )
 
 type State struct {
-	db       *badger.DB
-	pcache   module.PayloadCache
-	clusters uint
+	db               *badger.DB
+	pcache           module.PayloadCache
+	clusters         uint
 	validationBlocks uint64
 }
 
@@ -25,9 +24,9 @@ type State struct {
 // optional configuration parameters.
 func NewState(db *badger.DB, pcache module.PayloadCache, options ...func(*State)) (*State, error) {
 	s := &State{
-		db:       db,
-		pcache:   pcache,
-		clusters: 1,
+		db:               db,
+		pcache:           pcache,
+		clusters:         1,
 		validationBlocks: 64,
 	}
 	for _, option := range options {

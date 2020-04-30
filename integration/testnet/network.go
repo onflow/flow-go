@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -457,15 +456,41 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
+	// generate the root account
+	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := flow.DecodeAccountPrivateKey(hardcoded)
+	if err != nil {
+		return nil, err
+	}
+
+	// generate the initial execution state
+	commit, err := bootstraprun.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
+	if err != nil {
+		return nil, err
+	}
+
 	// generate genesis block
-	seal := bootstraprun.GenerateRootSeal(flow.GenesisStateCommitment)
-	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), seal)
+	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs))
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
 	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
 
-	qc, err := bootstraprun.GenerateGenesisQC(signerData, &genesis)
+	qc, err := bootstraprun.GenerateGenesisQC(signerData, genesis)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameAccount0Priv), account)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisCommit), commit)
 	if err != nil {
 		return nil, err
 	}
