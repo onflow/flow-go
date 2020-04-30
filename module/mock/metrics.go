@@ -12,8 +12,53 @@ type Metrics struct {
 	mock.Mock
 }
 
-// BadgerDBSize provides a mock function with given fields: sizeBytes
-func (_m *Metrics) BadgerDBSize(sizeBytes int64) {
+// BadgerLSMSize provides a mock function with given fields: sizeBytes
+func (_m *Metrics) BadgerLSMSize(sizeBytes int64) {
+	_m.Called(sizeBytes)
+}
+
+// BadgerNumBlockedPuts provides a mock function with given fields: n
+func (_m *Metrics) BadgerNumBlockedPuts(n int64) {
+	_m.Called(n)
+}
+
+// BadgerNumBytesRead provides a mock function with given fields: n
+func (_m *Metrics) BadgerNumBytesRead(n int64) {
+	_m.Called(n)
+}
+
+// BadgerNumBytesWritten provides a mock function with given fields: n
+func (_m *Metrics) BadgerNumBytesWritten(n int64) {
+	_m.Called(n)
+}
+
+// BadgerNumGets provides a mock function with given fields: n
+func (_m *Metrics) BadgerNumGets(n int64) {
+	_m.Called(n)
+}
+
+// BadgerNumMemtableGets provides a mock function with given fields: n
+func (_m *Metrics) BadgerNumMemtableGets(n int64) {
+	_m.Called(n)
+}
+
+// BadgerNumPuts provides a mock function with given fields: n
+func (_m *Metrics) BadgerNumPuts(n int64) {
+	_m.Called(n)
+}
+
+// BadgerNumReads provides a mock function with given fields: n
+func (_m *Metrics) BadgerNumReads(n int64) {
+	_m.Called(n)
+}
+
+// BadgerNumWrites provides a mock function with given fields: n
+func (_m *Metrics) BadgerNumWrites(n int64) {
+	_m.Called(n)
+}
+
+// BadgerVLogSize provides a mock function with given fields: sizeBytes
+func (_m *Metrics) BadgerVLogSize(sizeBytes int64) {
 	_m.Called(sizeBytes)
 }
 

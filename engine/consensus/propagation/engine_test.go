@@ -36,6 +36,8 @@ func TestOnCollectionGuarantee(t *testing.T) {
 		pool:  pool,
 	}
 
+	rand.Seed(time.Now().UnixNano())
+
 	// create random collection
 	var collID flow.Identifier
 	_, _ = rand.Read(collID[:])
@@ -81,6 +83,7 @@ func TestProcessCollectionGuarantee(t *testing.T) {
 		pool: pool,
 	}
 
+	rand.Seed(time.Now().UnixNano())
 	// generate n random collections
 	n := 3
 	collections := make([]*flow.CollectionGuarantee, 0, n)
