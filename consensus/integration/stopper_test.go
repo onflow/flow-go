@@ -28,11 +28,12 @@ func (c *StopperConsumer) OnStartingTimeout(info *model.TimerInfo) {
 
 type Stopper struct {
 	sync.Mutex
-	running    map[flow.Identifier]struct{}
-	nodes      []*Node
-	stopping   bool
-	stopAtView uint64
-	stopped    chan struct{}
+	running     map[flow.Identifier]struct{}
+	nodes       []*Node
+	stopping    bool
+	stopAtView  uint64
+	stopAtCount uint
+	stopped     chan struct{}
 }
 
 // How to stop nodes?
@@ -42,13 +43,14 @@ type Stopper struct {
 // to catch up.
 // a better strategy is to wait until all nodes has entered a certain view,
 // then stop them all.
-func NewStopper(stopAtView uint64) *Stopper {
+func NewStopper(stopAtView uint64, stopAtCount uint) *Stopper {
 	return &Stopper{
-		running:    make(map[flow.Identifier]struct{}),
-		nodes:      make([]*Node, 0),
-		stopping:   false,
-		stopAtView: stopAtView,
-		stopped:    make(chan struct{}),
+		running:     make(map[flow.Identifier]struct{}),
+		nodes:       make([]*Node, 0),
+		stopping:    false,
+		stopAtView:  stopAtView,
+		stopAtCount: stopAtCount,
+		stopped:     make(chan struct{}),
 	}
 }
 
@@ -57,11 +59,12 @@ func (s *Stopper) AddNode(n *Node) *StopperConsumer {
 	defer s.Unlock()
 	s.running[n.id.ID()] = struct{}{}
 	s.nodes = append(s.nodes, n)
-	return &StopperConsumer{
+	stopConsumer := &StopperConsumer{
 		onEnteringView: func(view uint64) {
 			s.onEnteringView(n.id.ID(), view)
 		},
 	}
+	return stopConsumer
 }
 
 func (s *Stopper) onEnteringView(id flow.Identifier, view uint64) {
@@ -69,6 +72,23 @@ func (s *Stopper) onEnteringView(id flow.Identifier, view uint64) {
 	defer s.Unlock()
 
 	if view < s.stopAtView {
+		return
+	}
+
+	// keep track of remaining running nodes
+	delete(s.running, id)
+
+	// if there is no running nodes, stop all
+	if len(s.running) == 0 {
+		s.stopAll()
+	}
+}
+
+func (s *Stopper) onFinalizedTotal(id flow.Identifier, total uint) {
+	s.Lock()
+	defer s.Unlock()
+
+	if total < s.stopAtCount {
 		return
 	}
 

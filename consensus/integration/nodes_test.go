@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -55,45 +54,41 @@ type Node struct {
 	rangereq      int
 	batchreq      int
 	batchresp     int
-	sync.Mutex
 }
 
-func createNodes(t *testing.T, n int, stopAtView uint64) ([]*Node, *Stopper) {
-	// create n consensus nodes
-	participants := make([]*flow.Identity, 0)
-	for i := 0; i < n; i++ {
-		identity := unittest.IdentityFixture()
-		participants = append(participants, identity)
-	}
+func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*Node, *Stopper) {
+
+	// create n consensus node participants
+	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
 
 	// create non-consensus nodes
-	collection := unittest.IdentityFixture()
-	collection.Role = flow.RoleCollection
+	collection := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	verification := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	execution := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
-	verification := unittest.IdentityFixture()
-	verification.Role = flow.RoleVerification
+	// append additional nodes to consensus
+	participants := append(consensus, collection, verification, execution)
 
-	execution := unittest.IdentityFixture()
-	execution.Role = flow.RoleExecution
-
-	allParitipants := append(participants, collection, verification, execution)
+	// create a network hub for all nodes
+	hub := NewHub()
 
 	// add all identities to genesis block and
 	// create and bootstrap consensus node with the genesis
-	genesis := run.GenerateRootBlock(allParitipants, run.GenerateRootSeal([]byte{}))
+	genesis := run.GenerateRootBlock(participants, run.GenerateRootSeal([]byte{}))
 
-	stopper := NewStopper(stopAtView)
-	nodes := make([]*Node, 0, len(participants))
-	for i, identity := range participants {
-		node := createNode(t, i, identity, participants, &genesis, stopper)
+	stopper := NewStopper(stopAtView, stopCountAt)
+	nodes := make([]*Node, 0, len(consensus))
+	for i, identity := range consensus {
+		node := createNode(t, i, identity, consensus, &genesis, hub, stopper)
 		nodes = append(nodes, node)
 	}
 
 	return nodes, stopper
 }
 
-func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, stopper *Stopper) *Node {
+func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, hub *Hub, stopper *Stopper) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
+
 	state, err := protocol.NewState(db)
 	require.NoError(t, err)
 
@@ -109,15 +104,26 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 		id:    identity,
 	}
 
+	// log with node index an ID
+	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("node_id", localID[:]).Logger()
+
 	stopConsumer := stopper.AddNode(node)
 
+	counterConsumer := &CounterConsumer{
+		log:      log,
+		interval: time.Second,
+		next:     time.Now().Add(time.Second),
+		finalized: func(total uint) {
+			stopper.onFinalizedTotal(node.id.ID(), total)
+		},
+	}
+
 	// log with node index
-	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	// log := zerolog.New(ioutil.Discard).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("local_id", localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(stopConsumer)
+	dis.AddConsumer(counterConsumer)
 	dis.AddConsumer(notifier)
 
 	// initialize no-op metrics mock
@@ -131,17 +137,17 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	local, err := local.New(identity, priv)
 	require.NoError(t, err)
 
-	// make network
-	net := NewNetwork()
+	// add a network for this node to the hub
+	net := hub.AddNetwork(localID)
 
 	headersDB := storage.NewHeaders(db)
 	payloadsDB := storage.NewPayloads(db)
 	blocksDB := storage.NewBlocks(db)
 	viewsDB := storage.NewViews(db)
 
-	guarantees, err := stdmap.NewGuarantees(100000)
+	guarantees, err := stdmap.NewGuarantees(10000)
 	require.NoError(t, err)
-	seals, err := stdmap.NewSeals(100000)
+	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
 	// initialize the block builder
@@ -160,8 +166,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 		SigData:   nil,
 	}
 	// selector := filter.HasRole(flow.RoleConsensus)
-
-	committee, err := committee.NewMainConsensusCommitteeState(state, localID)
+	com, err := committee.NewMainConsensusCommitteeState(state, localID)
 	require.NoError(t, err)
 
 	// initialize the block finalizer
@@ -179,7 +184,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
-		viewsDB, committee, state, build, final, signer, comp, rootHeader,
+		viewsDB, com, state, build, final, signer, comp, rootHeader,
 		rootQC, consensus.WithTimeout(hotstuffTimeout))
 
 	require.NoError(t, err)
@@ -196,4 +201,11 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	node.log = log
 
 	return node
+}
+
+func cleanupNodes(nodes []*Node) {
+	for _, n := range nodes {
+		n.db.Close()
+		os.RemoveAll(n.dbDir)
+	}
 }
