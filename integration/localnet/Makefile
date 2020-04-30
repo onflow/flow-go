@@ -1,12 +1,18 @@
+CONSENSUS = 3
+
+.PHONY: init
+init:
+	go run -tags relic bootstrap.go -consensus=$(CONSENSUS)
+
 .PHONY: start
 start:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose up --build -d
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.base.yml -f docker-compose.nodes.yml up --build -d
 
 .PHONY: logs
 logs:
-	docker-compose logs -f consensus_1 consensus_2 consensus_3 consensus_4 consensus_5 consensus_6 consensus_7 consensus_8 consensus_9 consensus_10
+	docker-compose -f docker-compose.base.yml -f docker-compose.nodes.yml logs -f
 
 .PHONY: stop
 stop:
-	docker-compose down
-	docker-compose rm -v consensus_1 consensus_2 consensus_3 consensus_4 consensus_5 consensus_6 consensus_7 consensus_8 consensus_9 consensus_10
+	docker-compose -f docker-compose.base.yml -f docker-compose.nodes.yml down -v
+
