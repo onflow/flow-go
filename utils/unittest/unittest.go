@@ -91,7 +91,12 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 
 	dir := TempDBDir(t)
 
-	opts := badger.DefaultOptions(dir).WithLogger(nil)
+	opts := badger.DefaultOptions(dir).WithLogger(nil).
+		WithMaxTableSize(1 << 20). // 1 MiB
+		WithMaxLevels(2).          // needs to be > 1
+		WithLevelSizeMultiplier(1).
+		WithNumLevelZeroTables(1).
+		WithNumLevelZeroTablesStall(2) // must be bigger than NumLevelZeroTables
 
 	db, err := badger.Open(opts)
 	require.Nil(t, err)
