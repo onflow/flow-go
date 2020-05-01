@@ -547,6 +547,7 @@ func TestExtendIdentities(t *testing.T) {
 		// we should not store or retrieve identities with the block for now
 		var retrieved flow.Block
 		err = db.View(procedure.RetrieveBlock(block.ID(), &retrieved))
+		require.NoError(t, err)
 		require.Empty(t, retrieved.Identities)
 	})
 }

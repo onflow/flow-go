@@ -18,8 +18,8 @@ const (
 	codeView                 = 4 // persisting the latest view for hotstuff
 
 	// block header and entities included in block contents
-	codeHeader    = 10
-	codeIdentity  = 11
+	codeHeader = 10
+	// codeIdentity  = 11
 	codeGuarantee = 12
 	codeSeal      = 13
 
