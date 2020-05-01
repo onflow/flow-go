@@ -170,6 +170,9 @@ func main() {
 
 			// query the last finalized block and unfinalized blocks for recovery
 			finalized, unfinalized, err := findLatest(node.State, headersDB, &node.GenesisBlock.Header)
+			if err != nil {
+				return nil, fmt.Errorf("could not find latest finalized block and unfinalized blocks: %w", err)
+			}
 
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
