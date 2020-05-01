@@ -15,7 +15,7 @@ func IndexChildByBlockID(blockID flow.Identifier, childID flow.Identifier) func(
 
 		childID := flow.Identifier{}
 
-		err := operation.RetrieveChild(blockID, &childID)(tx)
+		err := operation.LookupBlockIDByParentID(blockID, &childID)(tx)
 		if err == nil {
 			// there is a child exist already abort
 			return nil
@@ -27,7 +27,7 @@ func IndexChildByBlockID(blockID flow.Identifier, childID flow.Identifier) func(
 
 		// there is no child for this block
 		// index this child
-		err = operation.InsertChild(blockID, childID)(tx)
+		err = operation.IndexBlockByParentID(blockID, childID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert child to index: %v, %w", blockID, err)
 		}
@@ -42,7 +42,7 @@ func RetrieveChildByBlockID(blockID flow.Identifier, childHeader *flow.Header) f
 		childID := flow.Identifier{}
 
 		// retrieve the child block ID
-		err := operation.RetrieveChild(blockID, &childID)(tx)
+		err := operation.LookupBlockIDByParentID(blockID, &childID)(tx)
 		if err != nil {
 			if err == badger.ErrKeyNotFound {
 				return storage.ErrNotFound
