@@ -3,10 +3,12 @@ package ingest_test
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -77,6 +79,13 @@ func TestConcurrency(t *testing.T) {
 }
 
 func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	// to demarcate the logs
+	log.Debug().
+		Int("execution_receipt_count", erCount).
+		Int("sender_count", senderCount).
+		Int("chunks_num", chunksNum).
+		Msg("TestConcurrency started")
 	hub := stub.NewNetworkHub()
 
 	// ingest engine parameters
@@ -240,6 +249,13 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	exeNode.Done()
 	colNode.Done()
 	verNode.Done()
+
+	// to demarcate the logs
+	log.Debug().
+		Int("execution_receipt_count", erCount).
+		Int("sender_count", senderCount).
+		Int("chunks_num", chunksNum).
+		Msg("TestConcurrency finished")
 }
 
 // setupMockExeNode sets up a mocked execution node that responds to requests for
