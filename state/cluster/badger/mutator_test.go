@@ -74,7 +74,7 @@ func (suite *MutatorSuite) Bootstrap() {
 		id.Role = role
 		role++
 	}))
-	err := suite.protoState.Mutate().Bootstrap(genesis)
+	err := suite.protoState.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
 	suite.Require().Nil(err)
 
 	// bootstrap cluster chain

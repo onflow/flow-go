@@ -1,7 +1,6 @@
 package unittest
 
 import (
-	"crypto/rand"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
