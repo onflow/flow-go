@@ -180,11 +180,12 @@ func (n *NetworkConfig) Swap(i, j int) {
 // NodeConfig defines the input config for a particular node, specified prior
 // to network creation.
 type NodeConfig struct {
-	Role       flow.Role
-	Stake      uint64
-	Identifier flow.Identifier
-	LogLevel   zerolog.Level
-	Ghost      bool
+	Role            flow.Role
+	Stake           uint64
+	Identifier      flow.Identifier
+	LogLevel        zerolog.Level
+	Ghost           bool
+	AdditionalFlags []string
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -254,6 +255,13 @@ func AsGhost() func(config *NodeConfig) {
 	}
 }
 
+// WithAdditionalFlag adds additional flags to the command
+func WithAdditionalFlag(flag string) func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.AdditionalFlags = append(config.AdditionalFlags, flag)
+	}
+}
+
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// number of nodes
@@ -314,13 +322,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		Config: &container.Config{
 			Image: nodeConf.ImageName(),
 			User:  currentUser(),
-			Cmd: []string{
+			Cmd: append([]string{
 				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
 				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
 				fmt.Sprintf("--nclusters=%d", net.config.NClusters),
-			},
+			}, nodeConf.AdditionalFlags...),
 		},
 		HostConfig: &container.HostConfig{},
 	}
@@ -583,10 +591,11 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		)
 
 		containerConf := ContainerConfig{
-			NodeInfo:      info,
-			ContainerName: name,
-			LogLevel:      conf.LogLevel,
-			Ghost:         conf.Ghost,
+			NodeInfo:        info,
+			ContainerName:   name,
+			LogLevel:        conf.LogLevel,
+			Ghost:           conf.Ghost,
+			AdditionalFlags: conf.AdditionalFlags,
 		}
 
 		confs = append(confs, containerConf)
