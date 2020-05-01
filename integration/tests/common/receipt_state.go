@@ -59,7 +59,9 @@ func (rs *ReceiptState) WaitForAtFrom(t *testing.T, blockID, executorID flow.Ide
 
 // WaitUntilFinalizedStateCommitmentChanged waits until a different state commitment for a finalized block is received
 // compared to the latest one from any execution node and returns the corresponding block and execution receipt
-func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState) (*messages.BlockProposal, *flow.ExecutionReceipt) {
+func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState) (*messages.BlockProposal,
+	*flow.ExecutionReceipt) {
+
 	// get the state commitment for the highest finalized block
 	initialFinalizedSC := flow.GenesisStateCommitment
 	b1, ok := bs.HighestFinalized()
