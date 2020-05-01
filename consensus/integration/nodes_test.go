@@ -5,6 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
@@ -16,21 +20,18 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	"github.com/dapperlabs/flow-go/module/cache"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 const hotstuffTimeout = 200 * time.Millisecond
@@ -123,18 +124,17 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 		},
 	}
 
+	// use actual metrics
+	metrics, err := metrics.NewCollector(log)
+	require.NoError(t, err)
+
 	// log with node index
 	notifier := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(stopConsumer)
 	dis.AddConsumer(counterConsumer)
+	dis.AddConsumer(&MetricsConsumer{metrics: metrics})
 	dis.AddConsumer(notifier)
-
-	// initialize no-op metrics mock
-	metrics := &module.Metrics{}
-	metrics.On("HotStuffBusyDuration", mock.Anything, mock.Anything)
-	metrics.On("HotStuffIdleDuration", mock.Anything, mock.Anything)
-	metrics.On("HotStuffWaitDuration", mock.Anything, mock.Anything)
 
 	// com, err := committee.NewMainConsensusCommitteeState(state, localID)
 	// require.NoError(t, err)
@@ -213,4 +213,15 @@ func cleanupNodes(nodes []*Node) {
 		n.db.Close()
 		os.RemoveAll(n.dbDir)
 	}
+}
+
+// create a metrics consumer only for finalization
+type MetricsConsumer struct {
+	// inherit from noop consumer in order to satisfy the full interface
+	notifications.NoopConsumer
+	metrics module.Metrics
+}
+
+func (c *MetricsConsumer) OnFinalizedBlock(block *model.Block) {
+	c.metrics.FinalizedBlocks(1)
 }

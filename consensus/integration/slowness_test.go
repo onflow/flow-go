@@ -6,7 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/module/metrics/example"
 )
 
 func runNodes(nodes []*Node) {
@@ -20,13 +23,15 @@ func runNodes(nodes []*Node) {
 // happy path: with 3 nodes, they can reach consensus
 func TestSlowdown(t *testing.T) {
 
-	nodes, stopper := createNodes(t, 10, 250000, 200000)
+	example.WithMetricsServer(func(logger zerolog.Logger) {
+		nodes, stopper := createNodes(t, 10, 250000, 200000)
 
-	runNodes(nodes)
+		runNodes(nodes)
 
-	<-stopper.stopped
+		<-stopper.stopped
 
-	require.True(t, true)
+		require.True(t, true)
+	})
 }
 
 // with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
