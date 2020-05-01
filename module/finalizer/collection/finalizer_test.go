@@ -1,7 +1,9 @@
 package collection_test
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +24,9 @@ import (
 
 func TestFinalizer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		// seed the RNG
+		rand.Seed(time.Now().UnixNano())
 
 		genesis := model.Genesis()
 		chainID := genesis.ChainID

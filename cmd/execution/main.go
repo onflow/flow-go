@@ -76,7 +76,7 @@ func main() {
 			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
 				panic("error while boostrapping execution state - resulting state is different than precalculated!")
 			}
-			if !bytes.Equal(flow.GenesisStateCommitment, block.Seals[0].FinalState) {
+			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
 				panic("genesis seal state commitment different from precalculated")
 			}
 
@@ -127,6 +127,7 @@ func main() {
 				executionState,
 				6, //TODO - config param maybe?
 				node.Metrics,
+				true,
 			)
 			return ingestionEng, err
 		}).

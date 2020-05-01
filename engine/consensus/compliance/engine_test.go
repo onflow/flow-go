@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -62,6 +63,8 @@ type ComplianceSuite struct {
 }
 
 func (cs *ComplianceSuite) SetupTest() {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
@@ -230,7 +233,6 @@ func (cs *ComplianceSuite) SetupTest() {
 }
 
 func (cs *ComplianceSuite) TestSendVote() {
-
 	// create parameters to send a vote
 	blockID := unittest.IdentifierFixture()
 	view := rand.Uint64()
@@ -447,10 +449,10 @@ func (cs *ComplianceSuite) TestOnSubmitVote() {
 func (cs *ComplianceSuite) TestProcessPendingChildrenNone() {
 
 	// generate random block ID
-	blockID := unittest.IdentifierFixture()
+	header := unittest.BlockHeaderFixture()
 
 	// execute handle connected children
-	err := cs.e.processPendingChildren(blockID)
+	err := cs.e.processPendingChildren(&header)
 	require.NoError(cs.T(), err, "should pass when no children")
 	cs.snapshot.AssertNotCalled(cs.T(), "Final")
 	cs.pending.AssertNotCalled(cs.T(), "DropForParent", mock.Anything)
@@ -480,7 +482,7 @@ func (cs *ComplianceSuite) TestProcessPendingChildren() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
 	// execute the connected children handling
-	err := cs.e.processPendingChildren(parent.ID())
+	err := cs.e.processPendingChildren(&parent.Header)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff
@@ -489,7 +491,7 @@ func (cs *ComplianceSuite) TestProcessPendingChildren() {
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", &block3.Header, parent.View)
 
 	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
+	cs.pending.AssertCalled(cs.T(), "DropForParent", &parent.Header)
 }
 
 func (cs *ComplianceSuite) TestProposalBufferingOrder() {

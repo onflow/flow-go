@@ -24,6 +24,9 @@ type Receipts interface {
 	// DropForBlock will drop all receipts for the given block ID.
 	DropForBlock(blockID flow.Identifier)
 
+	// Size will return the current size of the memory pool.
+	Size() uint
+
 	// All will return a list of all receipts in the memory pool.
 	All() []*flow.ExecutionReceipt
 }

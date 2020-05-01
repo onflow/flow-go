@@ -15,6 +15,7 @@ require (
 	github.com/rs/zerolog v1.15.0
 	github.com/stretchr/testify v1.5.1
 	google.golang.org/grpc v1.28.0
+	gopkg.in/yaml.v2 v2.2.4
 )
 
 replace github.com/dapperlabs/flow-go => ../
@@ -22,3 +23,5 @@ replace github.com/dapperlabs/flow-go => ../
 replace github.com/dapperlabs/flow-go/protobuf => ../protobuf
 
 replace github.com/dapperlabs/flow-go/crypto => ../crypto
+
+replace github.com/dapperlabs/flow-go/integration => ../integration

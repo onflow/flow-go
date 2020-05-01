@@ -26,5 +26,7 @@ func genGenesisExecutionState() flow.StateCommitment {
 	}
 	log.Info().Msgf("wrote execution state db to directory %v", dbpath)
 
+	writeJSON(bootstrap.FilenameGenesisCommit, stateCommitment)
+
 	return stateCommitment
 }

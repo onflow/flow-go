@@ -44,8 +44,7 @@ WORKDIR /app
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
 # Also, allow ssh access
-RUN --mount=type=ssh \
-    --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags relic -ldflags "-extldflags -static" -o ./app ./cmd/${TARGET}
 

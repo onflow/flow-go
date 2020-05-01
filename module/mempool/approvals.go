@@ -23,4 +23,7 @@ type Approvals interface {
 
 	// Drop will drop the approvals for the given block.
 	DropForBlock(blockID flow.Identifier)
+
+	// Size will return the current size of the memory pool.
+	Size() uint
 }

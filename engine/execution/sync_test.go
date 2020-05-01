@@ -133,7 +133,7 @@ func TestSyncFlow(t *testing.T) {
 	collectionEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col2.ID() })).Run(func(args mock.Arguments) {
 		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col2}, exe2ID.NodeID)
 	}).Return(nil)
-	collectionEngine.On("Submit", exe1ID.NodeID, &messages.CollectionRequest{ID: col4.ID()}).Run(func(args mock.Arguments) {
+	collectionEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col4.ID() })).Run(func(args mock.Arguments) {
 		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col4}, exe1ID.NodeID)
 	}).Return(nil)
 
