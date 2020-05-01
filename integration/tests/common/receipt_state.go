@@ -16,6 +16,7 @@ const receiptStateTimeout = 60 * time.Second
 
 type ReceiptState struct {
 	// receipts contains execution receipts are indexed by blockID, then by executorID
+	// TODO add lock to prevent concurrent map access bugs
 	receipts map[flow.Identifier]map[flow.Identifier]*flow.ExecutionReceipt
 }
 
@@ -31,8 +32,8 @@ func (rs *ReceiptState) Add(er *flow.ExecutionReceipt) {
 	rs.receipts[er.ExecutionResult.BlockID][er.ExecutorID] = er
 }
 
-// WaitForAtFromAny waits for an execution receipt for the given blockID from any execution node and returns it
-func (rs *ReceiptState) WaitForAtFromAny(t *testing.T, blockID flow.Identifier) *flow.ExecutionReceipt {
+// WaitForReceiptFromAny waits for an execution receipt for the given blockID from any execution node and returns it
+func (rs *ReceiptState) WaitForReceiptFromAny(t *testing.T, blockID flow.Identifier) *flow.ExecutionReceipt {
 	require.Eventually(t, func() bool {
 		return len(rs.receipts[blockID]) > 0
 	}, receiptStateTimeout, 100*time.Millisecond,
@@ -44,8 +45,8 @@ func (rs *ReceiptState) WaitForAtFromAny(t *testing.T, blockID flow.Identifier) 
 	panic("there needs to be an entry in rs.receipts[blockID]")
 }
 
-// WaitForAtFrom waits for an execution receipt for the given blockID and the given executorID and returns it
-func (rs *ReceiptState) WaitForAtFrom(t *testing.T, blockID, executorID flow.Identifier) *flow.ExecutionReceipt {
+// WaitForReceiptFrom waits for an execution receipt for the given blockID and the given executorID and returns it
+func (rs *ReceiptState) WaitForReceiptFrom(t *testing.T, blockID, executorID flow.Identifier) *flow.ExecutionReceipt {
 	var r *flow.ExecutionReceipt
 	require.Eventually(t, func() bool {
 		var ok bool
@@ -66,7 +67,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	initialFinalizedSC := flow.GenesisStateCommitment
 	b1, ok := bs.HighestFinalized()
 	if ok {
-		r1 := rs.WaitForAtFromAny(t, b1.Header.ID())
+		r1 := rs.WaitForReceiptFromAny(t, b1.Header.ID())
 		initialFinalizedSC = r1.ExecutionResult.FinalStateCommit
 	}
 
@@ -81,7 +82,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 			return false
 		}
 		currentID = b2.Header.ID()
-		r2 = rs.WaitForAtFromAny(t, b2.Header.ID())
+		r2 = rs.WaitForReceiptFromAny(t, b2.Header.ID())
 		if bytes.Compare(initialFinalizedSC, r2.ExecutionResult.FinalStateCommit) == 0 {
 			// received a new execution result for the next finalized block, but it has the same final state commitment
 			// check the next finalized block

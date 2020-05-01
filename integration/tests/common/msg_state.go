@@ -14,6 +14,7 @@ import (
 const msgStateTimeout = 10 * time.Second
 
 type MsgState struct {
+	// TODO add lock to prevent concurrent map access bugs
 	msgs map[flow.Identifier][]interface{}
 }
 

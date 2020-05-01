@@ -14,6 +14,7 @@ import (
 const blockStateTimeout = 60 * time.Second
 
 type BlockState struct {
+	// TODO add locks to prevent concurrent map access bugs
 	blocksByID        map[flow.Identifier]*messages.BlockProposal
 	finalizedByHeight map[uint64]*messages.BlockProposal
 	highestFinalized  uint64
@@ -34,7 +35,8 @@ func (bs *BlockState) Add(b *messages.BlockProposal) {
 			bs.finalizedByHeight = make(map[uint64]*messages.BlockProposal)
 		}
 		// put all ancestors into `finalizedByHeight`
-		for ancestor, ok := b, true; ancestor.Header.Height > bs.highestFinalized; {
+		ancestor, ok := b, true
+		for ancestor.Header.Height > bs.highestFinalized {
 			h := ancestor.Header.Height
 
 			// if ancestor is confirmed put it into the finalized map

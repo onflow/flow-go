@@ -90,12 +90,12 @@ func (net *FlowNetwork) Remove() {
 
 	defer net.Cleanup()          // defer to ensure it runs, even if stop fails
 	defer net.RemoveContainers() // defer to ensure it runs, even if stop fails
-	net.Stop()
+	net.StopContainers()
 }
 
-// Stop stops all containers in the network, without removing them. This allows containers to be
+// StopContainers stops all containers in the network, without removing them. This allows containers to be
 // restarted. To remove them, call `RemoveContainers`.
-func (net *FlowNetwork) Stop() {
+func (net *FlowNetwork) StopContainers() {
 
 	fmt.Println("<<<< stopping network: ", net.config.Name)
 	err := net.suite.Close()

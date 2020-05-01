@@ -20,9 +20,13 @@ type TestnetStateTracker struct {
 	MsgState      MsgState
 }
 
-func (tst *TestnetStateTracker) Track(t *testing.T, ghost *client.GhostClient) {
+// Track starts to track new blocks, execution receipts and individual messages the ghost receives. The context will
+// only be used for the initial subscription.
+func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *client.GhostClient) {
+	// reset the state for in between tests
 	tst.BlockState = BlockState{}
 	tst.ReceiptState = ReceiptState{}
+
 	tst.ghostTracking = true
 
 	var reader *client.FlowMessageStreamReader
@@ -85,6 +89,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ghost *client.GhostClient) {
 	}()
 }
 
+// StopTracking will stop the tracking
 func (tst *TestnetStateTracker) StopTracking() {
 	tst.ghostTracking = false
 }

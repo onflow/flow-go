@@ -100,12 +100,13 @@ func (gs *ExecutionSuite) SetupTest() {
 	gs.net.Start(ctx)
 
 	// start tracking blocks
-	gs.Track(gs.T(), gs.Ghost())
+	gs.Track(gs.T(), ctx, gs.Ghost())
 }
 
 func (gs *ExecutionSuite) TearDownTest() {
 	gs.StopTracking()
 	gs.net.Remove()
+	gs.cancel()
 }
 
 func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
@@ -119,7 +120,7 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 	gs.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for execution receipt for blockA from execution node 1
-	erExe1BlockA := gs.ReceiptState.WaitForAtFrom(gs.T(), blockA.Header.ID(), gs.exe1ID)
+	erExe1BlockA := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockA.Header.ID(), gs.exe1ID)
 	gs.T().Logf("got erExe1BlockA with SC %x", erExe1BlockA.ExecutionResult.FinalStateCommit)
 
 	// send transaction
@@ -130,7 +131,7 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 	gs.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// wait for execution receipt for blockB from execution node 1
-	erExe1BlockB := gs.ReceiptState.WaitForAtFrom(gs.T(), blockB.Header.ID(), gs.exe1ID)
+	erExe1BlockB := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockB.Header.ID(), gs.exe1ID)
 	gs.T().Logf("got erExe1BlockB with SC %x", erExe1BlockB.ExecutionResult.FinalStateCommit)
 
 	// require that state between blockA and blockB has changed
@@ -146,28 +147,28 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 	gs.T().Logf("got blockC height %v ID %v", blockC.Header.Height, blockC.Header.ID())
 
 	// wait for execution receipt for blockC from execution node 1
-	erExe1BlockC := gs.ReceiptState.WaitForAtFrom(gs.T(), blockC.Header.ID(), gs.exe1ID)
+	erExe1BlockC := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockC.Header.ID(), gs.exe1ID)
 	gs.T().Logf("got erExe1BlockC with SC %x", erExe1BlockC.ExecutionResult.FinalStateCommit)
 
 	// require that state between blockB and blockC has not changed
 	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, erExe1BlockC.ExecutionResult.FinalStateCommit)
 
 	// wait for execution receipt for blockA from execution node 2 (this one must have been synced)
-	erExe2BlockA := gs.ReceiptState.WaitForAtFrom(gs.T(), blockA.Header.ID(), gs.exe2ID)
+	erExe2BlockA := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockA.Header.ID(), gs.exe2ID)
 	gs.T().Logf("got erExe2BlockA with SC %x", erExe2BlockA.ExecutionResult.FinalStateCommit)
 
 	// require that state for blockA is the same for execution node 1 and 2
 	require.Equal(gs.T(), erExe1BlockA.ExecutionResult.FinalStateCommit, erExe2BlockA.ExecutionResult.FinalStateCommit)
 
 	// wait for execution receipt for blockB from execution node 2 (this one must have been synced)
-	erExe2BlockB := gs.ReceiptState.WaitForAtFrom(gs.T(), blockB.Header.ID(), gs.exe2ID)
+	erExe2BlockB := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockB.Header.ID(), gs.exe2ID)
 	gs.T().Logf("got erExe2BlockB with SC %x", erExe2BlockB.ExecutionResult.FinalStateCommit)
 
 	// require that state for blockB is the same for execution node 1 and 2
 	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, erExe2BlockB.ExecutionResult.FinalStateCommit)
 
 	// wait for execution receipt for blockC from execution node 2 (this one must have been synced)
-	erExe2BlockC := gs.ReceiptState.WaitForAtFrom(gs.T(), blockC.Header.ID(), gs.exe2ID)
+	erExe2BlockC := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockC.Header.ID(), gs.exe2ID)
 	gs.T().Logf("got erExe2BlockC with SC %x", erExe2BlockC.ExecutionResult.FinalStateCommit)
 
 	// require that state for blockC is the same for execution node 1 and 2
