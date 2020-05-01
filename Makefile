@@ -240,37 +240,37 @@ docker-build-flow: docker-build-collection docker-build-consensus docker-build-e
 
 .PHONY: docker-push-collection
 docker-push-collection:
-	docker push gcr.io/dl-flow/collection:latest
+	# docker push gcr.io/dl-flow/collection:latest
 	docker push "gcr.io/dl-flow/collection:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/collection:$(IMAGE_TAG)"
 
 .PHONY: docker-push-consensus
 docker-push-consensus:
-	docker push gcr.io/dl-flow/consensus:latest
+	# docker push gcr.io/dl-flow/consensus:latest
 	docker push "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/consensus:$(IMAGE_TAG)"
 
 .PHONY: docker-push-execution
 docker-push-execution:
-	docker push gcr.io/dl-flow/execution:latest
+	# docker push gcr.io/dl-flow/execution:latest
 	docker push "gcr.io/dl-flow/execution:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/execution:$(IMAGE_TAG)"
 
 .PHONY: docker-push-verification
 docker-push-verification:
-	docker push gcr.io/dl-flow/verification:latest
+	# docker push gcr.io/dl-flow/verification:latest
 	docker push "gcr.io/dl-flow/verification:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/verification:$(IMAGE_TAG)"
 
 .PHONY: docker-push-access
 docker-push-access:
-	docker push gcr.io/dl-flow/access:latest
+	# docker push gcr.io/dl-flow/access:latest
 	docker push "gcr.io/dl-flow/access:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/access:$(IMAGE_TAG)"
 
 .PHONY: docker-push-ghost
 docker-push-ghost:
-	docker push gcr.io/dl-flow/ghost:latest
+	# docker push gcr.io/dl-flow/ghost:latest
 	docker push "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)"
 	docker push "gcr.io/dl-flow/ghost:$(IMAGE_TAG)"
 

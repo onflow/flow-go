@@ -77,7 +77,7 @@ func main() {
 				panic("error while boostrapping execution state - resulting state is different than precalculated!")
 			}
 			if !bytes.Equal(flow.GenesisStateCommitment, block.Seals[0].FinalState) {
-				panic("genesis seal state commitment different from precalculated")
+				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", block.Seals[0].FinalState, flow.GenesisStateCommitment))
 			}
 
 			err = bootstrap.BootstrapExecutionDatabase(node.DB, &block.Header)
