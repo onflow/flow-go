@@ -1,6 +1,7 @@
 package procedure
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -21,15 +22,15 @@ func IndexChildByBlockID(blockID flow.Identifier, childID flow.Identifier) func(
 			return nil
 		}
 
-		if err != badger.ErrKeyNotFound {
-			return fmt.Errorf("could not retrieve child for block: %v, %w", blockID, err)
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return fmt.Errorf("could not retrieve child %v for block: %v, %w", childID, blockID, err)
 		}
 
 		// there is no child for this block
 		// index this child
 		err = operation.IndexBlockByParentID(blockID, childID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert child to index: %v, %w", blockID, err)
+			return fmt.Errorf("could not insert child %v to index: %v, %w", childID, blockID, err)
 		}
 
 		return nil
@@ -44,7 +45,7 @@ func RetrieveChildByBlockID(blockID flow.Identifier, childHeader *flow.Header) f
 		// retrieve the child block ID
 		err := operation.LookupBlockIDByParentID(blockID, &childID)(tx)
 		if err != nil {
-			if err == badger.ErrKeyNotFound {
+			if errors.Is(err, badger.ErrKeyNotFound) {
 				return storage.ErrNotFound
 			}
 			return fmt.Errorf("could not retrieve child for block: %v, %w", blockID, err)
