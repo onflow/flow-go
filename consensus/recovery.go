@@ -16,6 +16,7 @@ func Recover(
 	log zerolog.Logger,
 	forks hotstuff.Forks,
 	validator hotstuff.Validator,
+	finalized *flow.Header,
 	unfinalized []*flow.Header,
 ) error {
 	// create the recovery component
@@ -29,6 +30,9 @@ func Recover(
 	}
 
 	blocks := make(map[flow.Identifier]*flow.Header, len(unfinalized)+1)
+
+	// finalized is the root
+	blocks[finalized.ID()] = finalized
 
 	log.Info().Int("total", len(unfinalized)).Msgf("recover started")
 

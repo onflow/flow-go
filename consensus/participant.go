@@ -70,7 +70,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// recover the hotstuff state, mainly to recover all unfinalized blocks
 	// in forks
-	err = Recover(log, forks, validator, unfinalized)
+	err = Recover(log, forks, validator, finalized, unfinalized)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
