@@ -8,19 +8,20 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 )
 
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
-	viewState hotstuff.ViewState
+	committee hotstuff.Committee
 	forks     hotstuff.ForksReader
 	verifier  hotstuff.Verifier
 }
 
 // New creates a new Validator instance
-func New(viewState hotstuff.ViewState, forks hotstuff.ForksReader, verifier hotstuff.Verifier) *Validator {
+func New(committee hotstuff.Committee, forks hotstuff.ForksReader, verifier hotstuff.Verifier) *Validator {
 	return &Validator{
-		viewState: viewState,
+		committee: committee,
 		forks:     forks,
 		verifier:  verifier,
 	}
@@ -30,44 +31,41 @@ func New(viewState hotstuff.ViewState, forks hotstuff.ForksReader, verifier hots
 // qc - the qc to be validated
 // block - the block that the qc is pointing to
 func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) error {
-	if qc.BlockID != block.BlockID { // check block ID
-		return newInvalidBlockError(block, fmt.Sprintf("qc.BlockID (%s) doesn't match with block's ID (%s)", qc.BlockID, block.BlockID))
+	if qc.BlockID != block.BlockID {
+		// Sanity check! Failing indicates a bug in the higher-level logic
+		return fmt.Errorf("qc.BlockID %s doesn't match block's ID %s", qc.BlockID, block.BlockID)
 	}
 	if qc.View != block.View { // check view
-		return newInvalidBlockError(block, fmt.Sprintf("qc.View (%d) doesn't match with block's View (%d)", qc.View, block.View))
+		return newInvalidBlockError(block, fmt.Errorf("qc's View %d doesn't match referenced block's View %d", qc.View, block.View))
 	}
 
-	// get the identities of the QC's voters
-	// NOTE: the function guarantees that there are no duplicate voters and that all signers
-	// are valid, staked consensus nodes
-	// TODO IdentitiesForConsensusParticipants should generate different errors depending on whether
-	// we have an application-internal (fatal) disfunction or the `SignerIDs` are not valid consensus members
-	voters, err := v.viewState.IdentitiesForConsensusParticipants(qc.BlockID, qc.SignerIDs)
+	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
+	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive stake)
+	allParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
-		return fmt.Errorf("invalid signer identities in qc of blockID %s: %w", qc.BlockID, err)
+		return fmt.Errorf("could not get consensus participants for blcok %s: %w", block.BlockID, err)
+	}
+	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
+	if len(signers) < len(qc.SignerIDs) {
+		return newInvalidBlockError(block, fmt.Errorf("some qc signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner))
 	}
 
-	// determine whether voters reach minimally required stake threshold for consensus
-	allConsensusParticipants, err := v.viewState.AllConsensusParticipants(qc.BlockID)
-	if err != nil {
-		return fmt.Errorf("cannot get identities at blockID (%s) to validate QC, %w", qc.BlockID, err)
-	}
-	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(allConsensusParticipants.TotalStake()) // compute required stake threshold
-	totalStakes := voters.TotalStake()                                                              // total stakes of all signers
-	if totalStakes < threshold {                                                                    // if stake is below minimally required threshold: qc is invalid
-		return newInvalidBlockError(block, fmt.Sprintf("insufficient stake (required=%d, got=%d) before signatures are verified", threshold, totalStakes))
+	// determine whether signers reach minimally required stake threshold for consensus
+	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake()) // compute required stake threshold
+	if signers.TotalStake() < threshold {
+		return newInvalidBlockError(block, fmt.Errorf("qc signers have insufficient stake of %d (required=%d)", signers.TotalStake(), threshold))
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
 	valid, err := v.verifier.VerifyQC(qc.SignerIDs, qc.SigData, block)
 	if errors.Is(err, verification.ErrInvalidFormat) {
-		return newInvalidBlockError(block, fmt.Sprintf("QC signature has bad format (%s)", err))
+		return newInvalidBlockError(block, fmt.Errorf("QC signature has bad format: %w", err))
 	}
 	if err != nil {
 		return fmt.Errorf("cannot verify qc's aggregated signature, qc.BlockID: %s", qc.BlockID)
 	}
 	if !valid {
-		return newInvalidBlockError(block, "QC signature is invalid")
+		return newInvalidBlockError(block, fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
 	}
 
 	return nil
@@ -79,18 +77,23 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	qc := proposal.Block.QC
 	block := proposal.Block
-	blockID := proposal.Block.BlockID
 
 	// validate the proposer's vote and get his identity
-	proposer, err := v.ValidateVote(proposal.ProposerVote(), proposal.Block)
+	_, err := v.ValidateVote(proposal.ProposerVote(), block)
+	if errors.Is(err, model.ErrorInvalidVote{}) {
+		return newInvalidBlockError(block, fmt.Errorf("invalid proposer signature: %w", err))
+	}
 	if err != nil {
-		return newInvalidBlockError(block, fmt.Sprintf("invalid proposer for block %s: %s", blockID, err.Error()))
+		return fmt.Errorf("error verifying primary signature for block %x: %w", block.BlockID, err)
 	}
 
 	// check the proposer is the leader for the proposed block's view
-	leader := v.viewState.LeaderForView(proposal.Block.View)
-	if leader.ID() != proposer.ID() {
-		return newInvalidBlockError(block, fmt.Sprintf("proposed by from wrong leader (%s), expected leader: (%s)", proposer.ID(), leader.ID()))
+	leader, err := v.committee.LeaderForView(block.View)
+	if err != nil {
+		return fmt.Errorf("error determining primary for block %x: %w", block.BlockID, err)
+	}
+	if leader != block.ProposerID {
+		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not primary for view %d", block.ProposerID, block.View))
 	}
 
 	// check that we have the parent for the proposal
@@ -118,48 +121,56 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 // vote - the vote to be validated
 // block - the voting block. Assuming the block has been validated.
 func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Identity, error) {
-	// view must match with the block's view
-	if vote.View != block.View {
-		return nil, newInvalidVoteError(vote, fmt.Sprintf("wrong view number. expected (%d), got (%d)", block.View, vote.View))
-	}
 	// block hash must match
 	if vote.BlockID != block.BlockID {
-		return nil, newInvalidVoteError(vote, fmt.Sprintf("wrong block ID. expected (%s), got (%d)", block.BlockID, vote.BlockID))
+		// Sanity check! Failing indicates a bug in the higher-level logic
+		return nil, fmt.Errorf("wrong block ID. expected (%s), got (%d)", block.BlockID, vote.BlockID)
+	}
+	// view must match with the block's view
+	if vote.View != block.View {
+		return nil, newInvalidVoteError(vote, fmt.Errorf("vote's view %d is inconsistent with referenced block (view %d)", vote.View, block.View))
 	}
 
-	// get voter's identity (will error if voter is not a staked consensus participant at block)
-	voter, err := v.viewState.IdentityForConsensusParticipant(block.BlockID, vote.SignerID)
+	// TODO: this lookup is duplicated in Verifier
+	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
+	if errors.Is(err, model.ErrInvalidSigner) {
+		return nil, newInvalidVoteError(vote, err)
+	}
 	if err != nil {
-		return nil, newInvalidVoteError(vote, fmt.Sprintf("invalid voter identity: %s", err.Error()))
+		return nil, fmt.Errorf("error retrieving voter Identity %x: %w", block.BlockID, err)
 	}
 
 	// check whether the signature data is valid for the vote in the hotstuff context
 	valid, err := v.verifier.VerifyVote(vote.SignerID, vote.SigData, block)
-	if errors.Is(err, verification.ErrInvalidFormat) {
-		return nil, newInvalidVoteError(vote, fmt.Sprintf("vote signature has bad format (%s)", err))
-	}
 	if err != nil {
-		return nil, fmt.Errorf("cannot verify signature for vote (%s): %w", vote.ID(), err)
+		switch {
+		case errors.Is(err, verification.ErrInvalidFormat):
+			return nil, newInvalidVoteError(vote, err)
+		case errors.Is(err, model.ErrInvalidSigner):
+			return nil, newInvalidVoteError(vote, err)
+		default:
+			return nil, fmt.Errorf("cannot verify signature for vote (%s): %w", vote.ID(), err.Error())
+		}
 	}
 	if !valid {
-		return nil, newInvalidVoteError(vote, "vote signature is invalid")
+		return nil, newInvalidVoteError(vote, model.ErrInvalidSignature)
 	}
 
 	return voter, nil
 }
 
-func newInvalidBlockError(block *model.Block, msg string) error {
+func newInvalidBlockError(block *model.Block, err error) error {
 	return &model.ErrorInvalidBlock{
 		BlockID: block.BlockID,
 		View:    block.View,
-		Msg:     msg,
+		Err:     err,
 	}
 }
 
-func newInvalidVoteError(vote *model.Vote, msg string) error {
+func newInvalidVoteError(vote *model.Vote, err error) error {
 	return &model.ErrorInvalidVote{
 		VoteID: vote.ID(),
 		View:   vote.View,
-		Msg:    msg,
+		Err:    err,
 	}
 }

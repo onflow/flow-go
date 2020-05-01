@@ -5,6 +5,7 @@ package ingestion
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/rs/zerolog"
 
@@ -145,6 +146,7 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
 		}
+		e.metrics.FinalizedBlocks(1)
 	})
 }
 
@@ -197,7 +199,7 @@ func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) err
 
 	// Request all the collections for this block
 	for _, g := range guarantees {
-		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID()}, ids...)
+		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID(), Nonce: rand.Uint64()}, ids...)
 		if err != nil {
 			return err
 		}

@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -27,8 +26,8 @@ import (
 )
 
 func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, headers storage.Headers,
-	views storage.Views, state protocol.State, me module.Local, builder module.Builder, updater module.Finalizer,
-	signer hotstuff.Signer, communicator hotstuff.Communicator, selector flow.IdentityFilter, rootHeader *flow.Header,
+	views storage.Views, committee hotstuff.Committee, protocolState protocol.State, builder module.Builder, updater module.Finalizer,
+	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header,
 	rootQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
 
 	// initialize the default configuration
@@ -44,12 +43,6 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	// apply the configuration options
 	for _, option := range options {
 		option(&cfg)
-	}
-
-	// initialize view state
-	viewState, err := viewstate.New(state, me.NodeID(), selector)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize view state: %w", err)
 	}
 
 	// initialize internal finalizer
@@ -80,7 +73,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	forks := forks.New(finalizer, forkchoice)
 
 	// initialize the validator
-	validator := validator.New(viewState, forks, signer)
+	validator := validator.New(committee, forks, signer)
 
 	// get the last view we started
 	lastStarted, err := views.Retrieve(persister.ActionStarted)
@@ -95,7 +88,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	// recover the hotstuff state
-	err = Recover(log, forks, validator, headers, state)
+	err = Recover(log, forks, validator, headers, protocolState)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -121,7 +114,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	// initialize block producer
-	producer, err := blockproducer.New(signer, viewState, builder)
+	producer, err := blockproducer.New(signer, committee, builder)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize block producer: %w", err)
 	}
@@ -130,10 +123,10 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	voter := voter.New(signer, forks, persist, lastVoted)
 
 	// initialize the vote aggregator
-	aggregator := voteaggregator.New(notifier, 0, viewState, validator, signer)
+	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
 
 	// initialize the event handler
-	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, viewState, aggregator, voter, validator, notifier)
+	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event handler: %w", err)
 	}

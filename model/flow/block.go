@@ -10,25 +10,17 @@ import (
 
 func Genesis(identities IdentityList) *Block {
 
-	// create the first seal with zero references
-	seal := Seal{
-		BlockID:      ZeroID,
-		ResultID:     ZeroID,
-		InitialState: nil,
-		FinalState:   GenesisStateCommitment,
-	}
-
 	// create the raw content for the genesis block
 	payload := Payload{
 		Identities: identities,
 		Guarantees: nil,
-		Seals:      []*Seal{&seal},
+		Seals:      nil,
 	}
 
 	// create the header
 	header := Header{
 		ChainID:     DefaultChainID,
-		ParentID:    GenesisParentID,
+		ParentID:    ZeroID,
 		Height:      0,
 		PayloadHash: payload.Hash(),
 		Timestamp:   GenesisTime(),

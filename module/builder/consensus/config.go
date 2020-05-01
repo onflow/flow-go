@@ -7,8 +7,9 @@ import (
 )
 
 type Config struct {
-	minInterval time.Duration
-	maxInterval time.Duration
+	minInterval  time.Duration
+	maxInterval  time.Duration
+	expiryBlocks uint64
 }
 
 func WithMinInterval(minInterval time.Duration) func(*Config) {
@@ -20,5 +21,11 @@ func WithMinInterval(minInterval time.Duration) func(*Config) {
 func WithMaxInterval(maxInterval time.Duration) func(*Config) {
 	return func(cfg *Config) {
 		cfg.maxInterval = maxInterval
+	}
+}
+
+func WithExpiryBlocks(expiryBlocks uint64) func(*Config) {
+	return func(cfg *Config) {
+		cfg.expiryBlocks = expiryBlocks
 	}
 }

@@ -118,6 +118,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		// set initial value
 		view1 := es.NewView(sc1)
 		view1.Set(registerID1, flow.RegisterValue("apple"))
+		view1.Set(registerID2, flow.RegisterValue("apple"))
 
 		sc2, err := es.CommitDelta(view1.Delta(), sc1)
 		assert.NoError(t, err)

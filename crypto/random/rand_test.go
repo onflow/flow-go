@@ -12,7 +12,7 @@ import (
 
 // math/random is only used to randomize test inputs
 
-// The only purpose of this function is unit testing. It also implements a very basic tandomness test.
+// The only purpose of this function is unit testing. It also implements a very basic randomness test.
 // it doesn't evaluate randomness of the random function and doesn't perform advanced statistical tests
 // just making sure code works on edge cases
 func TestRandInt(t *testing.T) {

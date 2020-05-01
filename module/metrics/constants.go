@@ -6,5 +6,10 @@ const (
 	namespaceCollection   = "collection"
 	namespaceConsensus    = "consensus"
 	namespaceVerification = "verification"
-	subsystemNetwork      = "network"
+)
+
+// Prometheus metric subsystems
+const (
+	subsystemBadger  = "badger"
+	subsystemNetwork = "network"
 )

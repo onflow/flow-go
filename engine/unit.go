@@ -4,6 +4,7 @@ package engine
 
 import (
 	"sync"
+	"time"
 )
 
 // Unit handles synchronization management, startup, and shutdown for engines.
@@ -47,6 +48,26 @@ func (u *Unit) Launch(f func()) {
 	go func() {
 		defer u.wg.Done()
 		f()
+	}()
+}
+
+// LaunchPeriodically asynchronously executes the input function on `interval` periods
+// unless the unit has shut down.
+// If f is executed, the unit will not shut down until after f returns.
+func (u *Unit) LaunchPeriodically(f func(), interval time.Duration) {
+	timer := time.NewTicker(interval)
+	u.wg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-u.quit:
+				u.wg.Done()
+				timer.Stop()
+				return
+			case <-timer.C:
+				u.Launch(f)
+			}
+		}
 	}()
 }
 

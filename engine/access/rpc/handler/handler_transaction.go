@@ -72,7 +72,7 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 	txID := tx.ID()
 
 	// get events for the transaction
-	events, err := h.lookupEvents(ctx, txID)
+	events, statusCode, txError, err := h.lookupTransactionResult(ctx, txID)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
@@ -87,8 +87,10 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 
 	// return result
 	resp := &access.TransactionResultResponse{
-		Status: status,
-		Events: events,
+		Status:       status,
+		Events:       events,
+		StatusCode:   statusCode,
+		ErrorMessage: txError,
 	}
 
 	return resp, nil
@@ -140,18 +142,18 @@ func (h *Handler) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 	return block, nil
 }
 
-func (h *Handler) lookupEvents(ctx context.Context, txID flow.Identifier) ([]*entities.Event, error) {
+func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identifier) ([]*entities.Event, uint32, string, error) {
 
 	// find the block ID for the transaction
 	block, err := h.lookupBlock(txID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			// access node may not have the block if it hasn't yet been finalized
-			return nil, nil
+			return nil, 0, "", nil
 		}
-		return nil, convertStorageError(err)
+		return nil, 0, "", convertStorageError(err)
 	}
 
 	blockID := block.ID()
-	return h.getTransactionEventsFromExecutionNode(ctx, blockID[:], txID[:])
+	return h.getTransactionResultFromExecutionNode(ctx, blockID[:], txID[:])
 }
