@@ -40,7 +40,7 @@ type Engine struct {
 	transactions storage.Transactions
 	headers      storage.Headers
 	payloads     storage.ClusterPayloads
-	cache        module.PendingClusterBlockBuffer // pending block cache
+	pending      module.PendingClusterBlockBuffer // pending block cache
 	participants flow.IdentityList                // consensus participants in our cluster
 
 	coldstuff module.ColdStuff
@@ -78,7 +78,7 @@ func New(
 		transactions: transactions,
 		headers:      headers,
 		payloads:     payloads,
-		cache:        cache,
+		pending:      cache,
 		participants: participants,
 	}
 
@@ -325,7 +325,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	// report proposed (case that we are follower)
 	e.metrics.CollectionProposed(proposal.Payload.Collection.Light())
 
-	children, ok := e.cache.ByParentID(blockID)
+	children, ok := e.pending.ByParentID(blockID)
 	if !ok {
 		return nil
 	}
@@ -342,7 +342,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	// remove children from cache
-	e.cache.DropForParent(blockID)
+	e.pending.DropForParent(blockID)
 
 	return result.ErrorOrNil()
 }
@@ -420,14 +420,14 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 	}
 
 	// cache the block
-	e.cache.Add(pendingBlock)
+	e.pending.Add(pendingBlock)
 
 	// request the missing block - typically this is the pending block's direct
 	// parent, but in general we walk the block's pending ancestors until we find
 	// the oldest one that is missing its parent.
 	missingID := proposal.Header.ParentID
 	for {
-		nextBlock, ok := e.cache.ByID(missingID)
+		nextBlock, ok := e.pending.ByID(missingID)
 		if !ok {
 			break
 		}
