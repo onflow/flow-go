@@ -237,6 +237,9 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 
 // handleChunkDataPack receives a chunk data pack and stores that in the mempool
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) error {
+	e.checkTrackerLock.Lock()
+	defer e.checkTrackerLock.Unlock()
+
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
@@ -323,6 +326,9 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 // after a request. It adds the collection to the mempool and checks for
 // pending receipts that are ready for verification.
 func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
+	e.checkTrackerLock.Lock()
+	defer e.checkTrackerLock.Unlock()
+
 	collID := coll.ID()
 
 	e.log.Info().
