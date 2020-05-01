@@ -170,7 +170,8 @@ func main() {
 			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, guaranteesDB, sealsDB)
 
 			// query the last finalized block and unfinalized blocks for recovery
-			finalized, unfinalized, err := findLatest(node.State, headersDB, &node.GenesisBlock.Header)
+			rootHeader := &node.GenesisBlock.Header
+			finalized, unfinalized, err := findLatest(node.State, headersDB, rootHeader)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and unfinalized blocks: %w", err)
 			}

@@ -22,7 +22,8 @@ func IndexChildByBlockID(blockID flow.Identifier, childID flow.Identifier) func(
 			return nil
 		}
 
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		// exceptions other than not found
+		if !errors.Is(err, badger.ErrKeyNotFound) {
 			return fmt.Errorf("could not retrieve child %v for block: %v, %w", childID, blockID, err)
 		}
 
@@ -44,17 +45,21 @@ func RetrieveChildByBlockID(blockID flow.Identifier, childHeader *flow.Header) f
 
 		// retrieve the child block ID
 		err := operation.LookupBlockIDByParentID(blockID, &childID)(tx)
+
+		// no child for this block
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return storage.ErrNotFound
+		}
+
 		if err != nil {
-			if errors.Is(err, badger.ErrKeyNotFound) {
-				return storage.ErrNotFound
-			}
 			return fmt.Errorf("could not retrieve child for block: %v, %w", blockID, err)
 		}
 
 		// retrieve the block header of the child block
 		err = operation.RetrieveHeader(childID, childHeader)(tx)
+		// must be able to find child block's header
 		if err != nil {
-			return fmt.Errorf("could not child block's header: %w", err)
+			return fmt.Errorf("could not find child block's header: %w", err)
 		}
 
 		return nil

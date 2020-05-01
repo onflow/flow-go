@@ -48,7 +48,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// initialize forks with only finalized block.
 	// unfinalized blocks was not recovered yet
-	forks, err := initForks(finalized, unfinalized, headers, updater, notifier, rootHeader, rootQC)
+	forks, err := initForks(finalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover forks: %w", err)
 	}
@@ -122,7 +122,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	return loop, nil
 }
 
-func initForks(final *flow.Header, unfinalized []*flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.Forks, error) {
+func initForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.Forks, error) {
 	// recover the trusted root
 	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
 	if err != nil {

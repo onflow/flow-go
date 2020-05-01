@@ -279,6 +279,18 @@ func (fnb *FlowNodeBuilder) initState() {
 			Hex("final_id", logging.ID(head.ID())).
 			Uint64("final_height", head.Height).
 			Msg("using existing database")
+
+		// Load the genesis info for recovery
+		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
+		}
+
+		// load genesis QC and DKG data from bootstrap files for recovery
+		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
+		}
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
