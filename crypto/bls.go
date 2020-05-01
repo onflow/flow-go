@@ -2,15 +2,18 @@
 
 package crypto
 
-// BLS signature scheme implementation using BLS12-381 curve ([zcash]https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#bls12-381)
+// BLS signature scheme implementation using BLS12-381 curve
+// ([zcash]https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#bls12-381)
 // Pairing, ellipic curve and modular arithmetic is using Relic library.
 // This implementation does not include any security against side-channel attacks.
 
 // existing features:
 //  - the implementation is optimized for shorter signatures (on G1).
 //  - public keys are longer (on G2)
-//  - serialization of points on G1 and G2 is compressed ([zcash] https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization)
-//  - hash to curve is using the optimized SWU map (https://eprint.iacr.org/2019/403.pdf section 4)
+//  - serialization of points on G1 and G2 is compressed ([zcash]
+//     https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization)
+//  - hash to curve is using the optimized SWU map
+//    (https://eprint.iacr.org/2019/403.pdf section 4)
 //  - expanding the message is using a cSHAKE-based KMAC128 with a domain separation tag
 //  - signature verification checks the membership of signature in G1
 //  - the public key membership check in G2 is implemented separately
@@ -58,11 +61,13 @@ func newBLSBLS12381() *blsBLS12381Algo {
 }
 
 // Sign signs an array of bytes using the private key
-// Signature is compressed [zcash] https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization
+// Signature is compressed [zcash]
+// https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization
 // This function only reads the private key
 // If the hasher used is KMAC128, the hasher is only read.
 // It is recommended to use Sign with the hasher from NewBLSKMAC. If not, the hasher used
-// must expand the message to 1024 bits. It is also recommended to use a hasher with a domain separation tag.
+// must expand the message to 1024 bits. It is also recommended to use a hasher
+// with a domain separation tag.
 func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
 	if kmac == nil {
 		return nil, errors.New("Sign requires a Hasher")
