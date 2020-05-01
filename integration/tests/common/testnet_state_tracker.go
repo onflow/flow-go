@@ -30,7 +30,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 	var reader *client.FlowMessageStreamReader
 
 	// subscribe to the ghost
-	timeout := time.After(10 * time.Second)
+	timeout := time.After(20 * time.Second)
 	ticker := time.Tick(100 * time.Millisecond)
 	for retry := true; retry; {
 		select {
