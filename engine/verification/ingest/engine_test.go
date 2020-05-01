@@ -808,6 +808,7 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 			// collection
 			suite.authCollections.On("Has", suite.collection.ID()).Return(true)
+			suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
 			suite.authCollections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
 			// tracker for the collection
 			suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
