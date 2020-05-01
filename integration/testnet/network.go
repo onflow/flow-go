@@ -288,7 +288,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
 	require.Nil(t, err)
 
-	confs, err := BootstrapNetwork(networkConf, bootstrapDir)
+	genesis, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
@@ -299,7 +299,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		network:     network,
 		Containers:  make(map[string]*Container, nNodes),
 		AccessPorts: make(map[string]string),
-		genesis:     genesis,
+		genesis:     *genesis,
 	}
 
 	// add each node to the network
@@ -443,11 +443,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	return nil
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]ContainerConfig, error) {
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, []ContainerConfig, error) {
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
-		return nil, fmt.Errorf("must specify at least one node")
+		return nil, nil, fmt.Errorf("must specify at least one node")
 	}
 
 	// Sort so that access nodes start up last
@@ -456,30 +456,30 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 	// generate staking and networking keys for each configured node
 	confs, err := setupKeys(networkConf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup keys: %w", err)
+		return nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
 	// run DKG for all consensus nodes
 	dkg, err := runDKG(confs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run DKG: %w", err)
+		return nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
 	// generate the root account
 	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	account, err := flow.DecodeAccountPrivateKey(hardcoded)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// generate the initial execution state
 	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// generate genesis block
@@ -491,33 +491,33 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 
 	qc, err := bootstraprun.GenerateGenesisQC(signerData, genesis)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// write common genesis bootstrap files
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameAccount0Priv), account)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisCommit), commit)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisBlock), genesis)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisQC), qc)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkg.Public())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// write private key files for each DKG participant
@@ -525,7 +525,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 		filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, part.NodeID)
 		err = writeJSON(filepath.Join(bootstrapDir, filename), part.Private())
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -536,16 +536,16 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 		// retrieve private representation of the node
 		private, err := nodeConfig.NodeInfo.Private()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		err = writeJSON(path, private)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	return confs, nil
+	return genesis, confs, nil
 }
 
 // setupKeys generates private staking and networking keys for each configured
