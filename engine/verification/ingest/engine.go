@@ -613,6 +613,11 @@ func (e *Engine) checkPendingChunks() {
 
 			// does resource cleanup
 			e.onChunkIngested(vchunk)
+
+			e.log.Debug().
+				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+				Hex("chunk_id", logging.ID(chunk.ID())).
+				Msg("chunk successfully ingested")
 		}
 	}
 }
