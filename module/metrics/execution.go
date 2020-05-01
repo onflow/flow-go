@@ -15,24 +15,30 @@ const (
 )
 
 var (
-	executionGasUsedPerBlockGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "gas_used_per_block",
-		Namespace: "execution",
+	executionGasUsedPerBlockHist = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Buckets:   []float64{1}, //TODO(andrew) Set once there are some figures around gas usage and limits
+		Name:      "used_gas",
 		Help:      "the gas used per block",
 	})
-	executionStateReadsPerBlockGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "state_reads_per_block",
-		Namespace: "execution",
+	executionStateReadsPerBlockHist = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Buckets:   []float64{5, 10, 50, 100, 500},
+		Name:      "block_state_reads",
 		Help:      "count of state access/read operations performed per block",
 	})
 	executionStateStorageDiskTotalGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "execution_state_storage_disk_total",
-		Namespace: "execution",
+		Namespace: namespaceExecution,
+		Subsystem: subsystemStateStorage,
+		Name:      "data_size_bytes",
 		Help:      "the execution state size on disk in bytes",
 	})
 	executionStorageStateCommitmentGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "storage_state_commitment",
-		Namespace: "execution",
+		Namespace: namespaceExecution,
+		Subsystem: subsystemStateStorage,
+		Name:      "commitment_size_bytes",
 		Help:      "the storage size of a state commitment in bytes",
 	})
 )
@@ -52,12 +58,12 @@ func (c *Collector) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
 
 // ExecutionGasUsedPerBlock reports gas used per block
 func (c *Collector) ExecutionGasUsedPerBlock(gas uint64) {
-	executionGasUsedPerBlockGauge.Set(float64(gas))
+	executionGasUsedPerBlockHist.Observe(float64(gas))
 }
 
 // ExecutionStateReadsPerBlock reports number of state access/read operations per block
 func (c *Collector) ExecutionStateReadsPerBlock(reads uint64) {
-	executionStateReadsPerBlockGauge.Set(float64(reads))
+	executionStateReadsPerBlockHist.Observe(float64(reads))
 }
 
 // ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
