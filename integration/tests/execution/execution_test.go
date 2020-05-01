@@ -104,7 +104,6 @@ func (gs *ExecutionSuite) SetupTest() {
 }
 
 func (gs *ExecutionSuite) TearDownTest() {
-	gs.StopTracking()
 	gs.net.Remove()
 	gs.cancel()
 }

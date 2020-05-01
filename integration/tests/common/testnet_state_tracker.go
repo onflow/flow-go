@@ -21,29 +21,23 @@ type TestnetStateTracker struct {
 }
 
 // Track starts to track new blocks, execution receipts and individual messages the ghost receives. The context will
-// only be used for the initial subscription.
+// be used to stop tracking
 func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *client.GhostClient) {
 	// reset the state for in between tests
 	tst.BlockState = BlockState{}
 	tst.ReceiptState = ReceiptState{}
-
-	tst.ghostTracking = true
 
 	var reader *client.FlowMessageStreamReader
 
 	// subscribe to the ghost
 	timeout := time.After(10 * time.Second)
 	ticker := time.Tick(100 * time.Millisecond)
-	for retry := true; retry && tst.ghostTracking; {
+	for retry := true; retry; {
 		select {
 		case <-timeout:
 			require.FailNowf(t, "could not subscribe to ghost", "%v", timeout)
 			return
 		case <-ticker:
-			if !tst.ghostTracking {
-				return
-			}
-
 			var err error
 			reader, err = ghost.Subscribe(context.Background())
 			if err != nil {
@@ -51,21 +45,33 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			} else {
 				retry = false
 			}
+		case <-ctx.Done():
+			return
 		}
 	}
 
 	// continue with processing of messages in the background
 	go func() {
 		for {
-			if !tst.ghostTracking {
+			select {
+			// return if context cancelled
+			case <-ctx.Done():
 				return
+			default:
+				// continue with this iteration of the loop
 			}
 
-			// we read the next message until we reach deadline
 			sender, msg, err := reader.Next()
 
+			select {
 			// don't error if container shuts down
-			if err != nil && strings.Contains(err.Error(), "transport is closing") && !tst.ghostTracking {
+			case <-ctx.Done():
+				return
+			default:
+				// continue with this iteration of the loop
+			}
+
+			if err != nil && strings.Contains(err.Error(), "transport is closing") {
 				return
 			}
 
@@ -87,9 +93,4 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			}
 		}
 	}()
-}
-
-// StopTracking will stop the tracking
-func (tst *TestnetStateTracker) StopTracking() {
-	tst.ghostTracking = false
 }
