@@ -182,7 +182,7 @@ func main() {
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			build := builder.NewBuilder(node.DB, pool, clusterID)
+			build := builder.NewBuilder(node.DB, pool)
 			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
 
 			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, headers, colPayloads, colCache)

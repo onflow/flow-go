@@ -191,7 +191,17 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 }
 
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
-	return procedure.RetrieveHeader(&s.number, &s.blockID, head)
+	return func(tx *badger.Txn) error {
+		err := procedure.RetrieveHeader(&s.number, &s.blockID, head)(tx)
+		// since the header model is shared between main consensus and cluster
+		// consensus, this check will ensure we are only dealing with main
+		// consensus blocks within the protocol state
+		if err == nil && head.ChainID != flow.DefaultChainID {
+			return fmt.Errorf("invalid chain id (%s)", head.ChainID)
+		}
+
+		return err
+	}
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
@@ -199,9 +209,6 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	err := s.state.db.View(func(tx *badger.Txn) error {
 		return s.head(&header)(tx)
 	})
-	if header.ChainID != flow.DefaultChainID {
-		return nil, fmt.Errorf("non-protocol header (chain_id=%s)", header.ChainID)
-	}
 	return &header, err
 }
 

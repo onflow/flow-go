@@ -56,6 +56,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	block := &flow.Block{
 		Header: flow.Header{
+			ChainID:  genesis.ChainID,
 			ParentID: genesis.ID(),
 			View:     42,
 		},
@@ -162,6 +163,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 
 	block2 := &flow.Block{
 		Header: flow.Header{
+			ChainID:    genesis.ChainID,
 			ParentID:   genesis.ID(),
 			View:       2,
 			Height:     2,
@@ -170,6 +172,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	}
 	fork := &flow.Block{
 		Header: flow.Header{
+			ChainID:    genesis.ChainID,
 			ParentID:   genesis.ID(),
 			View:       2,
 			Height:     2,
@@ -178,6 +181,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	}
 	block3 := &flow.Block{
 		Header: flow.Header{
+			ChainID:    genesis.ChainID,
 			ParentID:   block2.ID(),
 			View:       3,
 			Height:     3,
@@ -241,6 +245,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	block2 := &flow.Block{
 		Header: flow.Header{
 			ParentID:   genesis.ID(),
+			ChainID:    genesis.ChainID,
 			View:       2,
 			Height:     2,
 			ProposerID: conID.ID(),
@@ -260,6 +265,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	block3 := &flow.Block{
 		Header: flow.Header{
 			ParentID:   block2.ID(),
+			ChainID:    genesis.ChainID,
 			View:       3,
 			Height:     3,
 			ProposerID: conID.ID(),
@@ -368,6 +374,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	block := &flow.Block{
 		Header: flow.Header{
 			ParentID: genesis.ID(),
+			ChainID:  genesis.ChainID,
 			View:     42,
 		},
 	}

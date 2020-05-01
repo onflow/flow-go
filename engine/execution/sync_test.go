@@ -50,6 +50,7 @@ func TestSyncFlow(t *testing.T) {
 	//Create three blocks, with one tx each
 	block1 := &flow.Block{
 		Header: flow.Header{
+			ChainID:  genesis.ChainID,
 			ParentID: genesis.ID(),
 			View:     42,
 			Height:   1,
@@ -67,6 +68,7 @@ func TestSyncFlow(t *testing.T) {
 
 	block2 := &flow.Block{
 		Header: flow.Header{
+			ChainID:  genesis.ChainID,
 			ParentID: block1.ID(),
 			View:     44,
 			Height:   2,
@@ -84,6 +86,7 @@ func TestSyncFlow(t *testing.T) {
 
 	block3 := &flow.Block{
 		Header: flow.Header{
+			ChainID:  genesis.ChainID,
 			ParentID: block2.ID(),
 			View:     45,
 			Height:   3,
@@ -94,6 +97,7 @@ func TestSyncFlow(t *testing.T) {
 
 	block4 := &flow.Block{
 		Header: flow.Header{
+			ChainID:  genesis.ChainID,
 			ParentID: block3.ID(),
 			View:     46,
 			Height:   4,
