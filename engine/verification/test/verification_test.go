@@ -207,12 +207,6 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 
 	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 
-	for _, verNode := range verNodes {
-		// both receipts should be added to the authenticated mempool of verification node
-		require.True(t, verNode.AuthReceipts.Has(receipt1.ID()) && verNode.AuthReceipts.Has(receipt2.ID()))
-		// and do not reside in pending pool
-		require.False(t, verNode.PendingReceipts.Has(receipt1.ID()) || verNode.PendingReceipts.Has(receipt2.ID()))
-	}
 	// creates a network instance for each verification node
 	// and sets it in continuous delivery mode
 	// then flushes the collection requests

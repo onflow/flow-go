@@ -27,9 +27,10 @@ type Engine struct {
 	unit     *engine.Unit   // used to control startup/shutdown
 	log      zerolog.Logger // used to log relevant actions with context
 	me       module.Local
-	state    protocol.State
+	cleaner  storage.Cleaner
 	headers  storage.Headers
 	payloads storage.Payloads
+	state    protocol.State
 	con      network.Conduit
 	prov     network.Engine
 	pending  module.PendingBlockBuffer
@@ -42,9 +43,10 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	state protocol.State,
+	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
+	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
 ) (*Engine, error) {
@@ -54,9 +56,10 @@ func New(
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "consensus").Logger(),
 		me:       me,
-		state:    state,
+		cleaner:  cleaner,
 		headers:  headers,
 		payloads: payloads,
+		state:    state,
 		prov:     prov,
 		pending:  pending,
 		sync:     nil, // use `WithSynchronization`
@@ -239,6 +242,11 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	// submit the proposal to the provider engine to forward it to other
 	// node roles
 	e.prov.SubmitLocal(msg)
+
+	// after broadcasting a new proposal is a great time to garbage collect
+	// on badger; we won't need to do any heavy work soon, because the other
+	// replicas will be busy validating our proposal
+	e.cleaner.RunGC()
 
 	return nil
 }

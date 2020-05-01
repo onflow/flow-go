@@ -1,6 +1,6 @@
 // +build relic
 
-#include "misc.h"
+#include "bls12381_utils.h"
 #include "bls_include.h"
 
 extern prec_st* bls_prec;
@@ -89,9 +89,9 @@ static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
 
 // Maps a 384 bits number to G1
 // Optimized Shallue–van de Woestijne encoding from Section 3 of
-// "Fast and simple constant-time hashing to the BLS12-381 elliptic curve".
+// https://eprint.iacr.org/2019/403.pdf.
 // taken and modified from Relic library
-static void mapToG1_swu(ep_t p, const uint8_t *digest, const int len) {
+static void map_to_G1_swu(ep_t p, const uint8_t *digest, const int len) {
 	bn_t k, pm1o2;
 	fp_t t;
 	ep_t q;
@@ -151,7 +151,7 @@ static void mapToG1_swu(ep_t p, const uint8_t *digest, const int len) {
 // Simple hashing to G1 as described in the original BLS paper 
 // https://www.iacr.org/archive/asiacrypt2001/22480516.pdf
 // taken and modified from Relic library
-static void mapToG1_hashCheck(ep_t p, const uint8_t *msg, int len) {
+static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 	bn_t k, pm1o2;
 	fp_t t;
 	uint8_t digest[RLC_MD_LEN];
@@ -247,7 +247,7 @@ static int quotient_sqrt(fp_t out, const fp_t u, const fp_t v) {
 // Maps the field element t to a point p in E1(Fp) where E1: y^2 = g(x) = x^3 + a1*x + b1 
 // using optimized non-constant-time SWU impl
 // p point is in Jacobian coordinates
-static inline void mapToE1_swu(ep_st* p, const fp_t t) {
+static inline void map_to_E1_swu(ep_st* p, const fp_t t) {
     const int tmp_len = 6;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
     for (int i=0; i<tmp_len; i++) fp_new(&fp_tmp[i]);
@@ -517,7 +517,7 @@ static void clear_cofactor(ep_st* out, const ep_st* in) {
 // evaluate the optimized SWU map twice, add resulting points, apply isogeny map, clear cofactor
 // the result is stored in p
 // msg is the input message to hash, must be at least 2*(FP_BYTES+16) = 128 bytes
-static void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
+static void map_to_G1_opswu(ep_st* p, const uint8_t *msg, int len) {
     TRY {
         if (len < 2*(Fp_BYTES+16)) {
             THROW(ERR_NO_BUFFER);
@@ -534,8 +534,8 @@ static void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
 
         ep_st p_temp;
         ep_new(&p_temp);
-        mapToE1_swu(&p_temp, t1); // map to E1
-        mapToE1_swu(p, t2); // map to E1
+        map_to_E1_swu(&p_temp, t1); // map to E1
+        map_to_E1_swu(p, t2); // map to E1
         ep_add_projc(p, p, &p_temp);
         eval_iso11(&p_temp, p); // map to E
         clear_cofactor(p, &p_temp); // map to G1
@@ -560,24 +560,24 @@ void opswu_test(uint8_t *out, const uint8_t *msg, int len){
 
     ep_st p;
     ep_new(&p);
-    mapToE1_swu(&p, t); // map to E1
+    map_to_E1_swu(&p, t); // map to E1
     eval_iso11(&p, &p); // map to E
     clear_cofactor(&p, &p); // map to G1
-    _ep_write_bin_compact(out, &p, SIGNATURE_LEN);
+    ep_write_bin_compact(out, &p, SIGNATURE_LEN);
 }
 #endif
 
 // computes a hash of input data to G1
-void mapToG1(ep_st* h, const byte* data, const int len) {
+void map_to_G1(ep_st* h, const byte* data, const int len) {
     #if hashToPoint==OPSWU
     // construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
-    mapToG1_opswu(h, data, len);
+    map_to_G1_opswu(h, data, len);
     #elif hashToPoint==SWU
     // section 3 in https://eprint.iacr.org/2019/403.pdf`
-    mapToG1_swu(h, data, len);
+    map_to_G1_swu(h, data, len);
     #elif hashToPoint==HASHCHECK 
     // hash & check as described in the BLS paper
-    mapToG1_hashCheck(h, data, len);
+    map_to_G1_hashCheck(h, data, len);
     #endif
 }
 
