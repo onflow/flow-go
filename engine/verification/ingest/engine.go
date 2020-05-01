@@ -370,6 +370,7 @@ func (e *Engine) requestCollection(collID, blockID flow.Identifier) error {
 
 	e.log.Debug().
 		Hex("collection_id", logging.ID(collID)).
+		Hex("block_id", logging.ID(blockID)).
 		Msg("collection request submitted")
 
 	// stores collection tracker in the memory
@@ -471,7 +472,7 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 		log.Error().
 			Err(err).
 			Hex("chunk_id", logging.ID(chunkID)).
-			Msg("could make a request of chunk data pack to the network")
+			Msg("could not make a request of chunk data pack to the network")
 	}
 
 	return nil, false
@@ -532,6 +533,11 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 			Hex("collection_id", logging.ID(collID)).
 			Msg("could make a request of collection to the network")
 	}
+
+	log.Debug().
+		Hex("collection_id", logging.ID(collID)).
+		Hex("chunk_id", logging.ID(chunk.ID())).
+		Msg("collection for chunk requested")
 
 	return nil, false
 }
