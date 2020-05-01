@@ -541,33 +541,32 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 		}
 	}
 
+	// generate genesis blocks for each collector cluster
+	clusterBlocks, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs, genesis)
+	if err != nil {
+		return nil, err
+	}
 
-// generate genesis blocks for each collector cluster
-clusterBlocks, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs, genesis)
-if err != nil {
-return nil, err
-}
+	// write collector-specific genesis bootstrap files for each cluster
+	for i := 0; i < len(clusterBlocks); i++ {
+		clusterGenesis := clusterBlocks[i]
+		clusterQC := clusterQCs[i]
 
-// write collector-specific genesis bootstrap files for each cluster
-for i := 0; i < len(clusterBlocks); i++ {
-clusterGenesis := clusterBlocks[i]
-clusterQC := clusterQCs[i]
+		// cluster ID is equivalent to chain ID
+		clusterID := clusterGenesis.ChainID
 
-// cluster ID is equivalent to chain ID
-clusterID := clusterGenesis.ChainID
+		clusterGenesisPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
+		err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
+		if err != nil {
+			return nil, err
+		}
 
-clusterGenesisPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
-err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
-if err != nil {
-return nil, err
-}
-
-clusterQCPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
-err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
-if err != nil {
-return nil, err
-}
-}
+		clusterQCPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
+		err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return confs, nil
 }
@@ -668,7 +667,7 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
 //   * a cluster-specific genesis block
 //   * a cluster-specific genesis QC
-func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig, genesis flow.Block) ([]*cluster.Block, []*hotstuff.QuorumCertificate, error) {
+func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig, genesis *flow.Block) ([]*cluster.Block, []*hotstuff.QuorumCertificate, error) {
 
 	identities := toIdentityList(confs)
 	clusters := protocol.Clusters(nClusters, identities)
@@ -697,13 +696,13 @@ func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig, genesi
 		}
 
 		// generate qc for genesis cluster block
-		qc, err := bootstraprun.GenerateClusterGenesisQC(participants, &genesis, &block)
+		qc, err := bootstraprun.GenerateClusterGenesisQC(participants, genesis, block)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		// add block and qc to list
-		blocks = append(blocks, &block)
+		blocks = append(blocks, block)
 		qcs = append(qcs, qc)
 	}
 
