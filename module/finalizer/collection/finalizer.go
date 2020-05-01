@@ -129,7 +129,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				continue
 			}
 
-			// NOTE: when we incorporate HotStuff AND require BFT, the consensus
+			//TODO when we incorporate HotStuff AND require BFT, the consensus
 			// node will need to be able ensure finalization by checking a
 			// 3-chain of children for this block. Probably it will be simplest
 			// to have a follower engine configured for the cluster chain
@@ -142,9 +142,10 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// https://github.com/dapperlabs/flow-go/issues/2711
 			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: payload.Collection.ID(),
-					SignerIDs:    step.ParentVoterIDs,
-					Signature:    step.ParentVoterSig,
+					CollectionID:     payload.Collection.ID(),
+					ReferenceBlockID: payload.ReferenceBlockID,
+					SignerIDs:        step.ParentVoterIDs,
+					Signature:        step.ParentVoterSig,
 				},
 			})
 		}
