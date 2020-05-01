@@ -28,6 +28,7 @@ func TestIndexAndRetrieveChild(t *testing.T) {
 		// store parent
 		headersDB := storage.NewHeaders(db)
 		err := headersDB.Store(block1)
+		require.NoError(t, err)
 
 		// stored headers can be retrieved
 		var childHeader flow.Header
@@ -75,6 +76,7 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 		// store parent
 		headersDB := storage.NewHeaders(db)
 		err := headersDB.Store(block1)
+		require.NoError(t, err)
 
 		// store child
 		err = headersDB.Store(block2)
