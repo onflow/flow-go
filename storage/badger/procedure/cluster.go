@@ -28,7 +28,7 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 		}
 
 		// insert the block payload
-		err = InsertClusterPayload(&block.Payload)(tx)
+		err = InsertClusterPayload(&block.Header, &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload: %w", err)
 		}
@@ -57,7 +57,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		}
 
 		// retrieve payload
-		err = RetrieveClusterPayload(block.ID(), &block.Payload)(tx)
+		err = RetrieveClusterPayload(&block.Header, &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
@@ -122,7 +122,7 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 
 // InsertClusterPayload inserts the payload for a cluster block. It inserts
 // both the collection and all constituent transactions, allowing duplicates.
-func InsertClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
+func InsertClusterPayload(header *flow.Header, payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// cluster payloads only contain a single collection, allow duplicates,
@@ -139,6 +139,12 @@ func InsertClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 			if err != nil {
 				return fmt.Errorf("could not insert payload transaction: %w", err)
 			}
+		}
+
+		// insert the reference block ID
+		err = operation.InsertClusterRefBlockID(header.ID(), payload.ReferenceBlockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert reference block ID: %w", err)
 		}
 
 		return nil
@@ -172,19 +178,19 @@ func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*ba
 }
 
 // RetrieveClusterPayload retrieves a cluster consensus block payload by block ID.
-func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
+func RetrieveClusterPayload(header *flow.Header, payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// retrieve the block header
-		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(tx)
+		// lookup the reference block ID
+		var refID flow.Identifier
+		err := operation.RetrieveClusterRefBlockID(header.ID(), &refID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve header: %w", err)
+			return fmt.Errorf("could not retrieve reference block ID: %w", err)
 		}
 
 		// lookup collection transaction IDs
 		var txIDs []flow.Identifier
-		err = operation.LookupCollectionPayload(header.Height, blockID, header.ParentID, &txIDs)(tx)
+		err = operation.LookupCollectionPayload(header.Height, header.ID(), header.ParentID, &txIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not look up collection payload: %w", err)
 		}
@@ -200,7 +206,7 @@ func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) f
 			colTransactions = append(colTransactions, &nextTx)
 		}
 
-		*payload = cluster.PayloadFromTransactions(colTransactions...)
+		*payload = cluster.PayloadFromTransactions(refID, colTransactions...)
 
 		return nil
 	}
