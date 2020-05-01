@@ -67,7 +67,7 @@ func main() {
 
 	cmd.FlowNode("collection").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&txLimit, "tx-limit", 100000, "maximum number of transactions in the memory pool")
+			flags.UintVar(&txLimit, "tx-limit", 10000, "maximum number of transactions in the memory pool")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {

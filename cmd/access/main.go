@@ -46,9 +46,9 @@ func main() {
 
 	cmd.FlowNode("access").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of collections in the memory pool")
-			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
+			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")

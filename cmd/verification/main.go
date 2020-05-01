@@ -75,10 +75,10 @@ func main() {
 
 	cmd.FlowNode("verification").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of authCollections in the memory pool")
-			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
-			flags.UintVar(&chunkLimit, "chunk-limit", 100000, "maximum number of chunk states in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of authCollections in the memory pool")
+			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
+			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
 			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
