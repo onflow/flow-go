@@ -177,8 +177,6 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 }
 
 func (gs *ExecutionSuite) trackBlocksAndReceipts() {
-	var reader *client.FlowMessageStreamReader
-
 	gs.blockState = common.BlockState{}
 	gs.receiptState = common.ReceiptState{}
 	gs.ghostTracking = true
