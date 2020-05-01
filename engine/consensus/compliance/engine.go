@@ -55,19 +55,18 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:       engine.NewUnit(),
-		log:        log.With().Str("engine", "consensus").Logger(),
-		me:         me,
-		cleaner:    cleaner,
-		headers:    headers,
-		payloads:   payloads,
-		state:      state,
-		prov:       prov,
-		pending:    pending,
-		maxPending: maxPending,
-		metrics:    metrics,
-		sync:       nil, // use `WithSynchronization`
-		hotstuff:   nil, // use `WithConsensus`
+		unit:     engine.NewUnit(),
+		log:      log.With().Str("engine", "consensus").Logger(),
+		me:       me,
+		cleaner:  cleaner,
+		headers:  headers,
+		payloads: payloads,
+		state:    state,
+		prov:     prov,
+		pending:  pending,
+		metrics:  metrics,
+		sync:     nil, // use `WithSynchronization`
+		hotstuff: nil, // use `WithConsensus`
 	}
 
 	// register the engine with the network layer and store the conduit
