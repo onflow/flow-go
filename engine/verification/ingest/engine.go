@@ -245,17 +245,30 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	if e.ingestedChunkIDs.Has(chunkDataPack.ChunkID) {
 		// belongs to an already ingested chunk
 		// discards the chunk data pack
+		e.log.Debug().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+			Msg("discards the chunk data pack of an already ingested chunk")
 		return nil
 	}
 
 	if !e.chunkDataPackTackers.Has(chunkDataPack.ChunkID) {
 		// does not have a valid tracker
 		// discards the chunk data pack
+		e.log.Debug().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+			Msg("discards the chunk data pack with no tracker")
 		return nil
 	}
 
 	tracker, err := e.chunkDataPackTackers.ByChunkID(chunkDataPack.ChunkID)
 	if err != nil {
+		e.log.Debug().
+			Err(err).
+			Hex("origin_id", logging.ID(originID)).
+			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+			Msg("cannot retrieve tracker for received chunk data pack")
 		return fmt.Errorf("no tracker available for chunk ID: %x", chunkDataPack.ChunkID)
 	}
 
@@ -263,12 +276,22 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	origin, err := e.state.AtBlockID(tracker.BlockID).Identity(originID)
 	if err != nil {
 		// TODO: potential attack on authenticity
+		e.log.Debug().
+			Err(err).
+			Hex("origin_id", logging.ID(originID)).
+			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+			Msg("invalid origin ID for chunk data pack")
 		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
 	}
 
 	// chunk data pack should only be sent by an execution node
 	if origin.Role != flow.RoleExecution {
 		// TODO: potential attack on integrity
+		e.log.Debug().
+			Hex("origin_id", logging.ID(originID)).
+			Str("origin_role", origin.Role.String()).
+			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+			Msg("invalid origin role for chunk data pack")
 		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", origin.NodeID, origin.Role)
 	}
 
@@ -276,11 +299,20 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	// this will fail if the receipt already exists in the store
 	err = e.chunkDataPacks.Add(chunkDataPack)
 	if err != nil {
-		return fmt.Errorf("could not store execution receipt: %w", err)
+		e.log.Debug().
+			Err(err).
+			Hex("origin_id", logging.ID(originID)).
+			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+			Msg("could not store chunk data pack")
+		return fmt.Errorf("could not store chunk data pack: %w", err)
 	}
 
 	// removes chunk data pack tracker from  mempool
 	e.chunkDataPackTackers.Rem(chunkDataPack.ChunkID)
+	e.log.Debug().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+		Msg("chunk data pack stored in mempool, tracker removed")
 
 	e.checkPendingChunks()
 
