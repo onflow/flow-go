@@ -220,6 +220,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	)
 	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
+	cs.pending.On("PruneByHeight", mock.Anything).Return()
 
 	// set up hotstuff module mock
 	cs.hotstuff = &module.HotStuff{}

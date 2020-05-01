@@ -104,6 +104,7 @@ func (suite *Suite) SetupTest() {
 	suite.finalizer = new(module.Finalizer)
 	suite.pending = new(module.PendingClusterBlockBuffer)
 	suite.pending.On("Size").Return(uint(0))
+	suite.pending.On("PruneByHeight", mock.Anything).Return()
 	suite.coldstuff = new(module.ColdStuff)
 
 	eng, err := proposal.New(log, suite.net, suite.me, suite.proto.state, suite.cluster.state, metrics, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending)

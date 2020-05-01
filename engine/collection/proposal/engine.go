@@ -25,10 +25,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// max size of the pending cache, after which we prune blocks older than the
-// finalized head.
-const maxPending = 5000
-
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
 type Engine struct {
@@ -45,7 +41,6 @@ type Engine struct {
 	headers      storage.Headers
 	payloads     storage.ClusterPayloads
 	pending      module.PendingClusterBlockBuffer // pending block cache
-	maxPending   uint                             // pending cache size limit
 	participants flow.IdentityList                // consensus participants in our cluster
 
 	coldstuff module.ColdStuff
@@ -84,7 +79,6 @@ func New(
 		headers:      headers,
 		payloads:     payloads,
 		pending:      cache,
-		maxPending:   maxPending,
 		participants: participants,
 	}
 
@@ -280,9 +274,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		Hex("parent_id", logging.ID(header.ParentID)).
 		Msg("received proposal")
 
-	if e.pending.Size() > e.maxPending {
-		e.prunePendingCache()
-	}
+	e.prunePendingCache()
 	e.metrics.PendingClusterBlocks(e.pending.Size())
 
 	// retrieve the parent block

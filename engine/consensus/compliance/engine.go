@@ -21,27 +21,22 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// max size of the pending cache, after which we prune blocks older than the
-// finalized head.
-const maxPending = 5000
-
 // Engine is the consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
 type Engine struct {
-	unit       *engine.Unit   // used to control startup/shutdown
-	log        zerolog.Logger // used to log relevant actions with context
-	me         module.Local
-	cleaner    storage.Cleaner
-	headers    storage.Headers
-	payloads   storage.Payloads
-	state      protocol.State
-	con        network.Conduit
-	prov       network.Engine
-	pending    module.PendingBlockBuffer // pending block cache
-	maxPending uint                      // maximum size of the pending cache
-	sync       module.Synchronization
-	hotstuff   module.HotStuff
-	metrics    module.Metrics
+	unit     *engine.Unit   // used to control startup/shutdown
+	log      zerolog.Logger // used to log relevant actions with context
+	me       module.Local
+	cleaner  storage.Cleaner
+	headers  storage.Headers
+	payloads storage.Payloads
+	state    protocol.State
+	con      network.Conduit
+	prov     network.Engine
+	pending  module.PendingBlockBuffer // pending block cache
+	sync     module.Synchronization
+	hotstuff module.HotStuff
+	metrics  module.Metrics
 }
 
 // New creates a new consensus propagation engine.
@@ -321,9 +316,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	log.Info().Msg("block proposal received")
 
-	if e.pending.Size() > e.maxPending {
-		e.prunePendingCache()
-	}
+	e.prunePendingCache()
 	e.metrics.PendingBlocks(e.pending.Size())
 
 	// first, we reject all blocks that we don't need to process:
