@@ -283,6 +283,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	if e.pending.Size() > e.maxPending {
 		e.prunePendingCache()
 	}
+	e.metrics.PendingClusterBlocks(e.pending.Size())
 
 	// retrieve the parent block
 	// if the parent is not in storage, it has not yet been processed

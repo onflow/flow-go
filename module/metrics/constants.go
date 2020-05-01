@@ -10,6 +10,8 @@ const (
 
 // Prometheus metric subsystems
 const (
-	subsystemBadger  = "badger"
-	subsystemNetwork = "network"
+	subsystemBadger     = "badger"
+	subsystemProposal   = "proposal"
+	subsystemCompliance = "compliance"
+	subsystemNetwork    = "network"
 )

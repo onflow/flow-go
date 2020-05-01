@@ -41,6 +41,7 @@ type Engine struct {
 	maxPending uint                      // maximum size of the pending cache
 	sync       module.Synchronization
 	hotstuff   module.HotStuff
+	metrics    module.Metrics
 }
 
 // New creates a new consensus propagation engine.
@@ -54,6 +55,7 @@ func New(
 	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
+	metrics module.Metrics,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -68,6 +70,7 @@ func New(
 		prov:       prov,
 		pending:    pending,
 		maxPending: maxPending,
+		metrics:    metrics,
 		sync:       nil, // use `WithSynchronization`
 		hotstuff:   nil, // use `WithConsensus`
 	}
@@ -321,6 +324,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if e.pending.Size() > e.maxPending {
 		e.prunePendingCache()
 	}
+	e.metrics.PendingBlocks(e.pending.Size())
 
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
