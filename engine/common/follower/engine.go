@@ -21,9 +21,10 @@ type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
 	me       module.Local
-	state    protocol.State
+	cleaner  storage.Cleaner
 	headers  storage.Headers
 	payloads storage.Payloads
+	state    protocol.State
 	pending  module.PendingBlockBuffer
 	follower module.HotStuffFollower
 	con      network.Conduit
@@ -34,9 +35,10 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	state protocol.State,
+	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
+	state protocol.State,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 ) (*Engine, error) {
@@ -45,9 +47,10 @@ func New(
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "follower").Logger(),
 		me:       me,
-		state:    state,
+		cleaner:  cleaner,
 		headers:  headers,
 		payloads: payloads,
+		state:    state,
 		pending:  pending,
 		follower: follower,
 	}
@@ -252,7 +255,15 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
+
 	log.Info().Msg("block proposal processed")
+
+	// this is a good time to run garbage collection; it means we will run
+	// garbage collection after processing a new block proposal, which is a
+	// moment where the database is a bit less busy - however, we will only
+	// run it around every 60 finalized blocks, which should be around once a
+	// minute at a one block per second rate
+	e.cleaner.RunGC()
 
 	return nil
 }
