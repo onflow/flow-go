@@ -70,6 +70,15 @@ func (r *TransactionContext) SetValue(owner, controller, key, value []byte) erro
 	return nil
 }
 
+func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists bool, err error) {
+	v, err := r.GetValue(owner, controller, key)
+	if err != nil {
+		return false, err
+	}
+
+	return v != nil, nil
+}
+
 func CreateAccountInLedger(ledger Ledger, publicKeys [][]byte) (runtime.Address, error) {
 	latestAccountID, _ := ledger.Get(fullKeyHash("", "", keyLatestAccount))
 
@@ -305,10 +314,6 @@ func (r *TransactionContext) GetCachedProgram(runtime.Location) (*ast.Program, e
 
 func (r *TransactionContext) CacheProgram(runtime.Location, *ast.Program) error {
 	return nil
-}
-
-func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists bool, err error) {
-	panic("implement me")
 }
 
 func (r *TransactionContext) GenerateUUID() uint64 {
