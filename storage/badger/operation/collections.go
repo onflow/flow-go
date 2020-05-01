@@ -44,6 +44,13 @@ func LookupCollectionPayload(height uint64, blockID, parentID flow.Identifier, t
 //
 // NOTE: This only checks back to the last valid reference block, it is up to
 // the caller to ensure the input transactions have not expired.
+//
+//TODO: we lookback by the transaction expiry as a heuristic. This does not
+// work in the general case. We need to modify this to look back to the oldest
+// CLUSTER block that references the oldest possible valid reference block on
+// the main chain, which involves adding extra indexing to do properly. For
+// now, the heuristic is acceptable since EXE nodes will reject duplicate
+// transactions.
 func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flow.Identifier) func(*badger.Txn) error {
 	var to uint64
 	if height > flow.DefaultTransactionExpiry {
@@ -58,6 +65,13 @@ func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flo
 //
 // NOTE: This only checks back to the last valid reference block, it is up to
 // the caller to ensure the input transactions have not expired.
+//
+//TODO: we lookback by the transaction expiry as a heuristic. This does not
+// work in the general case. We need to modify this to look back to the oldest
+// CLUSTER block that references the oldest possible valid reference block on
+// the main chain, which involves adding extra indexing to do properly. For
+// now, the heuristic is acceptable since EXE nodes will reject duplicate
+// transactions.
 func CheckCollectionPayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
 	var to uint64
 	if height > flow.DefaultTransactionExpiry {
