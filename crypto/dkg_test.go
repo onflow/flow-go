@@ -168,7 +168,7 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 		// start dkg could also run in parallel
 		// but they are run sequentially to avoid having non-deterministic
 		// output (the PRG used is common)
-		err := processors[current].dkg.StartDKG(seed)
+		err := processors[current].dkg.Start(seed)
 		require.Nil(t, err)
 		go dkgRunChan(&processors[current], &sync, t, phase)
 	}
@@ -195,13 +195,13 @@ func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
 // implements DKGProcessor interface
 type testDKGProcessor struct {
 	current   int
-	dkg       DKGstate
+	dkg       DKGState
 	chans     []chan *message
 	msgType   int
 	pkBytes   []byte
 	malicious bool
 	// only used when testing the threshold signature stateful api
-	ts *ThresholdSigner
+	ts *thresholdSigner
 	// only used when testing the threshold signature statless api
 	keys *statelessKeys
 }
@@ -246,7 +246,7 @@ func (proc *testDKGProcessor) honestSend(dest int, data []byte) {
 
 // This is a testing function
 // it simulates sending a message from one node to another
-func (proc *testDKGProcessor) Send(dest int, data []byte) {
+func (proc *testDKGProcessor) PrivateSend(dest int, data []byte) {
 	if proc.malicious {
 		proc.maliciousSend(dest, data)
 		return
@@ -298,7 +298,7 @@ func dkgRunChan(proc *testDKGProcessor,
 				require.Nil(t, err)
 			case 2:
 				log.Infof("%d dkg ended \n", proc.current)
-				_, pk, _, err := proc.dkg.EndDKG()
+				_, pk, _, err := proc.dkg.End()
 				assert.Nil(t, err, "end dkg error should be nil")
 				if pk == nil {
 					proc.pkBytes = []byte{}

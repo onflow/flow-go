@@ -193,16 +193,26 @@ func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
 func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// insert the block header & payload
-		err := InsertBlock(genesis)(tx)
+		// insert genesis identities
+		err := operation.InsertIdentities(genesis.Identities)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert genesis block: %w", err)
+			return fmt.Errorf("could not insert genesis identities: %w", err)
 		}
 
-		// apply the stake deltas
-		err = ApplyDeltas(genesis.Height, genesis.Identities)(tx)
+		// insert the block header
+		err = operation.InsertHeader(&genesis.Header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not apply stake deltas: %w", err)
+			return fmt.Errorf("could not insert header: %w", err)
+		}
+
+		// NOTE: no need to insert the payload, both seal and guarantees should
+		// be empty and we don't want guarantees inserted as the payload, just
+		// as the genesis identities
+
+		// index the genesis payload (still useful to have empty index entry)
+		err = IndexPayload(&genesis.Header, &genesis.Payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index payload: %w", err)
 		}
 
 		// generate genesis execution result

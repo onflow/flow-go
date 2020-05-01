@@ -67,7 +67,7 @@ func main() {
 
 	cmd.FlowNode("collection").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&txLimit, "tx-limit", 100000, "maximum number of transactions in the memory pool")
+			flags.UintVar(&txLimit, "tx-limit", 10000, "maximum number of transactions in the memory pool")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -119,6 +119,10 @@ func main() {
 			return nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// initialize cleaner for DB
+			cleaner := storage.NewCleaner(node.Logger, node.DB)
+
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := followerfinalizer.NewFinalizer(node.DB)
@@ -154,7 +158,7 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.State, headers, conPayloads, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, headers, conPayloads, node.State, conCache, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}

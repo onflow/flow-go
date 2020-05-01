@@ -16,11 +16,6 @@
 #define SK_BITS             (Fr_BITS)
 #define SK_LEN              BITS_TO_BYTES(SK_BITS)    
 
-// Compressed and uncompressed points
-#define COMPRESSED      1
-#define UNCOMPRESSED    0
-#define SERIALIZATION   COMPRESSED
-
 // Simultaneous Pairing in verification
 #define DOUBLE_PAIRING 1
 #define SINGLE_PAIRING (DOUBLE_PAIRING^1)

@@ -29,6 +29,11 @@ typedef uint8_t byte;
 #define G1_BYTES (2*Fp_BYTES)
 #define G2_BYTES (4*Fp_BYTES)
 
+// Compressed and uncompressed points
+#define COMPRESSED      1
+#define UNCOMPRESSED    0
+#define SERIALIZATION   COMPRESSED
+
 // Structure of precomputed data
 #if (hashToPoint == OPSWU)
     #define ELLP_Nx_LEN 12
