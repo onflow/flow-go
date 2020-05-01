@@ -103,7 +103,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// look up the transactions included in the payload
 			step := steps[i]
 			var payload cluster.Payload
-			err = procedure.RetrieveClusterPayload(step.ID(), &payload)(tx)
+			err = procedure.RetrieveClusterPayload(step, &payload)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve cluster payload: %w", err)
 			}
