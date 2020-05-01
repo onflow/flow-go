@@ -189,7 +189,10 @@ func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
 		// the order guarantees that if a block requires certain blocks to connect to the
 		// finalized block, those connecting blocks must appear before this block.
 		// TODO: double check the unfinalized blocks don't include invalid block
-		operation.FindDescendants(boundary, headID, &unfinalizedBlockIDs)
+		err = operation.FindDescendants(boundary, headID, &unfinalizedBlockIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not find descendants: %w", err)
+		}
 
 		return nil
 	})
