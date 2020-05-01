@@ -13,7 +13,6 @@ const (
 const (
 	subsystemBadger  = "badger"
 	subsystemNetwork = "network"
-
 )
 
 // Execution Subsystems
