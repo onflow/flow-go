@@ -15,7 +15,7 @@ const (
 )
 
 var (
-	executionGasUsedPerBlockGauge = promauto.NewHistogram(prometheus.HistogramOpts{
+	executionGasUsedPerBlockHist = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Buckets:   []float64{1}, //TODO(andrew) Set once there are some figures around gas usage and limits
@@ -58,7 +58,7 @@ func (c *Collector) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
 
 // ExecutionGasUsedPerBlock reports gas used per block
 func (c *Collector) ExecutionGasUsedPerBlock(gas uint64) {
-	executionGasUsedPerBlockGauge.Set(float64(gas))
+	executionGasUsedPerBlockHist.Observe(float64(gas))
 }
 
 // ExecutionStateReadsPerBlock reports number of state access/read operations per block
