@@ -267,6 +267,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		},
 	)
 
+	in.finalizer.On("MakeConfirm", mock.Anything, mock.Anything).Return(nil)
+
 	// initialize error handling and logging
 	var err error
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
