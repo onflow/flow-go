@@ -27,6 +27,7 @@ type TransactionContext struct {
 	events            []cadence.Event
 	OnSetValueHandler func(owner, controller, key, value []byte)
 	gasUsed           uint64 // TODO fill with actual gas
+	uuid              uint64
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -311,7 +312,8 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 }
 
 func (r *TransactionContext) GenerateUUID() uint64 {
-	panic("implement me")
+	defer func() { r.uuid++ }()
+	return r.uuid
 }
 
 func (r *TransactionContext) GetComputationLimit() uint64 {
