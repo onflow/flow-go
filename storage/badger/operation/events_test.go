@@ -2,6 +2,7 @@ package operation
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 	"testing"
 
@@ -86,14 +87,15 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 		t.Run("retrieve events by block ID and transaction ID", func(t *testing.T) {
 			for _, b := range blockIDs {
-				for _, t := range txIDs {
+				for _, txID := range txIDs {
 					var actualEvents = make([]flow.Event, 0)
 
 					//lookup events by block id and transaction id
-					err := db.View(RetrieveEvents(b, t, &actualEvents))
-
-					expectedEvents := txMap[b.String()+"_"+t.String()]
+					err := db.View(RetrieveEvents(b, txID, &actualEvents))
+					fmt.Println(actualEvents)
+					expectedEvents := txMap[b.String()+"_"+txID.String()]
 					assertFunc(err, expectedEvents, actualEvents)
+					t.Fail()
 				}
 			}
 		})

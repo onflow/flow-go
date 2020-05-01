@@ -51,7 +51,7 @@ func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 // ByBlockIDTransactionID returns the events for the given block ID and transaction ID
 func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) ([]flow.Event, error) {
 
-	var events *[]flow.Event
+	events := new([]flow.Event)
 	err := e.db.View(func(btx *badger.Txn) error {
 		err := operation.RetrieveEvents(blockID, txID, events)(btx)
 		return handleError(err, flow.Event{})
@@ -61,13 +61,16 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 		return nil, err
 	}
 
+	for _, event := range *events {
+		fmt.Printf("%+v\n", event)
+	}
 	return *events, nil
 }
 
 // ByBlockIDEventType returns the events for the given block ID and event type
 func (e *Events) ByBlockIDEventType(blockID flow.Identifier, event flow.EventType) ([]flow.Event, error) {
 
-	var events *[]flow.Event
+	events := new([]flow.Event)
 	err := e.db.View(func(btx *badger.Txn) error {
 		err := operation.LookupEventsByBlockIDEventType(blockID, event, events)(btx)
 		return handleError(err, flow.Event{})

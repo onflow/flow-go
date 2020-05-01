@@ -75,18 +75,23 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 			// remove the guarantees from the memory pool
 			for _, guaranteeID := range guaranteeIDs {
-				ok := f.guarantees.Rem(guaranteeID)
-				if !ok {
-					return fmt.Errorf("could not remove guarantee (collID: %x)", guaranteeID)
-				}
+				// ok := f.guarantees.Rem(guaranteeID)
+				// if !ok {
+				// 	return fmt.Errorf("could not remove guarantee (collID: %x)", guaranteeID)
+				// }
+				// TODO: guarantee not found in mempool, error?
+				f.guarantees.Rem(guaranteeID)
 			}
 
 			// remove all seals from the memory pool
 			for _, sealID := range sealIDs {
-				ok := f.seals.Rem(sealID)
-				if !ok {
-					return fmt.Errorf("could not remove seal (sealID: %x)", sealID)
-				}
+				// ok := f.seals.Rem(sealID)
+				// if !ok {
+				// 	return fmt.Errorf("could not remove seal (sealID: %x)", sealID)
+				// }
+				// TODO: seal not found in mempool, error?
+				f.seals.Rem(sealID)
+
 			}
 
 			// finalize the block in the protocol state

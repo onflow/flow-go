@@ -678,6 +678,9 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 	}
 
 	if len(events) > 0 {
+		for _, event := range events {
+			e.log.Error().Msgf("%+v", event)
+		}
 		err = e.events.Store(block.ID(), events)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store events: %w", err)
