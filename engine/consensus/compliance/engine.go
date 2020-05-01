@@ -21,21 +21,26 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+// max size of the pending cache, after which we prune blocks older than the
+// finalized head.
+const maxPending = 5000
+
 // Engine is the consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
 type Engine struct {
-	unit     *engine.Unit   // used to control startup/shutdown
-	log      zerolog.Logger // used to log relevant actions with context
-	me       module.Local
-	cleaner  storage.Cleaner
-	headers  storage.Headers
-	payloads storage.Payloads
-	state    protocol.State
-	con      network.Conduit
-	prov     network.Engine
-	pending  module.PendingBlockBuffer
-	sync     module.Synchronization
-	hotstuff module.HotStuff
+	unit       *engine.Unit   // used to control startup/shutdown
+	log        zerolog.Logger // used to log relevant actions with context
+	me         module.Local
+	cleaner    storage.Cleaner
+	headers    storage.Headers
+	payloads   storage.Payloads
+	state      protocol.State
+	con        network.Conduit
+	prov       network.Engine
+	pending    module.PendingBlockBuffer // pending block cache
+	maxPending uint                      // maximum size of the pending cache
+	sync       module.Synchronization
+	hotstuff   module.HotStuff
 }
 
 // New creates a new consensus propagation engine.
@@ -53,17 +58,18 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "consensus").Logger(),
-		me:       me,
-		cleaner:  cleaner,
-		headers:  headers,
-		payloads: payloads,
-		state:    state,
-		prov:     prov,
-		pending:  pending,
-		sync:     nil, // use `WithSynchronization`
-		hotstuff: nil, // use `WithConsensus`
+		unit:       engine.NewUnit(),
+		log:        log.With().Str("engine", "consensus").Logger(),
+		me:         me,
+		cleaner:    cleaner,
+		headers:    headers,
+		payloads:   payloads,
+		state:      state,
+		prov:       prov,
+		pending:    pending,
+		maxPending: maxPending,
+		sync:       nil, // use `WithSynchronization`
+		hotstuff:   nil, // use `WithConsensus`
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -312,6 +318,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	log.Info().Msg("block proposal received")
 
+	if e.pending.Size() > e.maxPending {
+		e.prunePendingCache()
+	}
+
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
 	// 2) blocks already on disk; they were processed and await finalization
@@ -351,8 +361,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// => in each case, we cache the proposal and request the missing link
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
-
-	// TODO: prune cache from outdated blocks
 
 	// if we can connect the proposal to an ancestor in the cache, it means
 	// there is a missing link; we cache it and request the missing link
@@ -515,4 +523,14 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	e.pending.DropForParent(header)
 
 	return result.ErrorOrNil()
+}
+
+// prunePendingCache prunes the pending block cache.
+func (e *Engine) prunePendingCache() {
+	// retrieve the finalized height
+	final, err := e.state.Final().Head()
+	if err != nil {
+		e.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
+	}
+	e.pending.PruneByHeight(final.Height)
 }
