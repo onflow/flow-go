@@ -139,13 +139,3 @@ func TestPayloadEmptyIdentities(t *testing.T) {
 		assert.Nil(t, retrievedPayload.Identities)
 	})
 }
-
-func TestPayloadOrderedIdentities(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-
-		block := unittest.BlockFixture()
-		block.Payload.Identities = unittest.IdentityListFixture(5)
-
-		check(t, db, &block.Header, &block.Payload)
-	})
-}

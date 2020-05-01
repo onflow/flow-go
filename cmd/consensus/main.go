@@ -113,6 +113,7 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
+			cleaner := storage.NewCleaner(node.Logger, node.DB)
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
 			blocksDB := storage.NewBlocks(node.DB)
@@ -124,7 +125,7 @@ func main() {
 			cache := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, prov, cache)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, cleaner, headersDB, payloadsDB, node.State, prov, cache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}

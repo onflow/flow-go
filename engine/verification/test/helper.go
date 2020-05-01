@@ -70,7 +70,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 	}
 
 	payload := flow.Payload{
-		Identities: unittest.IdentityListFixture(32),
+		Identities: nil,
 		Guarantees: guarantees,
 	}
 	header := unittest.BlockHeaderFixture()
