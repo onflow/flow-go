@@ -295,6 +295,7 @@ func initNewestForkChoice(t *testing.T, view uint64) (hs.Forks, *mocks.Consumer,
 
 	finalizationCallback := &mockfinalizer.Finalizer{}
 	finalizationCallback.On("MakeFinal", mock.Anything).Return(nil)
+	finalizationCallback.On("MakeConfirm", mock.Anything, mock.Anything).Return(nil)
 
 	// construct Finalizer
 	root := makeRootBlock(t, view)
