@@ -199,6 +199,9 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	err := s.state.db.View(func(tx *badger.Txn) error {
 		return s.head(&header)(tx)
 	})
+	if header.ChainID != flow.DefaultChainID {
+		return nil, fmt.Errorf("non-protocol header (chain_id=%s)", header.ChainID)
+	}
 	return &header, err
 }
 
