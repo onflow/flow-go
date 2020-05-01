@@ -325,7 +325,13 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		// removes tracker
 		e.collectionTrackers.Rem(collID)
 
+		e.log.Debug().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("collection_id", logging.Entity(coll)).
+			Msg("collection added to authenticated mempool, and tracker removed")
+
 		e.checkPendingChunks()
+
 	} else {
 		// this collection came passively
 		// collections with no tracker add to the pending collections mempool
@@ -337,6 +343,11 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		if err != nil && err != mempool.ErrAlreadyExists {
 			return fmt.Errorf("could not store collection in pending pool: %w", err)
 		}
+
+		e.log.Debug().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("collection_id", logging.Entity(coll)).
+			Msg("collection added to pending mempool")
 	}
 
 	return nil
