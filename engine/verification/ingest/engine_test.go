@@ -31,8 +31,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// TestSuite contains the context of a verifier engine test using mocked components.
-type TestSuite struct {
+// IngestTestSuite contains the context of a verifier engine test using mocked components.
+type IngestTestSuite struct {
 	sync.Mutex // to provide mutual exclusion of mocked objects
 	suite.Suite
 	net   *module.Network
@@ -75,13 +75,13 @@ type TestSuite struct {
 	failureThreshold uint
 }
 
-// TestIngestEngine executes all TestSuite tests.
+// TestIngestEngine executes all IngestTestSuite tests.
 func TestIngestEngine(t *testing.T) {
-	suite.Run(t, new(TestSuite))
+	suite.Run(t, new(IngestTestSuite))
 }
 
 // SetupTest initiates the test setups prior to each test.
-func (suite *TestSuite) SetupTest() {
+func (suite *IngestTestSuite) SetupTest() {
 	// initializing test suite fields
 	suite.collectionsConduit = &network.Conduit{}
 	suite.statesConduit = &network.Conduit{}
@@ -138,7 +138,7 @@ func (suite *TestSuite) SetupTest() {
 // TestNewEngine verifies the establishment of the network registration upon
 // creation of an instance of verifier.IngestEngine using the New method
 // It also returns an instance of new engine to be used in the later tests
-func (suite *TestSuite) TestNewEngine() *ingest.Engine {
+func (suite *IngestTestSuite) TestNewEngine() *ingest.Engine {
 	e, err := ingest.New(zerolog.Logger{},
 		suite.net,
 		suite.state,
@@ -166,7 +166,7 @@ func (suite *TestSuite) TestNewEngine() *ingest.Engine {
 
 // TestHandleBlock passes a block to ingest engine and evaluates internal path
 // as ingest engine only accepts a block through consensus follower, it should return an error
-func (suite *TestSuite) TestHandleBlock() {
+func (suite *IngestTestSuite) TestHandleBlock() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -178,7 +178,7 @@ func (suite *TestSuite) TestHandleBlock() {
 
 // TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
 // but not the collections, it asks for the collections through the network
-func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
+func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -271,7 +271,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 // TestHandleReceipt_MissingChunkDataPack evaluates that when ingest engine has both a receipt and its block
 // but not the chunk data pack of it, it asks for the chunk data pack through the network
-func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
+func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -358,7 +358,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingChunkDataPack() {
 // TestHandleReceipt_RetryMissingCollection evaluates that when ingest engine has a missing collections with
 // a tracker registered, it retries its request (`failureThreshold` - 1)-many times and then drops it.
 // The -1 is to account for the initial request of the collection directly without registering the tracker.
-func (suite *TestSuite) TestHandleReceipt_RetryMissingCollection() {
+func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -424,7 +424,7 @@ func (suite *TestSuite) TestHandleReceipt_RetryMissingCollection() {
 // TestHandleReceipt_RetryMissingChunkDataPack evaluates that when ingest engine has a missing chunk data pack with
 // a tracker registered, it retries its request (`failureThreshold` - 1)-many times and then drops it.
 // The -1 is to account for the initial request of the chunk data pack directly without registering the tracker.
-func (suite *TestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
+func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -487,7 +487,7 @@ func (suite *TestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
 }
 
 // TestIngestedResult evaluates the happy path of submitting an execution receipt with an already ingested result
-func (suite *TestSuite) TestIngestedResult() {
+func (suite *IngestTestSuite) TestIngestedResult() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -503,7 +503,7 @@ func (suite *TestSuite) TestIngestedResult() {
 }
 
 // TestIngestedChunk evaluates the happy path of submitting a chunk data pack for an already ingested chunk
-func (suite *TestSuite) TestIngestedChunk() {
+func (suite *IngestTestSuite) TestIngestedChunk() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -526,7 +526,7 @@ func (suite *TestSuite) TestIngestedChunk() {
 // it should go to the pending receipts and (later on) dropped from the cache
 // Todo dropping unauthenticated receipts from cache
 // https://github.com/dapperlabs/flow-go/issues/2966
-func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
+func (suite *IngestTestSuite) TestHandleReceipt_UnstakedSender() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -574,7 +574,7 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 
 // TestHandleReceipt_SenderWithWrongRole evaluates sending an execution receipt from a staked
 // node with a role rather than execution node discards that immediately
-func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
+func (suite *IngestTestSuite) TestHandleReceipt_SenderWithWrongRole() {
 	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleCollection, flow.RoleVerification, flow.RoleAccess}
 
 	for _, role := range invalidRoles {
@@ -611,7 +611,7 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 
 // TestHandleCollection_Tracked evaluates receiving a tracked collection without any other receipt-dependent resources
 // the collection should be added to the authenticate collection pool, and tracker should be removed
-func (suite *TestSuite) TestHandleCollection_Tracked() {
+func (suite *IngestTestSuite) TestHandleCollection_Tracked() {
 	// locks to run the tests sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -647,7 +647,7 @@ func (suite *TestSuite) TestHandleCollection_Tracked() {
 
 // TestHandleCollection_Untracked evaluates receiving an  un-tracked collection
 // It expects that the collection to be added to the pending receipts
-func (suite *TestSuite) TestHandleCollection_Untracked() {
+func (suite *IngestTestSuite) TestHandleCollection_Untracked() {
 	// Locks to run the tests sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -683,7 +683,7 @@ func (suite *TestSuite) TestHandleCollection_Untracked() {
 // process method should return an error
 // TODO pending collections cleanup
 // https://github.com/dapperlabs/flow-go/issues/2966
-func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
+func (suite *IngestTestSuite) TestHandleCollection_UnstakedSender() {
 	// locks to run the tests sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -713,7 +713,7 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 
 // TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
 // process method should return an error
-func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
+func (suite *IngestTestSuite) TestHandleCollection_SenderWithWrongRole() {
 	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
 
 	for _, role := range invalidRoles {
@@ -745,7 +745,7 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 
 // TestVerifyReady evaluates that a verifiable chunk is locally passed to the verifier engine
 // whenever all of its relevant resources are ready regardless of the order in which dependent resources are received.
-func (suite *TestSuite) TestVerifyReady() {
+func (suite *IngestTestSuite) TestVerifyReady() {
 	// Mocking identities
 	//
 	// required roles
@@ -754,16 +754,16 @@ func (suite *TestSuite) TestVerifyReady() {
 	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 	testcases := []struct {
-		getResource func(*TestSuite) interface{}
+		getResource func(*IngestTestSuite) interface{}
 		from        *flow.Identity
 		label       string
 	}{
 		{
-			getResource: func(s *TestSuite) interface{} { return s.receipt },
+			getResource: func(s *IngestTestSuite) interface{} { return s.receipt },
 			from:        execIdentity,
 			label:       "received receipt",
 		}, {
-			getResource: func(s *TestSuite) interface{} { return s.collection },
+			getResource: func(s *IngestTestSuite) interface{} { return s.collection },
 			from:        collIdentity,
 			label:       "received collection",
 		},
@@ -888,7 +888,7 @@ func (suite *TestSuite) TestVerifyReady() {
 
 // TestChunkDataPackTracker_UntrackedChunkDataPack tests that ingest engine process method returns an error
 // if it receives a ChunkDataPackResponse that does not have any tracker in the engine's mempool
-func (suite *TestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
+func (suite *IngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
 	// locks to run the tests sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -917,7 +917,7 @@ func (suite *TestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
 }
 
 // TestChunkDataPackTracker_HappyPath evaluates the happy path of receiving a chunk data pack upon a request
-func (suite *TestSuite) TestChunkDataPackTracker_HappyPath() {
+func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()

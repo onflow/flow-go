@@ -545,6 +545,9 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 
 	collID := block.Guarantees[collIndex].ID()
 
+	// updates pending collection
+	e.checkPendingCollections(collID, block.ID())
+
 	// checks authenticated collections mempool
 	//
 	//
@@ -785,7 +788,8 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 		if blockID == p.Receipt.ExecutionResult.BlockID {
 			// removes receipt from pending receipts pool
 			e.pendingReceipts.Rem(p.Receipt.ID())
-			// adds receipt to authenticated receipts pool
+
+			// evaluates receipt origin ID at the block it refers to
 			origin, err := e.state.AtBlockID(blockID).Identity(p.OriginID)
 			if err != nil {
 				// could not verify origin Id of pending receipt based on its referenced block
@@ -796,31 +800,108 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 					Hex("receipt_id", logging.ID(p.Receipt.ID())).
 					Hex("origin_id", logging.ID(p.OriginID)).
 					Msg("could not verify origin ID of pending receipt")
-			} else {
-				// execution results are only valid from execution nodes
-				if origin.Role != flow.RoleExecution {
-					// TODO: potential attack on integrity
-					e.log.Error().
-						Err(err).
-						Hex("receipt_id", logging.ID(p.Receipt.ID())).
-						Hex("origin_id", logging.ID(origin.NodeID)).
-						Uint8("origin_role", uint8(origin.Role)).
-						Msg("invalid role for pending execution receipt")
-				}
-				// store the execution receipt in the store of the engine
-				// this will fail if the receipt already exists in the store
-				err = e.authReceipts.Add(p.Receipt)
-				if err != nil && err != mempool.ErrAlreadyExists {
-					// TODO potential memory leakage
-					e.log.Error().
-						Err(err).
-						Hex("receipt_id", logging.ID(p.Receipt.ID())).
-						Hex("origin_id", logging.ID(origin.NodeID)).
-						Msg("could not store authenticated receipt in mempool")
-				}
+				continue
 			}
+
+			// execution results are only valid from execution nodes
+			if origin.Role != flow.RoleExecution {
+				// TODO: potential attack on integrity
+				e.log.Error().
+					Err(err).
+					Hex("receipt_id", logging.ID(p.Receipt.ID())).
+					Hex("origin_id", logging.ID(origin.NodeID)).
+					Uint8("origin_role", uint8(origin.Role)).
+					Msg("invalid role for pending execution receipt")
+				continue
+			}
+
+			// store the execution receipt in the authenticated mempool of the engine
+			// this will fail if the receipt already exists in the store
+			err = e.authReceipts.Add(p.Receipt)
+			if err != nil && err != mempool.ErrAlreadyExists {
+				// TODO potential memory leakage
+				e.log.Error().
+					Err(err).
+					Hex("receipt_id", logging.ID(p.Receipt.ID())).
+					Hex("origin_id", logging.ID(origin.NodeID)).
+					Msg("could not store authenticated receipt in mempool")
+				continue
+			}
+
+			e.log.Debug().
+				Hex("receipt_id", logging.ID(p.Receipt.ID())).
+				Hex("block_id", logging.ID(blockID)).
+				Msg("pending receipt moved to authenticated mempool")
 		}
 	}
+}
+
+// checkPendingCollections checks if a certain collection is available for the requested block.
+// if the collection is available, it evaluates the collections's origin ID based on the block ID.
+// if originID is evaluated successfully, the collection is added to authenticated collections mempool.
+// Otherwise it is dropped completely.
+func (e *Engine) checkPendingCollections(collID, blockID flow.Identifier) {
+	if !e.pendingCollections.Has(collID) {
+		e.log.Debug().
+			Hex("collection_id", logging.ID(collID)).
+			Hex("block_id", logging.ID(blockID)).
+			Msg("no pending collection is available with this parameters")
+		return
+	}
+
+	// retrieves collection from mempool
+	pcoll, err := e.pendingCollections.ByID(collID)
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Hex("collection_id", logging.ID(collID)).
+			Msg("could not retrieve collection from pending mempool")
+	}
+	// removes collection from pending pool
+	e.pendingCollections.Rem(collID)
+
+	// evaluates origin ID of pending collection at the block it is referenced
+	origin, err := e.state.AtBlockID(blockID).Identity(pcoll.OriginID)
+	if err != nil {
+		// could not verify origin ID of pending collection based on its referenced block
+		// drops it
+		// TODO: potential attack on authenticity
+		e.log.Error().
+			Err(err).
+			Hex("collection_id", logging.ID(pcoll.ID())).
+			Hex("origin_id", logging.ID(pcoll.OriginID)).
+			Msg("could not verify origin ID of pending collection")
+		return
+	}
+	// collections should come from collection nodes
+	if origin.Role != flow.RoleCollection {
+		// TODO: potential attack on integrity
+		e.log.Error().
+			Err(err).
+			Hex("collection_id", logging.ID(pcoll.ID())).
+			Hex("origin_id", logging.ID(pcoll.OriginID)).
+			Str("origin_role", origin.Role.String()).
+			Msg("invalid role for pending collection")
+		return
+	}
+	// store the collection in the authenticated collections mempool
+	// this will fail if the collection already exists in the store
+	err = e.authCollections.Add(pcoll.Collection)
+	if err != nil && err != mempool.ErrAlreadyExists {
+		// TODO potential memory leakage
+		e.log.Error().
+			Err(err).
+			Hex("collection_id", logging.ID(pcoll.ID())).
+			Hex("origin_id", logging.ID(pcoll.OriginID)).
+			Str("origin_role", origin.Role.String()).
+			Msg("could not store authenticated collection in mempool")
+		return
+	}
+
+	e.log.Debug().
+		Hex("collection_id", logging.ID(collID)).
+		Hex("block_id", logging.ID(blockID)).
+		Msg("pending collection successfully moved to authenticated mempool")
 }
 
 // checkTrackers should be called periodically at intervals
