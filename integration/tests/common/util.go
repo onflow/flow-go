@@ -1,11 +1,11 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	encoding "github.com/onflow/cadence/encoding/xdr"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/examples"
@@ -66,12 +66,13 @@ func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 		return 0, err
 	}
 
-	v, err := jsoncdc.Decode(res)
+	decoder := encoding.NewDecoder(bytes.NewReader(res))
+	i, err := decoder.DecodeInt()
 	if err != nil {
 		return 0, err
 	}
 
-	return v.(cadence.Int).Int(), nil
+	return int(i.Value.Int64()), nil
 }
 
 // createCounter creates a counter instance in the root account. The counter
