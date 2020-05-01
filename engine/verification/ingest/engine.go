@@ -833,6 +833,11 @@ func (e *Engine) checkTrackers() {
 	//
 	// iterates over all chunk data pack trackers
 	for _, cdpt := range e.chunkDataPackTackers.All() {
+		// to avoid race condition checks if any pulled tracker
+		// has already been addressed
+		if !e.chunkDataPackTackers.Has(cdpt.ChunkID) {
+			continue
+		}
 		if cdpt.Counter > e.failureThreshold {
 			// tracker met maximum retry chances
 			// drops out of memory
@@ -858,6 +863,11 @@ func (e *Engine) checkTrackers() {
 	// collection trackers
 	//
 	for _, ct := range e.collectionTrackers.All() {
+		// to avoid race condition checks if any pulled tracker
+		// has already been addressed
+		if !e.collectionTrackers.Has(ct.CollectionID) {
+			continue
+		}
 		if ct.Counter > e.failureThreshold {
 			// tracker met maximum retry chances
 			// drops out of memory
