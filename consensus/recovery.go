@@ -30,6 +30,8 @@ func Recover(
 
 	blocks := make(map[flow.Identifier]*flow.Header, len(unfinalized)+1)
 
+	log.Info().Int("total", len(unfinalized)).Msgf("recover started")
+
 	// add all unfinalized blocks to Forks
 	for _, header := range unfinalized {
 		blocks[header.ID()] = header
@@ -46,6 +48,8 @@ func Recover(
 			return fmt.Errorf("can't recover this proposal: %w", err)
 		}
 	}
+
+	log.Info().Msgf("recover completed")
 
 	return nil
 }
