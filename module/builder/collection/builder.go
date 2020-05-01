@@ -188,6 +188,9 @@ func (builder *Builder) getCandidateTransactions(tx *badger.Txn) ([]flow.Identif
 	// transactions have expired and should be discarded
 	var final flow.Header
 	err := procedure.RetrieveLatestFinalizedHeader(&final)(tx)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve finalized header: %w", err)
+	}
 
 	// build a payload that includes as many transactions from the memory
 	// that have not expired
