@@ -24,9 +24,10 @@ var (
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
 	bootstrap.NodeInfo
-	ContainerName string
-	LogLevel      zerolog.Level
-	Ghost         bool
+	ContainerName   string
+	LogLevel        zerolog.Level
+	Ghost           bool
+	AdditionalFlags []string
 }
 
 // ImageName returns the Docker image name for the given config.
