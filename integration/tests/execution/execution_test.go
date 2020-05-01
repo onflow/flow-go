@@ -58,7 +58,8 @@ func (gs *ExecutionSuite) SetupTest() {
 	gs.nodeIDs = unittest.IdentifierListFixture(3)
 	for _, nodeID := range gs.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.ErrorLevel))
+			testnet.WithLogLevel(zerolog.ErrorLevel),
+			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 	}
 
@@ -172,6 +173,4 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 
 	// require that state for blockC is the same for execution node 1 and 2
 	require.Equal(gs.T(), erExe1BlockC.ExecutionResult.FinalStateCommit, erExe2BlockC.ExecutionResult.FinalStateCommit)
-
-	require.Fail(gs.T(), "fail to debug")
 }
