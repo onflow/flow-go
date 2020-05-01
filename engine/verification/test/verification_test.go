@@ -365,13 +365,6 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	err = verNode.IngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
-	// the receipt should be added to the mempool
-	// sleep for 1 second to make sure that receipt finds its way to
-	// authReceipts pool
-	assert.Eventually(t, func() bool {
-		return verNode.AuthReceipts.Has(completeER.Receipt.ID())
-	}, time.Second, 50*time.Millisecond)
-
 	unittest.RequireReturnsBefore(t, approvalWG.Wait, 5*time.Second)
 
 	// assert that the RA was received
