@@ -123,6 +123,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 
 func BlockHeaderFixture() flow.Header {
 	return BlockHeaderWithParentFixture(&flow.Header{
+		ChainID:  flow.DefaultChainID,
 		ParentID: IdentifierFixture(),
 		Height:   rand.Uint64(),
 	})
@@ -147,7 +148,7 @@ func ClusterPayloadFixture(n int) cluster.Payload {
 		tx := TransactionBodyFixture()
 		transactions[i] = &tx
 	}
-	return cluster.PayloadFromTransactions(transactions...)
+	return cluster.PayloadFromTransactions(flow.ZeroID, transactions...)
 }
 
 func ClusterBlockFixture() cluster.Block {
