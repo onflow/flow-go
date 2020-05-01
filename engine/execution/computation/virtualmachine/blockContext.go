@@ -46,6 +46,7 @@ func (bc *blockContext) newTransactionContext(
 	ctx := &TransactionContext{
 		LedgerAccess:    LedgerAccess{ledger},
 		signingAccounts: signingAccounts,
+		tx:              tx,
 	}
 
 	for _, option := range options {
@@ -76,7 +77,16 @@ func (bc *blockContext) ExecuteTransaction(
 	location := runtime.TransactionLocation(txID[:])
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
-	err := bc.vm.executeTransaction(tx.Script, ctx, location)
+
+	err := ctx.verifySignatures()
+	if err != nil {
+		return &TransactionResult{
+			TransactionID: txID,
+			Error:         err,
+		}, nil
+	}
+
+	err = bc.vm.executeTransaction(tx.Script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts

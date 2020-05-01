@@ -62,7 +62,7 @@ func BootstrapView(view *delta.View) {
 		panic("Cannot decode hardcoded private key!")
 	}
 
-	publicKeyBytes, err := flow.EncodeAccountPublicKey(privateKey.PublicKey(1000))
+	publicKeyBytes, err := flow.EncodeRuntimeAccountPublicKey(privateKey.PublicKey(1000))
 	if err != nil {
 		panic("Cannot encode public key of hardcoded private key!")
 	}

@@ -15,6 +15,16 @@ type accountPublicKeyWrapper struct {
 	SignAlgo  uint
 	HashAlgo  uint
 	Weight    uint
+	SeqNumber uint64
+}
+
+// runtimeAccountPublicKeyWrapper must match format used in Transaction
+// currently should match SDK AccountKey encoded format
+type runtimeAccountPublicKeyWrapper struct {
+	PublicKey []byte
+	SignAlgo  uint
+	HashAlgo  uint
+	Weight    uint
 }
 
 // accountPrivateKeyWrapper is used for encoding and decoding.
@@ -28,6 +38,20 @@ func EncodeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
 	publicKey := a.PublicKey.Encode()
 
 	w := accountPublicKeyWrapper{
+		PublicKey: publicKey,
+		SignAlgo:  uint(a.SignAlgo),
+		HashAlgo:  uint(a.HashAlgo),
+		Weight:    uint(a.Weight),
+		SeqNumber: a.SeqNumber,
+	}
+
+	return rlp.EncodeToBytes(&w)
+}
+
+func EncodeRuntimeAccountPublicKey(a AccountPublicKey) ([]byte, error) {
+	publicKey := a.PublicKey.Encode()
+
+	w := runtimeAccountPublicKeyWrapper{
 		PublicKey: publicKey,
 		SignAlgo:  uint(a.SignAlgo),
 		HashAlgo:  uint(a.HashAlgo),
@@ -58,6 +82,36 @@ func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
 		Weight:    int(w.Weight),
+		SeqNumber: w.SeqNumber,
+	}, nil
+}
+
+// DecodeRuntimeAccountPublicKey decode bytes into AccountPublicKey
+// but it is designed to accept byte-format used by Cadence runtime
+// (currently same as SDK, but we don't want to keep explicit dependency
+// on SDK)
+func DecodeRuntimeAccountPublicKey(b []byte) (AccountPublicKey, error) {
+	var w runtimeAccountPublicKeyWrapper
+
+	err := rlp.DecodeBytes(b, &w)
+	if err != nil {
+		return AccountPublicKey{}, err
+	}
+
+	signAlgo := crypto.SigningAlgorithm(w.SignAlgo)
+	hashAlgo := hash.HashingAlgorithm(w.HashAlgo)
+
+	publicKey, err := crypto.DecodePublicKey(signAlgo, w.PublicKey)
+	if err != nil {
+		return AccountPublicKey{}, err
+	}
+
+	return AccountPublicKey{
+		PublicKey: publicKey,
+		SignAlgo:  signAlgo,
+		HashAlgo:  hashAlgo,
+		Weight:    int(w.Weight),
+		SeqNumber: 0,
 	}, nil
 }
 

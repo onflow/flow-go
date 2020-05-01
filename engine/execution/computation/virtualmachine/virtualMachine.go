@@ -6,6 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+const AccountKeyWeightThreshold = 1000
+
 // VirtualMachine augments the Cadence runtime with the Flow host functionality required
 // to execute transactions.
 type VirtualMachine interface {

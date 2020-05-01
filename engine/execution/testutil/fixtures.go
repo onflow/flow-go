@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -91,4 +92,32 @@ func AddToCounterTransaction() flow.TransactionBody {
 			}`),
 		Authorizers: []flow.Address{flow.RootAddress},
 	}
+}
+
+func SignTransactionbyRoot(tx *flow.TransactionBody, seqNum uint64) error {
+
+	privateKeyBytes, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
+	if err != nil {
+		return fmt.Errorf("cannot hex decode hardcoded key: %w", err)
+	}
+
+	privateKey, err := flow.DecodeAccountPrivateKey(privateKeyBytes)
+	if err != nil {
+		return fmt.Errorf("cannot decode hardcoded private key: %w", err)
+	}
+
+	hasher, err := hash.NewHasher(privateKey.HashAlgo)
+	if err != nil {
+		return fmt.Errorf("cannot create hasher: %w", err)
+	}
+
+	err = tx.SetPayer(flow.RootAddress).
+		SetProposalKey(flow.RootAddress, 0, seqNum).
+		SignEnvelope(flow.RootAddress, 0, privateKey.PrivateKey, hasher)
+
+	if err != nil {
+		return fmt.Errorf("cannot sign tx: %w", err)
+	}
+
+	return nil
 }

@@ -136,7 +136,8 @@ func (r *LedgerAccess) GetAccount(address flow.Address) *flow.Account {
 
 	accountPublicKeys := make([]flow.AccountPublicKey, len(publicKeys))
 	for i, publicKey := range publicKeys {
-		accountPublicKey, err := decodePublicKey(publicKey)
+		//accountPublicKey, err := decodePublicKey(publicKey)
+		accountPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
 		if err != nil {
 			panic(err)
 		}
@@ -159,6 +160,7 @@ func decodePublicKey(b []byte) (a flow.AccountPublicKey, err error) {
 		SignAlgo  uint
 		HashAlgo  uint
 		Weight    uint
+		SeqNumber uint64
 	}
 
 	encoder := rlp.NewEncoder()
@@ -181,6 +183,7 @@ func decodePublicKey(b []byte) (a flow.AccountPublicKey, err error) {
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
 		Weight:    int(temp.Weight),
+		SeqNumber: temp.SeqNumber,
 	}, nil
 }
 
@@ -242,7 +245,7 @@ func (r *LedgerAccess) SetAccountPublicKeys(accountID []byte, publicKeys [][]byt
 
 	for i, publicKey := range publicKeys {
 
-		accountPublicKey, err := decodePublicKey(publicKey)
+		accountPublicKey, err := flow.DecodeRuntimeAccountPublicKey(publicKey)
 		if err != nil {
 			return err
 		}
@@ -252,10 +255,11 @@ func (r *LedgerAccess) SetAccountPublicKeys(accountID []byte, publicKeys [][]byt
 			return err
 		}
 
-		r.Ledger.Set(
-			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
-			publicKey,
-		)
+		fullAccountPublicKey, err := flow.EncodeAccountPublicKey(accountPublicKey)
+		if err != nil {
+			return err
+		}
+		r.setAccountPublicKey(accountID, i, fullAccountPublicKey)
 	}
 
 	// delete leftover keys
@@ -264,4 +268,11 @@ func (r *LedgerAccess) SetAccountPublicKeys(accountID []byte, publicKeys [][]byt
 	}
 
 	return nil
+}
+
+func (r *LedgerAccess) setAccountPublicKey(accountID []byte, keyndex int, publicKey []byte) {
+	r.Ledger.Set(
+		fullKeyHash(string(accountID), string(accountID), keyPublicKey(keyndex)),
+		publicKey,
+	)
 }

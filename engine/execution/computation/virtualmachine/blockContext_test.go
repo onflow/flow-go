@@ -189,7 +189,17 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	bc := vm.NewBlockContext(&h)
 
 	ledger := make(virtualmachine.MapLedger)
-	ledgerAccess := virtualmachine.LedgerAccess{ledger}
+	ledgerAccess := virtualmachine.LedgerAccess{Ledger: ledger}
+
+	rootAccountKey, err := unittest.AccountKeyFixture()
+	require.NoError(t, err)
+
+	rootAccountKeyBytes, err := flow.EncodeRuntimeAccountPublicKey(rootAccountKey.PublicKey(virtualmachine.AccountKeyWeightThreshold))
+
+	require.NoError(t, err)
+
+	rootAccountAddress, err := ledgerAccess.CreateAccountInLedger([][]byte{rootAccountKeyBytes})
+	require.NoError(t, err)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 
@@ -208,7 +218,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 			SignAlgo:  key.Algorithm(),
 			HashAlgo:  hash.SHA3_256,
 		}
-		keyBytes, err := flow.EncodeAccountPublicKey(accountKey)
+		keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
 		assert.NoError(t, err)
 
 		// encode the bytes to cadence string
@@ -227,7 +237,19 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// create the transaction to create the account
 		tx := &flow.TransactionBody{
 			Script: []byte(script),
+			Payer:  rootAccountAddress,
+			ProposalKey: flow.ProposalKey{
+				Address:        rootAccountAddress,
+				KeyID:          0,
+				SequenceNumber: 0,
+			},
 		}
+
+		rootHasher, err := hash.NewHasher(rootAccountKey.HashAlgo)
+		require.NoError(t, err)
+
+		err = tx.SignEnvelope(rootAccountAddress, 0, rootAccountKey.PrivateKey, rootHasher)
+		require.NoError(t, err)
 
 		// execute the transaction
 		result, err := bc.ExecuteTransaction(ledger, tx)

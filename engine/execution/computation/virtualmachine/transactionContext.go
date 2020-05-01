@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -18,6 +19,7 @@ type TransactionContext struct {
 	events            []runtime.Event
 	OnSetValueHandler func(owner, controller, key, value []byte)
 	gasUsed           uint64 // TODO fill with actual gas
+	tx                *flow.TransactionBody
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -212,4 +214,177 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 	location := runtime.AddressLocation(address[:])
 
 	return r.checker(code, location)
+}
+
+// verifySignatures verifies that a transaction contains the necessary signatures.
+//
+// An error is returned if any of the expected signatures are invalid or missing.
+func (r *TransactionContext) verifySignatures() error {
+
+	if r.tx.Payer == flow.ZeroAddress {
+		// TODO: add error type for missing payer
+		return fmt.Errorf("missing payer signature")
+	}
+
+	payloadWeights, proposalKeyVerifiedInPayload, err := r.aggregateAccountSignatures(
+		r.tx.PayloadSignatures,
+		r.tx.PayloadMessage(),
+		r.tx.ProposalKey,
+	)
+	if err != nil {
+		return err
+	}
+
+	envelopeWeights, proposalKeyVerifiedInEnvelope, err := r.aggregateAccountSignatures(
+		r.tx.EnvelopeSignatures,
+		r.tx.EnvelopeMessage(),
+		r.tx.ProposalKey,
+	)
+	if err != nil {
+		return err
+	}
+
+	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
+
+	if !proposalKeyVerified {
+		return fmt.Errorf(
+			"missing signature for proposal key (address: %s, key: %d)",
+			r.tx.ProposalKey.Address,
+			r.tx.ProposalKey.KeyID,
+		)
+	}
+
+	for _, addr := range r.tx.Authorizers {
+		// Skip this authorizer if it is also the payer. In the case where an account is
+		// both a PAYER as well as an AUTHORIZER or PROPOSER, that account is required
+		// to sign only the envelope.
+		if addr == r.tx.Payer {
+			continue
+		}
+
+		if !hasSufficientKeyWeight(payloadWeights, addr) {
+			return &MissingSignatureError{addr}
+		}
+	}
+
+	if !hasSufficientKeyWeight(envelopeWeights, r.tx.Payer) {
+		return &MissingSignatureError{r.tx.Payer}
+	}
+
+	return nil
+}
+
+// CheckAndIncrementSequenceNumber validates and increments a sequence number for with an account key.
+//
+// This function first checks that the provided sequence number matches the version stored on-chain.
+// If they are equal, the on-chain sequence number is incremented.
+// If they are not equal, the on-chain sequence number is not incremented.
+//
+// This function returns a boolean flag indicating validity as well as the updated sequence number value.
+// This function returns an error if the sequence number cannot be read from storage.
+func (r *TransactionContext) checkAndIncrementSequenceNumber(proposalKey flow.ProposalKey) (bool, error) {
+
+	account := r.GetAccount(proposalKey.Address)
+
+	if proposalKey.KeyID < 0 || proposalKey.KeyID >= len(account.Keys) {
+		return false, &InvalidProposalKeyError{
+			Address: proposalKey.Address,
+			KeyID:   proposalKey.KeyID,
+		}
+	}
+
+	accountKey := account.Keys[proposalKey.KeyID]
+
+	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
+
+	if valid {
+
+		accountKey.SeqNumber++
+
+		updatedAccountBytes, err := flow.EncodeAccountPublicKey(accountKey)
+		if err != nil {
+			return false, err
+		}
+		r.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
+	}
+
+	return valid, nil
+}
+
+func keyPublicKeySequenceNumber(index int) string {
+	return fmt.Sprintf("public_key_%d_seq_num", index)
+}
+
+func (r *TransactionContext) aggregateAccountSignatures(
+	signatures []flow.TransactionSignature,
+	message []byte,
+	proposalKey flow.ProposalKey,
+) (
+	weights map[flow.Address]int,
+	proposalKeyVerified bool,
+	err error,
+) {
+	weights = make(map[flow.Address]int)
+
+	for _, txSig := range signatures {
+		accountKey, err := r.verifyAccountSignature(txSig, message)
+		if err != nil {
+			return nil, false, err
+		}
+
+		if sigIsForProposalKey(txSig, proposalKey) {
+			proposalKeyVerified = true
+		}
+
+		weights[txSig.Address] += accountKey.Weight
+	}
+
+	return
+}
+
+// verifyAccountSignature verifies that an account signature is valid for the
+// account and given message.
+//
+// If the signature is valid, this function returns the associated account key.
+//
+// An error is returned if the account does not contain a public key that
+// correctly verifies the signature against the given message.
+func (r *TransactionContext) verifyAccountSignature(
+	txSig flow.TransactionSignature,
+	message []byte,
+) (accountKey *flow.AccountPublicKey, err error) {
+	account := r.GetAccount(txSig.Address)
+	if account == nil {
+		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
+	}
+
+	if txSig.KeyID < 0 || txSig.KeyID >= len(account.Keys) {
+		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
+	}
+
+	accountKey = &account.Keys[txSig.KeyID]
+
+	hasher, err := hash.NewHasher(accountKey.HashAlgo)
+	if err != nil {
+		return accountKey, fmt.Errorf("public key specifies invalid hash algorithm")
+	}
+
+	valid, err := accountKey.PublicKey.Verify(txSig.Signature, message, hasher)
+	if err != nil {
+		return accountKey, fmt.Errorf("cannot verify public key")
+	}
+
+	if !valid {
+		return accountKey, &InvalidSignaturePublicKeyError{Address: txSig.Address, KeyID: txSig.KeyID}
+	}
+
+	return accountKey, nil
+}
+
+func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.ProposalKey) bool {
+	return txSig.Address == proposalKey.Address && txSig.KeyID == proposalKey.KeyID
+}
+
+func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
+	return weights[address] >= AccountKeyWeightThreshold
 }
