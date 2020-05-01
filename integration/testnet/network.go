@@ -2,6 +2,7 @@ package testnet
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -21,6 +22,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 
 	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
+	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
@@ -269,7 +271,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		dockerclient.FromEnv,
 		dockerclient.WithAPIVersionNegotiation(),
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	suite, _ := testingdock.GetOrCreateSuite(t, networkConf.Name, testingdock.SuiteOpts{
 		Client: dockerClient,
@@ -299,7 +301,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	// add each node to the network
 	for _, nodeConf := range confs {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	return flowNetwork
@@ -345,7 +347,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// create a directory for the node database
 	flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
 	err = os.Mkdir(flowDBDir, 0700)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// Bind the host directory to the container's database directory
 	// Bind the common bootstrap directory to the container
@@ -388,7 +390,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// create directories for execution state trie and values in the tmp
 			// host directory.
 			tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(
 				opts.HostConfig.Binds,
@@ -459,19 +461,46 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
+	// generate the root account
+	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := flow.DecodeAccountPrivateKey(hardcoded)
+	if err != nil {
+		return nil, err
+	}
+
+	// generate the initial execution state
+	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
+	if err != nil {
+		return nil, err
+	}
+
 	// generate genesis block
-	seal := bootstraprun.GenerateRootSeal(flow.GenesisStateCommitment)
-	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), seal)
+	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs))
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
 	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
-	qc, err := bootstraprun.GenerateGenesisQC(signerData, &genesis)
+
+	qc, err := bootstraprun.GenerateGenesisQC(signerData, genesis)
 	if err != nil {
 		return nil, err
 	}
 
 	// write common genesis bootstrap files
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameAccount0Priv), account)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisCommit), commit)
+	if err != nil {
+		return nil, err
+	}
+
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisBlock), genesis)
 	if err != nil {
 		return nil, err
@@ -512,32 +541,33 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 		}
 	}
 
-	// generate genesis blocks for each collector cluster
-	clusterBlocks, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs, genesis)
-	if err != nil {
-		return nil, err
-	}
 
-	// write collector-specific genesis bootstrap files for each cluster
-	for i := 0; i < len(clusterBlocks); i++ {
-		clusterGenesis := clusterBlocks[i]
-		clusterQC := clusterQCs[i]
+// generate genesis blocks for each collector cluster
+clusterBlocks, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs, genesis)
+if err != nil {
+return nil, err
+}
 
-		// cluster ID is equivalent to chain ID
-		clusterID := clusterGenesis.ChainID
+// write collector-specific genesis bootstrap files for each cluster
+for i := 0; i < len(clusterBlocks); i++ {
+clusterGenesis := clusterBlocks[i]
+clusterQC := clusterQCs[i]
 
-		clusterGenesisPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
-		err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
-		if err != nil {
-			return nil, err
-		}
+// cluster ID is equivalent to chain ID
+clusterID := clusterGenesis.ChainID
 
-		clusterQCPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
-		err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
-		if err != nil {
-			return nil, err
-		}
-	}
+clusterGenesisPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
+err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
+if err != nil {
+return nil, err
+}
+
+clusterQCPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
+err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
+if err != nil {
+return nil, err
+}
+}
 
 	return confs, nil
 }

@@ -8,6 +8,13 @@ import (
 // a label for OneToOne messaging for the networking related vector metrics
 const TopicLabelOneToOne = "OneToOne"
 
+const (
+	_   = iota
+	KiB = 1 << (10 * iota)
+	MiB
+	GiB
+)
+
 var (
 	// BADGER
 	badgerLSMSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
@@ -62,29 +69,19 @@ var (
 	})
 
 	// NETWORKING
-	networkOutboundMessageSizeGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	networkOutboundMessageSizeHist = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Subsystem: subsystemNetwork,
 		Namespace: namespaceCommon,
-		Name:      "message_size_bytes_outbound",
+		Name:      "outbound_message_size_bytes",
 		Help:      "size of the outbound network message",
+		Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
 	}, []string{"topic"})
-	networkOutboundMessageCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	networkInboundMessageSizeHist = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Subsystem: subsystemNetwork,
 		Namespace: namespaceCommon,
-		Name:      "message_count_outbound",
-		Help:      "the number of outbound network messages",
-	}, []string{"topic"})
-	networkInboundMessageSizeGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Subsystem: subsystemNetwork,
-		Namespace: namespaceCommon,
-		Name:      "message_size_bytes_inbound",
+		Name:      "inbound_message_size_bytes",
 		Help:      "size of the inbound network message",
-	}, []string{"topic"})
-	networkInboundMessageCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Subsystem: subsystemNetwork,
-		Namespace: namespaceCommon,
-		Name:      "message_count_inbound",
-		Help:      "the number of inbound network messages",
+		Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
 	}, []string{"topic"})
 )
 
@@ -130,16 +127,14 @@ func (c *Collector) BadgerNumMemtableGets(n int64) {
 	badgerDBNumMemtableGets.Set(float64(n))
 }
 
-// NetworkMessageSent increments the message counter and sets the message size of the last message sent out on the wire
+// NetworkMessageSent tracks the message size of the last message sent out on the wire
 // in bytes for the given topic
 func (c *Collector) NetworkMessageSent(sizeBytes int, topic string) {
-	networkOutboundMessageCounter.WithLabelValues(topic).Inc()
-	networkOutboundMessageSizeGauge.WithLabelValues(topic).Set(float64(sizeBytes))
+	networkOutboundMessageSizeHist.WithLabelValues(topic).Observe(float64(sizeBytes))
 }
 
-// NetworkMessageReceived increments the message counter and sets the message size of the last message received on the wire
+// NetworkMessageReceived tracks the message size of the last message received on the wire
 // in bytes for the given topic
 func (c *Collector) NetworkMessageReceived(sizeBytes int, topic string) {
-	networkInboundMessageCounter.WithLabelValues(topic).Inc()
-	networkInboundMessageSizeGauge.WithLabelValues(topic).Set(float64(sizeBytes))
+	networkInboundMessageSizeHist.WithLabelValues(topic).Observe(float64(sizeBytes))
 }

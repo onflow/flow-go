@@ -6,15 +6,15 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
-func GenerateGenesisClusterBlocks(clusters *flow.ClusterList) []cluster.Block {
-	clusterBlocks := make([]cluster.Block, clusters.Size())
+func GenerateGenesisClusterBlocks(clusters *flow.ClusterList) []*cluster.Block {
+	clusterBlocks := make([]*cluster.Block, clusters.Size())
 	for i := range clusterBlocks {
 		clusterBlocks[i] = GenerateGenesisClusterBlock(clusters.ByIndex(uint(i)))
 	}
 	return clusterBlocks
 }
 
-func GenerateGenesisClusterBlock(identities flow.IdentityList) cluster.Block {
+func GenerateGenesisClusterBlock(identities flow.IdentityList) *cluster.Block {
 	payload := cluster.EmptyPayload()
 	header := flow.Header{
 		ChainID:        protocol.ChainIDForCluster(identities),
@@ -29,7 +29,7 @@ func GenerateGenesisClusterBlock(identities flow.IdentityList) cluster.Block {
 		ProposerSig:    nil,
 	}
 
-	return cluster.Block{
+	return &cluster.Block{
 		Header:  header,
 		Payload: payload,
 	}

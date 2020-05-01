@@ -190,7 +190,7 @@ func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
 }
 
 // Bootstrap inserts the genesis block to the storage
-func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
+func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// insert the block header & payload
@@ -205,25 +205,43 @@ func Bootstrap(genesis *flow.Block) func(*badger.Txn) error {
 			return fmt.Errorf("could not apply stake deltas: %w", err)
 		}
 
-		// get first seal
-		seal := genesis.Seals[0]
-
-		// index the block seal
-		err = operation.IndexSealIDByBlock(genesis.ID(), seal.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index seal by block: %w", err)
-		}
-
+		// generate genesis execution result
 		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.GenesisExecutionResultParentID,
+			PreviousResultID: flow.ZeroID,
 			BlockID:          genesis.ID(),
-			FinalStateCommit: seal.FinalState,
+			FinalStateCommit: commit,
 		}}
 
-		// index the commit for the execution node
+		// generate genesis block seal
+		seal := flow.Seal{
+			BlockID:      genesis.ID(),
+			ResultID:     result.ID(),
+			InitialState: flow.GenesisStateCommitment,
+			FinalState:   result.FinalStateCommit,
+		}
+
+		// insert genesis block seal
+		err = operation.InsertSeal(&seal)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis seal: %w", err)
+		}
+
+		// index genesis block seal
+		err = operation.IndexSealIDByBlock(genesis.ID(), seal.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index genesis seal: %w", err)
+		}
+
+		// index the state commitment for the void state (before genesis)
+		err = operation.IndexStateCommitment(flow.ZeroID, seal.InitialState)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index void commit: %w", err)
+		}
+
+		// index the genesis seal state commitment (after genesis)
 		err = operation.IndexStateCommitment(genesis.ID(), seal.FinalState)(tx)
 		if err != nil {
-			return fmt.Errorf("could not index commit: %w", err)
+			return fmt.Errorf("could not index genesis commit: %w", err)
 		}
 
 		// insert first execution result

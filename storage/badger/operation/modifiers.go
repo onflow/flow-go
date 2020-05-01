@@ -10,22 +10,20 @@ import (
 
 func SkipDuplicates(op func(*badger.Txn) error) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		if err := op(tx); err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return err
+		err := op(tx)
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			return nil
 		}
-		return nil
+		return err
 	}
 }
 
-func RetryOnConflict(op func() error) error {
+func RetryOnConflict(action func() error) error {
 	for {
-		err := op()
-		if err == nil {
-			return nil
+		err := action()
+		if errors.Is(err, badger.ErrConflict) {
+			continue
 		}
-
-		if !errors.Is(err, badger.ErrConflict) {
-			return err
-		}
+		return err
 	}
 }

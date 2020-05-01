@@ -417,6 +417,14 @@ func TestIterateBoundaries(t *testing.T) {
 		// after end -> not included in range
 		{0x21, 0x00},
 	}
+
+	// set the maximum current DB key range
+	for _, key := range keys {
+		if uint32(len(key)) > max {
+			max = uint32(len(key))
+		}
+	}
+
 	// keys within the expected range
 	keysInRange := keys[1:11]
 
@@ -452,14 +460,18 @@ func TestIterateBoundaries(t *testing.T) {
 		// iterate forward and check boundaries are included correctly
 		found = nil
 		err := db.View(iterate(start, end, iteration))
-		t.Log(found)
+		for i, f := range found {
+			t.Logf("forward %d: %x", i, f)
+		}
 		require.NoError(t, err, "should iterate forward without error")
 		assert.ElementsMatch(t, keysInRange, found, "forward iteration should go over correct keys")
 
 		// iterate backward and check boundaries are included correctly
 		found = nil
 		err = db.View(iterate(end, start, iteration))
-		t.Log(found)
+		for i, f := range found {
+			t.Logf("backward %d: %x", i, f)
+		}
 		require.NoError(t, err, "should iterate backward without error")
 		assert.ElementsMatch(t, keysInRange, found, "backward iteration should go over correct keys")
 	})
