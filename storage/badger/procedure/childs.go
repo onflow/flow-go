@@ -1,7 +1,6 @@
 package procedure
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -11,25 +10,20 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
+// IndexChildByBlockID add an index to a block's parent
+// child block means that a block is its parent block's child block
+// This procedure doesn't check the existance of the child block in storage
 func IndexChildByBlockID(blockID flow.Identifier, childID flow.Identifier) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		childID := flow.Identifier{}
+		// index this child
+		err := operation.IndexBlockByParentID(blockID, childID)(tx)
 
-		err := operation.LookupBlockIDByParentID(blockID, &childID)(tx)
-		if err == nil {
-			// there is a child exist already abort
+		// if there is already a child for this block, then skip
+		if err == storage.ErrAlreadyExists {
 			return nil
 		}
 
-		// exceptions other than not found
-		if !errors.Is(err, badger.ErrKeyNotFound) {
-			return fmt.Errorf("could not retrieve child %v for block: %v, %w", childID, blockID, err)
-		}
-
-		// there is no child for this block
-		// index this child
-		err = operation.IndexBlockByParentID(blockID, childID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert child %v to index: %v, %w", childID, blockID, err)
 		}
@@ -41,15 +35,10 @@ func IndexChildByBlockID(blockID flow.Identifier, childID flow.Identifier) func(
 func RetrieveChildByBlockID(blockID flow.Identifier, childHeader *flow.Header) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		childID := flow.Identifier{}
+		var childID flow.Identifier
 
 		// retrieve the child block ID
 		err := operation.LookupBlockIDByParentID(blockID, &childID)(tx)
-
-		// no child for this block
-		if errors.Is(err, badger.ErrKeyNotFound) {
-			return storage.ErrNotFound
-		}
 
 		if err != nil {
 			return fmt.Errorf("could not retrieve child for block: %v, %w", blockID, err)
@@ -59,7 +48,7 @@ func RetrieveChildByBlockID(blockID flow.Identifier, childHeader *flow.Header) f
 		err = operation.RetrieveHeader(childID, childHeader)(tx)
 		// must be able to find child block's header
 		if err != nil {
-			return fmt.Errorf("could not find child block's header: %w", err)
+			return fmt.Errorf("could not find child block's header (%v): %w", childID, err)
 		}
 
 		return nil
