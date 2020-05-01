@@ -1,6 +1,9 @@
 package virtualmachine
 
 import (
+	"fmt"
+
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/cadence/runtime/ast"
 )
 
@@ -10,15 +13,33 @@ type ASTCache interface {
 	SetProgram(ast.Location, *ast.Program) error
 }
 
-func (vm *virtualMachine) GetProgram(location ast.Location) (*ast.Program, error) {
-	program, found := vm.cache.Get(location.ID())
+// LRUASTCache implements a program AST cache with a LRU cache.
+type LRUASTCache struct {
+	lru *lru.Cache
+}
+
+// NewLRUASTCache creates a new LRU cache that implements the ASTCache interface.
+func NewLRUASTCache(size int) (*LRUASTCache, error) {
+	lru, err := lru.New(size)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lru cache, %w", err)
+	}
+	return &LRUASTCache{
+		lru: lru,
+	}, nil
+}
+
+// GetProgram retrieves a program AST from the LRU cache.
+func (cache *LRUASTCache) GetProgram(location ast.Location) (*ast.Program, error) {
+	program, found := cache.lru.Get(location.ID())
 	if found {
 		return program.(*ast.Program), nil
 	}
 	return nil, nil
 }
 
-func (vm *virtualMachine) SetProgram(location ast.Location, program *ast.Program) error {
-	_ = vm.cache.Add(location.ID(), program)
+// SetProgram adds a program AST to the LRU cache.
+func (cache *LRUASTCache) SetProgram(location ast.Location, program *ast.Program) error {
+	_ = cache.lru.Add(location.ID(), program)
 	return nil
 }

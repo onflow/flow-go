@@ -40,12 +40,8 @@ func TestTransactionASTCache(t *testing.T) {
 		txID := tx.ID()
 		location := runtime.TransactionLocation(txID[:])
 
-		// Get cache
-		astCache, ok := vm.(virtualmachine.ASTCache)
-		assert.True(t, ok)
-
 		// Get cached program
-		program, err := astCache.GetProgram(location)
+		program, err := vm.GetCache().GetProgram(location)
 		assert.NotNil(t, program)
 		assert.NoError(t, err)
 	})
@@ -76,12 +72,8 @@ func TestScriptASTCache(t *testing.T) {
 		scriptHash := hash.DefaultHasher.ComputeHash(script)
 		location := runtime.ScriptLocation(scriptHash)
 
-		// Get cache
-		astCache, ok := vm.(virtualmachine.ASTCache)
-		assert.True(t, ok)
-
 		// Get cached program
-		program, err := astCache.GetProgram(location)
+		program, err := vm.GetCache().GetProgram(location)
 		assert.NotNil(t, program)
 		assert.NoError(t, err)
 

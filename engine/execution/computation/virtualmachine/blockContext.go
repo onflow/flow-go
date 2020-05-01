@@ -46,7 +46,7 @@ func (bc *blockContext) newTransactionContext(
 
 	ctx := &TransactionContext{
 		ledger:          ledger,
-		astCache:        bc.vm,
+		astCache:        bc.vm.cache,
 		signingAccounts: signingAccounts,
 	}
 
@@ -60,7 +60,7 @@ func (bc *blockContext) newTransactionContext(
 func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
 		ledger:   ledger,
-		astCache: bc.vm,
+		astCache: bc.vm.cache,
 	}
 }
 

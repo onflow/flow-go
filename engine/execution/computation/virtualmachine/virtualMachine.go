@@ -3,7 +3,6 @@ package virtualmachine
 import (
 	"fmt"
 
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -18,13 +17,15 @@ const (
 type VirtualMachine interface {
 	// NewBlockContext creates a new block context for executing transactions.
 	NewBlockContext(b *flow.Header) BlockContext
+	// GetCache returns the program AST cache.
+	GetCache() ASTCache
 }
 
 // New creates a new virtual machine instance with the provided runtime.
 func New(rt runtime.Runtime) (VirtualMachine, error) {
-	cache, err := lru.New(MaxProgramASTCacheSize)
+	cache, err := NewLRUASTCache(MaxProgramASTCacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vm cache, %w", err)
+		return nil, fmt.Errorf("failed to create vm ast cache, %w", err)
 	}
 	return &virtualMachine{
 		rt:    rt,
@@ -34,7 +35,7 @@ func New(rt runtime.Runtime) (VirtualMachine, error) {
 
 type virtualMachine struct {
 	rt    runtime.Runtime
-	cache *lru.Cache
+	cache ASTCache
 }
 
 func (vm *virtualMachine) NewBlockContext(header *flow.Header) BlockContext {
@@ -42,6 +43,10 @@ func (vm *virtualMachine) NewBlockContext(header *flow.Header) BlockContext {
 		vm:     vm,
 		header: header,
 	}
+}
+
+func (vm *virtualMachine) GetCache() ASTCache {
+	return vm.cache
 }
 
 func (vm *virtualMachine) executeTransaction(
