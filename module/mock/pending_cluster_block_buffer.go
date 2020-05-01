@@ -75,3 +75,22 @@ func (_m *PendingClusterBlockBuffer) ByParentID(parentID flow.Identifier) ([]*cl
 func (_m *PendingClusterBlockBuffer) DropForParent(parentID flow.Identifier) {
 	_m.Called(parentID)
 }
+
+// PruneByHeight provides a mock function with given fields: height
+func (_m *PendingClusterBlockBuffer) PruneByHeight(height uint64) {
+	_m.Called(height)
+}
+
+// Size provides a mock function with given fields:
+func (_m *PendingClusterBlockBuffer) Size() uint {
+	ret := _m.Called()
+
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint)
+	}
+
+	return r0
+}
