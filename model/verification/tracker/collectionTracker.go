@@ -18,3 +18,11 @@ func (c *CollectionTracker) ID() flow.Identifier {
 func (c *CollectionTracker) Checksum() flow.Identifier {
 	return flow.MakeID(c)
 }
+
+func NewCollectionTracker(collID, blockID flow.Identifier) *CollectionTracker {
+	return &CollectionTracker{
+		CollectionID: collID,
+		BlockID:      blockID,
+		Counter:      1,
+	}
+}

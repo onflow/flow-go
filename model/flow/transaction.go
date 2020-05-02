@@ -114,7 +114,7 @@ type Transaction struct {
 
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
 func (tb *TransactionBody) MissingFields() []string {
-	// Required fields are Script, ReferenceBlockHash, Nonce, GasLimit, Payer
+	// Required fields are Script, ReferenceBlockID, Payer
 	missingFields := make([]string, 0)
 
 	if len(tb.Script) == 0 {
@@ -363,13 +363,12 @@ const (
 	TransactionFieldUnknown TransactionField = iota
 	TransactionFieldScript
 	TransactionFieldRefBlockID
-	TransactionFieldGasLimit
 	TransactionFieldPayer
 )
 
 // String returns the string representation of a transaction field.
 func (f TransactionField) String() string {
-	return [...]string{"Unknown", "Script", "ReferenceBlockHash", "GasLimit", "Payer"}[f]
+	return [...]string{"Unknown", "Script", "ReferenceBlockID", "Payer"}[f]
 }
 
 // A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.

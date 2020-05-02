@@ -93,7 +93,7 @@ func StateDeltaFixture() *messages.ExecutionStateDelta {
 
 func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := flow.Payload{
-		Identities: IdentityListFixture(32),
+		Identities: nil,
 		Guarantees: CollectionGuaranteesFixture(16),
 		Seals:      BlockSealsFixture(16),
 	}
@@ -107,7 +107,7 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
 	payload := flow.Payload{
-		Identities: IdentityListFixture(32),
+		Identities: nil,
 		Guarantees: CollectionGuaranteesFixture(16),
 	}
 	header := BlockHeaderWithParentFixture(parent)
@@ -527,7 +527,7 @@ func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 	}
 
 	payload := flow.Payload{
-		Identities: IdentityListFixture(32),
+		Identities: nil,
 		Guarantees: guarantees,
 	}
 	header := BlockHeaderFixture()

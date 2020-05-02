@@ -2,33 +2,33 @@
 
 package crypto
 
-// DKG stands for Distributed Key Generation. In this library, DKG
+// DKG stands for distributed key generation. In this library, DKG
 // refers to specific protocols that generate keys for a BLS-based
 // threshold signature scheme.
 // BLS is used with the BLS12381 curve.
 
 // These protocols mainly generate a BLS key pair and share the secret key
-// among (n)) particapants in a way that any (t+1) key shares allow reconstructing
+// among (n) participants in a way that any (t+1) key shares allow reconstructing
 // the initial key (and also reconstructing a BLS signature of the initial key).
 // We refer to the initial key pair by group private and group public key.
-// (t) is the threshold parameter, it is fixed for all protocols to maximize
-// the unforgeability and robustness, t = floor((n-1)/2).
+// (t) is the threshold parameter and is fixed for all protocols to maximize
+// the unforgeability and robustness, with a value of t = floor((n-1)/2).
 
-// Private keys are scalar in Zr, where r is the group order of G1/G2
+// Private keys are scalar in Zr, where r is the group order of G1/G2.
 // Public keys are in G2.
 
 import (
 	"fmt"
 )
 
-// DKGType is the type for supported protocols
-type DKGType int
+// DKGProtocol is the type for supported protocols
+type DKGProtocol int
 
 // Supported Key Generation protocols
 const (
 	// FeldmanVSS is Feldman Verifiable Secret Sharing
 	// (non distributed generation)
-	FeldmanVSS DKGType = iota
+	FeldmanVSS DKGProtocol = iota
 	// FeldmanVSSQual is Feldman Verifiable Secret Sharing using a complaint
 	// mechanism to qualify/disqualify the leader
 	// (non distributed generation)
@@ -46,25 +46,25 @@ type DKGState interface {
 	Threshold() int
 	// Start starts running a DKG in the current node
 	Start(seed []byte) error
-	// HandleMsg processes a new message received by the current node
+	// HandleMsg processes a new message received by the current node.
 	// orig is the message origin index
 	HandleMsg(orig int, msg []byte) error
-	// End ends a DKG protocol in the current node
+	// End ends a DKG protocol in the current node.
 	// It returns the finalized public data and node private key share.
 	// - the group public key corresponding to the group secret key
 	// - all the public key shares corresponding to the nodes private
-	// key shares.
+	// key shares
 	// - the finalized private key which is the current node's own private key share
 	End() (PrivateKey, PublicKey, []PublicKey, error)
-	// NextTimeout set the next timeout of the protocol if any timeout applies
+	// NextTimeout set the next timeout of the protocol if any timeout applies.
 	// Some protocols could require more than one timeout
 	NextTimeout() error
 	// Running returns the running state of the DKG protocol
 	Running() bool
 	// Disqualify forces a node to get disqualified
-	// for a reason outside of the DKG protocol
+	// for a reason outside of the DKG protocol.
 	// The caller should make sure all honest nodes call this function,
-	// otherwise, the protocol can be broken
+	// otherwise, the protocol can be broken.
 	Disqualify(node int) error
 }
 
@@ -80,10 +80,11 @@ func optimalThreshold(size int) int {
 }
 
 // NewDKG creates a new instance of a DKG protocol.
+//
 // An instance is run by a single node and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
 // leaderIndex value is ignored if the protocol does not require a leader (JointFeldman for instance)
-func NewDKG(dkg DKGType, size int, currentIndex int,
+func NewDKG(dkg DKGProtocol, size int, currentIndex int,
 	processor DKGProcessor, leaderIndex int) (DKGState, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d", DKGMinSize, DKGMaxSize)
@@ -142,7 +143,7 @@ type dkgCommon struct {
 	processor DKGProcessor
 }
 
-// Running returns the running state of the DKG protocol
+// Running returns the running state of the DKG protocol.
 // The state is equal to true when the DKG protocol is running, and is equal to false otherwise.
 func (s *dkgCommon) Running() bool {
 	return s.running
@@ -159,7 +160,7 @@ func (s *dkgCommon) Threshold() int {
 }
 
 // NextTimeout sets the next protocol timeout if there is any.
-// this function should be overwritten by any protocol that uses timeouts
+// This function should be overwritten by any protocol that uses timeouts.
 func (s *dkgCommon) NextTimeout() error {
 	return nil
 }
@@ -174,17 +175,18 @@ const (
 	feldmanVSSComplaintAnswer
 )
 
-// DKGProcessor is an interface that implements the DKG output actions
-// an instance of a DKGProcessor is needed for each node in order to
+// DKGProcessor is an interface that implements the DKG output actions.
+//
+// An instance of a DKGProcessor is needed for each node in order to
 // particpate in a DKG protocol
 type DKGProcessor interface {
-	// PrivateSend sends a private message to a destination
+	// PrivateSend sends a private message to a destination.
 	// The data to be sent is confidential and the function
 	// must make sure data is encrypted before being shared
 	// on a public channel, in a way that it is only received
 	// by the destination participant.
 	PrivateSend(dest int, data []byte)
-	// Broadcast broadcasts a message to all participants
+	// Broadcast broadcasts a message to all participants.
 	// This function assumes all nodes have received the same message,
 	// failing to do so, the protocol can be broken.
 	// The broadcasted message is public and not confidential.
