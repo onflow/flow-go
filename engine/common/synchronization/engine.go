@@ -370,14 +370,14 @@ func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Bloc
 
 	// check if we still need to process this block or it is stale already
 	blockID := block.ID()
-	_, wantHeight := e.heights[block.Height]
+	_, wantHeight := e.heights[block.Header.Height]
 	_, wantBlockID := e.blockIDs[blockID]
 	if !wantHeight && !wantBlockID {
 		return
 	}
 
 	// delete from the queue and forward
-	delete(e.heights, block.Height)
+	delete(e.heights, block.Header.Height)
 	delete(e.blockIDs, blockID)
 
 	synced := &events.SyncedBlock{

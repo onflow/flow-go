@@ -26,24 +26,24 @@ func TestHead(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		// setup
 		block := unittest.BlockFixture()
-		block.Height = 42
+		block.Header.Height = 42
 
 		err := db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
-		err = db.Update(operation.InsertNumber(block.Height, block.ID()))
+		err = db.Update(operation.InsertNumber(block.Header.Height, block.ID()))
 		require.NoError(t, err)
 
 		// add a second, outdated boundary to ensure the latest is taken
-		err = db.Update(operation.InsertBoundary(block.Height - 1))
+		err = db.Update(operation.InsertBoundary(block.Header.Height - 1))
 		require.NoError(t, err)
 
-		err = db.Update(operation.UpdateBoundary(block.Height))
+		err = db.Update(operation.UpdateBoundary(block.Header.Height))
 		require.NoError(t, err)
 
 		state := State{db: db}
 
 		t.Run("works with block number", func(t *testing.T) {
-			header, err := state.AtNumber(block.Height).Head()
+			header, err := state.AtNumber(block.Header.Height).Head()
 			require.NoError(t, err)
 			require.Equal(t, block.ID(), header.ID())
 		})

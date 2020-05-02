@@ -74,47 +74,32 @@ func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
 		"expected error: '%s', got: '%s'", expected.Error(), actual.Error())
 }
 
-func TempDBDir(t testing.TB) string {
-	dir, err := ioutil.TempDir("", "flow-test-db")
+func TempDir(t testing.TB) string {
+	dir, err := ioutil.TempDir("", "flow-testing-temp-")
 	require.NoError(t, err)
 	return dir
 }
 
-func RunWithTempDBDir(t testing.TB, f func(string)) {
-	dbDir := TempDBDir(t)
+func RunWithTempDir(t testing.TB, f func(string)) {
+	dbDir := TempDir(t)
 	defer os.RemoveAll(dbDir)
-
 	f(dbDir)
 }
 
-func TempBadgerDB(t testing.TB) (*badger.DB, string) {
-
-	dir := TempDBDir(t)
-
+func BadgerDB(t testing.TB, dir string) *badger.DB {
 	opts := badger.
 		LSMOnlyOptions(dir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
-
 	db, err := badger.Open(opts)
-	require.Nil(t, err)
-
-	return db, dir
+	require.NoError(t, err)
+	return db
 }
 
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
-	RunWithTempDBDir(t, func(dir string) {
-
-		opts := badger.
-			LSMOnlyOptions(dir).
-			WithKeepL0InMemory(true).
-			WithLogger(nil)
-
-		db, err := badger.Open(opts)
-		require.NoError(t, err)
-
+	RunWithTempDir(t, func(dir string) {
+		db := BadgerDB(t, dir)
+		defer db.Close()
 		f(db)
-
-		db.Close()
 	})
 }

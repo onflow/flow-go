@@ -17,24 +17,24 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// check payload integrity
-		if block.PayloadHash != block.Payload.Hash() {
+		if block.Header.PayloadHash != block.Payload.Hash() {
 			return fmt.Errorf("computed payload hash does not match header")
 		}
 
 		// store the block header
-		err := operation.InsertHeader(&block.Header)(tx)
+		err := operation.InsertHeader(block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
 
 		// insert the block payload
-		err = InsertClusterPayload(&block.Payload)(tx)
+		err = InsertClusterPayload(block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload: %w", err)
 		}
 
 		// index the block payload
-		err = IndexClusterPayload(&block.Header, &block.Payload)(tx)
+		err = IndexClusterPayload(block.Header, block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
 		}
@@ -47,19 +47,24 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// ensure block is empty
-		*block = cluster.Block{}
-
 		// retrieve the block header
-		err := operation.RetrieveHeader(blockID, &block.Header)(tx)
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
 		}
 
 		// retrieve payload
-		err = RetrieveClusterPayload(block.ID(), &block.Payload)(tx)
+		var payload cluster.Payload
+		err = RetrieveClusterPayload(blockID, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
+		}
+
+		// overwrite block
+		*block = cluster.Block{
+			Header:  &header,
+			Payload: &payload,
 		}
 
 		return nil
@@ -200,7 +205,7 @@ func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) f
 			colTransactions = append(colTransactions, &nextTx)
 		}
 
-		*payload = cluster.PayloadFromTransactions(colTransactions...)
+		*payload = *cluster.PayloadFromTransactions(colTransactions...)
 
 		return nil
 	}

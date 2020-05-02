@@ -35,11 +35,11 @@ func GenerateClusterGenesisQC(participants []bootstrap.NodeInfo, block *flow.Blo
 
 	hotBlock := model.Block{
 		BlockID:     clusterBlock.ID(),
-		View:        clusterBlock.View,
-		ProposerID:  clusterBlock.ProposerID,
+		View:        clusterBlock.Header.View,
+		ProposerID:  clusterBlock.Header.ProposerID,
 		QC:          nil,
-		PayloadHash: clusterBlock.PayloadHash,
-		Timestamp:   clusterBlock.Timestamp,
+		PayloadHash: clusterBlock.Header.PayloadHash,
+		Timestamp:   clusterBlock.Header.Timestamp,
 	}
 
 	votes := make([]*model.Vote, 0, len(signers))

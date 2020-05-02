@@ -65,8 +65,9 @@ func CreateCounterPanicTransaction() flow.TransactionBody {
 
 			transaction {
 				prepare(acc: AuthAccount) {
-					let existing <- acc.storage[Container.Counter] <- Container.createCounter(42)
-					destroy existing
+					if let existing <- acc.load<@Container.Counter>(from: /storage/counter) {
+						destroy existing
+            		}
 
 					panic("fail for testing purposes")
               	}
@@ -82,11 +83,8 @@ func AddToCounterTransaction() flow.TransactionBody {
 			
 			transaction {
 				prepare(acc: AuthAccount) {
-					let counter <- acc.load<@Container.Counter>(from: /storage/counter)
-			
+					let counter = acc.borrow<&Container.Counter>(from: /storage/counter)
 					counter?.add(2)
-			
-					acc.save(<-counter, to: /storage/counter)
 				}
 			}`),
 		Authorizers: []flow.Address{flow.RootAddress},

@@ -137,14 +137,16 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 		block, err := e.blocks.ByID(id)
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to lookup block")
+			return
 		}
 		proposal := &messages.BlockProposal{
-			Header:  &block.Header,
-			Payload: &block.Payload,
+			Header:  block.Header,
+			Payload: block.Payload,
 		}
 		err = e.ProcessLocal(proposal)
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
+			return
 		}
 		e.metrics.FinalizedBlocks(1)
 	})

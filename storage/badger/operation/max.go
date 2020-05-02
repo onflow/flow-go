@@ -27,7 +27,7 @@ func InitMax(tx *badger.Txn) error {
 	item, err := tx.Get(key)
 	if errors.Is(err, badger.ErrKeyNotFound) { // just keep zero value as default
 		max = 0
-		return SetMax(tx)
+		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("could not get max: %w", err)

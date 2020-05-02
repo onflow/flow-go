@@ -193,7 +193,7 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 
 		}
 
-		err = operation.LookupStateCommitment(block.ParentID, &startStateCommitment)(txn)
+		err = operation.LookupStateCommitment(block.Header.ParentID, &startStateCommitment)(txn)
 		if err != nil {
 			return fmt.Errorf("cannot lookup parent state commitment: %w", err)
 		}

@@ -51,7 +51,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	// setup the events storage mock
 	for i := range blockIDs {
 		block := unittest.BlockFixture()
-		block.Height = uint64(i)
+		block.Header.Height = uint64(i)
 		id := block.ID()
 		blockIDs[i] = id[:]
 		eventsForBlock := make([]flow.Event, eventsPerBlock)
@@ -70,7 +70,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the expected result for this block
 		expectedResult[i] = &execution.GetEventsForBlockIDsResponse_Result{
 			BlockId:     id[:],
-			BlockHeight: block.Height,
+			BlockHeight: block.Header.Height,
 			Events:      eventMessages,
 		}
 	}
