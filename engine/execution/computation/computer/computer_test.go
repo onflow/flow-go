@@ -5,10 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -165,7 +162,9 @@ func generateEvents(eventCount int) []cadence.Event {
 	events := make([]cadence.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := runtime.Event{Type: &sema.CompositeType{Location: ast.StringLocation("whatever"), Kind: common.CompositeKindEvent}}
+		event := cadence.Event{EventType: cadence.EventType{
+			Identifier: "whatever",
+		}}
 		events[i] = event
 	}
 	return events

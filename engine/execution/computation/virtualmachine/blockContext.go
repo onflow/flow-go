@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/cadence/runtime"
@@ -152,10 +151,7 @@ func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) 
 	flowEvents := make([]flow.Event, len(tr.Events))
 
 	for i, event := range tr.Events {
-		eventValue := cadence.ConvertEvent(event)
-
-		payload, err := jsoncdc.Encode(eventValue)
-
+		payload, err := jsoncdc.Encode(event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode event: %w", err)
 		}

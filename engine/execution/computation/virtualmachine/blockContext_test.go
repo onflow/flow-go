@@ -95,8 +95,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 				    log("bar")
 				  }
                 }
-            `),
-		}
+            `))
+
 		err := execTestutil.SignTransactionbyRoot(tx, 0)
 		require.NoError(t, err)
 
@@ -211,7 +211,12 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 				tx.AddAuthorizer(authorizer)
 			}
 
-			ledger := make(virtualmachine.MapLedger)
+			ledger, err := execTestutil.RootBootstrappedLedger()
+			require.NoError(t, err)
+
+			err = execTestutil.SignTransactionbyRoot(tx, 0)
+			require.NoError(t, err)
+			//seq++
 
 			result, err := bc.ExecuteTransaction(ledger, tx)
 			require.NoError(t, err)
