@@ -118,14 +118,14 @@ func (suite *Suite) TestHandleProposal() {
 	block := unittest.ClusterBlockWithParent(&parent)
 
 	proposal := &messages.ClusterBlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
+		Header:  block.Header,
+		Payload: block.Payload,
 	}
 
 	tx := unittest.TransactionBodyFixture()
 
 	// we have already received and stored the parent
-	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
+	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
 	// we have all transactions
 	suite.pool.On("Has", mock.Anything).Return(true)
 	// should store transactions
@@ -137,7 +137,7 @@ func (suite *Suite) TestHandleProposal() {
 	// should extend state with new block
 	suite.cluster.mutator.On("Extend", block.ID()).Return(nil).Once()
 	// should submit to consensus algo
-	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.View).Once()
+	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
 	suite.pending.On("ByParentID", block.ID()).Return(nil, false)
 
@@ -154,12 +154,12 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	block := unittest.ClusterBlockWithParent(&parent)
 
 	proposal := &messages.ClusterBlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
+		Header:  block.Header,
+		Payload: block.Payload,
 	}
 
 	// we have already received and stored the parent
-	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
+	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
 	// we are missing all the transactions
 	suite.pool.On("Has", mock.Anything).Return(false)
 	// the missing transactions should be verified
@@ -174,7 +174,7 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	// should extend state with new block
 	suite.cluster.mutator.On("Extend", block.ID()).Return(nil).Once()
 	// should submit to consensus algo
-	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.View).Once()
+	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
 	suite.pending.On("ByParentID", block.ID()).Return(nil, false)
 
@@ -194,16 +194,16 @@ func (suite *Suite) TestHandlePendingProposal() {
 	block := unittest.ClusterBlockFixture()
 
 	proposal := &messages.ClusterBlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
+		Header:  block.Header,
+		Payload: block.Payload,
 	}
 
 	// we do not have the parent yet
-	suite.headers.On("ByBlockID", block.ParentID).Return(nil, realstorage.ErrNotFound)
+	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound)
 	// should request parent block
 	suite.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	suite.pending.On("Add", mock.Anything).Return(true).Once()
-	suite.pending.On("ByID", block.ParentID).Return(nil, false)
+	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Nil(err)
@@ -224,17 +224,17 @@ func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
 	suite.T().Logf("block: %x\nparent: %x\ng-parent: %x", block.ID(), parent.ID(), grandparent.ID())
 
 	proposal := &messages.ClusterBlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
+		Header:  block.Header,
+		Payload: block.Payload,
 	}
 
 	// we have the parent, it is in pending cache
 	pendingParent := &cluster.PendingBlock{
 		OriginID: originID,
-		Header:   &parent.Header,
-		Payload:  &parent.Payload,
+		Header:   parent.Header,
+		Payload:  parent.Payload,
 	}
-	suite.headers.On("ByBlockID", block.ParentID).Return(nil, realstorage.ErrNotFound)
+	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound)
 
 	// should add block to the cache
 	suite.pending.On("Add", mock.Anything).Return(true).Once()
@@ -266,14 +266,14 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	child := unittest.ClusterBlockWithParent(&block)
 
 	proposal := &messages.ClusterBlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
+		Header:  block.Header,
+		Payload: block.Payload,
 	}
 	tx := unittest.TransactionBodyFixture()
 
 	// we have already received and stored the parent
-	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
-	suite.headers.On("ByBlockID", block.ID()).Return(&block.Header, nil)
+	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
+	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil)
 	// we have all transactions
 	suite.pool.On("Has", mock.Anything).Return(true)
 	// should store transactions
@@ -290,8 +290,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	// should return the pending child
 	suite.pending.On("ByParentID", block.ID()).Return([]*cluster.PendingBlock{{
 		OriginID: unittest.IdentifierFixture(),
-		Header:   &child.Header,
-		Payload:  &child.Payload,
+		Header:   child.Header,
+		Payload:  child.Payload,
 	}}, true)
 	suite.pending.On("DropForParent", block.ID()).Once()
 	suite.pending.On("ByParentID", child.ID()).Return(nil, false)

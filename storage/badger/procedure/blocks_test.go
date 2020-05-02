@@ -32,15 +32,15 @@ func TestInsertRetrieveBlock(t *testing.T) {
 func TestFinalizeBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		parent := unittest.BlockFixture()
-		block := unittest.BlockWithParentFixture(&parent.Header)
+		block := unittest.BlockWithParentFixture(parent.Header)
 
 		err := db.Update(InsertBlock(&block))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertNumber(parent.Height, parent.ID()))
+		err = db.Update(operation.InsertNumber(parent.Header.Height, parent.ID()))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertBoundary(parent.Height))
+		err = db.Update(operation.InsertBoundary(parent.Header.Height))
 		require.NoError(t, err)
 
 		err = db.Update(FinalizeBlock(block.Header.ID()))
@@ -49,7 +49,7 @@ func TestFinalizeBlock(t *testing.T) {
 		var boundary uint64
 		err = db.View(operation.RetrieveBoundary(&boundary))
 		require.NoError(t, err)
-		require.Equal(t, block.Height, boundary)
+		require.Equal(t, block.Header.Height, boundary)
 
 		var headID flow.Identifier
 		err = db.View(operation.RetrieveNumber(boundary, &headID))
@@ -69,7 +69,7 @@ func TestInsertRetrieveBlockByCollectionGuarantee(t *testing.T) {
 		require.NoError(t, err)
 
 		var retrieved flow.Block
-		for _, g := range block.Guarantees {
+		for _, g := range block.Payload.Guarantees {
 			collID := g.CollectionID
 			err = db.View(RetrieveBlockByCollectionID(collID, &retrieved))
 			require.NoError(t, err)

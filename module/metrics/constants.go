@@ -6,6 +6,7 @@ const (
 	namespaceCollection   = "collection"
 	namespaceConsensus    = "consensus"
 	namespaceVerification = "verification"
+	namespaceExecution    = "execution"
 )
 
 // Prometheus metric subsystems
@@ -14,4 +15,10 @@ const (
 	subsystemProposal   = "proposal"
 	subsystemCompliance = "compliance"
 	subsystemNetwork    = "network"
+)
+
+// Execution Subsystems
+const (
+	subsystemStateStorage = "state_storage"
+	subsystemRuntime      = "runtime"
 )
