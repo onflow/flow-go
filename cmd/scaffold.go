@@ -81,7 +81,7 @@ type FlowNodeBuilder struct {
 	flags          *pflag.FlagSet
 	name           string
 	Logger         zerolog.Logger
-	Metrics        *metrics.Collector
+	Metrics        module.Metrics
 	DB             *badger.DB
 	Me             *local.Local
 	State          *protocol.State

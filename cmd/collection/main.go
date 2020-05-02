@@ -10,11 +10,14 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
+
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	hotstuffmodels "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
@@ -70,8 +73,8 @@ func main() {
 		clusterState *clusterkv.State // chain state for the cluster
 
 		// from bootstrap files
-		clusterGenesis *cluster.Block              // genesis block for the cluster
-		clusterQC      *hotstuff.QuorumCertificate // QC for the cluster
+		clusterGenesis *cluster.Block                    // genesis block for the cluster
+		clusterQC      *hotstuffmodels.QuorumCertificate // QC for the cluster
 
 		prov *provider.Engine
 		ing  *ingest.Engine
@@ -168,7 +171,7 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB)
+			cleaner := badger.NewCleaner(node.Logger, node.DB)
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
@@ -236,22 +239,22 @@ func main() {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
 
-			// create a filter for consensus members for our cluster
-			selector, err := protocol.ClusterFilterFor(node.State.Final(), node.Me.NodeID())
+			//Collector cluster's HotStuff committee state
+			committee, err := initClusterCommittee(node)
 			if err != nil {
-				return nil, fmt.Errorf("could not get cluster member filter: %w", err)
+				return nil, fmt.Errorf("could not create HotStuff committee state: %w", err)
 			}
 
-			// create a signing provider for signing votes
+			// create a signing provider for signing HotStuff messages (within cluster)
 			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
-			signer := verification.NewSingleSigner(node.State, staking, selector, node.Me.NodeID())
+			signer := verification.NewSingleSigner(committee, staking, node.Me.NodeID())
 
-			// TODO implement notification consumer for col nodes
-			var notifier *notifications.NoopConsumer
+			// initialize logging notifier for hotstuff
+			notifier := createNotifier(node.Logger, node.Metrics)
 
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, headers, views, node.State, node.Me,
-				build, final, signer, prop, selector, &clusterGenesis.Header, clusterQC,
+				node.Logger, notifier, node.Metrics, headers, views, committee, node.State,
+				build, final, signer, prop, &clusterGenesis.Header, clusterQC,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
 
@@ -259,6 +262,22 @@ func main() {
 			return prop, nil
 		}).
 		Run("collection")
+}
+
+// initClusterCommittee initializes the Collector cluster's HotStuff committee state
+func initClusterCommittee(node *cmd.FlowNodeBuilder) (hotstuff.Committee, error) {
+	mainGenesisBlockID := node.GenesisBlock.ID()
+	// TODO: update to return reference block ID from collection
+	blockTranslator := func(blockID flow.Identifier) (flow.Identifier, error) { return mainGenesisBlockID, nil }
+
+	// create a filter for consensus members for our cluster
+	cluster, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
+	if err != nil {
+		return nil, fmt.Errorf("could not get cluster members for node %x: %w", node.Me.NodeID(), err)
+	}
+	selector := filter.And(filter.In(cluster), filter.HasStake(true))
+
+	return committee.New(node.State, blockTranslator, node.Me.NodeID(), selector, cluster.NodeIDs()), nil
 }
 
 func loadClusterBlock(path string, clusterID string) (*cluster.Block, error) {
@@ -276,14 +295,14 @@ func loadClusterBlock(path string, clusterID string) (*cluster.Block, error) {
 	return &block, nil
 }
 
-func loadClusterQC(path string, clusterID string) (*hotstuff.QuorumCertificate, error) {
+func loadClusterQC(path string, clusterID string) (*hotstuffmodels.QuorumCertificate, error) {
 	filename := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
 	}
 
-	var qc hotstuff.QuorumCertificate
+	var qc hotstuffmodels.QuorumCertificate
 	err = json.Unmarshal(data, &qc)
 	if err != nil {
 		return nil, err

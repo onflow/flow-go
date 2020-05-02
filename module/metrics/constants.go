@@ -9,6 +9,11 @@ const (
 	namespaceExecution    = "execution"
 )
 
+// Consensus subsystem (consensus nodes and cluster collectors)
+const (
+	subsystemHotStuff = "hotstuff"
+)
+
 // Prometheus metric subsystems
 const (
 	subsystemBadger  = "badger"

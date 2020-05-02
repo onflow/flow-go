@@ -46,20 +46,20 @@ var (
 
 // TransactionReceived starts a span to trace the duration of a transaction
 // from being created to being included as part of a collection.
-func (c *Collector) TransactionReceived(txID flow.Identifier) {
+func (c *BaseMetrics) TransactionReceived(txID flow.Identifier) {
 	transactionsIngestedCounter.Inc()
 	c.tracer.StartSpan(txID, spanTransactionToCollection)
 }
 
 // CollectionProposed tracks the size and number of proposals.
-func (c *Collector) CollectionProposed(collection flow.LightCollection) {
+func (c *BaseMetrics) CollectionProposed(collection flow.LightCollection) {
 	proposalSizeGauge.Observe(float64(collection.Len()))
 	proposalsCounter.Inc()
 }
 
 // CollectionGuaranteed updates the guaranteed collection size gauge and
 // finishes the tx->collection span for each constituent transaction.
-func (c *Collector) CollectionGuaranteed(collection flow.LightCollection) {
+func (c *BaseMetrics) CollectionGuaranteed(collection flow.LightCollection) {
 	guaranteedCollectionSizeGauge.Observe(float64(collection.Len()))
 	for _, txID := range collection.Transactions {
 		c.tracer.FinishSpan(txID, spanTransactionToCollection)
@@ -69,7 +69,7 @@ func (c *Collector) CollectionGuaranteed(collection flow.LightCollection) {
 // StartCollectionToGuarantee starts a span to trace the duration of a collection
 // from being created to being submitted as a collection guarantee
 // TODO not used, revisit once HotStuff is in use
-func (c *Collector) StartCollectionToGuarantee(collection flow.LightCollection) {
+func (c *BaseMetrics) StartCollectionToGuarantee(collection flow.LightCollection) {
 
 	followsFrom := make([]opentracing.StartSpanOption, 0, len(collection.Transactions))
 	for _, txID := range collection.Transactions {
@@ -87,6 +87,6 @@ func (c *Collector) StartCollectionToGuarantee(collection flow.LightCollection) 
 // FinishCollectionToGuarantee finishes a span to trace the duration of a collection
 // from being proposed to being finalized (eg. guaranteed).
 // TODO not used, revisit once HotStuff is in use
-func (c *Collector) FinishCollectionToGuarantee(collectionID flow.Identifier) {
+func (c *BaseMetrics) FinishCollectionToGuarantee(collectionID flow.Identifier) {
 	c.tracer.FinishSpan(collectionID, spanCollectionToGuarantee)
 }

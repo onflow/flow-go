@@ -1,4 +1,4 @@
-package consensus
+package main
 
 import (
 	"github.com/rs/zerolog"
@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-func CreateNotifier(log zerolog.Logger, metrics module.Metrics, guarantees storage.Guarantees, seals storage.Seals) hotstuff.Consumer {
+func createNotifier(log zerolog.Logger, metrics module.Metrics, guarantees storage.Guarantees, seals storage.Seals) hotstuff.Consumer {
 	logConsumer := notifications.NewLogConsumer(log)
 	metricsConsumer := consensusmetrics.NewMetricsConsumer(metrics, guarantees, seals)
 	dis := pubsub.NewDistributor()
