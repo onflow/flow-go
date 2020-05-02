@@ -26,7 +26,7 @@ type BlockContext interface {
 }
 
 type blockContext struct {
-	LedgerAccess
+	LedgerDAL
 	vm     *virtualMachine
 	header *flow.Header
 }
@@ -43,7 +43,7 @@ func (bc *blockContext) newTransactionContext(
 	}
 
 	ctx := &TransactionContext{
-		LedgerAccess:    LedgerAccess{ledger},
+		LedgerDAL:       LedgerDAL{ledger},
 		signingAccounts: signingAccounts,
 		tx:              tx,
 	}
@@ -57,7 +57,7 @@ func (bc *blockContext) newTransactionContext(
 
 func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
-		LedgerAccess: LedgerAccess{ledger},
+		LedgerDAL: LedgerDAL{ledger},
 	}
 }
 

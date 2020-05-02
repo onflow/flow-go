@@ -119,7 +119,7 @@ func RootBootstrappedLedger() (virtualmachine.Ledger, error) {
 
 func BootstrapLedgerWithRootAccount(ledger virtualmachine.Ledger) error {
 
-	ledgerAccess := virtualmachine.LedgerAccess{Ledger: ledger}
+	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
 
 	rootAccountPublicKey := flow.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 

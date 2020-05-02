@@ -306,7 +306,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	ledger, err := execTestutil.RootBootstrappedLedger()
 	require.NoError(t, err)
 
-	ledgerAccess := virtualmachine.LedgerAccess{Ledger: ledger}
+	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 

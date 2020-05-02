@@ -15,7 +15,7 @@ import (
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
-	LedgerAccess
+	LedgerDAL
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
