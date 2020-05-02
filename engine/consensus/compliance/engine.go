@@ -33,9 +33,10 @@ type Engine struct {
 	state    protocol.State
 	con      network.Conduit
 	prov     network.Engine
-	pending  module.PendingBlockBuffer
+	pending  module.PendingBlockBuffer // pending block cache
 	sync     module.Synchronization
 	hotstuff module.HotStuff
+	metrics  module.Metrics
 }
 
 // New creates a new consensus propagation engine.
@@ -49,6 +50,7 @@ func New(
 	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
+	metrics module.Metrics,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -62,6 +64,7 @@ func New(
 		state:    state,
 		prov:     prov,
 		pending:  pending,
+		metrics:  metrics,
 		sync:     nil, // use `WithSynchronization`
 		hotstuff: nil, // use `WithConsensus`
 	}
@@ -305,6 +308,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	log.Info().Msg("block proposal received")
 
+	e.prunePendingCache()
+	e.metrics.PendingBlocks(e.pending.Size())
+
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
 	// 2) blocks already on disk; they were processed and await finalization
@@ -344,8 +350,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// => in each case, we cache the proposal and request the missing link
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
-
-	// TODO: prune cache from outdated blocks
 
 	// if we can connect the proposal to an ancestor in the cache, it means
 	// there is a missing link; we cache it and request the missing link
@@ -513,4 +517,15 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	e.pending.DropForParent(header)
 
 	return result.ErrorOrNil()
+}
+
+// prunePendingCache prunes the pending block cache.
+func (e *Engine) prunePendingCache() {
+	// retrieve the finalized height
+	final, err := e.state.Final().Head()
+	if err != nil {
+		e.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
+		return
+	}
+	e.pending.PruneByHeight(final.Height)
 }

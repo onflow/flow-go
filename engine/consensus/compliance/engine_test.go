@@ -58,6 +58,7 @@ type ComplianceSuite struct {
 	pending  *module.PendingBlockBuffer
 	hotstuff *module.HotStuff
 	sync     *module.Synchronization
+	metrics  *module.Metrics
 
 	// engine under test
 	e *Engine
@@ -218,6 +219,8 @@ func (cs *ComplianceSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("DropForParent", mock.Anything).Return()
+	cs.pending.On("Size").Return(uint(0))
+	cs.pending.On("PruneByHeight", mock.Anything).Return()
 
 	// set up hotstuff module mock
 	cs.hotstuff = &module.HotStuff{}
@@ -228,9 +231,12 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.sync = &module.Synchronization{}
 	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
 
+	cs.metrics = &module.Metrics{}
+	cs.metrics.On("PendingBlocks", mock.Anything).Return()
+
 	// initialize the engine
 	log := zerolog.New(os.Stderr)
-	e, err := New(log, cs.net, cs.me, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.prov, cs.pending)
+	e, err := New(log, cs.net, cs.me, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.prov, cs.pending, cs.metrics)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	// assign engine with consensus & synchronization
