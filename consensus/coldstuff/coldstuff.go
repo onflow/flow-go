@@ -229,10 +229,20 @@ func (e *ColdStuff) sendProposal() error {
 	}
 
 	// define the block header build function
-	setProposer := func(header *flow.Header) {
+	setProposer := func(header *flow.Header) error {
 		header.ProposerID = myIdentity.NodeID
 		header.View = e.round.Parent().View + 1
 		header.ParentVoterIDs = e.participants.NodeIDs()
+
+		// create a fake signature to avoid network message de-duplication
+		sig := make([]byte, 32)
+		_, err := rand.Read(sig)
+		if err != nil {
+			return fmt.Errorf("could not create fake signature: %w", err)
+		}
+		header.ProposerSig = sig
+
+		return nil
 	}
 
 	// define payload and build next block
