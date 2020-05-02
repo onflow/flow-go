@@ -7,7 +7,6 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
-	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896
@@ -15,12 +14,12 @@ require (
 	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.4.0
 	github.com/hashicorp/go-multierror v1.0.0
-	github.com/hashicorp/golang-lru v0.5.3
+	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-log v0.0.1
 	github.com/jrick/bitset v1.0.0
 	github.com/libp2p/go-libp2p v0.5.1
 	github.com/libp2p/go-libp2p-core v0.3.0
-	github.com/libp2p/go-libp2p-pubsub v0.2.5
+	github.com/libp2p/go-libp2p-pubsub v0.2.7-0.20200226020716-1f147c24576a
 	github.com/libp2p/go-libp2p-swarm v0.2.2
 	github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 	github.com/libp2p/go-tcp-transport v0.1.1

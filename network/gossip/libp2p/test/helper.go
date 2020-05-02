@@ -116,7 +116,7 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 		}
 
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics)
+		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics, libp2p.DefaultMaxPubSubMsgSize)
 		if err != nil {
 			return nil, err
 		}
