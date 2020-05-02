@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -35,7 +36,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
             `),
 		}
 
-		ledger := make(virtualmachine.MapLedger)
+		err := execTestutil.SignTransactionbyRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 
@@ -65,7 +70,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
             `),
 		}
 
-		ledger := make(virtualmachine.MapLedger)
+		err := execTestutil.SignTransactionbyRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 
@@ -85,8 +94,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `),
 		}
+		err := execTestutil.SignTransactionbyRoot(tx, 0)
+		require.NoError(t, err)
 
-		ledger := make(virtualmachine.MapLedger)
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 		assert.NoError(t, err)
@@ -107,7 +119,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
             `),
 		}
 
-		ledger := make(virtualmachine.MapLedger)
+		err := execTestutil.SignTransactionbyRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 		assert.NoError(t, err)
@@ -135,7 +151,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
-		ledger := make(virtualmachine.MapLedger)
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteScript(ledger, script)
 		assert.NoError(t, err)
@@ -150,7 +167,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
-		ledger := make(virtualmachine.MapLedger)
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteScript(ledger, script)
 
@@ -168,7 +186,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
-		ledger := make(virtualmachine.MapLedger)
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteScript(ledger, script)
 		assert.NoError(t, err)
@@ -188,18 +207,12 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	vm := virtualmachine.New(rt)
 	bc := vm.NewBlockContext(&h)
 
-	ledger := make(virtualmachine.MapLedger)
+	sequenceNumber := 0
+
+	ledger, err := execTestutil.RootBootstrappedLedger()
+	require.NoError(t, err)
+
 	ledgerAccess := virtualmachine.LedgerAccess{Ledger: ledger}
-
-	rootAccountKey, err := unittest.AccountKeyFixture()
-	require.NoError(t, err)
-
-	rootAccountKeyBytes, err := flow.EncodeRuntimeAccountPublicKey(rootAccountKey.PublicKey(virtualmachine.AccountKeyWeightThreshold))
-
-	require.NoError(t, err)
-
-	rootAccountAddress, err := ledgerAccess.CreateAccountInLedger([][]byte{rootAccountKeyBytes})
-	require.NoError(t, err)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 
@@ -237,18 +250,20 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// create the transaction to create the account
 		tx := &flow.TransactionBody{
 			Script: []byte(script),
-			Payer:  rootAccountAddress,
+			Payer:  flow.RootAddress,
 			ProposalKey: flow.ProposalKey{
-				Address:        rootAccountAddress,
+				Address:        flow.RootAddress,
 				KeyID:          0,
-				SequenceNumber: 0,
+				SequenceNumber: uint64(sequenceNumber),
 			},
 		}
 
-		rootHasher, err := hash.NewHasher(rootAccountKey.HashAlgo)
+		sequenceNumber++
+
+		rootHasher, err := hash.NewHasher(flow.RootAccountPrivateKey.HashAlgo)
 		require.NoError(t, err)
 
-		err = tx.SignEnvelope(rootAccountAddress, 0, rootAccountKey.PrivateKey, rootHasher)
+		err = tx.SignEnvelope(flow.RootAddress, 0, flow.RootAccountPrivateKey.PrivateKey, rootHasher)
 		require.NoError(t, err)
 
 		// execute the transaction

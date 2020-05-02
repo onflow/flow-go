@@ -90,7 +90,7 @@ func DecodeAccountPublicKey(b []byte) (AccountPublicKey, error) {
 // but it is designed to accept byte-format used by Cadence runtime
 // (currently same as SDK, but we don't want to keep explicit dependency
 // on SDK)
-func DecodeRuntimeAccountPublicKey(b []byte) (AccountPublicKey, error) {
+func DecodeRuntimeAccountPublicKey(b []byte, seqNumber uint64) (AccountPublicKey, error) {
 	var w runtimeAccountPublicKeyWrapper
 
 	err := rlp.DecodeBytes(b, &w)
@@ -111,7 +111,7 @@ func DecodeRuntimeAccountPublicKey(b []byte) (AccountPublicKey, error) {
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,
 		Weight:    int(w.Weight),
-		SeqNumber: 0,
+		SeqNumber: seqNumber,
 	}, nil
 }
 

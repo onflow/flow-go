@@ -1,6 +1,7 @@
 package chunks
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -22,7 +23,13 @@ type CFMissingRegisterTouch struct {
 }
 
 func (cf CFMissingRegisterTouch) String() string {
-	return fmt.Sprint("atleast one register touch was missing inside the chunk data package that was needed while running transactions: ", cf.regsterIDs)
+	hexStrings := make([]string, len(cf.regsterIDs))
+	for i, s := range cf.regsterIDs {
+		hexStrings[i] = hex.EncodeToString([]byte(s))
+	}
+
+	//strings.Join(hexStrings)
+	return fmt.Sprint("at least one register touch was missing inside the chunk data package that was needed while running transactions (hex-encoded): ", hexStrings)
 }
 
 // ChunkIndex returns chunk index of the faulty chunk

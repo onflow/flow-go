@@ -68,7 +68,17 @@ func (r *TransactionContext) SetValue(owner, controller, key, value []byte) erro
 //
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
-func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address, error) {
+func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Address, error) {
+
+	publicKeys := make([]flow.AccountPublicKey, len(publicKeysBytes))
+	var err error
+	for i, keyBytes := range publicKeysBytes {
+		publicKeys[i], err = flow.DecodeRuntimeAccountPublicKey(keyBytes, 0)
+		if err != nil {
+			return runtime.Address{}, fmt.Errorf("cannot decode public key %d:%w", i, err)
+		}
+	}
+
 	accountAddress, err := r.CreateAccountInLedger(publicKeys)
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %x", accountAddress))
@@ -88,12 +98,17 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 		return err
 	}
 
+	runtimePublicKey, err := flow.DecodeRuntimeAccountPublicKey(publicKey, 0)
+	if err != nil {
+		return fmt.Errorf("cannot decode runtime public account key: %w", err)
+	}
+
 	publicKeys, err := r.GetAccountPublicKeys(accountID)
 	if err != nil {
 		return err
 	}
 
-	publicKeys = append(publicKeys, publicKey)
+	publicKeys = append(publicKeys, runtimePublicKey)
 
 	return r.SetAccountPublicKeys(accountID, publicKeys)
 }
@@ -128,7 +143,11 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 		return publicKey, err
 	}
 
-	return removedKey, nil
+	removedKeyBytes, err := flow.EncodeRuntimeAccountPublicKey(removedKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot encode removed runtime account key: %w", err)
+	}
+	return removedKeyBytes, nil
 }
 
 // CheckCode checks the code for its validity.
@@ -222,8 +241,7 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 func (r *TransactionContext) verifySignatures() error {
 
 	if r.tx.Payer == flow.ZeroAddress {
-		// TODO: add error type for missing payer
-		return fmt.Errorf("missing payer signature")
+		return &MissingPayerError{}
 	}
 
 	payloadWeights, proposalKeyVerifiedInPayload, err := r.aggregateAccountSignatures(
@@ -280,14 +298,15 @@ func (r *TransactionContext) verifySignatures() error {
 // If they are equal, the on-chain sequence number is incremented.
 // If they are not equal, the on-chain sequence number is not incremented.
 //
-// This function returns a boolean flag indicating validity as well as the updated sequence number value.
-// This function returns an error if the sequence number cannot be read from storage.
-func (r *TransactionContext) checkAndIncrementSequenceNumber(proposalKey flow.ProposalKey) (bool, error) {
+// This function returns an error if any problem occured during checking or the check failed
+func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
+
+	proposalKey := r.tx.ProposalKey
 
 	account := r.GetAccount(proposalKey.Address)
 
 	if proposalKey.KeyID < 0 || proposalKey.KeyID >= len(account.Keys) {
-		return false, &InvalidProposalKeyError{
+		return &InvalidProposalKeyError{
 			Address: proposalKey.Address,
 			KeyID:   proposalKey.KeyID,
 		}
@@ -297,18 +316,24 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber(proposalKey flow.Pr
 
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
-	if valid {
-
-		accountKey.SeqNumber++
-
-		updatedAccountBytes, err := flow.EncodeAccountPublicKey(accountKey)
-		if err != nil {
-			return false, err
+	if !valid {
+		return &InvalidProposalSequenceNumberError{
+			Address:           proposalKey.Address,
+			KeyID:             proposalKey.KeyID,
+			CurrentSeqNumber:  accountKey.SeqNumber,
+			ProvidedSeqNumber: proposalKey.SequenceNumber,
 		}
-		r.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
 	}
 
-	return valid, nil
+	accountKey.SeqNumber++
+
+	updatedAccountBytes, err := flow.EncodeAccountPublicKey(accountKey)
+	if err != nil {
+		return err
+	}
+	r.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
+
+	return nil
 }
 
 func keyPublicKeySequenceNumber(index int) string {

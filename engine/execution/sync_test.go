@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -39,9 +40,22 @@ func TestSyncFlow(t *testing.T) {
 
 	genesis := flow.Genesis(identities)
 
+	seq := uint64(0)
+
 	tx1 := execTestutil.DeployCounterContractTransaction()
+	err := execTestutil.SignTransactionbyRoot(&tx1, seq)
+	require.NoError(t, err)
+	seq++
+
 	tx2 := execTestutil.CreateCounterTransaction()
+	err = execTestutil.SignTransactionbyRoot(&tx2, seq)
+	require.NoError(t, err)
+	seq++
+
 	tx4 := execTestutil.AddToCounterTransaction()
+	err = execTestutil.SignTransactionbyRoot(&tx4, seq)
+	require.NoError(t, err)
+	seq++
 
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}

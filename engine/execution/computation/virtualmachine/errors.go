@@ -25,6 +25,14 @@ func (e *MissingSignatureError) Error() string {
 	return fmt.Sprintf("account %s does not have sufficient signatures", e.Address)
 }
 
+// A MissingPayerError indicates that a transaction is missing payer.
+type MissingPayerError struct {
+}
+
+func (e *MissingPayerError) Error() string {
+	return fmt.Sprintf("no payer address provided")
+}
+
 // An InvalidSignatureAccountError indicates that a signature references a nonexistent account.
 type InvalidSignatureAccountError struct {
 	Address flow.Address

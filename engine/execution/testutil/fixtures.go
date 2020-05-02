@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -96,27 +97,37 @@ func AddToCounterTransaction() flow.TransactionBody {
 
 func SignTransactionbyRoot(tx *flow.TransactionBody, seqNum uint64) error {
 
-	privateKeyBytes, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
-	if err != nil {
-		return fmt.Errorf("cannot hex decode hardcoded key: %w", err)
-	}
-
-	privateKey, err := flow.DecodeAccountPrivateKey(privateKeyBytes)
-	if err != nil {
-		return fmt.Errorf("cannot decode hardcoded private key: %w", err)
-	}
-
-	hasher, err := hash.NewHasher(privateKey.HashAlgo)
+	hasher, err := hash.NewHasher(flow.RootAccountPrivateKey.HashAlgo)
 	if err != nil {
 		return fmt.Errorf("cannot create hasher: %w", err)
 	}
 
 	err = tx.SetPayer(flow.RootAddress).
 		SetProposalKey(flow.RootAddress, 0, seqNum).
-		SignEnvelope(flow.RootAddress, 0, privateKey.PrivateKey, hasher)
+		SignEnvelope(flow.RootAddress, 0, flow.RootAccountPrivateKey.PrivateKey, hasher)
 
 	if err != nil {
 		return fmt.Errorf("cannot sign tx: %w", err)
+	}
+
+	return nil
+}
+
+func RootBootstrappedLedger() (virtualmachine.Ledger, error) {
+	ledger := make(virtualmachine.MapLedger)
+
+	return ledger, BootstrapLedgerWithRootAccount(ledger)
+}
+
+func BootstrapLedgerWithRootAccount(ledger virtualmachine.Ledger) error {
+
+	ledgerAccess := virtualmachine.LedgerAccess{Ledger: ledger}
+
+	rootAccountPublicKey := flow.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+
+	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{rootAccountPublicKey})
+	if err != nil {
+		return err
 	}
 
 	return nil

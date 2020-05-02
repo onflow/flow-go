@@ -86,6 +86,14 @@ func (bc *blockContext) ExecuteTransaction(
 		}, nil
 	}
 
+	err = ctx.checkAndIncrementSequenceNumber()
+	if err != nil {
+		return &TransactionResult{
+			TransactionID: txID,
+			Error:         err,
+		}, nil
+	}
+
 	err = bc.vm.executeTransaction(tx.Script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
@@ -116,7 +124,6 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 	location := runtime.ScriptLocation(scriptHash)
 
 	ctx := bc.newScriptContext(ledger)
-
 	value, err := bc.vm.executeScript(script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {

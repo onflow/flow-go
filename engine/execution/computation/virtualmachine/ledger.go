@@ -80,7 +80,7 @@ func (r *LedgerAccess) CheckAccountExists(accountID []byte) error {
 	return fmt.Errorf("account with ID %x does not exist", accountID)
 }
 
-func (r *LedgerAccess) GetAccountPublicKeys(accountID []byte) (publicKeys [][]byte, err error) {
+func (r *LedgerAccess) GetAccountPublicKeys(accountID []byte) (publicKeys []flow.AccountPublicKey, err error) {
 	countBytes, err := r.Ledger.Get(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 	)
@@ -94,7 +94,7 @@ func (r *LedgerAccess) GetAccountPublicKeys(accountID []byte) (publicKeys [][]by
 
 	count := int(big.NewInt(0).SetBytes(countBytes).Int64())
 
-	publicKeys = make([][]byte, count)
+	publicKeys = make([]flow.AccountPublicKey, count)
 
 	for i := 0; i < count; i++ {
 		publicKey, err := r.Ledger.Get(
@@ -108,7 +108,12 @@ func (r *LedgerAccess) GetAccountPublicKeys(accountID []byte) (publicKeys [][]by
 			return nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
 		}
 
-		publicKeys[i] = publicKey
+		decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode account public key: %w", err)
+		}
+
+		publicKeys[i] = decodedPublicKey
 	}
 
 	return publicKeys, nil
@@ -134,22 +139,11 @@ func (r *LedgerAccess) GetAccount(address flow.Address) *flow.Account {
 		panic(err)
 	}
 
-	accountPublicKeys := make([]flow.AccountPublicKey, len(publicKeys))
-	for i, publicKey := range publicKeys {
-		//accountPublicKey, err := decodePublicKey(publicKey)
-		accountPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
-		if err != nil {
-			panic(err)
-		}
-
-		accountPublicKeys[i] = accountPublicKey
-	}
-
 	return &flow.Account{
 		Address: address,
 		Balance: balanceInt.Uint64(),
 		Code:    code,
-		Keys:    accountPublicKeys,
+		Keys:    publicKeys,
 	}
 }
 
@@ -193,7 +187,7 @@ func (r *LedgerAccess) GetLatestAccount() flow.Address {
 	return flow.BytesToAddress(latestAccountID)
 }
 
-func (r *LedgerAccess) CreateAccountInLedger(publicKeys [][]byte) (flow.Address, error) {
+func (r *LedgerAccess) CreateAccountInLedger(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
 	accountAddress := r.GetLatestAccount()
 
 	accountID := accountAddress[:]
@@ -210,6 +204,8 @@ func (r *LedgerAccess) CreateAccountInLedger(publicKeys [][]byte) (flow.Address,
 	// set account balance to 0
 	r.Ledger.Set(fullKeyHash(string(newAccountID), "", keyBalance), big.NewInt(0).Bytes())
 
+	r.Ledger.Set(fullKeyHash(string(newAccountID), string(newAccountID), keyCode), nil)
+
 	err := r.SetAccountPublicKeys(newAccountID, publicKeys)
 	if err != nil {
 		return flow.Address{}, err
@@ -220,7 +216,7 @@ func (r *LedgerAccess) CreateAccountInLedger(publicKeys [][]byte) (flow.Address,
 	return flow.BytesToAddress(newAccountID), nil
 }
 
-func (r *LedgerAccess) SetAccountPublicKeys(accountID []byte, publicKeys [][]byte) error {
+func (r *LedgerAccess) SetAccountPublicKeys(accountID []byte, publicKeys []flow.AccountPublicKey) error {
 	var existingCount int
 
 	countBytes, err := r.Ledger.Get(
@@ -245,21 +241,27 @@ func (r *LedgerAccess) SetAccountPublicKeys(accountID []byte, publicKeys [][]byt
 
 	for i, publicKey := range publicKeys {
 
-		accountPublicKey, err := flow.DecodeRuntimeAccountPublicKey(publicKey)
+		//accountPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
+		//if err != nil {
+		//	return err
+		//}
+
+		err = publicKey.Validate()
 		if err != nil {
 			return err
 		}
 
-		err = accountPublicKey.Validate()
+		//fullAccountPublicKey, err := flow.EncodeAccountPublicKey(accountPublicKey)
+		//if err != nil {
+		//	return err
+		//}
+
+		publicKeyBytes, err := flow.EncodeAccountPublicKey(publicKey)
 		if err != nil {
-			return err
+			return fmt.Errorf("cannot enocde accout public key: %w", err)
 		}
 
-		fullAccountPublicKey, err := flow.EncodeAccountPublicKey(accountPublicKey)
-		if err != nil {
-			return err
-		}
-		r.setAccountPublicKey(accountID, i, fullAccountPublicKey)
+		r.setAccountPublicKey(accountID, i, publicKeyBytes)
 	}
 
 	// delete leftover keys
