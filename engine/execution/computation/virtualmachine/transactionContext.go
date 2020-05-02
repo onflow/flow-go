@@ -336,10 +336,6 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
 	return nil
 }
 
-func keyPublicKeySequenceNumber(index int) string {
-	return fmt.Sprintf("public_key_%d_seq_num", index)
-}
-
 func (r *TransactionContext) aggregateAccountSignatures(
 	signatures []flow.TransactionSignature,
 	message []byte,

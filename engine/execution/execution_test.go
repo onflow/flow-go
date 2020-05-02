@@ -266,7 +266,6 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	tx2 := execTestutil.CreateCounterPanicTransaction()
 	err = execTestutil.SignTransactionbyRoot(&tx2, seq)
 	require.NoError(t, err)
-	seq++
 
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
 	block3 := &flow.Block{

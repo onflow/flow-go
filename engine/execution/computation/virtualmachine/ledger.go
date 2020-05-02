@@ -6,9 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -145,40 +142,6 @@ func (r *LedgerAccess) GetAccount(address flow.Address) *flow.Account {
 		Code:    code,
 		Keys:    publicKeys,
 	}
-}
-
-// TODO: replace once public key format changes @psiemens
-func decodePublicKey(b []byte) (a flow.AccountPublicKey, err error) {
-	var temp struct {
-		PublicKey []byte
-		SignAlgo  uint
-		HashAlgo  uint
-		Weight    uint
-		SeqNumber uint64
-	}
-
-	encoder := rlp.NewEncoder()
-
-	err = encoder.Decode(b, &temp)
-	if err != nil {
-		return a, err
-	}
-
-	signAlgo := crypto.SigningAlgorithm(temp.SignAlgo)
-	hashAlgo := hash.HashingAlgorithm(temp.HashAlgo)
-
-	publicKey, err := crypto.DecodePublicKey(signAlgo, temp.PublicKey)
-	if err != nil {
-		return a, err
-	}
-
-	return flow.AccountPublicKey{
-		PublicKey: publicKey,
-		SignAlgo:  signAlgo,
-		HashAlgo:  hashAlgo,
-		Weight:    int(temp.Weight),
-		SeqNumber: temp.SeqNumber,
-	}, nil
 }
 
 func (r *LedgerAccess) GetLatestAccount() flow.Address {
