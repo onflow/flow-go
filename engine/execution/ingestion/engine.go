@@ -50,6 +50,7 @@ type Engine struct {
 	payloads           storage.Payloads
 	collections        storage.Collections
 	events             storage.Events
+	transactionResults storage.TransactionResults
 	computationManager computation.ComputationManager
 	providerEngine     provider.ProviderEngine
 	mempool            *Mempool
@@ -61,6 +62,7 @@ type Engine struct {
 	syncTargetBlockID  atomic.Value
 	stateSync          executionSync.StateSynchronizer
 	mc                 module.Metrics
+	extensiveLogging   bool
 }
 
 func New(
@@ -72,11 +74,13 @@ func New(
 	payloads storage.Payloads,
 	collections storage.Collections,
 	events storage.Events,
+	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
 	syncThreshold uint64,
 	mc module.Metrics,
+	extLog bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
@@ -92,6 +96,7 @@ func New(
 		payloads:           payloads,
 		collections:        collections,
 		events:             events,
+		transactionResults: transactionResults,
 		computationManager: executionEngine,
 		providerEngine:     providerEngine,
 		mempool:            mempool,
@@ -100,6 +105,7 @@ func New(
 		syncInProgress:     atomic.NewBool(false),
 		stateSync:          executionSync.NewStateSynchronizer(execState),
 		mc:                 mc,
+		extensiveLogging:   extLog,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -409,7 +415,9 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		if executableBlock.IsComplete() {
 
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
-
+			if e.extensiveLogging {
+				e.logExecutableBlock(executableBlock)
+			}
 			e.wg.Add(1)
 			go e.executeBlock(executableBlock)
 		}
@@ -538,7 +546,7 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 				Hex("collection_id", logging.ID(guarantee.ID())).
 				Msg("requesting collection")
 
-			err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID()}, collectionGuaranteesIdentifiers...)
+			err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID(), Nonce: rand.Uint64()}, collectionGuaranteesIdentifiers...)
 			if err != nil {
 				// TODO - this should be handled, maybe retried or put into some form of a queue
 				e.log.Err(err).Msg("cannot submit collection requests")
@@ -592,7 +600,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
-	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateSnapshots, result.Events, startState)
+	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateSnapshots, result.Events, result.TransactionResult, startState)
 	if err != nil {
 		return nil, err
 	}
@@ -605,7 +613,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
 
-func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Snapshot, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Snapshot, events []flow.Event, txResults []flow.TransactionResult, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
 
 	originalState := startState
 
@@ -674,6 +682,13 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 		}
 	}
 
+	for _, te := range txResults {
+		err = e.transactionResults.Store(block.ID(), &te)
+		if err != nil {
+			return nil, fmt.Errorf("failed to store transaction error: %w", err)
+		}
+	}
+
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Hex("start_state", originalState).Hex("final_state", endState).Msg("saved computation results")
 
 	err = e.providerEngine.BroadcastExecutionReceipt(receipt)
@@ -682,6 +697,36 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 	}
 
 	return receipt, nil
+}
+
+// logExecutableBlock logs all data about an executable block
+// over time we should skip this
+func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
+	// log block
+	e.log.Info().
+		Hex("block_id", logging.Entity(eb.Block)).
+		Hex("prev_block_id", logging.ID(eb.Block.ParentID)).
+		Int("block_height", int(eb.Block.Height)).
+		Int("number_of_collections", len(eb.Collections())).
+		RawJSON("block_header", logging.AsJSON(eb.Block.Header)).
+		Msg("extensive log: block header")
+
+	// logs transactions
+	for i, col := range eb.Collections() {
+		for j, tx := range col.Transactions {
+			e.log.Info().
+				Hex("block_id", logging.Entity(eb.Block)).
+				Int("block_height", int(eb.Block.Height)).
+				Hex("prev_block_id", logging.ID(eb.Block.ParentID)).
+				Int("collection_index", i).
+				Int("tx_index", j).
+				Hex("collection_id", logging.ID(col.Guarantee.CollectionID)).
+				Hex("tx_hash", logging.Entity(tx)).
+				Hex("start_state_commitment", eb.StartState).
+				RawJSON("transaction", logging.AsJSON(tx)).
+				Msg("extensive log: executed tx content")
+		}
+	}
 }
 
 // generateChunk creates a chunk from the provided computation data.
@@ -857,7 +902,8 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 	}
 
 	//TODO - validate state sync, reject invalid messages, change provider
-	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateInteractions, executionStateDelta.Events, executionStateDelta.StartState)
+	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateInteractions,
+		executionStateDelta.Events, executionStateDelta.TransactionResults, executionStateDelta.StartState)
 	if err != nil {
 		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).Err(err).Msg("fatal error while processing sync message")
 	}

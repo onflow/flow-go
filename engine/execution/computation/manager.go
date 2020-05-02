@@ -3,10 +3,8 @@ package computation
 import (
 	"fmt"
 
-	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
-
-	encoding "github.com/onflow/cadence/encoding/xdr"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
@@ -64,9 +62,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *d
 		return nil, fmt.Errorf("failed to execute script at block (%s): %w", blockHeader.ID(), result.Error)
 	}
 
-	value := cadence.ConvertValue(result.Value)
-
-	encodedValue, err := encoding.Encode(value)
+	encodedValue, err := jsoncdc.Encode(result.Value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}

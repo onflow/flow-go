@@ -57,7 +57,7 @@ func TestG1(t *testing.T) {
 	var expo scalar
 	randZr(&expo)
 	var res pointG1
-	_G1scalarGenMult(&res, &expo)
+	genScalarMultG1(&res, &expo)
 
 }
 
@@ -73,20 +73,10 @@ func BenchmarkG1(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_G1scalarGenMult(&res, &expo)
+		genScalarMultG1(&res, &expo)
 	}
 	b.StopTimer()
 	return
-}
-
-// TestG2 helps debugging but is not a unit test
-func TestG2(t *testing.T) {
-	_ = newBLSBLS12381()
-	var expo scalar
-	(&expo).setInt(1)
-	var res pointG2
-	_G2scalarGenMult(&res, &expo)
-
 }
 
 // G2 bench
@@ -101,7 +91,7 @@ func BenchmarkG2(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_G2scalarGenMult(&res, &expo)
+		genScalarMultG2(&res, &expo)
 	}
 	b.StopTimer()
 	return

@@ -10,13 +10,13 @@ type Mutator struct {
 	mock.Mock
 }
 
-// Bootstrap provides a mock function with given fields: genesis
-func (_m *Mutator) Bootstrap(genesis *flow.Block) error {
-	ret := _m.Called(genesis)
+// Bootstrap provides a mock function with given fields: state, genesis
+func (_m *Mutator) Bootstrap(state []byte, genesis *flow.Block) error {
+	ret := _m.Called(state, genesis)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
-		r0 = rf(genesis)
+	if rf, ok := ret.Get(0).(func([]byte, *flow.Block) error); ok {
+		r0 = rf(state, genesis)
 	} else {
 		r0 = ret.Error(0)
 	}

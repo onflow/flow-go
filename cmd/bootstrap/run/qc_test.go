@@ -27,7 +27,7 @@ func TestGenerateGenesisQC(t *testing.T) {
 	}
 	block.ParentID = flow.ZeroID
 	block.View = 3
-	block.Seals = []*flow.Seal{&flow.Seal{}}
+	block.Seals = nil
 	block.Guarantees = nil
 	block.PayloadHash = block.Payload.Hash()
 

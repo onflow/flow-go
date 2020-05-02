@@ -18,6 +18,7 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 	t := flow.NewTransactionBody()
 
 	t.SetScript(m.GetScript())
+	t.SetArguments(m.GetArguments())
 	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
 	t.SetGasLimit(m.GetGasLimit())
 
@@ -87,6 +88,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 
 	return &entities.Transaction{
 		Script:             tb.Script,
+		Arguments:          tb.Arguments,
 		ReferenceBlockId:   tb.ReferenceBlockID[:],
 		GasLimit:           tb.GasLimit,
 		ProposalKey:        proposalKeyMessage,
@@ -215,4 +217,13 @@ func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) 
 		HashAlgo:  uint32(a.HashAlgo),
 		Weight:    uint32(a.Weight),
 	}, nil
+}
+
+func EventsToMessages(flowEvents []flow.Event) []*entities.Event {
+	events := make([]*entities.Event, len(flowEvents))
+	for i, e := range flowEvents {
+		event := EventToMessage(e)
+		events[i] = event
+	}
+	return events
 }

@@ -28,8 +28,8 @@ func LookupSealPayload(height uint64, blockID flow.Identifier, parentID flow.Ide
 
 // VerifySealPayload verifies that the candidate seal IDs don't exist
 // in any ancestor block.
-func VerifySealPayload(height uint64, blockID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
-	start, end := payloadIterRange(codeIndexSeal, height, 0)
+func VerifySealPayload(height uint64, limit uint64, blockID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
+	start, end := payloadIterRange(codeIndexSeal, height, limit)
 	return iterate(start, end, validatepayload(blockID, sealIDs))
 }
 

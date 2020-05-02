@@ -94,7 +94,7 @@ func (bc *blockContext) ExecuteTransaction(
 		}, nil
 	}
 
-	err = bc.vm.executeTransaction(tx.Script, ctx, location)
+	err = bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
@@ -161,7 +161,7 @@ func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) 
 		}
 
 		flowEvents[i] = flow.Event{
-			Type:             flow.EventType(event.Type.ID()),
+			Type:             flow.EventType(event.EventType.ID()),
 			TransactionID:    tr.TransactionID,
 			TransactionIndex: txIndex,
 			EventIndex:       uint32(i),

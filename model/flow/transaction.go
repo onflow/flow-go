@@ -19,8 +19,11 @@ type TransactionBody struct {
 	// user can adjust this reference to older blocks if he/she wants to make tx expire faster
 	ReferenceBlockID Identifier
 
-	// the script part of the transaction in Cadence Language
+	// the transaction script as UTF-8 encoded Cadence source code
 	Script []byte
+
+	// arguments passed to the Cadence transaction
+	Arguments [][]byte
 
 	// Max amount of computation which is allowed to be done during this transaction
 	GasLimit uint64
@@ -60,6 +63,18 @@ func (tb TransactionBody) Checksum() Identifier {
 // SetScript sets the Cadence script for this transaction.
 func (tb *TransactionBody) SetScript(script []byte) *TransactionBody {
 	tb.Script = script
+	return tb
+}
+
+// SetArguments sets the Cadence arguments list for this transaction.
+func (tb *TransactionBody) SetArguments(args [][]byte) *TransactionBody {
+	tb.Arguments = args
+	return tb
+}
+
+// AddArgument adds an argument to the Cadence arguments list for this transaction.
+func (tb *TransactionBody) AddArgument(arg []byte) *TransactionBody {
+	tb.Arguments = append(tb.Arguments, arg)
 	return tb
 }
 
@@ -113,7 +128,7 @@ type Transaction struct {
 
 // MissingFields checks if a transaction is missing any required fields and returns those that are missing.
 func (tb *TransactionBody) MissingFields() []string {
-	// Required fields are Script, ReferenceBlockHash, Nonce, GasLimit, Payer
+	// Required fields are Script, ReferenceBlockID, Payer
 	missingFields := make([]string, 0)
 
 	if len(tb.Script) == 0 {
@@ -362,13 +377,12 @@ const (
 	TransactionFieldUnknown TransactionField = iota
 	TransactionFieldScript
 	TransactionFieldRefBlockID
-	TransactionFieldGasLimit
 	TransactionFieldPayer
 )
 
 // String returns the string representation of a transaction field.
 func (f TransactionField) String() string {
-	return [...]string{"Unknown", "Script", "ReferenceBlockHash", "GasLimit", "Payer"}[f]
+	return [...]string{"Unknown", "Script", "ReferenceBlockID", "Payer"}[f]
 }
 
 // A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.
