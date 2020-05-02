@@ -46,8 +46,7 @@ import (
 )
 
 const (
-	proposalInterval = time.Second * 2
-	proposalTimeout  = time.Second * 4
+	proposalTimeout = time.Second * 4
 )
 
 func main() {
@@ -85,7 +84,7 @@ func main() {
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 10000, "maximum number of transactions in the memory pool")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", proposalTimeout, "the initial timeout for the hotstuff pacemaker")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			pool, err = stdmap.NewTransactions(txLimit)
@@ -242,7 +241,7 @@ func main() {
 			//Collector cluster's HotStuff committee state
 			committee, err := initClusterCommittee(node)
 			if err != nil {
-				return nil, fmt.Errorf("could not create HotStuff committee state: %w", err)
+				return nil, fmt.Errorf("creating HotStuff committee state failed: %w", err)
 			}
 
 			// create a signing provider for signing HotStuff messages (within cluster)
@@ -257,6 +256,9 @@ func main() {
 				build, final, signer, prop, &clusterGenesis.Header, clusterQC,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
+			if err != nil {
+				return nil, fmt.Errorf("creating HotStuff participant failed: %w", err)
+			}
 
 			prop = prop.WithConsensus(hot)
 			return prop, nil
