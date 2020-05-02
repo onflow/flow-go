@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
@@ -89,19 +90,19 @@ func main() {
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			results := badger.NewExecutionResults(node.DB)
-			return matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
+			results := storage.NewExecutionResults(node.DB)
+			return matching.New(node.Logger, node.Network, node.Proto, node.Me, results, receipts, approvals, seals)
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prov, err = provider.New(node.Logger, node.Metrics, node.Network, node.State, node.Me)
+			prov, err = provider.New(node.Logger, node.Metrics, node.Network, node.Proto, node.Me)
 			return prov, err
 		}).
 		Component("propagation engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prop, err = propagation.New(node.Logger, node.Network, node.State, node.Me, guarantees)
+			prop, err = propagation.New(node.Logger, node.Network, node.Proto, node.Me, guarantees)
 			return prop, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Metrics, node.Me)
+			ing, err := ingestion.New(node.Logger, node.Network, prop, node.Proto, node.Metrics, node.Me)
 			return ing, err
 		}).
 		Component("mempool metrics monitor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -113,25 +114,19 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			cleaner := badger.NewCleaner(node.Logger, node.DB)
-			headersDB := badger.NewHeaders(node.DB)
-			payloadsDB := badger.NewPayloads(node.DB)
-			blocksDB := badger.NewBlocks(node.DB)
-			guaranteesDB := badger.NewGuarantees(node.DB)
-			sealsDB := badger.NewSeals(node.DB)
-			viewsDB := badger.NewViews(node.DB)
+			cleaner := storage.NewCleaner(node.Logger, node.DB)
 
 			// initialize the pending blocks cache
 			cache := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(node.Logger, node.Network, node.Me, cleaner, headersDB, payloadsDB, node.State, prov, cache, node.Metrics)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, cleaner, node.Headers, node.Payloads, node.Proto, prov, cache, node.Metrics)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
 			// initialize the synchronization engine
-			sync, err = synchronization.New(node.Logger, node.Network, node.Me, node.State, blocksDB, comp)
+			sync, err = synchronization.New(node.Logger, node.Network, node.Me, node.Proto, node.Blocks, comp)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
@@ -155,27 +150,30 @@ func main() {
 			merger := signature.NewCombiner()
 
 			// initialize Main consensus committee's state
-			committee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			committee, err := committee.NewMainConsensusCommitteeState(node.Proto, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the combined signer for hotstuff
-			signer := verification.NewCombinedSigner(committee, node.DKGState, staking, beacon, merger, node.Me.NodeID())
+			signer := verification.NewCombinedSigner(committee, node.DKG, staking, beacon, merger, node.Me.NodeID())
 
 			// initialize a logging notifier for hotstuff
-			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, guaranteesDB, sealsDB)
+			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, node.Guarantees, node.Seals)
+
+			// initialize the persister
+			persist := persister.New(node.DB)
 
 			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := findLatest(node.State, headersDB, node.GenesisBlock.Header)
+			finalized, pending, err := findLatest(node.Proto, node.Headers, node.GenesisBlock.Header)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
 
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, headersDB, viewsDB, committee,
-				build, final, signer, comp, node.GenesisBlock.Header, node.GenesisQC,
+				node.Logger, notifier, node.Metrics, node.Headers, committee, build, final,
+				persist, signer, comp, node.GenesisBlock.Header, node.GenesisQC,
 				finalized, pending,
 				consensus.WithTimeout(hotstuffTimeout),
 			)

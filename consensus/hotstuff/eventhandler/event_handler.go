@@ -217,7 +217,7 @@ func (e *EventHandler) startNewView() error {
 
 	curView := e.paceMaker.CurView()
 
-	err := e.persist.StartedView(curView)
+	err := e.persist.PutStarted(curView)
 	if err != nil {
 		return fmt.Errorf("could not persist current view: %w", err)
 	}

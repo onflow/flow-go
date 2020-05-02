@@ -117,7 +117,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		require.NoError(suite.T(), blocks.Store(&block2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
-		err := db.Update(operation.InsertNumber(block2.Header.Height, block2.ID()))
+		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
 		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil)
@@ -276,7 +276,7 @@ func (suite *Suite) TestExecuteScript() {
 		}
 		err := blocks.Store(&lastBlock)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.InsertNumber(lastBlock.Header.Height, lastBlock.ID()))
+		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Seal").Return(&seal, nil).Once()
 
@@ -285,7 +285,7 @@ func (suite *Suite) TestExecuteScript() {
 		prevBlock.Header.Height = lastBlock.Header.Height - 1
 		err = blocks.Store(&prevBlock)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.InsertNumber(prevBlock.Header.Height, prevBlock.ID()))
+		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
 
 		ctx := context.Background()

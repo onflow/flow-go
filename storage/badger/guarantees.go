@@ -7,52 +7,56 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Guarantees implements persistent storage for collection guarantees.
 type Guarantees struct {
-	db *badger.DB
+	db    *badger.DB
+	cache *Cache
 }
 
 func NewGuarantees(db *badger.DB) *Guarantees {
-	return &Guarantees{
-		db: db,
+
+	store := func(guarID flow.Identifier, guarantee interface{}) error {
+		return db.Update(operation.InsertGuarantee(guarID, guarantee.(*flow.CollectionGuarantee)))
 	}
+
+	retrieve := func(guarID flow.Identifier) (interface{}, error) {
+		var guarantee flow.CollectionGuarantee
+		err := db.View(operation.RetrieveGuarantee(guarID, &guarantee))
+		return &guarantee, err
+	}
+
+	g := &Guarantees{
+		db:    db,
+		cache: newCache(withLimit(10000), withStore(store), withRetrieve(retrieve)),
+	}
+
+	return g
 }
 
 func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return g.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertGuarantee(guarantee)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert collection guarantee: %w", err)
-		}
-		return nil
-	})
+	return g.cache.Put(guarantee.ID(), guarantee)
 }
 
-func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
-	var guarantee flow.CollectionGuarantee
-
-	err := g.db.View(func(tx *badger.Txn) error {
-		return operation.RetrieveGuarantee(collID, &guarantee)(tx)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve collection guarantee: %w", err)
-	}
-
-	return &guarantee, nil
+func (g *Guarantees) ByID(guarID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	guarantee, err := g.cache.Get(guarID)
+	return guarantee.(*flow.CollectionGuarantee), err
 }
 
 func (g *Guarantees) ByBlockID(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
-	var guarantees []*flow.CollectionGuarantee
-
-	err := g.db.View(func(tx *badger.Txn) error {
-		return procedure.RetrieveGuarantees(blockID, &guarantees)(tx)
-	})
+	var guarIDs []flow.Identifier
+	err := g.db.View(operation.LookupPayloadGuarantees(blockID, &guarIDs))
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve guarantees: %w", err)
+		return nil, fmt.Errorf("could not lookup guarantees for block: %w", err)
 	}
-
+	guarantees := make([]*flow.CollectionGuarantee, 0, len(guarIDs))
+	for _, guarID := range guarIDs {
+		guarantee, err := g.ByID(guarID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve guarantee (%x): %w", guarID, err)
+		}
+		guarantees = append(guarantees, guarantee)
+	}
 	return guarantees, nil
 }

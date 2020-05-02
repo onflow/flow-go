@@ -39,13 +39,19 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
+func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
 
-	state, err := UncheckedState(db, flow.GenesisStateCommitment, identities)
+	identities := storage.NewIdentities(db)
+	headers := storage.NewHeaders(db)
+	payloads := storage.NewPayloads(db)
+	seals := storage.NewSeals(db)
+	commits := storage.NewCommits(db)
+
+	state, err := UncheckedState(db, identities, headers, payloads, seals, commits, flow.GenesisStateCommitment, participants)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -315,6 +321,10 @@ func VerificationNode(t *testing.T,
 		require.Nil(t, err)
 	}
 
+	if node.HeaderStorage == nil {
+		node.HeaderStorage = storage.NewHeaders(node.DB)
+	}
+
 	if node.BlockStorage == nil {
 		node.BlockStorage = storage.NewBlocks(node.DB)
 	}
@@ -354,6 +364,7 @@ func VerificationNode(t *testing.T,
 			node.ChunkDataPackTrackers,
 			node.IngestedChunkIDs,
 			node.IngestedResultIDs,
+			node.HeaderStorage,
 			node.BlockStorage,
 			assigner,
 			requestIntervalMs,

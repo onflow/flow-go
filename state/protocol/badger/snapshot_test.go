@@ -28,22 +28,22 @@ func TestHead(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Header.Height = 42
 
-		err := db.Update(procedure.InsertBlock(&block))
+		err := db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
-		err = db.Update(operation.InsertNumber(block.Header.Height, block.ID()))
+		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
 		require.NoError(t, err)
 
 		// add a second, outdated boundary to ensure the latest is taken
-		err = db.Update(operation.InsertBoundary(block.Header.Height - 1))
+		err = db.Update(operation.InsertFinalizedHeight(block.Header.Height - 1))
 		require.NoError(t, err)
 
-		err = db.Update(operation.UpdateBoundary(block.Header.Height))
+		err = db.Update(operation.UpdateFinalizedHeight(block.Header.Height))
 		require.NoError(t, err)
 
 		state := State{db: db}
 
 		t.Run("works with block number", func(t *testing.T) {
-			header, err := state.AtNumber(block.Header.Height).Head()
+			header, err := state.AtHeight(block.Header.Height).Head()
 			require.NoError(t, err)
 			require.Equal(t, block.ID(), header.ID())
 		})

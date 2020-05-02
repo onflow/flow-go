@@ -45,25 +45,28 @@ func testWithBootstrapped(t *testing.T, f func(t *testing.T, mutator *Mutator, d
 
 func TestBootstrapValid(t *testing.T) {
 	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB, genesis *flow.Block, commit flow.StateCommitment) {
-		var boundary uint64
-		err := db.View(operation.RetrieveBoundary(&boundary))
+		var finalized uint64
+		err := db.View(operation.RetrieveFinalizedHeight(&finalized))
 		require.Nil(t, err)
 
 		var storedID flow.Identifier
-		err = db.View(operation.RetrieveNumber(0, &storedID))
+		err = db.View(operation.LookupBlockHeight(0, &storedID))
 		require.Nil(t, err)
 
 		var storedHeader flow.Header
 		err = db.View(operation.RetrieveHeader(genesis.ID(), &storedHeader))
 		require.Nil(t, err)
 
-		var storedSeal flow.Seal
-		err = db.View(procedure.LookupSealByBlock(storedHeader.ID(), &storedSeal))
+		var sealID flow.Identifier
+		err = db.View(operation.LookupBlockSeal(storedHeader.ID(), &sealID))
 		require.NoError(t, err)
-		require.Equal(t, genesis.ID(), storedSeal.BlockID)
-		require.Equal(t, commit, storedSeal.FinalState)
+		require.Equal(t, genesis.ID(), sealID)
 
-		assert.Zero(t, boundary)
+		var storedCommit flow.StateCommitment
+		err = db.View(operation.LookupStateCommitment(storedHeader.ID(), &storedCommit))
+		require.Equal(t, commit, storedCommit)
+
+		assert.Zero(t, finalized)
 		assert.Equal(t, genesis.ID(), storedID)
 		assert.Equal(t, genesis.Header, &storedHeader)
 	})
@@ -73,9 +76,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB, genesis *flow.Block, commit flow.StateCommitment) {
 		state := State{db: db}
 
-		seal, err := state.Final().Seal()
+		finalCommit, err := state.Final().Commit()
 		assert.NoError(t, err)
-		assert.Equal(t, commit, seal.FinalState)
+		assert.Equal(t, commit, finalCommit)
 
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
@@ -89,24 +92,24 @@ func TestExtendSealedBoundary(t *testing.T) {
 		newSeal := flow.Seal{
 			BlockID:      block.ID(),
 			ResultID:     flow.ZeroID, // TODO: we should probably check this
-			InitialState: seal.FinalState,
+			InitialState: commit,
 			FinalState:   unittest.StateCommitmentFixture(),
 		}
 
-		sealingBlock := unittest.BlockFixture()
-		sealingBlock.Payload.Identities = nil
-		sealingBlock.Payload.Guarantees = nil
-		sealingBlock.Payload.Seals = []*flow.Seal{&newSeal}
-		sealingBlock.Header.Height = 2
-		sealingBlock.Header.ParentID = block.ID()
-		sealingBlock.Header.PayloadHash = sealingBlock.Payload.Hash()
+		sealing := unittest.BlockFixture()
+		sealing.Payload.Identities = nil
+		sealing.Payload.Guarantees = nil
+		sealing.Payload.Seals = []*flow.Seal{&newSeal}
+		sealing.Header.Height = 2
+		sealing.Header.ParentID = block.ID()
+		sealing.Header.PayloadHash = sealing.Payload.Hash()
 
 		err = db.Update(func(txn *badger.Txn) error {
-			err = procedure.InsertBlock(&block)(txn)
+			err = procedure.InsertBlock(block.ID(), &block)(txn)
 			if err != nil {
 				return err
 			}
-			err = procedure.InsertBlock(&sealingBlock)(txn)
+			err = procedure.InsertBlock(sealing.ID(), &sealing)(txn)
 			if err != nil {
 				return err
 			}
@@ -117,23 +120,23 @@ func TestExtendSealedBoundary(t *testing.T) {
 		err = mutator.Extend(block.ID())
 		assert.NoError(t, err)
 
-		err = mutator.Extend(sealingBlock.ID())
+		err = mutator.Extend(sealing.ID())
 		assert.NoError(t, err)
 
-		sealed, err := state.Final().Seal()
+		finalCommit, err = state.Final().Commit()
 		assert.NoError(t, err)
 
 		// Sealed only moves after a block is finalized
 		// so here we still want to check for genesis seal
-		assert.Equal(t, genesis.ID(), sealed.BlockID)
+		assert.Equal(t, commit, finalCommit)
 
-		err = mutator.Finalize(sealingBlock.ID())
+		err = mutator.Finalize(sealing.ID())
 		assert.NoError(t, err)
 
-		sealed, err = state.Final().Seal()
+		finalCommit, err = state.Final().Commit()
 		assert.NoError(t, err)
 
-		assert.Equal(t, block.ID(), sealed.BlockID)
+		assert.Equal(t, newSeal.FinalState, finalCommit)
 	})
 }
 
@@ -326,17 +329,15 @@ func TestExtendValid(t *testing.T) {
 		block.Header.ParentID = genesis.ID()
 		block.Header.PayloadHash = block.Payload.Hash()
 
-		err := db.Update(procedure.InsertBlock(&block))
+		err := db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
 		require.NoError(t, err)
 
-		seal, err := mutator.state.Final().Seal()
+		finalCommit, err := mutator.state.Final().Commit()
 		assert.NoError(t, err)
-		assert.Equal(t, flow.GenesisStateCommitment, seal.InitialState)
-		assert.Equal(t, commit, seal.FinalState)
-		assert.Equal(t, genesis.ID(), seal.BlockID)
+		assert.Equal(t, commit, finalCommit)
 	})
 }
 
@@ -350,7 +351,7 @@ func TestExtendMissingParent(t *testing.T) {
 		block.Header.ParentID = unittest.BlockFixture().ID()
 		block.Header.PayloadHash = block.Payload.Hash()
 
-		err := db.Update(procedure.InsertBlock(&block))
+		err := db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
@@ -359,7 +360,7 @@ func TestExtendMissingParent(t *testing.T) {
 
 		// verify seal not indexed
 		var seal flow.Identifier
-		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
+		err = db.View(operation.LookupBlockSeal(block.ID(), &seal))
 		require.Error(t, err)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
@@ -375,7 +376,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		block.Header.ParentID = genesis.Header.ID()
 		block.Header.PayloadHash = block.Payload.Hash()
 
-		err := db.Update(procedure.InsertBlock(&block))
+		err := db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
@@ -386,7 +387,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		block.Header.Height = 1
 		block.Header.View = 2
 
-		err = db.Update(procedure.InsertBlock(&block))
+		err = db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
@@ -394,7 +395,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 
 		// verify seal not indexed
 		var seal flow.Identifier
-		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
+		err = db.View(operation.LookupBlockSeal(block.ID(), &seal))
 		require.True(t, errors.Is(err, storage.ErrNotFound), err)
 	})
 }
@@ -424,37 +425,29 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		block.Header.View = 1
 		block.Header.ParentID = genesis.Header.ID()
 		block.Header.PayloadHash = block.Payload.Hash()
+		blockID := block.ID()
 
-		sealingBlock := unittest.BlockFixture()
-		sealingBlock.Payload.Guarantees = nil
-		sealingBlock.Payload.Seals = []*flow.Seal{&flow.Seal{
+		seal := flow.Seal{
 			BlockID:      block.ID(),
 			InitialState: commit,
 			FinalState:   unittest.StateCommitmentFixture(),
-		}}
-		sealingBlock.Header.Height = 2
-		sealingBlock.Header.View = 2
-		sealingBlock.Header.ParentID = block.ID()
-		sealingBlock.Header.PayloadHash = sealingBlock.Payload.Hash()
+		}
+
+		sealing := unittest.BlockFixture()
+		sealing.Payload.Guarantees = nil
+		sealing.Payload.Seals = []*flow.Seal{&seal}
+		sealing.Header.Height = 2
+		sealing.Header.View = 2
+		sealing.Header.ParentID = block.ID()
+		sealing.Header.PayloadHash = sealing.Payload.Hash()
+		sealingID := sealing.ID()
 
 		err := db.Update(func(txn *badger.Txn) error {
-			err := procedure.InsertPayload(block.Payload)(txn)
+			err := procedure.InsertBlock(blockID, &block)(txn)
 			if err != nil {
 				return err
 			}
-			err = procedure.InsertBlock(&block)(txn)
-			if err != nil {
-				return err
-			}
-			err = operation.InsertSeal(sealingBlock.Payload.Seals[0])(txn)
-			if err != nil {
-				return err
-			}
-			err = procedure.InsertPayload(sealingBlock.Payload)(txn)
-			if err != nil {
-				return err
-			}
-			err = procedure.InsertBlock(&sealingBlock)(txn)
+			err = procedure.InsertBlock(sealingID, &sealing)(txn)
 			if err != nil {
 				return err
 			}
@@ -472,15 +465,12 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		block.Header.Timestamp = block.Header.Timestamp.Add(time.Second)
 		block.Header.ParentID = genesis.ID()
 
-		err = db.Update(procedure.InsertBlock(&block))
-		require.NoError(t, err)
-
 		err = mutator.Extend(block.ID())
 		require.EqualError(t, err, fmt.Sprintf("extend header not valid: block doesn't connect to finalized state (0 < 1), ancestorID (%v)", genesis.ID()))
 
 		// verify seal not indexed
-		var seal flow.Identifier
-		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
+		var sealID flow.Identifier
+		err = db.View(operation.LookupBlockSeal(block.ID(), &sealID))
 		assert.EqualError(t, err, "key not found")
 	})
 }
@@ -496,7 +486,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 		block.Header.ParentID = genesis.Header.ID()
 		block.Header.PayloadHash = block.Payload.Hash()
 
-		err := db.Update(procedure.InsertBlock(&block))
+		err := db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
@@ -509,23 +499,23 @@ func TestExtendSealNotConnected(t *testing.T) {
 			FinalState:   unittest.StateCommitmentFixture(),
 		}
 
-		sealingBlock := unittest.BlockFixture()
-		sealingBlock.Payload.Identities = nil
-		sealingBlock.Payload.Seals = []*flow.Seal{seal}
-		sealingBlock.Header.Height = 2
-		sealingBlock.Header.View = 2
-		sealingBlock.Header.ParentID = block.Header.ID()
-		sealingBlock.Header.PayloadHash = sealingBlock.Payload.Hash()
+		sealing := unittest.BlockFixture()
+		sealing.Payload.Identities = nil
+		sealing.Payload.Seals = []*flow.Seal{seal}
+		sealing.Header.Height = 2
+		sealing.Header.View = 2
+		sealing.Header.ParentID = block.Header.ID()
+		sealing.Header.PayloadHash = sealing.Payload.Hash()
 
-		err = db.Update(procedure.InsertBlock(&sealingBlock))
+		err = db.Update(procedure.InsertBlock(sealing.ID(), &sealing))
 		require.NoError(t, err)
 
-		err = mutator.Extend(sealingBlock.ID())
+		err = mutator.Extend(sealing.ID())
 		require.EqualError(t, err, "seal execution states do not connect")
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupSealIDByBlock(sealingBlock.ID(), &sealID))
+		err = db.View(operation.LookupBlockSeal(sealing.ID(), &sealID))
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
@@ -539,7 +529,7 @@ func TestExtendWrongIdentity(t *testing.T) {
 		block.Header.PayloadHash = block.Payload.Hash()
 		block.Payload.Guarantees = nil
 
-		err := db.Update(procedure.InsertBlock(&block))
+		err := db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
@@ -547,7 +537,7 @@ func TestExtendWrongIdentity(t *testing.T) {
 
 		// verify seal not indexed
 		var seal flow.Identifier
-		err = db.View(operation.LookupSealIDByBlock(block.ID(), &seal))
+		err = db.View(operation.LookupBlockSeal(block.ID(), &seal))
 		assert.EqualError(t, err, "key not found")
 	})
 }

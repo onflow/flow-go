@@ -1,14 +1,12 @@
 package badger
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -78,16 +76,45 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			return fmt.Errorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.chainID)
 		}
 
-		// check for duplicate transactions in block's ancestry
-		parentHeight := block.Header.Height - 1
-		parentID := block.Header.ParentID
-		txIDs := block.Payload.Collection.Light().Transactions
-		err = operation.VerifyCollectionPayload(parentHeight, parentID, txIDs)(tx)
-		if errors.Is(err, storage.ErrAlreadyIndexed) {
-			return fmt.Errorf("found duplicate transaction in payload: %w", err)
+		// we go back at most 1k blocks to check payload for now
+		limit := block.Header.Height - 1000
+		if limit > 0 { // overflow check
+			limit = 0
 		}
-		if err != nil {
-			return fmt.Errorf("could not verify collection payload: %w", err)
+
+		// check for duplicate transactions in block's ancestry
+		txLookup := make(map[flow.Identifier]struct{})
+		for _, tx := range block.Payload.Collection.Transactions {
+			txLookup[tx.ID()] = struct{}{}
+		}
+		var duplicateTxIDs flow.IdentifierList
+		ancestorID := block.Header.ParentID
+		for {
+			var ancestor flow.Header
+			err := m.state.db.View(operation.RetrieveHeader(ancestorID, &ancestor))
+			if err != nil {
+				return fmt.Errorf("could not retrieve ancestor header: %w", err)
+			}
+			if ancestor.Height <= limit {
+				break
+			}
+			var payload cluster.Payload
+			err = m.state.db.View(procedure.RetrieveClusterPayload(ancestorID, &payload))
+			if err != nil {
+				return fmt.Errorf("could not retrieve ancestor payload: %w", err)
+			}
+			for _, tx := range payload.Collection.Transactions {
+				txID := tx.ID()
+				_, duplicated := txLookup[txID]
+				if duplicated {
+					duplicateTxIDs = append(duplicateTxIDs, txID)
+				}
+			}
+		}
+
+		// if we have duplicate transactions, fail
+		if len(duplicateTxIDs) > 0 {
+			return fmt.Errorf("payload includes duplicate transactions (duplicates: %s)", duplicateTxIDs)
 		}
 
 		// get the chain ID, which determines which cluster state to query

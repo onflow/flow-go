@@ -21,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
+	storeBadger "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 type Participant struct {
@@ -141,7 +142,13 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 		return nil, nil, err
 	}
 
-	state, err := protoBadger.NewState(db)
+	identities := storeBadger.NewIdentities(db)
+	headers := storeBadger.NewHeaders(db)
+	payloads := storeBadger.NewPayloads(db)
+	seals := storeBadger.NewSeals(db)
+	commits := storeBadger.NewCommits(db)
+
+	state, err := protoBadger.NewState(db, identities, headers, payloads, seals, commits)
 	if err != nil {
 		return nil, nil, err
 	}

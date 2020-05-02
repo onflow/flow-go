@@ -7,6 +7,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+func withLimit(limit uint) func(*Cache) {
+	return func(c *Cache) {
+		c.limit = limit
+	}
+}
+
 type storeFunc func(flow.Identifier, interface{}) error
 
 func withStore(store storeFunc) func(*Cache) {
@@ -74,6 +80,8 @@ func (c *Cache) Get(entityID flow.Identifier) (interface{}, error) {
 
 // Put will add an entity to the cache with the given ID.
 func (c *Cache) Put(entityID flow.Identifier, entity interface{}) error {
+	c.Lock()
+	defer c.Unlock()
 
 	// if there is no store function, fail
 	if c.store == nil {

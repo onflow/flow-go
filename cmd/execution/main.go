@@ -29,9 +29,7 @@ import (
 func main() {
 
 	var (
-		stateCommitments   storage.Commits
 		ledgerStorage      storage.Ledger
-		blocks             storage.Blocks
 		events             storage.Events
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
@@ -57,7 +55,7 @@ func main() {
 			computationManager = computation.New(
 				node.Logger,
 				node.Me,
-				node.State,
+				node.Proto,
 				vm,
 			)
 
@@ -91,14 +89,13 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
-			stateCommitments = badger.NewCommits(node.DB)
-			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks, executionResults, node.DB)
+			executionState = state.NewExecutionState(ledgerStorage, node.Commits, chunkDataPacks, executionResults, node.DB)
 			//registerDeltas := badger.NewRegisterDeltas(node.DB)
 			stateSync := sync.NewStateSynchronizer(executionState)
 			providerEngine, err = provider.New(
 				node.Logger,
 				node.Network,
-				node.State,
+				node.Proto,
 				node.Me,
 				executionState,
 				stateSync,
@@ -108,20 +105,18 @@ func main() {
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// Only needed for ingestion engine
-			payloads := badger.NewPayloads(node.DB)
 			collections := badger.NewCollections(node.DB)
 
 			// Needed for grpc server, make sure to assign to main scoped vars
-			blocks = badger.NewBlocks(node.DB)
 			events = badger.NewEvents(node.DB)
 			txResults = badger.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,
-				node.State,
-				blocks,
-				payloads,
+				node.Proto,
+				node.Blocks,
+				node.Payloads,
 				collections,
 				events,
 				txResults,
@@ -135,7 +130,7 @@ func main() {
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events, txResults)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Blocks, events, txResults)
 			return rpcEng, nil
 		}).Run("execution")
 

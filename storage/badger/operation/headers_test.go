@@ -60,3 +60,20 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		assert.Equal(t, headerID, *actualID)
 	})
 }
+
+func TestBlockHeightIndexLookup(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		height := uint64(1337)
+		expected := flow.Identifier{0x01, 0x02, 0x03}
+
+		err := db.Update(IndexBlockHeight(height, expected))
+		require.Nil(t, err)
+
+		var actual flow.Identifier
+		err = db.View(LookupBlockHeight(height, &actual))
+		require.Nil(t, err)
+
+		assert.Equal(t, expected, actual)
+	})
+}

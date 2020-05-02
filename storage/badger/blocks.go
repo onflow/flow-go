@@ -58,7 +58,7 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	var blockID flow.Identifier
-	err := b.db.View(operation.RetrieveNumber(height, &blockID))
+	err := b.db.View(operation.LookupBlockHeight(height, &blockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}

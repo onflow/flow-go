@@ -53,10 +53,7 @@ func main() {
 		pool         mempool.Transactions
 		collections  *storage.Collections
 		transactions *storage.Transactions
-		headers      *storage.Headers
-		blocks       *storage.Blocks
 		colPayloads  *storage.ClusterPayloads
-		conPayloads  *storage.Payloads
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
@@ -83,10 +80,7 @@ func main() {
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
 			transactions = storage.NewTransactions(node.DB)
-			headers = storage.NewHeaders(node.DB)
-			blocks = storage.NewBlocks(node.DB)
 			colPayloads = storage.NewClusterPayloads(node.DB)
-			conPayloads = storage.NewPayloads(node.DB)
 			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -95,7 +89,7 @@ func main() {
 			return nil
 		}).
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
-			myCluster, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
+			myCluster, err := protocol.ClusterFor(node.Proto.Final(), node.Me.NodeID())
 			if err != nil {
 				return fmt.Errorf("could not get my cluster: %w", err)
 			}
@@ -142,13 +136,13 @@ func main() {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.Proto, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKG, staking, beacon, merger)
 
 			// TODO: use proper engine for notifier to follower
 			notifier := notifications.NewNoopConsumer()
@@ -165,14 +159,14 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, headers, conPayloads, node.State, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, node.Headers, node.Payloads, node.Proto, conCache, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
-			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, blocks, follower)
+			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.Proto, node.Blocks, follower)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
@@ -180,7 +174,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool, ingressExpiryBuffer)
+			ing, err = ingest.New(node.Logger, node.Network, node.Proto, node.Metrics, node.Me, pool, ingressExpiryBuffer)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -189,7 +183,7 @@ func main() {
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collections = storage.NewCollections(node.DB)
-			prov, err = provider.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool, collections, transactions)
+			prov, err = provider.New(node.Logger, node.Network, node.Proto, node.Metrics, node.Me, pool, collections, transactions)
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -199,12 +193,12 @@ func main() {
 			)
 			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, headers, colPayloads, colCache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.Proto, clusterState, node.Metrics, ing, pool, transactions, node.Headers, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
 
-			memberFilter, err := protocol.ClusterFilterFor(node.State.Final(), node.Me.NodeID())
+			memberFilter, err := protocol.ClusterFilterFor(node.Proto.Final(), node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not get cluster member filter: %w", err)
 			}
@@ -213,7 +207,7 @@ func main() {
 				return clusterState.Final().Head()
 			}
 
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, prop, build, final, memberFilter, proposalInterval, proposalTimeout, head)
+			cold, err := coldstuff.New(node.Logger, node.Proto, node.Me, prop, build, final, memberFilter, proposalInterval, proposalTimeout, head)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize algorithm: %w", err)
 			}

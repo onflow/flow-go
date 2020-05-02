@@ -17,7 +17,7 @@ func TestSealInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.BlockSealFixture()
 
-		err := db.Update(InsertSeal(expected))
+		err := db.Update(InsertSeal(expected.ID(), expected))
 		require.Nil(t, err)
 
 		var exists bool
@@ -46,11 +46,11 @@ func TestSealIndexAndLookup(t *testing.T) {
 
 		err := db.Update(func(tx *badger.Txn) error {
 			for _, seal := range seals {
-				if err := InsertSeal(seal)(tx); err != nil {
+				if err := InsertSeal(seal.ID(), seal)(tx); err != nil {
 					return err
 				}
 			}
-			if err := IndexSealPayload(blockID, expected)(tx); err != nil {
+			if err := IndexPayloadSeals(blockID, expected)(tx); err != nil {
 				return err
 			}
 			return nil
@@ -58,25 +58,9 @@ func TestSealIndexAndLookup(t *testing.T) {
 		require.Nil(t, err)
 
 		var actual []flow.Identifier
-		err = db.View(LookupSealPayload(blockID, &actual))
+		err = db.View(LookupPayloadSeals(blockID, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
-	})
-}
-
-func TestSealIDByBlockIndexLookup(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		sealID := unittest.IdentifierFixture()
-		blockID := unittest.IdentifierFixture()
-
-		err := db.Update(IndexSealIDByBlock(blockID, sealID))
-		require.Nil(t, err)
-
-		var actual flow.Identifier
-		err = db.View(LookupSealIDByBlock(blockID, &actual))
-		require.Nil(t, err)
-
-		assert.Equal(t, sealID, actual)
 	})
 }

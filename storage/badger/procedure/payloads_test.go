@@ -18,10 +18,7 @@ func TestInsertIndexRetrievePayload(t *testing.T) {
 		err := db.Update(operation.InsertHeader(block.ID(), block.Header))
 		require.NoError(t, err)
 
-		err = db.Update(InsertPayload(block.Payload))
-		require.NoError(t, err)
-
-		err = db.Update(IndexPayload(block.Header.ID(), block.Payload))
+		err = db.Update(InsertPayload(block.ID(), block.Payload))
 		require.NoError(t, err)
 
 		var retrieved flow.Payload

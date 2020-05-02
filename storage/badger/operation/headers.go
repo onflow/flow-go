@@ -27,3 +27,11 @@ func IndexHeaderByCollection(collectionID, headerID flow.Identifier) func(*badge
 func LookupBlockIDByCollectionID(collectionID flow.Identifier, headerID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIndexHeaderByCollection, collectionID), headerID)
 }
+
+func IndexBlockHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeHeightToBlock, height), blockID)
+}
+
+func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
+}

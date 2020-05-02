@@ -6,22 +6,22 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertGuarantee(guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
-	return insert(makePrefix(codeGuarantee, guarantee.CollectionID), guarantee)
+func InsertGuarantee(guarID flow.Identifier, guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
+	return insert(makePrefix(codeGuarantee, guarID), guarantee)
 }
 
-func CheckGuarantee(guaranteeID flow.Identifier, exists *bool) func(*badger.Txn) error {
-	return check(makePrefix(codeGuarantee, guaranteeID), exists)
+func CheckGuarantee(guarID flow.Identifier, exists *bool) func(*badger.Txn) error {
+	return check(makePrefix(codeGuarantee, guarID), exists)
 }
 
-func RetrieveGuarantee(guaranteeID flow.Identifier, guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeGuarantee, guaranteeID), guarantee)
+func RetrieveGuarantee(guarID flow.Identifier, guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeGuarantee, guarID), guarantee)
 }
 
-func IndexGuaranteePayload(blockID flow.Identifier, guaranteeIDs []flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexGuarantee, blockID), guaranteeIDs)
+func IndexPayloadGuarantees(blockID flow.Identifier, guarIDs []flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codePayloadGuarantees, blockID), guarIDs)
 }
 
-func LookupGuaranteePayload(blockID flow.Identifier, guaranteeIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexGuarantee, blockID), guaranteeIDs)
+func LookupPayloadGuarantees(blockID flow.Identifier, guarIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codePayloadGuarantees, blockID), guarIDs)
 }

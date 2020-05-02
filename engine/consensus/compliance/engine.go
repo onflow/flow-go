@@ -433,7 +433,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	log.Info().Msg("processing block proposal")
 
 	// store the proposal block payload
-	err := e.payloads.Store(header, proposal.Payload)
+	err := e.payloads.Store(header.ID(), proposal.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store proposal payload: %w", err)
 	}

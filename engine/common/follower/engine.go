@@ -274,7 +274,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 
 	// store the proposal block payload
-	err := e.payloads.Store(proposal.Header, proposal.Payload)
+	err := e.payloads.Store(proposal.Header.ID(), proposal.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store proposal payload: %w", err)
 	}

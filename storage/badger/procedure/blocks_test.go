@@ -15,10 +15,7 @@ func TestInsertRetrieveBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.BlockFixture()
 
-		// This will break test
-		//block.ChainID = "\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;"
-
-		err := db.Update(InsertBlock(&block))
+		err := db.Update(InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
 		var retrieved flow.Block
@@ -34,25 +31,25 @@ func TestFinalizeBlock(t *testing.T) {
 		parent := unittest.BlockFixture()
 		block := unittest.BlockWithParentFixture(parent.Header)
 
-		err := db.Update(InsertBlock(&block))
+		err := db.Update(InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertNumber(parent.Header.Height, parent.ID()))
+		err = db.Update(operation.IndexBlockHeight(parent.Header.Height, parent.ID()))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertBoundary(parent.Header.Height))
+		err = db.Update(operation.InsertFinalizedHeight(parent.Header.Height))
 		require.NoError(t, err)
 
 		err = db.Update(FinalizeBlock(block.Header.ID()))
 		require.NoError(t, err)
 
-		var boundary uint64
-		err = db.View(operation.RetrieveBoundary(&boundary))
+		var height uint64
+		err = db.View(operation.RetrieveFinalizedHeight(&height))
 		require.NoError(t, err)
-		require.Equal(t, block.Header.Height, boundary)
+		require.Equal(t, block.Header.Height, height)
 
 		var headID flow.Identifier
-		err = db.View(operation.RetrieveNumber(boundary, &headID))
+		err = db.View(operation.LookupBlockHeight(height, &headID))
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), headID)
 	})

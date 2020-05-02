@@ -139,7 +139,7 @@ func (s *state) GetRegistersWithProofs(
 }
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	return s.commits.ByID(blockID)
+	return s.commits.ByBlockID(blockID)
 }
 
 func (s *state) PersistStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) error {
@@ -230,13 +230,12 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 func (s *state) UpdateHighestExecutedBlockIfHigher(header *flow.Header) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		var number uint64
-		var blockID flow.Identifier
-		err := operation.RetrieveHighestExecutedBlockNumber(&number, &blockID)(txn)
+		err := operation.RetrieveExecutedHeight(&number)(txn)
 		if err != nil {
 			return fmt.Errorf("cannot retrieve highest executed block: %w", err)
 		}
 		if number < header.Height {
-			err = operation.UpdateHighestExecutedBlockNumber(header.Height, header.ID())(txn)
+			err = operation.UpdateExecutedHeight(header.Height)(txn)
 			if err != nil {
 				return fmt.Errorf("cannot update highest executed block: %w", err)
 			}
@@ -248,8 +247,16 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(header *flow.Header) error {
 func (s *state) GetHighestExecutedBlockID() (uint64, flow.Identifier, error) {
 	var height uint64
 	var blockID flow.Identifier
-	err := s.db.View(func(txn *badger.Txn) error {
-		return operation.RetrieveHighestExecutedBlockNumber(&height, &blockID)(txn)
+	err := s.db.View(func(tx *badger.Txn) error {
+		err := operation.RetrieveExecutedHeight(&height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve executed height: %w", err)
+		}
+		err = operation.LookupBlockHeight(height, &blockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup executed block: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return 0, flow.ZeroID, err

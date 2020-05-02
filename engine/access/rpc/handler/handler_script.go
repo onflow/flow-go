@@ -46,7 +46,7 @@ func (h *Handler) ExecuteScriptAtBlockHeight(ctx context.Context,
 	height := req.GetBlockHeight()
 
 	// get header at given height
-	header, err := h.headers.ByNumber(height)
+	header, err := h.headers.ByHeight(height)
 	if err != nil {
 		err = convertStorageError(err)
 		return nil, err

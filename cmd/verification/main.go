@@ -58,9 +58,6 @@ func main() {
 		err                  error
 		authReceipts         *stdmap.Receipts
 		pendingReceipts      *stdmap.PendingReceipts
-		blockStorage         *storage.Blocks
-		headerStorage        *storage.Headers
-		conPayloads          *storage.Payloads
 		conCache             *buffer.PendingBlocks
 		authCollections      *stdmap.Collections
 		pendingCollections   *stdmap.PendingCollections
@@ -101,15 +98,6 @@ func main() {
 			collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
 			return err
 		}).
-		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			// creates a block storage for the node
-			// to reflect incoming blocks on state
-			blockStorage = storage.NewBlocks(node.DB)
-			// headers and consensus storage for consensus follower engine
-			headerStorage = storage.NewHeaders(node.DB)
-			conPayloads = storage.NewPayloads(node.DB)
-			return nil
-		}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
 			return err
@@ -135,7 +123,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 			chunkVerifier := chunks.NewChunkVerifier(vm)
-			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, node.Metrics)
+			verifierEng, err = verifier.New(node.Logger, node.Network, node.Proto, node.Me, chunkVerifier, node.Metrics)
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -146,7 +134,7 @@ func main() {
 			}
 			ingestEng, err = ingest.New(node.Logger,
 				node.Network,
-				node.State,
+				node.Proto,
 				node.Me,
 				verifierEng,
 				authReceipts,
@@ -158,7 +146,8 @@ func main() {
 				chunkDataPackTracker,
 				ingestedChunkIDs,
 				ingestedResultIDs,
-				blockStorage,
+				node.Headers,
+				node.Blocks,
 				assigner,
 				requestIntervalMs,
 				failureThreshold)
@@ -181,13 +170,13 @@ func main() {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.Proto, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKG, staking, beacon, merger)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
@@ -205,9 +194,9 @@ func main() {
 				node.Network,
 				node.Me,
 				cleaner,
-				headerStorage,
-				conPayloads,
-				node.State,
+				node.Headers,
+				node.Payloads,
+				node.Proto,
 				conCache,
 				core)
 			if err != nil {
@@ -219,8 +208,8 @@ func main() {
 			sync, err := synchronization.New(node.Logger,
 				node.Network,
 				node.Me,
-				node.State,
-				blockStorage,
+				node.Proto,
+				node.Blocks,
 				followerEng)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)

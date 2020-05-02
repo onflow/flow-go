@@ -61,6 +61,7 @@ type IngestTestSuite struct {
 	chunkDataPackTrackers *mempool.ChunkDataPackTrackers
 	ingestedChunkIDs      *mempool.Identifiers
 	ingestedResultIDs     *mempool.Identifiers
+	headerStorage         *storage.Headers
 	blockStorage          *storage.Blocks
 	// resources fixtures
 	collection       *flow.Collection
@@ -93,6 +94,7 @@ func (suite *IngestTestSuite) SetupTest() {
 	suite.state = &protocol.State{}
 	suite.me = &module.Local{}
 	suite.ss = &protocol.Snapshot{}
+	suite.headerStorage = &storage.Headers{}
 	suite.blockStorage = &storage.Blocks{}
 	suite.authReceipts = &mempool.Receipts{}
 	suite.pendingReceipts = &mempool.PendingReceipts{}
@@ -153,6 +155,7 @@ func (suite *IngestTestSuite) TestNewEngine() *ingest.Engine {
 		suite.chunkDataPackTrackers,
 		suite.ingestedChunkIDs,
 		suite.ingestedResultIDs,
+		suite.headerStorage,
 		suite.blockStorage,
 		suite.assigner,
 		suite.requestInterval,
@@ -205,6 +208,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	// mocks existing resources at the engine's disposal
 	//
 	// mocks the possession of 'suite.block` in the storage
+	suite.headerStorage.On("ByID", suite.block.ID()).Return(suite.block.Header, nil).Once()
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
 	// mocks the possession of chunk data pack associated with the `suite.block`
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()

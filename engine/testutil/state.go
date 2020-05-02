@@ -7,11 +7,12 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func UncheckedState(db *badger.DB, commit flow.StateCommitment, participants flow.IdentityList) (*protocol.State, error) {
+func UncheckedState(db *badger.DB, identities storage.Identities, headers storage.Headers, payloads storage.Payloads, seals storage.Seals, commits storage.Commits, commit flow.StateCommitment, participants flow.IdentityList) (*protocol.State, error) {
 
 	genesis := unittest.GenesisFixture(participants)
 
@@ -22,7 +23,7 @@ func UncheckedState(db *badger.DB, commit flow.StateCommitment, participants flo
 		return nil, fmt.Errorf("could not bootstrap: %w", err)
 	}
 
-	state, err := protocol.NewState(db)
+	state, err := protocol.NewState(db, identities, headers, payloads, seals, commits)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize state: %w", err)
 	}

@@ -32,7 +32,8 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	"github.com/dapperlabs/flow-go/storage"
+	storerr "github.com/dapperlabs/flow-go/storage"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -83,10 +84,17 @@ type FlowNodeBuilder struct {
 	name           string
 	Logger         zerolog.Logger
 	Metrics        *metrics.Collector
-	DB             *badger.DB
 	Me             *local.Local
-	State          *protocol.State
-	DKGState       *wrapper.State
+	DB             *badger.DB
+	Identities     *storage.Identities
+	Headers        *storage.Headers
+	Payloads       *storage.Payloads
+	Blocks         *storage.Blocks
+	Guarantees     *storage.Guarantees
+	Seals          *storage.Seals
+	Commits        *storage.Commits
+	Proto          *protocol.State
+	DKG            *wrapper.State
 	modules        []namedModuleFunc
 	components     []namedComponentFunc
 	doneObject     []namedDoneObject
@@ -135,19 +143,19 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
 
-		ids, err := fnb.State.Final().Identities(filter.Any)
+		participants, err := fnb.Proto.Final().Identities(filter.Any)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
+		nodeID, err := fnb.Proto.Final().Identity(fnb.Me.NodeID())
 		if err != nil {
 			return nil, fmt.Errorf("could not get node id: %w", err)
 		}
 		nodeRole := nodeID.Role
 		topology := libp2p.NewRandPermTopology(nodeRole)
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, topology)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, mw, 10e6, topology)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -239,6 +247,13 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	fnb.DB = db
+	fnb.Identities = storage.NewIdentities(fnb.DB)
+	fnb.Headers = storage.NewHeaders(fnb.DB)
+	fnb.Payloads = storage.NewPayloads(fnb.DB)
+	fnb.Blocks = storage.NewBlocks(fnb.DB)
+	fnb.Guarantees = storage.NewGuarantees(fnb.DB)
+	fnb.Seals = storage.NewSeals(fnb.DB)
+	fnb.Commits = storage.NewCommits(fnb.DB)
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
@@ -248,12 +263,21 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 }
 
 func (fnb *FlowNodeBuilder) initState() {
-	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
+
+	proto, err := protocol.NewState(
+		fnb.DB,
+		fnb.Identities,
+		fnb.Headers,
+		fnb.Payloads,
+		fnb.Seals,
+		fnb.Commits,
+		protocol.SetClusters(fnb.BaseConfig.nClusters),
+	)
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	// check if database is initialized
-	head, err := state.Final().Head()
-	if errors.Is(err, storage.ErrNotFound) {
+	head, err := proto.Final().Head()
+	if errors.Is(err, storerr.ErrNotFound) {
 		// Bootstrap!
 
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
@@ -280,9 +304,9 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 		}
-		fnb.DKGState = wrapper.NewState(dkgPubData)
+		fnb.DKG = wrapper.NewState(dkgPubData)
 
-		err = state.Mutate().Bootstrap(fnb.GenesisCommit, fnb.GenesisBlock)
+		err = proto.Mutate().Bootstrap(fnb.GenesisCommit, fnb.GenesisBlock)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
@@ -316,17 +340,17 @@ func (fnb *FlowNodeBuilder) initState() {
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
-	allIdentities, err := state.Final().Identities(filter.Any)
+	allIdentities, err := proto.Final().Identities(filter.Any)
 	fnb.MustNot(err).Msg("could not retrieve finalized identities")
 	fnb.Logger.Debug().Msgf("known nodes: %v", allIdentities)
 
-	id, err := state.Final().Identity(myID)
+	id, err := proto.Final().Identity(myID)
 	fnb.MustNot(err).Msg("could not get identity")
 
 	fnb.Me, err = local.New(id, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")
 
-	fnb.State = state
+	fnb.Proto = proto
 }
 
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {

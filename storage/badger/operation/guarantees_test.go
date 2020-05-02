@@ -16,7 +16,7 @@ func TestGuaranteeInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		g := unittest.CollectionGuaranteeFixture()
 
-		err := db.Update(InsertGuarantee(g))
+		err := db.Update(InsertGuarantee(g.CollectionID, g))
 		require.Nil(t, err)
 
 		var exists bool
@@ -37,19 +37,19 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		blockID := flow.Identifier{0x10}
 		collID1 := flow.Identifier{0x01}
 		collID2 := flow.Identifier{0x02}
-		collections := []*flow.CollectionGuarantee{
+		guarantees := []*flow.CollectionGuarantee{
 			{CollectionID: collID1, Signature: crypto.Signature{0x10}},
 			{CollectionID: collID2, Signature: crypto.Signature{0x20}},
 		}
-		expected := flow.GetIDs(collections)
+		expected := flow.GetIDs(guarantees)
 
 		err := db.Update(func(tx *badger.Txn) error {
-			for _, coll := range collections {
-				if err := InsertGuarantee(coll)(tx); err != nil {
+			for _, guarantee := range guarantees {
+				if err := InsertGuarantee(guarantee.ID(), guarantee)(tx); err != nil {
 					return err
 				}
 			}
-			if err := IndexGuaranteePayload(blockID, expected)(tx); err != nil {
+			if err := IndexPayloadGuarantees(blockID, expected)(tx); err != nil {
 				return err
 			}
 			return nil
@@ -57,7 +57,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		require.Nil(t, err)
 
 		var actual []flow.Identifier
-		err = db.View(LookupGuaranteePayload(blockID, &actual))
+		err = db.View(LookupPayloadGuarantees(blockID, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, []flow.Identifier{collID1, collID2}, actual)
@@ -85,12 +85,12 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 
 		// insert block 1
 		err := db.Update(func(tx *badger.Txn) error {
-			for _, coll := range set1 {
-				if err := InsertGuarantee(coll)(tx); err != nil {
+			for _, guarantee := range set1 {
+				if err := InsertGuarantee(guarantee.CollectionID, guarantee)(tx); err != nil {
 					return err
 				}
 			}
-			if err := IndexGuaranteePayload(blockID1, ids1)(tx); err != nil {
+			if err := IndexPayloadGuarantees(blockID1, ids1)(tx); err != nil {
 				return err
 			}
 			return nil
@@ -99,12 +99,12 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 
 		// insert block 2
 		err = db.Update(func(tx *badger.Txn) error {
-			for _, coll := range set2 {
-				if err := InsertGuarantee(coll)(tx); err != nil {
+			for _, guarantee := range set2 {
+				if err := InsertGuarantee(guarantee.CollectionID, guarantee)(tx); err != nil {
 					return err
 				}
 			}
-			if err := IndexGuaranteePayload(blockID2, ids2)(tx); err != nil {
+			if err := IndexPayloadGuarantees(blockID2, ids2)(tx); err != nil {
 				return err
 			}
 			return nil
@@ -113,13 +113,13 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 
 		t.Run("should retrieve collections for block", func(t *testing.T) {
 			var actual1 []flow.Identifier
-			err = db.View(LookupGuaranteePayload(blockID1, &actual1))
+			err = db.View(LookupPayloadGuarantees(blockID1, &actual1))
 			assert.NoError(t, err)
 			assert.ElementsMatch(t, []flow.Identifier{collID1}, actual1)
 
 			// get block 2
 			var actual2 []flow.Identifier
-			err = db.View(LookupGuaranteePayload(blockID2, &actual2))
+			err = db.View(LookupPayloadGuarantees(blockID2, &actual2))
 			assert.NoError(t, err)
 			assert.Equal(t, []flow.Identifier{collID2, collID3, collID4}, actual2)
 		})

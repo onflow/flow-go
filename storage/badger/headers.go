@@ -21,8 +21,7 @@ type Headers struct {
 func NewHeaders(db *badger.DB) *Headers {
 
 	store := func(headerID flow.Identifier, header interface{}) error {
-		err := db.Update(operation.InsertHeader(headerID, header.(*flow.Header)))
-		return err
+		return db.Update(operation.InsertHeader(headerID, header.(*flow.Header)))
 	}
 
 	retrieve := func(blockID flow.Identifier) (interface{}, error) {
@@ -48,9 +47,9 @@ func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return header.(*flow.Header), err
 }
 
-func (h *Headers) ByNumber(number uint64) (*flow.Header, error) {
+func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	var blockID flow.Identifier
-	err := h.db.View(operation.RetrieveNumber(number, &blockID))
+	err := h.db.View(operation.LookupBlockHeight(height, &blockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}

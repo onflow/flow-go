@@ -3,8 +3,6 @@
 package badger
 
 import (
-	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -20,15 +18,7 @@ type Payloads struct {
 func NewPayloads(db *badger.DB) *Payloads {
 
 	store := func(blockID flow.Identifier, payload interface{}) error {
-		err := db.Update(procedure.InsertPayload(payload.(*flow.Payload)))
-		if err != nil {
-			return fmt.Errorf("could not insert payload: %w", err)
-		}
-		err = db.Update(procedure.IndexPayload(blockID, payload.(*flow.Payload)))
-		if err != nil {
-			return fmt.Errorf("could not index payload: %w", err)
-		}
-		return nil
+		return db.Update(procedure.InsertPayload(blockID, payload.(*flow.Payload)))
 	}
 
 	retrieve := func(blockID flow.Identifier) (interface{}, error) {

@@ -46,7 +46,7 @@ func (h *Handler) GetBlockHeaderByID(_ context.Context, req *access.GetBlockHead
 
 func (h *Handler) GetBlockHeaderByHeight(_ context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
 
-	header, err := h.headers.ByNumber(req.Height)
+	header, err := h.headers.ByHeight(req.Height)
 	if err != nil {
 		err = convertStorageError(err)
 		return nil, err

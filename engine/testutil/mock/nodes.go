@@ -106,6 +106,7 @@ type VerificationNode struct {
 	GenericNode
 	AuthReceipts          mempool.Receipts
 	PendingReceipts       mempool.PendingReceipts
+	HeaderStorage         storage.Headers
 	BlockStorage          storage.Blocks
 	AuthCollections       mempool.Collections
 	PendingCollections    mempool.PendingCollections

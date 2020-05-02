@@ -6,8 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertSeal(seal *flow.Seal) func(*badger.Txn) error {
-	return insert(makePrefix(codeSeal, seal.ID()), seal)
+func InsertSeal(sealID flow.Identifier, seal *flow.Seal) func(*badger.Txn) error {
+	return insert(makePrefix(codeSeal, sealID), seal)
 }
 
 func CheckSeal(sealID flow.Identifier, exists *bool) func(*badger.Txn) error {
@@ -18,10 +18,18 @@ func RetrieveSeal(sealID flow.Identifier, seal *flow.Seal) func(*badger.Txn) err
 	return retrieve(makePrefix(codeSeal, sealID), seal)
 }
 
-func IndexSealPayload(blockID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexSeal, blockID), sealIDs)
+func IndexPayloadSeals(blockID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codePayloadSeals, blockID), sealIDs)
 }
 
-func LookupSealPayload(blockID flow.Identifier, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexSeal, blockID), sealIDs)
+func LookupPayloadSeals(blockID flow.Identifier, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codePayloadSeals, blockID), sealIDs)
+}
+
+func IndexBlockSeal(blockID flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeBlockToSeal, blockID), sealID)
+}
+
+func LookupBlockSeal(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeBlockToSeal, blockID), &sealID)
 }

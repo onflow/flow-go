@@ -4,7 +4,6 @@ package procedure
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -13,26 +12,19 @@ import (
 )
 
 // InsertBlock inserts a block to the storage
-func InsertBlock(block *flow.Block) func(*badger.Txn) error {
+func InsertBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// store the block header
-		blockID := block.ID()
 		err := operation.InsertHeader(blockID, block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert block header: %w", err)
 		}
 
 		// insert the block payload
-		err = InsertPayload(block.Payload)(tx)
+		err = InsertPayload(blockID, block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert block payload: %w", err)
-		}
-
-		// index the block payload
-		err = IndexPayload(blockID, block.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index block payload: %w", err)
 		}
 
 		return nil
@@ -68,58 +60,6 @@ func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn)
 	}
 }
 
-// RetrieveUnfinalizedAncestors retrieves all un-finalized ancestors of the
-// given block, including the block itself, reverse-ordered by height.
-func RetrieveUnfinalizedAncestors(blockID flow.Identifier, unfinalized *[]*flow.Header) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// retrieve the block header of the block we want to finalize
-		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve header: %w", err)
-		}
-
-		// retrieve the current boundary of the finalized state
-		var boundary uint64
-		err = operation.RetrieveBoundary(&boundary)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
-
-		// if the block has already been finalized, exit early
-		if boundary >= header.Height {
-			*unfinalized = []*flow.Header{}
-			return nil
-		}
-
-		// retrieve the ID of the last finalized block as marker for stopping
-		var headID flow.Identifier
-		err = operation.RetrieveNumber(boundary, &headID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve head: %w", err)
-		}
-
-		// in order to validate the validity of all changes, we need to iterate
-		// through the blocks that need to be finalized from oldest to youngest;
-		// we thus start at the youngest remember all of the intermediary steps
-		// while tracing back until we reach the finalized state
-		*unfinalized = append(*unfinalized, &header)
-		parentID := header.ParentID
-		for parentID != headID {
-			var parent flow.Header
-			err = operation.RetrieveHeader(parentID, &parent)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve parent (%x): %w", parentID, err)
-			}
-			*unfinalized = append(*unfinalized, &parent)
-			parentID = parent.ParentID
-		}
-
-		return nil
-	}
-}
-
 // FinalizeBlock finalizes the block by the given blockID and all blocks along the path
 // that connects to the finalized block.
 func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
@@ -133,32 +73,44 @@ func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// retrieve the current finalized state boundary
-		var boundary uint64
-		err = operation.RetrieveBoundary(&boundary)(tx)
+		var finalized uint64
+		err = operation.RetrieveFinalizedHeight(&finalized)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
+			return fmt.Errorf("could not retrieve finalized height: %w", err)
 		}
 
 		// retrieve the ID of the boundary head
-		var headID flow.Identifier
-		err = operation.RetrieveNumber(boundary, &headID)(tx)
+		var finalID flow.Identifier
+		err = operation.LookupBlockHeight(finalized, &finalID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
 
 		// check that the head ID is the parent of the block we finalize
-		if header.ParentID != headID {
+		if header.ParentID != finalID {
 			return fmt.Errorf("can't finalize non-child of chain head")
 		}
 
+		// retrieve the parent of the extension header
+		var final flow.Header
+		err = operation.RetrieveHeader(finalID, &final)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve final header: %w", err)
+		}
+
+		// check that the height is exactly on higher
+		if header.Height != final.Height+1 {
+			return fmt.Errorf("extension has invalid height (extension: %d, final: %d)", header.Height, final.Height)
+		}
+
 		// insert the number to block mapping
-		err = operation.InsertNumber(header.Height, header.ID())(tx)
+		err = operation.IndexBlockHeight(header.Height, header.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
 		}
 
 		// update the finalized boundary
-		err = operation.UpdateBoundary(header.Height)(tx)
+		err = operation.UpdateFinalizedHeight(header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update finalized boundary: %w", err)
 		}
@@ -194,7 +146,7 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 		// as the genesis identities
 
 		// index the genesis payload (still useful to have empty index entry)
-		err = IndexPayload(genesisID, genesis.Payload)(tx)
+		err = InsertPayload(genesisID, genesis.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
 		}
@@ -215,13 +167,13 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 		}
 
 		// insert genesis block seal
-		err = operation.InsertSeal(&seal)(tx)
+		err = operation.InsertSeal(seal.ID(), &seal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis seal: %w", err)
 		}
 
 		// index genesis block seal
-		err = operation.IndexSealIDByBlock(genesis.ID(), seal.ID())(tx)
+		err = operation.IndexBlockSeal(genesis.ID(), seal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index genesis seal: %w", err)
 		}
@@ -251,15 +203,39 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 		}
 
 		// insert the block number mapping
-		err = operation.InsertNumber(0, genesis.ID())(tx)
+		err = operation.IndexBlockHeight(0, genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not initialize boundary: %w", err)
 		}
 
-		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.Header.Height)(tx)
+		// insert last started view
+		err = operation.InsertStartedView(genesis.Header.View)(tx)
 		if err != nil {
-			return fmt.Errorf("could not update boundary: %w", err)
+			return fmt.Errorf("could not insert started view: %w", err)
+		}
+
+		// insert last voted view
+		err = operation.InsertVotedView(genesis.Header.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert started view: %w", err)
+		}
+
+		// insert the finalized boundary
+		err = operation.InsertFinalizedHeight(genesis.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert finalized height: %w", err)
+		}
+
+		// insert the executed boundary
+		err = operation.InsertExecutedHeight(genesis.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert executed height: %w", err)
+		}
+
+		// insert the sealed boundary
+		err = operation.InsertSealedHeight(genesis.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
 		return nil
@@ -280,41 +256,6 @@ func IndexBlockByGuarantees(blockID flow.Identifier) func(*badger.Txn) error {
 				return fmt.Errorf("could not add block guarantee index: %w", err)
 			}
 		}
-		return nil
-	}
-}
-
-func RetrieveLatestFinalizedHeader(header *flow.Header) func(tx *badger.Txn) error {
-	var number uint64 = math.MaxUint64
-	blockID := flow.ZeroID
-	return RetrieveHeader(&number, &blockID, header)
-}
-
-func RetrieveHeader(number *uint64, blockID *flow.Identifier, header *flow.Header) func(tx *badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// set the number to boundary if it's at max uint64
-		if *number == math.MaxUint64 {
-			err := operation.RetrieveBoundary(number)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve boundary: %w", err)
-			}
-		}
-
-		// check if hash is nil and try to get it from height
-		if *blockID == flow.ZeroID {
-			err := operation.RetrieveNumber(*number, blockID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve hash (%d): %w", number, err)
-			}
-		}
-
-		// get the height for our desired target hash
-		err := operation.RetrieveHeader(*blockID, header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve header (%x): %w", blockID, err)
-		}
-
 		return nil
 	}
 }

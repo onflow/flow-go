@@ -150,7 +150,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should index collection
 		collection = flow.LightCollection{} // reset the collection
-		err = operation.LookupCollectionPayload(suite.genesis.Header.Height, suite.genesis.ID(), suite.genesis.Header.ParentID, &collection.Transactions)(tx)
+		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 

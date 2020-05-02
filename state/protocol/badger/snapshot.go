@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -20,8 +18,8 @@ import (
 
 // Snapshot represents a read-only immutable snapshot of the protocol state.
 type Snapshot struct {
+	err     error
 	state   *State
-	number  uint64
 	blockID flow.Identifier
 }
 
@@ -30,9 +28,15 @@ type Snapshot struct {
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 
 	// retrieve identities from storage
-	identities, err := s.state.identities.Retrieve(s.blockID)
+	identities, err := s.state.identities.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get identities for block: %w", err)
+	}
 
-	// identities should always be deterministically storted
+	// apply the filter to the identities
+	identities = identities.Filter(selector)
+
+	// apply a deterministic sort to the identities
 	sort.Slice(identities, func(i int, j int) bool {
 		return order.ByNodeIDAsc(identities[i], identities[j])
 	})
@@ -42,13 +46,13 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 
 func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 
-	// get the ids
+	// filter identities at snapshot for node ID
 	identities, err := s.Identities(filter.HasNodeID(nodeID))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// return error if he doesn't exist
+	// check if node ID is part of identities
 	if len(identities) == 0 {
 		return nil, fmt.Errorf("identity not staked (%x)", nodeID)
 	}
@@ -56,30 +60,8 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return identities[0], nil
 }
 
-func (s *Snapshot) Seal() (*flow.Seal, error) {
-
-	var seal flow.Seal
-	err := s.state.db.View(func(tx *badger.Txn) error {
-
-		// get the head at the requested snapshot
-		var header flow.Header
-		err := s.head(&header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve head: %w", err)
-		}
-
-		err = procedure.LookupSealByBlock(header.ID(), &seal)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get seal by block: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve seal: %w", err)
-	}
-
-	return &seal, nil
+func (s *Snapshot) Commit() (flow.StateCommitment, error) {
+	return s.state.commits.ByBlockID(s.blockID)
 }
 
 // Clusters sorts the list of node identities after filtering into the given
@@ -100,36 +82,8 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 	return protocol.Clusters(nClusters, identities), nil
 }
 
-func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		err := procedure.RetrieveHeader(&s.number, &s.blockID, head)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get snapshot header: %w", err)
-		}
-
-		// retrieve the finalized header to ensure we are only dealing with
-		// blocks from the main consensus-node chain within the protocol state
-		var final flow.Header
-		err = procedure.RetrieveLatestFinalizedHeader(&final)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get chain ID: %w", err)
-		}
-
-		if head.ChainID != final.ChainID {
-			return fmt.Errorf("invalid chain id (got=%s expected=%s)", head.ChainID, final.ChainID)
-		}
-
-		return err
-	}
-}
-
 func (s *Snapshot) Head() (*flow.Header, error) {
-	var header flow.Header
-	err := s.state.db.View(func(tx *badger.Txn) error {
-		return s.head(&header)(tx)
-	})
-	return &header, err
+	return s.state.headers.ByBlockID(s.blockID)
 }
 
 func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
@@ -139,10 +93,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	}
 
 	// get the current state snapshot head
-	var header flow.Header
-	err := s.state.db.View(func(tx *badger.Txn) error {
-		return s.head(&header)(tx)
-	})
+	head, err := s.state.headers.ByBlockID(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}
@@ -165,7 +116,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
 	// split the parent voter sig into staking & beacon parts
 	combiner := signature.NewCombiner()
-	sigs, err := combiner.Split(header.ParentVoterSig)
+	sigs, err := combiner.Split(head.ParentVoterSig)
 	if err != nil {
 		return nil, fmt.Errorf("could not split block signature: %w", err)
 	}
@@ -182,35 +133,6 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 	var pendingIDs []flow.Identifier
-	err := s.state.db.View(func(tx *badger.Txn) error {
-		var boundary uint64
-		// retrieve the current finalized height
-		err := operation.RetrieveBoundary(&boundary)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
-
-		// retrieve the block ID of the last finalized block
-		var headID flow.Identifier
-		err = operation.RetrieveNumber(boundary, &headID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve head: %w", err)
-		}
-
-		// find all the pending blocks that connect to the finalized block
-		// the order guarantees that if a block requires certain blocks to connect to the
-		// finalized block, those connecting blocks must appear before this block.
-		err = operation.FindDescendants(boundary, headID, &pendingIDs)(tx)
-		if err != nil {
-			return fmt.Errorf("could not find descendants: %w", err)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("could not find pending block IDs: %w", err)
-	}
-
+	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &pendingIDs))
 	return pendingIDs, nil
 }

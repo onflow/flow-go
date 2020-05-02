@@ -16,9 +16,6 @@ type Blocks interface {
 	// finalized and ambiguous blocks.
 	ByID(blockID flow.Identifier) (*flow.Block, error)
 
-	// Has returns true if the identified block is in the storage
-	Has(blockID flow.Identifier) bool
-
 	// ByHeight returns the block at the given height. It is only available
 	// for finalized blocks.
 	ByHeight(height uint64) (*flow.Block, error)
