@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
@@ -30,15 +29,8 @@ type Snapshot struct {
 // applies the given filters.
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 
-	// retrieve identities from the database
-	var identities flow.IdentityList
-	err := s.state.db.View(operation.RetrieveIdentities(&identities))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve identities: %w", err)
-	}
-
-	// filter the identities
-	identities = identities.Filter(selector)
+	// retrieve identities from storage
+	identities, err := s.state.identities.Retrieve(s.blockID)
 
 	// identities should always be deterministically storted
 	sort.Slice(identities, func(i int, j int) bool {
@@ -189,7 +181,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 }
 
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {
-	var pendingBlockIDs []flow.Identifier
+	var pendingIDs []flow.Identifier
 	err := s.state.db.View(func(tx *badger.Txn) error {
 		var boundary uint64
 		// retrieve the current finalized height
@@ -208,8 +200,7 @@ func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 		// find all the pending blocks that connect to the finalized block
 		// the order guarantees that if a block requires certain blocks to connect to the
 		// finalized block, those connecting blocks must appear before this block.
-		// TODO: double check the pending blocks don't include invalid blocks with invalid payload
-		err = operation.FindDescendants(boundary, headID, &pendingBlockIDs)(tx)
+		err = operation.FindDescendants(boundary, headID, &pendingIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not find descendants: %w", err)
 		}
@@ -221,5 +212,5 @@ func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 		return nil, fmt.Errorf("could not find pending block IDs: %w", err)
 	}
 
-	return pendingBlockIDs, nil
+	return pendingIDs, nil
 }

@@ -16,7 +16,7 @@ func TestInsertIndexRetreiveGuarantees(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.BlockFixture()
 
-		err := db.Update(operation.InsertHeader(block.Header))
+		err := db.Update(operation.InsertHeader(block.ID(), block.Header))
 		require.NoError(t, err)
 
 		err = db.Update(func(tx *badger.Txn) error {
@@ -30,7 +30,7 @@ func TestInsertIndexRetreiveGuarantees(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = db.Update(IndexGuarantees(block.Header.Height, block.ID(), block.Header.ParentID, block.Payload.Guarantees))
+		err = db.Update(IndexGuarantees(block.ID(), flow.GetIDs(block.Payload.Guarantees)))
 		require.NoError(t, err)
 
 		var retrieved []*flow.CollectionGuarantee

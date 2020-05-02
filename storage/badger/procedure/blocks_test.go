@@ -57,23 +57,3 @@ func TestFinalizeBlock(t *testing.T) {
 		require.Equal(t, block.ID(), headID)
 	})
 }
-
-func TestInsertRetrieveBlockByCollectionGuarantee(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		block := unittest.BlockFixture()
-
-		err := db.Update(InsertBlock(&block))
-		require.NoError(t, err)
-
-		err = db.Update(IndexBlockByGuarantees(block.ID()))
-		require.NoError(t, err)
-
-		var retrieved flow.Block
-		for _, g := range block.Payload.Guarantees {
-			collID := g.CollectionID
-			err = db.View(RetrieveBlockByCollectionID(collID, &retrieved))
-			require.NoError(t, err)
-			require.Equal(t, block, retrieved)
-		}
-	})
-}

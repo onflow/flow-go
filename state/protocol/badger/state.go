@@ -10,21 +10,28 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 type State struct {
 	db               *badger.DB
 	clusters         uint
 	validationBlocks uint64
+	identities       storage.Identities
+	headers          storage.Headers
+	payloads         storage.Payloads
 }
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
-func NewState(db *badger.DB, options ...func(*State)) (*State, error) {
+func NewState(db *badger.DB, identities storage.Identities, headers storage.Headers, payloads storage.Payloads, options ...func(*State)) (*State, error) {
 	s := &State{
 		db:               db,
 		clusters:         1,
 		validationBlocks: 64,
+		identities:       identities,
+		headers:          headers,
+		payloads:         payloads,
 	}
 	for _, option := range options {
 		option(s)

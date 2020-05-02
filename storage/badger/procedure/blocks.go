@@ -17,7 +17,8 @@ func InsertBlock(block *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// store the block header
-		err := operation.InsertHeader(block.Header)(tx)
+		blockID := block.ID()
+		err := operation.InsertHeader(blockID, block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert block header: %w", err)
 		}
@@ -29,7 +30,7 @@ func InsertBlock(block *flow.Block) func(*badger.Txn) error {
 		}
 
 		// index the block payload
-		err = IndexPayload(block.Header, block.Payload)(tx)
+		err = IndexPayload(blockID, block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index block payload: %w", err)
 		}
@@ -119,32 +120,6 @@ func RetrieveUnfinalizedAncestors(blockID flow.Identifier, unfinalized *[]*flow.
 	}
 }
 
-// RetrieveUnfinalizedDescendants find all unfinalized block IDs that connect to the finalized block
-func RetrieveUnfinalizedDescendants(unfinalizedBlockIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		var boundary uint64
-		// retrieve the current finalized view
-		err := operation.RetrieveBoundary(&boundary)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
-
-		// retrieve the block ID of the last finalized block
-		var headID flow.Identifier
-		err = operation.RetrieveNumber(boundary, &headID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve head: %w", err)
-		}
-
-		// find all the unfinalized blocks that connect to the finalized block
-		// the order guarantees that if a block requires certain blocks to connect to the
-		// finalized block, those connecting blocks must appear before this block.
-		operation.FindDescendants(boundary, headID, unfinalizedBlockIDs)
-
-		return nil
-	}
-}
-
 // FinalizeBlock finalizes the block by the given blockID and all blocks along the path
 // that connects to the finalized block.
 func FinalizeBlock(blockID flow.Identifier) func(*badger.Txn) error {
@@ -208,7 +183,8 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 		}
 
 		// insert the block header
-		err = operation.InsertHeader(genesis.Header)(tx)
+		genesisID := genesis.ID()
+		err = operation.InsertHeader(genesisID, genesis.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
@@ -218,7 +194,7 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 		// as the genesis identities
 
 		// index the genesis payload (still useful to have empty index entry)
-		err = IndexPayload(genesis.Header, genesis.Payload)(tx)
+		err = IndexPayload(genesisID, genesis.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
 		}
@@ -303,26 +279,6 @@ func IndexBlockByGuarantees(blockID flow.Identifier) func(*badger.Txn) error {
 			if err != nil {
 				return fmt.Errorf("could not add block guarantee index: %w", err)
 			}
-		}
-		return nil
-	}
-}
-
-func RetrieveBlockByCollectionID(collectionID flow.Identifier, block *flow.Block) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		headerID := &flow.Identifier{}
-
-		// get the block header
-		err := operation.LookupHeaderIDByCollectionID(collectionID, headerID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve header: %w", err)
-		}
-
-		// get the complete block
-		err = RetrieveBlock(*headerID, block)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 		return nil
 	}

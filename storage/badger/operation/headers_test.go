@@ -29,7 +29,7 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		}
 		blockID := expected.ID()
 
-		err := db.Update(InsertHeader(&expected))
+		err := db.Update(InsertHeader(expected.ID(), &expected))
 		require.Nil(t, err)
 
 		var exists bool
@@ -55,7 +55,7 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		require.Nil(t, err)
 
 		actualID := &flow.Identifier{}
-		err = db.View(LookupHeaderIDByCollectionID(collectionID, actualID))
+		err = db.View(LookupBlockIDByCollectionID(collectionID, actualID))
 		require.Nil(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})

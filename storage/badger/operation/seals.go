@@ -18,24 +18,10 @@ func RetrieveSeal(sealID flow.Identifier, seal *flow.Seal) func(*badger.Txn) err
 	return retrieve(makePrefix(codeSeal, sealID), seal)
 }
 
-func IndexSealPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
-	return insert(toPayloadIndex(codeIndexSeal, height, blockID, parentID), sealIDs)
+func IndexSealPayload(blockID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexSeal, blockID), sealIDs)
 }
 
-func LookupSealPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return retrieve(toPayloadIndex(codeIndexSeal, height, blockID, parentID), sealIDs)
-}
-
-// VerifySealPayload verifies that the candidate seal IDs don't exist
-// in any ancestor block.
-func VerifySealPayload(height uint64, limit uint64, blockID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
-	start, end := payloadIterRange(codeIndexSeal, height, limit)
-	return iterate(start, end, validatepayload(blockID, sealIDs))
-}
-
-// CheckSealPayload populates `invalidIDs` with any IDs in the candidate
-// set that already exist in an ancestor block.
-func CheckSealPayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	start, end := payloadIterRange(codeIndexSeal, height, 0)
-	return iterate(start, end, searchduplicates(blockID, candidateIDs, invalidIDs))
+func LookupSealPayload(blockID flow.Identifier, sealIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexSeal, blockID), sealIDs)
 }

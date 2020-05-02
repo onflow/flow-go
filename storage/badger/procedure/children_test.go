@@ -14,7 +14,7 @@ import (
 )
 
 // after indexing a block by its parent, it should be able to retrieve the child block by the parentID
-func TestIndexAndRetrieveChild(t *testing.T) {
+func TestIndexAndLookupChild(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block1 := &flow.Header{
 			ParentID: flow.ZeroID,
@@ -41,16 +41,16 @@ func TestIndexAndRetrieveChild(t *testing.T) {
 
 		parentID, childID := block1.ID(), block2.ID()
 
-		err = db.Update(procedure.IndexChildByBlockID(parentID, childID))
+		err = db.Update(procedure.IndexBlockChild(parentID, childID))
 		require.NoError(t, err)
 
 		// retrieve child
-		var retrievedChild flow.Header
-		err = db.View(procedure.RetrieveChildByBlockID(parentID, &retrievedChild))
+		var retrievedIDs []flow.Identifier
+		err = db.View(procedure.LookupBlockChildren(parentID, &retrievedIDs))
 		require.NoError(t, err)
 
 		// retrieved child should be the stored child
-		require.Equal(t, childID, retrievedChild.ID())
+		require.Equal(t, []flow.Identifier{childID}, retrievedIDs)
 	})
 }
 
@@ -89,19 +89,19 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 		parentID, childID, secondChildID := block1.ID(), block2.ID(), block3.ID()
 
 		// index the first child
-		err = db.Update(procedure.IndexChildByBlockID(parentID, childID))
+		err = db.Update(procedure.IndexBlockChild(parentID, childID))
 		require.NoError(t, err)
 
 		// index the second child
-		err = db.Update(procedure.IndexChildByBlockID(parentID, secondChildID))
+		err = db.Update(procedure.IndexBlockChild(parentID, secondChildID))
 		require.NoError(t, err)
 
 		// retrieve child
-		var retrievedChild flow.Header
-		err = db.View(procedure.RetrieveChildByBlockID(parentID, &retrievedChild))
+		var retrievedIDs []flow.Identifier
+		err = db.View(procedure.LookupBlockChildren(parentID, &retrievedIDs))
 		require.NoError(t, err)
 
 		// retrieved child should be the first child
-		require.Equal(t, childID, retrievedChild.ID())
+		require.Equal(t, []flow.Identifier{childID, secondChildID}, retrievedIDs)
 	})
 }

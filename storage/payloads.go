@@ -10,7 +10,7 @@ import (
 type Payloads interface {
 
 	// Store will store a payload and index its contents.
-	Store(header *flow.Header, payload *flow.Payload) error
+	Store(blockID flow.Identifier, payload *flow.Payload) error
 
 	// ByBlockID returns the payload with the given hash. It is available for
 	// finalized and ambiguous blocks.

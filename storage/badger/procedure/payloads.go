@@ -34,28 +34,17 @@ func InsertPayload(payload *flow.Payload) func(*badger.Txn) error {
 	}
 }
 
-func IndexPayload(header *flow.Header, payload *flow.Payload) func(*badger.Txn) error {
+func IndexPayload(blockID flow.Identifier, payload *flow.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// NOTE: we index the payload by blockID and parentID so that we can
-		// scan the index by fork and exclude checking orphaned payloads and
-		// payloads on a competing fork
-		blockID := header.ID()
-
-		// NOTE: we also need to add the block height, so that we can be sure
-		// that iteration happens sequentially; otherwise, knowing the parent
-		// of the block we are currently scanning won't help us decide whether
-		// the next scanned block is on the same fork, as they will all be out
-		// of order
-
 		// index guarantees
-		err := IndexGuarantees(header.Height, blockID, header.ParentID, payload.Guarantees)(tx)
+		err := IndexGuarantees(blockID, flow.GetIDs(payload.Guarantees))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index guarantees: %w", err)
 		}
 
 		// index seals
-		err = IndexSeals(header.Height, blockID, header.ParentID, payload.Seals)(tx)
+		err = IndexSeals(blockID, flow.GetIDs(payload.Seals))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index seals: %w", err)
 		}

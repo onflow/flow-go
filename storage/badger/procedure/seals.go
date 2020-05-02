@@ -11,23 +11,23 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-func IndexSeals(height uint64, blockID flow.Identifier, parentID flow.Identifier, seals []*flow.Seal) func(*badger.Txn) error {
+func IndexSeals(blockID flow.Identifier, sealIDs []flow.Identifier) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// check that all seals are in the database
-		for _, seal := range seals {
+		for _, sealID := range sealIDs {
 			var exists bool
-			err := operation.CheckSeal(seal.ID(), &exists)(tx)
+			err := operation.CheckSeal(sealID, &exists)(tx)
 			if err != nil {
-				return fmt.Errorf("could not check seal in DB (%x): %w", seal.ID(), err)
+				return fmt.Errorf("could not check seal in DB (%x): %w", sealID, err)
 			}
 			if !exists {
-				return fmt.Errorf("node seal missing in DB (%x)", seal.ID())
+				return fmt.Errorf("node seal missing in DB (%x)", sealID)
 			}
 		}
 
 		// insert the list of IDs into the payload index
-		err := operation.IndexSealPayload(height, blockID, parentID, flow.GetIDs(seals))(tx)
+		err := operation.IndexSealPayload(blockID, sealIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index seals: %w", err)
 		}
@@ -48,7 +48,7 @@ func RetrieveSeals(blockID flow.Identifier, seals *[]*flow.Seal) func(*badger.Tx
 
 		// get the sealection IDs for the seals
 		var sealIDs []flow.Identifier
-		err = operation.LookupSealPayload(header.Height, blockID, header.ParentID, &sealIDs)(tx)
+		err = operation.LookupSealPayload(blockID, &sealIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup seals: %w", err)
 		}

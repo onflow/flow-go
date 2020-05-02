@@ -39,6 +39,9 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 }
 
 func (m *Mutator) Extend(blockID flow.Identifier) error {
+
+	// first, we retrieve all the data we can
+
 	return operation.RetryOnConflict(func() error {
 		return m.state.db.Update(func(tx *badger.Txn) error {
 
@@ -115,6 +118,12 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			err = operation.IndexSealIDByBlock(blockID, lastSeal.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index seal by block: %w", err)
+			}
+
+			// insert an empty children lookup for the block
+			err = operation.InsertBlockChildren(blockID, nil)(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert empty block children: %w", err)
 			}
 
 			return nil

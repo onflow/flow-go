@@ -15,13 +15,13 @@ func TestInsertIndexRetrievePayload(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.BlockFixture()
 
-		err := db.Update(operation.InsertHeader(block.Header))
+		err := db.Update(operation.InsertHeader(block.ID(), block.Header))
 		require.NoError(t, err)
 
 		err = db.Update(InsertPayload(block.Payload))
 		require.NoError(t, err)
 
-		err = db.Update(IndexPayload(block.Header, block.Payload))
+		err = db.Update(IndexPayload(block.Header.ID(), block.Payload))
 		require.NoError(t, err)
 
 		var retrieved flow.Payload

@@ -40,9 +40,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 
 		seals := []*flow.Seal{seal1, seal2}
 
-		height := uint64(1337)
 		blockID := flow.MakeID([]byte{0x42})
-		parentID := flow.MakeID([]byte{0x99})
 
 		expected := flow.GetIDs(seals)
 
@@ -52,7 +50,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 					return err
 				}
 			}
-			if err := IndexSealPayload(height, blockID, parentID, expected)(tx); err != nil {
+			if err := IndexSealPayload(blockID, expected)(tx); err != nil {
 				return err
 			}
 			return nil
@@ -60,7 +58,7 @@ func TestSealIndexAndLookup(t *testing.T) {
 		require.Nil(t, err)
 
 		var actual []flow.Identifier
-		err = db.View(LookupSealPayload(height, blockID, parentID, &actual))
+		err = db.View(LookupSealPayload(blockID, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)

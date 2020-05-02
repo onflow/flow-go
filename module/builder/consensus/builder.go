@@ -286,7 +286,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		// insert the header into the DB
-		err = operation.InsertHeader(header)(tx)
+		blockID := header.ID()
+		err = operation.InsertHeader(blockID, header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
@@ -298,7 +299,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		// index the payload for the block
-		err = procedure.IndexPayload(header, &payload)(tx)
+		err = procedure.IndexPayload(blockID, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
 		}
@@ -309,9 +310,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		// index the last seal for this block
-		err = operation.IndexSealIDByBlock(header.ID(), lastSeal.ID())(tx)
+		err = operation.IndexSealIDByBlock(blockID, lastSeal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index commit: %w", err)
+		}
+
+		// insert an empty children lookup for the block
+		err = operation.InsertBlockChildren(blockID, nil)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert empty block children: %w", err)
 		}
 
 		return nil

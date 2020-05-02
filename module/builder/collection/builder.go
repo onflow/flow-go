@@ -271,7 +271,7 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		}
 
 		// insert the header for the newly built block
-		err = operation.InsertHeader(&proposal)(tx)
+		err = operation.InsertHeader(proposal.ID(), proposal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert cluster header: %w", err)
 		}

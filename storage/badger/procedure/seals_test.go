@@ -15,13 +15,13 @@ import (
 func saveAndRetrieve(t *testing.T, db *badger.DB, header *flow.Header, payload *flow.Payload, retrievedPayload *flow.Payload) {
 
 	header.PayloadHash = payload.Hash()
-	err := db.Update(operation.InsertHeader(header))
+	err := db.Update(operation.InsertHeader(header.ID(), header))
 	require.NoError(t, err)
 
 	err = db.Update(InsertPayload(payload))
 	require.NoError(t, err)
 
-	err = db.Update(IndexPayload(header, payload))
+	err = db.Update(IndexPayload(header.ID(), payload))
 	require.NoError(t, err)
 
 	err = db.View(RetrievePayload(header.ID(), retrievedPayload))

@@ -11,23 +11,23 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-func IndexGuarantees(height uint64, blockID flow.Identifier, parentID flow.Identifier, guarantees []*flow.CollectionGuarantee) func(*badger.Txn) error {
+func IndexGuarantees(blockID flow.Identifier, guaranteeIDs []flow.Identifier) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// check that all guarantees are part of the database
-		for _, guarantee := range guarantees {
+		for _, guaranteeID := range guaranteeIDs {
 			var exists bool
-			err := operation.CheckGuarantee(guarantee.CollectionID, &exists)(tx)
+			err := operation.CheckGuarantee(guaranteeID, &exists)(tx)
 			if err != nil {
-				return fmt.Errorf("could not check guarantee in DB (%x): %w", guarantee.CollectionID, err)
+				return fmt.Errorf("could not check guarantee in DB (%x): %w", guaranteeID, err)
 			}
 			if !exists {
-				return fmt.Errorf("node guarantee missing in DB (%x)", guarantee.CollectionID)
+				return fmt.Errorf("node guarantee missing in DB (%x)", guaranteeID)
 			}
 		}
 
 		// insert the list of IDs into the payload index
-		err := operation.IndexGuaranteePayload(height, blockID, parentID, flow.GetIDs(guarantees))(tx)
+		err := operation.IndexGuaranteePayload(blockID, guaranteeIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index guarantees: %w", err)
 		}
@@ -48,7 +48,7 @@ func RetrieveGuarantees(blockID flow.Identifier, guarantees *[]*flow.CollectionG
 
 		// get the collection IDs for the guarantees
 		var collIDs []flow.Identifier
-		err = operation.LookupGuaranteePayload(header.Height, blockID, header.ParentID, &collIDs)(tx)
+		err = operation.LookupGuaranteePayload(blockID, &collIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup guarantees: %w", err)
 		}

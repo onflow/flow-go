@@ -14,65 +14,64 @@ import (
 
 // Blocks implements a simple read-only block storage around a badger DB.
 type Blocks struct {
-	db *badger.DB
+	db       *badger.DB
+	headers  *Headers
+	payloads *Payloads
 }
 
 func NewBlocks(db *badger.DB) *Blocks {
 	b := &Blocks{
-		db: db,
+		db:       db,
+		headers:  NewHeaders(db),
+		payloads: NewPayloads(db),
 	}
 	return b
 }
 
 func (b *Blocks) Store(block *flow.Block) error {
-	err := b.db.Update(func(tx *badger.Txn) error {
-		return procedure.InsertBlock(block)(tx)
-	})
-	return err
+	err := b.headers.Store(block.Header)
+	if err != nil {
+		return fmt.Errorf("could not store header: %w", err)
+	}
+	err = b.payloads.Store(block.ID(), block.Payload)
+	if err != nil {
+		return fmt.Errorf("could not store payload: %w", err)
+	}
+	return nil
 }
 
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
-	var block flow.Block
-	err := b.db.View(func(tx *badger.Txn) error {
-		return procedure.RetrieveBlock(blockID, &block)(tx)
-	})
-	return &block, err
-}
-
-func (b *Blocks) Has(blockID flow.Identifier) bool {
-	_, err := b.ByID(blockID)
-	return err == nil
+	header, err := b.headers.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get header: %w", err)
+	}
+	payload, err := b.payloads.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve payload: %w", err)
+	}
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+	return &block, nil
 }
 
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
-	var block flow.Block
-	err := b.db.View(func(tx *badger.Txn) error {
-
-		// retrieve the block ID by height
-		var blockID flow.Identifier
-		err := operation.RetrieveNumber(height, &blockID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve block ID: %w", err)
-		}
-
-		// retrieve the block by block ID
-		err = procedure.RetrieveBlock(blockID, &block)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve block: %w", err)
-		}
-
-		return nil
-	})
-
-	return &block, err
+	var blockID flow.Identifier
+	err := b.db.View(operation.RetrieveNumber(height, &blockID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up block: %w", err)
+	}
+	return b.ByID(blockID)
 }
 
 func (b *Blocks) ByCollectionID(collectionID flow.Identifier) (*flow.Block, error) {
-	var block flow.Block
-	err := b.db.View(func(tx *badger.Txn) error {
-		return procedure.RetrieveBlockByCollectionID(collectionID, &block)(tx)
-	})
-	return &block, err
+	var blockID flow.Identifier
+	err := b.db.View(operation.LookupBlockIDByCollectionID(collectionID, &blockID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up block: %w", err)
+	}
+	return b.ByID(blockID)
 }
 
 func (b *Blocks) IndexByGuarantees(blockID flow.Identifier) error {

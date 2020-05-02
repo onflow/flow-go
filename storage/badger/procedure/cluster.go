@@ -22,7 +22,8 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 		}
 
 		// store the block header
-		err := operation.InsertHeader(block.Header)(tx)
+		blockID := block.ID()
+		err := operation.InsertHeader(blockID, block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
@@ -198,7 +199,7 @@ func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*ba
 
 		// index the transaction IDs within the collection
 		txIDs := payload.Collection.Light().Transactions
-		err = operation.SkipDuplicates(operation.IndexCollectionPayload(header.Height, header.ID(), header.ParentID, txIDs))(tx)
+		err = operation.SkipDuplicates(operation.IndexCollectionPayload(header.ID(), txIDs))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}
@@ -213,14 +214,15 @@ func RetrieveClusterPayload(header *flow.Header, payload *cluster.Payload) func(
 
 		// lookup the reference block ID
 		var refID flow.Identifier
-		err := operation.RetrieveClusterRefBlockID(header.ID(), &refID)(tx)
+		blockID := header.ID()
+		err := operation.RetrieveClusterRefBlockID(blockID, &refID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve reference block ID: %w", err)
 		}
 
 		// lookup collection transaction IDs
 		var txIDs []flow.Identifier
-		err = operation.LookupCollectionPayload(header.Height, header.ID(), header.ParentID, &txIDs)(tx)
+		err = operation.LookupCollectionPayload(blockID, &txIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not look up collection payload: %w", err)
 		}

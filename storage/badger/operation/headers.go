@@ -8,8 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertHeader(header *flow.Header) func(*badger.Txn) error {
-	return insert(makePrefix(codeHeader, header.ID()), header)
+func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
+	return insert(makePrefix(codeHeader, headerID), header)
 }
 
 func CheckHeader(blockID flow.Identifier, exists *bool) func(*badger.Txn) error {
@@ -24,6 +24,6 @@ func IndexHeaderByCollection(collectionID, headerID flow.Identifier) func(*badge
 	return insert(makePrefix(codeIndexHeaderByCollection, collectionID), headerID)
 }
 
-func LookupHeaderIDByCollectionID(collectionID flow.Identifier, headerID *flow.Identifier) func(*badger.Txn) error {
+func LookupBlockIDByCollectionID(collectionID flow.Identifier, headerID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIndexHeaderByCollection, collectionID), headerID)
 }
