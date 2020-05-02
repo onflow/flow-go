@@ -78,8 +78,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	result := flow.ExecutionResult{

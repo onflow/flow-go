@@ -65,7 +65,7 @@ func TestBootstrapValid(t *testing.T) {
 
 		assert.Zero(t, boundary)
 		assert.Equal(t, genesis.ID(), storedID)
-		assert.Equal(t, genesis.Header, storedHeader)
+		assert.Equal(t, genesis.Header, &storedHeader)
 	})
 }
 
@@ -268,7 +268,7 @@ func TestBootstrapNonZeroHeight(t *testing.T) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(identities)
-		genesis.Height = 42
+		genesis.Header.Height = 42
 
 		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis header not valid: invalid initial height (42 != 0)")
@@ -281,7 +281,7 @@ func TestBootstrapNonZeroParent(t *testing.T) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(identities)
-		genesis.ParentID = unittest.BlockFixture().ID()
+		genesis.Header.ParentID = unittest.BlockFixture().ID()
 
 		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis header not valid: genesis parent must be zero hash")
@@ -294,8 +294,8 @@ func TestBootstrapNonEmptyCollections(t *testing.T) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(identities)
-		genesis.Guarantees = unittest.CollectionGuaranteesFixture(1)
-		genesis.PayloadHash = genesis.Payload.Hash()
+		genesis.Payload.Guarantees = unittest.CollectionGuaranteesFixture(1)
+		genesis.Header.PayloadHash = genesis.Payload.Hash()
 
 		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: genesis block must have zero guarantees")
@@ -308,8 +308,8 @@ func TestBootstraWithSeal(t *testing.T) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(identities)
-		genesis.Seals = []*flow.Seal{unittest.BlockSealFixture()}
-		genesis.PayloadHash = genesis.Payload.Hash()
+		genesis.Payload.Seals = []*flow.Seal{unittest.BlockSealFixture()}
+		genesis.Header.PayloadHash = genesis.Payload.Hash()
 
 		err := mutator.Bootstrap(commit, genesis)
 		require.EqualError(t, err, "genesis identities not valid: genesis block must have zero seals")
@@ -319,13 +319,12 @@ func TestBootstraWithSeal(t *testing.T) {
 func TestExtendValid(t *testing.T) {
 	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB, genesis *flow.Block, commit flow.StateCommitment) {
 		block := unittest.BlockFixture()
-		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
 		block.Payload.Seals = nil
-		block.Height = 1
-		block.View = 1
-		block.ParentID = genesis.ID()
-		block.PayloadHash = block.Payload.Hash()
+		block.Header.Height = 1
+		block.Header.View = 1
+		block.Header.ParentID = genesis.ID()
+		block.Header.PayloadHash = block.Payload.Hash()
 
 		err := db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
@@ -344,13 +343,12 @@ func TestExtendValid(t *testing.T) {
 func TestExtendMissingParent(t *testing.T) {
 	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB, genesis *flow.Block, commit flow.StateCommitment) {
 		block := unittest.BlockFixture()
-		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
 		block.Payload.Seals = nil
-		block.Height = 2
-		block.View = 2
-		block.ParentID = unittest.BlockFixture().ID()
-		block.PayloadHash = block.Payload.Hash()
+		block.Header.Height = 2
+		block.Header.View = 2
+		block.Header.ParentID = unittest.BlockFixture().ID()
+		block.Header.PayloadHash = block.Payload.Hash()
 
 		err := db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
@@ -370,13 +368,12 @@ func TestExtendMissingParent(t *testing.T) {
 func TestExtendHeightTooSmall(t *testing.T) {
 	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB, genesis *flow.Block, commit flow.StateCommitment) {
 		block := unittest.BlockFixture()
-		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
 		block.Payload.Seals = nil
-		block.Height = 1
-		block.View = 1
-		block.ParentID = genesis.ID()
-		block.PayloadHash = block.Payload.Hash()
+		block.Header.Height = 1
+		block.Header.View = 1
+		block.Header.ParentID = genesis.Header.ID()
+		block.Header.PayloadHash = block.Payload.Hash()
 
 		err := db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
@@ -385,9 +382,9 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		// create another block with the same height and view, that is coming after
-		block.ParentID = block.ID()
-		block.Height = 1
-		block.View = 2
+		block.Header.ParentID = block.Header.ID()
+		block.Header.Height = 1
+		block.Header.View = 2
 
 		err = db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
@@ -406,29 +403,27 @@ func TestExtendBlockNotConnected(t *testing.T) {
 	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB, genesis *flow.Block, commit flow.StateCommitment) {
 		// add 2 blocks, the second finalizing/sealing the state of the first
 		block := unittest.BlockFixture()
-		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
 		block.Payload.Seals = nil
-		block.Height = 1
-		block.View = 1
-		block.ParentID = genesis.ID()
-		block.PayloadHash = block.Payload.Hash()
+		block.Header.Height = 1
+		block.Header.View = 1
+		block.Header.ParentID = genesis.Header.ID()
+		block.Header.PayloadHash = block.Payload.Hash()
 
 		sealingBlock := unittest.BlockFixture()
-		sealingBlock.Identities = nil
-		sealingBlock.Guarantees = nil
-		sealingBlock.Height = 2
-		sealingBlock.View = 2
-		sealingBlock.ParentID = block.ID()
-		sealingBlock.Seals = []*flow.Seal{&flow.Seal{
+		sealingBlock.Payload.Guarantees = nil
+		sealingBlock.Payload.Seals = []*flow.Seal{&flow.Seal{
 			BlockID:      block.ID(),
 			InitialState: commit,
 			FinalState:   unittest.StateCommitmentFixture(),
 		}}
-		sealingBlock.PayloadHash = sealingBlock.Payload.Hash()
+		sealingBlock.Header.Height = 2
+		sealingBlock.Header.View = 2
+		sealingBlock.Header.ParentID = block.ID()
+		sealingBlock.Header.PayloadHash = sealingBlock.Payload.Hash()
 
 		err := db.Update(func(txn *badger.Txn) error {
-			err := procedure.InsertPayload(&block.Payload)(txn)
+			err := procedure.InsertPayload(block.Payload)(txn)
 			if err != nil {
 				return err
 			}
@@ -436,11 +431,11 @@ func TestExtendBlockNotConnected(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			err = operation.InsertSeal(sealingBlock.Seals[0])(txn)
+			err = operation.InsertSeal(sealingBlock.Payload.Seals[0])(txn)
 			if err != nil {
 				return err
 			}
-			err = procedure.InsertPayload(&sealingBlock.Payload)(txn)
+			err = procedure.InsertPayload(sealingBlock.Payload)(txn)
 			if err != nil {
 				return err
 			}
@@ -459,8 +454,8 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		require.NoError(t, err)
 
 		// create a fork at view/height 1 and try to connect it to genesis
-		block.Timestamp = block.Timestamp.Add(time.Second)
-		block.ParentID = genesis.ID()
+		block.Header.Timestamp = block.Header.Timestamp.Add(time.Second)
+		block.Header.ParentID = genesis.ID()
 
 		err = db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
@@ -479,13 +474,12 @@ func TestExtendSealNotConnected(t *testing.T) {
 	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB, genesis *flow.Block, commit flow.StateCommitment) {
 
 		block := unittest.BlockFixture()
-		block.Identities = nil
-		block.Guarantees = nil
-		block.Seals = nil
-		block.Height = 1
-		block.View = 1
-		block.ParentID = genesis.ID()
-		block.PayloadHash = block.Payload.Hash()
+		block.Payload.Guarantees = nil
+		block.Payload.Seals = nil
+		block.Header.Height = 1
+		block.Header.View = 1
+		block.Header.ParentID = genesis.Header.ID()
+		block.Header.PayloadHash = block.Payload.Hash()
 
 		err := db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)
@@ -501,13 +495,12 @@ func TestExtendSealNotConnected(t *testing.T) {
 		}
 
 		sealingBlock := unittest.BlockFixture()
-		sealingBlock.Identities = nil
-		sealingBlock.Guarantees = nil
-		sealingBlock.Seals = []*flow.Seal{seal}
-		sealingBlock.Height = 2
-		sealingBlock.View = 2
-		sealingBlock.ParentID = block.ID()
-		sealingBlock.PayloadHash = sealingBlock.Payload.Hash()
+		sealingBlock.Payload.Identities = nil
+		sealingBlock.Payload.Seals = []*flow.Seal{seal}
+		sealingBlock.Header.Height = 2
+		sealingBlock.Header.View = 2
+		sealingBlock.Header.ParentID = block.Header.ID()
+		sealingBlock.Header.PayloadHash = sealingBlock.Payload.Hash()
 
 		err = db.Update(procedure.InsertBlock(&sealingBlock))
 		require.NoError(t, err)
@@ -525,11 +518,11 @@ func TestExtendSealNotConnected(t *testing.T) {
 func TestExtendWrongIdentity(t *testing.T) {
 	testWithBootstrapped(t, func(t *testing.T, mutator *Mutator, db *badger.DB, genesis *flow.Block, commit flow.StateCommitment) {
 		block := unittest.BlockFixture()
-		block.Payload.Identities = nil
+		block.Header.Height = 1
+		block.Header.View = 1
+		block.Header.ParentID = genesis.ID()
+		block.Header.PayloadHash = block.Payload.Hash()
 		block.Payload.Guarantees = nil
-		block.Height = 1
-		block.View = 1
-		block.ParentID = genesis.ID()
 
 		err := db.Update(procedure.InsertBlock(&block))
 		require.NoError(t, err)

@@ -145,8 +145,8 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 	// process as proposal
 	proposal := &messages.BlockProposal{
-		Header:  &synced.Block.Header,
-		Payload: &synced.Block.Payload,
+		Header:  synced.Block.Header,
+		Payload: synced.Block.Payload,
 	}
 	return e.onBlockProposal(originID, proposal)
 }

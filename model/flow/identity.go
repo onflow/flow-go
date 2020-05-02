@@ -92,6 +92,30 @@ func toEncodable(iy Identity) (encodableIdentity, error) {
 	return ie, nil
 }
 
+func (iy Identity) MarshalJSON() ([]byte, error) {
+	encodable, err := toEncodable(iy)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert to encodable: %w", err)
+	}
+	data, err := json.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode json: %w", err)
+	}
+	return data, nil
+}
+
+func (iy Identity) MarshalMsgpack() ([]byte, error) {
+	encodable, err := toEncodable(iy)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert to encodable: %w", err)
+	}
+	data, err := msgpack.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode msgpack: %w", err)
+	}
+	return data, nil
+}
+
 func fromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
@@ -135,30 +159,6 @@ func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 		return fmt.Errorf("could not convert from encodable: %w", err)
 	}
 	return nil
-}
-
-func (iy Identity) MarshalJSON() ([]byte, error) {
-	encodable, err := toEncodable(iy)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert to encodable: %w", err)
-	}
-	data, err := json.Marshal(encodable)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode json: %w", err)
-	}
-	return data, nil
-}
-
-func (iy Identity) MarshalMsgpack() ([]byte, error) {
-	encodable, err := toEncodable(iy)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert to encodable: %w", err)
-	}
-	data, err := msgpack.Marshal(encodable)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode msgpack: %w", err)
-	}
-	return data, nil
 }
 
 // IdentityFilter is a filter on identities.

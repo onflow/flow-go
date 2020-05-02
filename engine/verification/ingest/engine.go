@@ -540,7 +540,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 	collIndex := int(chunk.CollectionIndex)
 
 	// ensure the collection index specified by the ER is valid
-	if len(block.Guarantees) <= collIndex {
+	if len(block.Payload.Guarantees) <= collIndex {
 		log.Error().
 			Int("collection_index", collIndex).
 			Msg("could not get collections - invalid collection index")
@@ -549,7 +549,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		return nil, false
 	}
 
-	collID := block.Guarantees[collIndex].ID()
+	collID := block.Payload.Guarantees[collIndex].ID()
 
 	// updates pending collection
 	e.checkPendingCollections(collID, block.ID())

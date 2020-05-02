@@ -256,7 +256,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	if errors.Is(err, storage.ErrNotFound) {
 		// Bootstrap!
 
-		fnb.Logger.Info().Msg("bootstrapping empty database")
+		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
 		// Load the genesis state commitment
 		fnb.GenesisCommit, err = loadGenesisCommit(fnb.BaseConfig.BootstrapDir)
@@ -265,7 +265,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 
 		// Load the rest of the genesis info, eventually needed for the consensus follower
-		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.BootstrapDir)
+		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
@@ -532,7 +532,7 @@ func loadGenesisCommit(path string) (flow.StateCommitment, error) {
 	return commit, err
 }
 
-func loadTrustedRootBlock(path string) (*flow.Block, error) {
+func loadGenesisBlock(path string) (*flow.Block, error) {
 	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisBlock))
 	if err != nil {
 		return nil, err

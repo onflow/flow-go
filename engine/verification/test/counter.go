@@ -103,8 +103,8 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	// Setup chunk and chunk data package

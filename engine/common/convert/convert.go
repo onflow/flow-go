@@ -113,30 +113,30 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 
 	id := h.ID()
 
-	parentID := h.ParentID
-	t, err := ptypes.TimestampProto(h.Timestamp)
+	parentID := h.Header.ParentID
+	t, err := ptypes.TimestampProto(h.Header.Timestamp)
 	if err != nil {
 		return nil, err
 	}
 
-	cg := make([]*entities.CollectionGuarantee, len(h.Guarantees))
-	for i, g := range h.Guarantees {
+	cg := make([]*entities.CollectionGuarantee, len(h.Payload.Guarantees))
+	for i, g := range h.Payload.Guarantees {
 		cg[i] = collectionGuaranteeToMessage(g)
 	}
 
-	seals := make([]*entities.BlockSeal, len(h.Seals))
-	for i, s := range h.Seals {
+	seals := make([]*entities.BlockSeal, len(h.Payload.Seals))
+	for i, s := range h.Payload.Seals {
 		seals[i] = blockSealToMessage(s)
 	}
 
 	bh := entities.Block{
 		Id:                   id[:],
-		Height:               h.Height,
+		Height:               h.Header.Height,
 		ParentId:             parentID[:],
 		Timestamp:            t,
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
-		Signatures:           [][]byte{h.ParentVoterSig},
+		Signatures:           [][]byte{h.Header.ParentVoterSig},
 	}
 	return &bh, nil
 }

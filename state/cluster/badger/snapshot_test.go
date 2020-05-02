@@ -36,7 +36,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	suite.genesis = model.Genesis()
-	suite.chainID = suite.genesis.ChainID
+	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
@@ -91,7 +91,7 @@ func (suite *SnapshotSuite) TestAtBlockID() {
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
 	assert.Nil(t, err)
-	assert.Equal(t, &suite.genesis.Collection, coll)
+	assert.Equal(t, &suite.genesis.Payload.Collection, coll)
 
 	// ensure head is correct
 	head, err := snapshot.Head()
@@ -112,7 +112,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
 	assert.Nil(t, err)
-	assert.Equal(t, &block.Collection, coll)
+	assert.Equal(t, &block.Payload.Collection, coll)
 }
 
 func (suite *SnapshotSuite) TestFinalizedBlock() {
@@ -146,7 +146,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
 	assert.Nil(t, err)
-	assert.Equal(t, &finalizedBlock1.Collection, coll)
+	assert.Equal(t, &finalizedBlock1.Payload.Collection, coll)
 
 	// ensure head is correct
 	head, err := snapshot.Head()

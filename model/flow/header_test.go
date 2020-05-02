@@ -3,6 +3,7 @@ package flow_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,4 +37,13 @@ func TestHeaderEncodingMsgpack(t *testing.T) {
 	decodedID := decoded.ID()
 	assert.Equal(t, headerID, decodedID)
 	assert.Equal(t, header, decoded)
+}
+
+func TestNonUTCTimestampSameHashAsUTC(t *testing.T) {
+	header := unittest.BlockHeaderFixture()
+	headerID := header.ID()
+	loc := time.FixedZone("UTC-8", -8*60*60)
+	header.Timestamp = header.Timestamp.In(loc)
+	checkedID := header.ID()
+	assert.Equal(t, headerID, checkedID)
 }

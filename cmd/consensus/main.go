@@ -169,7 +169,7 @@ func main() {
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger, notifier, node.Metrics, headersDB, viewsDB, committee, node.State,
-				build, final, signer, comp, &node.GenesisBlock.Header, node.GenesisQC,
+				build, final, signer, comp, node.GenesisBlock.Header, node.GenesisQC,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
 			if err != nil {

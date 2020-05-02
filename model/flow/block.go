@@ -22,8 +22,8 @@ func Genesis(identities IdentityList) *Block {
 
 	// combine to block
 	genesis := Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	return &genesis
@@ -32,28 +32,23 @@ func Genesis(identities IdentityList) *Block {
 // Block (currently) includes the header, the payload hashes as well as the
 // payload contents.
 type Block struct {
-	Header
-	Payload
+	Header  *Header
+	Payload *Payload
 }
 
 // Valid will check whether the block is valid bottom-up.
 func (b Block) Valid() bool {
-	return b.PayloadHash == b.Payload.Hash()
+	return b.Header.PayloadHash == b.Payload.Hash()
 }
 
-// Payload is the actual content of each block.
-type Payload struct {
-	Identities IdentityList
-	Guarantees []*CollectionGuarantee
-	Seals      []*Seal
+// ID returns the ID of the header.
+func (b Block) ID() Identifier {
+	return b.Header.ID()
 }
 
-// Hash returns the root hash of the payload.
-func (p Payload) Hash() Identifier {
-	idHash := MerkleRoot(GetIDs(p.Identities)...)
-	collHash := MerkleRoot(GetIDs(p.Guarantees)...)
-	sealHash := MerkleRoot(GetIDs(p.Seals)...)
-	return ConcatSum(idHash, collHash, sealHash)
+// Checksum returns the checksum of the header.
+func (b Block) Checksum() Identifier {
+	return b.Header.Checksum()
 }
 
 // PendingBlock is a wrapper type representing a block that cannot yet be

@@ -128,8 +128,8 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	header := unittest.BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	// registerTouch and State setup

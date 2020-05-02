@@ -155,8 +155,8 @@ ConsentLoop:
 				continue ConsentLoop
 			}
 			block := flow.Block{
-				Header:  *proposal,
-				Payload: *payload,
+				Header:  proposal,
+				Payload: payload,
 			}
 
 			// Broadcast block

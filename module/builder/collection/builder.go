@@ -169,13 +169,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// insert the payload
 		// this inserts the collection AND all constituent transactions
-		err = procedure.InsertClusterPayload(&payload)(tx)
+		err = procedure.InsertClusterPayload(payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert cluster payload: %w", err)
 		}
 
 		// index the payload by block ID
-		err = procedure.IndexClusterPayload(header, &payload)(tx)
+		err = procedure.IndexClusterPayload(header, payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index cluster payload: %w", err)
 		}
