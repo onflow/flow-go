@@ -294,8 +294,8 @@ func (fnb *FlowNodeBuilder) initState() {
 			Uint64("final_height", head.Height).
 			Msg("using existing database")
 
-		// Load the genesis info for recovery
-		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.BootstrapDir)
+		// Load the rest of the genesis info, eventually needed for the consensus follower
+		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
