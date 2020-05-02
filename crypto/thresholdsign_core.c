@@ -1,7 +1,6 @@
 // +build relic
 
 #include "thresholdsign_include.h"
-#include "dkg_include.h"
 
 // Computes the Lagrange coefficient L(i+1) at 0 with regards to the range [signers(0)+1..signers(t)+1]
 // and stores it in res, where t is the degree of the polynomial P
@@ -112,7 +111,7 @@ void G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t*
         ep_add_projc(&acc, &acc, &mult);
     }
     // export the result
-    _ep_write_bin_compact(dest, &acc, SIGNATURE_LEN);
+    ep_write_bin_compact(dest, &acc, SIGNATURE_LEN);
 
     // free the temp memory
     ep2_free(&acc);

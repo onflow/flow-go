@@ -3,10 +3,12 @@ package ingest_test
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -44,17 +46,17 @@ func TestConcurrency(t *testing.T) {
 		},
 		{
 			erCount:     1,
-			senderCount: 10,
+			senderCount: 5,
 			chunksNum:   2,
 		},
 		{
-			erCount:     10,
+			erCount:     5,
 			senderCount: 1,
 			chunksNum:   2,
 		},
 		{
 			erCount:     5,
-			senderCount: 10,
+			senderCount: 5,
 			chunksNum:   2,
 		},
 		{
@@ -63,17 +65,7 @@ func TestConcurrency(t *testing.T) {
 			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
 		},
 		{
-			erCount:     1,
-			senderCount: 10,
-			chunksNum:   20,
-		},
-		{
-			erCount:     3,
-			senderCount: 1,
-			chunksNum:   10,
-		},
-		{
-			erCount:     3,
+			erCount:     2,
 			senderCount: 5,
 			chunksNum:   4,
 		},
@@ -87,7 +79,20 @@ func TestConcurrency(t *testing.T) {
 }
 
 func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	// to demarcate the logs
+	log.Debug().
+		Int("execution_receipt_count", erCount).
+		Int("sender_count", senderCount).
+		Int("chunks_num", chunksNum).
+		Msg("TestConcurrency started")
 	hub := stub.NewNetworkHub()
+
+	// ingest engine parameters
+	// parameters added based on following issue:
+
+	requestInterval := uint(1000)
+	failureThreshold := uint(2)
 
 	// creates test id for each role
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -138,8 +143,12 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// to the verifier exactly once.
 	verifierEng, verifierEngWG := setupMockVerifierEng(t, vChunks)
 	assigner := NewMockAssigner(verID.NodeID)
-	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner,
+	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, requestInterval, failureThreshold,
 		testutil.WithVerifierEngine(verifierEng))
+
+	// waits for Ingest engine to be up and running
+	// and checkTrackers loop starts
+	<-verNode.IngestEngine.Ready()
 
 	colNode := testutil.CollectionNode(t, hub, colID, identities)
 
@@ -148,8 +157,11 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	exeNode := testutil.GenericNode(t, hub, exeID, identities)
 	setupMockExeNode(t, exeNode, verID.NodeID, ers)
 
+	// creates a network instance for verification node
+	// and sets it in continuous delivery mode
 	verNet, ok := hub.GetNetwork(verID.NodeID)
 	assert.True(t, ok)
+	verNet.StartConDev(requestInterval, true)
 
 	// the wait group tracks goroutines for each ER sending it to VER
 	var senderWG sync.WaitGroup
@@ -199,30 +211,33 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 				case 0:
 					// block then receipt
 					sendBlock()
-					verNet.DeliverAll(true)
 					// allow another goroutine to run before sending receipt
 					time.Sleep(time.Nanosecond)
 					sendReceipt()
 				case 1:
 					// receipt then block
 					sendReceipt()
-					verNet.DeliverAll(true)
 					// allow another goroutine to run before sending block
 					time.Sleep(time.Nanosecond)
 					sendBlock()
 				}
 
-				verNet.DeliverAll(true)
 				senderWG.Done()
 			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.Block, completeER.Receipt)
 		}
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.RequireReturnsBefore(t, senderWG.Wait, 5*time.Second)
-	verNet.DeliverAll(false)
-	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, 5*time.Second)
-	verNet.DeliverAll(false)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
+	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
+
+	// stops ingest engine of verification node
+	// Note: this should be done prior to any evaluation to make sure that
+	// the checkTrackers method of Ingest engine is done working.
+	<-verNode.IngestEngine.Done()
+
+	// stops the network continuous delivery mode
+	verNet.StopConDev()
 
 	for _, c := range vChunks {
 		if isAssigned(c.ChunkIndex) {
@@ -234,6 +249,13 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	exeNode.Done()
 	colNode.Done()
 	verNode.Done()
+
+	// to demarcate the logs
+	log.Debug().
+		Int("execution_receipt_count", erCount).
+		Int("sender_count", senderCount).
+		Int("chunks_num", chunksNum).
+		Msg("TestConcurrency finished")
 }
 
 // setupMockExeNode sets up a mocked execution node that responds to requests for

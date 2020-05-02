@@ -1,7 +1,7 @@
 // +build relic
 
 #include "dkg_include.h"
-#include "bls_include.h"
+
 
 #define N_max 250
 #define N_bits_max 8  // log(250)  
@@ -107,7 +107,7 @@ void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
     const int size = (G2_BYTES/(SERIALIZATION+1));
     byte* p = out;
     for (int i=0; i<len; i++){
-        _ep2_write_bin_compact(p, &A[i], size);
+        ep2_write_bin_compact(p, &A[i], size);
         p += size;
     }
 }
@@ -136,7 +136,7 @@ int verifyshare(const bn_st* x, const ep2_st* y) {
 
 // computes the sum of the array elements x and writes the sum in jointx
 // the sum is computed in Zr
-void sumScalarVector(bn_st* jointx, bn_st* x, int len) {
+void bn_sum_vector(bn_st* jointx, bn_st* x, int len) {
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
@@ -152,7 +152,7 @@ void sumScalarVector(bn_st* jointx, bn_st* x, int len) {
 
 // computes the sum of the array elements y and writes the sum in jointy
 // the sum is computed in G2
-void sumPointG2Vector(ep2_st* jointy, ep2_st* y, int len){
+void ep2_sum_vector(ep2_st* jointy, ep2_st* y, int len){
     ep2_set_infty(jointy);
     for (int i=0; i<len; i++){
         ep2_add_projc(jointy, jointy, &y[i]);

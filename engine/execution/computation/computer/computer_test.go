@@ -1,10 +1,11 @@
 package computer_test
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -66,7 +67,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm.On("NewBlockContext", &block.Block.Header).Return(bc)
 
 		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
-			Return(&virtualmachine.TransactionResult{Events: events}, nil).
+			Return(&virtualmachine.TransactionResult{Events: events, Error: fmt.Errorf("runtime error")}, nil).
 			Times(totalTransactionCount)
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
@@ -92,6 +93,18 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				k++
 			}
 		}
+
+		expectedResults := make([]flow.TransactionResult, 0)
+		for _, c := range block.CompleteCollections {
+			for _, t := range c.Transactions {
+				txResult := flow.TransactionResult{
+					TransactionID: t.ID(),
+					ErrorMessage:  "runtime error",
+				}
+				expectedResults = append(expectedResults, txResult)
+			}
+		}
+		assert.ElementsMatch(t, expectedResults, result.TransactionResult)
 
 		vm.AssertExpectations(t)
 		bc.AssertExpectations(t)
@@ -130,6 +143,7 @@ func generateCollection(transactionCount int) *entity.CompleteCollection {
 
 	for i := 0; i < transactionCount; i++ {
 		transactions[i] = &flow.TransactionBody{
+			Payer:  flow.HexToAddress(fmt.Sprintf("0%d", rand.Intn(1000))), // a unique payer for each tx to generate a unique id
 			Script: []byte("transaction { execute {} }"),
 		}
 	}
@@ -144,11 +158,11 @@ func generateCollection(transactionCount int) *entity.CompleteCollection {
 	}
 }
 
-func generateEvents(eventCount int) []runtime.Event {
-	events := make([]runtime.Event, eventCount)
+func generateEvents(eventCount int) []cadence.Event {
+	events := make([]cadence.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := runtime.Event{Type: &sema.StringType{}}
+		event := cadence.Event{EventType: cadence.EventType{TypeID: "foo"}}
 		events[i] = event
 	}
 	return events

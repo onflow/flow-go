@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -45,11 +46,12 @@ type ComplianceSuite struct {
 
 	// mocked dependencies
 	me       *module.Local
+	cleaner  *storage.Cleaner
+	headers  *storage.Headers
+	payloads *storage.Payloads
 	state    *protocol.State
 	snapshot *protocol.Snapshot
 	mutator  *protocol.Mutator
-	headers  *storage.Headers
-	payloads *storage.Payloads
 	con      *network.Conduit
 	net      *module.Network
 	prov     *network.Engine
@@ -62,6 +64,8 @@ type ComplianceSuite struct {
 }
 
 func (cs *ComplianceSuite) SetupTest() {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
@@ -90,42 +94,9 @@ func (cs *ComplianceSuite) SetupTest() {
 		},
 	)
 
-	// set up protocol state mock
-	cs.state = &protocol.State{}
-	cs.state.On("Final").Return(
-		func() protint.Snapshot {
-			return cs.snapshot
-		},
-	)
-	cs.state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) protint.Snapshot {
-			return cs.snapshot
-		},
-	)
-	cs.state.On("Mutate", mock.Anything).Return(
-		func() protint.Mutator {
-			return cs.mutator
-		},
-	)
-
-	// set up protocol snapshot mock
-	cs.snapshot = &protocol.Snapshot{}
-	cs.snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
-			return cs.participants.Filter(filter)
-		},
-		nil,
-	)
-	cs.snapshot.On("Head").Return(
-		func() *flow.Header {
-			return cs.head
-		},
-		nil,
-	)
-
-	// set up protocol mutator mock
-	cs.mutator = &protocol.Mutator{}
-	cs.mutator.On("Extend", mock.Anything).Return(nil)
+	// set up storage cleaner
+	cs.cleaner = &storage.Cleaner{}
+	cs.cleaner.On("RunGC").Return()
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
@@ -168,6 +139,43 @@ func (cs *ComplianceSuite) SetupTest() {
 			return nil
 		},
 	)
+
+	// set up protocol state mock
+	cs.state = &protocol.State{}
+	cs.state.On("Final").Return(
+		func() protint.Snapshot {
+			return cs.snapshot
+		},
+	)
+	cs.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) protint.Snapshot {
+			return cs.snapshot
+		},
+	)
+	cs.state.On("Mutate", mock.Anything).Return(
+		func() protint.Mutator {
+			return cs.mutator
+		},
+	)
+
+	// set up protocol snapshot mock
+	cs.snapshot = &protocol.Snapshot{}
+	cs.snapshot.On("Identities", mock.Anything).Return(
+		func(filter flow.IdentityFilter) flow.IdentityList {
+			return cs.participants.Filter(filter)
+		},
+		nil,
+	)
+	cs.snapshot.On("Head").Return(
+		func() *flow.Header {
+			return cs.head
+		},
+		nil,
+	)
+
+	// set up protocol mutator mock
+	cs.mutator = &protocol.Mutator{}
+	cs.mutator.On("Extend", mock.Anything).Return(nil)
 
 	// set up network conduit mock
 	cs.con = &network.Conduit{}
@@ -222,7 +230,7 @@ func (cs *ComplianceSuite) SetupTest() {
 
 	// initialize the engine
 	log := zerolog.New(os.Stderr)
-	e, err := New(log, cs.net, cs.me, cs.state, cs.headers, cs.payloads, cs.prov, cs.pending)
+	e, err := New(log, cs.net, cs.me, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.prov, cs.pending)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	// assign engine with consensus & synchronization
@@ -230,7 +238,6 @@ func (cs *ComplianceSuite) SetupTest() {
 }
 
 func (cs *ComplianceSuite) TestSendVote() {
-
 	// create parameters to send a vote
 	blockID := unittest.IdentifierFixture()
 	view := rand.Uint64()
@@ -447,10 +454,10 @@ func (cs *ComplianceSuite) TestOnSubmitVote() {
 func (cs *ComplianceSuite) TestProcessPendingChildrenNone() {
 
 	// generate random block ID
-	blockID := unittest.IdentifierFixture()
+	header := unittest.BlockHeaderFixture()
 
 	// execute handle connected children
-	err := cs.e.processPendingChildren(blockID)
+	err := cs.e.processPendingChildren(&header)
 	require.NoError(cs.T(), err, "should pass when no children")
 	cs.snapshot.AssertNotCalled(cs.T(), "Final")
 	cs.pending.AssertNotCalled(cs.T(), "DropForParent", mock.Anything)
@@ -480,7 +487,7 @@ func (cs *ComplianceSuite) TestProcessPendingChildren() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
 	// execute the connected children handling
-	err := cs.e.processPendingChildren(parent.ID())
+	err := cs.e.processPendingChildren(&parent.Header)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff
@@ -489,7 +496,7 @@ func (cs *ComplianceSuite) TestProcessPendingChildren() {
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", &block3.Header, parent.View)
 
 	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.ID())
+	cs.pending.AssertCalled(cs.T(), "DropForParent", &parent.Header)
 }
 
 func (cs *ComplianceSuite) TestProposalBufferingOrder() {

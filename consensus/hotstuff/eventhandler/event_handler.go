@@ -23,7 +23,7 @@ type EventHandler struct {
 	forks          hotstuff.Forks
 	persist        hotstuff.Persister
 	communicator   hotstuff.Communicator
-	viewState      hotstuff.ViewState
+	committee      hotstuff.Committee
 	voteAggregator hotstuff.VoteAggregator
 	voter          hotstuff.Voter
 	validator      hotstuff.Validator
@@ -38,7 +38,7 @@ func New(
 	forks hotstuff.Forks,
 	persist hotstuff.Persister,
 	communicator hotstuff.Communicator,
-	viewState hotstuff.ViewState,
+	committee hotstuff.Committee,
 	voteAggregator hotstuff.VoteAggregator,
 	voter hotstuff.Voter,
 	validator hotstuff.Validator,
@@ -54,7 +54,7 @@ func New(
 		voteAggregator: voteAggregator,
 		voter:          voter,
 		validator:      validator,
-		viewState:      viewState,
+		committee:      committee,
 		notifier:       notifier,
 	}
 	return e, nil
@@ -109,11 +109,11 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	// validate the block. exit if the proposal is invalid
 	err := e.validator.ValidateProposal(proposal)
 	if errors.Is(err, model.ErrorInvalidBlock{}) {
-		log.Warn().Msg("invalid block proposal")
+		log.Warn().AnErr("ErrorInvalidBlock", err).Msg("invalid block proposal")
 		return nil
 	}
 	if errors.Is(err, model.ErrUnverifiableBlock) {
-		log.Warn().Msg("unverifiable block proposal")
+		log.Warn().AnErr("ErrUnverifiableBlock", err).Msg("unverifiable block proposal")
 
 		// even if the block is unverifiable because the QC has been
 		// pruned, it still needs to be added to the forks, otherwise,
@@ -232,7 +232,11 @@ func (e *EventHandler) startNewView() error {
 
 	e.pruneSubcomponents()
 
-	if e.viewState.IsSelfLeaderForView(curView) {
+	currentLeader, err := e.committee.LeaderForView(curView)
+	if err != nil {
+		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)
+	}
+	if e.committee.Self() == currentLeader {
 
 		log.Debug().Msg("generating block proposal as leader")
 
@@ -334,10 +338,12 @@ func (e *EventHandler) processBlockForCurrentView(block *model.Block) error {
 	}
 
 	// checking if I'm the next leader
-	nextLeader := e.viewState.LeaderForView(curView + 1)
-	isNextLeader := e.viewState.IsSelf(nextLeader.ID())
-
-	if isNextLeader {
+	nextView := curView + 1
+	nextLeader, err := e.committee.LeaderForView(nextView)
+	if err != nil {
+		return fmt.Errorf("failed to determine primary for next view %d: %w", nextView, err)
+	}
+	if e.committee.Self() == nextLeader {
 		return e.processBlockForCurrentViewIfIsNextLeader(block)
 	}
 
@@ -394,7 +400,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 	return e.processVote(ownVote)
 }
 
-func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.Block, nextLeader *flow.Identity) error {
+func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.Block, nextLeader flow.Identifier) error {
 
 	log := e.log.With().
 		Uint64("block_view", block.View).
@@ -425,7 +431,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 
 		log.Debug().Msg("forwarding vote to compliance engine")
 
-		err := e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader.NodeID)
+		err := e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 		if err != nil {
 			log.Warn().Err(err).Msg("could not forward vote")
 		}
@@ -509,7 +515,7 @@ func (e *EventHandler) processQC(qc *model.QuorumCertificate) error {
 	log := e.log.With().
 		Uint64("block_view", qc.View).
 		Hex("block_id", qc.BlockID[:]).
-		RawJSON("signers", logging.AsJSON(qc.SignerIDs)).
+		Int("signers", len(qc.SignerIDs)).
 		Logger()
 
 	err := e.forks.AddQC(qc)

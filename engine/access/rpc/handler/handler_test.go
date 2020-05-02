@@ -2,7 +2,9 @@ package handler
 
 import (
 	"context"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -41,6 +43,7 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
+	rand.Seed(time.Now().UnixNano())
 	suite.log = zerolog.Logger{}
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
@@ -183,15 +186,15 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	txID := transactionBody.ID()
 	blockID := block.ID()
-	exeEventReq := execution.GetEventsForBlockIDTransactionIDRequest{
+	exeEventReq := execution.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
 	}
-	exeEventResp := execution.EventsResponse{
-		Results: nil,
+	exeEventResp := execution.GetTransactionResultResponse{
+		Events: nil,
 	}
 	// execution node returns an empty list of events each time
-	suite.execClient.On("GetEventsForBlockIDTransactionID", ctx, &exeEventReq).Return(&exeEventResp, nil)
+	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, nil)
 
 	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions)
 	req := &access.GetTransactionRequest{
@@ -244,11 +247,11 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	events := getEvents(10)
 
 	// create the expected results from execution node and access node
-	exeResults := make([]*execution.EventsResponse_Result, len(blockIDs))
+	exeResults := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockIDs))
 	accResults := make([]*access.EventsResponse_Result, len(blockIDs))
 
 	for i := 0; i < len(blockIDs); i++ {
-		exeResults[i] = &execution.EventsResponse_Result{
+		exeResults[i] = &execution.GetEventsForBlockIDsResponse_Result{
 			BlockId:     blockIDs[i],
 			BlockHeight: uint64(i),
 			Events:      events,
@@ -261,7 +264,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	}
 
 	// create the execution node response
-	exeResp := execution.EventsResponse{
+	exeResp := execution.GetEventsForBlockIDsResponse{
 		Results: exeResults,
 	}
 	// create the expected access node response
@@ -320,7 +323,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	setupExecClient := func() *access.EventsResponse {
 		execReq := &execution.GetEventsForBlockIDsRequest{BlockIds: expBlockIDs, Type: string(flow.EventAccountCreated)}
 		results := make([]*access.EventsResponse_Result, len(expBlockIDs))
-		exeResults := make([]*execution.EventsResponse_Result, len(expBlockIDs))
+		exeResults := make([]*execution.GetEventsForBlockIDsResponse_Result, len(expBlockIDs))
 		for i, id := range expBlockIDs {
 			e := getEvents(1)
 			h := uint64(5) // an arbitrary height
@@ -329,7 +332,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 				BlockHeight: h,
 				Events:      e,
 			}
-			exeResults[i] = &execution.EventsResponse_Result{
+			exeResults[i] = &execution.GetEventsForBlockIDsResponse_Result{
 				BlockId:     id,
 				BlockHeight: h,
 				Events:      e,
@@ -338,7 +341,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		expectedResp := &access.EventsResponse{
 			Results: results,
 		}
-		exeResp := &execution.EventsResponse{
+		exeResp := &execution.GetEventsForBlockIDsResponse{
 			Results: exeResults,
 		}
 		suite.execClient.On("GetEventsForBlockIDs", ctx, execReq).Return(exeResp, nil).Once()

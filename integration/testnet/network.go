@@ -2,6 +2,7 @@ package testnet
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -21,6 +22,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 
 	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
+	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -285,7 +287,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		dockerclient.FromEnv,
 		dockerclient.WithAPIVersionNegotiation(),
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	suite, _ := testingdock.GetOrCreateSuite(t, networkConf.Name, testingdock.SuiteOpts{
 		Client: dockerClient,
@@ -294,53 +296,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		Name: networkConf.Name,
 	})
 
-	// generate staking and networking keys for each configured node
-	confs := setupKeys(t, networkConf)
-
-	// run DKG for all consensus nodes
-	dkg := runDKG(t, confs)
-
-	// generate genesis block
-	seal := bootstraprun.GenerateRootSeal(flow.GenesisStateCommitment)
-	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), seal)
-
-	// generate QC
-	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
-	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
-	qc, err := bootstraprun.GenerateGenesisQC(signerData, &genesis)
-	require.Nil(t, err)
-
 	// create a temporary directory to store all bootstrapping files, these
 	// will be shared between all nodes
 	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
 	require.Nil(t, err)
 
-	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisBlock), genesis)
+	confs, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisQC), qc)
-	require.Nil(t, err)
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkg.Public())
-	require.Nil(t, err)
-
-	// write private key files for each DKG participant
-	for _, part := range dkg.Participants {
-		filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, part.NodeID)
-		err = writeJSON(filepath.Join(bootstrapDir, filename), part.Private())
-		require.Nil(t, err)
-	}
-
-	// write private key files for each node
-	for _, nodeConfig := range confs {
-		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, nodeConfig.NodeID))
-
-		// retrieve private representation of the node
-		private, err := nodeConfig.NodeInfo.Private()
-		require.Nil(t, err)
-
-		err = writeJSON(path, private)
-		require.Nil(t, err)
-	}
 
 	flowNetwork := &FlowNetwork{
 		t:           t,
@@ -355,7 +317,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	// add each node to the network
 	for _, nodeConf := range confs {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	return flowNetwork
@@ -401,7 +363,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// create a directory for the node database
 	flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
 	err = os.Mkdir(flowDBDir, 0700)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// Bind the host directory to the container's database directory
 	// Bind the common bootstrap directory to the container
@@ -444,7 +406,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// create directories for execution state trie and values in the tmp
 			// host directory.
 			tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(
 				opts.HostConfig.Binds,
@@ -493,9 +455,114 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	return nil
 }
 
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]ContainerConfig, error) {
+	// number of nodes
+	nNodes := len(networkConf.Nodes)
+	if nNodes == 0 {
+		return nil, fmt.Errorf("must specify at least one node")
+	}
+
+	// Sort so that access nodes start up last
+	sort.Sort(&networkConf)
+
+	// generate staking and networking keys for each configured node
+	confs, err := setupKeys(networkConf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup keys: %w", err)
+	}
+
+	// run DKG for all consensus nodes
+	dkg, err := runDKG(confs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run DKG: %w", err)
+	}
+
+	// generate the root account
+	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := flow.DecodeAccountPrivateKey(hardcoded)
+	if err != nil {
+		return nil, err
+	}
+
+	// generate the initial execution state
+	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
+	if err != nil {
+		return nil, err
+	}
+
+	// generate genesis block
+	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs))
+
+	// generate QC
+	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
+	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
+
+	qc, err := bootstraprun.GenerateGenesisQC(signerData, genesis)
+	if err != nil {
+		return nil, err
+	}
+
+	// write common genesis bootstrap files
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameAccount0Priv), account)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisCommit), commit)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisBlock), genesis)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisQC), qc)
+	if err != nil {
+		return nil, err
+	}
+
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkg.Public())
+	if err != nil {
+		return nil, err
+	}
+
+	// write private key files for each DKG participant
+	for _, part := range dkg.Participants {
+		filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, part.NodeID)
+		err = writeJSON(filepath.Join(bootstrapDir, filename), part.Private())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// write private key files for each node
+	for _, nodeConfig := range confs {
+		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, nodeConfig.NodeID))
+
+		// retrieve private representation of the node
+		private, err := nodeConfig.NodeInfo.Private()
+		if err != nil {
+			return nil, err
+		}
+
+		err = writeJSON(path, private)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return confs, nil
+}
+
 // setupKeys generates private staking and networking keys for each configured
 // node. It also assigns each node a unique container name and network address.
-func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
+func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 
 	nNodes := len(networkConf.Nodes)
 
@@ -505,11 +572,15 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 
 	// get networking keys for all nodes
 	networkKeys, err := unittest.NetworkingKeys(nNodes)
-	require.Nil(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	// get staking keys for all nodes
 	stakingKeys, err := unittest.StakingKeys(nNodes)
-	require.Nil(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	// create node container configs and corresponding public identities
 	confs := make([]ContainerConfig, 0, nNodes)
@@ -541,10 +612,10 @@ func setupKeys(t *testing.T, networkConf NetworkConfig) []ContainerConfig {
 		confs = append(confs, containerConf)
 	}
 
-	return confs
+	return confs, nil
 }
 
-func runDKG(t *testing.T, confs []ContainerConfig) bootstrap.DKGData {
+func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 
 	// filter by consensus nodes
 	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
@@ -552,12 +623,23 @@ func runDKG(t *testing.T, confs []ContainerConfig) bootstrap.DKGData {
 
 	// run the core dkg algorithm
 	dkgSeeds, err := getSeeds(nConsensusNodes)
-	require.Nil(t, err)
+	if err != nil {
+		return bootstrap.DKGData{}, err
+	}
+
 	dkg, err := bootstraprun.RunDKG(nConsensusNodes, dkgSeeds)
-	require.Nil(t, err)
+	if err != nil {
+		return bootstrap.DKGData{}, err
+	}
 
 	// sanity check
-	assert.Equal(t, nConsensusNodes, len(dkg.Participants))
+	if nConsensusNodes != len(dkg.Participants) {
+		return bootstrap.DKGData{}, fmt.Errorf(
+			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
+			nConsensusNodes,
+			len(dkg.Participants),
+		)
+	}
 
 	// set the node IDs in the dkg data
 	for i := range dkg.Participants {
@@ -565,5 +647,5 @@ func runDKG(t *testing.T, confs []ContainerConfig) bootstrap.DKGData {
 		dkg.Participants[i].NodeID = nodeID
 	}
 
-	return dkg
+	return dkg, nil
 }

@@ -27,9 +27,10 @@ type Engine struct {
 	unit     *engine.Unit   // used to control startup/shutdown
 	log      zerolog.Logger // used to log relevant actions with context
 	me       module.Local
-	state    protocol.State
+	cleaner  storage.Cleaner
 	headers  storage.Headers
 	payloads storage.Payloads
+	state    protocol.State
 	con      network.Conduit
 	prov     network.Engine
 	pending  module.PendingBlockBuffer
@@ -42,9 +43,10 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	state protocol.State,
+	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
+	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
 ) (*Engine, error) {
@@ -54,9 +56,10 @@ func New(
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "consensus").Logger(),
 		me:       me,
-		state:    state,
+		cleaner:  cleaner,
 		headers:  headers,
 		payloads: payloads,
+		state:    state,
 		prov:     prov,
 		pending:  pending,
 		sync:     nil, // use `WithSynchronization`
@@ -199,7 +202,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -239,6 +242,11 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	// submit the proposal to the provider engine to forward it to other
 	// node roles
 	e.prov.SubmitLocal(msg)
+
+	// after broadcasting a new proposal is a great time to garbage collect
+	// on badger; we won't need to do any heavy work soon, because the other
+	// replicas will be busy validating our proposal
+	e.cleaner.RunGC()
 
 	return nil
 }
@@ -298,7 +306,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -416,7 +424,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		RawJSON("parent_voters", logging.AsJSON(header.ParentVoterIDs)).
+		Int("parent_voters", len(header.ParentVoterIDs)).
 		Hex("parent_sig", header.ParentVoterSig[:]).
 		Logger()
 
@@ -452,7 +460,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	e.hotstuff.SubmitProposal(header, parent.View)
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(header.ID())
+	err = e.processPendingChildren(header)
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}
@@ -482,10 +490,10 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 // processPendingChildren checks if there are proposals connected to the given
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
-func (e *Engine) processPendingChildren(parentID flow.Identifier) error {
+func (e *Engine) processPendingChildren(header *flow.Header) error {
 
 	// check if there are any children for this parent in the cache
-	children, has := e.pending.ByParentID(parentID)
+	children, has := e.pending.ByParentID(header.ID())
 	if !has {
 		return nil
 	}
@@ -504,7 +512,7 @@ func (e *Engine) processPendingChildren(parentID flow.Identifier) error {
 	}
 
 	// drop all of the children that should have been processed now
-	e.pending.DropForParent(parentID)
+	e.pending.DropForParent(header)
 
 	return result.ErrorOrNil()
 }

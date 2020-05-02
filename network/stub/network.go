@@ -2,6 +2,7 @@ package stub
 
 import (
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -22,6 +23,7 @@ type Network struct {
 	hub          *Hub
 	engines      map[uint8]network.Engine
 	seenEventIDs map[string]bool
+	qCD          chan struct{} // used to stop continous delivery mode of the network
 }
 
 // NewNetwork create a mocked network.
@@ -34,6 +36,7 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 		hub:          hub,
 		engines:      make(map[uint8]network.Engine),
 		seenEventIDs: make(map[string]bool),
+		qCD:          make(chan struct{}),
 	}
 	// Plug the network to a hub so that networks can find each other.
 	hub.Plug(o)
@@ -173,4 +176,36 @@ func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 
 	}
 	return nil
+}
+
+// StartConDev starts the continuous delivery mode of the network.
+// In this mode, the network continuously checks the nodes' buffer
+// every `updateInterval` milliseconds, and delivers all the pending
+// messages. `recursive` determines whether the delivery is in recursive mode or not
+func (mn *Network) StartConDev(updateInterval uint, recursive bool) {
+	timer := time.NewTicker(time.Duration(updateInterval))
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		wg.Done()
+		for {
+			select {
+			case <-timer.C:
+				mn.DeliverAll(recursive)
+			case <-mn.qCD:
+				// stops continuous delivery mode
+				break
+			}
+		}
+	}()
+
+	// waits till the internal goroutine starts
+	wg.Wait()
+}
+
+// StopConDev stops the continuous deliver mode of the network
+func (mn *Network) StopConDev() {
+	close(mn.qCD)
 }

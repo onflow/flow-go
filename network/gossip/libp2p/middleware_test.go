@@ -41,7 +41,8 @@ func (m *MiddlewareTestSuit) SetupTest() {
 	m.size = 2 // operates on two middlewares
 
 	m.metrics = &mockmodule.Metrics{}
-	m.metrics.On("NetworkMessageSent", mockery.Anything).Return()
+	m.metrics.On("NetworkMessageSent", mockery.Anything, mockery.Anything).Return()
+	m.metrics.On("NetworkMessageReceived", mockery.Anything, mockery.Anything).Return()
 
 	// create the middlewares
 	m.ids, m.mws = m.createMiddleWares(m.size)
@@ -267,7 +268,7 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		key := m.generateNetworkingKey(target[:])
 
 		// creates new middleware
-		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics)
+		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics, DefaultMaxPubSubMsgSize)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)

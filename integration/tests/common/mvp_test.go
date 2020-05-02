@@ -14,7 +14,6 @@ import (
 )
 
 func TestMVP_Network(t *testing.T) {
-
 	colNode := testnet.NewNodeConfig(flow.RoleCollection)
 	exeNode := testnet.NewNodeConfig(flow.RoleExecution)
 
@@ -37,15 +36,15 @@ func TestMVP_Network(t *testing.T) {
 	flowNetwork.Start(ctx)
 	defer flowNetwork.Remove()
 
-	accessClient, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]))
+	accessPort := fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort])
+	accessClient, err := testnet.NewClient(accessPort)
 	require.NoError(t, err)
 
 	runMVPTest(t, accessClient)
 }
 
 func TestMVP_Emulator(t *testing.T) {
-
-	//Start emulator manually for now, used for testing the test
+	// Start emulator manually for now, used for testing the test
 	// TODO - start an emulator instance
 	t.Skip()
 
@@ -77,7 +76,7 @@ func runMVPTest(t *testing.T, accessClient *testnet.Client) {
 		return err == nil && counter == -3
 	}, 30*time.Second, time.Second)
 
-	//TODO: Fix Cadence code
+	// TODO: Fix Cadence code
 	err = createCounter(ctx, accessClient)
 	require.NoError(t, err)
 
