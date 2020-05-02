@@ -35,10 +35,9 @@ func TestReadyDone(t *testing.T) {
 	var wg sync.WaitGroup
 	go func() {
 		wg.Add(1)
-		<-eventLoop.Wait()
+		<-eventLoop.Done()
 		wg.Done()
 	}()
-	<-eventLoop.Done()
 
 	// wait until Wait returns
 	wg.Wait()

@@ -25,11 +25,12 @@ type Suite struct {
 	net      *module.Network
 	con      *network.Conduit
 	me       *module.Local
+	cleaner  *storage.Cleaner
+	headers  *storage.Headers
+	payloads *storage.Payloads
 	state    *protocol.State
 	mutator  *protocol.Mutator
 	snapshot *protocol.Snapshot
-	headers  *storage.Headers
-	payloads *storage.Payloads
 	cache    *module.PendingBlockBuffer
 	follower *module.HotStuffFollower
 
@@ -42,22 +43,24 @@ func (suite *Suite) SetupTest() {
 	suite.net = new(module.Network)
 	suite.con = new(network.Conduit)
 	suite.me = new(module.Local)
+	suite.cleaner = new(storage.Cleaner)
+	suite.headers = new(storage.Headers)
+	suite.payloads = new(storage.Payloads)
 	suite.state = new(protocol.State)
 	suite.mutator = new(protocol.Mutator)
 	suite.snapshot = new(protocol.Snapshot)
-	suite.headers = new(storage.Headers)
-	suite.payloads = new(storage.Payloads)
 	suite.cache = new(module.PendingBlockBuffer)
 	suite.follower = new(module.HotStuffFollower)
 	suite.sync = new(module.Synchronization)
 
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
-	suite.state.On("Mutate").Return(suite.mutator)
-	suite.state.On("Final").Return(suite.snapshot)
+	suite.cleaner.On("RunGC").Return()
 	suite.headers.On("Store", mock.Anything).Return(nil)
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil)
+	suite.state.On("Mutate").Return(suite.mutator)
+	suite.state.On("Final").Return(suite.snapshot)
 
-	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, suite.state, suite.headers, suite.payloads, suite.cache, suite.follower)
+	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, suite.cleaner, suite.headers, suite.payloads, suite.state, suite.cache, suite.follower)
 	require.Nil(suite.T(), err)
 	eng.WithSynchronization(suite.sync)
 
@@ -177,7 +180,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	}
 	suite.cache.On("ByParentID", block.ID()).Return(pending, true)
 	suite.cache.On("ByParentID", child.ID()).Return(nil, false)
-	suite.cache.On("DropForParent", block.ID()).Once()
+	suite.cache.On("DropForParent", &block.Header).Once()
 
 	// submit the block proposal
 	proposal := unittest.ProposalFromBlock(&block)

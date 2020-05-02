@@ -13,7 +13,7 @@ type ExecutionAPIClient struct {
 }
 
 // ExecuteScriptAtBlockID provides a mock function with given fields: ctx, in, opts
-func (_m *ExecutionAPIClient) ExecuteScriptAtBlockID(ctx context.Context, in *execution.ExecuteScriptAtBlockIDRequest, opts ...grpc.CallOption) (*execution.ExecuteScriptResponse, error) {
+func (_m *ExecutionAPIClient) ExecuteScriptAtBlockID(ctx context.Context, in *execution.ExecuteScriptAtBlockIDRequest, opts ...grpc.CallOption) (*execution.ExecuteScriptAtBlockIDResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -23,12 +23,12 @@ func (_m *ExecutionAPIClient) ExecuteScriptAtBlockID(ctx context.Context, in *ex
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *execution.ExecuteScriptResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.ExecuteScriptAtBlockIDRequest, ...grpc.CallOption) *execution.ExecuteScriptResponse); ok {
+	var r0 *execution.ExecuteScriptAtBlockIDResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.ExecuteScriptAtBlockIDRequest, ...grpc.CallOption) *execution.ExecuteScriptAtBlockIDResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.ExecuteScriptResponse)
+			r0 = ret.Get(0).(*execution.ExecuteScriptAtBlockIDResponse)
 		}
 	}
 
@@ -72,8 +72,8 @@ func (_m *ExecutionAPIClient) GetAccountAtBlockID(ctx context.Context, in *execu
 	return r0, r1
 }
 
-// GetEventsForBlockIDTransactionID provides a mock function with given fields: ctx, in, opts
-func (_m *ExecutionAPIClient) GetEventsForBlockIDTransactionID(ctx context.Context, in *execution.GetEventsForBlockIDTransactionIDRequest, opts ...grpc.CallOption) (*execution.EventsResponse, error) {
+// GetEventsForBlockIDs provides a mock function with given fields: ctx, in, opts
+func (_m *ExecutionAPIClient) GetEventsForBlockIDs(ctx context.Context, in *execution.GetEventsForBlockIDsRequest, opts ...grpc.CallOption) (*execution.GetEventsForBlockIDsResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -83,17 +83,17 @@ func (_m *ExecutionAPIClient) GetEventsForBlockIDTransactionID(ctx context.Conte
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *execution.EventsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetEventsForBlockIDTransactionIDRequest, ...grpc.CallOption) *execution.EventsResponse); ok {
+	var r0 *execution.GetEventsForBlockIDsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetEventsForBlockIDsRequest, ...grpc.CallOption) *execution.GetEventsForBlockIDsResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.EventsResponse)
+			r0 = ret.Get(0).(*execution.GetEventsForBlockIDsResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetEventsForBlockIDTransactionIDRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetEventsForBlockIDsRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
@@ -102,8 +102,8 @@ func (_m *ExecutionAPIClient) GetEventsForBlockIDTransactionID(ctx context.Conte
 	return r0, r1
 }
 
-// GetEventsForBlockIDs provides a mock function with given fields: ctx, in, opts
-func (_m *ExecutionAPIClient) GetEventsForBlockIDs(ctx context.Context, in *execution.GetEventsForBlockIDsRequest, opts ...grpc.CallOption) (*execution.EventsResponse, error) {
+// GetTransactionResult provides a mock function with given fields: ctx, in, opts
+func (_m *ExecutionAPIClient) GetTransactionResult(ctx context.Context, in *execution.GetTransactionResultRequest, opts ...grpc.CallOption) (*execution.GetTransactionResultResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -113,17 +113,17 @@ func (_m *ExecutionAPIClient) GetEventsForBlockIDs(ctx context.Context, in *exec
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *execution.EventsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetEventsForBlockIDsRequest, ...grpc.CallOption) *execution.EventsResponse); ok {
+	var r0 *execution.GetTransactionResultResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionResultRequest, ...grpc.CallOption) *execution.GetTransactionResultResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.EventsResponse)
+			r0 = ret.Get(0).(*execution.GetTransactionResultResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetEventsForBlockIDsRequest, ...grpc.CallOption) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetTransactionResultRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)

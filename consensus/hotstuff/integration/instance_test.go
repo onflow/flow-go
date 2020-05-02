@@ -3,6 +3,7 @@ package integration
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -20,13 +21,10 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -43,11 +41,10 @@ type Instance struct {
 
 	// instance data
 	queue   chan interface{}
-	headers map[flow.Identifier]*flow.Header
+	headers sync.Map //	headers map[flow.Identifier]*flow.Header
 
 	// mocked dependencies
-	snapshot     *protocol.Snapshot
-	proto        *protocol.State
+	committee    *mocks.Committee
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	persist      *mocks.Persister
@@ -56,7 +53,6 @@ type Instance struct {
 	communicator *mocks.Communicator
 
 	// real dependencies
-	viewstate  *viewstate.ViewState
 	pacemaker  *pacemaker.FlowPaceMaker
 	producer   *blockproducer.BlockProducer
 	forks      *forks.Forks
@@ -116,12 +112,10 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		stop:         cfg.StopCondition,
 
 		// instance data
-		queue:   make(chan interface{}, 1024),
-		headers: make(map[flow.Identifier]*flow.Header),
+		queue: make(chan interface{}, 1024),
 
 		// instance mocks
-		snapshot:     &protocol.Snapshot{},
-		proto:        &protocol.State{},
+		committee:    &mocks.Committee{},
 		builder:      &module.Builder{},
 		persist:      &mocks.Persister{},
 		signer:       &mocks.Signer{},
@@ -131,44 +125,45 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	}
 
 	// insert root block into headers register
-	in.headers[cfg.Root.ID()] = cfg.Root
+	in.headers.Store(cfg.Root.ID(), cfg.Root)
 
-	// program the protocol snapshot behaviour
-	in.snapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+	// program the hotstuff committee state
+	in.committee.On("Identities", mock.Anything, mock.Anything).Return(
+		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
 			return in.participants.Filter(selector)
 		},
 		nil,
 	)
 	for _, participant := range in.participants {
-		in.snapshot.On("Identity", participant.NodeID).Return(participant, nil)
+		in.committee.On("Identity", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
-
-	// program the protocol state behaviour
-	in.proto.On("Final").Return(in.snapshot)
-	in.proto.On("AtNumber", mock.Anything).Return(in.snapshot)
-	in.proto.On("AtBlockID", mock.Anything).Return(in.snapshot)
+	in.committee.On("Self").Return(in.localID)
+	in.committee.On("LeaderForView", mock.Anything).Return(
+		func(view uint64) flow.Identifier {
+			return in.participants[int(view)%len(in.participants)].NodeID
+		}, nil,
+	)
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
 		func(parentID flow.Identifier, setter func(*flow.Header)) *flow.Header {
-			parent, ok := in.headers[parentID]
+			parent, ok := in.headers.Load(parentID)
 			if !ok {
 				return nil
 			}
 			header := &flow.Header{
 				ChainID:     "chain",
 				ParentID:    parentID,
-				Height:      parent.Height + 1,
+				Height:      parent.(*flow.Header).Height + 1,
 				PayloadHash: unittest.IdentifierFixture(),
 				Timestamp:   time.Now().UTC(),
 			}
 			setter(header)
-			in.headers[header.ID()] = header
+			in.headers.Store(header.ID(), header)
 			return header
 		},
 		func(parentID flow.Identifier, setter func(*flow.Header)) error {
-			_, ok := in.headers[parentID]
+			_, ok := in.headers.Load(parentID)
 			if !ok {
 				return fmt.Errorf("parent block not found (parent: %x)", parentID)
 			}
@@ -229,14 +224,14 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		func(header *flow.Header) error {
 
 			// check that we have the parent
-			parent, found := in.headers[header.ParentID]
+			parent, found := in.headers.Load(header.ParentID)
 			if !found {
 				return fmt.Errorf("can't broadcast with unknown parent")
 			}
 
 			// set the height and chain ID
-			header.ChainID = parent.ChainID
-			header.Height = parent.Height + 1
+			header.ChainID = parent.(*flow.Header).ChainID
+			header.Height = parent.(*flow.Header).Height + 1
 			return nil
 		},
 	)
@@ -248,9 +243,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 			// as we don't use mocks to assert expectations, but only to
 			// simulate behaviour, we should drop the call data regularly
-			if len(in.headers)%100 == 0 {
-				in.snapshot.Calls = nil
-				in.proto.Calls = nil
+			block, found := in.headers.Load(blockID)
+			if !found {
+				return fmt.Errorf("can't broadcast with unknown parent")
+			}
+			if block.(*flow.Header).Height%100 == 0 {
+				in.committee.Calls = nil
 				in.builder.Calls = nil
 				in.signer.Calls = nil
 				in.verifier.Calls = nil
@@ -280,24 +278,21 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	metrics.On("HotStuffBusyDuration", mock.Anything)
 	metrics.On("HotStuffIdleDuration", mock.Anything)
 
-	// initialize the viewstate
-	in.viewstate, err = viewstate.New(in.proto, in.localID, filter.Any)
-	require.NoError(t, err)
-
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
 	in.pacemaker, err = pacemaker.New(DefaultStart(), controller, notifier)
 	require.NoError(t, err)
 
 	// initialize the block producer
-	in.producer, err = blockproducer.New(in.signer, in.viewstate, in.builder)
+	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)
 	require.NoError(t, err)
 
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root, 0)
 	rootQC := &model.QuorumCertificate{
-		View:    rootBlock.View,
-		BlockID: rootBlock.BlockID,
+		View:      rootBlock.View,
+		BlockID:   rootBlock.BlockID,
+		SignerIDs: in.participants.NodeIDs(),
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)
@@ -311,16 +306,16 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.forks = forks.New(forkalizer, choice)
 
 	// initialize the validator
-	in.validator = validator.New(in.viewstate, in.forks, in.verifier)
+	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
 	// initialize the vote aggregator
-	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.viewstate, in.validator, in.signer)
+	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)
 
 	// initialize the voter
 	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
 
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.viewstate, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
 	require.NoError(t, err)
 
 	return &in

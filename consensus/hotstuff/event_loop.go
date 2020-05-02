@@ -42,6 +42,11 @@ func NewEventLoop(log zerolog.Logger, metrics module.Metrics, eventHandler Event
 
 func (el *EventLoop) loop() {
 
+	err := el.eventHandler.Start()
+	if err != nil {
+		el.log.Fatal().Err(err).Msg("could not start event handler")
+	}
+
 	// hotstuff will run in an event loop to process all events synchronously. And this is what will happen when hitting errors:
 	// if hotstuff hits a known critical error, it will exit the loop (for instance, there is a conflicting block with a QC against finalized blocks
 	// if hotstuff hits a known error indicating some assumption between components is broken, it will exit the loop (for instance, hotstuff receives a block whose parent is missing)
@@ -57,8 +62,6 @@ func (el *EventLoop) loop() {
 		// other events.
 		timeoutChannel := el.eventHandler.TimeoutChannel()
 
-		idleStart := time.Now()
-
 		// the first select makes sure we process timeouts with priority
 		select {
 
@@ -68,10 +71,6 @@ func (el *EventLoop) loop() {
 
 		// if we receive a time out, process it and log errors
 		case <-timeoutChannel:
-
-			// meansure how long the event loop was idle waiting for an
-			// incoming event
-			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
 
@@ -87,6 +86,8 @@ func (el *EventLoop) loop() {
 		default:
 			// fall through to non-priority events
 		}
+
+		idleStart := time.Now()
 
 		// select for block headers/votes here
 		select {
@@ -156,9 +157,9 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint
 	proposal := model.ProposalFromFlow(proposalHeader, parentView)
 	el.proposals <- proposal
 
-	// the busy duration is measured as how long it takes from a block being
-	// received to a block being handled by the event handler.
-	el.metrics.HotStuffBusyDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
+	// the wait duration is measured as how long it takes from a block being
+	// received to event handler commencing the processing of the block
+	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
 }
 
 // SubmitVote pushes the received vote to the votes channel
@@ -169,7 +170,7 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 	el.votes <- vote
 
 	// the wait duration is measured as how long it takes from a vote being
-	// received to a vote being handled by the event handler.
+	// received to event handler commencing the processing of the vote
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnVote)
 }
 
@@ -178,22 +179,11 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 // Multiple calls are handled gracefully and the event loop will only start
 // once.
 func (el *EventLoop) Ready() <-chan struct{} {
-	err := el.eventHandler.Start()
-	if err != nil {
-		el.log.Fatal().Err(err).Msg("could not start event handler")
-	}
-
 	el.unit.Launch(el.loop)
-
 	return el.unit.Ready()
 }
 
 // Done implements interface module.ReadyDoneAware
 func (el *EventLoop) Done() <-chan struct{} {
 	return el.unit.Done()
-}
-
-// Wait implements a function to wait for the event loop to exit.
-func (el *EventLoop) Wait() <-chan struct{} {
-	return el.unit.Quit()
 }

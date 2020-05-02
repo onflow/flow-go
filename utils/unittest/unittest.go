@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/dgraph-io/badger/v2/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,9 +68,10 @@ func RequireReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 // NOTE: This should only be used in cases where `errors.Is` cannot be, like
 // when errors are transmitted over the network without type information.
 func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
-	assert.NotNil(t, expected)
-	assert.NotNil(t, actual)
-	assert.True(t, strings.Contains(actual.Error(), expected.Error()))
+	require.NotNil(t, expected)
+	require.NotNil(t, actual)
+	assert.True(t, strings.Contains(actual.Error(), expected.Error()),
+		"expected error: '%s', got: '%s'", expected.Error(), actual.Error())
 }
 
 func TempDBDir(t testing.TB) string {
@@ -91,7 +91,12 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 
 	dir := TempDBDir(t)
 
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
+	opts := badger.
+		LSMOnlyOptions(dir).
+		WithKeepL0InMemory(true).
+		WithLogger(nil)
+
+	db, err := badger.Open(opts)
 	require.Nil(t, err)
 
 	return db, dir
@@ -99,8 +104,13 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	RunWithTempDBDir(t, func(dir string) {
-		// Ref: https://github.com/dgraph-io/badger#memory-usage
-		db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
+
+		opts := badger.
+			LSMOnlyOptions(dir).
+			WithKeepL0InMemory(true).
+			WithLogger(nil)
+
+		db, err := badger.Open(opts)
 		require.NoError(t, err)
 
 		f(db)

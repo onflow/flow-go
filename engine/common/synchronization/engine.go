@@ -5,11 +5,11 @@ package synchronization
 import (
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"sort"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -65,12 +65,12 @@ func New(
 		heights:  make(map[uint64]*Status),
 		blockIDs: make(map[flow.Identifier]*Status),
 
-		pollInterval:  10 * time.Second,
+		pollInterval:  8 * time.Second,
 		scanInterval:  1 * time.Second,
-		retryInterval: 10 * time.Second,
-		maxAttempts:   3,
+		retryInterval: 4 * time.Second,
+		maxAttempts:   5,
 		maxSize:       64,
-		maxRequests:   2,
+		maxRequests:   3,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -228,14 +228,8 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		return fmt.Errorf("could not get finalized head: %w", err)
 	}
 
-	// currently, we use `math.MaxUint64` as sentinel to indicate we want all finalized
-	// blocks, starting from the from field
-	if req.ToHeight == math.MaxUint64 {
-		req.ToHeight = head.Height
-	}
-
-	// if we don't have the full range, or there is nothing to send, bail
-	if head.Height < req.ToHeight || req.FromHeight > req.ToHeight {
+	// if we don't have anything to send, we can bail right away
+	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
 		return nil
 	}
 
@@ -253,6 +247,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		blocks = append(blocks, block)
 	}
 
+	// if there are no blocks to send, skip network message
 	if len(blocks) == 0 {
 		e.log.Debug().Msg("skipping empty range response")
 		return nil
@@ -274,16 +269,20 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 // onBatchRequest processes a request for a specific block by block ID.
 func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
 
-	// TODO: de-duplicate the elements in `req.BlockIDs` to prevent an uplink exhaustion attack (e.g. a request to send 500 times the same block).
-
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
 		return nil
 	}
 
-	// try to get all the blocks by ID
-	blocks := make([]*flow.Block, 0, len(req.BlockIDs))
+	// deduplicate the block IDs in the batch request
+	blockIDs := make(map[flow.Identifier]struct{})
 	for _, blockID := range req.BlockIDs {
+		blockIDs[blockID] = struct{}{}
+	}
+
+	// try to get all the blocks by ID
+	blocks := make([]*flow.Block, 0, len(blockIDs))
+	for blockID := range blockIDs {
 		block, err := e.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
@@ -295,12 +294,13 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 		blocks = append(blocks, block)
 	}
 
+	// if there are no blocks to send, skip network message
 	if len(blocks) == 0 {
 		e.log.Debug().Msg("skipping empty batch response")
 		return nil
 	}
 
-	// build the response
+	// send the response
 	res := &messages.BlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
@@ -347,11 +347,6 @@ func (e *Engine) queueByHeight(height uint64) {
 // queueByBlockID queues a request for a block by block ID.
 func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 
-	// Do not bother with the zero ID
-	if blockID == flow.ZeroID {
-		return
-	}
-
 	// if we already have the blockID, skip
 	_, ok := e.blockIDs[blockID]
 	if ok {
@@ -373,7 +368,7 @@ func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 // overlap between block IDs and heights.
 func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Block) {
 
-	// check if we still need to process this height or it is stale already
+	// check if we still need to process this block or it is stale already
 	blockID := block.ID()
 	_, wantHeight := e.heights[block.Height]
 	_, wantBlockID := e.blockIDs[blockID]
@@ -448,6 +443,7 @@ func (e *Engine) pollHeight() error {
 		return fmt.Errorf("could not send get consensus identities: %w", err)
 	}
 
+	var errs error
 	// send the request for synchronization
 	for _, targetID := range identities.Sample(3).NodeIDs() {
 		req := &messages.SyncRequest{
@@ -456,11 +452,11 @@ func (e *Engine) pollHeight() error {
 		}
 		err := e.con.Submit(req, targetID)
 		if err != nil {
-			return fmt.Errorf("could not send sync request: %w", err)
+			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
 		}
 	}
 
-	return nil
+	return errs
 }
 
 // scanPending will check which items shall be requested.
@@ -493,8 +489,6 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 		}
 
 		// otherwise, append to heights to be requested
-		status.Requested = time.Now()
-		status.Attempts++
 		heights = append(heights, height)
 	}
 
@@ -515,8 +509,6 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 		}
 
 		// otherwise, append to blockIDs to be requested
-		status.Requested = now
-		status.Attempts++
 		blockIDs = append(blockIDs, blockID)
 	}
 
@@ -550,50 +542,65 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 	var ranges []Range
 	for index, height := range heights {
 
-		// check if we start a range
-		if start == 0 {
-			start = height
-			end = height
-		}
-
-		// if current height jumps a gap, create a range and start a new one
-		// at the current height
-		// if we have reached the maximum range size, create a new range and
-		// start a new one as well
-		if height > end+1 {
-			r := Range{From: start, To: end}
-			ranges = append(ranges, r)
-			start = height
-		} else if end-start+1 >= uint64(e.maxSize) {
-			r := Range{From: start, To: end}
-			ranges = append(ranges, r)
+		// on the first iteration, we set the start pointer, so we don't need to
+		// guard the for loop when heights is empty
+		if index == 0 {
 			start = height
 		}
 
-		// set end to current height
+		// we always forward the end pointer to the new height
 		end = height
 
-		// if we have reached the end of the loop, create one final range
+		// if we have the end of the loop, we always create one final range
 		if index >= len(heights)-1 {
 			r := Range{From: start, To: end}
 			ranges = append(ranges, r)
 			break
 		}
+
+		// at this point, we will have a next height as iteration will continue
+		nextHeight := heights[index+1]
+
+		// if we have reached the maximum size for a range, we create the range
+		// and forward the start pointer to the next height
+		rangeSize := end - start + 1
+		if rangeSize >= uint64(e.maxSize) {
+			r := Range{From: start, To: end}
+			ranges = append(ranges, r)
+			start = nextHeight
+			continue
+		}
+
+		// if end is more than one smaller than the next height, we have a gap
+		// next, so we create a range and forward the start pointer
+		if nextHeight > end+1 {
+			r := Range{From: start, To: end}
+			ranges = append(ranges, r)
+			start = nextHeight
+			continue
+		}
 	}
 
 	// for each range, send a request until reaching max number
 	totalRequests := uint(0)
-	for _, r := range ranges {
+	for _, ran := range ranges {
 
 		// send the request first
 		req := &messages.RangeRequest{
 			Nonce:      rand.Uint64(),
-			FromHeight: r.From,
-			ToHeight:   r.To,
+			FromHeight: ran.From,
+			ToHeight:   ran.To,
 		}
 		err := e.con.Submit(req, identities.Sample(3).NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not send range request: %w", err)
+		}
+
+		// mark all of the heights as requested; these should always be there as
+		// we call this right after the scan and nothing else can delete keys
+		for height := ran.From; height <= ran.To; height++ {
+			e.heights[height].Requested = time.Now()
+			e.heights[height].Attempts++
 		}
 
 		// check if we reached the maximum number of requests for this period
@@ -621,6 +628,13 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 		err := e.con.Submit(req, identities.Sample(3).NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not send batch request: %w", err)
+		}
+
+		// mark all of the blocks as requested; these should always be there as
+		// we call this right after the scan and nothing else can delete keys
+		for _, blockID := range requestIDs {
+			e.blockIDs[blockID].Requested = time.Now()
+			e.blockIDs[blockID].Attempts++
 		}
 
 		// check if we reached maximum requests

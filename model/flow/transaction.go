@@ -303,7 +303,7 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 }
 
 // Encode serializes the full transaction data including the payload and all signatures.
-func (tb *TransactionBody) Encode() []byte {
+func (tb TransactionBody) Encode() []byte {
 	temp := struct {
 		Payload            interface{}
 		PayloadSignatures  interface{}

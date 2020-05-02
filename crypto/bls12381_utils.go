@@ -2,9 +2,13 @@
 
 package crypto
 
+// this file contains utility functions for the curve BLS 12-381
+// these tools are shared by the BLS signature scheme, the BLS based threshold signature
+// and the BLS distributed key generation protcols
+
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
-// #include "bls_include.h"
+// #include "bls12381_utils.h"
 import "C"
 import (
 	"errors"
@@ -38,38 +42,6 @@ func (ct *ctx) initContext() error {
 	return nil
 }
 
-// reInitContext re init the context of the C layer with pre-saved data
-func (ct *ctx) reInitContext() {
-	C.core_set(ct.relicCtx)
-	C.precomputed_data_set(ct.precCtx)
-}
-
-// Exponentiation in G1 (scalar point multiplication)
-func (p *pointG1) _G1scalarPointMult(res *pointG1, expo *scalar) {
-	C._G1scalarPointMult((*C.ep_st)(res), (*C.ep_st)(p), (*C.bn_st)(expo))
-}
-
-// Exponentiation of g1 in G1
-// This function is for DEBUG/TESTs purpose only
-func _G1scalarGenMult(res *pointG1, expo *scalar) {
-	C._G1scalarGenMult((*C.ep_st)(res), (*C.bn_st)(expo))
-}
-
-// Exponentiation of g2 in G2
-func _G2scalarGenMult(res *pointG2, expo *scalar) {
-	C._G2scalarGenMult((*C.ep2_st)(res), (*C.bn_st)(expo))
-}
-
-// comparison in Zp (both scalars are reduced mod p)
-func (x *scalar) equals(other *scalar) bool {
-	return C.bn_cmp((*C.bn_st)(x), (*C.bn_st)(other)) == valid
-}
-
-// comparison in G2
-func (p *pointG2) equals(other *pointG2) bool {
-	return C.ep2_cmp((*C.ep2_st)(p), (*C.ep2_st)(other)) == valid
-}
-
 // seeds the internal relic random function
 func seedRelic(seed []byte) error {
 	if len(seed) < (securityBits / 8) {
@@ -84,6 +56,39 @@ func seedRelic(seed []byte) error {
 	return nil
 }
 
+// reInitContext re init the context of the C layer with pre-saved data
+func (ct *ctx) reInitContext() {
+	C.core_set(ct.relicCtx)
+	C.precomputed_data_set(ct.precCtx)
+}
+
+// Exponentiation in G1 (scalar point multiplication)
+func (p *pointG1) scalarMultG1(res *pointG1, expo *scalar) {
+	C.ep_mult((*C.ep_st)(res), (*C.ep_st)(p), (*C.bn_st)(expo))
+}
+
+// This function is for DEBUG/TEST only
+// Exponentiation of g1 in G1
+func genScalarMultG1(res *pointG1, expo *scalar) {
+	C.ep_mult_gen((*C.ep_st)(res), (*C.bn_st)(expo))
+}
+
+// Exponentiation of g2 in G2
+func genScalarMultG2(res *pointG2, expo *scalar) {
+	C.ep2_mult_gen((*C.ep2_st)(res), (*C.bn_st)(expo))
+}
+
+// comparison in Zr where r is the group order of G1/G2
+// (both scalars should be reduced mod r)
+func (x *scalar) equals(other *scalar) bool {
+	return C.bn_cmp((*C.bn_st)(x), (*C.bn_st)(other)) == valid
+}
+
+// comparison in G2
+func (p *pointG2) equals(other *pointG2) bool {
+	return C.ep2_cmp((*C.ep2_st)(p), (*C.ep2_st)(other)) == valid
+}
+
 // returns a random number in Zr
 func randZr(x *scalar) error {
 	C.bn_randZr((*C.bn_st)(x))
@@ -93,25 +98,16 @@ func randZr(x *scalar) error {
 	return nil
 }
 
-// mapKeyZr reads a private key from a slice of bytes and maps it to Zr
+// mapToZr reads a scalar from a slice of bytes and maps it to Zr
 // the resulting scalar is in the range 0 < k < r
-func mapKeyZr(x *scalar, src []byte) error {
+func mapToZr(x *scalar, src []byte) error {
 	if len(src) > maxScalarSize {
 		return fmt.Errorf("input slice length must be less than %d", maxScalarSize)
 	}
-	C.bn_privateKey_mod_r((*C.bn_st)(x),
+	C.bn_map_to_Zr((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 	return nil
-}
-
-// TEST/DEBUG/BENCH
-// returns the hash to G1 point
-func hashToG1(data []byte) *pointG1 {
-	l := len(data)
-	var h pointG1
-	C.mapToG1((*C.ep_st)(&h), (*C.uchar)(&data[0]), (C.int)(l))
-	return &h
 }
 
 // sets a scalar to a small integer
@@ -137,7 +133,7 @@ func readScalar(x *scalar, src []byte) {
 
 // writePointG2 writes a G2 point in a slice of bytes
 func writePointG2(dest []byte, a *pointG2) {
-	C._ep2_write_bin_compact((*C.uchar)(&dest[0]),
+	C.ep2_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(a),
 		(C.int)(pubKeyLengthBLSBLS12381),
 	)

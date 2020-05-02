@@ -7,16 +7,15 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/viewstate"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/dkg"
@@ -92,13 +91,6 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 
 	forks := &mocks.ForksReader{}
 
-	// create selector
-	nodeIDs := make([]flow.Identifier, 0, len(participantData.Participants))
-	for _, participant := range participantData.Participants {
-		nodeIDs = append(nodeIDs, participant.NodeID)
-	}
-	selector := filter.HasNodeID(nodeIDs...)
-
 	for i, participant := range participantData.Participants {
 		// get the participant private keys
 		keys, err := participant.PrivateKeys()
@@ -111,21 +103,21 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 			return nil, nil, err
 		}
 
-		// create signer
-		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
-		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
-		merger := signature.NewCombiner()
-		signer := verification.NewCombinedSigner(ps, participantData.DKGState, stakingSigner, beaconSigner, merger, selector, participant.NodeID)
-		signers[i] = signer
-
-		// create view state
-		vs, err := viewstate.New(ps, participant.NodeID, selector)
+		// create consensus committee's state
+		committee, err := committee.NewMainConsensusCommitteeState(ps, participant.NodeID)
 		if err != nil {
 			return nil, nil, err
 		}
 
+		// create signer
+		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
+		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
+		merger := signature.NewCombiner()
+		signer := verification.NewCombinedSigner(committee, participantData.DKGState, stakingSigner, beaconSigner, merger, participant.NodeID)
+		signers[i] = signer
+
 		// create validator
-		v := validator.New(vs, forks, signer)
+		v := validator.New(committee, forks, signer)
 		validators[i] = v
 	}
 
@@ -139,7 +131,12 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 		return nil, nil, err
 	}
 
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
+	opts := badger.
+		LSMOnlyOptions(dir).
+		WithKeepL0InMemory(true).
+		WithLogger(nil)
+
+	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -149,7 +146,7 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 		return nil, nil, err
 	}
 
-	err = state.Mutate().Bootstrap(block)
+	err = state.Mutate().Bootstrap(nil, block)
 	if err != nil {
 		return nil, nil, err
 	}

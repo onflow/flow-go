@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -29,38 +30,52 @@ import (
 // the happy path should result in dissemination of a result approval for each
 // distinct chunk by each verification node. The result approvals should be
 // sent to the consensus nodes
+//
+// NOTE: some test cases are meant to solely run locally when FLOWLOCAL environmental
+// variable is set to TRUE
 func TestHappyPath(t *testing.T) {
 	testcases := []struct {
 		verNodeCount,
 		chunkCount int
+		ci bool // indicates if this test should run on CI
 	}{
 		{
 			verNodeCount: 1,
 			chunkCount:   2,
+			ci:           true,
 		},
 		{
 			verNodeCount: 1,
 			chunkCount:   10,
+			ci:           true,
 		},
 		{
 			verNodeCount: 2,
 			chunkCount:   2,
+			ci:           true,
 		},
 		{
 			verNodeCount: 2,
 			chunkCount:   10,
+			ci:           true,
 		},
 		{
 			verNodeCount: 5,
 			chunkCount:   2,
+			ci:           false,
 		},
 		{
 			verNodeCount: 5,
 			chunkCount:   10,
+			ci:           false,
 		},
 	}
 
 	for _, tc := range testcases {
+		if os.Getenv("FLOWLOCAL") != "TRUE" && !tc.ci {
+			// skip the test case if it is not meant for CI
+			continue
+		}
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
 			testHappyPath(t, tc.verNodeCount, tc.chunkCount)
 		})
@@ -77,6 +92,12 @@ func TestHappyPath(t *testing.T) {
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
 func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
+	// ingest engine parameters
+	// set based on following issue
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	requestInterval := uint(1000)
+	failureThreshold := uint(2)
+
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
@@ -120,7 +141,10 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 	for _, verIdentity := range verIdentities {
-		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
+		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
+
+		// starts the ingest engine
+		<-verNode.IngestEngine.Ready()
 
 		// assumes the verification node has received the block
 		err := verNode.BlockStorage.Store(completeER.Block)
@@ -138,12 +162,15 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 			assert.Nil(t, err)
 		}
 	}
+	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
+	assert.True(t, ok)
+	colNet.StartConDev(100, true)
 
 	// mock execution node
 	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
 
 	// mock consensus node
-	conNode, conEngine := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
+	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
 
 	// duplicates the ER (receipt1) into another ER (receipt2)
 	// that share their result part
@@ -178,7 +205,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		}(verNode)
 	}
 
-	unittest.AssertReturnsBefore(t, verWG.Wait, 5*time.Second)
+	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 
 	for _, verNode := range verNodes {
 		// both receipts should be added to the authenticated mempool of verification node
@@ -186,12 +213,14 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		// and do not reside in pending pool
 		require.False(t, verNode.PendingReceipts.Has(receipt1.ID()) || verNode.PendingReceipts.Has(receipt2.ID()))
 	}
-
-	// flush the collection requests
+	// creates a network instance for each verification node
+	// and sets it in continuous delivery mode
+	// then flushes the collection requests
 	verNets := make([]*stub.Network, 0)
 	for _, verIdentity := range verIdentities {
 		verNet, ok := hub.GetNetwork(verIdentity.NodeID)
 		assert.True(t, ok)
+		verNet.StartConDev(requestInterval, true)
 		verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
 			return m.ChannelID == engine.CollectionProvider
 		})
@@ -199,23 +228,25 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		verNets = append(verNets, verNet)
 	}
 
-	// flush the collection response
-	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
-	assert.True(t, ok)
-	colNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.CollectionProvider
-	})
-
-	// flush the result approval broadcast
-	for _, verNet := range verNets {
-		verNet.DeliverAll(true)
-	}
-
+	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 
 	// assert proper number of calls made
 	exeEngine.AssertExpectations(t)
+
+	// stops verification nodes
+	// Note: this should be done prior to any evaluation to make sure that
+	// the process method of Ingest engines is done working.
+	for _, verNode := range verNodes {
+		<-verNode.IngestEngine.Done()
+	}
+
+	// stops continuous delivery of verification nodes
+	for _, verNet := range verNets {
+		verNet.StopConDev()
+	}
+	colNet.StopConDev()
 
 	// resource cleanup
 	//
@@ -250,7 +281,12 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 // path assuming a single collection (including transactions on counter example)
 // are submited to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
+	// TODO unskip this :(
 	t.Skip()
+
+	// ingest engine parameters
+	requestInterval := uint(1)
+	failureThreshold := uint(1)
 
 	// network identity setup
 	hub := stub.NewNetworkHub()
@@ -279,7 +315,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// setup nodes
 
 	// verification node
-	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner)
+	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
 	// inject block
 	err := verNode.BlockStorage.Store(completeER.Block)
 	assert.Nil(t, err)
@@ -383,7 +419,7 @@ func setupMockExeNode(t *testing.T,
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if isAssigned(len(completeER.ChunkDataPacks), int(chunk.Index)) {
+		if isAssigned(int(chunk.Index), len(completeER.ChunkDataPacks)) {
 			chunkDataPackCount++
 		}
 	}
@@ -450,15 +486,21 @@ func setupMockConsensusNode(t *testing.T,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
-	completeER verification.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
-
+	completeER verification.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if isAssigned(len(completeER.ChunkDataPacks), int(chunk.Index)) {
+		if isAssigned(int(chunk.Index), len(completeER.ChunkDataPacks)) {
 			approvalsCount++
 		}
 	}
+
+	wg := &sync.WaitGroup{}
+	// each verification node is assigned to `approvalsCount`-many independent chunks
+	// and there are `len(verIdentities)`-many verification nodes
+	// so there is a total of len(verIdentities) * approvalsCount expected
+	// result approvals
+	wg.Add(len(verIdentities) * approvalsCount)
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
@@ -488,17 +530,14 @@ func setupMockConsensusNode(t *testing.T,
 
 			// asserts that the result approval is assigned to the verifier
 			assert.True(t, isAssigned(int(resultApproval.Body.ChunkIndex), len(completeER.ChunkDataPacks)))
-		}).Return(nil).
-		// each verification node is assigned to `approvalsCount`-many independent chunks
-		// and there are `len(verIdentities)`-many verification nodes
-		// so there is a total of len(verIdentities) * approvalsCount expected
-		// result approvals
-		Times(len(verIdentities) * approvalsCount)
+
+			wg.Done()
+		}).Return(nil)
 
 	_, err := conNode.Net.Register(engine.ApprovalProvider, conEngine)
 	assert.Nil(t, err)
 
-	return &conNode, conEngine
+	return &conNode, conEngine, wg
 }
 
 // isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]

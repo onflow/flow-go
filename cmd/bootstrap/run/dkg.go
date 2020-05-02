@@ -53,7 +53,7 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 		// start dkg could also run in parallel
 		// but they are run sequentially to avoid having non-deterministic
 		// output (the PRG used is common)
-		err := processors[i].dkg.StartDKG(seeds[i])
+		err := processors[i].dkg.Start(seeds[i])
 		if err != nil {
 			return model.DKGData{}, err
 		}
@@ -90,7 +90,7 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 // localDKGProcessor implements DKGProcessor interface
 type localDKGProcessor struct {
 	current     int
-	dkg         crypto.DKGstate
+	dkg         crypto.DKGState
 	chans       []chan *message
 	privkey     crypto.PrivateKey
 	pubgroupkey crypto.PublicKey
@@ -102,8 +102,8 @@ type message struct {
 	data []byte
 }
 
-// Send a message from one node to another
-func (proc *localDKGProcessor) Send(dest int, data []byte) {
+// PrivateSend a message from one node to another
+func (proc *localDKGProcessor) PrivateSend(dest int, data []byte) {
 	newMsg := &message{proc.current, data}
 	proc.chans[dest] <- newMsg
 }
@@ -150,7 +150,7 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 					log.Fatal().Err(err).Msg("failed to wait for next timeout")
 				}
 			case 2:
-				privkey, pubgroupkey, _, err := proc.dkg.EndDKG()
+				privkey, pubgroupkey, _, err := proc.dkg.End()
 				if err != nil {
 					log.Fatal().Err(err).Msg("end dkg error should be nit")
 				}

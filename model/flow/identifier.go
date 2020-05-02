@@ -21,9 +21,6 @@ var (
 	ZeroID = Identifier{}
 )
 
-var GenesisParentID = ZeroID
-var GenesisExecutionResultParentID = ZeroID
-
 // HexStringToIdentifier converts a hex string to an identifier. The input
 // must be 64 characters long and contain only valid hex characters.
 func HexStringToIdentifier(hexString string) (Identifier, error) {
@@ -71,10 +68,17 @@ func HashToID(hash []byte) Identifier {
 }
 
 // MakeID creates an ID from the hash of encoded data.
+// By default, uses the default encoder. If the input defines its own
+// canonical encoding by implementing Encodable, uses that instead.
 func MakeID(body interface{}) Identifier {
-	data := encoding.DefaultEncoder.MustEncode(body)
+	var encoded []byte
+	if encodable, ok := body.(encoding.Encodable); ok {
+		encoded = encodable.Encode()
+	} else {
+		encoded = encoding.DefaultEncoder.MustEncode(body)
+	}
 	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(data)
+	hash := hasher.ComputeHash(encoded)
 	return HashToID(hash)
 }
 

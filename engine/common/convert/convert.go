@@ -216,3 +216,12 @@ func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) 
 		Weight:    uint32(a.Weight),
 	}, nil
 }
+
+func EventsToMessages(flowEvents []flow.Event) []*entities.Event {
+	events := make([]*entities.Event, len(flowEvents))
+	for i, e := range flowEvents {
+		event := EventToMessage(e)
+		events[i] = event
+	}
+	return events
+}
