@@ -128,7 +128,7 @@ func main() {
 			cache := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(node.Logger, node.Network, node.Me, cleaner, headersDB, payloadsDB, node.State, prov, cache)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, cleaner, headersDB, payloadsDB, node.State, prov, cache, node.Metrics)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -170,7 +170,7 @@ func main() {
 			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, guaranteesDB, sealsDB)
 
 			// query the last finalized block and unfinalized blocks for recovery
-			rootHeader := &node.GenesisBlock.Header
+			rootHeader := node.GenesisBlock.Header
 			finalized, unfinalized, err := findLatest(node.State, headersDB, rootHeader)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and unfinalized blocks: %w", err)
@@ -179,7 +179,7 @@ func main() {
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger, notifier, node.Metrics, headersDB, viewsDB, committee, node.State,
-				build, final, signer, comp, &node.GenesisBlock.Header, node.GenesisQC,
+				build, final, signer, comp, node.GenesisBlock.Header, node.GenesisQC,
 				finalized, unfinalized,
 				consensus.WithTimeout(hotstuffTimeout),
 			)

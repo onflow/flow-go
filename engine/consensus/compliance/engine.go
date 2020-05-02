@@ -33,9 +33,10 @@ type Engine struct {
 	state    protocol.State
 	con      network.Conduit
 	prov     network.Engine
-	pending  module.PendingBlockBuffer
+	pending  module.PendingBlockBuffer // pending block cache
 	sync     module.Synchronization
 	hotstuff module.HotStuff
+	metrics  module.Metrics
 }
 
 // New creates a new consensus propagation engine.
@@ -49,6 +50,7 @@ func New(
 	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
+	metrics module.Metrics,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -62,6 +64,7 @@ func New(
 		state:    state,
 		prov:     prov,
 		pending:  pending,
+		metrics:  metrics,
 		sync:     nil, // use `WithSynchronization`
 		hotstuff: nil, // use `WithConsensus`
 	}
@@ -151,7 +154,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	log := e.log.With().
 		Uint64("block_view", view).
 		Hex("block_id", blockID[:]).
-		Hex("signer", logging.ID(e.me.NodeID())).
+		Hex("voter", logging.ID(e.me.NodeID())).
 		Logger()
 
 	log.Info().Msg("processing vote transmission request from hotstuff")
@@ -202,8 +205,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("parent_voters", len(header.ParentVoterIDs)).
-		Hex("parent_sig", header.ParentVoterSig[:]).
+		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 
 	log.Info().Msg("processing proposal broadcast request from hotstuff")
@@ -243,11 +245,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	// node roles
 	e.prov.SubmitLocal(msg)
 
-	// after broadcasting a new proposal is a great time to garbage collect
-	// on badger; we won't need to do any heavy work soon, because the other
-	// replicas will be busy validating our proposal
-	e.cleaner.RunGC()
-
 	return nil
 }
 
@@ -286,10 +283,10 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 	// process as proposal
 	proposal := &messages.BlockProposal{
-		Header:  &synced.Block.Header,
-		Payload: &synced.Block.Payload,
+		Header:  synced.Block.Header,
+		Payload: synced.Block.Payload,
 	}
-	return e.onBlockProposal(synced.Block.ProposerID, proposal)
+	return e.onBlockProposal(synced.Block.Header.ProposerID, proposal)
 }
 
 // onBlockProposal handles incoming block proposals.
@@ -306,11 +303,13 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("parent_voters", len(header.ParentVoterIDs)).
-		Hex("parent_sig", header.ParentVoterSig[:]).
+		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 
 	log.Info().Msg("block proposal received")
+
+	e.prunePendingCache()
+	e.metrics.PendingBlocks(e.pending.Size())
 
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
@@ -351,8 +350,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// => in each case, we cache the proposal and request the missing link
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
-
-	// TODO: prune cache from outdated blocks
 
 	// if we can connect the proposal to an ancestor in the cache, it means
 	// there is a missing link; we cache it and request the missing link
@@ -404,6 +401,12 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
 
+	// most of the heavy database checks are done at this point, so this is a
+	// good moment to potentially kick-off a garbage collection of the DB
+	// NOTE: this is only effectively run every 1000th calls, which corresponds
+	// to every 1000th successfully processed block
+	e.cleaner.RunGC()
+
 	return nil
 }
 
@@ -424,8 +427,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("parent_voters", len(header.ParentVoterIDs)).
-		Hex("parent_sig", header.ParentVoterSig[:]).
+		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 
 	log.Info().Msg("processing block proposal")
@@ -515,4 +517,15 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	e.pending.DropForParent(header)
 
 	return result.ErrorOrNil()
+}
+
+// prunePendingCache prunes the pending block cache.
+func (e *Engine) prunePendingCache() {
+	// retrieve the finalized height
+	final, err := e.state.Final().Head()
+	if err != nil {
+		e.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
+		return
+	}
+	e.pending.PruneByHeight(final.Height)
 }

@@ -268,7 +268,7 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		key := m.generateNetworkingKey(target[:])
 
 		// creates new middleware
-		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics)
+		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics, DefaultMaxPubSubMsgSize)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)

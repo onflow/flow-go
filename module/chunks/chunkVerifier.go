@@ -44,7 +44,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	if ch.Block == nil {
 		return nil, fmt.Errorf("missing block")
 	}
-	blockCtx := fcv.vm.NewBlockContext(&ch.Block.Header)
+	blockCtx := fcv.vm.NewBlockContext(ch.Block.Header)
 
 	// constructing a partial trie given chunk data package
 	if ch.ChunkDataPack == nil {

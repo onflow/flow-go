@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dchest/siphash"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -193,7 +193,18 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	}
 
 	// use a hash with an engine-specific salt to get the payload hash
-	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
+	h := hash.NewSHA3_384()
+	_, err = h.Write([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not hash channel ID as salt")
+	}
+
+	_, err = h.Write(payload)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not hash event")
+	}
+
+	payloadHash := h.SumHash()
 
 	var emTargets [][]byte
 	for _, targetID := range targetIDs {
@@ -208,7 +219,7 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: uint32(channelID),
-		EventID:   sip.Sum(payload),
+		EventID:   payloadHash,
 		OriginID:  originID,
 		TargetIDs: emTargets,
 		Payload:   payload,

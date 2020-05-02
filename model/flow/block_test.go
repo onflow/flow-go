@@ -1,15 +1,74 @@
 package flow_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func Test_NilProducesSameHashAsEmptySlice(t *testing.T) {
+func TestGenesisEncodingJSON(t *testing.T) {
+	identities := unittest.IdentityListFixture(8)
+	genesis := flow.Genesis(identities)
+	genesisID := genesis.ID()
+	data, err := json.Marshal(genesis)
+	require.NoError(t, err)
+	fmt.Println(string(data))
+	var decoded flow.Block
+	err = json.Unmarshal(data, &decoded)
+	require.NoError(t, err)
+	decodedID := decoded.ID()
+	assert.Equal(t, genesisID, decodedID)
+	assert.Equal(t, genesis, &decoded)
+}
+
+func TestGenesisDecodingMsgpack(t *testing.T) {
+	identities := unittest.IdentityListFixture(8)
+	genesis := flow.Genesis(identities)
+	genesisID := genesis.ID()
+	data, err := msgpack.Marshal(genesis)
+	require.NoError(t, err)
+	var decoded flow.Block
+	err = msgpack.Unmarshal(data, &decoded)
+	require.NoError(t, err)
+	decodedID := decoded.ID()
+	assert.Equal(t, genesisID, decodedID)
+	assert.Equal(t, genesis, &decoded)
+}
+
+func TestBlockEncodingJSON(t *testing.T) {
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	data, err := json.Marshal(block)
+	require.NoError(t, err)
+	var decoded flow.Block
+	err = json.Unmarshal(data, &decoded)
+	require.NoError(t, err)
+	decodedID := decoded.ID()
+	assert.Equal(t, blockID, decodedID)
+	assert.Equal(t, block, decoded)
+}
+
+func TestBlockEncodingMsgpack(t *testing.T) {
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	data, err := msgpack.Marshal(block)
+	require.NoError(t, err)
+	var decoded flow.Block
+	err = msgpack.Unmarshal(data, &decoded)
+	require.NoError(t, err)
+	decodedID := decoded.ID()
+	assert.Equal(t, blockID, decodedID)
+	assert.Equal(t, block, decoded)
+}
+
+func TestNilProducesSameHashAsEmptySlice(t *testing.T) {
 
 	nilPayload := flow.Payload{
 		Identities: nil,
@@ -26,7 +85,7 @@ func Test_NilProducesSameHashAsEmptySlice(t *testing.T) {
 	assert.Equal(t, nilPayload.Hash(), slicePayload.Hash())
 }
 
-func Test_OrderingChangesHash(t *testing.T) {
+func TestOrderingChangesHash(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(5)
 

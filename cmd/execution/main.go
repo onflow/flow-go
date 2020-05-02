@@ -80,7 +80,7 @@ func main() {
 				panic("genesis seal state commitment different from precalculated")
 			}
 
-			err = bootstrap.BootstrapExecutionDatabase(node.DB, &block.Header)
+			err = bootstrap.BootstrapExecutionDatabase(node.DB, block.Header)
 			if err != nil {
 				panic(fmt.Sprintf("error while boostrapping execution state - cannot bootstrap database: %s", err))
 			}

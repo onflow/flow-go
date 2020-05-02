@@ -102,7 +102,7 @@ type message struct {
 	data []byte
 }
 
-// PrivateSend a message from one node to another
+// PrivateSend sends a message from one node to another
 func (proc *localDKGProcessor) PrivateSend(dest int, data []byte) {
 	newMsg := &message{proc.current, data}
 	proc.chans[dest] <- newMsg

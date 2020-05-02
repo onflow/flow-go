@@ -19,7 +19,7 @@ import (
 func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T) {
 	return func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
-			unittest.RunWithTempDBDir(t, func(dbDir string) {
+			unittest.RunWithTempDir(t, func(dbDir string) {
 				ls, err := ledger.NewTrieStorage(dbDir)
 				require.NoError(t, err)
 

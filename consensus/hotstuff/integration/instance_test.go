@@ -146,7 +146,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header)) *flow.Header {
+		func(parentID flow.Identifier, setter func(*flow.Header) error) *flow.Header {
 			parent, ok := in.headers.Load(parentID)
 			if !ok {
 				return nil
@@ -162,7 +162,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			in.headers.Store(header.ID(), header)
 			return header
 		},
-		func(parentID flow.Identifier, setter func(*flow.Header)) error {
+		func(parentID flow.Identifier, setter func(*flow.Header) error) error {
 			_, ok := in.headers.Load(parentID)
 			if !ok {
 				return fmt.Errorf("parent block not found (parent: %x)", parentID)

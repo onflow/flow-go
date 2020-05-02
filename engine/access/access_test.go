@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func TestAccess(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	suite.log = zerolog.Logger{}
+	suite.log = zerolog.New(os.Stderr)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
@@ -108,7 +109,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		block1 := unittest.BlockFixture()
 		// test block2 get by height
 		block2 := unittest.BlockFixture()
-		block2.Height = 2
+		block2.Header.Height = 2
 
 		blocks := bstorage.NewBlocks(db)
 		headers := bstorage.NewHeaders(db)
@@ -116,7 +117,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		require.NoError(suite.T(), blocks.Store(&block2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
-		err := db.Update(operation.InsertNumber(block2.Height, block2.ID()))
+		err := db.Update(operation.InsertNumber(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
 		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil)
@@ -147,7 +148,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			resp, err := handler.GetBlockHeaderByID(context.Background(), req)
 
 			// assert it is indeed block1
-			assertHeaderResp(resp, err, &block1.Header)
+			assertHeaderResp(resp, err, block1.Header)
 		})
 
 		suite.Run("get block 1 by ID", func() {
@@ -166,18 +167,18 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 			// get header by height
 			req := &access.GetBlockHeaderByHeightRequest{
-				Height: block2.Height,
+				Height: block2.Header.Height,
 			}
 
 			resp, err := handler.GetBlockHeaderByHeight(context.Background(), req)
 
-			assertHeaderResp(resp, err, &block2.Header)
+			assertHeaderResp(resp, err, block2.Header)
 		})
 
 		suite.Run("get block 2 by height", func() {
 			// get block details by height
 			req := &access.GetBlockByHeightRequest{
-				Height: block2.Height,
+				Height: block2.Header.Height,
 			}
 
 			resp, err := handler.GetBlockByHeight(context.Background(), req)
@@ -201,7 +202,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Once()
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
-		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
+		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
 		metrics := &mockmodule.Metrics{}
 		metrics.On("FinalizedBlocks", mock.Anything).Return()
 
@@ -269,22 +270,22 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()
-		lastBlock.Height = 2
+		lastBlock.Header.Height = 2
 		seal := flow.Seal{
 			BlockID: lastBlock.ID(),
 		}
 		err := blocks.Store(&lastBlock)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.InsertNumber(lastBlock.Height, lastBlock.ID()))
+		err = db.Update(operation.InsertNumber(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Seal").Return(&seal, nil).Once()
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockFixture()
-		prevBlock.Height = lastBlock.Height - 1
+		prevBlock.Header.Height = lastBlock.Header.Height - 1
 		err = blocks.Store(&prevBlock)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.InsertNumber(prevBlock.Height, prevBlock.ID()))
+		err = db.Update(operation.InsertNumber(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
 
 		ctx := context.Background()
@@ -341,7 +342,7 @@ func (suite *Suite) TestExecuteScript() {
 		suite.Run("execute script at block height", func() {
 			expectedResp := setupExecClientMock(prevBlock.ID())
 			req := access.ExecuteScriptAtBlockHeightRequest{
-				BlockHeight: prevBlock.Height,
+				BlockHeight: prevBlock.Header.Height,
 				Script:      script,
 			}
 			actualResp, err := handler.ExecuteScriptAtBlockHeight(ctx, &req)
@@ -357,7 +358,7 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection, flow.Seal) {
 		Signature:    crypto.Signature([]byte("signature A")),
 	}
 	block := unittest.BlockFixture()
-	block.Guarantees = []*flow.CollectionGuarantee{cg}
+	block.Payload.Guarantees = []*flow.CollectionGuarantee{cg}
 
 	seal := flow.Seal{
 		BlockID: block.ID(),

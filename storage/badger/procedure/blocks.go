@@ -17,19 +17,19 @@ func InsertBlock(block *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// store the block header
-		err := operation.InsertHeader(&block.Header)(tx)
+		err := operation.InsertHeader(block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert block header: %w", err)
 		}
 
 		// insert the block payload
-		err = InsertPayload(&block.Payload)(tx)
+		err = InsertPayload(block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert block payload: %w", err)
 		}
 
 		// index the block payload
-		err = IndexPayload(&block.Header, &block.Payload)(tx)
+		err = IndexPayload(block.Header, block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index block payload: %w", err)
 		}
@@ -44,15 +44,23 @@ func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn)
 	return func(tx *badger.Txn) error {
 
 		// get the block header
-		err := operation.RetrieveHeader(blockID, &block.Header)(tx)
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
 		}
 
 		// get the block payload
-		err = RetrievePayload(block.Header.ID(), &block.Payload)(tx)
+		var payload flow.Payload
+		err = RetrievePayload(blockID, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
+		}
+
+		// build block and replace original
+		*block = flow.Block{
+			Header:  &header,
+			Payload: &payload,
 		}
 
 		return nil
@@ -194,13 +202,13 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 	return func(tx *badger.Txn) error {
 
 		// insert genesis identities
-		err := operation.InsertIdentities(genesis.Identities)(tx)
+		err := operation.InsertIdentities(genesis.Payload.Identities)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis identities: %w", err)
 		}
 
 		// insert the block header
-		err = operation.InsertHeader(&genesis.Header)(tx)
+		err = operation.InsertHeader(genesis.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
@@ -210,7 +218,7 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 		// as the genesis identities
 
 		// index the genesis payload (still useful to have empty index entry)
-		err = IndexPayload(&genesis.Header, &genesis.Payload)(tx)
+		err = IndexPayload(genesis.Header, genesis.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
 		}
@@ -273,7 +281,7 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 		}
 
 		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.Height)(tx)
+		err = operation.InsertBoundary(genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update boundary: %w", err)
 		}
