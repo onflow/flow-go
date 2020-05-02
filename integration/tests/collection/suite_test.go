@@ -144,10 +144,20 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 	return tx
 }
 
-func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
+func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier) {
+
+	var (
+		// for quickly looking up tx IDs
+		lookup = make(map[flow.Identifier]struct{}, len(txIDs))
+		// for keeping track of which transactions we've seen
+		seen = make(map[flow.Identifier]struct{}, len(txIDs))
+	)
+	for _, txID := range txIDs {
+		lookup[txID] = struct{}{}
+	}
 
 	// the height at which the collection is included
-	var height uint64
+	height := uint64(0)
 
 	waitFor := time.Second * 30
 	deadline := time.Now().Add(waitFor)
@@ -163,14 +173,16 @@ func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 			collection := val.Payload.Collection
 			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
 
-			// note the height when transaction is includedj
-			if collection.Light().Has(txID) {
-				height = header.Height
+			for _, txID := range collection.Light().Transactions {
+				if _, exists := lookup[txID]; exists {
+					seen[txID] = struct{}{}
+					height = header.Height
+				}
 			}
 
-			// use building two blocks as an indication of inclusion
+			// use proposing two blocks as an indication of inclusion
 			// TODO replace this with finalization by listening to guarantees
-			if height > 0 && header.Height-height >= 2 {
+			if len(seen) == len(lookup) && header.Height-height >= 2 {
 				return
 			}
 
@@ -179,7 +191,7 @@ func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 		}
 	}
 
-	suite.T().Logf("timed out waiting for inclusion (timeout=%s, txid=%s)", waitFor.String(), txID)
+	suite.T().Logf("timed out waiting for inclusion (timeout=%s, txid=%s)", waitFor.String(), txIDs)
 	suite.T().FailNow()
 }
 

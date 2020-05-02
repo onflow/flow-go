@@ -133,7 +133,7 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	assert.Nil(t, err)
 
 	// wait for the transaction to be included in a collection
-	suite.AwaitTransactionIncluded(convert.IDFromSDK(tx.ID()))
+	suite.AwaitTransactionsIncluded(convert.IDFromSDK(tx.ID()))
 	suite.net.Stop()
 
 	state := suite.ClusterStateFor(col1.Config.NodeID)
@@ -182,7 +182,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	assert.Nil(t, err)
 
 	// wait for the transaction to be included in a collection
-	suite.AwaitTransactionIncluded(convert.IDFromSDK(tx.ID()))
+	suite.AwaitTransactionsIncluded(convert.IDFromSDK(tx.ID()))
 	suite.net.Stop()
 
 	// ensure the transaction IS included in target cluster collection
@@ -269,7 +269,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
 	}()
 
 	// wait for the transaction to be included in a collection
-	suite.AwaitTransactionIncluded(convert.IDFromSDK(tx.ID()))
+	suite.AwaitTransactionsIncluded(convert.IDFromSDK(tx.ID()))
 	suite.net.Stop()
 
 	// ensure the transaction IS included in target cluster collection
