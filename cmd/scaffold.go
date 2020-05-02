@@ -219,14 +219,20 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
 
+	// we initialize the database with options that allow us to keep the maximum
+	// item size in the trie itself (up to 1MB) and where we keep all level zero
+	// tables in-memory as well; this slows down compaction and increases memory
+	// usage, but it improves overall performance and disk i/o
 	opts := badger.
 		LSMOnlyOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
-
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 
+	// in order to void long iterations with big keys when initializing with an
+	// already populated database, we bootstrap the initial maximum key size
+	// upon starting
 	err = db.Update(func(tx *badger.Txn) error {
 		return operation.InitMax(tx)
 	})

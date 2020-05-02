@@ -22,14 +22,6 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 
 	return func(tx *badger.Txn) error {
 
-		// initialize the maximum key size if it hasn't been yet
-		if max == maxKey {
-			err := InitMax(tx)
-			if err != nil {
-				return fmt.Errorf("could not init max tracker: %w", err)
-			}
-		}
-
 		// update the maximum key size if the inserted key is bigger
 		if uint32(len(key)) > max {
 			max = uint32(len(key))
