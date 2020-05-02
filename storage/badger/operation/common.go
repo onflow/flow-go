@@ -5,11 +5,11 @@ package operation
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -50,7 +50,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// serialize the entity data
-		val, err := json.Marshal(entity)
+		val, err := msgpack.Marshal(entity)
 		if err != nil {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
@@ -99,7 +99,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// serialize the entity data
-		val, err := json.Marshal(entity)
+		val, err := msgpack.Marshal(entity)
 		if err != nil {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
@@ -149,7 +149,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 
 		// get the value from the item
 		err = item.Value(func(val []byte) error {
-			err := json.Unmarshal(val, entity)
+			err := msgpack.Unmarshal(val, entity)
 			return err
 		})
 		if err != nil {
@@ -306,7 +306,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 
 				// decode into the entity
 				entity := create()
-				err := json.Unmarshal(val, entity)
+				err := msgpack.Unmarshal(val, entity)
 				if err != nil {
 					return fmt.Errorf("could not decode entity: %w", err)
 				}
@@ -368,7 +368,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 
 				// decode into the entity
 				entity := create()
-				err := json.Unmarshal(val, entity)
+				err := msgpack.Unmarshal(val, entity)
 				if err != nil {
 					return fmt.Errorf("could not decode entity: %w", err)
 				}

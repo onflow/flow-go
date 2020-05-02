@@ -151,7 +151,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	log := e.log.With().
 		Uint64("block_view", view).
 		Hex("block_id", blockID[:]).
-		Hex("signer", logging.ID(e.me.NodeID())).
+		Hex("voter", logging.ID(e.me.NodeID())).
 		Logger()
 
 	log.Info().Msg("processing vote transmission request from hotstuff")
@@ -202,8 +202,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("parent_voters", len(header.ParentVoterIDs)).
-		Hex("parent_sig", header.ParentVoterSig[:]).
+		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 
 	log.Info().Msg("processing proposal broadcast request from hotstuff")
@@ -301,8 +300,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("parent_voters", len(header.ParentVoterIDs)).
-		Hex("parent_sig", header.ParentVoterSig[:]).
+		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 
 	log.Info().Msg("block proposal received")
@@ -425,8 +423,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("parent_voters", len(header.ParentVoterIDs)).
-		Hex("parent_sig", header.ParentVoterSig[:]).
+		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 
 	log.Info().Msg("processing block proposal")
