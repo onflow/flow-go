@@ -469,6 +469,7 @@ func (e *Engine) prunePendingCache() {
 	final, err := e.clusterState.Final().Head()
 	if err != nil {
 		e.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
+		return
 	}
 	e.pending.PruneByHeight(final.Height)
 }
