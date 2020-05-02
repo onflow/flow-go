@@ -22,7 +22,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 
 	return func(tx *badger.Txn) error {
 
-		// initialize the maximum key size if this is the first insert
+		// initialize the maximum key size if it hasn't been yet
 		if max == maxKey {
 			err := InitMax(tx)
 			if err != nil {
@@ -223,6 +223,14 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 // functions to allow timing functions out.
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
+
+		// initialize the maximum key size if it hasn't been yet
+		if max == maxKey {
+			err := InitMax(tx)
+			if err != nil {
+				return fmt.Errorf("could not init max tracker: %w", err)
+			}
+		}
 
 		// initialize the default options and comparison modifier for iteration
 		modifier := 1

@@ -243,11 +243,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	// node roles
 	e.prov.SubmitLocal(msg)
 
-	// after broadcasting a new proposal is a great time to garbage collect
-	// on badger; we won't need to do any heavy work soon, because the other
-	// replicas will be busy validating our proposal
-	e.cleaner.RunGC()
-
 	return nil
 }
 
@@ -403,6 +398,12 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
+
+	// most of the heavy database checks are done at this point, so this is a
+	// good moment to potentially kick-off a garbage collection of the DB
+	// NOTE: this is only effectively run every 1000th calls, which corresponds
+	// to every 1000th successfully processed block
+	e.cleaner.RunGC()
 
 	return nil
 }

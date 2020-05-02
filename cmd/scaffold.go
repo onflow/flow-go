@@ -222,6 +222,7 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 		LSMOnlyOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
+
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 	fnb.DB = db
