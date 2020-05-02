@@ -109,11 +109,6 @@ func (c *Container) DB() (*badger.DB, error) {
 // re-started with Start.
 func (c *Container) Pause() error {
 
-	//TODO
-	// update testingdock to remove autoremove option
-	// ref https://github.com/dapperlabs/testingdock/blob/master/container.go#L132
-	panic("not supported")
-
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
 
@@ -133,11 +128,6 @@ func (c *Container) Pause() error {
 // Start starts this container that has been stopped temporarily with Pause,
 // preserving existing state.
 func (c *Container) Start() error {
-
-	//TODO
-	// update testingdock to remove autoremove option
-	// ref https://github.com/dapperlabs/testingdock/blob/master/container.go#L132
-	panic("not supported")
 
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()

@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/integration/convert"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
@@ -118,6 +119,28 @@ func (suite *CollectorSuite) Clusters() *flow.ClusterList {
 	return clusters
 }
 
+func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sdk.Transaction {
+	acct := suite.acct
+
+	tx := sdk.NewTransaction().
+		SetScript(unittest.NoopTxScript()).
+		SetReferenceBlockID(sdk.BytesToID([]byte{1})).
+		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
+		SetPayer(acct.addr).
+		AddAuthorizer(acct.addr)
+
+	for _, apply := range opts {
+		apply(tx)
+	}
+
+	err := tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
+	require.Nil(suite.T(), err)
+
+	suite.acct.key.SequenceNumber++
+
+	return tx
+}
+
 func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
 	acct := suite.acct
 
@@ -142,6 +165,39 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 	}
 
 	return tx
+}
+
+// AwaitClusterBlocks waits to observe the given number of cluster blocks,
+// and returns them.
+func (suite *CollectorSuite) AwaitClusterBlocks(n uint) []cluster.Block {
+
+	blocks := make([]cluster.Block, 0, n)
+
+	// allow 5 seconds for each block
+	waitFor := time.Duration(n) * time.Second * 5
+	deadline := time.Now().Add(waitFor)
+	for time.Now().Before(deadline) {
+
+		_, msg, err := suite.reader.Next()
+		suite.Require().Nil(err, "could not read next message")
+		suite.T().Logf("ghost recv: %T", msg)
+
+		switch val := msg.(type) {
+		case *messages.ClusterBlockProposal:
+			block := cluster.Block{
+				Header:  val.Header,
+				Payload: val.Payload,
+			}
+			blocks = append(blocks, block)
+			if len(blocks) == int(n) {
+				return blocks
+			}
+		}
+	}
+
+	suite.T().Logf("timed out waiting for blocks (timeout=%s, saw=%d, expected=%d)", waitFor.String(), len(blocks), n)
+	suite.T().FailNow()
+	return nil
 }
 
 func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier) {
@@ -180,7 +236,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 				}
 			}
 
-			// use proposing two blocks as an indication of inclusion
+			// once we have seen all the transactions, and 2 blocks have proposed
+			// above the highest, we know they are incorporated (w/ Coldstuff)
 			// TODO replace this with finalization by listening to guarantees
 			if len(seen) == len(lookup) && header.Height-height >= 2 {
 				return
@@ -191,7 +248,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		}
 	}
 
-	suite.T().Logf("timed out waiting for inclusion (timeout=%s, txid=%s)", waitFor.String(), txIDs)
+	suite.T().Logf("timed out waiting for inclusion (timeout=%s, saw=%d, expected=%d)", waitFor.String(), len(seen), len(lookup))
 	suite.T().FailNow()
 }
 
