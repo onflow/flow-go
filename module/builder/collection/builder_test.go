@@ -51,7 +51,8 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.pool, err = stdmap.NewTransactions(1000)
 	suite.Assert().Nil(err)
 
-	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
+	suite.dbdir = unittest.TempDir(suite.T())
+	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
 	suite.Assert().Nil(err)
@@ -381,7 +382,8 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.pool, err = stdmap.NewTransactions(1000)
 		assert.Nil(b, err)
 
-		suite.db, suite.dbdir = unittest.TempBadgerDB(b)
+		suite.dbdir = unittest.TempDir(b)
+		suite.db = unittest.BadgerDB(b, suite.dbdir)
 		defer func() {
 			err = suite.db.Close()
 			assert.Nil(b, err)

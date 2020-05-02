@@ -33,6 +33,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -225,6 +226,12 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
+
+	err = db.Update(func(tx *badger.Txn) error {
+		return operation.InitMax(tx)
+	})
+	fnb.MustNot(err).Msg("could not initialize max tracker")
+
 	fnb.DB = db
 }
 

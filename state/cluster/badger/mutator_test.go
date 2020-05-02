@@ -42,7 +42,8 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.ChainID
 
-	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
+	suite.dbdir = unittest.TempDir(suite.T())
+	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	suite.state, err = NewState(suite.db, suite.chainID)
 	suite.Assert().Nil(err)

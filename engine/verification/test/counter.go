@@ -111,7 +111,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 	chunks := make([]*flow.Chunk, 0)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
-	unittest.RunWithTempDBDir(t, func(dir string) {
+	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := ledger.NewTrieStorage(dir)
 		require.NoError(t, err)
 		defer led.Done()

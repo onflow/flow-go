@@ -122,18 +122,24 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 }
 
 func BlockHeaderFixture() flow.Header {
+	height := rand.Uint64()
+	view := height + uint64(rand.Intn(1000))
 	return BlockHeaderWithParentFixture(&flow.Header{
+		ChainID:  "testing_chain",
 		ParentID: IdentifierFixture(),
-		Height:   rand.Uint64(),
+		Height:   height,
+		View:     view,
 	})
 }
 
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
+	height := parent.Height + 1
+	view := parent.View + uint64(rand.Intn(10))
 	return flow.Header{
 		ChainID:        parent.ChainID,
 		ParentID:       parent.ID(),
-		View:           rand.Uint64(),
-		Height:         parent.Height + 1,
+		Height:         height,
+		View:           view,
 		ParentVoterIDs: IdentifierListFixture(4),
 		ParentVoterSig: SignatureFixture(),
 		ProposerID:     IdentifierFixture(),

@@ -13,7 +13,7 @@ import (
 
 func TestRestart(t *testing.T) {
 
-	dir := unittest.TempDBDir(t)
+	dir := unittest.TempDir(t)
 
 	trie, err := NewSMT(dir, 9, 10, 100, 5)
 	if err != nil {
@@ -94,7 +94,7 @@ func TestRestart(t *testing.T) {
 
 func TestRestartMultipleKeys(t *testing.T) {
 
-	dir := unittest.TempDBDir(t)
+	dir := unittest.TempDir(t)
 
 	trie, err := NewSMT(dir, 9, 10, 100, 5)
 	if err != nil {
