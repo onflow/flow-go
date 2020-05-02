@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
@@ -9,6 +10,7 @@ import (
 
 type Hub struct {
 	networks map[flow.Identifier]*Network
+	filter   BlockOrDelayFunc
 }
 
 func NewHub() *Hub {
@@ -18,11 +20,17 @@ func NewHub() *Hub {
 	return h
 }
 
-func (h *Hub) AddNetwork(originID flow.Identifier) *Network {
+func (h *Hub) WithFilter(filter BlockOrDelayFunc) *Hub {
+	h.filter = filter
+	return h
+}
+
+func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 	net := &Network{
 		hub:      h,
 		originID: originID,
 		conduits: make(map[uint8]*Conduit),
+		node:     node,
 	}
 	h.networks[originID] = net
 	return net
@@ -30,6 +38,7 @@ func (h *Hub) AddNetwork(originID flow.Identifier) *Network {
 
 type Network struct {
 	hub      *Hub
+	node     *Node
 	originID flow.Identifier
 	conduits map[uint8]*Conduit
 }
@@ -65,7 +74,28 @@ func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error 
 		if !found {
 			return fmt.Errorf("invalid conduit (target: %x, channel: %d)", targetID, c.channelID)
 		}
-		con.queue <- message{originID: c.net.originID, event: event}
+
+		sender, receiver := c.net.node, net.node
+
+		block, delay := c.net.hub.filter(c.channelID, event, sender, receiver)
+		// block the message
+		if block {
+			fmt.Printf("message blocked\n")
+			continue
+		}
+
+		// no delay, push to the receiver's message queue right away
+		if delay == 0 {
+			con.queue <- message{originID: c.net.originID, event: event}
+			continue
+		}
+
+		// use a goroutine to wait and send
+		go func(delay time.Duration, senderID flow.Identifier, receiver *Conduit, event interface{}) {
+			// sleep in order to simulate the network delay
+			time.Sleep(delay)
+			con.queue <- message{originID: senderID, event: event}
+		}(delay, c.net.originID, con, event)
 	}
 	return nil
 }

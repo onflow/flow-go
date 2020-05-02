@@ -56,7 +56,7 @@ type Node struct {
 	batchresp     int
 }
 
-func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint, hub *Hub) ([]*Node, *Stopper) {
+func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*Node, *Stopper, *Hub) {
 
 	// create n consensus node participants
 	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
@@ -73,6 +73,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint, hub *
 	// create and bootstrap consensus node with the genesis
 	genesis := run.GenerateRootBlock(participants, run.GenerateRootSeal([]byte{}))
 
+	hub := NewHub()
 	stopper := NewStopper(stopAtView, stopCountAt)
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
@@ -80,7 +81,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint, hub *
 		nodes = append(nodes, node)
 	}
 
-	return nodes, stopper
+	return nodes, stopper, hub
 }
 
 func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, hub *Hub, stopper *Stopper) *Node {
@@ -135,7 +136,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	require.NoError(t, err)
 
 	// add a network for this node to the hub
-	net := hub.AddNetwork(localID)
+	net := hub.AddNetwork(localID, node)
 
 	headersDB := storage.NewHeaders(db)
 	payloadsDB := storage.NewPayloads(db)

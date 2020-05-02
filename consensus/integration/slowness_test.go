@@ -21,10 +21,9 @@ func runNodes(nodes []*Node) {
 func estSlowdown(t *testing.T) {
 
 	// create a network hub for all nodes
-	hub := NewHub()
+	nodes, stopper, hub := createNodes(t, 10, 250000, 200000)
 
-	nodes, stopper := createNodes(t, 10, 250000, 200000, hub)
-
+	hub.WithFilter(blockNothing)
 	runNodes(nodes)
 
 	<-stopper.stopped
@@ -42,10 +41,9 @@ func estSlowdown(t *testing.T) {
 // happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
 
-	hub := NewHub()
+	nodes, stopper, hub := createNodes(t, 3, 100, 1000)
 
-	nodes, stopper := createNodes(t, 3, 100, 1000, hub)
-
+	hub.WithFilter(blockNothing)
 	runNodes(nodes)
 
 	<-stopper.stopped
@@ -63,10 +61,9 @@ func Test3Nodes(t *testing.T) {
 // with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
 
-	hub := NewHub()
+	nodes, stopper, hub := createNodes(t, 5, 100, 1000)
 
-	nodes, stopper := createNodes(t, 5, 100, 1000, hub)
-
+	hub.WithFilter(blockNodesForFirstNMessages(0, nodes[0]))
 	runNodes(nodes)
 
 	<-stopper.stopped
@@ -92,10 +89,9 @@ func Test5Nodes(t *testing.T) {
 // verify if a node lost some messages, it's still able to catch up.
 func TestMessagesLost(t *testing.T) {
 
-	hub := NewHub()
+	nodes, stopper, hub := createNodes(t, 5, 100, 1000)
 
-	nodes, stopper := createNodes(t, 5, 100, 1000, hub)
-
+	hub.WithFilter(blockNothing)
 	runNodes(nodes)
 
 	<-stopper.stopped
@@ -112,10 +108,9 @@ func TestMessagesLost(t *testing.T) {
 // verify if each receiver lost 10% messages, the network can still reach consensus
 func TestMessagesLostAcrossNetwork(t *testing.T) {
 
-	hub := NewHub()
+	nodes, stopper, hub := createNodes(t, 5, 150, 1500)
 
-	nodes, stopper := createNodes(t, 5, 150, 1500, hub)
-
+	hub.WithFilter(blockNothing)
 	runNodes(nodes)
 
 	<-stopper.stopped
@@ -133,28 +128,6 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 
 func nextDelay(low, high time.Duration) time.Duration {
 	return time.Duration(int64(low) + rand.Int63n(int64(high-low)))
-}
-
-// verify if messages were delayed, can still reach consensus
-func TestMessagesDelayAcrossNetwork(t *testing.T) {
-
-	hub := NewHub()
-
-	endBlock := uint64(150)
-	nodes, stopper := createNodes(t, 5, endBlock, 1000, hub)
-
-	runNodes(nodes)
-
-	<-stopper.stopped
-
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
-	allViews := allFinalizedViews(t, nodes)
-	assertSafety(t, allViews)
-	// should finalize at least 1/3 of blocks
-	assertLiveness(t, allViews, endBlock*1/3)
-	cleanupNodes(nodes)
 }
 
 func allFinalizedViews(t *testing.T, nodes []*Node) [][]uint64 {
