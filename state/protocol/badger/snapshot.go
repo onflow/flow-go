@@ -134,5 +134,5 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 	var pendingIDs []flow.Identifier
 	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &pendingIDs))
-	return pendingIDs, nil
+	return pendingIDs, err
 }

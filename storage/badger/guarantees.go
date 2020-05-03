@@ -11,8 +11,9 @@ import (
 
 // Guarantees implements persistent storage for collection guarantees.
 type Guarantees struct {
-	db    *badger.DB
-	cache *Cache
+	db       *badger.DB
+	payloads *Payloads
+	cache    *Cache
 }
 
 func NewGuarantees(db *badger.DB) *Guarantees {
@@ -28,8 +29,9 @@ func NewGuarantees(db *badger.DB) *Guarantees {
 	}
 
 	g := &Guarantees{
-		db:    db,
-		cache: newCache(withLimit(10000), withStore(store), withRetrieve(retrieve)),
+		db:       db,
+		payloads: NewPayloads(db),
+		cache:    newCache(withLimit(10000), withStore(store), withRetrieve(retrieve)),
 	}
 
 	return g
@@ -45,18 +47,9 @@ func (g *Guarantees) ByID(guarID flow.Identifier) (*flow.CollectionGuarantee, er
 }
 
 func (g *Guarantees) ByBlockID(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
-	var guarIDs []flow.Identifier
-	err := g.db.View(operation.LookupPayloadGuarantees(blockID, &guarIDs))
+	payload, err := g.payloads.ByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not lookup guarantees for block: %w", err)
+		return nil, fmt.Errorf("could not retrieve block payload: %w", err)
 	}
-	guarantees := make([]*flow.CollectionGuarantee, 0, len(guarIDs))
-	for _, guarID := range guarIDs {
-		guarantee, err := g.ByID(guarID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve guarantee (%x): %w", guarID, err)
-		}
-		guarantees = append(guarantees, guarantee)
-	}
-	return guarantees, nil
+	return payload.Guarantees, nil
 }

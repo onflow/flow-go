@@ -46,13 +46,13 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 		}
 
 		// insert block number -> ID mapping
-		err = operation.InsertNumberForCluster(genesis.Header.ChainID, genesis.Header.Height, genesis.ID())(tx)
+		err = operation.IndexClusterBlockHeight(genesis.Header.ChainID, genesis.Header.Height, genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis number: %w", err)
 		}
 
 		// insert boundary
-		err = operation.InsertBoundaryForCluster(genesis.Header.ChainID, genesis.Header.Height)(tx)
+		err = operation.InsertClusterFinalizedHeight(genesis.Header.ChainID, genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
 		}
@@ -78,7 +78,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 		// we go back at most 1k blocks to check payload for now
 		limit := block.Header.Height - 1000
-		if limit > 0 { // overflow check
+		if limit > block.Header.Height { // overflow check
 			limit = 0
 		}
 
@@ -122,14 +122,14 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 		// get finalized state boundary
 		var boundary uint64
-		err = operation.RetrieveBoundaryForCluster(chainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		// get the hash of the latest finalized block
 		var lastFinalizedBlockID flow.Identifier
-		err = operation.RetrieveNumberForCluster(chainID, boundary, &lastFinalizedBlockID)(tx)
+		err = operation.LookupClusterBlockHeight(chainID, boundary, &lastFinalizedBlockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve latest finalized ID: %w", err)
 		}

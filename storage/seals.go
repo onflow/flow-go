@@ -20,5 +20,5 @@ type Seals interface {
 	ByBlockID(blockID flow.Identifier) ([]*flow.Seal, error)
 
 	// BySealedID retrieves the seal for a block that was sealed.
-	BySealedID(sealID flow.Identifier) (*flow.Seal, error)
+	BySealedID(sealedID flow.Identifier) (*flow.Seal, error)
 }

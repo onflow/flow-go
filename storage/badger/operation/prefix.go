@@ -34,8 +34,9 @@ const (
 	codeExecutionResult = 36
 
 	// codes for indexing single identifier by identifier
-	codeHeightToBlock = 40 // index mapping height to block ID
-	codeBlockToSeal   = 41 // index mapping sealed block ID to seal ID
+	codeHeightToBlock       = 40 // index mapping height to block ID
+	codeBlockToSeal         = 41 // index mapping sealed block ID to seal ID
+	codeCollectionReference = 42 // index reference block ID for collection
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren     = 50 // index mapping block ID to children blocks
@@ -53,7 +54,6 @@ const (
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
 	codeIndexHeaderByCollection      = 204
-	codeCollectionRefBlockID         = 206
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

@@ -238,9 +238,16 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	sealedID := candidate.ParentID
 	var lastSeal *flow.Seal
 	for {
-		var err error
+		sealed, err := m.state.headers.ByBlockID(sealedID)
+		if err != nil {
+			return fmt.Errorf("could not look up sealed parent (%x): %w", sealedID, err)
+		}
+		if sealed.Height < limit {
+			return fmt.Errorf("could not find sealed block in range")
+		}
 		lastSeal, err = m.state.seals.BySealedID(sealedID)
 		if errors.Is(err, storage.ErrNotFound) {
+			sealedID = sealed.ParentID
 			continue
 		}
 		if err != nil {

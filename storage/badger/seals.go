@@ -12,8 +12,9 @@ import (
 )
 
 type Seals struct {
-	db    *badger.DB
-	cache *Cache
+	db       *badger.DB
+	payloads *Payloads
+	cache    *Cache
 }
 
 func NewSeals(db *badger.DB) *Seals {
@@ -29,8 +30,9 @@ func NewSeals(db *badger.DB) *Seals {
 	}
 
 	s := &Seals{
-		db:    db,
-		cache: newCache(withLimit(1000), withStore(store), withRetrieve(retrieve)),
+		db:       db,
+		payloads: NewPayloads(db),
+		cache:    newCache(withLimit(1000), withStore(store), withRetrieve(retrieve)),
 	}
 
 	return s
@@ -46,20 +48,11 @@ func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 }
 
 func (s *Seals) ByBlockID(blockID flow.Identifier) ([]*flow.Seal, error) {
-	var sealIDs []flow.Identifier
-	err := s.db.View(operation.LookupPayloadSeals(blockID, &sealIDs))
+	payload, err := s.payloads.ByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not lookup seals for block: %w", err)
+		return nil, fmt.Errorf("could not retrieve block payload: %w", err)
 	}
-	seals := make([]*flow.Seal, 0, len(sealIDs))
-	for _, sealID := range sealIDs {
-		seal, err := s.ByID(sealID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve seal (%x): %w", sealID, err)
-		}
-		seals = append(seals, seal)
-	}
-	return seals, nil
+	return payload.Seals, nil
 }
 
 func (s *Seals) BySealedID(sealedID flow.Identifier) (*flow.Seal, error) {

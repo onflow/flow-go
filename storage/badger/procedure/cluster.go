@@ -57,7 +57,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 
 		// retrieve payload
 		var payload cluster.Payload
-		err = RetrieveClusterPayload(&header, &payload)(tx)
+		err = RetrieveClusterPayload(blockID, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
@@ -77,13 +77,13 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 func RetrieveLatestFinalizedClusterHeader(chainID string, final *flow.Header) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		var boundary uint64
-		err := operation.RetrieveBoundaryForCluster(chainID, &boundary)(tx)
+		err := operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		var finalID flow.Identifier
-		err = operation.RetrieveNumberForCluster(chainID, boundary, &finalID)(tx)
+		err = operation.LookupClusterBlockHeight(chainID, boundary, &finalID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve final ID: %w", err)
 		}
@@ -113,14 +113,14 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 
 		// retrieve the current finalized state boundary
 		var boundary uint64
-		err = operation.RetrieveBoundaryForCluster(chainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		// retrieve the ID of the boundary head
 		var headID flow.Identifier
-		err = operation.RetrieveNumberForCluster(chainID, boundary, &headID)(tx)
+		err = operation.LookupClusterBlockHeight(chainID, boundary, &headID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
@@ -131,13 +131,13 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// insert block view -> ID mapping
-		err = operation.InsertNumberForCluster(chainID, header.Height, header.ID())(tx)
+		err = operation.IndexClusterBlockHeight(chainID, header.Height, header.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert view->ID mapping: %w", err)
 		}
 
 		// update the finalized boundary
-		err = operation.UpdateBoundaryForCluster(chainID, header.Height)(tx)
+		err = operation.UpdateClusterFinalizedHeight(chainID, header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update finalized boundary: %w", err)
 		}
@@ -173,7 +173,7 @@ func InsertClusterPayload(header *flow.Header, payload *cluster.Payload) func(*b
 		}
 
 		// insert the reference block ID
-		err = operation.InsertClusterRefBlockID(header.ID(), payload.ReferenceBlockID)(tx)
+		err = operation.IndexCollectionReference(header.ID(), payload.ReferenceBlockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert reference block ID: %w", err)
 		}
@@ -209,13 +209,12 @@ func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*ba
 }
 
 // RetrieveClusterPayload retrieves a cluster consensus block payload by block ID.
-func RetrieveClusterPayload(header *flow.Header, payload *cluster.Payload) func(*badger.Txn) error {
+func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// lookup the reference block ID
 		var refID flow.Identifier
-		blockID := header.ID()
-		err := operation.RetrieveClusterRefBlockID(blockID, &refID)(tx)
+		err := operation.LookupCollectionReference(blockID, &refID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve reference block ID: %w", err)
 		}

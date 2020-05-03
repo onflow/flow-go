@@ -407,7 +407,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 		// set an invalid height
 		block.Header.Height = genesis.Header.Height + 2
 
-		err := db.Update(procedure.InsertBlock(&block))
+		err := db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
@@ -549,7 +549,7 @@ func TestExtendInvalidChainID(t *testing.T) {
 		// use an invalid chain ID
 		block.Header.ChainID = genesis.Header.ChainID + "-invalid"
 
-		err := db.Update(procedure.InsertBlock(&block))
+		err := db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
 
 		err = mutator.Extend(block.ID())
