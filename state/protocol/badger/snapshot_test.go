@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package badger_test
+package badger
 
 import (
 	"math/rand"
@@ -13,7 +13,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -24,7 +23,7 @@ func init() {
 }
 
 func TestHead(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, state *State) {
 
 		// setup
 		block := unittest.BlockFixture()
@@ -32,6 +31,7 @@ func TestHead(t *testing.T) {
 
 		err := db.Update(procedure.InsertBlock(block.ID(), &block))
 		require.NoError(t, err)
+
 		err = db.Update(operation.IndexBlockHeight(block.Header.Height, block.ID()))
 		require.NoError(t, err)
 
@@ -63,7 +63,7 @@ func TestHead(t *testing.T) {
 }
 
 func TestIdentity(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, state *State) {
 
 		identity := unittest.IdentityFixture()
 
@@ -86,7 +86,7 @@ func TestIdentity(t *testing.T) {
 }
 
 func TestIdentities(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, state *State) {
 
 		identities := unittest.IdentityListFixture(8)
 
@@ -106,7 +106,7 @@ func TestIdentities(t *testing.T) {
 }
 
 func TestClusters(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, state *State) {
 
 		identities := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleCollection))
 
@@ -126,5 +126,5 @@ func TestClusters(t *testing.T) {
 		assert.Len(t, actual.ByIndex(0), 3)
 		assert.Len(t, actual.ByIndex(1), 2)
 		assert.Len(t, actual.ByIndex(2), 2)
-	}, protocol.SetClusters(3))
+	}, SetClusters(3))
 }

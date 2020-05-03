@@ -10,9 +10,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func ExpectPanic(expectedMsg string, t *testing.T) {
@@ -107,22 +104,5 @@ func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 		db := BadgerDB(t, dir)
 		defer db.Close()
 		f(db)
-	})
-}
-
-func ProtocolState(t testing.TB, db *badger.DB, options ...func(*protocol.State)) *protocol.State {
-	identities := storage.NewIdentities(db)
-	headers := storage.NewHeaders(db)
-	payloads := storage.NewPayloads(db)
-	seals := storage.NewSeals(db)
-	proto, err := protocol.NewState(db, identities, headers, payloads, seals, options...)
-	require.NoError(t, err)
-	return proto
-}
-
-func RunWithProtocolState(t testing.TB, f func(*badger.DB, *protocol.State), options ...func(*protocol.State)) {
-	RunWithBadgerDB(t, func(db *badger.DB) {
-		proto := ProtocolState(t, db, options...)
-		f(db, proto)
 	})
 }

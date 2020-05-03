@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package badger_test
+package badger
 
 import (
 	"errors"
@@ -13,10 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	stoerr "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -32,7 +30,7 @@ var participants = flow.IdentityList{
 }
 
 func TestBootstrapValid(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -55,10 +53,6 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.LookupBlockHeight(0, &genesisID))
 		require.NoError(t, err)
 
-		var sealedID flow.Identifier
-		err = db.View(operation.LookupSealedBlock(genesisID, &sealedID))
-		require.NoError(t, err)
-
 		var header flow.Header
 		err = db.View(operation.RetrieveHeader(genesisID, &header))
 		require.NoError(t, err)
@@ -75,15 +69,14 @@ func TestBootstrapValid(t *testing.T) {
 		assert.Equal(t, genesis.Header.Height, executed)
 		assert.Equal(t, genesis.Header.Height, sealed)
 		assert.Equal(t, genesis.ID(), genesisID)
-		assert.Equal(t, genesis.ID(), sealedID)
-		assert.Equal(t, genesis.Header, &header)
 		assert.Equal(t, genesis.ID(), seal.BlockID)
+		assert.Equal(t, genesis.Header, &header)
 		assert.Equal(t, commit, seal.FinalState)
 	})
 }
 
 func TestExtendSealedBoundary(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -101,9 +94,6 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block.Header.ParentID = genesis.ID()
 		block.Header.PayloadHash = block.Payload.Hash()
 
-		err = db.Update(procedure.InsertBlock(block.ID(), &block))
-		require.NoError(t, err)
-
 		seal := &flow.Seal{
 			BlockID:      block.ID(),
 			ResultID:     flow.ZeroID,
@@ -119,13 +109,10 @@ func TestExtendSealedBoundary(t *testing.T) {
 		sealing.Header.ParentID = block.ID()
 		sealing.Header.PayloadHash = sealing.Payload.Hash()
 
-		err = db.Update(procedure.InsertBlock(sealing.ID(), &sealing))
+		err = proto.Mutate().Extend(&block)
 		require.NoError(t, err)
 
-		err = proto.Mutate().Extend(block.ID())
-		require.NoError(t, err)
-
-		err = proto.Mutate().Extend(sealing.ID())
+		err = proto.Mutate().Extend(&sealing)
 		require.NoError(t, err)
 
 		finalCommit, err = proto.Final().Commit()
@@ -149,7 +136,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 }
 
 func TestBootstrapDuplicateID(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		participants := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
@@ -168,7 +155,7 @@ func TestBootstrapDuplicateID(t *testing.T) {
 }
 
 func TestBootstrapZeroStake(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		participants := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 0},
@@ -186,7 +173,7 @@ func TestBootstrapZeroStake(t *testing.T) {
 }
 
 func TestBootstrapNoCollection(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		participants := flow.IdentityList{
 			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
@@ -203,7 +190,7 @@ func TestBootstrapNoCollection(t *testing.T) {
 }
 
 func TestBootstrapNoConsensus(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		participants := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
@@ -220,7 +207,7 @@ func TestBootstrapNoConsensus(t *testing.T) {
 }
 
 func TestBootstrapNoExecution(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		participants := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
@@ -237,7 +224,7 @@ func TestBootstrapNoExecution(t *testing.T) {
 }
 
 func TestBootstrapNoVerification(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		participants := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
@@ -254,7 +241,7 @@ func TestBootstrapNoVerification(t *testing.T) {
 }
 
 func TestBootstrapExistingAddress(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		participants := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
@@ -272,7 +259,7 @@ func TestBootstrapExistingAddress(t *testing.T) {
 }
 
 func TestBootstrapNonZeroHeight(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -284,7 +271,7 @@ func TestBootstrapNonZeroHeight(t *testing.T) {
 }
 
 func TestBootstrapNonZeroParent(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -296,7 +283,7 @@ func TestBootstrapNonZeroParent(t *testing.T) {
 }
 
 func TestBootstrapNonEmptyCollections(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -309,7 +296,7 @@ func TestBootstrapNonEmptyCollections(t *testing.T) {
 }
 
 func TestBootstrapWithSeal(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -322,7 +309,7 @@ func TestBootstrapWithSeal(t *testing.T) {
 }
 
 func TestExtendValid(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -337,10 +324,7 @@ func TestExtendValid(t *testing.T) {
 		block.Header.ParentID = genesis.ID()
 		block.Header.PayloadHash = block.Payload.Hash()
 
-		err = db.Update(procedure.InsertBlock(block.ID(), &block))
-		require.NoError(t, err)
-
-		err = proto.Mutate().Extend(block.ID())
+		err = proto.Mutate().Extend(&block)
 		require.NoError(t, err)
 
 		finalCommit, err := proto.Final().Commit()
@@ -350,7 +334,7 @@ func TestExtendValid(t *testing.T) {
 }
 
 func TestExtendMissingParent(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -365,10 +349,7 @@ func TestExtendMissingParent(t *testing.T) {
 		block.Header.ParentID = unittest.BlockFixture().ID()
 		block.Header.PayloadHash = block.Payload.Hash()
 
-		err = db.Update(procedure.InsertBlock(block.ID(), &block))
-		require.NoError(t, err)
-
-		err = proto.Mutate().Extend(block.ID())
+		err = proto.Mutate().Extend(&block)
 		require.Error(t, err)
 		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
 
@@ -381,7 +362,7 @@ func TestExtendMissingParent(t *testing.T) {
 }
 
 func TestExtendHeightTooSmall(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -396,10 +377,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		block.Header.ParentID = genesis.Header.ID()
 		block.Header.PayloadHash = block.Payload.Hash()
 
-		err = db.Update(procedure.InsertBlock(block.ID(), &block))
-		require.NoError(t, err)
-
-		err = proto.Mutate().Extend(block.ID())
+		err = proto.Mutate().Extend(&block)
 		require.NoError(t, err)
 
 		// create another block with the same height and view, that is coming after
@@ -407,10 +385,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		block.Header.Height = 1
 		block.Header.View = 2
 
-		err = db.Update(procedure.InsertBlock(block.ID(), &block))
-		require.NoError(t, err)
-
-		err = proto.Mutate().Extend(block.ID())
+		err = proto.Mutate().Extend(&block)
 		require.Error(t, err)
 
 		// verify seal not indexed
@@ -440,7 +415,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 }
 
 func TestExtendBlockNotConnected(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -455,37 +430,8 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		block.Header.View = 1
 		block.Header.ParentID = genesis.Header.ID()
 		block.Header.PayloadHash = block.Payload.Hash()
-		blockID := block.ID()
 
-		seal := flow.Seal{
-			BlockID:      block.ID(),
-			InitialState: commit,
-			FinalState:   unittest.StateCommitmentFixture(),
-		}
-
-		sealing := unittest.BlockFixture()
-		sealing.Payload.Guarantees = nil
-		sealing.Payload.Seals = []*flow.Seal{&seal}
-		sealing.Header.Height = 2
-		sealing.Header.View = 2
-		sealing.Header.ParentID = block.ID()
-		sealing.Header.PayloadHash = sealing.Payload.Hash()
-		sealingID := sealing.ID()
-
-		err = db.Update(func(txn *badger.Txn) error {
-			err := procedure.InsertBlock(blockID, &block)(txn)
-			if err != nil {
-				return err
-			}
-			err = procedure.InsertBlock(sealingID, &sealing)(txn)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		assert.NoError(t, err)
-
-		err = proto.Mutate().Extend(block.ID())
+		err = proto.Mutate().Extend(&block)
 		require.NoError(t, err)
 
 		err = proto.Mutate().Finalize(block.ID())
@@ -495,7 +441,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		block.Header.Timestamp = block.Header.Timestamp.Add(time.Second)
 		block.Header.ParentID = genesis.ID()
 
-		err = proto.Mutate().Extend(block.ID())
+		err = proto.Mutate().Extend(&block)
 		require.Error(t, err)
 
 		// verify seal not indexed
@@ -506,7 +452,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 }
 
 func TestExtendSealNotConnected(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -521,10 +467,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 		block.Header.ParentID = genesis.Header.ID()
 		block.Header.PayloadHash = block.Payload.Hash()
 
-		err = db.Update(procedure.InsertBlock(block.ID(), &block))
-		require.NoError(t, err)
-
-		err = proto.Mutate().Extend(block.ID())
+		err = proto.Mutate().Extend(&block)
 		require.NoError(t, err)
 
 		// create seal for the block
@@ -542,10 +485,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 		sealing.Header.ParentID = block.Header.ID()
 		sealing.Header.PayloadHash = sealing.Payload.Hash()
 
-		err = db.Update(procedure.InsertBlock(sealing.ID(), &sealing))
-		require.NoError(t, err)
-
-		err = proto.Mutate().Extend(sealing.ID())
+		err = proto.Mutate().Extend(&sealing)
 		require.EqualError(t, err, "seal execution states do not connect")
 
 		// verify seal not indexed
@@ -556,7 +496,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 }
 
 func TestExtendWrongIdentity(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, proto *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, proto *State) {
 
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
@@ -570,10 +510,7 @@ func TestExtendWrongIdentity(t *testing.T) {
 		block.Header.PayloadHash = block.Payload.Hash()
 		block.Payload.Guarantees = nil
 
-		err = db.Update(procedure.InsertBlock(block.ID(), &block))
-		require.NoError(t, err)
-
-		err = proto.Mutate().Extend(block.ID())
+		err = proto.Mutate().Extend(&block)
 		require.Error(t, err)
 
 		// verify seal not indexed

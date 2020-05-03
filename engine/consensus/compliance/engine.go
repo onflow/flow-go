@@ -422,11 +422,11 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	log.Info().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
-	block := flow.Block{
+	block := &flow.Block{
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
-	err := e.state.Mutate().Extend(&block)
+	err := e.state.Mutate().Extend(block)
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
