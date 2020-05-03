@@ -34,7 +34,7 @@ func NewBuilder(db *badger.DB, transactions mempool.Transactions, chainID string
 
 // BuildOn creates a new block built on the given parent. It produces a payload
 // that is valid with respect to the un-finalized chain it extends.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 	var header *flow.Header
 	err := b.db.Update(func(tx *badger.Txn) error {
 
@@ -159,7 +159,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		// set fields specific to the consensus algorithm
-		setter(header)
+		err = setter(header)
+		if err != nil {
+			return fmt.Errorf("could not set fields to header: %w", err)
+		}
 
 		// insert the header for the newly built block
 		err = operation.InsertHeader(header)(tx)
